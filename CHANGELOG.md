@@ -5,6 +5,204 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-24]
+
+### @real-router/core@0.61.0
+
+### Minor Changes
+
+- [#926](https://github.com/greydragon888/real-router/pull/926) [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal: dead-code removal and equivalent-mutant annotations from the core mutation audit ([#925](https://github.com/greydragon888/real-router/issues/925))
+
+  No public API or behaviour change. Removes internal dead code surfaced by mutation testing — the `reverseArray` helper, the dead `getLifecycleFactories` RouterInternals accessor (no production caller — clone rebuilds from definitions), and the unreachable `config === null`, `!state`, and `buildNameFromSegments` fallback guards (all replaced by gated non-null assertions where TypeScript needs the narrowing) — and annotates proven-equivalent mutants with `// Stryker disable`.
+
+- [#926](https://github.com/greydragon888/real-router/pull/926) [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove unused public API surface surfaced by the mutation audit (YAGNI) ([#925](https://github.com/greydragon888/real-router/issues/925))
+
+  - `RouterError` no longer accepts or exposes `redirect`. The field was never produced or consumed by any router code path — guards cannot redirect (`GuardFn` returns `boolean` only), and the supported redirect mechanism is declarative route-config `forwardTo`. A thrown object with a `redirect` key is now carried as plain metadata instead of being rejected. Migration: if you constructed `new RouterError(code, { redirect })`, pass it as a plain custom field (e.g. `{ redirectTo }`).
+  - `getDependenciesApi(router).setDependency(...)` now returns `void` instead of an always-`true` `boolean` — the return value was never meaningful.
+  - Drops the internal `deepFreezeState` helper (its only caller was the redirect path) and the dead `origin` parameter on the internal `clearCanActivate` / `clearCanDeactivate`.
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/types@0.37.0
+
+### @real-router/types@0.37.0
+
+### Minor Changes
+
+- [#926](https://github.com/greydragon888/real-router/pull/926) [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the unused `redirect` field from the router-error details type ([#925](https://github.com/greydragon888/real-router/issues/925))
+
+  The error-details type no longer declares `redirect: State | undefined` — it was never produced or consumed (guards return `boolean` only; redirect is declarative `forwardTo`). Paired with the `@real-router/core` change that drops the runtime field.
+
+### @real-router/angular@0.11.7
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/sources@0.8.10
+  - @real-router/route-utils@0.2.4
+
+### @real-router/browser-plugin@0.17.13
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/hash-plugin@0.7.12
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/lifecycle-plugin@0.6.2
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/logger-plugin@0.5.14
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+
+### @real-router/memory-plugin@0.4.11
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/navigation-plugin@0.7.12
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/persistent-params-plugin@0.2.14
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/preact@0.15.7
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/sources@0.8.10
+  - @real-router/route-utils@0.2.4
+
+### @real-router/preload-plugin@0.6.2
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/react@0.27.7
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/sources@0.8.10
+  - @real-router/route-utils@0.2.4
+
+### @real-router/route-utils@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/types@0.37.0
+
+### @real-router/rsc-server-plugin@0.2.8
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/rx@0.3.16
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+
+### @real-router/search-schema-plugin@0.4.2
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+
+### @real-router/solid@0.14.7
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/sources@0.8.10
+  - @real-router/route-utils@0.2.4
+
+### @real-router/sources@0.8.10
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/route-utils@0.2.4
+
+### @real-router/ssr-data-plugin@0.4.8
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/types@0.37.0
+
+### @real-router/svelte@0.13.8
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/sources@0.8.10
+  - @real-router/route-utils@0.2.4
+
+### @real-router/validation-plugin@0.8.2
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+
+### @real-router/vue@0.15.7
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/sources@0.8.10
+  - @real-router/route-utils@0.2.4
+
 ## [2026-06-22]
 
 ### @real-router/core@0.60.2

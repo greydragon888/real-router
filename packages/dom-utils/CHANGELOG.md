@@ -1,5 +1,13 @@
 # dom-utils
 
+## 0.2.23
+
+### Patch Changes
+
+- Updated dependencies [[`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4), [`70eae16`](https://github.com/greydragon888/real-router/commit/70eae16d05ccfd0195e50483ddcf52246801c6d4)]:
+  - @real-router/core@0.61.0
+  - @real-router/sources@0.8.10
+
 ## 0.2.22
 
 ### Patch Changes
