@@ -235,6 +235,7 @@ function collectIndexedChunk(
     group.push([index, value]);
   }
 
+  // Stryker disable next-line BooleanLiteral: equivalent — returning false makes the caller ALSO push via insertion order, but indexedGroups was already populated above and parseIntoInternal overwrites the key with the index-sorted result, so the final params are identical (proven by injection).
   return true;
 }
 

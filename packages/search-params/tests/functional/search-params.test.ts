@@ -1017,3 +1017,108 @@ describe("search-params", () => {
     });
   });
 });
+
+// =============================================================================
+// Mutation guards — assert observable behavior that line coverage exercised but
+// did not pin. Each kills a specific survivor via the public parse/build/omit/keep.
+// =============================================================================
+
+describe("mutation guards (observable-behavior kills)", () => {
+  // number.ts auto: non-decimal numeric forms (exponent, hex) stay STRINGS —
+  // the charCode scan rejects 'e'/'x', so they are not coerced to numbers.
+  it("auto number keeps exponent / hex forms as strings", () => {
+    expect(parse("n=1e5")).toStrictEqual({ n: "1e5" });
+    expect(parse("n=0x1f")).toStrictEqual({ n: "0x1f" });
+  });
+
+  // array.ts encodeValue: a valid primitive element must NOT throw (the type
+  // guard fires only for non-primitives) and the error names the actual type.
+  it("builds arrays of valid primitive elements without throwing", () => {
+    // all three accepted types — exercises each operand of the type guard
+    // (string / number / boolean), so a per-operand `!== ` → `true` mutant throws.
+    expect(() =>
+      build({ x: ["a", 1, true] }, { arrayFormat: "brackets" }),
+    ).not.toThrow();
+
+    const built = build({ x: ["a", 1, true] }, { arrayFormat: "comma" });
+
+    expect(parse(built, { arrayFormat: "comma" })).toStrictEqual({
+      x: ["a", 1, true],
+    });
+  });
+
+  it("array element type error names the actual non-primitive type", () => {
+    expect(() => build({ x: [{}] }, { arrayFormat: "brackets" })).toThrow(
+      /received object/,
+    );
+  });
+
+  // searchParams.ts parse/omit/keep loop bound: a trailing "&" must NOT spawn an
+  // extra empty-name chunk (the `start < length` guard, not `<=`).
+  it("a trailing & yields no empty-name param", () => {
+    expect(parse("a=1&")).toStrictEqual({ a: 1 });
+    expect(omit("a=1&", ["x"]).querystring).toBe("a=1");
+    expect(keep("a=1&", ["a"]).querystring).toBe("a=1");
+  });
+
+  // searchParams.ts __proto__ via defineProperty: enumerable AND configurable.
+  it("a literal __proto__ key is an enumerable, redefinable own property", () => {
+    const single = parse("__proto__=x", { numberFormat: "none" });
+
+    expect(Object.keys(single)).toContain("__proto__"); // enumerable: true
+
+    // repeated key forces a second defineProperty → needs configurable: true
+    const repeated = parse("__proto__=a&__proto__=b", { numberFormat: "none" });
+
+    expect(repeated.__proto__).toStrictEqual(["a", "b"]);
+  });
+
+  // searchParams.ts bracketIndex: index format orders by the NUMERIC bracket
+  // index (boundary digit '9' included), not insertion order.
+  it("index array format orders by the numeric bracket index", () => {
+    expect(
+      parse("a[9]=x&a[1]=y", { arrayFormat: "index", numberFormat: "none" }),
+    ).toStrictEqual({ a: ["y", "x"] });
+  });
+
+  // build skips an empty encoded value (no stray leading "&"): nullFormat:hidden
+  // makes the null param encode to "", which must NOT be pushed into parts.
+  it("build drops an empty encoded value without a stray separator", () => {
+    expect(build({ a: null, b: "x" }, { nullFormat: "hidden" })).toBe("b=x");
+  });
+
+  // bracketIndex: an empty "[]" is NOT index 0 — it falls back to insertion,
+  // so a real "[1]" sibling still wins its slot (hasDigit gate).
+  it("index format: empty [] is not treated as index 0", () => {
+    expect(
+      parse("a[]=x&a[1]=y", { arrayFormat: "index", numberFormat: "none" }),
+    ).toStrictEqual({ a: ["y"] });
+  });
+
+  // a key-only chunk must not steal the "=" of a LATER chunk: hasValue is gated
+  // by eqPos < end (the "=" must lie inside this chunk).
+  it("a key-only param before a valued one stays key-only", () => {
+    expect(parse("a&b=1")).toStrictEqual({ a: null, b: 1 });
+  });
+
+  // comma split applies ONLY to valued, non-bracketed chunks: a key-only chunk
+  // (no "=") is left intact even if its name contains a comma.
+  it("comma format does not split a key-only chunk", () => {
+    expect(parse("x,y", { arrayFormat: "comma" })).toStrictEqual({
+      "x,y": null,
+    });
+  });
+
+  // bracketIndex: a NON-digit bracket ("a[k]") is not an index — it falls back
+  // to insertion order and does not join the index-sorted group of "a[0]".
+  it("index format: a non-digit bracket falls back, separate from numeric ones", () => {
+    // "k" (>'9') and "." (<'0') both fail the digit range on BOTH sides, so
+    // neither joins the index-sorted group — only the real "[0]" does.
+    expect(
+      parse("a[k]=v&a[.]=w&a[0]=z", {
+        arrayFormat: "index",
+        numberFormat: "none",
+      }),
+    ).toStrictEqual({ a: ["z"] });
+  });
+});

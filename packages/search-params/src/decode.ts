@@ -23,7 +23,9 @@ import type { DecodeResult } from "./types";
  * because indexOf("x") returns -1 when not found, while includes("") always returns true.
  */
 export const decodeValue = (value: string): string => {
+  // Stryker disable next-line StringLiteral: equivalent — indexOf("%") -> indexOf("") returns 0, forcing the full decode path; decodeURIComponent is a no-op on a %-free string, so the result is identical (proven by injection). See the indexOf rationale above.
   const percentIdx = value.indexOf("%");
+  // Stryker disable next-line StringLiteral: equivalent — indexOf("+") -> indexOf("") returns 0, forcing replaceAll("+"," ") which is a no-op on a +-free string (proven by injection).
   const plusIdx = value.indexOf("+");
 
   // Fast path: no encoding needed (common case - most values are simple)

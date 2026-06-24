@@ -19,6 +19,7 @@
 export const getSearch = (path: string): string => {
   const pos = path.indexOf("?");
 
+  // Stryker disable next-line BlockStatement: equivalent — fast path; when there is no "?" (pos === -1) the fallthrough `path.slice(pos + 1)` is `path.slice(0)` === path, identical result (proven by injection). ConditionalExpression stays live (killable `->true` sibling returns the whole path on a "?"-bearing input).
   if (pos === -1) {
     return path;
   }
