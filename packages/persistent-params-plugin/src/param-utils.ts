@@ -18,7 +18,9 @@ export function extractOwnParams(params: Params): Params {
   const result: Params = {};
 
   for (const key in params) {
-    /* v8 ignore next -- @preserve: core validates params prototype — inherited keys never reach here */
+    // Skip inherited (e.g. prototype-polluted) keys — this is the boundary guard
+    // the docstring describes; the "excludes inherited properties" unit test drives
+    // an Object.create(proto) object through the `false` branch.
     if (Object.hasOwn(params, key)) {
       result[key] = params[key];
     }
