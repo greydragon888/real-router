@@ -203,6 +203,7 @@ class Logger {
   ): void {
     // Early exit optimization: if level is 'none' and callback doesn't ignore level,
     // skip all processing (both console and callback)
+    // Stryker disable next-line BlockStatement: equivalent — emptying this early-exit block falls through, but at level "none" the downstream guards already yield no output: #writeToConsole skips (threshold 3 > every message level) and #invokeCallback returns (this branch runs only when callbackIgnoresLevel is false). Pure perf shortcut; the ConditionalExpression →true sibling on this line stays killed (not silenced here).
     if (this.#config.level === "none" && !this.#config.callbackIgnoresLevel) {
       return;
     }

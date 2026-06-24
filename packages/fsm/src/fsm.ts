@@ -89,6 +89,7 @@ export class FSM<
       }
     }
 
+    // Stryker disable next-line ConditionalExpression: equivalent — count>0 is a perf gate to skip the dispatch loop; `true` always enters it, but with no live listener `#listeners` holds only null slots and the loop body guards `listener !== null`, so dispatch is a no-op either way. The EqualityOperator `<=0` sibling on this line stays killed (not silenced here).
     if (this.#listenerCount > 0) {
       // `info` is structurally a valid TransitionInfo, but the distributive
       // union can't be matched to one variant while `event`/`payload` are
@@ -161,6 +162,7 @@ export class FSM<
     stateActions.set(event, capturedAction);
 
     return () => {
+      // Stryker disable next-line OptionalChaining: equivalent — `#actions` is assigned (`??= new Map()` above) before this unsubscribe closure is created and returned, so it is never null when the closure runs; `?.` can't short-circuit and behaves identically to `.get`.
       const stateMap = this.#actions?.get(from);
 
       if (stateMap?.get(event) === capturedAction) {
@@ -193,6 +195,7 @@ export class FSM<
 
       subscribed = false;
       this.#listeners[index] = null;
+      // Stryker disable next-line UpdateOperator: equivalent — #listenerCount feeds only the `> 0` loop gate; `++` inflates it but the loop then iterates already-nulled slots (no-op), and no public reader exposes the count, so the miscount is unobservable.
       this.#listenerCount--;
     };
   }

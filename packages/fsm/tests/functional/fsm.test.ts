@@ -330,6 +330,28 @@ describe("FSM", () => {
 
       expect(calls).toStrictEqual(["c", "b"]);
     });
+
+    it("should not corrupt the listener count on double-unsubscribe (other listeners keep firing)", () => {
+      const fsm = new FSM(lightConfig);
+      const a = vi.fn();
+      const b = vi.fn();
+
+      const unsubA = fsm.onTransition(a);
+
+      fsm.onTransition(b);
+
+      // The `subscribed` latch must make the 2nd unsub a true no-op. Without it
+      // (`!subscribed → false`, emptied block, or `subscribed = true`), the
+      // cleanup runs twice and decrements #listenerCount past the live count → the
+      // `> 0` gate then wrongly skips the loop and b is never called.
+      unsubA();
+      unsubA();
+
+      fsm.send("TIMER");
+
+      expect(a).not.toHaveBeenCalled();
+      expect(b).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("on()", () => {
@@ -459,6 +481,23 @@ describe("FSM", () => {
       fsm.send("RESOLVE");
 
       expect(action).toHaveBeenCalledExactlyOnceWith(undefined);
+    });
+
+    it("should keep a prior same-from-state action when a second event is registered (per-pair, not per-state)", () => {
+      const fsm = new FSM(lightConfig);
+      const onTimer = vi.fn();
+      const onReset = vi.fn();
+
+      // Both actions share the from-state "red" but differ by event. The second
+      // on() must REUSE the existing per-state Map, not replace it — a
+      // `!stateActions → true` mutant rebuilds the Map and drops onTimer.
+      fsm.on("red", "TIMER", onTimer);
+      fsm.on("red", "RESET", onReset);
+
+      fsm.forceState("red");
+      fsm.send("TIMER"); // red --TIMER--> green, must still fire the first action
+
+      expect(onTimer).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -702,7 +741,11 @@ describe("FSM", () => {
       expect(() => {
         // @ts-expect-error — "GHOST" is not a declared state
         fsm.forceState("GHOST");
-      }).toThrow("is not declared in config.transitions");
+        // The `[FSM.forceState]` prefix names the offending entry-point — part
+        // of the #754 "fail loud" contract, so assert it, not just the suffix.
+      }).toThrow(
+        '[FSM.forceState] state "GHOST" is not declared in config.transitions',
+      );
     });
 
     it("should leave the FSM usable after rejecting an undeclared state", () => {
@@ -733,7 +776,9 @@ describe("FSM", () => {
             context: null,
             transitions: { a: { go: "b" }, b: {} },
           }),
-      ).toThrow("is not declared in config.transitions");
+      ).toThrow(
+        '[FSM.constructor] state "GHOST" is not declared in config.transitions',
+      );
     });
 
     it("should throw when on() targets an undeclared from-state", () => {
@@ -745,7 +790,9 @@ describe("FSM", () => {
 
       expect(() => {
         fsm.on("GHOST", "go", () => {});
-      }).toThrow("is not declared in config.transitions");
+      }).toThrow(
+        '[FSM.on] state "GHOST" is not declared in config.transitions',
+      );
     });
   });
 

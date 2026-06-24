@@ -33,6 +33,17 @@ describe("exported constants (LEVEL_CONFIGS / LOG_LEVELS)", () => {
   });
 });
 
+describe("fresh singleton default (before any configure())", () => {
+  // The #config initializer sets `callbackIgnoresLevel: false`. The main Logger
+  // suite's beforeEach overwrites it on every test, masking the initializer
+  // default — so assert it HERE, where the singleton is still pristine (this
+  // block runs first and calls no configure()). A `true` initializer mutant
+  // flips this default.
+  it("defaults callbackIgnoresLevel to false on the untouched singleton", () => {
+    expect(logger.getConfig().callbackIgnoresLevel).toBe(false);
+  });
+});
+
 describe("Logger", () => {
   beforeEach(() => {
     // Mock console methods
