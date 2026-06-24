@@ -327,6 +327,25 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
       expect(router.getState()?.name).toBe("home");
     });
 
+    it("non-Error async rejection is wrapped via ensureError", async () => {
+      // The settle path wraps `rejected.reason` with ensureError. A non-Error
+      // rejection (a bare string) exercises the `new Error(String(value))` arm —
+      // the navigation still rejects with a real Error carrying the stringified
+      // reason instead of leaking the raw string.
+      router.subscribeLeave(async () => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- intentional non-Error to exercise ensureError's wrapping arm
+        throw "boom";
+      });
+
+      const error = await router.navigate("users").then(
+        () => undefined,
+        (error_: unknown) => error_,
+      );
+
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("boom");
+    });
+
     it("sync throw → other listeners still run", async () => {
       const calls: number[] = [];
 

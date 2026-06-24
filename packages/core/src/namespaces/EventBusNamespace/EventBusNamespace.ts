@@ -30,7 +30,6 @@ import type { EventEmitter } from "event-emitter";
 const TREE_CHANGED = "TREE_CHANGED";
 
 function ensureError(value: unknown): Error {
-  /* v8 ignore next -- @preserve: defensive guard — listeners should always throw Error objects */
   return value instanceof Error ? value : new Error(String(value));
 }
 
