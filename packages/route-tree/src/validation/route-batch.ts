@@ -235,6 +235,7 @@ function findNodeByFullName(
   fullName: string,
 ): RouteTree | undefined {
   // Fast path: single-segment names don't need splitting
+  // Stryker disable next-line ConditionalExpression,StringLiteral,BlockStatement: equivalent — the fast path is a pure optimization; for a dotless name the general path below yields the identical result (`name.split(".")` → `[name]`, a one-iteration `children.get(name)`). (BooleanLiteral stays live: dropping the `!` runs the fast path for a dotted name → `children.get("a.b")` is undefined = killed.)
   if (!fullName.includes(".")) {
     return rootNode.children.get(fullName);
   }

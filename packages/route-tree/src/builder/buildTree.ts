@@ -24,10 +24,6 @@ export interface MutableRouteNode {
   absolute: boolean;
   children: MutableRouteNode[];
   parent: MutableRouteNode | null;
-
-  // These are computed later by computeCaches
-  nonAbsoluteChildren: MutableRouteNode[];
-  fullName: string;
 }
 
 // =============================================================================
@@ -62,9 +58,6 @@ function createNode(
     absolute,
     children: [],
     parent,
-    // These will be computed by computeCaches
-    nonAbsoluteChildren: [],
-    fullName: "",
   };
 
   // Recursively add children

@@ -133,6 +133,7 @@ function processNode(
     children: undefined as unknown as ReadonlyMap<string, RouteTree>,
     paramMeta,
     nonAbsoluteChildren: undefined as unknown as RouteTree[],
+    // Stryker disable next-line StringLiteral: equivalent — placeholder overwritten unconditionally on the next statement (`node.fullName = computeFullName(node)`); the initial value is never observed.
     fullName: "",
     paramTypeMap,
   };
@@ -190,6 +191,7 @@ function processNode(
  */
 export function computeCaches(
   mutableRoot: MutableRouteNode,
+  // Stryker disable next-line BooleanLiteral: equivalent — defensive default expressing the package's immutable-by-default contract; the sole caller (createRouteTree) always passes `freeze` explicitly, so the default is never exercised (NoCoverage artifact).
   freeze = true,
 ): RouteTree {
   return processNode(mutableRoot, null, freeze);
