@@ -4,6 +4,29 @@ import { isParams, isParamsStrict } from "type-guards";
 
 const noop = () => undefined;
 
+/**
+ * Runs `fn` with Object.prototype polluted by a single enumerable probe key, then
+ * removes it. The proto gate in isParams / isParamsStrict only admits objects whose
+ * prototype IS Object.prototype, so polluting the global prototype is the only way
+ * to make `for...in` surface an inherited enumerable key — exactly the case the
+ * own-key (Object.hasOwn) guard exists to skip. Synchronous window + finally
+ * cleanup, so the pollution never leaks to sibling tests.
+ */
+function withProtoPollution(value: unknown, fn: () => void): void {
+  Object.defineProperty(Object.prototype, "__rrPollutionProbe__", {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+
+  try {
+    fn();
+  } finally {
+    delete (Object.prototype as Record<string, unknown>).__rrPollutionProbe__;
+  }
+}
+
 describe("Params Type Guards", () => {
   describe("isParams", () => {
     describe("Basic validation", () => {
@@ -81,15 +104,13 @@ describe("Params Type Guards", () => {
         expect(isParams(customProtoObj)).toBe(false);
       });
 
-      it("skips inherited properties in fast path (isParams line 152)", () => {
-        // Ensure inherited properties don't cause issues
-        // This is a valid plain object with inherited enumerable properties
-        const plainObj = { id: "123" };
-
-        // Add non-own but enumerable property via defineProperty on prototype
-        // Actually, for-in iterates inherited properties, but we skip them
-        // This test verifies the Object.hasOwn check works correctly
-        expect(isParams(plainObj)).toBe(true);
+      it("skips prototype-polluted inherited keys in the fast path", () => {
+        // The probe is a function: were the Object.hasOwn skip removed, the fast
+        // path would read the inherited probe and return false on its
+        // function-reject branch. Staying `true` proves the inherited key is skipped.
+        withProtoPollution(noop, () => {
+          expect(isParams({ id: "123" })).toBe(true);
+        });
       });
     });
 
@@ -658,6 +679,15 @@ describe("Params Type Guards", () => {
   describe("isParamsStrict", () => {
     it("validates strict params", () => {
       expect(isParamsStrict({ id: "123", page: 1 })).toBe(true);
+    });
+
+    it("skips prototype-polluted inherited keys", () => {
+      // The probe is an object: were the Object.hasOwn skip removed,
+      // isValidParamValueStrict would reject the inherited nested object and the
+      // guard would return false. Staying `true` proves the inherited key is skipped.
+      withProtoPollution({ nested: true }, () => {
+        expect(isParamsStrict({ id: "123" })).toBe(true);
+      });
     });
 
     it("validates with arrays of primitives", () => {

@@ -238,8 +238,8 @@ export function isParams(value: unknown): value is Params {
     // Skip inherited properties (only check own properties for fast path)
     // Note: With proto === Object.prototype check above, inherited properties
     // would only come from Object.prototype, which has no enumerable properties.
-    // This check is defensive against Object.prototype pollution.
-    /* v8 ignore next 3 -- @preserve Defensive: Object.prototype pollution */
+    // This check is defensive against Object.prototype pollution — covered by the
+    // prototype-pollution test, which surfaces an inherited enumerable key here.
     if (!Object.hasOwn(value, key)) {
       continue;
     }
@@ -346,8 +346,8 @@ export function isParamsStrict(value: unknown): value is Params {
   // Check all own properties have valid param values
   for (const key in value) {
     // With the proto === Object.prototype check above, inherited enumerable
-    // properties can only come from Object.prototype pollution (defensive).
-    /* v8 ignore next 3 -- @preserve Defensive: Object.prototype pollution */
+    // properties can only come from Object.prototype pollution — covered by the
+    // prototype-pollution test.
     if (!Object.hasOwn(value, key)) {
       continue; // Skip inherited properties
     }
