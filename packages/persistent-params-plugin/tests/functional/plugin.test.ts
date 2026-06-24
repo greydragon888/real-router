@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";
@@ -1072,6 +1072,34 @@ describe("Persistent params plugin", () => {
       const state2 = router.getState();
 
       expect(state2?.path).toBe("/route/2?mode=dev");
+    });
+
+    it("drops a persisted param when navigateToState bypasses forwardState", async () => {
+      const router = createRouter([{ name: "route", path: "/route/:id" }], {
+        queryParamsMode: "default",
+      });
+
+      router.usePlugin(persistentParamsPlugin({ lang: "en" }));
+
+      await router.start("/route/1");
+
+      expect(router.getState()?.context.persistentParams).toStrictEqual({
+        lang: "en",
+      });
+
+      // navigateToState commits the given state directly, bypassing the
+      // forwardState interceptor — so this state carries no `lang` even though
+      // the snapshot still holds lang=en. onTransitionSuccess must drop it from
+      // the snapshot (the defensive-removal branch).
+      const noLangState = getPluginApi(router).makeState(
+        "route",
+        { id: "2" },
+        "/route/2",
+      );
+
+      await getPluginApi(router).navigateToState(noLangState);
+
+      expect(router.getState()?.context.persistentParams).toStrictEqual({});
     });
   });
 

@@ -109,7 +109,9 @@ export class PersistentParamsPlugin {
       const value = toState.params[key];
 
       if (!Object.hasOwn(toState.params, key) || value === undefined) {
-        /* v8 ignore next 4 -- @preserve: defensive removal for states committed via navigateToState bypassing forwardState */
+        // Drop a persisted key absent from a state committed via navigateToState
+        // (which bypasses the forwardState injection) — covered by the "drops a
+        // persisted param when navigateToState bypasses forwardState" test.
         if (
           Object.hasOwn(this.#persistentParams, key) &&
           this.#persistentParams[key] !== undefined
