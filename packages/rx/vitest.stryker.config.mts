@@ -19,16 +19,14 @@ export default defineConfig({
   cacheDir: "./.vitest-stryker",
 
   resolve: {
+    // Resolve workspace deps to their src via the internal-source export
+    // condition (sandbox node_modules symlinks → original src). Do NOT add
+    // manual aliases for deps: they break vitest's module dedup so rx's own
+    // barrel-reached code (state$/events$/operators) loads a non-instrumented
+    // copy and loses Stryker mutant activation (false 0% coverage).
+    conditions: ["@real-router/internal-source", "import", "node"],
     alias: {
       "@real-router/rx": path.resolve(import.meta.dirname, "./src"),
-      "@real-router/core/api": path.resolve(
-        import.meta.dirname,
-        "../core/src/api/index.ts",
-      ),
-      "@real-router/core": path.resolve(
-        import.meta.dirname,
-        "../core/src/index.ts",
-      ),
     },
   },
 

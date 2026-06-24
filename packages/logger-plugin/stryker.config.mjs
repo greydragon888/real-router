@@ -10,9 +10,17 @@
  * @type {import('@stryker-mutator/api/core').PartialStrykerOptions}
  */
 export default {
-  packageManager: "npm",
+  packageManager: "pnpm",
   testRunner: "vitest",
   checkers: ["typescript"],
+
+  // Explicitly load plugins (required for pnpm strict node_modules) — without
+  // this the "typescript" checker and vitest runner are not discovered and
+  // Stryker fails with: Cannot find Checker plugin "typescript".
+  plugins: [
+    "@stryker-mutator/vitest-runner",
+    "@stryker-mutator/typescript-checker",
+  ],
 
   // Mutate all source code except barrel exports, types and constants
   mutate: [

@@ -18,16 +18,14 @@ export default defineConfig({
 
   // Resolve workspace package imports to local src
   resolve: {
+    // Resolve workspace deps to their src via the internal-source export
+    // condition (sandbox node_modules symlinks → original src); do NOT add
+    // manual aliases for deps — they break vitest's module dedup and the
+    // package's own barrel-reached code loses Stryker mutant activation.
+    conditions: ["@real-router/internal-source", "import", "node"],
     alias: {
       // THIS package: relative = sandbox mutated code
       "@real-router/logger-plugin": resolve(__dirname, "./src/index.ts"),
-      // Workspace deps: ABSOLUTE = original unmutated code (work!)
-      logger:
-        "/Users/olegivanov/WebstormProjects/real-router/packages/logger/src/index.ts",
-      "@real-router/core":
-        "/Users/olegivanov/WebstormProjects/real-router/packages/core/src/index.ts",
-      "core-types":
-        "/Users/olegivanov/WebstormProjects/real-router/packages/core-types/src/index.ts",
     },
   },
 
