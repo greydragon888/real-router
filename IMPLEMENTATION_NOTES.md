@@ -4356,3 +4356,31 @@ The `/mutation-score` workflow had the model hand-write a throwaway node script 
 ### Why
 
 The disable-safety verdict is a **pure structural function** of the report — "does mutator X have a Killed sibling on this line?" — computed exactly the way Stryker's `disable next-line` behaves (mutator-level, column-blind). Automating it removes a class of silent error (losing a kill by suppressing a still-partly-killed mutator) that prose guidance could only warn about. **Critically, the tool flags only STRUCTURAL safety, never equivalence:** DISABLE-SAFE means "you *may* suppress without losing a kill," not "this is an equivalent." The skill still mandates empirical proof (inject the mutation → full suite green) before any disable, so the tool cannot induce disable-theater — it narrows *where* to look, the model still proves *whether*. The score formula and the column-aware grouping match the skill verbatim, making the tool a faithful executable of what was previously re-authored ad-hoc each run.
+
+## Local SonarCloud parity: `scripts/sonar-local.sh` (`pnpm sonar:local`)
+
+### Problem
+
+`pnpm sonar:local` was `pnpm type-check && pnpm test:coverage && pnpm sonar`, where `sonar` is a bare `dotenv -- sonar -Dsonar.login=$SONAR_TOKEN`. That predates #732/#735, which **removed** `sonar.sources` / `sonar.tests` / `sonar.javascript.lcov.reportPaths` / `sonar.projectVersion` from `sonar-project.properties` and made CI generate them dynamically (the `Get version`, `Compute Sonar scope`, and `Fix coverage paths` steps in `ci.yml`), passing them as scanner `-D` args that override the properties file. The local script never caught up, so it diverged from CI in two ways that make a local run **misleading, not just different**:
+
+1. **No scope args** → with `sonar.sources` unset the scanner falls back to its default (`.`), analysing a different file set than CI's exact `packages/*/src` + `shared/*` list.
+2. **No lcov path rewrite** → vitest writes package-relative `SF:src/…` (and shared owners write `SF:../../shared/…`); run from the repo root the scanner can't match those, so it reports **~0 % coverage** on new code and `sonar.qualitygate.wait=true` can red falsely.
+
+### Solution
+
+`scripts/sonar-local.sh` (wired as `sonar:local`) reproduces the three CI steps locally before invoking the scanner:
+
+1. `projectVersion` from `packages/core/package.json` (CI "Get version").
+2. `sources` / `tests` / `reports` parsed from `node scripts/check-coverage-scope.mjs --emit` — the **same source of truth** CI uses, so local scope and the codecov/sonar drift guard cannot disagree (CI "Compute Sonar scope").
+3. lcov `SF:` rewrite to repo-root-relative, shared collapsed to `shared/<dir>/…` (CI "Fix coverage paths").
+
+Then `exec pnpm run sonar -- -Dsonar.projectVersion=… -Dsonar.sources=… -Dsonar.tests=… -Dsonar.javascript.lcov.reportPaths=…` (pnpm forwards the trailing `--` args onto the base `sonar` script, which injects `SONAR_TOKEN` via dotenv).
+
+Two portability/robustness points the CI steps don't need but a local script does:
+
+- **BSD-sed safe** — CI uses GNU `sed -i`; the script writes to `"$lcov.tmp"` then `mv`s (no `-i`), and uses `-E` (honoured by both BSD sed on macOS dev and GNU sed on Linux/CI).
+- **Idempotent** — a `grep -qE '^SF:(packages|shared)/'` guard skips an already-rewritten lcov, so a re-run that didn't regenerate coverage can't double the path prefix (CI is immune — fresh artifacts every run; local files persist between invocations).
+
+### Why
+
+Kept as a **manual command, not a pre-push hook**: the scanner UPLOADS to SonarCloud and (with `qualitygate.wait=true`) blocks on the server verdict, so wiring it into `pre-push` would add a network round-trip to every push, publish every local branch's analysis to the server ahead of CI, and re-run full coverage each time — while the bulk of Sonar's value is already enforced locally (SonarJS rules via `eslint-plugin-sonarjs`, duplication via `jscpd`/`lint:duplicates`, coverage via vitest). The unique server-side checks (new-code quality gate, security hotspots) already run in CI on every PR. So `sonar:local` exists to reproduce a CI Sonar result on demand, not to gate pushes.

@@ -33,7 +33,7 @@
     "resolve:dependabot": "bash scripts/resolve-dependabot.sh",
     "type-check": "turbo run type-check",
     "sonar": "dotenv -- sonar -Dsonar.login=$SONAR_TOKEN",
-    "sonar:local": "pnpm type-check && pnpm test:coverage && pnpm sonar",
+    "sonar:local": "bash scripts/sonar-local.sh",
     "packages-structure": "find packages/*/src -type f -name \"*.ts*\" -print | tree --fromfile",
     "prepare": "husky || true",
     "verify:examples": "pnpm -r --filter './examples/*/*' --workspace-concurrency=4 run build",
