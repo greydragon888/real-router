@@ -72,9 +72,13 @@ describe("dispose", () => {
   });
 
   describe("dispose() during active states", () => {
-    it("dispose() during TRANSITION_STARTED cancels and disposes", async () => {
+    it("dispose() right after a guardless navigate disposes from READY (navigate resolves sync)", async () => {
       await router.start("/home");
 
+      // A guardless navigate resolves synchronously, so the FSM is already back
+      // at READY by the time dispose() runs — this is NOT a genuine
+      // TRANSITION_STARTED dispose. For that, see the "mid TRANSITION_STARTED …
+      // async deactivate guard pending" test below.
       router.navigate("users.list").catch(() => {});
 
       router.dispose();
@@ -156,6 +160,90 @@ describe("dispose", () => {
 
       expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
+    });
+
+    it("dispose() mid TRANSITION_STARTED emits exactly one TRANSITION_CANCEL (async deactivate guard pending)", async () => {
+      const cancelSpy = vi.fn();
+      const errorSpy = vi.fn();
+
+      router.usePlugin(() => ({
+        onTransitionCancel: cancelSpy,
+        onTransitionError: errorSpy,
+      }));
+
+      await router.start("/home");
+
+      let releaseGuard: ((v: boolean) => void) | undefined;
+
+      // An async DEACTIVATION guard on the current route parks the navigation in
+      // TRANSITION_STARTED (before LEAVE_APPROVE). A guardless navigate resolves
+      // synchronously and would leave the FSM in READY, so the async guard is
+      // required to genuinely exercise dispose-from-TRANSITION_STARTED.
+      getLifecycleApi(router).addDeactivateGuard(
+        "home",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            releaseGuard = resolve;
+          }),
+      );
+
+      const navPromise = router.navigate("users.list").catch(() => {});
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(router.isLeaveApproved()).toBe(false); // still TRANSITION_STARTED
+
+      router.dispose();
+
+      // dispose() must cancel the in-flight navigation observably:
+      // sendCancelIfPossible (Router.ts:512) runs BEFORE sendDispose (519), so
+      // onTransitionCancel fires exactly once and onTransitionError never fires.
+      // Reordering those two steps regresses this silently — after the reorder
+      // the FSM is already DISPOSED when sendCancelIfPossible runs, canCancel()
+      // returns false, and no TRANSITION_CANCEL is emitted.
+      expect(cancelSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      releaseGuard?.(true);
+      await navPromise;
+    });
+
+    it("dispose() mid LEAVE_APPROVED emits exactly one TRANSITION_CANCEL (async activate guard pending)", async () => {
+      const cancelSpy = vi.fn();
+      const errorSpy = vi.fn();
+
+      router.usePlugin(() => ({
+        onTransitionCancel: cancelSpy,
+        onTransitionError: errorSpy,
+      }));
+
+      await router.start("/home");
+
+      let releaseGuard: ((v: boolean) => void) | undefined;
+
+      // An async ACTIVATION guard parks the navigation in LEAVE_APPROVED
+      // (deactivation done, activation pending).
+      getLifecycleApi(router).addActivateGuard(
+        "users.list",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            releaseGuard = resolve;
+          }),
+      );
+
+      const navPromise = router.navigate("users.list").catch(() => {});
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(router.isLeaveApproved()).toBe(true);
+
+      router.dispose();
+
+      expect(cancelSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      releaseGuard?.(true);
+      await navPromise;
     });
   });
 

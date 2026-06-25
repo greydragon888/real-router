@@ -128,4 +128,54 @@ describe("addInterceptor('buildPath')", () => {
       }).toThrow(RouterError);
     });
   });
+
+  describe("short-circuit (interceptor returns without next)", () => {
+    it("skips the original buildPath when the interceptor never calls next()", () => {
+      // By-design: an interceptor that returns a value without invoking `next`
+      // halts the chain, so the original buildPath is never called. Returning a
+      // sentinel that differs from the real path proves the original was bypassed.
+      api.addInterceptor("buildPath", () => "HALTED");
+
+      expect(router.buildPath("users.view", { id: "original" })).toBe("HALTED");
+    });
+  });
+});
+
+describe("addInterceptor — unregistered method name", () => {
+  let router: Router;
+  let api: PluginApi;
+
+  beforeEach(() => {
+    router = createTestRouter();
+    api = getPluginApi(router);
+  });
+
+  afterEach(() => {
+    if (router.isActive()) {
+      router.stop();
+    }
+  });
+
+  it("registering an interceptor for a non-interceptable method is a silent no-op", () => {
+    // Core does NOT validate the method name (only @real-router/validation-plugin
+    // does). The interceptor is stored in the Map but never wrapped, so it never
+    // fires — and registration neither throws nor returns a broken unsubscribe.
+    let called = false;
+
+    const unsub = api.addInterceptor(
+      "notAnInterceptableMethod" as never,
+      (() => {
+        called = true;
+      }) as never,
+    );
+
+    // Exercising a genuinely interceptable method must not trigger the bogus one.
+    router.buildPath("users.view", { id: "x" });
+
+    expect(called).toBe(false);
+    expect(typeof unsub).toBe("function");
+    expect(() => {
+      unsub();
+    }).not.toThrow();
+  });
 });

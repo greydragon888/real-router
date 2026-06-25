@@ -225,6 +225,74 @@ describe("getPluginApi().claimContextNamespace()", () => {
       expect(state.context.custom).toStrictEqual({ inline: true });
     });
   });
+
+  describe("release() semantics (documentation)", () => {
+    it("write() still mutates state.context after release() (release frees the NAME, not the writer)", async () => {
+      const claim = api.claimContextNamespace("navigation");
+
+      await router.start("/home");
+
+      const state = router.getState()!;
+
+      claim.release();
+
+      // The writer closure captured the namespace; release() only deletes the
+      // registry entry, so write() keeps working — it is sugar over the direct
+      // `state.context[ns] = value` escape hatch.
+      claim.write(state, { direction: "forward" });
+
+      expect(state.context.navigation).toStrictEqual({ direction: "forward" });
+    });
+
+    it("re-claim after release sees the prior write on the SAME state object (bounded stale read)", async () => {
+      const claimA = api.claimContextNamespace("shared");
+
+      await router.start("/home");
+
+      const state = router.getState()!;
+
+      claimA.write(state, { secret: "A" });
+      claimA.release();
+
+      // A different consumer re-claims the freed name. release() never touched
+      // state.context, so the re-claim observes A's prior write on this same
+      // state object. The leak is bounded to one state — the next navigation
+      // rebuilds context fresh.
+      const claimB = api.claimContextNamespace("shared");
+
+      expect(state.context.shared).toStrictEqual({ secret: "A" });
+
+      claimB.release();
+    });
+
+    it("plugin unsubscribe does NOT auto-release the claim (manual release() required)", () => {
+      // Claims are not tracked per-plugin: a teardown that forgets release()
+      // leaves the namespace claimed (mirrors extendRouter's removeExtensions —
+      // cleanup is manual). Only dispose() clears it as a safety net.
+      const unsubscribe = router.usePlugin((r) => {
+        getPluginApi(r).claimContextNamespace("plugin-owned");
+
+        return {
+          teardown() {
+            // Intentionally does NOT release the claim.
+          },
+        };
+      });
+
+      unsubscribe();
+
+      let caught: RouterError | undefined;
+
+      try {
+        api.claimContextNamespace("plugin-owned");
+      } catch (error) {
+        caught = error as RouterError;
+      }
+
+      expect(caught).toBeInstanceOf(RouterError);
+      expect(caught!.code).toBe(errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED);
+    });
+  });
 });
 
 describe("State.context", () => {

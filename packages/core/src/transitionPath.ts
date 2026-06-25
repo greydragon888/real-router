@@ -344,12 +344,18 @@ function computeTransitionPath(
   const fromMetaParams = getStateMetaParams(fromState);
 
   if (!toMetaParams && !fromMetaParams) {
-    // FAST PATH 3 (both states meta-less) is reached ONLY via `shouldUpdateNode`
-    // — the order-sensitive consumers (the navigate pipeline, `canNavigateTo`)
-    // always carry at least one meta-aware state (navigate/getState() attach
-    // meta) and so take the STANDARD PATH below. `shouldUpdateNode` reads
-    // `toDeactivate` by MEMBERSHIP (`.includes`), not order, so the from-chain is
-    // returned as-is (root→leaf) — no reverse needed.
+    // FAST PATH 3 (both states meta-less). Consumers that land here read the
+    // result order-INSENSITIVELY, so the from-chain is returned as-is
+    // (root→leaf, no reverse needed):
+    //   • `shouldUpdateNode` reads `toDeactivate` by MEMBERSHIP (`.includes`).
+    //   • `canNavigateTo` reaches it too — its `toState` is built without meta
+    //     (`Router.canNavigateTo` → `makeState` 2-arg) and the committed
+    //     `getState()` carries no meta either, so both sides are meta-less — and
+    //     it only AND-folds the guard booleans, where order is irrelevant. That
+    //     same meta-absence is why canNavigateTo (de)activates the WHOLE chain
+    //     incl. shared ancestors: over-broad vs navigate, tracked as #970.
+    // The navigate pipeline always carries meta (buildNavigateState) → STANDARD
+    // PATH below, which trims the shared ancestor and reverses correctly.
     return {
       intersection: EMPTY_INTERSECTION,
       toActivate: nameToIDs(toState.name),

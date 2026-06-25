@@ -140,4 +140,56 @@ describe("serializeRouterState properties", () => {
       ).toStrictEqual({ ...payload });
     },
   );
+
+  test.prop([arbState, fc.string({ maxLength: 20 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "no raw `<`, `>`, `&` survive when XSS chars are in context VALUES (escape is content-agnostic)",
+    (state, raw) => {
+      // The base arbState hardcodes context to `{}`, so the existing XSS
+      // property only exercises name/params/path. Inject GUARANTEED `<`, `>`,
+      // `&` into a context value to cover the namespace bag too — the escape in
+      // serializeState is content-agnostic (it scans the whole serialized
+      // string), so it must catch context just as it catches params/path.
+      const xss = `<${raw}>&</script>`;
+      const withContext: State = {
+        ...state,
+        context: { ...state.context, payload: xss },
+      };
+
+      const json = serializeRouterState(withContext);
+
+      expect(json).not.toContain("<");
+      expect(json).not.toContain(">");
+      expect(json).not.toContain("&");
+
+      // ...and the value still round-trips intact.
+      const parsed = JSON.parse(json) as { context: Record<string, unknown> };
+
+      expect(parsed.context.payload).toBe(xss);
+    },
+  );
+
+  test.prop([arbState, fc.string({ maxLength: 20 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "U+2028 / U+2029 in context values stay JSON-valid and round-trip (by-design: not escaped)",
+    (state, raw) => {
+      // Line/paragraph separators are intentionally NOT escaped — calibrated
+      // LOW: they are not an XSS vector, are valid inside a JSON string, and
+      // modern (ES2019+) engines eval them. Pin that the output is parseable
+      // and the value round-trips; deliberately do NOT assert escaping.
+      const separator = `${raw}\u2028middle\u2029${raw}`;
+      const withContext: State = {
+        ...state,
+        context: { ...state.context, separator },
+      };
+
+      const parsed = JSON.parse(serializeRouterState(withContext)) as {
+        context: Record<string, unknown>;
+      };
+
+      expect(parsed.context.separator).toBe(separator);
+    },
+  );
 });

@@ -508,11 +508,17 @@ describe("core/plugins", () => {
         }).toThrow("must return an object");
       });
 
-      it("should silently skip null, undefined, false (falsy plugin values)", () => {
+      it("should silently skip all falsy plugin values (null, undefined, false, 0, '')", () => {
         expect(() => router.usePlugin(null)).not.toThrow();
         expect(() => router.usePlugin(undefined)).not.toThrow();
         expect(() => router.usePlugin(false)).not.toThrow();
-        expect(() => router.usePlugin(null, undefined, false)).not.toThrow();
+        // 0 and "" are outside the typed union but runtime-reachable via
+        // `cond && plugin` (cond === 0 or ""); `.filter(Boolean)` skips them too.
+        expect(() => router.usePlugin(0 as never)).not.toThrow();
+        expect(() => router.usePlugin("" as never)).not.toThrow();
+        expect(() =>
+          router.usePlugin(null, undefined, false, 0 as never, "" as never),
+        ).not.toThrow();
       });
 
       it("should return noop unsubscribe when all plugins are falsy", () => {
@@ -586,6 +592,33 @@ describe("core/plugins", () => {
         await router.start("/home");
 
         expect(tracker.getCalls().onStart).toBe(1);
+      });
+    });
+
+    describe("teardown order (FIFO)", () => {
+      // PluginsNamespace.disposeAll() iterates `#unsubscribes` (a Set) in
+      // insertion order, so plugin teardowns run in REGISTRATION order (FIFO),
+      // not reverse. Interceptors are LIFO (see addInterceptor tests); teardown
+      // is the opposite. Discriminating: a reorder to LIFO flips the array.
+      it("runs plugin teardowns in registration order on dispose", () => {
+        const order: string[] = [];
+        const mk =
+          (id: string): PluginFactory =>
+          () => ({
+            teardown: () => {
+              order.push(id);
+            },
+          });
+
+        const isolated = createTestRouter();
+
+        isolated.usePlugin(mk("A"));
+        isolated.usePlugin(mk("B"));
+        isolated.usePlugin(mk("C"));
+
+        isolated.dispose();
+
+        expect(order).toStrictEqual(["A", "B", "C"]);
       });
     });
 

@@ -2,7 +2,11 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
-import { createLifecycleTestRouter, type Router } from "./setup";
+import {
+  createLifecycleTestRouter,
+  createTestRouter,
+  type Router,
+} from "./setup";
 
 import type { RoutesApi } from "@real-router/core/api";
 
@@ -58,8 +62,17 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   it("should check nested route guards in correct order", async () => {
     routesApi.add({ name: "users", path: "/users" }, { parent: "admin" });
 
-    const adminGuard = vi.fn(() => true);
-    const usersGuard = vi.fn(() => true);
+    const callOrder: string[] = [];
+    const adminGuard = vi.fn(() => {
+      callOrder.push("admin");
+
+      return true;
+    });
+    const usersGuard = vi.fn(() => {
+      callOrder.push("admin.users");
+
+      return true;
+    });
 
     lifecycle.addActivateGuard("admin", () => adminGuard);
     lifecycle.addActivateGuard("admin.users", () => usersGuard);
@@ -69,8 +82,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     const result = router.canNavigateTo("admin.users");
 
     expect(result).toBe(true);
-    expect(adminGuard).toHaveBeenCalled();
-    expect(usersGuard).toHaveBeenCalled();
+    // Activation runs outermost-first: parent `admin` before child `admin.users`.
+    expect(callOrder).toStrictEqual(["admin", "admin.users"]);
   });
 
   it("should return false if any nested parent guard blocks", async () => {
@@ -263,7 +276,9 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("admin", {})).toBe(true);
   });
 
-  it("should check guards when no current state", () => {
+  it("returns false when a blocking activate guard is set, with a route committed", () => {
+    // `router` is started at /home (beforeEach), so a current state IS present.
+    // (The genuine before-start case is covered by the two tests below.)
     lifecycle.addActivateGuard("admin", () => () => false);
 
     expect(router.canNavigateTo("admin")).toBe(false);
@@ -292,5 +307,82 @@ describe("core/route-lifecycle/canNavigateTo", () => {
 
   it("returns true once the required path param is supplied (#725)", () => {
     expect(router.canNavigateTo("items", { id: "1" })).toBe(true);
+  });
+
+  // ── Side-effect / lifecycle invariants ────────────────────────────────────
+  // `canNavigateTo` is a read-only predicate: it must not mutate state, move the
+  // FSM, or fire subscriptions. Verified empirically in
+  // benchmarks/core/audit-probes/can-navigate-to-2026-06-25/probe-01.
+
+  it("does not mutate router state (getState() is reference-identical)", async () => {
+    await router.navigate("users.list");
+    const before = router.getState();
+
+    router.canNavigateTo("admin");
+    router.canNavigateTo("orders.pending");
+    router.canNavigateTo("home");
+
+    expect(router.getState()).toBe(before);
+  });
+
+  it("does not transition the FSM (isLeaveApproved stays false)", async () => {
+    await router.navigate("users.list");
+
+    expect(router.isLeaveApproved()).toBe(false);
+
+    router.canNavigateTo("admin");
+
+    expect(router.isLeaveApproved()).toBe(false);
+  });
+
+  it("does not fire subscribe or subscribeLeave listeners (no commit)", async () => {
+    await router.navigate("users.list");
+
+    const onSuccess = vi.fn();
+    const onLeave = vi.fn();
+
+    router.subscribe(onSuccess);
+    router.subscribeLeave(onLeave);
+
+    router.canNavigateTo("admin");
+    router.canNavigateTo("home");
+
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it("invokes guards with signal === undefined (no AbortController, unlike navigate)", () => {
+    let received: unknown = "unset";
+
+    lifecycle.addActivateGuard(
+      "admin",
+      () => (_toState, _fromState, signal) => {
+        received = signal;
+
+        return true;
+      },
+    );
+
+    router.canNavigateTo("admin");
+
+    expect(received).toBeUndefined();
+  });
+
+  it("before start(): enforces the target's activation guard", () => {
+    const fresh = createTestRouter();
+
+    getLifecycleApi(fresh).addActivateGuard("admin", () => () => false);
+
+    // Not started — fromState is undefined, so the full activation path runs
+    // the target's activate guard (only deactivation is skipped).
+    expect(fresh.canNavigateTo("admin")).toBe(false);
+  });
+
+  it("before start(): does not consult a deactivation guard (nothing to leave)", () => {
+    const fresh = createTestRouter();
+
+    getLifecycleApi(fresh).addDeactivateGuard("admin", () => () => false);
+
+    expect(fresh.canNavigateTo("admin")).toBe(true);
   });
 });

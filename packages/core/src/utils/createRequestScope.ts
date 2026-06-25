@@ -70,7 +70,10 @@ function isRequestLike(request: RequestScopeSource): request is RequestLike {
  * 4. `try { ... } finally { router.dispose() }`
  *
  * The signal is injected into the router clone under `abortSignal` so existing
- * loaders that read `getDep("abortSignal")` keep working without changes.
+ * loaders that read `getDep("abortSignal")` keep working without changes. If
+ * `deps` already carries an `abortSignal`, the request-tied signal **wins** (it
+ * is spread last) — a caller-supplied `abortSignal` is intentionally overridden,
+ * since the scope's purpose is to own the request-lifecycle signal.
  *
  * ## `await using` compatibility
  *

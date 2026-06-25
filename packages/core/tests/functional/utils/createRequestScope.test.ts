@@ -266,4 +266,134 @@ describe("createRequestScope", () => {
       baseRouter.stop();
     });
   });
+
+  // Discriminator + signal precedence (deep-audit create-request-scope 2026-06-25)
+  describe("source discrimination & signal precedence", () => {
+    it("classifies an object with BOTH `on` and a valid signal as Web (RequestLike precedence)", () => {
+      const baseRouter = createTestRouter();
+      const fake = createFakeIncomingMessage();
+      const controller = new AbortController();
+      // Hybrid: has Node `on` AND a valid Web `signal`. `isRequestLike` is checked
+      // first (createRequestScope.ts), so the Web path wins — NO close listener.
+      const request = Object.assign(fake, { signal: controller.signal });
+
+      const scope = createRequestScope(request, baseRouter);
+
+      expect(fake.listenerCount()).toBe(0);
+      expect(scope.signal).toBe(controller.signal);
+
+      void scope.dispose();
+      baseRouter.stop();
+    });
+
+    it("injected request signal overrides a caller-supplied deps.abortSignal (spread order)", () => {
+      interface Deps extends Record<string, unknown> {
+        abortSignal?: AbortSignal;
+      }
+
+      const baseRouter = createTestRouter() as unknown as Parameters<
+        typeof createRequestScope<Deps>
+      >[1];
+      const request = createFakeIncomingMessage();
+      const userSignal = new AbortController().signal;
+
+      // `{ ...deps, abortSignal: signal }` spreads the injected signal LAST, so a
+      // caller's abortSignal is intentionally overridden by the request-tied one.
+      const scope = createRequestScope<Deps>(request, baseRouter, {
+        abortSignal: userSignal,
+      });
+
+      const deps = getDependenciesApi(scope.router).getAll() as Deps;
+
+      expect(deps.abortSignal).toBe(scope.signal);
+      expect(deps.abortSignal).not.toBe(userSignal);
+
+      void scope.dispose();
+      baseRouter.stop();
+    });
+
+    it("tolerates a pre-aborted Web request signal — builds the scope, signal stays aborted, dispose works", async () => {
+      const baseRouter = createTestRouter();
+      const controller = new AbortController();
+
+      controller.abort();
+      const request = { signal: controller.signal };
+
+      const scope = createRequestScope(request, baseRouter);
+
+      expect(scope.signal.aborted).toBe(true);
+      await expect(scope.dispose()).resolves.toBeUndefined();
+      expect(isRouterDisposed(scope.router)).toBe(true);
+
+      baseRouter.stop();
+    });
+
+    it("throws a raw TypeError (not a RouterError) for a malformed source with neither `on` nor a valid signal", () => {
+      const baseRouter = createTestRouter();
+
+      // `{}` fails `isRequestLike` (no `signal`), so it takes the Node path and
+      // immediately hits `request.on(...)` → raw `TypeError: request.on is not a
+      // function`. This is a TYPES-ONLY guard (`RequestScopeSource` rejects it at
+      // compile time); core adds NO invariant-guard because the crash is immediate
+      // and local — not silent corruption, not a deferred crash with an unrelated
+      // stack (deep-audit Q4). Pin the error SHAPE: a raw engine `TypeError`, NOT
+      // the router's structured `RouterError`.
+      let threw: unknown;
+
+      try {
+        createRequestScope({} as never, baseRouter);
+      } catch (error) {
+        threw = error;
+      }
+
+      expect(threw).toBeInstanceOf(TypeError);
+      expect(threw).not.toBeInstanceOf(RouterError);
+
+      baseRouter.stop();
+    });
+  });
+
+  // Dispose lifecycle edge cases (deep-audit create-request-scope 2026-06-25)
+  describe("dispose lifecycle", () => {
+    it("dispose() detaches the Node listener but does NOT abort the dedicated signal", async () => {
+      const baseRouter = createTestRouter();
+      const request = createFakeIncomingMessage();
+      const scope = createRequestScope(request, baseRouter);
+
+      expect(scope.signal.aborted).toBe(false);
+
+      await scope.dispose();
+
+      // listener gone + router disposed, but the own-controller signal is NOT
+      // aborted by dispose — it aborts only on the client "close" event.
+      expect(request.listenerCount()).toBe(0);
+      expect(scope.signal.aborted).toBe(false);
+
+      baseRouter.stop();
+    });
+
+    it("a reentrant scope.dispose() from a plugin teardown is a no-op (no infinite loop)", async () => {
+      const baseRouter = createTestRouter();
+      const request = createFakeIncomingMessage();
+      const scope = createRequestScope(request, baseRouter);
+
+      let teardownCalls = 0;
+
+      // `disposed` is set BEFORE router.dispose() runs plugin teardown, so the
+      // re-entrant dispose() call short-circuits — teardown fires exactly once.
+      scope.router.usePlugin(() => ({
+        teardown() {
+          teardownCalls += 1;
+          void scope.dispose();
+        },
+      }));
+
+      await scope.dispose();
+
+      expect(teardownCalls).toBe(1);
+      expect(isRouterDisposed(scope.router)).toBe(true);
+
+      baseRouter.stop();
+    });
+  });
 });

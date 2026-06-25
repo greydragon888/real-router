@@ -31,7 +31,8 @@ utils/ (SSR/SSG/hydration helpers — separate subpath export)
     ├── serializeState(data)              — XSS-safe JSON for embedding in HTML <script> tags
     ├── serializeRouterState(state, opts) — XSS-safe State serializer (strips `transition`, keeps `context`); `excludeContext` filters non-JSON namespaces (#572); `serialize` plugs custom serializer (devalue/superjson) for non-JSON types like Date/Map/Set/RegExp/BigInt (#606)
     ├── hydrateRouter(router, source, opts?) — drives `router.start(parsed.path)` with a one-shot hydration scratchpad on `RouterInternals` so SSR loader plugins skip the post-hydration re-run (#596); `deserialize` matches the custom `serialize` choice (#606)
-    └── getStaticPaths(router, entries?)  — enumerate leaf routes and build URLs for SSG pre-rendering
+    ├── getStaticPaths(router, entries?)  — enumerate leaf routes and build URLs for SSG pre-rendering
+    └── createRequestScope(req, base, deps?) — per-request SSR isolation: clones `base`, binds an `AbortSignal` to the request lifetime (Node `"close"` event / Web `request.signal`), injects it into the clone's deps under `abortSignal`, exposes `dispose()` (+ `Symbol.asyncDispose` for `await using`) (#603)
 ```
 
 **Hydration scratchpad (#596)**: `RouterInternals.hydrationState` is `null` outside `hydrateRouter`. Inside, the parsed `SerializedRouterState` is briefly assigned, then cleared in `finally`. SSR loader plugins (`ssr-data-plugin`, `rsc-server-plugin`) read `getInternals(router).hydrationState` from inside their `start` interceptor — when the namespace value is already present in the parsed context for the same route name, they reuse it instead of invoking the loader. Single-shot semantics: only the first `start()` consumes the scratchpad. Plugin-internal mechanism — no public API surface beyond `hydrateRouter` itself.
@@ -187,7 +188,7 @@ router.dispose(); // Idempotent — safe to call multiple times
 ```
 
 **Lifecycle**: healthy flows route through IDLE (`STOP → IDLE → DISPOSE`). The FSM also accepts `DISPOSE` directly from `STARTING`, `READY`, `TRANSITION_STARTED`, and `LEAVE_APPROVED` as a safety net (#660) — required when the orchestrated path cannot reach `IDLE`, e.g. `dispose()` called mid-`STARTING` after a start-pipeline throw left the FSM stuck.
-**Cleanup order**: abort navigation → cancel transition → stop (if ready/transitioning) → FSM DISPOSE → clearAll (events) → plugins → router extensions (safety net) → routes → lifecycle → state → deps → markDisposed
+**Cleanup order**: abort navigation → cancel transition → stop (if ready/transitioning) → FSM DISPOSE → clearAll (events) → plugins → router extensions (safety net) → context claims (safety net) → routes → lifecycle → state → deps → markDisposed
 **After dispose**: All mutating methods throw `RouterError(ROUTER_DISPOSED)`
 **Idempotency**: Second call is a no-op (FSM state check)
 
@@ -493,7 +494,7 @@ const unsubscribe = routes.subscribeChanges((event) => {
 | **Clone isolation** | A cloned router has an independent emitter; mutations never cross the clone boundary. |
 | **Scope** | Internal-only channel: `TREE_CHANGED` is not in the public `EventName` union / `events.*` registry / `Plugin` interface. There is no `router.subscribeTree()` and no `addEventListener` path — by design (tree mutations are infrastructural, not app-level). |
 
-`dispose()` releases all `subscribeChanges` listeners (cleanup step 4) before the route teardown, so no event fires during disposal.
+`dispose()` releases all `subscribeChanges` listeners (during the `clearAll` events step) before the route teardown, so no event fires during disposal.
 
 ### Recommended pattern: declarative reactive cache invalidation
 
@@ -572,7 +573,7 @@ const nav = getNavigator(router);
 | `navigate`          | Navigate to a route                                          |
 | `getState`          | Get current router state                                     |
 | `isActiveRoute`     | Check if a route is active                                   |
-| `canNavigateTo`     | Check if guards allow navigation                             |
+| `canNavigateTo`     | Check whether a route's guards would allow navigation — **synchronous, returns `boolean`** (never a Promise). An async guard on the path can't be evaluated synchronously, so it resolves to `false` (core stays silent; `@real-router/validation-plugin` logs a warning). Guards are invoked with `signal === undefined` (no AbortController — unlike `navigate`). Returns `true` for the current route (same-state is a no-op, not a guard rejection); before `start()` it runs the target's **activation** guards only (nothing to deactivate, so a blocking *deactivate* guard is not consulted). Throws `ROUTER_DISPOSED` after `dispose()` |
 | `subscribe`         | Subscribe to successful transitions. Fire-and-forget: returned Promises ignored, `navigate()` does not wait for async listener bodies. Throws `TypeError` when `listener` is not a function |
 | `subscribeLeave`    | Subscribe to confirmed route departures (LEAVE_APPROVED phase). Listener receives `{ route: fromState, nextRoute: toState, signal: AbortSignal }`. Async listeners are awaited — the activation phase blocks until all Promises settle. Throws `TypeError` when `listener` is not a function |
 | `isLeaveApproved`   | Returns `true` when FSM is in LEAVE_APPROVED state (deactivation done, activation pending) |

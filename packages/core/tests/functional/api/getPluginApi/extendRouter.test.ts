@@ -166,4 +166,42 @@ describe("getPluginApi().extendRouter()", () => {
     expect(r.myObj).toBe(obj);
     expect(r.myBool).toBe(true);
   });
+
+  it("multi-key extend with one conflicting key assigns NONE (atomic)", () => {
+    // All keys are checked for conflict before any is assigned, so a single
+    // conflict (`navigate` is built-in) aborts the whole call — the valid
+    // `freshKey` is NOT added (all-or-nothing).
+    let caught: RouterError | undefined;
+
+    try {
+      api.extendRouter({ freshKey: 1, navigate: () => {} });
+    } catch (error) {
+      caught = error as RouterError;
+    }
+
+    expect(caught).toBeInstanceOf(RouterError);
+    expect(caught!.code).toBe(errorCodes.PLUGIN_CONFLICT);
+    expect("freshKey" in router).toBe(false);
+  });
+
+  it("blocks prototype-polluting keys (__proto__/constructor/toString) via conflict detection", () => {
+    // Computed keys create OWN enumerable props named __proto__/constructor/
+    // toString (unlike the `__proto__:` literal, which sets the prototype). All
+    // three are `in router` via the Object.prototype chain → PLUGIN_CONFLICT, so
+    // none is ever assigned and the global prototype stays clean.
+    for (const key of ["__proto__", "constructor", "toString"]) {
+      let caught: RouterError | undefined;
+
+      try {
+        api.extendRouter({ [key]: { polluted: "yes" } });
+      } catch (error) {
+        caught = error as RouterError;
+      }
+
+      expect(caught).toBeInstanceOf(RouterError);
+      expect(caught!.code).toBe(errorCodes.PLUGIN_CONFLICT);
+    }
+
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
 });
