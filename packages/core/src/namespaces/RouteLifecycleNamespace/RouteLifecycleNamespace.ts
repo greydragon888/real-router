@@ -20,10 +20,23 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 }
 
 /**
- * Independent namespace for managing route lifecycle handlers.
+ * Source of truth for `canActivate` / `canDeactivate` guards.
  *
- * Static methods handle input validation (called by facade).
- * Instance methods handle state-dependent validation, storage and business logic.
+ * Storage is split by origin into four factory Maps (definition vs external,
+ * each ×activate/deactivate); a single compiled-function Map per kind backs
+ * navigation ("last add wins" — the compiled guard reflects the most recent
+ * registration regardless of origin). `getFunctions()` returns a cached
+ * `[deactivate, activate]` tuple for the hot path (stable reference, no
+ * per-navigate allocation).
+ *
+ * All input validation is handled upstream by `getLifecycleApi` and
+ * `getRoutesApi` — this class has no static methods.
+ *
+ * **Ordering convention.** Every paired surface lists **deactivate before
+ * activate**: `getFunctions()` / `getFactories()` return `[deactivate,
+ * activate]`, `getFactoriesByOrigin()` returns that tuple per origin, and
+ * `canNavigateTo(toDeactivate, toActivate, …)` takes deactivate first. Keep
+ * any new paired surface consistent with this order.
  */
 export class RouteLifecycleNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,

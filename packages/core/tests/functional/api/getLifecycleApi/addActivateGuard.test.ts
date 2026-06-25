@@ -27,12 +27,10 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     // Set up canActivate guard to block admin route
     lifecycle.addActivateGuard("admin", false);
 
-    try {
-      await router.navigate("admin");
-    } catch (error: any) {
-      expect(error?.code).toStrictEqual(errorCodes.CANNOT_ACTIVATE);
-      expect(error?.segment).toStrictEqual("admin");
-    }
+    await expect(router.navigate("admin")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+      segment: "admin",
+    });
 
     expect(router.isActiveRoute("home")).toBe(true);
   });
@@ -40,11 +38,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
   it("should allow navigation if canActivate returns true", async () => {
     lifecycle.addActivateGuard("admin", true);
 
-    try {
-      await router.navigate("admin");
-    } catch (error: any) {
-      expect(error).toBeUndefined();
-    }
+    await router.navigate("admin");
 
     expect(router.getState()?.name).toBe("admin");
   });
@@ -53,11 +47,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     lifecycle.addActivateGuard("admin", false);
     lifecycle.addActivateGuard("admin", true);
 
-    try {
-      await router.navigate("admin");
-    } catch (error: any) {
-      expect(error).toBeUndefined();
-    }
+    await router.navigate("admin");
 
     expect(router.getState()?.name).toBe("admin");
   });
@@ -65,15 +55,9 @@ describe("core/route-lifecycle/addActivateGuard", () => {
   it("should return error when canActivate returns false", async () => {
     lifecycle.addActivateGuard("sign-in", () => () => false);
 
-    let err: any;
-
-    try {
-      await router.navigate("sign-in");
-    } catch (error: any) {
-      err = error;
-    }
-
-    expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+    await expect(router.navigate("sign-in")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
     expect(router.getState()?.name).not.toBe("sign-in");
   });
 
@@ -351,7 +335,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       }
     });
 
-    it("should cleanup registering set even if factory throws", async () => {
+    it("should roll back the slot and allow re-registration when the factory throws", async () => {
       // First attempt - factory throws
       expect(() => {
         lifecycle.addActivateGuard("throwingRoute", () => {
@@ -359,13 +343,13 @@ describe("core/route-lifecycle/addActivateGuard", () => {
         });
       }).toThrow("Factory error");
 
-      // Second attempt - should not claim route is being registered
+      // Second attempt - the failed slot was rolled back, so re-registration works
       expect(() => {
         lifecycle.addActivateGuard("throwingRoute", true);
       }).not.toThrow();
 
       // Guard was successfully registered on second attempt
-      // (registration state was cleaned up after first failure)
+      // (the slot touched by the throwing factory was rolled back on failure)
     });
   });
 

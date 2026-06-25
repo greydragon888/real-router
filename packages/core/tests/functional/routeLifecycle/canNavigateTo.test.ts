@@ -144,6 +144,24 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("admin")).toBe(false);
   });
 
+  it("should return true when overwritten deactivate guard unblocks (last add wins)", async () => {
+    lifecycle.addDeactivateGuard("users", () => () => false);
+    lifecycle.addDeactivateGuard("users", () => () => true); // overwrites previous
+
+    await router.navigate("users");
+
+    expect(router.canNavigateTo("home")).toBe(true);
+  });
+
+  it("should return true when overwritten activate guard unblocks (last add wins)", async () => {
+    lifecycle.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => true); // overwrites previous
+
+    await router.navigate("index");
+
+    expect(router.canNavigateTo("admin")).toBe(true);
+  });
+
   it("should handle complex nested transitions with mixed guards", async () => {
     routesApi.add({ name: "settings", path: "/settings" }, { parent: "admin" });
 
