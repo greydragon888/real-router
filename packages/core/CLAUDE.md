@@ -176,6 +176,8 @@ removeExtensions();
 
 States are **deeply frozen** via `Object.freeze()`. Never mutate, always create new.
 
+**Exception — `state.context`:** the `context` object is **intentionally not frozen** (`helpers.ts:24`). Plugins write per-route data into it via `claimContextNamespace()` + `claim.write(state, value)` (or the direct `state.context.<ns> = …` escape hatch) after state creation. The `context` *slot* on the state is frozen (cannot be reassigned — `state.context = {}` throws), but the object it points to stays mutable. So "deeply frozen" holds for `name` / `params` / `path` / `transition` (+ nested), with `context` the documented carve-out that the whole `claimContextNamespace` mechanism depends on.
+
 ### Router Lifecycle: dispose()
 
 `dispose()` permanently terminates the router. Unlike `stop()`, it cannot be restarted.
