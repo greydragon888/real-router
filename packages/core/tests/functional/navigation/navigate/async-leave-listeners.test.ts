@@ -530,4 +530,67 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
       expect(router.getState()?.name).toBe("users");
     });
   });
+
+  describe("payload + return-value contract", () => {
+    it("leave payload wrapper is frozen — listeners cannot mutate or extend it", async () => {
+      let payload: object | undefined;
+
+      router.subscribeLeave((p) => {
+        payload = p;
+      });
+
+      await router.navigate("users");
+
+      expect(Object.isFrozen(payload)).toBe(true);
+      expect(() => Object.assign(payload!, { extra: "x" })).toThrow(TypeError);
+    });
+
+    it("a thenable return value is awaited like a Promise (blocks until it resolves)", async () => {
+      const order: string[] = [];
+      let thenCalled = false;
+
+      // A plain object with a `then` method is NOT a Promise, but the pipeline
+      // treats any `typeof result.then === "function"` as awaitable. Cast past
+      // the `void | Promise<void>` return type to exercise that branch.
+      router.subscribeLeave(
+        () =>
+          ({
+            // eslint-disable-next-line unicorn/no-thenable -- intentional: exercising the thenable-as-Promise branch in awaitLeaveListeners
+            then(onFulfilled: () => void) {
+              thenCalled = true;
+              order.push("leave-then");
+              onFulfilled();
+            },
+          }) as unknown as Promise<void>,
+      );
+
+      router.subscribe(() => order.push("subscribe"));
+
+      await router.navigate("users");
+
+      expect(thenCalled).toBe(true);
+      // subscribe fires only after the thenable settled → it was awaited
+      expect(order).toStrictEqual(["leave-then", "subscribe"]);
+      expect(router.getState()?.name).toBe("users");
+    });
+
+    it("duplicate subscribeLeave(fn): both entries fire; unsubscribe removes exactly one", async () => {
+      const spy = vi.fn();
+
+      const unsubA = router.subscribeLeave(spy);
+      const unsubB = router.subscribeLeave(spy);
+
+      await router.navigate("users");
+
+      expect(spy).toHaveBeenCalledTimes(2); // both array entries fire
+
+      unsubB();
+
+      await router.navigate("orders");
+
+      expect(spy).toHaveBeenCalledTimes(3); // exactly one entry survived
+
+      unsubA();
+    });
+  });
 });

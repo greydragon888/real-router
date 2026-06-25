@@ -105,11 +105,19 @@ export class EventBusNamespace {
     if (typeof listener !== "function") {
       throw new TypeError(
         "[router.subscribe] Expected a function. " +
-          "For Observable pattern use @real-router/rx package",
+          "For Observable pattern use observable(router) from @real-router/rx",
       );
     }
   }
 
+  /**
+   * Validates the `subscribeLeave` listener. Unlike
+   * {@link validateSubscribeListener}, the error carries **no**
+   * `@real-router/rx` hint — rx exposes the Observable pattern for *success*
+   * transitions (`observable(router)`, `state$`, `events$`), not for leave
+   * events, so steering leave-listener misuse toward rx would mislead. The
+   * asymmetry is intentional (mirrored in `core/CLAUDE.md`).
+   */
   static validateSubscribeLeaveListener(listener: unknown): void {
     if (typeof listener !== "function") {
       throw new TypeError("[router.subscribeLeave] Expected a function");
@@ -492,8 +500,9 @@ export class EventBusNamespace {
       this.emitRouterStop();
     });
 
-    // NAVIGATE and COMPLETE actions bypassed — sendNavigate/sendComplete
-    // use fsm.forceState() + direct emit for zero-allocation hot path.
+    // NAVIGATE, LEAVE_APPROVE and COMPLETE actions bypassed —
+    // sendNavigate/sendLeaveApprove/sendComplete use fsm.forceState() + direct
+    // emit for the zero-allocation hot path.
     const handleCancel = () => {
       const toState = this.#pendingToState;
 

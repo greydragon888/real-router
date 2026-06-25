@@ -1,10 +1,10 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import { errorCodes, events, UNKNOWN_ROUTE } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter } from "../../helpers";
+import { captureUnhandledRejections, createTestRouter } from "../../helpers";
 
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -81,11 +81,10 @@ describe("core/observable", () => {
 
         lifecycle.addActivateGuard("admin-protected", () => () => false);
         getPluginApi(router).addEventListener(events.TRANSITION_ERROR, cb);
-        try {
-          await router.navigate("admin-protected", {}, {});
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        }
+
+        await expect(
+          router.navigate("admin-protected", {}, {}),
+        ).rejects.toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -291,6 +290,286 @@ describe("core/observable", () => {
         expect(() => {
           unsubscribe();
         }).not.toThrow();
+      });
+    });
+
+    // #6: subscribe error-isolation & lifecycle regression tests.
+    describe("error isolation & lifecycle (#6)", () => {
+      // (a) A synchronously-throwing listener is isolated via EventEmitter's
+      // per-listener try/catch → onListenerError → logger.error. Other
+      // listeners still run and navigate() resolves normally.
+      it("should isolate a synchronously-throwing listener and keep emitting", async () => {
+        vi.spyOn(logger, "error").mockImplementation(noop);
+
+        const before = vi.fn();
+        const bad = vi.fn(() => {
+          throw new Error("listener boom");
+        });
+        const after = vi.fn();
+
+        router.subscribe(before);
+        router.subscribe(bad);
+        router.subscribe(after);
+
+        // navigate must still resolve despite the throwing listener
+        const state = await router.navigate("users", {}, {});
+
+        expect(state.name).toBe("users");
+        expect(before).toHaveBeenCalledTimes(1);
+        expect(bad).toHaveBeenCalledTimes(1);
+        expect(after).toHaveBeenCalledTimes(1);
+        // error routed to onListenerError → logger.error (not re-thrown)
+        expect(logger.error).toHaveBeenCalled();
+
+        // router is not broken — a subsequent navigation still works
+        const next = await router.navigate("orders");
+
+        expect(next.name).toBe("orders");
+      });
+
+      // (b) An async listener whose returned Promise rejects is NOT caught by
+      // core (subscribe is fire-and-forget) — it leaks as a process-level
+      // `unhandledRejection`. This is the documented Bug #2 (intentionally not
+      // fixed here). Asserted via the repo's captureUnhandledRejections helper,
+      // which detaches/restores ambient listeners so the leak cannot fail the
+      // wider run. See packages/core/CLAUDE.md "subscribe" fire-and-forget note.
+      it("should leak an async listener's rejection as unhandledRejection (Bug #2)", async () => {
+        router.subscribe(async () => {
+          throw new Error("async-subscribe-boom");
+        });
+
+        const leaked = await captureUnhandledRejections(() => {
+          void router.navigate("users");
+        });
+
+        expect(leaked.length).toBeGreaterThan(0);
+        expect(leaked).toContainEqual(
+          expect.objectContaining({ message: "async-subscribe-boom" }),
+        );
+      });
+
+      // (c) Duplicate registration of the SAME callback reference — documented
+      // independent-subscription contract: each subscribe() wraps the listener
+      // in a fresh closure, so the callback fires ONCE PER registration.
+      it("should fire a duplicate-registered listener once per subscription", async () => {
+        const cb = vi.fn();
+
+        const unsub1 = router.subscribe(cb);
+        const unsub2 = router.subscribe(cb);
+
+        await router.navigate("users");
+
+        expect(cb).toHaveBeenCalledTimes(2);
+
+        // each unsubscribe removes exactly its own registration
+        unsub1();
+        cb.mockClear();
+        await router.navigate("orders");
+
+        expect(cb).toHaveBeenCalledTimes(1);
+
+        unsub2();
+        cb.mockClear();
+        await router.navigate("users");
+
+        expect(cb).not.toHaveBeenCalled();
+      });
+
+      // (d) navigateToNotFound emits TRANSITION_SUCCESS, so subscribe fires
+      // with the UNKNOWN_ROUTE state as `route` and the current state as
+      // `previousRoute`.
+      it("should fire subscribe on navigateToNotFound with UNKNOWN_ROUTE payload", () => {
+        const listener = vi.fn();
+        const previousState = router.getState();
+
+        router.subscribe(listener);
+        router.navigateToNotFound("/no/such/path");
+
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveBeenCalledWith({
+          route: expect.objectContaining({
+            name: UNKNOWN_ROUTE,
+            path: "/no/such/path",
+          }),
+          previousRoute: previousState,
+        });
+      });
+
+      // (e) The first navigation (start) fires subscribe with
+      // previousRoute === undefined (no prior state). subscribe must be
+      // registered BEFORE start().
+      it("should fire subscribe on start with previousRoute undefined", async () => {
+        const freshRouter = createTestRouter();
+        const listener = vi.fn();
+
+        freshRouter.subscribe(listener);
+        await freshRouter.start("/home");
+
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveBeenCalledWith({
+          route: expect.objectContaining({ name: "home" }),
+          previousRoute: undefined,
+        });
+
+        freshRouter.stop();
+      });
+
+      // (f) Failed navigations never emit TRANSITION_SUCCESS, so subscribe is
+      // not called — covered for SAME_STATES, CANNOT_ACTIVATE, ROUTE_NOT_FOUND.
+      it("should NOT fire subscribe on a SAME_STATES navigation", async () => {
+        const listener = vi.fn();
+        const unsub = router.subscribe(listener);
+
+        // already at /home (beforeEach) → navigating to "home" is SAME_STATES
+        await expect(router.navigate("home")).rejects.toMatchObject({
+          code: errorCodes.SAME_STATES,
+        });
+
+        expect(listener).not.toHaveBeenCalled();
+
+        unsub();
+      });
+
+      it("should NOT fire subscribe on a CANNOT_ACTIVATE navigation", async () => {
+        const listener = vi.fn();
+        const unsub = router.subscribe(listener);
+
+        // admin-protected has canActivate → false in the route config
+        await expect(router.navigate("admin-protected")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+        });
+
+        expect(listener).not.toHaveBeenCalled();
+
+        unsub();
+      });
+
+      it("should NOT fire subscribe on a ROUTE_NOT_FOUND navigation", async () => {
+        const listener = vi.fn();
+        const unsub = router.subscribe(listener);
+
+        await expect(
+          router.navigate("definitely-not-a-route"),
+        ).rejects.toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
+
+        expect(listener).not.toHaveBeenCalled();
+
+        unsub();
+      });
+
+      // (h) A listener that disposes the router mid-emit: snapshot iteration
+      // means the remaining listeners of the CURRENT cycle still run, and
+      // navigate() resolves. The router is disposed afterwards.
+      it("should run remaining listeners when one disposes the router mid-emit", async () => {
+        vi.spyOn(logger, "error").mockImplementation(noop);
+
+        const freshRouter = createTestRouter();
+
+        await freshRouter.start("/home");
+
+        const order: string[] = [];
+
+        freshRouter.subscribe(() => {
+          order.push("disposer");
+          freshRouter.dispose();
+        });
+        freshRouter.subscribe(() => {
+          order.push("second");
+        });
+
+        const state = await freshRouter.navigate("users");
+
+        // both listeners of the in-flight cycle ran (snapshot), navigate resolved
+        expect(order).toStrictEqual(["disposer", "second"]);
+        expect(state.name).toBe("users");
+
+        // router is genuinely disposed afterwards: mutating methods throw
+        expect(() => freshRouter.stop()).toThrow();
+        // no freshRouter.stop()/dispose() in cleanup — already disposed
+      });
+
+      // (i) A listener that issues a reentrant navigate() does not crash the
+      // emit cycle (depth tracking tolerates it); the reentrant navigation
+      // commits and becomes the final state.
+      it("should tolerate a reentrant navigate() from within a listener", async () => {
+        const seen: string[] = [];
+        let reentered = false;
+
+        router.subscribe((payload) => {
+          seen.push(payload.route.name);
+
+          if (!reentered && payload.route.name === "users") {
+            reentered = true;
+            void router.navigate("orders").catch(noop);
+          }
+        });
+
+        await expect(router.navigate("users")).resolves.toMatchObject({
+          name: "users",
+        });
+
+        // allow the reentrant navigation's microtasks to flush
+        await Promise.resolve();
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+
+        expect(seen).toStrictEqual(["users", "orders"]);
+        expect(router.getState()?.name).toBe("orders");
+      });
+    });
+
+    // #16: subscribe listener-contract boundary tests — the return value of a
+    // listener is always ignored; any callable shape is accepted.
+    describe("listener contract (#16)", () => {
+      // (a) An async function returns a Promise; subscribe ignores it (no
+      // await) and navigate resolves normally. The listener is still invoked.
+      it("should ignore an async listener's returned Promise and resolve navigate", async () => {
+        const listener = vi.fn(async () => {
+          await Promise.resolve();
+        });
+
+        router.subscribe(listener);
+
+        const state = await router.navigate("users");
+
+        expect(state.name).toBe("users");
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveBeenCalledWith({
+          route: expect.objectContaining({ name: "users" }),
+          previousRoute: expect.objectContaining({ name: "home" }),
+        });
+      });
+
+      // (b) A non-undefined return value (a string) is ignored.
+      it("should ignore a non-undefined (string) return value", async () => {
+        const listener = vi.fn((payload: { route: { name: string } }) => {
+          return payload.route.name;
+        });
+
+        router.subscribe(listener);
+
+        const state = await router.navigate("users");
+
+        expect(state.name).toBe("users");
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveReturnedWith("users");
+      });
+
+      // (c) A bound method works as a listener and is invoked with the payload.
+      it("should accept a bound method as a listener", async () => {
+        const obj = {
+          calls: [] as string[],
+          handle(payload: { route: { name: string } }): void {
+            this.calls.push(payload.route.name);
+          },
+        };
+
+        router.subscribe(obj.handle.bind(obj));
+
+        await router.navigate("users");
+
+        expect(obj.calls).toStrictEqual(["users"]);
       });
     });
   });

@@ -45,7 +45,7 @@ No boolean flags (`#started`, `#active`, `#navigating` removed).
 
 ### Validation Pattern
 
-Validation has two tiers: **invariant protection** in core (structural guards + 2 invariant guards) and **DX validation** opt-in via @real-router/validation-plugin. The plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
+Validation has two tiers: **invariant protection** in core (structural guards + 3 invariant guards) and **DX validation** opt-in via @real-router/validation-plugin. The plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
 
 **Facade methods** and **standalone API functions** call through the optional validator using optional chaining:
 
@@ -78,7 +78,7 @@ Structural guards remain in namespace folders (`OptionsNamespace/validators.ts`,
 
 Core contains three invariant guards that run regardless of whether validation-plugin is installed:
 
-- **`subscribe(listener)`** — validates `typeof listener === "function"`. Prevents deferred crash (non-function stored in EventEmitter, crash on next navigation). Includes actionable hint: "For Observable pattern use @real-router/rx package".
+- **`subscribe(listener)`** — validates `typeof listener === "function"`. Prevents deferred crash (non-function stored in EventEmitter, crash on next navigation). Includes actionable hint: "For Observable pattern use observable(router) from @real-router/rx". (`subscribeLeave` validates the same way but **without** the rx hint — `@real-router/rx` exposes the Observable pattern for success transitions (`observable(router)`, `state$`, `events$`), not for leave events.)
 - **`navigateToNotFound(path)`** — validates `typeof path === "string"` when path is provided. Prevents silent state corruption (`state.path = 42`).
 - **`claimContextNamespace(namespace)`** (on `PluginApi`, `getPluginApi.ts`) — throws `CONTEXT_NAMESPACE_ALREADY_CLAIMED` when a namespace is already claimed by another plugin. Prevents silent corruption: without it two plugins writing the same `state.context.<namespace>` would clobber each other's data.
 
@@ -268,7 +268,7 @@ router.navigate(name, params, opts)
   │
   ├── Build target state (buildNavigateState)
   ├── Same-state check (path comparison)
-  ├── FSM forceState(TRANSITIONING) + emitTransitionStart()
+  ├── FSM forceState(TRANSITION_STARTED) + emitTransitionStart()
   │
   ├── Guard pipeline (executeGuardPipeline)
   │   ├── Deactivation guards (innermost → outermost)
@@ -326,7 +326,7 @@ namespaces/NavigationNamespace/
 | Can transform state | No                  | No                 | No                      |
 | Scope               | Per-route           | Global             | Global                  |
 
-**`subscribeLeave(listener)`** — subscribe to confirmed route departures. Fires after all deactivation guards pass (departure is certain) but before activation guards run. Returns an unsubscribe function.
+**`subscribeLeave(listener)`** — subscribe to approved route departures. Fires after all deactivation guards pass (**departure is approved, not yet committed**) but before activation guards run — an activation guard can still reject, leaving state unchanged, so treat the leave as tentative (verify the outcome for non-idempotent side-effects). Returns an unsubscribe function.
 
 **Listener signature:** `(payload: LeaveState) => void | Promise<void>` where `LeaveState = { route: fromState, nextRoute: toState, signal: AbortSignal }`.
 
@@ -335,11 +335,11 @@ namespaces/NavigationNamespace/
 - Async cleanup that must complete before activation
 - Data prefetch coordinated with leave event
 
-Sync listeners run inline; their throws abort the navigation with `TRANSITION_CANCELLED` (first error wins if multiple listeners throw). The `signal` in the payload aborts **only** when the navigation is cancelled — superseded by a newer `navigate()`, `stop()`, `dispose()`, or an external `opts.signal` abort — and **never** on successful completion. This holds identically on the guard and no-guards pipeline paths: the same controller backs the signal, and core releases it without aborting on success (`#cleanupController(controller, /* cancelled */ false)`), so a listener that captured the signal still observes `aborted === false` after the navigation commits (#722).
+Sync listeners run inline; a sync throw rejects `navigate()` with that **original error** and emits `TRANSITION_ERROR` — it is **not** converted to `TRANSITION_CANCELLED`. The first sync throw wins, and a sync throw takes priority over any async listener rejection. The `signal` in the payload aborts when the navigation is **cancelled** — superseded by a newer `navigate()`, `stop()`, `dispose()`, or an external `opts.signal` abort — **or fails** (a sync leave throw, a rejecting activation guard), and **never** on successful completion. This holds identically on the guard and no-guards pipeline paths: the same controller backs the signal, and core releases it without aborting on success (`#cleanupController(controller, /* cancelled */ false)`), so a listener that captured the signal still observes `aborted === false` after the navigation commits (#722).
 
 **`subscribe(listener)`** — subscribe to `TRANSITION_SUCCESS` (post-commit). In contrast to `subscribeLeave`:
 
-- **Fire-and-forget:** listeners are invoked synchronously from `EventEmitter.emit`; returned Promises are **ignored**. An async listener may still run its async body, but `router.navigate()`'s returned Promise resolves before that async body completes.
+- **Fire-and-forget:** listeners are invoked synchronously from `EventEmitter.emit`; returned Promises are **not awaited** — `router.navigate()`'s returned Promise resolves before an async listener's body completes. **A rejected Promise from an async listener is NOT caught by core and surfaces as a Node `unhandledRejection`** (which can terminate the process under `--unhandled-rejections=strict`, the Node 22+ default). Always `.catch()` inside an async `subscribe` listener. (Unlike `subscribeLeave`, which awaits listeners via `Promise.allSettled` and isolates their rejections.)
 - **Listener signature:** `(payload: { route: State, previousRoute?: State }) => void` — no `signal` (no cancellation, the transition already committed).
 - **Invocation order:** `router.subscribe` listeners fire in registration order, all before `navigate()` resolves. Do not rely on other subscribers having run their async tails when your listener executes.
 
@@ -571,8 +571,8 @@ const nav = getNavigator(router);
 | `getState`          | Get current router state                                     |
 | `isActiveRoute`     | Check if a route is active                                   |
 | `canNavigateTo`     | Check if guards allow navigation                             |
-| `subscribe`         | Subscribe to successful transitions. Fire-and-forget: returned Promises ignored, `navigate()` does not wait for async listener bodies |
-| `subscribeLeave`    | Subscribe to confirmed route departures (LEAVE_APPROVED phase). Listener receives `{ route: fromState, nextRoute: toState, signal: AbortSignal }`. Async listeners are awaited — the activation phase blocks until all Promises settle |
+| `subscribe`         | Subscribe to successful transitions. Fire-and-forget: returned Promises ignored, `navigate()` does not wait for async listener bodies. Throws `TypeError` when `listener` is not a function |
+| `subscribeLeave`    | Subscribe to confirmed route departures (LEAVE_APPROVED phase). Listener receives `{ route: fromState, nextRoute: toState, signal: AbortSignal }`. Async listeners are awaited — the activation phase blocks until all Promises settle. Throws `TypeError` when `listener` is not a function |
 | `isLeaveApproved`   | Returns `true` when FSM is in LEAVE_APPROVED state (deactivation done, activation pending) |
 
 **Transition-in-flight signal.** `isLeaveApproved()` (public, on router and navigator) returns `true` only in the LEAVE_APPROVED phase (deactivation done, activation pending). There is **no public `isTransitioning()` method on the Router class today** — `isTransitioning()` exists only internally (`RouterInternals`, spanning TRANSITION_STARTED + LEAVE_APPROVED) for cross-namespace plumbing. Whether to promote it to the public surface is an open research question (ROI vs. `isLeaveApproved()` + `getState()` already covering the observable cases) — see issue #924.
@@ -674,9 +674,9 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - `buildPath` options cached per router instance (`#cachedBuildPathOpts`)
 
 ### Async subscribeLeave overhead
-- **0 listeners (hot path):** `#handleNoGuardsLeave` always called — 1 method call + 1 `{nav}` object literal + 1 `hasLeaveListeners()` check. `{nav}` allocation is avoidable (lazy creation inside async branch only)
-- **N sync listeners:** AbortController created + released (not aborted on success, #722; ~5µs total with cleanup), LeaveState object, N try/catch (V8 zero-cost on happy path), N×2 thenable checks
-- **`isCurrentNav` closure** (pre-existing): created every navigate, unused on no-guards path — can move into `if (hasGuards)` block
+- **0 listeners (hot path):** on the no-guards path `#handleNoGuardsLeave` runs only `sendLeaveApprove` + a `hasLeaveListeners()` check + a `navigationId` check — no `{nav}` context, no `LeaveState`, no `AbortController` (all allocated only when listeners exist)
+- **N sync listeners:** AbortController created + released (not aborted on success, #722; ~5µs total with cleanup), frozen `LeaveState` object, N try/catch (V8 zero-cost on happy path), N×2 thenable checks
+- **Lazy closures:** `isCurrentNav` / `emitLeaveApproveCallback` closures and the `{nav}` context are created inside the `if (hasGuards)` branch (or the async tail) only — not on the no-guards hot path
 - **Benchmarks:** `tests/benchmarks/navigation/leave-listeners.bench.ts` — run via `pnpm bench`
 
 ## Code Conventions
