@@ -30,7 +30,15 @@ echo "🔍 type-check..."
 pnpm type-check
 
 echo "🧪 coverage (lcov)..."
-pnpm test:coverage
+# `turbo run test` (NOT `-- --coverage`) — coverage is config-enabled in
+# vitest.config.unit.mts (coverage.enabled: true), so plain `test` already
+# emits lcov. This mirrors CI's "Test with coverage" step exactly. The
+# `-- --coverage` passthrough is deliberately avoided: it gives `test` a
+# distinct turbo cache key (→ cold full re-run every time, slow) and forces
+# every jsdom package to execute coverage concurrently, which triggers a
+# Node worker-thread `ReadFileUtf8`/`uv_fs_close` native abort under load.
+# Same reason ci.yml dropped it — do NOT re-add. See IMPLEMENTATION_NOTES.
+pnpm test
 
 # 1 + 2: projectVersion + analysis scope (mirrors CI "Get version" / "Compute
 # Sonar scope"). --emit prints `sources=…`, `tests=…`, `reports=…` lines — the
@@ -68,10 +76,19 @@ find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
     mv "$lcov.tmp" "$lcov"
   done
 
-# 4: run the scanner with the dynamic scope appended to the base `sonar` script
-# (which injects SONAR_TOKEN via dotenv). Mirrors CI "SonarCloud Scan".
+# 4: run the scanner directly via dotenv — NOT `pnpm run sonar -- …`.
+# `pnpm run <script> -- <args>` forwards <args> behind a literal `--`, and
+# @sonar/scan v4's commander CLI (`-D, --define <property=value...>`, zero
+# positional args) treats every token after `--` as a positional operand:
+# `error: too many arguments. Expected 0 arguments but got 4.`. Passing the
+# flags as plain options (no intervening `--`) parses them as -D defines.
+# Auth: dotenv loads SONAR_TOKEN from .env into the child env; the scanner
+# maps the SONAR_TOKEN env var → sonar.token (src/constants.js), so no
+# -Dsonar.login is needed (it's deprecated, and the old `$SONAR_TOKEN`
+# expansion in the `sonar` script ran in a shell without .env → always empty).
+# Mirrors CI "SonarCloud Scan".
 echo "☁️  running SonarCloud scan..."
-exec pnpm run sonar -- \
+exec pnpm exec dotenv -- sonar \
   -Dsonar.projectVersion="$VERSION" \
   -Dsonar.sources="$SOURCES" \
   -Dsonar.tests="$TESTS" \

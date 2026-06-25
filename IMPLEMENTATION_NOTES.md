@@ -4376,7 +4376,7 @@ The disable-safety verdict is a **pure structural function** of the report — "
 2. `sources` / `tests` / `reports` parsed from `node scripts/check-coverage-scope.mjs --emit` — the **same source of truth** CI uses, so local scope and the codecov/sonar drift guard cannot disagree (CI "Compute Sonar scope").
 3. lcov `SF:` rewrite to repo-root-relative, shared collapsed to `shared/<dir>/…` (CI "Fix coverage paths").
 
-Then `exec pnpm run sonar -- -Dsonar.projectVersion=… -Dsonar.sources=… -Dsonar.tests=… -Dsonar.javascript.lcov.reportPaths=…` (pnpm forwards the trailing `--` args onto the base `sonar` script, which injects `SONAR_TOKEN` via dotenv).
+Then `exec pnpm exec dotenv -- sonar -Dsonar.projectVersion=… -Dsonar.sources=… -Dsonar.tests=… -Dsonar.javascript.lcov.reportPaths=…` — the scanner is invoked **directly**, not via `pnpm run sonar -- …`. `pnpm run <script> -- <args>` forwards the args behind a literal `--`, and `@sonar/scan` v4's commander CLI (which declares `-D, --define <property=value...>` and **zero positional arguments**) treats every token after `--` as a positional operand → `error: too many arguments. Expected 0 arguments but got 4.`. Calling `dotenv -- sonar -D…` passes the flags as plain options with no intervening `--`. Auth comes from the `SONAR_TOKEN` env var: `dotenv` loads it from `.env` into the child env and the scanner maps `SONAR_TOKEN` → `sonar.token` (`@sonar/scan/src/constants.js`), so no `-Dsonar.login` is passed (it is deprecated, and the prior `$SONAR_TOKEN` interpolation in the `sonar` package script expanded in a shell without `.env` loaded — i.e. always empty). The standalone `sonar` package script (`dotenv -- sonar -Dsonar.login=$SONAR_TOKEN`) is now orphaned and, if run alone, analyses the wrong scope (the properties file omits sources/tests/lcov by #732/#735) — prefer `pnpm sonar:local`.
 
 Two portability/robustness points the CI steps don't need but a local script does:
 
@@ -4386,6 +4386,17 @@ Two portability/robustness points the CI steps don't need but a local script doe
 ### Why
 
 Kept as a **manual command, not a pre-push hook**: the scanner UPLOADS to SonarCloud and (with `qualitygate.wait=true`) blocks on the server verdict, so wiring it into `pre-push` would add a network round-trip to every push, publish every local branch's analysis to the server ahead of CI, and re-run full coverage each time — while the bulk of Sonar's value is already enforced locally (SonarJS rules via `eslint-plugin-sonarjs`, duplication via `jscpd`/`lint:duplicates`, coverage via vitest). The unique server-side checks (new-code quality gate, security hotspots) already run in CI on every PR. So `sonar:local` exists to reproduce a CI Sonar result on demand, not to gate pushes.
+
+### Coverage step uses `turbo run test`, never `-- --coverage` (drop of `test:coverage`)
+
+**Problem.** The coverage step was `pnpm test:coverage` → `turbo run test -- --coverage`. But coverage is already config-enabled (`vitest.config.unit.mts` → `coverage.enabled: true`), so the passthrough flag adds nothing yet does two kinds of harm, and it directly contradicts `ci.yml`'s "Test with coverage" step, which runs plain `pnpm turbo run test test:properties` with an explicit comment forbidding the re-addition of `-- --coverage` (it wipes property-config lcov → 0 % coverage). So the "parity" script diverged from CI in a third way:
+
+1. **Cache-buster → slow + maximal load.** `-- --coverage` hashes into the turbo task key, so the coverage run never reuses the warm `test` cache the pre-push/CI runs leave behind → cold full re-run of all ~34 packages every time.
+2. **Native crash.** The forced cold miss makes *every* jsdom package (12 of them: react/preact/vue/solid/svelte/angular + browser-env/browser-plugin/dom-utils/hash-plugin/navigation-plugin/preload-plugin) execute v8-coverage concurrently (turbo `concurrency: 4` × `maxWorkers: 4` threads). Under that fd/memory peak, css-tree (a jsdom transitive dep) hits a Node **worker-thread** `node::fs::ReadFileUtf8` → `Assertion failed: (0) == (uv_fs_close(...))` native abort (observed as SIGKILL/exit 137). A single jsdom package run in isolation passes — the bug is load-induced, specific to `pool: "threads"`.
+
+**Solution.** `sonar-local.sh` now runs `pnpm test` (= `turbo run test`); the root `test:coverage` script was removed (no remaining consumer; `packages/core` keeps its own unrelated `test:coverage`). Plain `test` emits the same lcov (config-enabled), reuses the cache, and — because warm-cache hits skip execution — keeps few packages actually running coverage at once, so the race effectively does not fire.
+
+**Why not just fix the race.** The structural fix for the worker-thread abort is `pool: "forks"` (process isolation, already used in every `*.stress.mts`), but that slows unit runs and is only needed under the artificial all-cold-coverage load `-- --coverage` was manufacturing. With the flag gone the cold-everything case only recurs on a fresh clone / wiped turbo cache — identical to a normal cold `pnpm test`, which the suite already tolerates. Left as a documented follow-up rather than a speculative perf regression. See `scripts/sonar-local.sh` inline comment.
 
 ## pnpm 10.33 → 11.9 migration (config relocation + native OIDC publish)
 

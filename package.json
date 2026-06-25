@@ -11,7 +11,6 @@
     "test:verbose": "turbo run test --output-logs=full",
     "test:stress": "turbo run test:stress",
     "test:properties": "turbo run test:properties",
-    "test:coverage": "turbo run test -- --coverage",
     "test:agent": "turbo run test -- --reporter=agent",
     "test:leaks": "turbo run test -- --detect-async-leaks",
     "test:changed": "turbo run test -- --coverage.changed",
