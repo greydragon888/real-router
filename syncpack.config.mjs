@@ -60,6 +60,12 @@ export default {
     },
   ],
   versionGroups: [
+    // REQUIRED — not dead after the pnpm 11 migration. syncpack 15.x reads pnpm
+    // `overrides` from pnpm-workspace.yaml as well as the legacy package.json#pnpm
+    // location, so this `pnpmOverrides` ignore still matches. Verified: removing
+    // it makes `@types/node: $@types/node` trip SameRangeMismatch against the
+    // pinned devDependency. (The pnpm-11 migration analysis assumed this group
+    // would go dead — it does not.)
     {
       label: "Ignore pnpm overrides",
       packages: ["**"],

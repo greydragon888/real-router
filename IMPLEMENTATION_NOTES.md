@@ -110,7 +110,7 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 
 - Uses npm's native OIDC (no NPM_TOKEN secret needed)
 - Requires Node.js 24+ (npm >= 11.5.1)
-- First publish must be manual (`npm publish`) - can't configure Trusted Publisher before package exists
+- First publish must be manual (`pnpm publish`) - can't configure Trusted Publisher before package exists (pnpm 11 publishes natively; no npm CLI needed even for bootstrap)
 - Trusted Publisher configured with workflow: `changesets.yml`
 
 **Build optimization:** Release workflow uses `pnpm turbo run build:dist-only --filter='!./examples/**'` and `pnpm turbo run test --filter='!./examples/**'` — packages only, skipping ~130 example apps. Previously used bare `pnpm build` / `pnpm test` which ran the full ~1200-task pipeline including all examples, adding ~10 minutes to release time.
@@ -4384,3 +4384,83 @@ Two portability/robustness points the CI steps don't need but a local script doe
 ### Why
 
 Kept as a **manual command, not a pre-push hook**: the scanner UPLOADS to SonarCloud and (with `qualitygate.wait=true`) blocks on the server verdict, so wiring it into `pre-push` would add a network round-trip to every push, publish every local branch's analysis to the server ahead of CI, and re-run full coverage each time — while the bulk of Sonar's value is already enforced locally (SonarJS rules via `eslint-plugin-sonarjs`, duplication via `jscpd`/`lint:duplicates`, coverage via vitest). The unique server-side checks (new-code quality gate, security hotspots) already run in CI on every PR. So `sonar:local` exists to reproduce a CI Sonar result on demand, not to gate pushes.
+
+## pnpm 10.33 → 11.9 migration (config relocation + native OIDC publish)
+
+### Problem
+
+pnpm 11 stops reading behavioral config from `.npmrc` and the `package.json#pnpm`
+field — both are now ignored with a warning, and `pnpm publish` no longer
+delegates the registry upload/OIDC exchange to the bundled npm CLI (in pnpm 10
+it did, which is why npm was previously listed in the toolchain as "used for
+publishing"). Staying on pnpm 10 meant npm stayed in the release path and the
+project missed pnpm 11's native OIDC + provenance publish and supply-chain
+defaults.
+
+### Solution
+
+- **Config relocated to `pnpm-workspace.yaml`.** All 9 `.npmrc` settings →
+  camelCase keys (`save-exact`→`saveExact`, `script-shell`→`scriptShell`,
+  `loglevel` stays `loglevel`, etc.); `package.json#pnpm` (39 `overrides`,
+  `peerDependencyRules`) moved verbatim; `onlyBuiltDependencies` +
+  `ignoredBuiltDependencies` → the unified `allowBuilds` map (`true` = allowed,
+  `electron-winstaller: false` = suppressed). The `package.json#pnpm` field is
+  **deleted** (left in place it would be silently ignored). `.npmrc` is reduced
+  to a comment (no auth/registry settings exist). The `@types/node: $@types/node`
+  DRY-override keeps the `$` syntax (deprecated-but-works; catalog deliberately
+  NOT adopted — syncpack already enforces single-version, and catalog breaks
+  Dependabot). Driven by the `pnpm-v10-to-v11` codemod, then hand-verified.
+- **`packageManager` pinned to `pnpm@11.9.0+sha512.<hex>`.** The codemod writes
+  a bare version (and silently falls back to `11.0.1` if the registry is
+  unreachable — below the OIDC-fix floor), so the version is written by hand and
+  asserted `≥ 11.1.3`. The integrity hash is `+sha512.<128-hex>`, NOT the
+  base64 SRI from `npm view … dist.integrity`; derive it with
+  `node -e "process.stdout.write(Buffer.from(<sri>.replace(/^sha512-/,''),'base64').toString('hex'))"`
+  (validated: decoding 10.33.0's SRI reproduces the old field's hash exactly).
+- **`minimumReleaseAge: 0`** (pnpm 11 default is 1440 = 24h quarantine). Opted
+  out: every dep is dev/build tooling and UI frameworks are peerDependencies
+  (the consumer installs them) — nothing ships to users at runtime, so the
+  quarantine adds no user-facing protection while it WOULD block Dependabot
+  security PRs (`ERR_PNPM_NO_MATURE_MATCHING_VERSION`). Protection stays
+  exact-pinning + deliberate bumps + PR review. NB: any explicit
+  `minimumReleaseAge` auto-enables `minimumReleaseAgeStrict`; at `0` it's a
+  no-op, but raising it later also needs the strict flag set deliberately.
+- **CI: zero workflow version edits.** All 9 `pnpm/action-setup@v6` usages
+  auto-detect the version from `packageManager`, so bumping that field switches
+  every workflow to 11.9.0. The 3 `npm view … version` calls in `changesets.yml`
+  → `pnpm view` (verified identical output for a `version` field query — the
+  "published X ago" annotation only appears in the full summary view, not field
+  queries; the `|| echo`/`|| continue` fallbacks still fire on exit 1).
+  `scripts/smoke-test-packages.sh`'s `npm install` is left untouched — it is the
+  deliberate "simulate a real npm consumer" coverage, not a build dependency.
+
+### Why it's low-risk here (empirically verified, pnpm 11.9.0, isolated install)
+
+- **Lockfile is byte-identical** under pnpm 11 (`--lockfile-only` produced the
+  same `9.0` single-document file, same 1758 resolutions, same sha256). The
+  multi-document lockfile class of breakage (turbo/osv/Dependabot parsers) does
+  **not** apply: multi-doc only appears with `configDependencies`/
+  `packageManagerDependencies`, which the repo has nowhere. `grep -c '^---$'
+  pnpm-lock.yaml` = 0.
+- **Clean `--frozen-lockfile` install passes with `strictDepBuilds: true`** —
+  proving the `allowBuilds` map has no name typos (a wrong name fails the
+  install) — and does **not** mutate the lockfile.
+- **dep-tooling green**: `lint:deps` (syncpack), `lint:dedupe`, `lint:audit`
+  (osv-scanner parses the v11 lockfile; 36 pre-existing Tauri RUSTSEC filters).
+
+### Gotcha: the syncpack "Ignore pnpm overrides" group is NOT dead
+
+The migration analysis assumed that, with `overrides` moved out of
+`package.json#pnpm`, syncpack's `pnpmOverrides` ignore group would go dead and
+could be deleted. **It cannot.** syncpack 15.x reads `overrides` from
+`pnpm-workspace.yaml` too, so deleting the group makes `@types/node: $@types/node`
+trip `SameRangeMismatch` against the pinned devDependency and fails `lint:deps`.
+The group is kept (with a comment in `syncpack.config.mjs` recording this).
+
+### What only a real release can confirm
+
+OIDC trusted publishing on pnpm 11's native publish path cannot be validated by
+`--dry-run` or verdaccio (neither performs the OIDC token exchange). The first
+real changeset release is the gate — watch provenance generation. The hard floor
+is 11.1.3 ([pnpm#11513](https://github.com/pnpm/pnpm/issues/11513) OIDC-404 fix);
+11.9.0 also has the 11.5.3 package-manager-binary signature verification.

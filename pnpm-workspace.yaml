@@ -7,3 +7,79 @@ packages:
   - "examples/desktop/*/*"
   - "examples/console/*"
   - "benchmarks"
+peerDependencyRules:
+  allowedVersions:
+    typescript: '6'
+overrides:
+  '@types/node': $@types/node
+  '@angular/router': 21.2.17
+  '@babel/core': '>=7.29.6'
+  '@isaacs/brace-expansion': 5.0.1
+  axios: '>=1.16.0'
+  follow-redirects: '>=1.16.0'
+  qs: '>=6.14.2'
+  rollup: 4.62.0
+  minimatch@3: ~3.1.4
+  minimatch@9: ~9.0.7
+  minimatch@10: ~10.2.3
+  ajv@6: ~6.14.0
+  ajv@8: ~8.18.0
+  underscore: '>=1.13.8'
+  http-proxy-agent: 7.0.2
+  undici: '>=7.28.0 <8.0.0'
+  piscina: '>=5.2.0 <6.0.0'
+  flatted: '>=3.4.2'
+  path-to-regexp: '>=8.4.0'
+  brace-expansion@1: 1.1.13
+  brace-expansion@2: 2.0.3
+  brace-expansion@5: 5.0.6
+  node-forge: '>=1.4.0'
+  picomatch@2: 2.3.2
+  picomatch@4: 4.0.4
+  yaml@1: 1.10.3
+  yaml@2: 2.8.3
+  smol-toml: '>=1.6.1'
+  defu: '>=6.1.5'
+  devalue: '>=5.8.1'
+  esbuild: '>=0.28.1'
+  vite: '>=7.3.5'
+  fast-uri: '>=3.1.2'
+  hono: '>=4.12.21'
+  ip-address: '>=10.1.1'
+  js-cookie: '>=3.0.7'
+  tmp: '>=0.2.6'
+  fflate: 0.8.2
+  read-yaml-file: '>=2.1.0 <3.0.0'
+# --- pnpm settings (migrated from .npmrc during the pnpm 11 upgrade) ---
+updateNotifier: false
+saveExact: true
+gitTagVersion: true
+loglevel: error
+# Strict mode for early peer-deps detection
+autoInstallPeers: true
+strictPeerDependencies: true
+# Security: strict build-script verification (default in pnpm 11; kept explicit)
+strictDepBuilds: true
+# Auto-cleanup unused catalog entries
+cleanupUnusedCatalogs: true
+scriptShell: bash
+# Supply-chain quarantine opt-out. Every dependency here is dev/build tooling,
+# and UI frameworks at the adapters are peerDependencies (installed by the
+# consumer) — nothing from these deps ships to users at runtime, so the 24h
+# new-version quarantine adds no user-facing protection, while it WOULD block
+# Dependabot security PRs (ERR_PNPM_NO_MATURE_MATCHING_VERSION). Protection is
+# exact-pinning + deliberate bumps + PR review.
+# NB: any explicit minimumReleaseAge auto-enables minimumReleaseAgeStrict; at 0
+# the gate is a no-op, but if this is ever raised, also set minimumReleaseAgeStrict.
+minimumReleaseAge: 0
+allowBuilds:
+  '@parcel/watcher': true
+  core-js: true
+  electron: true
+  esbuild: true
+  fsevents: true
+  lmdb: true
+  msgpackr-extract: true
+  unrs-resolver: true
+  vue-demi: true
+  electron-winstaller: false

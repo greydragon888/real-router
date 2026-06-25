@@ -36,8 +36,8 @@ shared/
 | Tool / runtime  | Version | Source of truth (actualize from here)                                      |
 | --------------- | ------- | -------------------------------------------------------------------------- |
 | Node.js         | 24.16   | CI pins major `24` (`.github/workflows/*`); no `engines`/`.nvmrc`, minor floats |
-| npm             | 11.6    | bundled with Node 24; used for **publishing** (`changeset publish` → npm OIDC Trusted Publishing in `changesets.yml`; manual `npm publish` for a new package's first release). Installs/builds are pnpm, not npm |
-| pnpm            | 10.33   | `packageManager` field, root `package.json`                                |
+| npm             | 11.6    | bundled with Node 24. **Not used for publishing** — pnpm 11 publishes natively (OIDC + provenance). npm's only deliberate use is the consumer smoke-test (`scripts/smoke-test-packages.sh`: `npm install` to simulate a real consumer). Installs/builds/publish are pnpm |
+| pnpm            | 11.9    | `packageManager` field, root `package.json`; behavioral config in `pnpm-workspace.yaml` (overrides/allowBuilds/settings — pnpm 11 no longer reads `.npmrc`/`package.json#pnpm`) |
 | TypeScript      | 6.0     | root `devDependencies` (pinned exact, `save-exact`)                         |
 | Vitest          | 4.1     | root `devDependencies`                                                      |
 | tsdown          | 0.22    | root `devDependencies`                                                      |
@@ -104,7 +104,7 @@ pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting O
 - **Main workflow:** `changesets.yml` — publishing via npm OIDC Trusted Publishing
 - **Manual workflow:** `release.yml` — for emergency releases
 - Trusted Publisher configured for all @real-router/\* packages with workflow `changesets.yml`
-- New packages must be published manually first (`npm publish`), then configure Trusted Publisher
+- New packages must be published manually first (`pnpm publish`), then configure Trusted Publisher
 
 ## Versioning
 

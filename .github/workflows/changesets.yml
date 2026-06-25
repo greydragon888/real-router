@@ -137,8 +137,8 @@ jobs:
                 continue
               fi
 
-              # Check if this version exists on npm
-              npm_version=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
+              # Check if this version exists on npm (pnpm view — pnpm 11 native)
+              npm_version=$(pnpm view "$name" version 2>/dev/null || echo "0.0.0")
 
               if [ "$local_version" != "$npm_version" ]; then
                 echo "📦 $name: local=$local_version, npm=$npm_version (needs publish)"
@@ -305,7 +305,7 @@ jobs:
           # tag at HEAD via the API (works with the read/write GITHUB_TOKEN —
           # checkout has persist-credentials: false, so plain `git push` can't)
           # and mirror it locally so the Release passes pick it up in this run.
-          # `npm view` runs only for missing tags — zero calls in steady state.
+          # `pnpm view` runs only for missing tags — zero calls in steady state.
           HEAD_SHA=$(git rev-parse HEAD)
           for dir in packages/*/; do
             [ -f "${dir}package.json" ] || continue
@@ -316,7 +316,7 @@ jobs:
             git rev-parse -q --verify "refs/tags/${tag}" >/dev/null && continue
             # Tag missing — backfill only if npm really has this exact version
             # (a never-published new package legitimately has no tag).
-            npm view "${tag}" version >/dev/null 2>&1 || continue
+            pnpm view "${tag}" version >/dev/null 2>&1 || continue
             echo "🏷️  Backfilling missing tag ${tag} at ${HEAD_SHA}"
             gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${tag}" -f sha="${HEAD_SHA}" --silent
             git tag "${tag}" "${HEAD_SHA}"
@@ -431,7 +431,7 @@ jobs:
           # Post-mortem: name the gap instead of "see the log" — list the
           # planned packages whose local version is still absent from npm
           # (same local-vs-npm comparison the "Check for unpublished" step
-          # uses). Only runs on the failure path, so the ~30 `npm view`
+          # uses). Only runs on the failure path, so the ~30 `pnpm view`
           # calls cost nothing in the steady state.
           MISSING=""
           for dir in packages/*/; do
@@ -439,7 +439,7 @@ jobs:
             [ "$(node -p "require('./${dir}package.json').private || false")" = "true" ] && continue
             name=$(node -p "require('./${dir}package.json').name")
             local_version=$(node -p "require('./${dir}package.json').version")
-            npm_version=$(npm view "$name" version 2>/dev/null || echo "none")
+            npm_version=$(pnpm view "$name" version 2>/dev/null || echo "none")
             if [ "$local_version" != "$npm_version" ]; then
               MISSING="$MISSING $name@$local_version"
             fi
