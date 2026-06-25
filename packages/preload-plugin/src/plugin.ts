@@ -299,12 +299,11 @@ export class PreloadPlugin {
     if (this.#stateCache.has(href)) {
       this.#stateCache.delete(href);
     } else if (this.#stateCache.size >= STATE_CACHE_LIMIT) {
-      // size >= LIMIT > 0 → iterator has at least one key.
-      for (const oldest of this.#stateCache.keys()) {
-        this.#stateCache.delete(oldest);
+      // Evict the oldest (first-inserted) entry. size >= LIMIT > 0, so the
+      // iterator yields at least one key — destructuring it is safe.
+      const [oldest] = this.#stateCache.keys();
 
-        break;
-      }
+      this.#stateCache.delete(oldest);
     }
 
     this.#stateCache.set(href, state);
