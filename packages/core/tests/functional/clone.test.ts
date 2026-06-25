@@ -11,7 +11,7 @@ import {
 
 import { createTestRouter } from "../helpers";
 
-import type { Router, RouterError } from "@real-router/core";
+import type { Router } from "@real-router/core";
 
 /**
  * Creates a trackable plugin that records when its hooks are called.
@@ -86,14 +86,10 @@ describe("cloneRouter()", () => {
     await clonedRouter.start("/");
 
     // Verify canActivate is cloned - navigation to admin should be blocked
-    try {
-      await clonedRouter.navigate("admin");
-
-      expect.fail("Should have thrown");
-    } catch (error) {
-      expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
-      expect(canActivateGuard).toHaveBeenCalled();
-    }
+    await expect(clonedRouter.navigate("admin")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+    expect(canActivateGuard).toHaveBeenCalled();
 
     clonedRouter.stop();
   });
@@ -117,14 +113,10 @@ describe("cloneRouter()", () => {
     expect(state1).toBeDefined();
 
     // Verify canDeactivate is cloned - leaving users should be blocked
-    try {
-      await clonedRouter.navigate("home");
-
-      expect.fail("Should have thrown");
-    } catch (error) {
-      expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      expect(canDeactivateGuard).toHaveBeenCalled();
-    }
+    await expect(clonedRouter.navigate("home")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_DEACTIVATE,
+    });
+    expect(canDeactivateGuard).toHaveBeenCalled();
 
     clonedRouter.stop();
   });
@@ -396,16 +388,12 @@ describe("cloneRouter()", () => {
 
       await clonedRouter.start("/");
 
-      // Verify lifecycle handlers are cloned by testing navigation behavior
-      // The "admin-protected" route has canActivate that blocks navigation
-      try {
-        await clonedRouter.navigate("admin-protected");
-
-        expect.fail("Should have thrown");
-      } catch (error) {
-        // If lifecycle handlers are cloned, admin-protected should be blocked
-        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
-      }
+      // Verify lifecycle handlers are cloned by testing navigation behavior.
+      // The "admin-protected" route has canActivate that blocks navigation —
+      // if lifecycle handlers are cloned, the navigation must reject.
+      await expect(
+        clonedRouter.navigate("admin-protected"),
+      ).rejects.toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
 
       clonedRouter.stop();
     });
@@ -653,14 +641,10 @@ describe("cloneRouter()", () => {
 
       guard.mockClear();
 
-      try {
-        await clonedRouter.navigate("home");
-
-        expect.fail("Should have thrown");
-      } catch (error) {
-        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        expect(guard).toHaveBeenCalled();
-      }
+      await expect(clonedRouter.navigate("home")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
+      });
+      expect(guard).toHaveBeenCalled();
 
       router.stop();
       clonedRouter.stop();
@@ -694,6 +678,169 @@ describe("cloneRouter()", () => {
       );
 
       expect(clonedResult.name).toBe("clone-target");
+    });
+  });
+
+  // Regression guards for the documented shallow-merge contract (#664): mutable
+  // values in deps / defaultParams / customFields are SHARED by reference with
+  // the original — per-request state must go through the override slot, not the
+  // base. These pin the contract so an accidental switch to deep-clone is caught.
+  describe("by-design shared-ref contract (#664)", () => {
+    interface Deps extends Record<string, unknown> {
+      sharedMap: Map<string, string>;
+    }
+
+    it("shares mutable dependency refs between base and clone (shallow merge)", () => {
+      const router = createTestRouter();
+      const sharedMap = new Map<string, string>();
+
+      getDependenciesApi<Deps>(router as never).set("sharedMap", sharedMap);
+
+      const clone = cloneRouter(router);
+      const cloneMap = getDependenciesApi<Deps>(clone as never).get(
+        "sharedMap",
+      );
+
+      // Top-level shallow merge: the SAME Map instance is shared by reference.
+      expect(cloneMap).toBe(sharedMap);
+
+      // Mutating via the clone is visible on the base (documented #664 contract).
+      cloneMap.set("from-clone", "x");
+
+      expect(
+        getDependenciesApi<Deps>(router as never)
+          .get("sharedMap")
+          .has("from-clone"),
+      ).toBe(true);
+    });
+
+    it("shares per-route defaultParams objects between base and clone", () => {
+      const router = createTestRouter();
+
+      getRoutesApi(router).add({
+        name: "paged",
+        path: "/paged",
+        defaultParams: { page: 1, sort: "name" },
+      });
+
+      const clone = cloneRouter(router);
+      const baseDef = getRoutesApi(router).get("paged")?.defaultParams;
+      const cloneDef = getRoutesApi(clone).get("paged")?.defaultParams;
+
+      // Object.assign(config.defaultParams, ...) is shallow — the per-route
+      // params object is shared by reference (same shape as deps).
+      expect(cloneDef).toBeDefined();
+      expect(cloneDef).toBe(baseDef);
+    });
+
+    it("shares per-route custom fields between base and clone", () => {
+      const router = createTestRouter();
+
+      getRoutesApi(router).add({
+        name: "withMeta",
+        path: "/with-meta",
+        meta: { title: "Page" },
+      });
+
+      const clone = cloneRouter(router);
+      const baseConfig = getPluginApi(router).getRouteConfig("withMeta");
+      const cloneConfig = getPluginApi(clone).getRouteConfig("withMeta");
+
+      // routeCustomFields are copied with Object.assign (shallow) — the custom
+      // fields object is shared by reference (same shape as deps/defaultParams).
+      expect(cloneConfig).toBeDefined();
+      expect(cloneConfig).toStrictEqual({ meta: { title: "Page" } });
+      expect(cloneConfig).toBe(baseConfig);
+    });
+  });
+
+  // The clone is always constructed fresh (IDLE) regardless of the original's
+  // FSM state. These cover the in-flight cases the audit flagged as untested:
+  // STARTING (mid-start), TRANSITION_STARTED (mid-navigate), LEAVE_APPROVED
+  // (mid-await of an async subscribeLeave listener).
+  describe("cloning while the original is mid-lifecycle yields a fresh IDLE clone", () => {
+    it("clone while original start is in STARTING (mid-start)", async () => {
+      const router = createTestRouter();
+      let releaseGuard!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseGuard = resolve;
+      });
+
+      getLifecycleApi(router).addActivateGuard("index", () => async () => {
+        await gate;
+
+        return true;
+      });
+
+      const startPromise = router.start("/"); // "/" → index, hangs in activation guard
+
+      // Original is mid-start (live, no committed state yet); clone is fresh.
+      expect(router.isActive()).toBe(true);
+      expect(cloneRouter(router).isActive()).toBe(false);
+
+      const clone = cloneRouter(router);
+
+      expect(clone.getState()).toBeUndefined();
+
+      releaseGuard();
+      await startPromise;
+
+      router.stop();
+    });
+
+    it("clone while original navigation is in TRANSITION_STARTED", async () => {
+      const router = createTestRouter();
+      let releaseGuard!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseGuard = resolve;
+      });
+
+      getLifecycleApi(router).addActivateGuard("users", () => async () => {
+        await gate;
+
+        return true;
+      });
+
+      await router.start("/");
+
+      const navPromise = router.navigate("users"); // hangs in activation guard
+
+      const clone = cloneRouter(router);
+
+      expect(clone.isActive()).toBe(false);
+      expect(clone.getState()).toBeUndefined();
+
+      releaseGuard();
+      await navPromise;
+
+      router.stop();
+    });
+
+    it("clone while original is in LEAVE_APPROVED (async subscribeLeave)", async () => {
+      const router = createTestRouter();
+      let releaseLeave!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseLeave = resolve;
+      });
+
+      await router.start("/");
+      await router.navigate("users");
+
+      router.subscribeLeave(async () => {
+        await gate;
+      });
+
+      const navPromise = router.navigate("home"); // hangs in LEAVE_APPROVED
+
+      const clone = cloneRouter(router);
+
+      expect(clone.isActive()).toBe(false);
+      expect(clone.getState()).toBeUndefined();
+
+      releaseLeave();
+      await navPromise;
+
+      router.stop();
     });
   });
 });

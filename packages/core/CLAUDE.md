@@ -189,6 +189,26 @@ router.dispose(); // Idempotent — safe to call multiple times
 **After dispose**: All mutating methods throw `RouterError(ROUTER_DISPOSED)`
 **Idempotency**: Second call is a no-op (FSM state check)
 
+### Cloning Semantics (SSR)
+
+`cloneRouter(router, deps?)` (standalone API, `api/cloneRouter.ts`) builds an independent router for **SSR per-request isolation** — one base router per process, one clone per request. The clone is always constructed fresh (FSM `IDLE`, no committed state) regardless of the source's lifecycle state; cloning a disposed router throws `ROUTER_DISPOSED`.
+
+| Subsystem | Clone behavior |
+| --- | --- |
+| Route tree | **Rebuilt** from serialized definitions (`routeTreeToDefinitions` → constructor) — not shared |
+| Options | Shallow spread; deep-frozen, so ref-sharing is safe |
+| Dependencies | **Shallow merge** `{ ...sourceDeps, ...deps }` — top-level keys fresh, **values shared by reference** |
+| Config (decoders / encoders / forwardMap / `defaultParams` / custom fields) | `Object.assign` shallow — per-route objects **shared by reference** |
+| Lifecycle guards | Re-registered **preserving origin** (definition stays definition, external stays external — #676) |
+| Plugins | Factories re-run on the clone — **fresh instances**, fresh `state.context` claims |
+| State / FSM / EventEmitter / interceptors / `hydrationState` / `contextClaimRecords` | **Reset** (fresh per clone) |
+
+**Shared-by-reference is intentional (#664).** A `Map`, `Set`, class instance, or nested object in `base.dependencies` (or a per-route `defaultParams` / custom-field object) is the **same instance** in every clone — mutating it from one clone is visible in the base and all siblings. `structuredClone` is deliberately not applied (it breaks class instances, functions, singleton pools, circular refs). Rule: **singletons / shared services → `base.dependencies`; per-request mutable state → the `deps` override** (or `createRequestScope`), which is applied last and wins over base keys. Cross-request leaks happen only when per-request state is wrongly placed in the base.
+
+**Guard origin round-trips (#676).** Cloned definition guards are re-registered with `isFromDefinition=true`, so the clone's `replace()` strips them via `clearDefinitionGuards()` exactly as on the source. Caveat: guard-factory **closures are shared** — do not capture per-request state in guards registered on the base router (register such guards on the clone).
+
+**Not re-applied on the clone:** `extendRouter` / `addInterceptor` called **outside** a plugin factory (directly via `getPluginApi(base)`) — only plugin-factory extensions/interceptors re-run. Full reference: `wiki/clone.md`.
+
 ### Enhanced State Object: TransitionMeta
 
 After every successful navigation, `router.getState()` includes a `transition` field:
