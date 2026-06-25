@@ -135,6 +135,6 @@
   },
   "ignoreWorkspaces": ["examples/**", "benchmarks"],
   "ignoreDependencies": ["@stryker-mutator/api"],
-  "ignoreBinaries": ["tree", "open"],
+  "ignoreBinaries": ["tree", "open", "view"],
   "ignoreExportsUsedInFile": true
 }

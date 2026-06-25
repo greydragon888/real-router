@@ -955,6 +955,8 @@ Per-workspace configurations in `knip.json`:
 
 `ignoreWorkspaces: ["examples/**"]` — examples have different dependency structures (Express, Vite, Playwright) that would trigger false positives in knip analysis. Uses `**` glob to match the nested `examples/{framework}/{app}` directory structure.
 
+`ignoreBinaries: ["tree", "open", "view"]` — commands invoked in `scripts/*.sh` / `.github/workflows/*.yml` that knip cannot resolve to a dependency. `tree`/`open` are system binaries. **`view` is the pnpm-11 fallout (#f30ee95e):** the release workflow checks npm for an already-published version via `pnpm view <pkg> version` (pnpm 11 native, alias of `pnpm info` — replaced the old `npm view`). knip parses `pnpm <subcommand>` as "pnpm executes a local binary `<subcommand>`", and since `view` isn't a knip-recognized pnpm builtin it flags it as an unlisted binary. knip.json is plain JSON (no inline comments), so the rationale lives here. Surfaced on the first `git push` after the pnpm 10→11 migration (pre-push runs `knip`), not at migration time.
+
 ### syncpack Configuration
 
 Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
