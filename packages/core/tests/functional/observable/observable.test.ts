@@ -334,6 +334,7 @@ describe("core/observable", () => {
       // which detaches/restores ambient listeners so the leak cannot fail the
       // wider run. See packages/core/CLAUDE.md "subscribe" fire-and-forget note.
       it("should leak an async listener's rejection as unhandledRejection (Bug #2)", async () => {
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fire-and-forget async listener under test
         router.subscribe(async () => {
           throw new Error("async-subscribe-boom");
         });
@@ -529,6 +530,7 @@ describe("core/observable", () => {
           await Promise.resolve();
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises -- async listener under test: subscribe must ignore the returned Promise
         router.subscribe(listener);
 
         const state = await router.navigate("users");
@@ -558,12 +560,14 @@ describe("core/observable", () => {
 
       // (c) A bound method works as a listener and is invoked with the payload.
       it("should accept a bound method as a listener", async () => {
-        const obj = {
-          calls: [] as string[],
+        class Handler {
+          calls: string[] = [];
           handle(payload: { route: { name: string } }): void {
             this.calls.push(payload.route.name);
-          },
-        };
+          }
+        }
+
+        const obj = new Handler();
 
         router.subscribe(obj.handle.bind(obj));
 
