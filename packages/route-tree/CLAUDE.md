@@ -53,5 +53,4 @@ src/index.ts                    -- public API re-exports
 tests/functional/               -- unit tests
 tests/property/                 -- property-based tests
 tests/stress/                   -- scale/robustness guards (run via test:stress; NO heap tests — build/serialize discard trees → GC-masked. Targets: build/round-trip throughput, deep-nesting recursion cliff, validateRoute anti-quadratic dup detection. Thresholds mutationally calibrated; see file headers)
-tests/benchmarks/               -- performance benchmarks
 ```

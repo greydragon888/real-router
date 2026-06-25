@@ -53,9 +53,9 @@ src/pathUtils.ts              -- createSegmentNode, normalizeTrailingSlash
 src/registration.ts           -- registerNode (tree-to-trie compilation)
 src/types.ts                  -- all type definitions
 src/index.ts                  -- public API re-exports
-tests/helpers/createTestMatcher.ts -- shared factory wiring search-params into SegmentMatcher for tests & benchmarks
+tests/helpers/createTestMatcher.ts -- shared factory wiring search-params into SegmentMatcher for tests
+tests/helpers/buildTree.ts    -- builds MatcherInputNode trees from simple route defs (stress tests)
 tests/unit/                   -- unit tests
 tests/property/               -- property-based tests (incl. param-name conflict + name-less marker rejection, #736/#858)
 tests/stress/                 -- scale/throughput guards (run via `test:stress`)
-tests/benchmarks/             -- performance benchmarks
 ```

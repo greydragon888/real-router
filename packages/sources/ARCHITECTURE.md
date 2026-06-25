@@ -170,7 +170,6 @@ Framework-agnostic port of the `routeSelector` pattern from `@real-router/solid`
 - 100% test coverage required
 - Tests cover only the public API
 - `v8 ignore @preserve` used for defensive guards that are unreachable via the public API
-- Benchmarks use the mitata engine, not vitest bench
 
 ## Stress Test Coverage
 

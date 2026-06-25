@@ -15,12 +15,9 @@ src/
 └── index.ts            — Public exports
 
 tests/
-├── functional/
-│   ├── RouteUtils.test.ts       — RouteUtils class + getRouteUtils factory
-│   └── segmentTesters.test.ts   — All segment testers + areRoutesRelated + static facade
-└── benchmarks/
-    ├── route-utils.bench.ts     — mitata benchmarks (construction, lookups, stress, scaling)
-    └── index.ts                 — Benchmark runner entry point
+└── functional/
+    ├── RouteUtils.test.ts       — RouteUtils class + getRouteUtils factory
+    └── segmentTesters.test.ts   — All segment testers + areRoutesRelated + static facade
 ```
 
 ## Two Concerns, One Package
@@ -152,7 +149,6 @@ const cache = new WeakMap<RouteTreeNode, RouteUtils>();
 | Dependency           | Type    | Purpose                                   |
 | -------------------- | ------- | ----------------------------------------- |
 | `@real-router/types` | runtime | `State` type for segment tester overloads |
-| `mitata`             | dev     | Benchmark engine                          |
 
 `RouteTreeNode` interface is defined locally — no runtime dependency on the internal `route-tree` package. TypeScript structural typing ensures compatibility when passing the real `RouteTree` object.
 
@@ -180,7 +176,6 @@ const cache = new WeakMap<RouteTreeNode, RouteUtils>();
 - Private fields use `#` syntax (true encapsulation)
 - Segment testers use factory pattern to avoid code duplication across three functions
 - `eslint-disable sonarjs/function-return-type` on the curried tester — intentional union return type
-- Benchmarks use mitata engine with `boxplot` + `summary` grouping and `.gc("inner")` for GC isolation
 
 ## See Also
 

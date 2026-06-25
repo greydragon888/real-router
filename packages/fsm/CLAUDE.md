@@ -74,11 +74,10 @@ src/
 
 - `tests/functional/` — unit tests
 - `tests/property/` — fast-check generative tests (`arbFSMConfig` builds arbitrary transition tables); see `INVARIANTS.md` for the invariant catalogue (state-transition determinism, listener reentrancy/validity, terminal states, `TransitionInfo` shape, action dispatch)
-- `tests/benchmarks/` — hot-path benchmarks (`send`/`canSend`/`forceState`)
 - **No `tests/stress/` — intentional, not a gap.** The FSM has no unbounded-growth path, so a heap-threshold stress test would lack discriminating power (the "theatre" the root [CLAUDE.md](../../CLAUDE.md) stress-test doctrine warns about). Every structure is bounded:
   - `#listeners` is bounded by **peak** concurrent listeners (null-slot reuse via `indexOf(null)`); its only memory-discriminable behavior — staying bounded under churn — rides the *same* code path as the reuse-correctness property (`INVARIANTS.md` → Listener "Churn integrity"), already mutation-validated (force-append breaks order **and** growth together). A stress test would be redundant.
   - `#actions` is **hard-capped** at `|states| × |events|` (last-write-wins; unsub `delete`s) → KB-scale, below the heap noise floor → no signal to threshold against.
-  - `send` rest-args / `TransitionInfo` are transient → GC-reclaimed (GC-masked, invisible to heap snapshots). That's GC-pressure/throughput, owned by `tests/benchmarks/` (`2.5` churn cycles, `2.7` reentrant ×1000, `2.3/2.4` 100/1000 listeners — all with `--expose-gc`).
+  - `send` rest-args / `TransitionInfo` are transient → GC-reclaimed (GC-masked, invisible to heap snapshots). That's GC-pressure/throughput — not locked by any local benchmark suite; functional + property tests cover correctness of the affected paths.
   - Synchronous & single-threaded → no async/concurrency race surface.
   - Contrast: sibling `event-emitter` *does* ship `tests/stress/` because it holds listener **records** needing explicit release (a real leak class, #752); the FSM's `#listeners[index] = null` releases the ref directly, so that surface doesn't exist here. The lone unbounded path is **misuse** — `on(undeclaredFrom, …)` keeps one never-deleted inner Map per distinct undeclared `from` — a guard candidate (à la #754), **not** a stress test.
 

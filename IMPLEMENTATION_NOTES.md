@@ -2062,8 +2062,7 @@ packages/fsm/
 │   ├── types.ts  — FSMConfig, TransitionInfo, TransitionListener
 │   └── index.ts  — public exports
 └── tests/
-    ├── functional/  — vitest tests (100% coverage)
-    └── benchmarks/  — mitata benchmarks
+    └── functional/  — vitest tests (100% coverage)
 ```
 
 ## Logger Package
@@ -4477,3 +4476,53 @@ OIDC trusted publishing on pnpm 11's native publish path cannot be validated by
 real changeset release is the gate — watch provenance generation. The hard floor
 is 11.1.3 ([pnpm#11513](https://github.com/pnpm/pnpm/issues/11513) OIDC-404 fix);
 11.9.0 also has the 11.5.3 package-manager-binary signature verification.
+
+## Core Hot-Path Benchmark Gate — "2.5 engines" doctrine (tinybench + CodSpeed)
+
+> Infra change, 2026-06-26. Implements `.claude/core-benchmark-strategy-rfc-ru.md`. Tooling/CI/tests only — no `packages/*/src/` change → straight to `master`, no changeset. Scope is ONLY `core` + its dependency cluster; the top-level `benchmarks/` directory (competitive suite) is untouched.
+
+### Problem
+
+Per-package benchmarks (`packages/*/tests/benchmarks/`, 10 packages, 55 `*.bench.ts`) were dead weight: all on **mitata**, runnable only via a local per-package `pnpm bench` (`tsx tests/benchmarks/index.ts`), and in core's entry only **2 of 13** files were even imported (the rest commented out). On top sat a **dead vitest-bench harness** — root `vitest.config.bench.mts` (plus a `packages/type-guards` sibling importing a `vitest.config.bench.mjs` that never existed) globbed `*.bench.ts` expecting vitest `bench()`, but the files use mitata `bench()`; no script ever invoked it. No workflow ran any of them — performance regressions were untracked. Worse, leaf microbenchmarks **dilute significance**: speeding up a leaf method in isolation says nothing about its weight on the real hot path.
+
+### Solution
+
+**Three benchmark engines, each for one job ("2.5 on the project"):**
+
+| Engine | Role | Gate? |
+|---|---|---|
+| **mitata** | probe scripts + local ad-hoc wall-clock (developer tool) | no |
+| **tinybench + `@codspeed/tinybench-plugin`** | hot-path regression gate for `core` (CodSpeed instrumentation) | **yes — per PR** |
+| **vitest bench** | possible future *adapter* benches (framework render) | future |
+
+"0.5" because vitest bench is an experimental wrapper over tinybench — in the gate we use tinybench directly, no wrapper.
+
+Concretely:
+- **Deleted** all 10 per-package `tests/benchmarks/` suites + their `"bench"` scripts, the dead vitest-bench harness (both `vitest.config.bench.mts` + the `vitest.config.common.mts` comment), and the now-orphaned `mitata` devDep (root + `sources` + `route-utils`).
+- **Built** a gated hot-path suite in `packages/core/tests/benchmarks/` on tinybench. It measures the **synchronous** core hot path only (RFC §6.1 — async navigations are dominated by app-code awaits and mirror the optimistic-sync-execution invariant #307; gating their *instructions* would be double noise). Three axes: A = sync `navigate()` paths, B = route/tree worst-case shapes, C = view-layer (`buildPath`/`isActiveRoute`/`areStatesEqual`/`shouldUpdateNode`/`matchPath`).
+- **Harvested** worst-case *inputs* (not code) from the path-matcher/route-tree leaf benches before deleting them (splat backtracking, percent-decode, wide tree, deep nesting, constraints, optional params) into `fixtures.ts`, so the macro-level core benches still traverse every expensive dependency branch.
+
+**File = matcher form, process = isolation (RFC §9.2).** Megamorphism (mixing matcher option-forms at one call-site) is a *validity* problem under instrumentation, not just noise. So one router option-form per file (`default` / `strict-query` / `trailing-preserve` / `encoding-uricomponent` / `encoding-none`), and `run.ts` runs **each file in its own process** (`node --conditions=@real-router/internal-source --import tsx <file>`). Different route *data* under the *same* options stays in one file (realistic polymorphism). The old `index.ts` that imported every form into one process was the anti-pattern.
+
+**Runs from `src`, no build.** `run.ts` injects `--conditions=@real-router/internal-source`, so `@real-router/*` workspace imports resolve to `src/` (live source) exactly as `tsc` does via `customConditions` — the suite needs no prior `dist/`. `tsx` is a pinned `core` devDep (the old `npx tsx` fetched it at runtime — a CI flake source the gate must not have).
+
+### Why these choices
+
+- **Why CodSpeed instrumentation, not wall-clock:** it measures simulated CPU instructions deterministically (<1% variance on shared CI runners), and differential profiling localizes a regression to the function *inside* the macro-bench — closing the "leaf bench dilutes significance" gap without keeping leaf benches.
+- **Rejected: a mitata ↔ `@codspeed/core` bridge.** CodSpeed has no mitata plugin (no `@codspeed/mitata-plugin`; docs cover only vitest/tinybench/benchmark.js). mitata measures via a generator running its own JIT'd loop with no single-shot hook for an external instrumenter — bridging means rewriting mitata's engine. tinybench is monkeypatched cleanly by the official plugin. In the gate mitata's output/engine are unused anyway; only its `bench()` syntax would remain. Not worth it.
+- **Gate measures instructions, not time.** A red check means "more instructions — verify wall-clock with a local mitata probe", not "slower". The hot path is allocation-heavy (AbortController, spreads, freeze); instruction counts track allocation paths well but not GC bandwidth. Wall-clock truth stays in local mitata.
+
+### Discrepancies found vs the RFC (fixed correctly, not transcribed)
+
+1. **`buildTree.ts` was NOT bench-only.** The RFC said delete each `tests/benchmarks/` wholesale "including `helpers/`". But `path-matcher/tests/benchmarks/helpers/buildTree.ts` was imported by **live stress tests** (`tests/stress/*.stress.ts`, 4 files). Deleting it wholesale broke them (caught by `knip` "unresolved imports"). Fixed by **relocating** `buildTree.ts` to `path-matcher/tests/helpers/` (next to `createTestMatcher.ts`) and repointing the 4 stress imports; the stress suite stays green (20/20).
+2. **knip needs the bench files as project+entry.** The old `index.ts` *imported* the leaf benches, so knip saw `mitata` used. The new `run.ts` *spawns* files instead of importing them, so `tinybench`/`@codspeed/tinybench-plugin` looked unused. Fixed with a `packages/core` knip workspace block whose `entry` + `project` include `tests/benchmarks/*.ts` (a dependency counts as used only when imported by a **project** file).
+3. **`tsx` added as an explicit `core` devDep** (the RFC listed only `tinybench` + the plugin) — see "runs from `src`" above.
+
+### Gated to a human (cannot be validated locally)
+
+Local verification done: the suite runs (47 benches across 5 files, all green) and `type-check` / `lint` / `knip` / `lint:deps` / `lint:dedupe` pass. The following require the maintainer:
+- Create the CodSpeed project + `CODSPEED_TOKEN` secret; add a `CodSpeedHQ/action` workflow on `push: master` (baseline) + `pull_request` (compare). **Not committed here** — it would red-fail every PR until the token exists.
+- Confirm the first baseline records on `master`; run a PoC regression to confirm the gate goes red and localizes (RFC §9 step 5).
+- Set per-bench thresholds *after* the first baseline (RFC §11.3 — strict ~3–5% for hot core, lenient ≥10% for edge cases).
+- Empirically confirm process isolation holds under CodSpeed instrumentation (RFC §9.2).
+- `@codspeed/tinybench-plugin@5.7.1 × tinybench@6.0.2` instrumentation compatibility is only verifiable under CodSpeed (local *execution* is verified).
