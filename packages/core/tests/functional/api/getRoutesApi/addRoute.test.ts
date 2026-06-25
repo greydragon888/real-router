@@ -458,6 +458,17 @@ describe("core/routes/addRoute", () => {
 
       expect(path).toBe("/api/v1");
     });
+
+    it("throws when { parent } is an empty string (treated as a missing parent)", () => {
+      // `""` is no longer silently coerced into a top-level add — assertAddable
+      // checks `parentName !== undefined`, so an empty parent is a missing parent.
+      expect(() => {
+        routesApi.add({ name: "detached", path: "/detached" }, { parent: "" });
+      }).toThrow(/Parent route "" does not exist/);
+
+      expect(routesApi.has("detached")).toBe(false);
+      expect(getPluginApi(router).matchPath("/detached")).toBeUndefined();
+    });
   });
 
   describe("encodeParams/decodeParams validation", () => {
@@ -1482,6 +1493,133 @@ describe("core/routes/addRoute", () => {
       }).not.toThrow();
       expect(routesApi.has("good-after-bad")).toBe(true);
       expect(router.buildPath("home")).toBe("/home");
+    });
+  });
+
+  // add() has no isTransitioning() guard (unlike clear/replace which no-op, and
+  // remove which warns) — adding mid-navigation is intentional and benign: the
+  // in-flight transition already resolved its target and is not corrupted.
+  describe("during active navigation", () => {
+    it("is allowed mid-async-navigation and does not disturb the in-flight nav", async () => {
+      const navRouter = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "slow",
+          path: "/slow",
+          canActivate: () => () =>
+            new Promise<boolean>((resolve) => {
+              setTimeout(() => {
+                resolve(true);
+              }, 20);
+            }),
+        },
+      ]);
+      const navApi = getRoutesApi(navRouter);
+
+      await navRouter.start("/home");
+
+      const navPromise = navRouter.navigate("slow"); // async guard → in-flight
+
+      let addThrew = false;
+
+      try {
+        navApi.add({ name: "injected", path: "/injected" });
+      } catch {
+        addThrew = true;
+      }
+
+      const finalState = await navPromise;
+
+      expect(addThrew).toBe(false);
+      expect(finalState.name).toBe("slow"); // in-flight nav reached its target
+      expect(navApi.has("injected")).toBe(true); // new route available afterward
+
+      navRouter.stop();
+    });
+
+    it("called reentrantly from a canActivate guard is benign — nav completes, route added", async () => {
+      const navRouter = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "target",
+          path: "/target",
+          canActivate: (r) => () => {
+            getRoutesApi(r).add({ name: "from-guard", path: "/from-guard" });
+
+            return true;
+          },
+        },
+      ]);
+      const navApi = getRoutesApi(navRouter);
+
+      await navRouter.start("/home");
+
+      const finalState = await navRouter.navigate("target");
+
+      expect(finalState.name).toBe("target"); // nav completed despite reentrant add
+      expect(navApi.has("from-guard")).toBe(true); // route added from the guard
+
+      navRouter.stop();
+    });
+  });
+
+  // A guard factory that throws on compile surfaces during adoptRouteArtifacts'
+  // guard-registration loop, which runs AFTER the tree swap. This is the
+  // throwing-guard-factory path of prepare-then-commit (issue #698).
+  describe("guard factory that throws on compile", () => {
+    it("propagates the factory error out of add()", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      const boom: GuardFnFactory = () => {
+        throw new Error("guard factory boom");
+      };
+
+      expect(() => {
+        api.add({ name: "boomRoute", path: "/boom", canActivate: boom });
+      }).toThrow("guard factory boom");
+
+      // KNOWN LIMITATION (documented in routesStore.ts adoptRouteArtifacts):
+      // guards are compiled/registered AFTER the tree/config swap, so the new
+      // route is already in the tree even though add() threw. prepare-then-commit
+      // is atomic for core build errors (async/circular forwardTo, invalid path
+      // constraint — those throw in the build, before any swap) but NOT for a
+      // guard factory that throws on compile. This pins the current behaviour —
+      // restoring full atomicity for guards would flip this assertion to false.
+      expect(api.has("boomRoute")).toBe(true);
+
+      router.dispose();
+    });
+  });
+
+  describe("guard origin on add", () => {
+    it("external guard survives an unrelated add()", () => {
+      routesApi.add({ name: "secure", path: "/secure" });
+      lifecycle.addActivateGuard("secure", () => () => false); // external guard
+
+      expect(router.canNavigateTo("secure")).toBe(false);
+
+      routesApi.add({ name: "unrelated", path: "/unrelated" });
+
+      expect(router.canNavigateTo("secure")).toBe(false); // guard untouched by add
+    });
+
+    it("add({ canActivate }) registers a DEFINITION guard — replace() clears it", () => {
+      routesApi.add({
+        name: "sec",
+        path: "/sec",
+        canActivate: () => () => false,
+      });
+
+      expect(router.canNavigateTo("sec")).toBe(false); // config guard blocks
+
+      // replace() clears definition-sourced guards (an external guard would survive).
+      routesApi.replace([
+        { name: "home", path: "/home" },
+        { name: "sec", path: "/sec" }, // re-added without the guard
+      ]);
+
+      expect(router.canNavigateTo("sec")).toBe(true); // definition guard cleared
     });
   });
 });

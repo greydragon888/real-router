@@ -113,15 +113,24 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-a", { forwardTo: "ur-b" });
         routesApi.update("ur-b", { forwardTo: "ur-c" });
 
-        // Should throw error AND NOT corrupt forwardMap
+        // The rejected update must throw AND leave config.forwardMap clean.
         expect(() => {
           routesApi.update("ur-c", { forwardTo: "ur-a" });
         }).toThrow(/Circular forwardTo/);
 
-        // forwardMap should remain clean (without ur-c) - verify via behavior
+        // resolvedForwardMap stays consistent (rejected edge never applied).
         expect(getPluginApi(router).forwardState("ur-a", {}).name).toBe("ur-c"); // ur-a → ur-b → ur-c
         expect(getPluginApi(router).forwardState("ur-b", {}).name).toBe("ur-c"); // ur-b → ur-c
         expect(getPluginApi(router).forwardState("ur-c", {}).name).toBe("ur-c"); // ur-c stays (no forward)
+
+        // Discriminating check (issue #698): forwardState reads resolvedForwardMap,
+        // which stayed clean even WITH the old bug — so it alone cannot prove the
+        // raw config.forwardMap is clean. A subsequent add() re-runs
+        // refreshForwardMap over config.forwardMap; if the cycle edge
+        // (ur-c → ur-a) had leaked, this would throw "Circular forwardTo".
+        expect(() => {
+          routesApi.add({ name: "ur-after-cycle", path: "/ur-after-cycle" });
+        }).not.toThrow();
       });
 
       it("should not corrupt forwardMap on longer indirect cycle (A → B → C → D → A)", () => {
@@ -138,8 +147,19 @@ describe("core/routes/routeTree/updateRoute", () => {
           routesApi.update("ur-w", { forwardTo: "ur-x" });
         }).toThrow(/Circular forwardTo/);
 
-        // forwardMap should remain without ur-w → ur-x - verify via behavior
+        // resolvedForwardMap stays consistent (rejected edge never applied).
         expect(getPluginApi(router).forwardState("ur-w", {}).name).toBe("ur-w"); // ur-w stays (no forward)
+
+        // Discriminating check (issue #698): forwardState reads resolvedForwardMap,
+        // which is clean even WITH the old bug. A subsequent add() re-runs
+        // refreshForwardMap over config.forwardMap; a leaked ur-w → ur-x edge
+        // would throw "Circular forwardTo" here.
+        expect(() => {
+          routesApi.add({
+            name: "ur-after-long-cycle",
+            path: "/ur-after-long-cycle",
+          });
+        }).not.toThrow();
       });
 
       it("should preserve resolvedForwardMap consistency after cycle rejection", () => {
@@ -1388,6 +1408,39 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(getPluginApi(router).forwardState("seq-test", {}).name).toBe(
         "final-dest",
       );
+    });
+  });
+
+  describe("core contract without validation-plugin", () => {
+    it("update(nonexistent) is a silent no-op (existence check is plugin-only)", () => {
+      // Without @real-router/validation-plugin, core trusts its input and does
+      // not verify the route exists — update throws nothing and creates no route
+      // (the orphan config write is unreachable). The plugin throws here instead.
+      expect(() => {
+        routesApi.update("nonexistent", { defaultParams: { x: "1" } });
+      }).not.toThrow();
+
+      expect(routesApi.has("nonexistent")).toBe(false);
+      expect(routesApi.get("nonexistent")).toBeUndefined();
+      expect(
+        getPluginApi(router).getRouteConfig("nonexistent"),
+      ).toBeUndefined();
+    });
+
+    it("update(encodeParams) on the active route leaves state.path stale (NO_TREE_REBUILD)", async () => {
+      await router.navigate("items", { id: "abc" });
+
+      expect(router.getState()?.path).toBe("/items/abc");
+
+      routesApi.update("items", {
+        encodeParams: (params) => ({ id: `X-${params.id as string}` }),
+      });
+
+      // update() does not revalidate the active state (by-design: no tree
+      // rebuild). The committed path stays as-built; only FUTURE buildPath calls
+      // pick up the new encoder. Navigate(reload) to refresh if needed.
+      expect(router.getState()?.path).toBe("/items/abc");
+      expect(router.buildPath("items", { id: "abc" })).toBe("/items/X-abc");
     });
   });
 });

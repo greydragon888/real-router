@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
+import { errorCodes, RouterError } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
@@ -186,49 +187,79 @@ describe("getRoutesApi()", () => {
     });
   });
 
+  // Assert the specific RouterError code, not a bare `.toThrow()` (which would
+  // pass on ANY throw, masking a regression that throws for another reason).
   describe("when router is disposed", () => {
-    it("add should throw RouterError", () => {
+    it("add should throw RouterError(ROUTER_DISPOSED)", () => {
       const freshRouter = createTestRouter();
       const freshApi = getRoutesApi(freshRouter);
 
       freshRouter.dispose();
 
-      expect(() => {
+      let caught: unknown;
+
+      try {
         freshApi.add({ name: "x", path: "/x" });
-      }).toThrow();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(RouterError);
+      expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
     });
 
-    it("remove should throw RouterError", () => {
+    it("remove should throw RouterError(ROUTER_DISPOSED)", () => {
       const freshRouter = createTestRouter();
       const freshApi = getRoutesApi(freshRouter);
 
       freshRouter.dispose();
 
-      expect(() => {
+      let caught: unknown;
+
+      try {
         freshApi.remove("home");
-      }).toThrow();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(RouterError);
+      expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
     });
 
-    it("update should throw RouterError", () => {
+    it("update should throw RouterError(ROUTER_DISPOSED)", () => {
       const freshRouter = createTestRouter();
       const freshApi = getRoutesApi(freshRouter);
 
       freshRouter.dispose();
 
-      expect(() => {
+      let caught: unknown;
+
+      try {
         freshApi.update("home", {});
-      }).toThrow();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(RouterError);
+      expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
     });
 
-    it("clear should throw RouterError", () => {
+    it("clear should throw RouterError(ROUTER_DISPOSED)", () => {
       const freshRouter = createTestRouter();
       const freshApi = getRoutesApi(freshRouter);
 
       freshRouter.dispose();
 
-      expect(() => {
+      let caught: unknown;
+
+      try {
         freshApi.clear();
-      }).toThrow();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(RouterError);
+      expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
     });
   });
 });

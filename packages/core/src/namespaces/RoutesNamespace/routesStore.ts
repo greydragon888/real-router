@@ -289,8 +289,13 @@ function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
 // only swap it into the store once every core-level error has surfaced from the
 // build itself (async/circular forwardTo throw in registerAllRouteHandlers /
 // refreshForwardMap; invalid path constraint throws in rebuildTree). The store
-// is mutated only by `adoptRouteArtifacts`, which cannot throw — so a rejected
-// build leaves the existing routes untouched. The two silent-corruption cases
+// is mutated only by `adoptRouteArtifacts`: its tree/config assignments cannot
+// throw, but it also compiles and registers the prepared guards, so a guard
+// factory that throws on compile (or returns a non-function) surfaces there —
+// after the swap. Core-level build errors (async/circular forwardTo, invalid
+// path constraint) are surfaced in the build and leave the existing routes
+// untouched; a malformed guard factory is the one residual that throws
+// post-swap (known limitation). The two silent-corruption cases
 // route-tree never throws on (duplicate name vs an existing route, missing
 // parent) are caught up front by `assertAddable`.
 // =============================================================================
@@ -487,11 +492,14 @@ export function buildReplaceArtifacts<Dependencies extends DefaultDependencies>(
 }
 
 /**
- * Commits prepared artifacts into the store in place. Pure assignment — never
- * throws — so it is the single atomic swap point of the prepare-then-commit
- * pipeline. Guard registration is deferred to here (the build collected guards
- * without compiling); `depsStore` is always set on a wired router, which is the
- * only path that reaches `add`/`replace`.
+ * Commits prepared artifacts into the store in place. The tree/config
+ * assignments are pure and cannot throw; guard registration is deferred to here
+ * (the build collected guards without compiling) and compiles each factory, so
+ * it WILL re-throw if a guard factory throws on compile (or returns a
+ * non-function) — the one residual that can throw after the swap (known
+ * limitation; for well-formed guards adopt is the atomic swap point).
+ * `depsStore` is always set on a wired router, which is the only path that
+ * reaches `add`/`replace`.
  */
 export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,

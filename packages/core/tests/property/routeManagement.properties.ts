@@ -47,6 +47,32 @@ describe("Route Management (getRoutesApi) Properties", () => {
     },
   );
 
+  test.prop([fc.uniqueArray(arbSegmentName, { minLength: 1, maxLength: 5 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "add → NO_REGRESSION: existing routes are structurally unchanged after adding new routes",
+    (newNames) => {
+      fc.pre(newNames.every((n) => !FIXTURE_ROUTE_NAMES.includes(n as never)));
+
+      const router = createFixtureRouter();
+      const routesApi = getRoutesApi(router);
+
+      // Snapshot every pre-existing route's full config BEFORE the add.
+      const before = new Map(
+        FIXTURE_ROUTE_NAMES.map((name) => [name, routesApi.get(name)]),
+      );
+
+      routesApi.add(newNames.map((name) => ({ name, path: `/${name}` })));
+
+      // Adding new (top-level) routes must not mutate any existing route —
+      // catches the historical dup-overwrite/torn-merge class (issue #698).
+      for (const name of FIXTURE_ROUTE_NAMES) {
+        expect(routesApi.has(name)).toBe(true);
+        expect(routesApi.get(name)).toStrictEqual(before.get(name));
+      }
+    },
+  );
+
   test.prop(
     [
       fc.constantFrom(

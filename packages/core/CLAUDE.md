@@ -351,17 +351,35 @@ When navigating FROM `UNKNOWN_ROUTE` state, `navigate()` auto-forces `replace: t
 
 `getRoutesApi(router).replace(routes)` atomically replaces all routes in one operation.
 
-**Semantics** (6-step pipeline):
-1. **Blocking** — `throwIfDisposed()`, silent no-op during active navigation
-2. **Validation** — fail-fast, tree unchanged on error (atomicity)
-3. **Clear route data** — `clearRouteData()` (without tree rebuild)
+**Semantics** (prepare-then-commit / build-then-swap, #698):
+1. **Blocking** — `throwIfDisposed()`; logged no-op during active navigation (`validateClearRoutes` → `logger.error`, returns `false`)
+2. **Validation** — fail-fast structural guards, tree unchanged on error (atomicity)
+3. **Build artifacts into locals** — `buildReplaceArtifacts()` builds the whole new `definitions`/`config`/`tree`/`matcher`/`forwardMap` in temporary structures; a circular/async `forwardTo` or invalid path **throws here**, before the store is touched — so atomicity holds even without validation-plugin
 4. **Clear definition guards** — `clearDefinitionGuards()` preserves external guards
-5. **Register new routes** — sanitize + `registerAllRouteHandlers()`
-6. **Single tree rebuild + state revalidation** — `commitTreeChanges()` + `matchPath(currentPath)`
+5. **Atomic swap** — `adoptRouteArtifacts()` assigns the prepared artifacts into the store in one pass (pure assignment, never throws) and registers the collected guards
+6. **State revalidation** — `matchPath(currentPath)` → `setState()` (path still matches) or `clearState()` (no match). Revalidation writes state **without emitting** a transition event, so `subscribe`/`useSyncExternalStore` adapters are not notified of this state change (open design question — see audit `route-crud-atomicity-root-cause-2026-06-04.md`).
 
-**Guard origin tracking**: `RouteLifecycleNamespace` tracks guard origins via `isFromDefinition` parameter on `addCanActivate()`/`addCanDeactivate()` with two tracking Sets (`#definitionActivateGuardNames`, `#definitionDeactivateGuardNames`). `clearDefinitionGuards()` clears only definition-sourced guards; external guards survive `replace()`.
+**Guard origin tracking**: `RouteLifecycleNamespace` tracks guard origins with four Maps split by origin (`#definitionActivateFactories` / `#externalActivateFactories` / `#definitionDeactivateFactories` / `#externalDeactivateFactories`), populated via the `isFromDefinition` parameter on `addCanActivate()`/`addCanDeactivate()`. `clearDefinitionGuards()` clears only the two definition Maps; external guards survive `replace()`.
 
-**Key files**: `getRoutesApi.ts` (`replaceRoutes` helper), `RouteLifecycleNamespace.ts` (guard tracking), `routesStore.ts` (`clearRouteData()`).
+**Key files**: `getRoutesApi.ts` (`replaceRoutes` helper), `routesStore.ts` (`buildReplaceArtifacts()` / `adoptRouteArtifacts()`), `RouteLifecycleNamespace.ts` (guard tracking).
+
+### Route CRUD during active navigation
+
+The five mutating route-CRUD ops react differently to an in-flight navigation (`isTransitioning()`):
+
+| Op        | During navigation                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------------- |
+| `add`     | no check — proceeds silently                                                                          |
+| `update`  | `logger.error` warning, then **proceeds** (an in-flight navigate may read the new config)             |
+| `remove`  | non-active route: `logger.warn`, proceeds; active route: `logger.warn`, **no-op** (always blocked)   |
+| `clear`   | `logger.error`, **no-op** (blocked)                                                                   |
+| `replace` | `logger.error`, **no-op** (blocked — shares `validateClearRoutes`)                                    |
+
+The asymmetry is intentional: `clear`/`replace` are destructive whole-tree swaps (blocked mid-navigation), while `add`/`update` are incremental and benign (the in-flight transition already resolved its target). `add` has no guard at all — the contract "add is allowed during navigation" is verified benign (no corruption of the in-flight nav).
+
+### `update()` does not revalidate the active state
+
+`getRoutesApi(router).update(name, ...)` mutates config in place and **does not rebuild the tree or recompute the current state** (NO_TREE_REBUILD). So when you update the **currently-active** route's `encodeParams` / `decodeParams` / `defaultParams` / `forwardTo`, the committed `getState().path` keeps the value built by the *old* config — it can disagree with a fresh `buildPath(name, params)` until the next navigation. This is by-design (update is O(1), not a re-navigation); call `router.navigate(name, params, { reload: true })` if you need the active path rebuilt with the new config.
 
 ### Plugin System
 

@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter, errorCodes } from "@real-router/core";
+import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import {
   getLifecycleApi,
   getPluginApi,
@@ -446,7 +446,9 @@ describe("core/routes/replaceRoutes", () => {
       await router.navigate("home");
 
       // Definition guard now blocks navigation
-      await expect(router.navigate("contested")).rejects.toThrow();
+      await expect(router.navigate("contested")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
     });
 
     it("replace() clears the definition slot but preserves a co-existing external guard's compiled function (cross-origin)", async () => {
@@ -515,7 +517,7 @@ describe("core/routes/replaceRoutes", () => {
         canActivate: () => () => false,
       });
 
-      // Remove the guard externally — should clear from definitionActivateGuardNames
+      // Remove the guard externally — clears the entry from #definitionActivateFactories
       lifecycle.removeActivateGuard("removable");
 
       // Navigation works now (guard removed)
@@ -641,9 +643,16 @@ describe("core/routes/replaceRoutes", () => {
     it("should throw RouterError(ROUTER_DISPOSED) after dispose", () => {
       router.dispose();
 
-      expect(() => {
+      let caught: unknown;
+
+      try {
         routesApi.replace([{ name: "after-dispose", path: "/after-dispose" }]);
-      }).toThrow();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(RouterError);
+      expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
     });
   });
 
@@ -662,7 +671,7 @@ describe("core/routes/replaceRoutes", () => {
       errorSpy.mockRestore();
     });
 
-    it("should be a silent no-op during active navigation (logger.error, no exception)", async () => {
+    it("is a logged no-op during active navigation (logger.error, no exception)", async () => {
       let resolveCanActivate!: () => void;
 
       routesApi.add({
@@ -685,7 +694,7 @@ describe("core/routes/replaceRoutes", () => {
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Replace during navigation — should be blocked (silent no-op)
+      // Replace during navigation — should be blocked (logged no-op)
       routesApi.replace([{ name: "replacement", path: "/replacement" }]);
 
       // Logger should have been called
@@ -699,6 +708,66 @@ describe("core/routes/replaceRoutes", () => {
       // Resolve guard to let navigation complete
       resolveCanActivate();
       await navigationPromise;
+    });
+  });
+
+  describe("reentrancy", () => {
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
+    it("is a logged no-op when called from a subscribeLeave listener (LEAVE_APPROVED phase)", async () => {
+      let replaceRan = false;
+
+      const unsub = router.subscribeLeave(() => {
+        // isTransitioning() is true in LEAVE_APPROVED → replace must no-op.
+        routesApi.replace([
+          { name: "leave-replaced", path: "/leave-replaced" },
+        ]);
+        replaceRan = true;
+      });
+
+      await router.navigate("admin.dashboard");
+
+      expect(replaceRan).toBe(true); // listener fired in the LEAVE_APPROVED phase
+      expect(errorSpy).toHaveBeenCalled(); // blocked via logger.error
+      // Tree UNCHANGED — the mid-transition replace was a no-op.
+      expect(routesApi.has("home")).toBe(true);
+      expect(routesApi.has("admin.dashboard")).toBe(true);
+      expect(routesApi.has("leave-replaced")).toBe(false);
+
+      unsub();
+    });
+
+    it("is allowed when called from a subscribe listener (post-commit, READY)", async () => {
+      let replaced = false;
+
+      const unsub = router.subscribe(() => {
+        if (replaced) {
+          return;
+        }
+
+        replaced = true;
+        // FSM is READY at TRANSITION_SUCCESS (isTransitioning() false) → allowed.
+        routesApi.replace([{ name: "post-commit", path: "/post-commit" }]);
+      });
+
+      await router.navigate("admin.dashboard");
+
+      expect(replaced).toBe(true);
+      expect(errorSpy).not.toHaveBeenCalled(); // not blocked
+      // The reentrant replace took effect — old tree swapped out.
+      expect(routesApi.has("post-commit")).toBe(true);
+      expect(routesApi.has("home")).toBe(false);
+      expect(routesApi.has("admin.dashboard")).toBe(false);
+
+      unsub();
     });
   });
 
