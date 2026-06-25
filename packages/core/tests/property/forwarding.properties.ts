@@ -128,3 +128,56 @@ describe("forwardState over generative dynamic + mixed chains (#916)", () => {
     },
   );
 });
+
+// =============================================================================
+// Generative cycle detection (#4)
+//
+// The acyclic chains above prove termination; cycles are the other half of
+// FORWARD_TERMINATION. A static forward cycle is opaque to nothing — it is
+// resolved eagerly at build time (`refreshForwardMap` → `resolveForwardChain`)
+// and rejected when the router is created. A dynamic cycle is opaque to the
+// build (callbacks are not walked there) and is caught only when the chain is
+// resolved at runtime (`#resolveDynamicForward`'s visited-set / MAX_DEPTH).
+// These properties drive both detectors over generated cycle lengths (incl. the
+// L=1 self-forward).
+// =============================================================================
+
+/** Cycle length: 1 (self-forward) … 6. */
+const arbCycleLength = fc.integer({ min: 1, max: 6 });
+
+/** Routes c0…c{L-1} forming a closed forward loop `c{i} → c{(i+1) mod L}`. */
+function createCyclicRoutes(length: number, dynamic: boolean): Route[] {
+  return Array.from({ length }, (_, i) => {
+    const next = `c${(i + 1) % length}`;
+
+    return {
+      name: `c${i}`,
+      path: `/c${i}`,
+      forwardTo: dynamic ? () => next : next,
+    };
+  });
+}
+
+describe("forwardState cycle detection over generative cycles (#4)", () => {
+  test.prop([arbCycleLength], { numRuns: NUM_RUNS.standard })(
+    "static forward cycle is rejected at router creation",
+    (length) => {
+      expect(() => createRouter(createCyclicRoutes(length, false))).toThrow(
+        /Circular forwardTo|maximum depth/,
+      );
+    },
+  );
+
+  test.prop([arbCycleLength], { numRuns: NUM_RUNS.standard })(
+    "dynamic forward cycle throws when resolved by forwardState",
+    (length) => {
+      // Dynamic forwardTo is opaque to the build, so creation succeeds; the
+      // cycle surfaces only when the chain is walked.
+      const router = createRouter(createCyclicRoutes(length, true));
+
+      expect(() => getPluginApi(router).forwardState("c0", {})).toThrow(
+        /Circular forwardTo|maximum depth/,
+      );
+    },
+  );
+});
