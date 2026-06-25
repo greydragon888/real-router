@@ -1,0 +1,47 @@
+/**
+ * Core hot-path benchmarks — `urlParamsEncoding: "none"` matcher form.
+ *
+ * The pass-through encode/decode strategy. Isolated in its own file/process so
+ * its encode-strategy call-site stays monomorphic under instrumentation,
+ * distinct from the default and uriComponent forms (§9.2 / §6.6.1).
+ */
+import { keep, makeBench } from "./fixtures";
+import { createRouter } from "../../src";
+import { getPluginApi } from "../../src/api";
+
+import type { Route } from "../../src";
+
+async function main(): Promise<void> {
+  const bench = makeBench("encoding-none");
+
+  const routes: Route[] = [{ name: "user", path: "/users/:id" }];
+
+  {
+    const router = createRouter(routes, { urlParamsEncoding: "none" });
+
+    await router.start("/users/seed");
+    const api = getPluginApi(router);
+
+    bench.add("matchPath/encoding-none", () => {
+      keep(api.matchPath("/users/plainvalue"));
+    });
+  }
+
+  {
+    const router = createRouter(routes, { urlParamsEncoding: "none" });
+
+    await router.start("/users/seed");
+
+    bench.add("buildPath/encoding-none", () => {
+      keep(router.buildPath("user", { id: "plainvalue" }));
+    });
+  }
+
+  await bench.run();
+  console.table(bench.table());
+}
+
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

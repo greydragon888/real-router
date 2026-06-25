@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createMatcher } from "../benchmarks/helpers/buildTree";
+import { createMatcher } from "../helpers/buildTree";
 
 /**
  * Anti-quadratic guards for `match()` on pathologically large inputs.

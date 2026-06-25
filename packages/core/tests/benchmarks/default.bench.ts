@@ -1,0 +1,441 @@
+/**
+ * Core hot-path benchmarks — DEFAULT matcher form (no option overrides).
+ *
+ * Covers (RFC §6.3):
+ *   Axis A — synchronous `navigate()` paths.
+ *   Axis C — view-layer: `buildPath` (warm), `isActiveRoute`, `areStatesEqual`,
+ *            `shouldUpdateNode`, `matchPath`.
+ *   Axis B — worst-case route/tree inputs reachable under default options
+ *            (splat backtracking, percent-decode, wide tree, deep nesting,
+ *            constraints, optional params). HARVESTED from the removed
+ *            path-matcher / route-tree leaf benches (§6.5 / §9.1).
+ *
+ * Different route data under the SAME (default) options is realistic
+ * polymorphism, not megamorphism — option-specific forms (strict-query /
+ * trailing-preserve / encoding) live in their own files (§9.2). Setup (routers
+ * built + started, states captured) happens outside the measured task fns.
+ */
+import {
+  deepName,
+  deepPath,
+  deepRoutes,
+  keep,
+  makeBench,
+  noopSuccessPlugin,
+  passthroughGuardFactory,
+  splatRoutes,
+  wideRoutes,
+} from "./fixtures";
+import { createRouter } from "../../src";
+import { getLifecycleApi, getPluginApi } from "../../src/api";
+
+import type { Route } from "../../src";
+
+async function main(): Promise<void> {
+  const bench = makeBench("default");
+
+  // ========================================================================
+  // Axis A — navigate() synchronous paths
+  // ========================================================================
+
+  // sync-baseline: flat, no guards, no leave listeners — purest sync path.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "about", path: "/about" },
+      { name: "users", path: "/users" },
+    ]);
+
+    await router.start("/");
+    const targets = ["about", "users", "home"] as const;
+    let i = 0;
+
+    bench.add("navigate/sync-baseline", () => {
+      void router.navigate(targets[i++ % targets.length]);
+    });
+  }
+
+  // same-state fast-reject: navigate to the current route (cached rejection).
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "about", path: "/about" },
+    ]);
+
+    await router.start("/about");
+
+    bench.add("navigate/same-state-reject", () => {
+      void router.navigate("about");
+    });
+  }
+
+  // sync-guards: 3 passthrough activate guards (AbortController alloc+release, #722).
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "page", path: "/page" },
+    ]);
+
+    for (let g = 0; g < 3; g++) {
+      getLifecycleApi(router).addActivateGuard("page", passthroughGuardFactory);
+    }
+
+    await router.start("/");
+    const targets = ["page", "home"] as const;
+    let i = 0;
+
+    bench.add("navigate/sync-guards", () => {
+      void router.navigate(targets[i++ % targets.length]);
+    });
+  }
+
+  // deep transition: long activate/deactivate chain (nested 5 / 10).
+  for (const depth of [5, 10]) {
+    const router = createRouter(deepRoutes(depth));
+
+    await router.start("/l0");
+    const targets = [deepName(depth), "l0"] as const;
+    let i = 0;
+
+    bench.add(`navigate/deep-${String(depth)}`, () => {
+      void router.navigate(targets[i++ % targets.length]);
+    });
+  }
+
+  // forwardTo redirect (members → users).
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "users", path: "/users" },
+      { name: "members", path: "/members", forwardTo: "users" },
+    ]);
+
+    await router.start("/");
+    const targets = ["members", "home"] as const;
+    let i = 0;
+
+    bench.add("navigate/forwardTo", () => {
+      void router.navigate(targets[i++ % targets.length]);
+    });
+  }
+
+  // N-plugin onTransitionSuccess fan-out (1 / 3 / 5).
+  for (const count of [1, 3, 5]) {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "page", path: "/page" },
+    ]);
+
+    for (let p = 0; p < count; p++) {
+      router.usePlugin(noopSuccessPlugin);
+    }
+
+    await router.start("/");
+    const targets = ["page", "home"] as const;
+    let i = 0;
+
+    bench.add(`navigate/plugins-${String(count)}`, () => {
+      void router.navigate(targets[i++ % targets.length]);
+    });
+  }
+
+  // N sync subscribeLeave listeners (1 / 3) — AbortController + frozen LeaveState.
+  for (const count of [1, 3]) {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "about", path: "/about" },
+      { name: "users", path: "/users" },
+    ]);
+
+    for (let l = 0; l < count; l++) {
+      router.subscribeLeave(() => {});
+    }
+
+    await router.start("/");
+    const targets = ["about", "users", "home"] as const;
+    let i = 0;
+
+    bench.add(`navigate/leave-${String(count)}`, () => {
+      void router.navigate(targets[i++ % targets.length]);
+    });
+  }
+
+  // ========================================================================
+  // Axis C — view layer
+  // ========================================================================
+
+  const view = createRouter([
+    { name: "home", path: "/" },
+    {
+      name: "users",
+      path: "/users",
+      children: [
+        { name: "list", path: "/list" },
+        {
+          name: "view",
+          path: "/view/:id",
+          children: [{ name: "settings", path: "/settings" }],
+        },
+      ],
+    },
+    {
+      name: "withDefaults",
+      path: "/wd/:id?tab",
+      defaultParams: { tab: "overview" },
+    },
+    {
+      name: "encoded",
+      path: "/enc/:id",
+      encodeParams: (params) => ({ ...params, id: `e-${params.id as string}` }),
+    },
+    { name: "files", path: "/files/*path" },
+  ]);
+
+  await view.start("/");
+  const fromState = await view.navigate("users.list");
+  const toState = await view.navigate("users.view", { id: "123" });
+
+  // buildPath (warm — after start(), options cached).
+  bench.add("buildPath/warm-static", () => {
+    keep(view.buildPath("users.list"));
+  });
+  bench.add("buildPath/warm-params", () => {
+    keep(view.buildPath("users.view", { id: "123" }));
+  });
+  bench.add("buildPath/warm-defaultParams", () => {
+    keep(view.buildPath("withDefaults", { id: "5" }));
+  });
+  bench.add("buildPath/warm-encoder", () => {
+    keep(view.buildPath("encoded", { id: "x" }));
+  });
+  bench.add("buildPath/warm-splat", () => {
+    keep(view.buildPath("files", { path: "a/b/c" }));
+  });
+
+  // isActiveRoute — active state is users.view {id:123}.
+  bench.add("state/isActiveRoute-exact", () => {
+    keep(view.isActiveRoute("users.view", { id: "123" }));
+  });
+  bench.add("state/isActiveRoute-parent", () => {
+    keep(view.isActiveRoute("users"));
+  });
+  bench.add("state/isActiveRoute-sibling", () => {
+    keep(view.isActiveRoute("users.list"));
+  });
+  bench.add("state/isActiveRoute-strict", () => {
+    keep(view.isActiveRoute("users.view", { id: "123" }, true));
+  });
+  {
+    const navbar = [
+      "home",
+      "users",
+      "users.list",
+      "users.view",
+      "withDefaults",
+    ];
+
+    bench.add("state/isActiveRoute-navbar-5", () => {
+      for (const name of navbar) {
+        keep(view.isActiveRoute(name));
+      }
+    });
+  }
+
+  // shouldUpdateNode — N-node batch (legitimate getTransitionPath ref-cache, §6.6.2).
+  {
+    const names = ["home", "users", "users.list", "users.view", "withDefaults"];
+    const predicates = names.map((name) => view.shouldUpdateNode(name));
+
+    bench.add("state/shouldUpdateNode-batch", () => {
+      for (const predicate of predicates) {
+        keep(predicate(toState, fromState));
+      }
+    });
+  }
+
+  // areStatesEqual — two states differing only in a query param.
+  {
+    const eq = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page" },
+    ]);
+
+    await eq.start("/");
+    const sA = await eq.navigate("search", { q: "a", page: "1" });
+    const sB = await eq.navigate("search", { q: "a", page: "2" });
+
+    bench.add("state/areStatesEqual-ignoreQuery", () => {
+      keep(eq.areStatesEqual(sA, sB));
+    });
+    bench.add("state/areStatesEqual-fullCompare", () => {
+      keep(eq.areStatesEqual(sA, sB, false));
+    });
+  }
+
+  // ========================================================================
+  // Axis B — matchPath worst-case inputs (default options)
+  // ========================================================================
+
+  const matchCases: {
+    name: string;
+    routes: Route[];
+    start: string;
+    url: string;
+  }[] = [
+    {
+      name: "matchPath/flat",
+      routes: [
+        { name: "home", path: "/" },
+        { name: "about", path: "/about" },
+        { name: "users", path: "/users" },
+      ],
+      start: "/",
+      url: "/users",
+    },
+    {
+      name: "matchPath/nested-4",
+      routes: [
+        {
+          name: "app",
+          path: "/app",
+          children: [
+            {
+              name: "users",
+              path: "/users",
+              children: [
+                {
+                  name: "view",
+                  path: "/:id",
+                  children: [{ name: "settings", path: "/settings" }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      start: "/app/users/1/settings",
+      url: "/app/users/123/settings",
+    },
+    {
+      name: "matchPath/search-params",
+      routes: [
+        { name: "home", path: "/" },
+        { name: "search", path: "/search?q&page&category" },
+      ],
+      start: "/",
+      url: "/search?q=hello&page=1&category=books",
+    },
+    {
+      name: "matchPath/forwardTo",
+      routes: [
+        { name: "home", path: "/" },
+        { name: "users", path: "/users" },
+        { name: "members", path: "/members", forwardTo: "users" },
+      ],
+      start: "/",
+      url: "/members",
+    },
+    {
+      name: "matchPath/defaultParams",
+      routes: [
+        { name: "home", path: "/" },
+        {
+          name: "users",
+          path: "/users?sort&page",
+          defaultParams: { sort: "asc", page: "1" },
+        },
+      ],
+      start: "/",
+      url: "/users?sort=desc",
+    },
+    {
+      name: "matchPath/splat-backtrack",
+      routes: splatRoutes(50),
+      start: "/base",
+      url: "/base/unknown/deep/path",
+    },
+    {
+      name: "matchPath/utf8-decode",
+      routes: [{ name: "user", path: "/users/:id" }],
+      start: "/users/seed",
+      url: "/users/%E4%B8%AD%E6%96%87%E6%B5%8B%E8%AF%95",
+    },
+    {
+      name: "matchPath/multi-decode",
+      routes: [
+        {
+          name: "a",
+          path: "/a/:p1",
+          children: [{ name: "b", path: "/b/:p2" }],
+        },
+      ],
+      start: "/a/seed/b/seed",
+      url: "/a/hello%20world/b/foo%26bar",
+    },
+    {
+      name: "matchPath/wide-500",
+      routes: wideRoutes(500),
+      start: "/route0",
+      url: "/route250",
+    },
+    {
+      name: "matchPath/deep-10",
+      routes: deepRoutes(10),
+      start: "/l0",
+      url: deepPath(10),
+    },
+    {
+      name: "matchPath/constraints",
+      routes: [
+        {
+          name: "r",
+          path: String.raw`/a/:p1<\d+>/:p2<[a-z]+>/:p3<\d+>/:p4<[a-z]+>/:p5<\d+>`,
+        },
+      ],
+      start: "/a/1/abc/2/def/3",
+      url: "/a/1/abc/2/def/3",
+    },
+    {
+      name: "matchPath/constraints-uuid",
+      routes: [
+        {
+          name: "entity",
+          path: "/entities/:id<[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>",
+        },
+      ],
+      start: "/entities/550e8400-e29b-41d4-a716-446655440000",
+      url: "/entities/550e8400-e29b-41d4-a716-446655440000",
+    },
+    {
+      name: "matchPath/optional-present",
+      routes: [{ name: "profile", path: "/profiles/:id?" }],
+      start: "/profiles",
+      url: "/profiles/456",
+    },
+    {
+      name: "matchPath/optional-absent",
+      routes: [{ name: "profile", path: "/profiles/:id?" }],
+      start: "/profiles/seed",
+      url: "/profiles",
+    },
+  ];
+
+  for (const matchCase of matchCases) {
+    const router = createRouter(matchCase.routes);
+
+    await router.start(matchCase.start);
+    const api = getPluginApi(router);
+
+    bench.add(matchCase.name, () => {
+      keep(api.matchPath(matchCase.url));
+    });
+  }
+
+  await bench.run();
+  console.table(bench.table());
+}
+
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createMatcher } from "../benchmarks/helpers/buildTree";
+import { createMatcher } from "../helpers/buildTree";
 
 /**
  * Correctness-at-scale + throughput guards for splat backtracking (INVARIANTS

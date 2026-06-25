@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { createMatcher } from "../benchmarks/helpers/buildTree";
+import { createMatcher } from "../helpers/buildTree";
 
-import type { SimpleRoute } from "../benchmarks/helpers/buildTree";
+import type { SimpleRoute } from "../helpers/buildTree";
 
 /**
  * Scale guard for trie registration breadth.

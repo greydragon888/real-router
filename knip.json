@@ -123,6 +123,16 @@
         "config": ["vitest.config.mts"]
       }
     },
+    "packages/core": {
+      "entry": ["tests/benchmarks/*.bench.ts"],
+      "project": ["src/**/*.{ts,tsx}", "tests/benchmarks/*.ts"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      },
+      "stryker": {
+        "config": ["stryker.config.mjs"]
+      }
+    },
     "packages/*": {
       "project": ["src/**/*.{ts,tsx}"],
       "vitest": {

@@ -91,7 +91,7 @@
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
-    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
+    "bench": "tsx tests/benchmarks/run.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
@@ -105,7 +105,10 @@
     "@real-router/types": "workspace:^"
   },
   "devDependencies": {
+    "@codspeed/tinybench-plugin": "5.7.1",
     "event-emitter": "workspace:^",
-    "route-tree": "workspace:^"
+    "route-tree": "workspace:^",
+    "tinybench": "6.0.2",
+    "tsx": "4.22.4"
   }
 }

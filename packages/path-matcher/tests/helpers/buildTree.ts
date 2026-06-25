@@ -1,19 +1,19 @@
 /**
- * Lightweight tree builder for path-matcher benchmarks.
+ * Lightweight tree builder for path-matcher stress tests.
  *
  * Constructs MatcherInputNode objects from simple route definitions
  * using path-matcher's own buildParamMeta. Avoids circular dependency
  * on route-tree (which depends on path-matcher at runtime).
  */
 
-import { buildParamMeta } from "../../../src";
-import { createTestMatcher } from "../../helpers/createTestMatcher";
+import { buildParamMeta } from "../../src";
+import { createTestMatcher } from "./createTestMatcher";
 
 import type {
   MatcherInputNode,
   SegmentMatcherOptions,
   SegmentMatcher,
-} from "../../../src";
+} from "../../src";
 
 export interface SimpleRoute {
   name: string;

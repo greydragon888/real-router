@@ -99,7 +99,6 @@ function workspaceSourceAliases(): Record<string, string> {
  * This base configuration contains settings that are common to:
  * - Unit/Integration tests (vitest.config.unit.mts)
  * - Property-based tests (vitest.config.properties.mts)
- * - Benchmarks (vitest.config.bench.mts)
  * - Mutation testing (vitest.stryker.config.mts)
  *
  * Specialized configs extend this using mergeConfig() and override specific settings.

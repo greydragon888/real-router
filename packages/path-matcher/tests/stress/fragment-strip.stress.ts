@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createMatcher } from "../benchmarks/helpers/buildTree";
+import { createMatcher } from "../helpers/buildTree";
 
 /**
  * Scale / throughput guards for the post-query fragment strip (#842).
