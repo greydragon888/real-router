@@ -122,67 +122,52 @@ describe("router.start() - state object scenarios", () => {
       it("should return ROUTE_NOT_FOUND error for non-existent route path", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        try {
-          await router.start("/nonexistent");
+        await expect(router.start("/nonexistent")).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          // Router should not be started
-          expect(router.isActive()).toBe(false);
-
-          expect(error).toBeDefined();
-          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-
-          // Router state should remain undefined
-          expect(router.getState()).toBeUndefined();
-        }
+        // Router should not be started, state should remain undefined
+        expect(router.isActive()).toBe(false);
+        expect(router.getState()).toBeUndefined();
       });
 
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
       it("should return ROUTE_NOT_FOUND error for completely invalid route path", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        try {
-          await router.start("/invalid");
+        await expect(router.start("/invalid")).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(router.isActive()).toBe(false);
-
-          expect(error).toBeDefined();
-          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-
-          expect(router.getState()).toBeUndefined();
-        }
+        expect(router.isActive()).toBe(false);
+        expect(router.getState()).toBeUndefined();
       });
 
-      it("should handle empty path string", async () => {
+      it("should resolve empty path string to the root index route", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        try {
-          await router.start("");
+        // FINDING (#13): the original test wrapped this in
+        // `try { await router.start(""); expect.fail() } catch (e) { expect(e).toBeDefined() }`
+        // and "passed" — but only because `expect.fail()` throws an AssertionError
+        // that its OWN catch swallows and asserts `toBeDefined()` on. start("") does
+        // NOT reject: the empty string normalizes to the root path "/" and matches
+        // the `index` route. Assert the real behavior.
+        const state = await router.start("");
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error).toBeDefined();
-        }
+        expect(state.name).toBe("index");
+        expect(state.path).toBe("/");
+        expect(router.isActive()).toBe(true);
       });
 
       it("should handle invalid path", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        try {
-          await router.start("/missing-name");
+        await expect(router.start("/missing-name")).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(router.isActive()).toBe(false);
-
-          expect(error).toBeDefined();
-          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-
-          expect(router.getState()).toBeUndefined();
-        }
+        expect(router.isActive()).toBe(false);
+        expect(router.getState()).toBeUndefined();
       });
 
       it("should successfully navigate to valid path with params", async () => {
@@ -629,14 +614,9 @@ describe("router.start() - state object scenarios", () => {
           path: "/nonexistent",
         };
 
-        try {
-          await router.start(invalidState.path);
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error).toBeDefined();
-          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        }
+        await expect(router.start(invalidState.path)).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
       });
 
       it("should not start router when invalid state object is provided", async () => {
@@ -737,14 +717,9 @@ describe("router.start() - state object scenarios", () => {
           path: "/deeply/nested/invalid",
         };
 
-        try {
-          await router.start(invalidState.path);
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error).toBeDefined();
-          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        }
+        await expect(router.start(invalidState.path)).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
       });
     });
 

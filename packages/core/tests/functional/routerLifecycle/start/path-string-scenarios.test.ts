@@ -273,26 +273,106 @@ describe("router.start() - path string scenarios", () => {
 
     it("should handle whitespace-only path as invalid route", async () => {
       router = createTestRouter({ allowNotFound: false });
-      try {
-        await router.start(" ".repeat(3)); // Whitespace is truthy, passed to matchPath, returns undefined
 
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      // Whitespace is truthy, passed to matchPath, returns undefined
+      await expect(router.start(" ".repeat(3))).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should handle path with double slashes", async () => {
       router = createTestRouter({ allowNotFound: false });
-      try {
-        await router.start("//users//list//"); // Double slashes are likely not matched by routes
 
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      // Double slashes are likely not matched by routes
+      await expect(router.start("//users//list//")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+    });
+
+    // --- #14: boundary / hostile path inputs to start() ---
+    // No unicode route exists in the test fixture, so an unmatched unicode path
+    // is exercised under both not-found policies.
+
+    it("rejects a non-ASCII (unicode) path when allowNotFound is false", async () => {
+      router = createTestRouter({ allowNotFound: false });
+
+      await expect(router.start("/пользователи/тест")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+    });
+
+    it("routes a non-ASCII (unicode) path to UNKNOWN_ROUTE with the path preserved verbatim when allowNotFound is true", async () => {
+      router = createTestRouter({ allowNotFound: true });
+
+      const state = await router.start("/пользователи/тест");
+
+      expect(state.name).toBe(constants.UNKNOWN_ROUTE);
+      // The unicode is preserved un-mangled in state.path (no silent corruption).
+      expect(state.path).toBe("/пользователи/тест");
+      expect(router.isActive()).toBe(true);
+    });
+
+    it("matches a percent-encoded path and decodes the param value", async () => {
+      router = createTestRouter({ allowNotFound: false });
+
+      // "%D1%82%D0%B5%D1%81%D1%82" is UTF-8 for "тест".
+      const state = await router.start("/items/%D1%82%D0%B5%D1%81%D1%82");
+
+      expect(state.name).toBe("items");
+      // The param is decoded back to its unicode form...
+      expect(state.params).toStrictEqual({ id: "тест" });
+      // ...while state.path keeps the encoded representation.
+      expect(state.path).toBe("/items/%D1%82%D0%B5%D1%81%D1%82");
+    });
+
+    it("rejects a very long unmatched path without crashing", async () => {
+      router = createTestRouter({ allowNotFound: false });
+
+      // 10k-char single segment matches no route.
+      const longPath = `/${"a".repeat(10_000)}`;
+
+      await expect(router.start(longPath)).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+    });
+
+    it("matches a very long param value without crashing (no RangeError)", async () => {
+      router = createTestRouter({ allowNotFound: false });
+
+      const longId = "a".repeat(10_000);
+      const state = await router.start(`/items/${longId}`);
+
+      expect(state.name).toBe("items");
+      expect(state.params).toStrictEqual({ id: longId });
+    });
+
+    // FINDING (#14): a NUL byte in the URL is NOT rejected or sanitized — it is
+    // silently accepted as a route param value (round-trips into state.params.id
+    // as " ", with state.path percent-encoded to "/items/%00"). The matcher
+    // treats it as an ordinary segment character. Documented here as current
+    // behavior; whether this should be rejected is a separate question.
+    it("accepts a NUL byte as a route param value (current behavior, allowNotFound false)", async () => {
+      router = createTestRouter({ allowNotFound: false });
+
+      const state = await router.start("/items/\0");
+
+      expect(state.name).toBe("items");
+      expect(state.params).toStrictEqual({ id: "\0" });
+      expect(state.path).toBe("/items/%00");
+      expect(router.isActive()).toBe(true);
+    });
+
+    // FINDING (#14): control characters (U+0001, U+0002) are likewise accepted
+    // verbatim as a param value (percent-encoded in state.path), not rejected.
+    it("accepts control characters as a route param value (current behavior, allowNotFound false)", async () => {
+      router = createTestRouter({ allowNotFound: false });
+
+      const state = await router.start("/items/\x01\x02");
+
+      expect(state.name).toBe("items");
+      expect(state.params).toStrictEqual({ id: "\x01\x02" });
+      expect(state.path).toBe("/items/%01%02");
+      expect(router.isActive()).toBe(true);
     });
   });
 
@@ -316,14 +396,10 @@ describe("router.start() - path string scenarios", () => {
 
     it("should ensure callback is called exactly once on route not found error", async () => {
       router = createTestRouter({ allowNotFound: false });
-      try {
-        await router.start("/non-existent");
 
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.start("/non-existent")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should protect callback when using defaultRoute", async () => {
@@ -359,21 +435,34 @@ describe("router.start() - path string scenarios", () => {
       expect(state?.name).toBe("orders.view");
     });
 
-    it("should throw error when transition fails", async () => {
+    it("ignores an activate guard on UNKNOWN_ROUTE — navigateToNotFound bypasses the guard pipeline", async () => {
+      // FINDING (#13): the original test was named "should throw error when
+      // transition fails", added a throwing activate guard on UNKNOWN_ROUTE, and
+      // asserted via `try { await start(); expect.fail() } catch (e) { expect(e).toBeDefined() }`.
+      // It "passed" only because `expect.fail()`'s own AssertionError was caught by
+      // its own catch. In reality the guard NEVER runs: this router defaults to
+      // `allowNotFound: true`, so an unmatched path is committed via
+      // `navigateToNotFound()`, which bypasses the guard pipeline entirely
+      // (see core CLAUDE.md "navigateToNotFound() bypasses both"). start()
+      // therefore RESOLVES to UNKNOWN_ROUTE regardless of the guard. (A real
+      // guard-blocked start rejection is covered in state-object-scenarios'
+      // "emit TRANSITION_ERROR on router start error" block, using a real route.)
       const invalidPath = "/nonexistent/route";
 
-      // Block transition via guard to force failure
+      let guardRan = false;
+
       lifecycle.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
+        guardRan = true;
+
         throw new Error("Blocked");
       });
 
-      try {
-        await router.start(invalidPath);
+      const state = await router.start(invalidPath);
 
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-      }
+      expect(state.name).toBe(constants.UNKNOWN_ROUTE);
+      expect(state.path).toBe(invalidPath);
+      expect(guardRan).toBe(false);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should return state on successful navigation", async () => {

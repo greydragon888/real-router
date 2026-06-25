@@ -103,14 +103,9 @@ describe("router.start() - arguments validation", () => {
         transitionErrorListener,
       );
 
-      try {
-        await router.start("/invalid/path");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.start("/invalid/path")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
@@ -180,14 +175,9 @@ describe("router.start() - arguments validation", () => {
         transitionErrorListener,
       );
 
-      try {
-        await router.start("/invalid/path");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.start("/invalid/path")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
@@ -239,14 +229,9 @@ describe("router state check", () => {
 
       getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
 
-      try {
-        await router.start("/home");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
-      }
+      await expect(router.start("/home")).rejects.toMatchObject({
+        code: errorCodes.ROUTER_ALREADY_STARTED,
+      });
 
       expect(router.isActive()).toBe(true);
       expect(startListener).not.toHaveBeenCalled();
@@ -281,13 +266,9 @@ describe("router state check", () => {
       await router.start("/users/list");
       const initialState = router.getState();
 
-      try {
-        await router.start("/orders/pending");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
-      }
+      await expect(router.start("/orders/pending")).rejects.toMatchObject({
+        code: errorCodes.ROUTER_ALREADY_STARTED,
+      });
 
       const currentState = router.getState();
 

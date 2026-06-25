@@ -60,6 +60,48 @@ describe("router.start() - error handling", () => {
         errorSpy.mockRestore();
       });
 
+      // #15: a Plugin.onStart that throws synchronously must not break start().
+      // onStart is wired internally as a ROUTER_START event listener
+      // (PluginsNamespace subscribes plugin methods to their EVENTS_MAP event),
+      // so the throw is caught by EventEmitter.emit's onListenerError path and
+      // routed to logger.error — exactly like the raw-listener case above. The
+      // router still starts; the plugin error is isolated and logged, never
+      // propagated to the start() caller.
+      it("isolates a synchronous throw from Plugin.onStart — router still starts", async () => {
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+        let onStartCalled = false;
+
+        router.usePlugin(() => ({
+          onStart() {
+            onStartCalled = true;
+
+            throw new Error("onStart boom");
+          },
+        }));
+
+        // The onStart throw must NOT reject start().
+        const state = await router.start("/home");
+
+        // onStart did run, and its throw was isolated.
+        expect(onStartCalled).toBe(true);
+
+        // Router started normally despite the throwing onStart.
+        expect(state.name).toBe("home");
+        expect(router.isActive()).toBe(true);
+        expect(router.getState()?.name).toBe("home");
+
+        // The plugin error surfaced via logger.error (onListenerError), not the
+        // start() promise.
+        expect(errorSpy).toHaveBeenCalledWith(
+          "Router",
+          expect.stringMatching(/Error in listener for/),
+          expect.any(Error),
+        );
+
+        errorSpy.mockRestore();
+      });
+
       it("should catch and log exception from TRANSITION_SUCCESS event listener", async () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
@@ -166,21 +208,13 @@ describe("router.start() - error handling", () => {
         await router.start("/home");
 
         // Subsequent calls should fail with ROUTER_ALREADY_STARTED
-        try {
-          await router.start("/users");
+        await expect(router.start("/users")).rejects.toMatchObject({
+          code: errorCodes.ROUTER_ALREADY_STARTED,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
-        }
-
-        try {
-          await router.start("/orders");
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
-        }
+        await expect(router.start("/orders")).rejects.toMatchObject({
+          code: errorCodes.ROUTER_ALREADY_STARTED,
+        });
 
         // Router should be in state from first call
         expect(router.getState()?.name).toBe("home");
@@ -276,13 +310,9 @@ describe("router.start() - error handling", () => {
         expect(router.isActive()).toBe(true);
 
         // Try second start() - should fail immediately with ROUTER_ALREADY_STARTED
-        try {
-          await router.start("/users");
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
-        }
+        await expect(router.start("/users")).rejects.toMatchObject({
+          code: errorCodes.ROUTER_ALREADY_STARTED,
+        });
 
         // Complete the first transition
         resolveMiddleware!();
@@ -614,6 +644,39 @@ describe("router.start() - error handling", () => {
       expect(localRouter.isActive()).toBe(true);
 
       removeInterceptor();
+      localRouter.stop();
+    });
+  });
+
+  // #8 / #4: start(undefined) with NO browser-plugin. Core is platform-agnostic:
+  // `start(path)` requires a string, and without browser-plugin's `start`
+  // interceptor nothing injects a location. Passing `undefined` reaches the
+  // path-string machinery and throws a cryptic, code-less TypeError
+  // ("Cannot read properties of undefined (reading 'codePointAt')") — the
+  // invariant guard for #4 that would turn this into an actionable error is a
+  // KNOWN GAP and is NOT yet added. This test deliberately does NOT pin the
+  // error message/shape (a future guard will change it); it pins the thing that
+  // must NOT regress: the Bug #1 fix that recovers the FSM out of STARTING back
+  // to IDLE on a start-pipeline throw, so the router is reusable afterwards.
+  describe("#8: start(undefined) without browser-plugin recovers the FSM", () => {
+    it("rejects, leaves the FSM recovered (isActive false), and a later start() succeeds", async () => {
+      const localRouter = createTestRouter(); // no browser-plugin
+
+      // Rejects (cryptic, code-less today — do not assert message/code: #4 gap).
+      await expect(localRouter.start(undefined as never)).rejects.toThrow();
+
+      // Regression we pin (#1 fix): the half-started FSM unwound STARTING → IDLE
+      // instead of getting stuck, so the router is not bricked.
+      expect(localRouter.isActive()).toBe(false);
+      expect(localRouter.getState()).toBeUndefined();
+
+      // Recovery: a subsequent well-formed start() must succeed.
+      const state = await localRouter.start("/home");
+
+      expect(state.name).toBe("home");
+      expect(localRouter.isActive()).toBe(true);
+      expect(localRouter.getState()?.name).toBe("home");
+
       localRouter.stop();
     });
   });
