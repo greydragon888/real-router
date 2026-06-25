@@ -415,7 +415,6 @@ export function getTransitionPath(
     return cached1Result;
   }
 
-  /* v8 ignore next 6 -- @preserve: 2nd cache slot hit path exercised by alternating navigation benchmarks, not unit tests */
   if (
     cached2Result !== null &&
     toState === cached2To &&

@@ -122,6 +122,77 @@ describe("getTransitionPath meta-less FAST PATH 3 — full reload via shouldUpda
   });
 });
 
+describe("getTransitionPath LRU-2 cache — slot-2 hit via alternating pairs", () => {
+  let router: Router | undefined;
+
+  afterEach(() => {
+    router?.stop();
+    router = undefined;
+  });
+
+  // getTransitionPath keeps a 2-slot LRU keyed by (toState, fromState) REFERENCE.
+  // A miss demotes the previous entry: cached2 ← cached1, cached1 ← new. So the
+  // SECOND slot is hit only when a pair recurs that has since been pushed out of
+  // slot 1 by a different pair — the classic alternating-tabs access pattern
+  // (pairP → pairQ → pairP). `navigate()` can't reach this: it mints a fresh
+  // frozen State on every transition, so re-visiting a route never reproduces the
+  // earlier (toState, fromState) reference pair. The reference-stable door is
+  // `router.shouldUpdateNode(node)(to, from)` fed makeState() objects (the same
+  // public entry the FAST PATH 3 / membership tests above use).
+  //
+  // Sequence (module-global cache, shared across the shouldUpdateNode closures):
+  //   1. shouldUpdateNode(...)(toP, fromP) — miss → cached1 = (toP, fromP)
+  //   2. shouldUpdateNode(...)(toQ, fromQ) — miss → cached2 = (toP, fromP),
+  //                                                  cached1 = (toQ, fromQ)
+  //   3. shouldUpdateNode(...)(toP, fromP) — cached1 mismatch, cached2 HIT ← here
+  //
+  // Asserting that step 3 returns the SAME membership decision as step 1 proves
+  // the slot-2 branch returns its OWN cached value (pairP), not pairQ's: a stale
+  // slot-2 hit returning cached2Result for the wrong pair would flip the boolean.
+  it("re-querying a demoted pair returns its slot-2 cached result (not the newer pair's)", () => {
+    router = createRouter([
+      {
+        name: "a",
+        path: "/a",
+        children: [{ name: "b", path: "/b" }],
+      },
+      {
+        name: "x",
+        path: "/x",
+        children: [{ name: "y", path: "/y" }],
+      },
+    ]);
+
+    const api = getPluginApi(router);
+
+    // Reference-stable, meta-aware states → STANDARD PATH (navigate-equivalent),
+    // not FAST PATH 3. Two distinct pairs so the cache actually rotates.
+    const toP = api.makeState("a.b", {});
+    const fromP = api.makeState("x.y", {});
+    const toQ = api.makeState("x.y", {});
+    const fromQ = api.makeState("a.b", {});
+
+    // For pair P (to "a.b", from "x.y"): "a.b" activates → true; "x.y" deactivates.
+    // For pair Q (to "x.y", from "a.b"): "a.b" deactivates; "x.y" activates → true.
+    // Node "a.b" therefore answers true under P but, under Q, only via the
+    // deactivation membership — pick node "a" (activated under P, deactivated
+    // under Q) so the two pairs would diverge if the wrong slot were returned.
+
+    // Step 1 — populate slot 1 with pair P.
+    const p1 = router.shouldUpdateNode("a")(toP, fromP);
+
+    // Step 2 — different pair Q → demotes P into slot 2.
+    router.shouldUpdateNode("x")(toQ, fromQ);
+
+    // Step 3 — pair P recurs: slot 1 now holds Q (miss), slot 2 holds P (HIT).
+    const p3 = router.shouldUpdateNode("a")(toP, fromP);
+
+    // Slot-2 hit must reproduce pair P's decision exactly.
+    expect(p3).toBe(p1);
+    expect(p3).toBe(true);
+  });
+});
+
 describe("transition.segments — deactivation order + ancestor identity (segmentParamsEqual)", () => {
   let router: Router | undefined;
 
