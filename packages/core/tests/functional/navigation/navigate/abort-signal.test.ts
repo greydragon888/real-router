@@ -582,5 +582,67 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
 
       expect(state.name).toBe("users");
     });
+
+    it("19. async navigate1 in-flight + navigate2 with ALREADY-aborted signal → both cancelled, FSM recovers to READY", async () => {
+      // Covers the uncovered combination inside #abortPreviousNavigation:
+      // isTransitioning() === true AND externalSignal.aborted === true.
+      // Both branches fire in sequence — the in-flight nav1 controller is
+      // aborted (nav1 rejects) and then the already-aborted external signal
+      // re-throws TRANSITION_CANCELLED (nav2 rejects) — and the FSM must
+      // unwind back to READY rather than stay stuck mid-transition.
+      vi.useFakeTimers();
+
+      // Pin nav1 in-flight on an async DEACTIVATION guard for the start route.
+      lifecycle.addDeactivateGuard("home", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 50);
+        });
+      });
+
+      const promise1 = router.navigate("users");
+
+      // Attach catch handlers eagerly so neither rejection leaks while we drain.
+      promise1.catch(() => {});
+
+      // Flush the deactivation-phase microtask so nav1 is genuinely awaiting
+      // its async guard (isTransitioning() === true) when nav2 arrives.
+      await Promise.resolve();
+
+      // nav2 carries an already-aborted external signal.
+      const controller = new AbortController();
+
+      controller.abort();
+
+      const promise2 = router.navigate(
+        "orders",
+        {},
+        { signal: controller.signal },
+      );
+
+      promise2.catch(() => {});
+
+      // Drain the pending guard timer + microtasks so both promises settle.
+      await vi.runAllTimersAsync();
+
+      await expect(promise1).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+      await expect(promise2).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      // FSM returned to READY (not stuck in a transition) — router still usable.
+      expect(router.isActive()).toBe(true);
+
+      // The `home` deactivation guard is still registered; switch to real timers
+      // so the recovery navigation's 50ms guard actually resolves.
+      vi.useRealTimers();
+
+      const state = await router.navigate("users");
+
+      expect(state.name).toBe("users");
+    });
   });
 });

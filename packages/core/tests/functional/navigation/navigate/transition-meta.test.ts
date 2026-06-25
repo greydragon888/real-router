@@ -41,11 +41,15 @@ describe("router.navigate() - TransitionMeta on state.transition", () => {
     it("should set from to previous route name after navigate()", async () => {
       const state = await router.navigate("users");
 
+      expect(state.transition).toBeDefined();
+
       expect(state.transition?.from).toBe("home");
     });
 
     it("should set from to undefined after start() (no previous state)", async () => {
       const startState = router.getState();
+
+      expect(startState?.transition).toBeDefined();
 
       expect(startState?.transition?.from).toBeUndefined();
     });
@@ -53,6 +57,8 @@ describe("router.navigate() - TransitionMeta on state.transition", () => {
     it("should update from on subsequent navigations", async () => {
       await router.navigate("users");
       const state = await router.navigate("admin.dashboard");
+
+      expect(state.transition).toBeDefined();
 
       expect(state.transition?.from).toBe("users");
     });
@@ -106,17 +112,23 @@ describe("router.navigate() - TransitionMeta on state.transition", () => {
     it("should freeze state.transition", async () => {
       const state = await router.navigate("users");
 
+      expect(state.transition).toBeDefined();
+
       expect(Object.isFrozen(state.transition)).toBe(true);
     });
 
     it("should freeze state.transition.segments", async () => {
       const state = await router.navigate("users");
 
+      expect(state.transition).toBeDefined();
+
       expect(Object.isFrozen(state.transition?.segments)).toBe(true);
     });
 
     it("should freeze state.transition.segments.deactivated array", async () => {
       const state = await router.navigate("users");
+
+      expect(state.transition).toBeDefined();
 
       expect(Object.isFrozen(state.transition?.segments.deactivated)).toBe(
         true,
@@ -125,6 +137,8 @@ describe("router.navigate() - TransitionMeta on state.transition", () => {
 
     it("should freeze state.transition.segments.activated array", async () => {
       const state = await router.navigate("users");
+
+      expect(state.transition).toBeDefined();
 
       expect(Object.isFrozen(state.transition?.segments.activated)).toBe(true);
     });

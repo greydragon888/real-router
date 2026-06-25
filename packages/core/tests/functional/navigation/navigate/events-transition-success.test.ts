@@ -57,9 +57,6 @@ describe("router.navigate() - events transition success", () => {
 
       const newState = await router.navigate("settings");
 
-      // Advance time to complete navigation
-      vi.advanceTimersByTime(0);
-
       expect(newState).toStrictEqual(
         expect.objectContaining({
           name: "settings",
@@ -221,13 +218,11 @@ describe("router.navigate() - events transition success", () => {
         onError,
       );
 
-      try {
-        await router.navigate("users.view", { id: 789 });
-
-        expect.fail("Should have thrown error");
-      } catch (error: any) {
-        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      }
+      await expect(
+        router.navigate("users.view", { id: 789 }),
+      ).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
 
       expect(onSuccess).not.toHaveBeenCalled();
       expect(onError).toHaveBeenCalledTimes(1);
@@ -271,13 +266,9 @@ describe("router.navigate() - events transition success", () => {
 
       await vi.runAllTimersAsync();
 
-      try {
-        await promise;
-
-        expect.fail("Should have been cancelled");
-      } catch (error: any) {
-        expect(error.code).toBe(errorCodes.TRANSITION_CANCELLED);
-      }
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       expect(onSuccess).not.toHaveBeenCalled();
       expect(onCancel).toHaveBeenCalledTimes(1);
@@ -301,13 +292,9 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Try to navigate to same route without force
-      try {
-        await router.navigate("orders", {}, {});
-
-        expect.fail("Should have thrown error");
-      } catch (error: any) {
-        expect(error.code).toBe(errorCodes.SAME_STATES);
-      }
+      await expect(router.navigate("orders", {}, {})).rejects.toMatchObject({
+        code: errorCodes.SAME_STATES,
+      });
 
       expect(onSuccess).not.toHaveBeenCalled();
 
@@ -323,13 +310,9 @@ describe("router.navigate() - events transition success", () => {
         onSuccess,
       );
 
-      try {
-        await router.navigate("users");
-
-        expect.fail("Should have thrown error");
-      } catch (error: any) {
-        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
-      }
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.ROUTER_NOT_STARTED,
+      });
 
       // TRANSITION_SUCCESS should not be emitted when router is not started
       expect(onSuccess).not.toHaveBeenCalled();

@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { errorCodes, UNKNOWN_ROUTE } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -55,6 +55,183 @@ describe("router.navigate() - edge cases input validation", () => {
   });
 
   // ============================================================================
-  // Edge cases from Section 12 analysis
+  // Boundary inputs — params / opts / route name (#17)
+  //
+  // Every assertion below reflects the ACTUAL, empirically-observed behavior of
+  // the code (validation-plugin is NOT registered, so core's `validator?` hooks
+  // are no-ops and inputs flow straight into buildNavigateState / the matcher).
+  // Where the observed behavior is surprising it is called out in a comment.
   // ============================================================================
+
+  describe("boundary inputs (#17)", () => {
+    it("accepts params with unicode (non-ASCII) keys", async () => {
+      const state = await router.navigate("items", {
+        "ключ-тест": "значение",
+        id: "1",
+      });
+
+      // Unicode key survives untouched in params; the path-param `id` matched
+      // the route segment, the extra key is serialized as a (URL-encoded) query.
+      expect(state.name).toBe("items");
+      expect(state.params).toMatchObject({
+        id: "1",
+        "ключ-тест": "значение",
+      });
+      expect(state.path).toContain("/items/1");
+      expect(state.path).toContain(
+        `${encodeURIComponent("ключ-тест")}=${encodeURIComponent("значение")}`,
+      );
+
+      expect(router.isActive()).toBe(true);
+    });
+
+    it("rejects a Symbol param VALUE with a TypeError (Symbol→string is illegal)", async () => {
+      // FINDING: a Symbol-valued, non-path param is NOT caught by a RouterError
+      // validation path — it reaches URL/query serialization (String(symbol))
+      // and throws a raw `TypeError: Cannot convert a Symbol value to a string`.
+      // The rejection therefore carries NO `code`; it is a native TypeError.
+      const sym = Symbol("boundary");
+
+      let error: unknown;
+
+      try {
+        await router.navigate("items", {
+          id: "1",
+          weird: sym as any,
+        });
+      } catch (error_: unknown) {
+        error = error_;
+      }
+
+      expect(error).toBeInstanceOf(TypeError);
+      expect((error as TypeError).message).toMatch(/Symbol/i);
+      // It is NOT a coded RouterError.
+      expect((error as { code?: unknown }).code).toBeUndefined();
+
+      // The throw happens before any state commit — the router is untouched and
+      // still fully operational on the previous (start) route.
+      expect(router.isActive()).toBe(true);
+      expect(router.getState()?.name).toBe("home");
+
+      const recovered = await router.navigate("users");
+
+      expect(recovered.name).toBe("users");
+    });
+
+    it("FINDING: a Symbol used as a PATH param is silently stringified into the path (params keeps the raw Symbol)", async () => {
+      // SECOND FINDING (URL-corruption-adjacent): unlike a Symbol query value
+      // (TypeError above), a Symbol bound to the `:id` PATH segment does NOT
+      // throw. The matcher template-literal-stringifies it into the URL
+      // (`/items/Symbol(path-id)`), producing a corrupt-but-non-throwing path —
+      // while `state.params.id` keeps the ORIGINAL Symbol (no coercion, no
+      // validation). Navigation "succeeds" with a path that can never round-trip
+      // back to that Symbol. Asserted here to pin the actual (surprising) behavior.
+      const sym = Symbol("path-id");
+
+      const state = await router.navigate("items", {
+        id: sym as any,
+      });
+
+      expect(state.name).toBe("items");
+      // The Symbol got stringified into the raw path via template literal...
+      expect(state.path).toBe("/items/Symbol(path-id)");
+      // ...yet params retains the un-coerced Symbol itself (not a string).
+      expect(typeof state.params.id).toBe("symbol");
+      expect(state.params.id).toBe(sym);
+
+      expect(router.isActive()).toBe(true);
+    });
+
+    it("FINDING: a NON-ENUMERABLE `replace` option is still honored", async () => {
+      // The pipeline reads `opts.replace` directly (property access), it does
+      // NOT enumerate own keys — so a non-enumerable `replace` is applied just
+      // like an enumerable one. Verified via state.transition.replace, which
+      // core sets from NavigationOptions.
+      const onTransitionSuccess = vi.fn();
+
+      const r = createTestRouter();
+
+      r.usePlugin(() => ({ onTransitionSuccess }));
+
+      await r.start("/home");
+
+      const opts = {};
+
+      Object.defineProperty(opts, "replace", {
+        enumerable: false,
+        value: true,
+      });
+
+      const state = await r.navigate("users", {}, opts);
+
+      expect(state.transition?.replace).toBe(true);
+      expect(onTransitionSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "users" }),
+        expect.anything(),
+        expect.objectContaining({ replace: true }),
+      );
+
+      r.stop();
+    });
+
+    it("rejects a whitespace-only route name with ROUTE_NOT_FOUND", async () => {
+      let error: any;
+
+      try {
+        await router.navigate("  ");
+      } catch (error_: any) {
+        error = error_;
+      }
+
+      // Whitespace is not trimmed/special-cased — it is simply an unknown route.
+      expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+
+      // Router stays operational.
+      expect(router.isActive()).toBe(true);
+
+      const recovered = await router.navigate("users");
+
+      expect(recovered.name).toBe("users");
+    });
+
+    it("rejects navigate(UNKNOWN_ROUTE) with ROUTE_NOT_FOUND (the sentinel is not a registered route)", async () => {
+      // The UNKNOWN_ROUTE sentinel ("@@router/UNKNOWN_ROUTE") is an internal
+      // state name produced by navigateToNotFound — it is NOT a route you can
+      // navigate() to. buildNavigateState finds no such route, so navigate()
+      // rejects with ROUTE_NOT_FOUND (same result with or without allowNotFound).
+      let error: any;
+
+      try {
+        await router.navigate(UNKNOWN_ROUTE);
+      } catch (error_: any) {
+        error = error_;
+      }
+
+      expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+
+      expect(router.isActive()).toBe(true);
+      expect(router.getState()?.name).toBe("home");
+    });
+
+    it("rejects navigate(UNKNOWN_ROUTE) with ROUTE_NOT_FOUND even when allowNotFound is enabled", async () => {
+      const r = createTestRouter({ allowNotFound: true });
+
+      await r.start("/home");
+
+      let error: any;
+
+      try {
+        await r.navigate(UNKNOWN_ROUTE);
+      } catch (error_: any) {
+        error = error_;
+      }
+
+      // allowNotFound governs unmatched *paths* (via navigateToNotFound), not
+      // an attempt to navigate by the sentinel route NAME — still ROUTE_NOT_FOUND.
+      expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      expect(r.isActive()).toBe(true);
+
+      r.stop();
+    });
+  });
 });

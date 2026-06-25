@@ -72,14 +72,11 @@ describe("router.navigate() - guards can activate", () => {
           () => blockingActivateGuard,
         );
 
-        try {
-          await router.navigate("orders.pending");
+        await expect(router.navigate("orders.pending")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-          expect(blockingActivateGuard).toHaveBeenCalledTimes(1);
-        }
+        expect(blockingActivateGuard).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -92,14 +89,13 @@ describe("router.navigate() - guards can activate", () => {
           () => nonExistentActivateGuard,
         );
 
-        try {
-          await router.navigate("non.existent.route");
+        await expect(
+          router.navigate("non.existent.route"),
+        ).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-          expect(nonExistentActivateGuard).not.toHaveBeenCalled();
-        }
+        expect(nonExistentActivateGuard).not.toHaveBeenCalled();
       });
 
       it("should not call canActivate for partially non-existing nested routes", async () => {
@@ -112,15 +108,14 @@ describe("router.navigate() - guards can activate", () => {
           () => nonExistentActivateGuard,
         );
 
-        try {
-          await router.navigate("orders.nonexistent");
+        await expect(
+          router.navigate("orders.nonexistent"),
+        ).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-          expect(existingActivateGuard).not.toHaveBeenCalled();
-          expect(nonExistentActivateGuard).not.toHaveBeenCalled();
-        }
+        expect(existingActivateGuard).not.toHaveBeenCalled();
+        expect(nonExistentActivateGuard).not.toHaveBeenCalled();
       });
 
       it("should handle completely invalid route names", async () => {
@@ -131,14 +126,13 @@ describe("router.navigate() - guards can activate", () => {
           () => invalidActivateGuard,
         );
 
-        try {
-          await router.navigate("totally.invalid.route.name");
+        await expect(
+          router.navigate("totally.invalid.route.name"),
+        ).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-          expect(invalidActivateGuard).not.toHaveBeenCalled();
-        }
+        expect(invalidActivateGuard).not.toHaveBeenCalled();
       });
     });
   });

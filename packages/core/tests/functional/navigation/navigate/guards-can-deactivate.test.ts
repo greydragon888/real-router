@@ -92,14 +92,11 @@ describe("router.navigate() - guards can deactivate", () => {
         blockingDeactivateGuard.mockClear();
 
         // Try to navigate away - should be blocked
-        try {
-          await router.navigate("profile");
+        await expect(router.navigate("profile")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_DEACTIVATE,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(blockingDeactivateGuard).toHaveBeenCalledTimes(1);
-        }
+        expect(blockingDeactivateGuard).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -207,15 +204,11 @@ describe("router.navigate() - guards can deactivate", () => {
         blockingDeactivateGuard.mockClear();
 
         // Normal navigation - should be blocked by guard
-        try {
-          await router.navigate("profile");
+        await expect(router.navigate("profile")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_DEACTIVATE,
+        });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          // Should be blocked
-          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(blockingDeactivateGuard).toHaveBeenCalledTimes(1);
-        }
+        expect(blockingDeactivateGuard).toHaveBeenCalledTimes(1);
       });
 
       it("should handle nested routes correctly in normal navigation", async () => {

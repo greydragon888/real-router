@@ -51,7 +51,12 @@ describe("router.navigate() - concurrent navigation", () => {
 
       expect(result).toBeInstanceOf(Promise);
 
-      await result; // Clean up
+      // Assert the OUTCOME, not just that a Promise was returned: it must
+      // RESOLVE to the target state (a rejected Promise is also instanceof
+      // Promise and would slip past the checks above).
+      const state = await result;
+
+      expect(state.name).toBe("users");
     });
 
     it("warns with the SSR cloneRouter() hint when a navigation starts mid-flight", async () => {

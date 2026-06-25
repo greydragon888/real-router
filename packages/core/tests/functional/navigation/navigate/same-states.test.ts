@@ -35,13 +35,9 @@ describe("router.navigate() - same states", () => {
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation to same state - should fail
-        try {
-          await router.navigate("orders.pending");
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.SAME_STATES);
-        }
+        await expect(router.navigate("orders.pending")).rejects.toMatchObject({
+          code: errorCodes.SAME_STATES,
+        });
       });
 
       it("should handle same states with different parameter values", async () => {
@@ -52,13 +48,11 @@ describe("router.navigate() - same states", () => {
         expect(state1?.params).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with same param - should fail
-        try {
-          await router.navigate("profile", { userId: "123" });
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.SAME_STATES);
-        }
+        await expect(
+          router.navigate("profile", { userId: "123" }),
+        ).rejects.toMatchObject({
+          code: errorCodes.SAME_STATES,
+        });
       });
 
       it("should allow navigation to same route with different parameters", async () => {
@@ -237,28 +231,22 @@ describe("router.navigate() - same states", () => {
         await router.navigate("orders.pending");
 
         // Same nested route - should fail
-        try {
-          await router.navigate("orders.pending");
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.SAME_STATES);
-        }
+        await expect(router.navigate("orders.pending")).rejects.toMatchObject({
+          code: errorCodes.SAME_STATES,
+        });
       });
 
       it("should compare states including meta information", async () => {
         // First navigate with options
         await router.navigate("profile", {}, { replace: true });
 
-        // Second navigate with different options but same route
-        try {
-          await router.navigate("profile", {}, { replace: false });
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          // Should still be considered same state (options don't affect state comparison)
-          expect(error?.code).toBe(errorCodes.SAME_STATES);
-        }
+        // Second navigate with different options but same route.
+        // Should still be considered same state (options don't affect state comparison)
+        await expect(
+          router.navigate("profile", {}, { replace: false }),
+        ).rejects.toMatchObject({
+          code: errorCodes.SAME_STATES,
+        });
       });
     });
   });

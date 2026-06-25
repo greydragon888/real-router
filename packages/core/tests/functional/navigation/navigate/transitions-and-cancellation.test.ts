@@ -28,35 +28,54 @@ describe("router.navigate() - transitions and cancellation", () => {
     vi.clearAllMocks();
   });
 
-  it("should be able to handle multiple cancellations", async () => {
-    const middleware = async (): Promise<void> => {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    };
-
-    router.usePlugin(() => ({
-      onTransitionSuccess: () => {
-        void middleware();
-      },
-    }));
-
-    // With sync navigate (no async guards), first navigate completes synchronously.
-    // Subsequent navigates to the same route get SAME_STATES (already there).
-    const promises = Array.from({ length: 5 }, () => null).map(() =>
-      router.navigate("users").catch((error: unknown) => {
-        const code = (error as Record<string, unknown>)?.code;
-
-        expect([
-          errorCodes.TRANSITION_CANCELLED,
-          errorCodes.SAME_STATES,
-        ]).toContain(code);
-      }),
+  it("concurrent navigate to the same route yields SAME_STATES (no cancellation)", async () => {
+    // No async guards → the first navigate to "users" resolves; because it is
+    // already the committed target, every concurrent navigate to the same route
+    // rejects with SAME_STATES. This is NOT cancellation — assert the exact code.
+    const first = router.navigate("users");
+    const concurrent = Array.from({ length: 4 }, () =>
+      router.navigate("users"),
     );
 
-    await router.navigate("users").catch(() => {
-      // SAME_STATES is expected
+    const firstState = await first;
+
+    expect(firstState.name).toBe("users");
+
+    await Promise.all(
+      concurrent.map((promise) =>
+        expect(promise).rejects.toMatchObject({
+          code: errorCodes.SAME_STATES,
+        }),
+      ),
+    );
+  });
+
+  it("a newer navigate cancels an in-flight async navigation with TRANSITION_CANCELLED", async () => {
+    // An async deactivation guard on "home" pins the first navigation in-flight
+    // (the transition cannot complete until the guard's Promise settles). A newer
+    // navigate to a different route supersedes it → the first rejects with
+    // TRANSITION_CANCELLED while the second commits. Real timers (no fake timers
+    // in this describe) drive the guard's setTimeout.
+    lifecycle.addDeactivateGuard(
+      "home",
+      () => () =>
+        new Promise((resolve) =>
+          setTimeout(() => {
+            resolve(true);
+          }, 50),
+        ),
+    );
+
+    const p1 = router.navigate("users"); // hangs on async deactivation guard
+    const p2 = router.navigate("orders"); // supersedes p1
+
+    await expect(p1).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
     });
 
-    await Promise.all(promises);
+    const ordersState = await p2;
+
+    expect(ordersState.name).toBe("orders");
   });
 
   it("should do nothing if stop is called after transition finished", async () => {

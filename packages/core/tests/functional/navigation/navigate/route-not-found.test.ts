@@ -28,14 +28,9 @@ describe("router.navigate() - route not found", () => {
 
   describe("navigation to non-existent route", () => {
     it("should call callback with ROUTE_NOT_FOUND error", async () => {
-      try {
-        await router.navigate("nonexistent.route");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("nonexistent.route")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should emit TRANSITION_ERROR event with ROUTE_NOT_FOUND error", async () => {
@@ -46,13 +41,11 @@ describe("router.navigate() - route not found", () => {
         onError,
       );
 
-      try {
-        await router.navigate("invalid.route.name");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("invalid.route.name")).rejects.toMatchObject(
+        {
+          code: errorCodes.ROUTE_NOT_FOUND,
+        },
+      );
 
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(
@@ -67,49 +60,35 @@ describe("router.navigate() - route not found", () => {
     });
 
     it("should return noop function", async () => {
-      try {
-        await router.navigate("nonexistent");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("nonexistent")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should handle route with invalid namespace", async () => {
-      try {
-        await router.navigate("invalid.namespace.route");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(
+        router.navigate("invalid.namespace.route"),
+      ).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should handle route with parameters when route not found", async () => {
-      try {
-        await router.navigate("nonexistent.route", { id: 123, name: "test" });
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(
+        router.navigate("nonexistent.route", { id: 123, name: "test" }),
+      ).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should handle route with options when route not found", async () => {
       const options = { replace: true, force: true };
 
-      try {
-        await router.navigate("invalid.route", {}, options);
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(
+        router.navigate("invalid.route", {}, options),
+      ).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should emit TRANSITION_ERROR with current state as fromState", async () => {
@@ -124,13 +103,9 @@ describe("router.navigate() - route not found", () => {
 
       onError.mockClear();
 
-      try {
-        await router.navigate("invalid.route");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("invalid.route")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(
@@ -227,19 +202,13 @@ describe("router.navigate() - route not found", () => {
         onError,
       );
 
-      try {
-        await router.navigate("invalid.route1");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("invalid.route1")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
-      try {
-        await router.navigate("invalid.route2");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("invalid.route2")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       expect(onError).toHaveBeenCalledTimes(2);
 
@@ -247,42 +216,22 @@ describe("router.navigate() - route not found", () => {
     });
 
     it("should handle empty route name", async () => {
-      try {
-        await router.navigate("");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should return ROUTE_NOT_FOUND error with correct properties", async () => {
-      try {
-        await router.navigate("invalid.route");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toStrictEqual(
-          expect.objectContaining({
-            code: errorCodes.ROUTE_NOT_FOUND,
-            message: "ROUTE_NOT_FOUND",
-          }),
-        );
-
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("invalid.route")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+        message: "ROUTE_NOT_FOUND",
+      });
     });
 
     it("should handle case-sensitive route names", async () => {
-      try {
-        await router.navigate("Users");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("Users")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
     });
 
     it("should handle route name with special characters", async () => {
@@ -346,14 +295,9 @@ describe("router.navigate() - route not found", () => {
     });
 
     it("should work correctly after trying invalid route", async () => {
-      try {
-        await router.navigate("invalid.route");
-
-        expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(router.navigate("invalid.route")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       const state = await router.navigate("users");
 

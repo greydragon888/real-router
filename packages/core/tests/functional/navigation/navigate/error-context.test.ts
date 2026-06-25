@@ -38,14 +38,9 @@ describe("router.navigate() - error context", () => {
         throw new Error(errorMessage);
       });
 
-      try {
-        await router.navigate("users");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.message).toBe(errorMessage);
-      }
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        message: errorMessage,
+      });
     });
 
     it("should preserve error stack when guard throws Error", async () => {
@@ -53,15 +48,9 @@ describe("router.navigate() - error context", () => {
         throw new Error("Error with stack");
       });
 
-      try {
-        await router.navigate("users");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.stack).toBeDefined();
-        expect(error?.stack).toContain("Error with stack");
-      }
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        stack: expect.stringContaining("Error with stack"),
+      });
     });
 
     it("should include segment info in canActivate error", async () => {
@@ -69,14 +58,9 @@ describe("router.navigate() - error context", () => {
         throw new Error("Guard error");
       });
 
-      try {
-        await router.navigate("users");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.segment).toBe("users");
-      }
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        segment: "users",
+      });
     });
 
     it("should include segment info in canDeactivate error", async () => {
@@ -86,14 +70,9 @@ describe("router.navigate() - error context", () => {
         throw new Error("Guard error");
       });
 
-      try {
-        await router.navigate("home");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.segment).toBe("users");
-      }
+      await expect(router.navigate("home")).rejects.toMatchObject({
+        segment: "users",
+      });
     });
 
     it("should preserve error message when Promise rejects with Error", async () => {
@@ -104,14 +83,9 @@ describe("router.navigate() - error context", () => {
         () => () => Promise.reject(new Error(errorMessage)),
       );
 
-      try {
-        await router.navigate("users");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.message).toBe(errorMessage);
-      }
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        message: errorMessage,
+      });
     });
 
     it("should handle Promise rejection with plain object", async () => {
@@ -120,17 +94,12 @@ describe("router.navigate() - error context", () => {
         () => () => Promise.reject({ reason: "auth_failed", userId: 123 }),
       );
 
-      try {
-        await router.navigate("users");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        // Custom properties should be preserved (except reserved)
-        expect(error?.reason).toBe("auth_failed");
-        expect(error?.userId).toBe(123);
-      }
+      // Custom properties should be preserved (except reserved)
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+        reason: "auth_failed",
+        userId: 123,
+      });
     });
   });
 

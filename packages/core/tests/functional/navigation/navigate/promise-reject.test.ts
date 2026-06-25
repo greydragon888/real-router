@@ -40,15 +40,12 @@ describe("router.navigate() - promise reject", () => {
         rejectingGuard.mockClear();
 
         // Navigate away - should be blocked with error
-        try {
-          await router.navigate("profile");
+        await expect(router.navigate("profile")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_DEACTIVATE,
+          message: expect.stringContaining("Deactivate guard failed"),
+        });
 
-          expect.fail("Should have thrown error");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(error?.message).toContain("Deactivate guard failed");
-          expect(rejectingGuard).toHaveBeenCalledTimes(1);
-        }
+        expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
 
       it("should stop on first promise-rejecting canDeactivate guard", async () => {
@@ -64,17 +61,14 @@ describe("router.navigate() - promise reject", () => {
         rejectingGuard.mockClear();
         nextGuard.mockClear();
 
-        try {
-          await router.navigate("profile");
+        await expect(router.navigate("profile")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_DEACTIVATE,
+          message: expect.stringContaining("First guard error"),
+        });
 
-          expect.fail("Should have thrown error");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(error?.message).toContain("First guard error");
-          // Based on current implementation order (child first)
-          expect(nextGuard).toHaveBeenCalledTimes(1);
-          expect(rejectingGuard).toHaveBeenCalledTimes(1);
-        }
+        // Based on current implementation order (child first)
+        expect(nextGuard).toHaveBeenCalledTimes(1);
+        expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -85,15 +79,12 @@ describe("router.navigate() - promise reject", () => {
 
         lifecycle.addActivateGuard("profile", () => rejectingGuard);
 
-        try {
-          await router.navigate("profile");
+        await expect(router.navigate("profile")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+          message: expect.stringContaining("Activate guard failed"),
+        });
 
-          expect.fail("Should have thrown error");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-          expect(error?.message).toContain("Activate guard failed");
-          expect(rejectingGuard).toHaveBeenCalledTimes(1);
-        }
+        expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
 
       it("should stop on first promise-rejecting canActivate guard", async () => {
@@ -104,17 +95,16 @@ describe("router.navigate() - promise reject", () => {
         lifecycle.addActivateGuard("settings", () => rejectingGuard);
         lifecycle.addActivateGuard("settings.account", () => nextGuard);
 
-        try {
-          await router.navigate("settings.account");
+        await expect(router.navigate("settings.account")).rejects.toMatchObject(
+          {
+            code: errorCodes.CANNOT_ACTIVATE,
+            message: expect.stringContaining("Activation blocked"),
+          },
+        );
 
-          expect.fail("Should have thrown error");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-          expect(error?.message).toContain("Activation blocked");
-          expect(rejectingGuard).toHaveBeenCalledTimes(1);
-          // Next guard should not be called due to rejection
-          expect(nextGuard).not.toHaveBeenCalled();
-        }
+        expect(rejectingGuard).toHaveBeenCalledTimes(1);
+        // Next guard should not be called due to rejection
+        expect(nextGuard).not.toHaveBeenCalled();
       });
     });
 
@@ -275,6 +265,9 @@ describe("router.navigate() - promise reject", () => {
         expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
         // String rejection should be wrapped in RouterError
         expect(err).toBeInstanceOf(Error);
+        // Wrapper carries the blocking segment and defaults its message to the code
+        expect(err?.segment).toBe("orders.pending");
+        expect(err?.message).toContain(errorCodes.CANNOT_DEACTIVATE);
 
         expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
@@ -298,6 +291,9 @@ describe("router.navigate() - promise reject", () => {
 
         expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
         expect(err).toBeInstanceOf(Error);
+        // Wrapper carries the blocking segment and defaults its message to the code
+        expect(err?.segment).toBe("orders.pending");
+        expect(err?.message).toContain(errorCodes.CANNOT_DEACTIVATE);
 
         expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
@@ -320,6 +316,9 @@ describe("router.navigate() - promise reject", () => {
 
         expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
         expect(err).toBeInstanceOf(Error);
+        // Wrapper carries the blocking segment and defaults its message to the code
+        expect(err?.segment).toBe("orders.pending");
+        expect(err?.message).toContain(errorCodes.CANNOT_DEACTIVATE);
 
         expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
@@ -342,6 +341,9 @@ describe("router.navigate() - promise reject", () => {
 
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(err).toBeInstanceOf(Error);
+        // Wrapper carries the blocking segment and defaults its message to the code
+        expect(err?.segment).toBe("profile");
+        expect(err?.message).toContain(errorCodes.CANNOT_ACTIVATE);
 
         expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
@@ -362,6 +364,9 @@ describe("router.navigate() - promise reject", () => {
 
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(err).toBeInstanceOf(Error);
+        // Wrapper carries the blocking segment and defaults its message to the code
+        expect(err?.segment).toBe("profile");
+        expect(err?.message).toContain(errorCodes.CANNOT_ACTIVATE);
 
         expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
@@ -381,6 +386,9 @@ describe("router.navigate() - promise reject", () => {
 
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(err).toBeInstanceOf(Error);
+        // Wrapper carries the blocking segment and defaults its message to the code
+        expect(err?.segment).toBe("profile");
+        expect(err?.message).toContain(errorCodes.CANNOT_ACTIVATE);
 
         expect(rejectingGuard).toHaveBeenCalledTimes(1);
       });
