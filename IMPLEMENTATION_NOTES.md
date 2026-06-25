@@ -113,7 +113,7 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 - First publish must be manual (`pnpm publish`) - can't configure Trusted Publisher before package exists (pnpm 11 publishes natively; no npm CLI needed even for bootstrap)
 - Trusted Publisher configured with workflow: `changesets.yml`
 
-**Build optimization:** Release workflow uses `pnpm turbo run build:dist-only --filter='!./examples/**'` and `pnpm turbo run test --filter='!./examples/**'` — packages only, skipping ~130 example apps. Previously used bare `pnpm build` / `pnpm test` which ran the full ~1200-task pipeline including all examples, adding ~10 minutes to release time.
+**Build optimization:** the release "Bundle packages for publish" step runs `pnpm turbo run bundle --filter='!./examples/**'` — dist artifacts only, no test gate. It deliberately does NOT run `turbo run build`: `build` `dependsOn` `test:stress`, and **no CI/post-merge job ever warms `test:stress`** (stress is pre-push-only — see "CI: test:stress lives only in pre-push"). So `turbo run build` at release cold-ran all ~23 `test:stress` tasks every publish (~3m of *guaranteed* cache misses — 156/179 hit, the 23 misses were exactly the 23 stress-test packages) plus a redundant full test re-run. The commit being published already passed the complete gate on its release-PR CI, and pre-push runs stress; the publish step only needs artifacts. `bundle` is a full cache hit off the post-merge build of the same commit. (An earlier version of this note claimed `build:dist-only` + `test`; that task never existed and the workflow actually ran bare `build` — corrected here.)
 
 ### Critical: Use `pnpm publish` NOT `npm publish`
 
