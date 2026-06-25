@@ -3715,7 +3715,7 @@ Mechanics:
 
 1. `hydrateRouter(router, ssrState)` parses `ssrState` (or accepts pre-parsed), writes `parsed` to `RouterInternals.hydrationState`, calls `router.start(parsed.path)`.
 2. `ssr-data-plugin`'s start interceptor checks `RouterInternals.hydrationState` synchronously inside `wrappedStart`. If the path matches and `"data" in scratchpad.context` (presence-wins, see below), it writes the scratchpad value via `claim.write()` instead of calling `entry.loader(...)`.
-3. After write, the scratchpad is **cleared** (`RouterInternals.hydrationState = null`). The next navigation runs the loader normally — scratchpad is **one-shot by design**, only the initial hydration benefits.
+3. The plugin does **not** clear the scratchpad after reading — it is restored to its previous value (`null` outside a hydrate) in `hydrateRouter`'s `finally` block after `router.start()` resolves. All start-interceptor reads within one hydrate see the same scratchpad (side-by-side `ssr-data` + `rsc-server` both consume it); the next navigation sees `hydrationState === null` and runs the loader normally — **one-shot by design**, only the initial hydration benefits.
 
 Per-namespace: each loader plugin (ssr-data-plugin, rsc-server-plugin) reads its own namespace from the scratchpad independently. Side-by-side composition still works — both `"data"` and `"rsc"` skip their loaders on the same hydration.
 
@@ -3728,7 +3728,7 @@ The presence-wins contract is frozen by an anchor test in `packages/ssr-data-plu
 ### Why a scratchpad, not a state-merging API
 
 - **Synchronous read.** The start interceptor runs inside `wrappedStart`, before any `await`. A synchronous slot access on a `WeakMap<Router, ScratchpadShape>` is O(1) with zero allocation. A state-merging API ("start with this state as initial") would require deserialising into a `State` shape before `start()`, then merging — duplicating the FSM transitions for one edge case.
-- **One-shot, no cleanup.** The scratchpad clears itself on read. No reference retained, no opportunity for stale state to bleed into later navigations.
+- **One-shot.** The scratchpad is cleared in `hydrateRouter`'s `finally` (restored to its prior value), not on read — so every start-interceptor read within one hydrate sees it, but no reference bleeds into later navigations.
 - **Plugin-extensible.** `claimContextNamespace()` consumers naturally read their own namespace from the scratchpad. The mechanism scales to any number of loader plugins without core changes.
 
 ### Angular asymmetry — TransferState bridge
