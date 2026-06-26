@@ -4518,10 +4518,14 @@ Concretely:
 2. **knip needs the bench files as project+entry.** The old `index.ts` *imported* the leaf benches, so knip saw `mitata` used. The new `run.ts` *spawns* files instead of importing them, so `tinybench`/`@codspeed/tinybench-plugin` looked unused. Fixed with a `packages/core` knip workspace block whose `entry` + `project` include `tests/benchmarks/*.ts` (a dependency counts as used only when imported by a **project** file).
 3. **`tsx` added as an explicit `core` devDep** (the RFC listed only `tinybench` + the plugin) — see "runs from `src`" above.
 
-### Gated to a human (cannot be validated locally)
+### CI runner — committed; CodSpeed App install is the only remaining human step
 
-Local verification done: the suite runs (47 benches across 5 files, all green) and `type-check` / `lint` / `knip` / `lint:deps` / `lint:dedupe` pass. The following require the maintainer:
-- Create the CodSpeed project + `CODSPEED_TOKEN` secret; add a `CodSpeedHQ/action` workflow on `push: master` (baseline) + `pull_request` (compare). **Not committed here** — it would red-fail every PR until the token exists.
+Update (2026-06-26): the `CodSpeedHQ/action@v4` workflow **is now committed** (`.github/workflows/codspeed.yml`) — runs `pnpm -F @real-router/core bench` on `push: master` (baseline) + `pull_request` (compare) + `workflow_dispatch` (backtest). Two corrections vs the original plan below:
+- **`mode: simulation` is mandatory.** The v4 action's `mode` input is `required` with no default — omitting it fails the run before any bench executes (the original draft workflow omitted it). `simulation` = Valgrind callgrind instruction counts, the deterministic gate instrument (vs `walltime`, which needs dedicated runners).
+- **No `CODSPEED_TOKEN` for a public repo.** The token is "only required for private repositories"; real-router is public, so the workflow runs **tokenless** — no secret, no `id-token: write` permission. The earlier "create the token" step is moot (the secret was never added, and isn't needed).
+
+Local verification done: the suite runs (6 files, all green) and `type-check` / `lint` / `knip` / `lint:deps` / `lint:dedupe` pass. The following require the maintainer:
+- **Install the CodSpeed GitHub App** on the repo (https://codspeed.io) and link the project — the sole external prerequisite for results to upload. Until then the job runs green but reports nowhere.
 - Confirm the first baseline records on `master`; run a PoC regression to confirm the gate goes red and localizes (RFC §9 step 5).
 - Set per-bench thresholds *after* the first baseline (RFC §11.3 — strict ~3–5% for hot core, lenient ≥10% for edge cases).
 - Empirically confirm process isolation holds under CodSpeed instrumentation (RFC §9.2).

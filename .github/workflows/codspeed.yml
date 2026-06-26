@@ -4,8 +4,15 @@ name: CodSpeed
 # The local part — the tinybench suite under packages/core/tests/benchmarks/
 # wired to @codspeed/tinybench-plugin via fixtures.ts (makeBench → withCodSpeed)
 # and a process-per-file runner (run.ts) — already ships on master. This is the
-# CI runner the RFC deferred as "user-gated": it needs a CodSpeed project + the
-# CODSPEED_TOKEN secret, neither of which can be created or validated locally.
+# CI runner that executes that suite under CodSpeed's `simulation` instrument
+# (Valgrind callgrind), so each bench emits deterministic instruction counts
+# instead of wall-clock.
+#
+# Auth: real-router is a PUBLIC repo, so CodSpeed runs tokenless — no
+# CODSPEED_TOKEN secret is required ("token: only required for private
+# repositories"). The one external prerequisite is installing the CodSpeed
+# GitHub App on the repo (https://codspeed.io) so the run has a project to
+# upload to; until then the action runs but has nowhere to report.
 #
 # Push-to-master establishes the baseline; pull_request compares against it. The
 # regression threshold / gate semantics live in the CodSpeed project settings,
@@ -16,6 +23,8 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  # Lets CodSpeed trigger a backtest run to seed the initial baseline data.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,27 +37,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Inline setup (master has no ./.github/actions/setup composite yet — it
-      # arrives with the #974 merge; switch this to `uses: ./.github/actions/setup`
-      # afterwards).
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup
+        uses: ./.github/actions/setup
 
       # CodSpeedHQ/action runs the command under Valgrind callgrind with
       # --trace-children, so the per-file child processes run.ts spawns inherit
       # the instrumentation; the withCodSpeed-wrapped Bench in each then emits
       # deterministic instruction counts instead of wall-clock.
+      #
+      # `mode` is a REQUIRED input on the v4 action (no default) — omitting it
+      # fails the run before any bench executes. `simulation` is the
+      # deterministic instruction-count instrument (vs `walltime`, which needs
+      # dedicated runners).
       - name: Run core hot-path benchmarks under CodSpeed
         uses: CodSpeedHQ/action@v4
         with:
+          mode: simulation
           run: pnpm -F @real-router/core bench
-          token: ${{ secrets.CODSPEED_TOKEN }}
