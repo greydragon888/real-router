@@ -80,8 +80,8 @@ importers:
         specifier: 12.1.0
         version: 12.1.0(size-limit@12.1.0(jiti@2.7.0))
       '@sonar/scan':
-        specifier: 4.3.6
-        version: 4.3.6
+        specifier: 4.3.8
+        version: 4.3.8
       '@stryker-mutator/core':
         specifier: 9.6.1
         version: 9.6.1(@types/node@25.9.3)
@@ -9349,8 +9349,8 @@ packages:
       '@solidjs/router':
         optional: true
 
-  '@sonar/scan@4.3.6':
-    resolution: {integrity: sha512-gPe4RgJtNi90dpEz/tlzmzwHJs9zmM3kB5acZbVwLyWOS/vOJqX1ZhStipbRFrkbd6z8ZLXCZStVuSk0MyP4GA==}
+  '@sonar/scan@4.3.8':
+    resolution: {integrity: sha512-JibF2fBqUNxyhRzNdEtbnay3krit/vLXPwr34easahTMeIClZflmXBWt/z9lUoqEWki2UhzrCxzGt6wrEFMJLg==}
     engines: {node: '>= 18'}
     hasBin: true
 
@@ -13240,8 +13240,9 @@ packages:
   proper-lockfile@4.1.2:
     resolution: {integrity: sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==}
 
-  properties-file@4.0.0:
-    resolution: {integrity: sha512-VWnuWVVQIeYPdJwWfBVu6/SQExpAliGkY8Bq58pHHPJHgD4THXlJfsc+qC41+62iV4WNwQhmrxbqpEXIvIMOmw==}
+  properties-file@5.0.5:
+    resolution: {integrity: sha512-Gfi6UgMENAzww1P4hloKhLIQxqcYmUS5z+Lhm/jmFV+ushbE416NalT42oEfJbF9vd0a02B3AaLHiQGmNSQ9EA==}
+    engines: {node: '>=0.4.0'}
 
   proto-list@1.2.4:
     resolution: {integrity: sha512-vtK/94akxsTMhe0/cbfpR+syPuszcuwhqVjJq26CuNDgFGj682oRBXOP5MJpv2r7JtE8MsiepGIqvvOTBwn2vA==}
@@ -13597,6 +13598,11 @@ packages:
 
   semver@7.7.4:
     resolution: {integrity: sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==}
+    engines: {node: '>=10'}
+    hasBin: true
+
+  semver@7.8.4:
+    resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -13999,8 +14005,8 @@ packages:
     resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
     engines: {node: '>=20'}
 
-  tar-stream@3.1.8:
-    resolution: {integrity: sha512-U6QpVRyCGHva435KoNWy9PRoi2IFYCgtEhq9nmrPPpbRacPs9IH4aJ3gbrFC8dPcXvdSZ4XXfXT5Fshbp2MtlQ==}
+  tar-stream@3.2.0:
+    resolution: {integrity: sha512-ojzvCvVaNp6aOTFmG7jaRD0meowIAuPc3cMMhSgKiVWws1GyHbGd/xvnyuRKcKlMpt3qvxx6r0hreCNITP9hIg==}
 
   tar@7.5.17:
     resolution: {integrity: sha512-wPEBwzapC+2PaTYPH6e2L+cNOEE227S47wUYFqlegcs8zlLLmeb9Fcff1HVZY4Fwku/1Eyv38n7GYwB2aaS71g==}
@@ -17375,18 +17381,18 @@ snapshots:
       '@testing-library/dom': 10.4.1
       solid-js: 1.9.13
 
-  '@sonar/scan@4.3.6':
+  '@sonar/scan@4.3.8':
     dependencies:
       adm-zip: 0.5.17
       axios: 1.16.1
       commander: 14.0.3
       hpagent: 1.2.0
       node-forge: 1.4.0
-      properties-file: 4.0.0
+      properties-file: 5.0.5
       proxy-from-env: 2.1.0
-      semver: 7.7.4
+      semver: 7.8.4
       slugify: 1.6.9
-      tar-stream: 3.1.8
+      tar-stream: 3.2.0
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -21733,7 +21739,7 @@ snapshots:
       retry: 0.12.0
       signal-exit: 3.0.7
 
-  properties-file@4.0.0: {}
+  properties-file@5.0.5: {}
 
   proto-list@1.2.4: {}
 
@@ -22164,6 +22170,8 @@ snapshots:
   semver@6.3.1: {}
 
   semver@7.7.4: {}
+
+  semver@7.8.4: {}
 
   semver@7.8.5: {}
 
@@ -22615,7 +22623,7 @@ snapshots:
 
   tagged-tag@1.0.0: {}
 
-  tar-stream@3.1.8:
+  tar-stream@3.2.0:
     dependencies:
       b4a: 1.8.0
       bare-fs: 4.7.1
