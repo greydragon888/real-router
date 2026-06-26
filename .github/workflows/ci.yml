@@ -275,26 +275,6 @@ jobs:
           --filter='!./examples/**'
           --filter='!./benchmarks'
 
-      - name: Check dependency consistency
-        run: pnpm lint:deps
-
-      - name: Check for duplicate dependencies
-        run: pnpm lint:dedupe
-
-      # Guard: codecov.yml components + Sonar coverage-exclusions stay in sync
-      # with the package set, so external quality gates can't silently drift (#732).
-      - name: Check coverage scope
-        run: pnpm lint:coverage-scope
-
-      # Dead-code / unused-export / unused-dependency detection (knip). Pure
-      # source-graph analysis — no dist needed — so it runs unconditionally
-      # alongside the other cheap lints (and catches unused introduced by a PR
-      # that turbo's affected filter scored as "nothing built"). Previously
-      # pre-push only (#813). The hard jscpd duplication threshold deliberately
-      # stays in the hook — CI keeps the informational SARIF channel instead.
-      - name: Check for unused code
-        run: pnpm lint:unused
-
       - name: Fix coverage paths
         run: |
           # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
@@ -332,9 +312,10 @@ jobs:
   # ============================================
   # BASE: core layer for the sharded path (mode=sharded). Validates
   # @real-router/core... (8 packages) ONCE so shards reuse it from Remote
-  # Cache, and runs the repo-global lints + core publication lints here —
-  # they are not per-package affected-scoped, so they must run somewhere on
-  # the sharded path. turbo restores coverage/** + dist/** even on a full
+  # Cache, and runs core's publication lints (publint/attw) here. The repo-
+  # global lints (syncpack/dedupe/coverage-scope/knip) moved OUT to the parallel
+  # repo-lints job — they inflated this Amdahl prefix (R2.6), not being per-
+  # package affected-scoped. turbo restores coverage/** + dist/** even on a full
   # cache hit, so `built` is tautologically true → uploads are unconditional.
   # ============================================
 
@@ -380,18 +361,6 @@ jobs:
       - name: Validate core published artifacts (publint + attw)
         run: pnpm turbo run lint:package lint:types --filter='@real-router/core...'
 
-      - name: Check dependency consistency
-        run: pnpm lint:deps
-
-      - name: Check for duplicate dependencies
-        run: pnpm lint:dedupe
-
-      - name: Check coverage scope
-        run: pnpm lint:coverage-scope
-
-      - name: Check for unused code
-        run: pnpm lint:unused
-
       - name: Fix coverage paths
         run: |
           # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
@@ -423,6 +392,55 @@ jobs:
           name: dist-base
           path: packages/*/dist/
           retention-days: 1
+
+  # ============================================
+  # REPO-LINTS: repo-global lints (syncpack / pnpm dedupe / coverage-scope /
+  # knip) — not per-package, not affected-scoped, and not turbo-cached (direct
+  # pnpm scripts that re-run every time). Pulled OUT of base + pipeline-leaf into
+  # a standalone job that runs in PARALLEL on both paths, so they no longer
+  # inflate the base→shards Amdahl prefix (R2.6). Needs only install — no build,
+  # no coverage. Mode-independent: runs on every should_run PR; CI gate requires
+  # it (hard, not ok()-skippable).
+  # ============================================
+  repo-lints:
+    name: Repo Lints
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: needs.check.outputs.should_run == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check dependency consistency
+        run: pnpm lint:deps
+
+      - name: Check for duplicate dependencies
+        run: pnpm lint:dedupe
+
+      # Guard: codecov.yml components + Sonar coverage-exclusions stay in sync
+      # with the package set, so external quality gates can't silently drift (#732).
+      - name: Check coverage scope
+        run: pnpm lint:coverage-scope
+
+      # Dead-code / unused-export / unused-dependency detection (knip). Pure
+      # source-graph analysis — no dist needed. Catches unused introduced by a PR
+      # that turbo's affected filter scored as "nothing built". Previously
+      # pre-push only (#813); the hard jscpd duplication threshold stays in the
+      # hook — CI keeps the informational SARIF channel instead.
+      - name: Check for unused code
+        run: pnpm lint:unused
 
   # ============================================
   # PIPELINE-SHARDED: one runner per affected class (mode=sharded). The matrix
@@ -1006,7 +1024,7 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded, smoke, sonarcloud, actionlint]
+    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded, repo-lints, smoke, sonarcloud, actionlint]
     if: always()
     steps:
       - name: Determine result
@@ -1032,7 +1050,8 @@ jobs:
           SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
           SONAR="${{ needs.sonarcloud.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base=$BASE sharded=$SHARDED smoke=$SMOKE sonar=$SONAR"
+          LINTS="${{ needs.repo-lints.result }}"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base=$BASE sharded=$SHARDED smoke=$SMOKE sonar=$SONAR lints=$LINTS"
 
           # compute-plan gates BOTH execution paths; if it died, MODE is empty and
           # every path job skipped — must not pass vacuously.
@@ -1057,7 +1076,10 @@ jobs:
               exit 1 ;;
           esac
 
-          if [[ "$PATH_OK" == "1" ]] && ok "$SMOKE" && ok "$SONAR"; then
+          # repo-lints runs on every should_run PR in BOTH modes — past the
+          # should_run short-circuit above it must have run AND passed (hard
+          # requirement, not ok()-skippable like smoke/sonar).
+          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$SONAR"; then
             echo "✅ All checks passed"
             exit 0
           fi
