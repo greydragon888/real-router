@@ -52,6 +52,7 @@ $ARGUMENTS
 - **Несколько задач**: каждый клауз со своим `(#N)`, через ` + ` —
   `fix(memory-plugin): same-tick navigate-after-back() (#807) + short-circuit no-emission contract (#808)`
 - `<type>`: `fix` для баг-фиксов, `feat` для фич (определи по changeset-бампу и характеру задач). `<scope>` — из changeset-пакета / скоупов коммитов.
+- **Смешанные типы в батче** (`refactor` + `fix` + `perf` и т.п.): НЕ выводи несколько `type:`-префиксов в одном заголовке. Возьми один наиболее значимый тип как префикс (`fix` > `feat` > `perf` > `refactor` > `chore`), а `(#N)` каждой задачи оставь инлайн в её клаузе.
 
 ### Тело (на английском, по `.github/PULL_REQUEST_TEMPLATE.md`)
 
