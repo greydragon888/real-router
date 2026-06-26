@@ -1,6 +1,7 @@
 import { render, screen } from "@solidjs/testing-library";
 import { fireEvent } from "@testing-library/dom";
 import { userEvent } from "@testing-library/user-event";
+import { createSignal } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 // @ts-expect-error - link is used in JSX directives
@@ -677,28 +678,53 @@ describe("link directive", () => {
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
     });
 
-    // Gotcha #19 (realistic case — accessor reading a Solid signal) and
-    // Gotcha #21 (accessor-form ≡ object-literal-form equivalence):
+    it("should NOT track Solid signal changes (options captured once, real signal)", async () => {
+      vi.spyOn(router, "navigate");
+
+      const [routeName, setRouteName] = createSignal("one-more-test");
+
+      render(
+        () => (
+          <a use:link={{ routeName: routeName() }} data-testid="link">
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      // href reflects the signal's INITIAL value
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
+
+      // Update the signal — babel-preset-solid wraps the object literal into an
+      // accessor that the directive calls ONCE at init, so the signal read is
+      // captured at mount and the later change is NOT tracked (the gotcha).
+      setRouteName("about");
+
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
+
+      // Click still targets the initial route, not the updated signal value.
+      await user.click(screen.getByTestId("link"));
+
+      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).not.toHaveBeenCalledWith("about", {}, {});
+    });
+
+    // Gotcha #19 — the realistic signal case is pinned IN-PROCESS by the
+    // "should NOT track Solid signal changes" test above: `<a use:link={{
+    // routeName: signal() }}>` is compiled for real by vite-plugin-solid
+    // (configured in vitest.config.mts — the same babel-preset-solid pipeline
+    // as production), the signal is flipped, and href is asserted unchanged.
+    // babel-preset-solid wraps the object literal into an accessor the
+    // directive calls once at init, so the signal read is captured at mount.
     //
-    // The realistic gotcha pattern is `<a use:link={() => ({ routeName: signal() })}>`,
-    // where babel-preset-solid auto-wraps the object literal OR the explicit
-    // arrow into a directive accessor at compile time. The directive then
-    // calls accessor() exactly once → reactivity dropped.
+    // (An earlier note claimed this scenario "cannot be unit-tested without a
+    // JSX compile pipeline that vitest does not provide" — that was wrong: the
+    // pipeline IS in vitest.config.mts, as this test proves. This test uses the
+    // object-literal form `{ routeName: signal() }`; the example app uses the
+    // accessor form `() => ({...})` — both are valid Solid directive forms.)
     //
-    // A unit test that hand-rolls the accessor (cast a function to the
-    // expected object type) cannot exercise this: Solid's directive runtime
-    // treats whatever it receives as an already-resolved options object, so
-    // a raw function does NOT get called — href stays null, click navigates
-    // to nothing. The contract only holds when the JSX is compiled by
-    // babel-preset-solid in the host project, which is exactly the
-    // production use case.
-    //
-    // Therefore: the closure-mutation tests above (gotcha #19, plain `let`)
-    // are the strongest in-process guarantee we can pin without an actual
-    // JSX compilation pipeline. Signal-reactivity and accessor↔literal
-    // equivalence remain documented in CLAUDE.md / Wiki under "use:link
-    // Options Are Captured Once" and are exercised end-to-end in the
-    // `examples/web/solid/use-link-directive` example app.
+    // `examples/web/solid/use-link-directive` adds an end-to-end pin (full Vite
+    // build + browser) on top of this unit test.
   });
 
   describe("cleanup", () => {

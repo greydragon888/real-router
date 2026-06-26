@@ -480,8 +480,16 @@ The `use:link` directive calls `accessor()` once at init. If the accessor return
 
 For reactive navigation links, use the `<Link>` component instead.
 
-> **Testing note (audit-4 LOW recommendation #3):**
-> Unit-testing the signal-reactivity scenario (e.g. `<a use:link={() => ({ routeName: signal() })}>`) requires a full Solid JSX compile pipeline that `vitest` + `@solidjs/testing-library` do not provide in isolation — `link-directive.test.tsx:540+` documents this limitation. The single end-to-end pin for that scenario lives in `examples/web/solid/use-link-directive`. **Do not delete that example app as "redundant" without replacing the integration-level signal-reactivity coverage** — otherwise this gotcha becomes a silent regression risk. See `audit-4-gotchas-tests.md` §"Слабые/спорные места" #1 for context.
+> **Testing note (audit-4 LOW recommendation #3 — corrected 2026-06-26):**
+> The signal-reactivity gotcha IS unit-tested. `link-directive.test.tsx` →
+> `"should NOT track Solid signal changes"` mounts `<a use:link={{ routeName: signal() }}>`,
+> flips the signal, and asserts `href` stays at its captured-once value. This works because
+> `vitest.config.mts` runs `vite-plugin-solid` — the **same** `babel-preset-solid` pipeline
+> as production — so the JSX compiles for real (the earlier claim that "vitest does not
+> provide a Solid JSX compile pipeline in isolation" was wrong; the plugin is in the config).
+> The test uses the object-literal form `{ routeName: signal() }` with the signal read inside.
+> `examples/web/solid/use-link-directive` remains as an additional end-to-end pin (full Vite
+> build + browser), no longer the only one.
 
 ### use:link Requires useRouter Context
 
