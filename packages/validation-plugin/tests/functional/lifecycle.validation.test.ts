@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 import { logger } from "@real-router/logger";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
@@ -200,6 +200,32 @@ describe("lifecycle validation — with validationPlugin", () => {
 
       expect(() => {
         lifecycle.addActivateGuard("route5", true);
+      }).toThrow(/limit exceeded/);
+    });
+
+    it("should throw when route-config guards exceed maxLifecycleHandlers (#961)", () => {
+      const r = createRouter([], { limits: { maxLifecycleHandlers: 5 } });
+
+      r.usePlugin(validationPlugin());
+      const routes = getRoutesApi(r);
+
+      // 5 guards registered via route config — within the limit, no throw.
+      expect(() => {
+        for (let i = 0; i < 5; i++) {
+          routes.add([
+            { name: `r${i}`, path: `/r${i}`, canActivate: () => () => true },
+          ]);
+        }
+      }).not.toThrow();
+
+      // The 6th route-config guard exceeds the limit — must throw, symmetric with
+      // the programmatic getLifecycleApi path. Before #961 this silently passed:
+      // route-config guards only triggered the approaching-limit warning, never
+      // the hard validateHandlerLimit throw.
+      expect(() => {
+        routes.add([
+          { name: "r5", path: "/r5", canActivate: () => () => true },
+        ]);
       }).toThrow(/limit exceeded/);
     });
   });

@@ -1,22 +1,27 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
-import { DEFAULT_LIMITS } from "../../constants";
-
 import type { RouteLifecycleDependencies } from "./types";
-import type { GuardFnFactory, Limits } from "../../types";
+import type { GuardFnFactory } from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
 import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
+
+// Boolean shorthand has only two possible values, so the guard and its factory
+// are module-level singletons — registering `true`/`false` reuses one cached
+// factory instead of allocating a fresh closure per call (#962).
+const TRUE_GUARD: GuardFn = () => true;
+const FALSE_GUARD: GuardFn = () => false;
+const TRUE_FACTORY: GuardFnFactory = () => TRUE_GUARD;
+const FALSE_FACTORY: GuardFnFactory = () => FALSE_GUARD;
 
 /**
  * Converts a boolean value to a guard function factory.
  * Used for the shorthand syntax where true/false is passed instead of a function.
+ * Returns one of two cached factories — no per-call allocation (#962).
  */
 function booleanToFactory<Dependencies extends DefaultDependencies>(
   value: boolean,
 ): GuardFnFactory<Dependencies> {
-  const guardFn: GuardFn = () => value;
-
-  return () => guardFn;
+  return value ? TRUE_FACTORY : FALSE_FACTORY;
 }
 
 /**
@@ -73,23 +78,10 @@ export class RouteLifecycleNamespace<
   ];
 
   #deps!: RouteLifecycleDependencies<Dependencies>;
-  #limits: Limits = DEFAULT_LIMITS;
   #getValidator: (() => RouterValidator | null) | null = null;
 
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
     this.#deps = deps;
-  }
-
-  /**
-   * Updates handler registration limits (max lifecycle handlers threshold).
-   *
-   * @param limits - Limits configuration with maxLifecycleHandlers
-   */
-  // Stryker disable next-line BlockStatement: equivalent — #limits is write-only here (stored then `void`-ed; never read). setLimits is a stub awaiting validator integration, so emptying the body has no observable effect.
-  setLimits(limits: Limits): void {
-    this.#limits = limits;
-    // eslint-disable-next-line sonarjs/void-use -- @preserve: Wave 3 validator reads limits via RouterInternals; void suppresses TS6133 until then
-    void this.#limits;
   }
 
   setValidatorGetter(getter: () => RouterValidator | null): void {
@@ -400,10 +392,21 @@ export class RouteLifecycleNamespace<
     if (isOverwrite) {
       this.#getValidator?.()?.lifecycle.warnOverwrite(name, type, methodName);
     } else {
-      this.#getValidator?.()?.lifecycle.validateCountThresholds(
-        this.getHandlerCount(type) + 1,
-        methodName,
-      );
+      // Single enforcement choke point for EVERY registration path: programmatic
+      // (getLifecycleApi) and route-config (getRoutesApi.add/update, where
+      // isFromDefinition=true). The hard limit throws here so route-config guards
+      // are bounded exactly like programmatic ones (#961); the approaching-limit
+      // warning follows. Only new slots count toward the limit — an overwrite
+      // leaves the count unchanged. `getHandlerCount` is read once and only when
+      // the validator is installed (opt-in), so the no-plugin path stays free.
+      const validator = this.#getValidator?.();
+
+      if (validator) {
+        const count = this.getHandlerCount(type);
+
+        validator.lifecycle.validateHandlerLimit(count, methodName);
+        validator.lifecycle.validateCountThresholds(count + 1, methodName);
+      }
     }
 
     const factory =

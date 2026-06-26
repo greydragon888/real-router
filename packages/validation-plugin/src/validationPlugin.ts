@@ -240,13 +240,11 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
     },
     lifecycle: {
       validateHandler,
-      validateHandlerLimit(count, limits, caller) {
-        validateHandlerLimit(
-          count,
-          caller,
-          (limits as { maxLifecycleHandlers?: number } | undefined)
-            ?.maxLifecycleHandlers,
-        );
+      validateHandlerLimit(count, methodName) {
+        const maxHandlers =
+          ctx.getOptions().limits?.maxLifecycleHandlers ?? 200;
+
+        validateHandlerLimit(count, methodName, maxHandlers);
       },
       validateCountThresholds(count, methodName) {
         const maxHandlers =

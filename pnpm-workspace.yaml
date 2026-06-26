@@ -13,7 +13,11 @@ peerDependencyRules:
 overrides:
   '@types/node': $@types/node
   '@angular/router': 21.2.17
-  '@babel/core': '>=7.29.6'
+  # Bound to <8: vite-plugin-solid (solid adapter) breaks on @babel/core 8 / vite 8
+  # (both released 2026-06). The previous open upper bounds let `pnpm dedupe` (the
+  # pre-commit hook auto-dedupes) pull 8 and kill the solid bundle. Lift both when
+  # vite-plugin-solid supports 8. (vite's bound is tightened at its existing entry.)
+  '@babel/core': '>=7.29.6 <8'
   '@isaacs/brace-expansion': 5.0.1
   axios: '>=1.16.0'
   follow-redirects: '>=1.16.0'
@@ -42,7 +46,7 @@ overrides:
   defu: '>=6.1.5'
   devalue: '>=5.8.1'
   esbuild: '>=0.28.1'
-  vite: '>=7.3.5'
+  vite: '>=7.3.5 <8'
   fast-uri: '>=3.1.2'
   hono: '>=4.12.21'
   ip-address: '>=10.1.1'

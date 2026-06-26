@@ -44,13 +44,11 @@ export class RouterWiringBuilder<
 
   wireLimits(): void {
     this.dependenciesStore.limits = this.limits;
-    this.plugins.setLimits(this.limits);
     this.eventBus.setLimits({
       maxListeners: this.limits.maxListeners,
       warnListeners: this.limits.warnListeners,
       maxEventDepth: this.limits.maxEventDepth,
     });
-    this.routeLifecycle.setLimits(this.limits);
   }
 
   wireRouteLifecycleDeps(): void {

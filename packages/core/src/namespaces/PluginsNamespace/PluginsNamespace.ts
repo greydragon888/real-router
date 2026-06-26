@@ -4,10 +4,9 @@ import { logger } from "@real-router/logger";
 
 import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
 import { validatePlugin } from "./validators";
-import { DEFAULT_LIMITS } from "../../constants";
 
 import type { PluginsDependencies } from "./types";
-import type { Limits, PluginFactory } from "../../types";
+import type { PluginFactory } from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   DefaultDependencies,
@@ -28,7 +27,6 @@ export class PluginsNamespace<
   readonly #unsubscribes = new Set<Unsubscribe>();
 
   #deps!: PluginsDependencies<Dependencies>;
-  #limits: Limits = DEFAULT_LIMITS;
   #getValidator: (() => RouterValidator | null) | null = null;
 
   // =========================================================================
@@ -46,13 +44,6 @@ export class PluginsNamespace<
 
   setDependencies(deps: PluginsDependencies<Dependencies>): void {
     this.#deps = deps;
-  }
-
-  // Stryker disable next-line BlockStatement: equivalent — #limits is write-only here (stored then `void`-ed; never read). setLimits is a stub awaiting validator integration, so emptying the body has no observable effect.
-  setLimits(limits: Limits): void {
-    this.#limits = limits;
-    // eslint-disable-next-line sonarjs/void-use -- @preserve: limits passed to validator via RouterInternals; void suppresses TS6133 until plugin implements validateCountThresholds
-    void this.#limits;
   }
 
   setValidatorGetter(getter: () => RouterValidator | null): void {

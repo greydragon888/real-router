@@ -1,0 +1,27 @@
+name: Setup
+description: Shared CI setup — pnpm, Node 24, and a pnpm install. Centralises the
+  block repeated across every build job so the Node version / cache / install
+  flags live in one place. The caller must run actions/checkout first (a local
+  composite action needs the repo present to be resolved).
+inputs:
+  install-args:
+    description: Arguments passed to `pnpm install` (e.g. `--frozen-lockfile --ignore-scripts`).
+    required: false
+    default: "--frozen-lockfile"
+runs:
+  using: composite
+  steps:
+    - name: Install pnpm
+      uses: pnpm/action-setup@v6
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      # Unquoted on purpose: install-args may carry multiple flags that must
+      # word-split (e.g. `--frozen-lockfile --ignore-scripts`).
+      run: pnpm install ${{ inputs.install-args }}

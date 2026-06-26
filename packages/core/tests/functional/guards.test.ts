@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
 
@@ -216,5 +216,34 @@ describe("core/crash guards (always enforced, no plugin required)", () => {
         createRouter([{ name: "a", path: "/a", children: [null] } as any]),
       ).toThrow("route must be a non-array object");
     });
+  });
+});
+
+describe("boolean-shorthand guard factory caching (#962)", () => {
+  it("reuses one cached factory per boolean value instead of allocating per call", () => {
+    const router = createRouter([
+      { name: "g-a", path: "/g-a" },
+      { name: "g-b", path: "/g-b" },
+    ]);
+    const lifecycle = getLifecycleApi(router);
+    const routes = getRoutesApi(router);
+
+    lifecycle.addActivateGuard("g-a", true);
+    lifecycle.addActivateGuard("g-b", true);
+    lifecycle.addDeactivateGuard("g-a", false);
+    lifecycle.addDeactivateGuard("g-b", false);
+
+    // Boolean shorthand has only two values; each must resolve to ONE shared
+    // cached factory, not a fresh closure per registration (#962). true and
+    // false are distinct cached instances.
+    expect(routes.get("g-a")?.canActivate).toBe(routes.get("g-b")?.canActivate);
+    expect(routes.get("g-a")?.canDeactivate).toBe(
+      routes.get("g-b")?.canDeactivate,
+    );
+    expect(routes.get("g-a")?.canActivate).not.toBe(
+      routes.get("g-a")?.canDeactivate,
+    );
+
+    router.stop();
   });
 });
