@@ -18,9 +18,12 @@ benchmarks/
 │   ├── .bench/                    # JSON results per router/section (gitignored)
 │   └── .bench-results/            # Text logs from bench-compare.sh (gitignored)
 ├── vs-tanstack/                   # Vitest bench: real-router vs TanStack Router (React/Vue/Solid)
-│   ├── real-router/{react,vue,solid}/
-│   ├── tanstack/{react,vue,solid}/
-│   ├── vitest.config.ts, vitest.setup.ts, jsdom.ts
+│   ├── shared/                    # jsdom, perf-utils, setup-helpers, memory-utils, vitest.setup
+│   ├── client-nav/               # scenario №1: navigation-loop (speed/flame/memory)
+│   │   ├── real-router/{react,vue,solid}/
+│   │   └── tanstack/{react,vue,solid}/
+│   ├── run.mjs                    # runner: <scenario> <engine> <framework> <mode>
+│   ├── tsconfig.json, vitest.config.ts
 │   └── .bench-results/            # Text logs from bench-compare-vs-tanstack.sh (gitignored)
 ├── bench-compare.sh               # Core comparison script (sudo, thermal monitoring)
 ├── bench-compare-vs-tanstack.sh   # TanStack comparison script (sudo, thermal monitoring)
@@ -66,20 +69,24 @@ node compare.mjs
 
 ### vs-tanstack benchmarks (real-router vs TanStack Router)
 
+Runner convention: `node vs-tanstack/run.mjs <scenario> <engine> <framework> <mode>`
+(scenario: `client-nav` · engine: `real-router`|`tanstack` · framework: `react`|`vue`|`solid` · mode: `build`|`speed`|`flame`|`memory`).
+Invoke via pnpm so `node_modules/.bin` is on PATH; pass runner args after `--`.
+
 ```bash
-# React (default)
+# React speed (shortcuts)
 pnpm bench:vs-tanstack:real-router
 pnpm bench:vs-tanstack:tanstack
 
-# Vue / Solid
-pnpm bench:vs-tanstack:real-router:vue
-pnpm bench:vs-tanstack:tanstack:solid
+# Any combination via the runner
+pnpm bench:vs-tanstack -- client-nav real-router vue speed
+pnpm bench:vs-tanstack -- client-nav tanstack solid speed
 
-# Flame graphs
-pnpm bench:vs-tanstack:flame:real-router
+# Flame graph
+pnpm bench:vs-tanstack -- client-nav real-router react flame
 
-# Memory profiling (--expose-gc)
-pnpm bench:vs-tanstack:memory:real-router
+# Memory profiling (--expose-gc auto)
+pnpm bench:vs-tanstack -- client-nav real-router react memory
 
 # Full comparison (requires sudo)
 sudo ./bench-compare-vs-tanstack.sh

@@ -8,7 +8,7 @@
     "tsBuildInfoFile": "./.tsbuildinfo",
     "incremental": false
   },
-  "files": ["./jsdom.d.ts"],
+  "files": ["./shared/jsdom.d.ts"],
   "include": ["./**/*.ts", "./**/*.tsx"],
-  "exclude": ["./real-router/solid/**", "./tanstack/solid/**", "./tanstack/vue/app.tsx"]
+  "exclude": ["./*/real-router/solid/**", "./*/tanstack/solid/**", "./*/tanstack/vue/app.tsx"]
 }

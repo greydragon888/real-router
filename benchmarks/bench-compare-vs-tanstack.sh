@@ -260,12 +260,12 @@ echo -e "${GREEN}@real-router/core and dependencies built successfully${NC}"
 
 # Build TanStack app
 echo "Building TanStack Router benchmark app..."
-pnpm bench:vs-tanstack:build:tanstack >/dev/null 2>&1
+vite build --config vs-tanstack/client-nav/tanstack/react/vite.config.ts >/dev/null 2>&1
 echo -e "${GREEN}TanStack Router app built${NC}"
 
 # Build Real-Router app
 echo "Building Real-Router benchmark app..."
-pnpm bench:vs-tanstack:build:real-router >/dev/null 2>&1
+vite build --config vs-tanstack/client-nav/real-router/react/vite.config.ts >/dev/null 2>&1
 echo -e "${GREEN}Real-Router app built${NC}"
 
 # -----------------------------------------------------------------------------
@@ -294,8 +294,8 @@ echo -e "${CYAN}║  [1/2] TanStack Router                ║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
 sync && sudo purge || true
 NODE_ENV=production nice -n -20 vitest bench \
-    --config vs-tanstack/tanstack/react/vite.config.ts \
-    vs-tanstack/tanstack/react/speed.bench.ts 2>&1 | tee "$RESULT_FILE_TANSTACK"
+    --config vs-tanstack/client-nav/tanstack/react/vite.config.ts \
+    vs-tanstack/client-nav/tanstack/react/speed.bench.ts 2>&1 | tee "$RESULT_FILE_TANSTACK"
 echo -e "${GREEN}✓ TanStack Router done, cooling down ${SHORT_COOLDOWN}s...${NC}"
 sleep "$SHORT_COOLDOWN"
 
@@ -306,8 +306,8 @@ echo -e "${CYAN}║  [2/2] Real-Router                    ║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
 sync && sudo purge || true
 NODE_ENV=production nice -n -20 vitest bench \
-    --config vs-tanstack/real-router/react/vite.config.ts \
-    vs-tanstack/real-router/react/speed.bench.ts 2>&1 | tee "$RESULT_FILE_REAL_ROUTER"
+    --config vs-tanstack/client-nav/real-router/react/vite.config.ts \
+    vs-tanstack/client-nav/real-router/react/speed.bench.ts 2>&1 | tee "$RESULT_FILE_REAL_ROUTER"
 echo -e "${GREEN}✓ Real-Router done${NC}"
 
 # -----------------------------------------------------------------------------
