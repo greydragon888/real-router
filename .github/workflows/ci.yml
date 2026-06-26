@@ -472,7 +472,19 @@ jobs:
       - name: Test + bundle shard
         env:
           SHARD_FILTER: ${{ matrix.filter }}
-        run: pnpm turbo run test test:properties bundle $SHARD_FILTER --filter='!./examples/**'
+        run: pnpm turbo run test test:properties bundle $SHARD_FILTER --filter='!./examples/**' --summarize
+
+      # Per-task execution timings (.turbo/runs/*.json) — perf diagnostics to
+      # localize which shard task dominates (e.g. solid#test vs react#test under
+      # vite-plugin-solid's on-the-fly babel compile). if: always() so a failing
+      # shard still uploads what ran.
+      - name: Upload turbo run summary (per-task timings)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: turbo-summary-${{ matrix.name }}
+          path: .turbo/runs/
+          retention-days: 1
 
       - name: Validate shard published artifacts (publint + attw)
         env:
