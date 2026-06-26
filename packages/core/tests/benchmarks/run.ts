@@ -3,13 +3,14 @@
  *
  * Each `*.bench.ts` file pins ONE matcher form (router options). Running them
  * in separate processes keeps their V8 inline caches isolated: a megamorphic
- * call-site in one form cannot deoptimize another and corrupt the instruction
- * counts CodSpeed reads. Importing every form into a single process (the old
- * `index.ts` anti-pattern) is exactly what this avoids.
+ * call-site in one form cannot deoptimize another and skew the WALL-CLOCK
+ * numbers. This runner is LOCAL-ONLY dev: `pnpm -F @real-router/core bench`.
  *
- * - Local: `pnpm -F @real-router/core bench` → wall-clock numbers per file.
- * - CI: the CodSpeed action runs this command under Valgrind instrumentation;
- *   the spawned child processes inherit the instrumentation.
+ * CI does NOT use it. CodSpeed must inject V8 flags into the bench process and
+ * can't carry them across spawn hops, so CI wraps the single-process
+ * `codspeed.ts` entry directly — safe there because `simulation` runs JIT-off
+ * (`--no-opt --predictable`), so inline-cache shape can't perturb the
+ * deterministic instruction counts. See `codspeed.ts` + `codspeed.yml`.
  *
  * Each child is launched as
  * `node --conditions=@real-router/internal-source --import tsx <file>`, so

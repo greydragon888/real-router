@@ -14,10 +14,38 @@
  * data under the SAME options is realistic polymorphism, not megamorphism
  * (RFC §9.2). The process-per-file runner (`run.ts`) keeps forms isolated.
  */
+import { argv } from "node:process";
+
 import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import { Bench } from "tinybench";
 
 import type { GuardFnFactory, PluginFactory, Route } from "../../src";
+
+/**
+ * True when `moduleFilename` (pass `__filename`) is the file Node launched
+ * directly (`node <file>`), false when the module was imported by another.
+ *
+ * `packages/core` is `"type": "commonjs"`, so under tsx these files are CJS —
+ * `__filename` is defined and `import.meta` is a compile error (TS1470). At
+ * launch Node sets `process.argv[1]` to the entry file's path; comparing it to
+ * each module's own `__filename` tells "launched directly" from "imported".
+ *
+ * Each `*.bench.ts` self-runs under `if (isMain(__filename))` so one body works
+ * BOTH ways:
+ *   - Local `pnpm bench` → `run.ts` spawns one process per file → `isMain` is
+ *     true → the file runs itself (process-per-file isolation, §9.2, wall-clock).
+ *   - CI → `codspeed.ts` *imports* every file's `run()` and awaits them in ONE
+ *     process → `isMain` is false → no self-run; the entry drives them serially.
+ *
+ * The single-process CI path exists because CodSpeed injects its required V8
+ * flags (`--allow-natives-syntax`, `--no-opt`, …) only into the process it
+ * wraps directly, and those flags cannot ride through `NODE_OPTIONS`. A spawned
+ * child (the old per-file model under CI) starts without them and dies in
+ * `optimizeFunction` on the `%`-native syntax. See IMPLEMENTATION_NOTES.
+ */
+export function isMain(moduleFilename: string): boolean {
+  return argv[1] === moduleFilename;
+}
 
 /**
  * Creates a CodSpeed-instrumented tinybench `Bench`. Under `codspeed run`

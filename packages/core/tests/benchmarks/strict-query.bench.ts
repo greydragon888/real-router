@@ -5,13 +5,13 @@
  * (RFC §6.5). Isolated in its own file/process so its matcher shape does not
  * megamorphic-pollute the default-form inline caches (§9.2 / §6.6.1).
  */
-import { keep, makeBench } from "./fixtures";
+import { isMain, keep, makeBench } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
 import type { Params, Route } from "../../src";
 
-async function main(): Promise<void> {
+export async function run(): Promise<void> {
   const bench = makeBench("strict-query");
 
   const routes: Route[] = [
@@ -67,7 +67,9 @@ async function main(): Promise<void> {
   console.table(bench.table());
 }
 
-main().catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (isMain(__filename)) {
+  run().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

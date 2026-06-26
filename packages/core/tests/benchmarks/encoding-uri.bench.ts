@@ -7,13 +7,13 @@
  * Isolated in its own file/process so the encode-strategy call-site stays
  * monomorphic under instrumentation (§9.2 / §6.6.1).
  */
-import { keep, makeBench } from "./fixtures";
+import { isMain, keep, makeBench } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
 import type { Route } from "../../src";
 
-async function main(): Promise<void> {
+export async function run(): Promise<void> {
   const bench = makeBench("encoding-uri");
 
   const routes: Route[] = [{ name: "user", path: "/users/:id" }];
@@ -43,7 +43,9 @@ async function main(): Promise<void> {
   console.table(bench.table());
 }
 
-main().catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (isMain(__filename)) {
+  run().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

@@ -124,7 +124,7 @@
       }
     },
     "packages/core": {
-      "entry": ["tests/benchmarks/*.bench.ts"],
+      "entry": ["tests/benchmarks/*.bench.ts", "tests/benchmarks/codspeed.ts"],
       "project": ["src/**/*.{ts,tsx}", "tests/benchmarks/*.ts"],
       "vitest": {
         "config": ["vitest.config.mts", "vitest.config.*.mts"]

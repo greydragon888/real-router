@@ -40,10 +40,16 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      # CodSpeedHQ/action runs the command under Valgrind callgrind with
-      # --trace-children, so the per-file child processes run.ts spawns inherit
-      # the instrumentation; the withCodSpeed-wrapped Bench in each then emits
-      # deterministic instruction counts instead of wall-clock.
+      # CodSpeed injects its required V8 flags (--allow-natives-syntax, --no-opt,
+      # …) ONLY into the process it wraps directly, and those flags can't ride
+      # through NODE_OPTIONS. So we wrap a DIRECT `node` that runs the whole suite
+      # in ONE process (tests/benchmarks/codspeed.ts imports every *.bench.ts and
+      # awaits them serially) — NOT `pnpm bench`, whose pnpm → tsx → spawn-per-file
+      # hops strip the flags and crash @codspeed/core on its `%` native. Local
+      # `pnpm bench` keeps process-per-file (run.ts) for wall-clock dev.
+      #
+      # working-directory: packages/core so `tsx` and @real-router/* resolve from
+      # the package; --conditions maps @real-router/* to live `src/` (no build).
       #
       # `mode` is a REQUIRED input on the v4 action (no default) — omitting it
       # fails the run before any bench executes. `simulation` is the
@@ -53,4 +59,5 @@ jobs:
         uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
-          run: pnpm -F @real-router/core bench
+          working-directory: packages/core
+          run: node --conditions=@real-router/internal-source --import tsx tests/benchmarks/codspeed.ts

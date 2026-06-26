@@ -20,6 +20,7 @@ import {
   deepName,
   deepPath,
   deepRoutes,
+  isMain,
   keep,
   makeBench,
   noopSuccessPlugin,
@@ -125,7 +126,7 @@ async function addCanNavigateTo(bench: Bench): Promise<void> {
   });
 }
 
-async function main(): Promise<void> {
+export async function run(): Promise<void> {
   const bench = makeBench("default");
 
   // ========================================================================
@@ -538,7 +539,9 @@ async function main(): Promise<void> {
   console.table(bench.table());
 }
 
-main().catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (isMain(__filename)) {
+  run().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

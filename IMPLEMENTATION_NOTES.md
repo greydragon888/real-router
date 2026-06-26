@@ -4520,13 +4520,22 @@ Concretely:
 
 ### CI runner — committed; CodSpeed App install is the only remaining human step
 
-Update (2026-06-26): the `CodSpeedHQ/action@v4` workflow **is now committed** (`.github/workflows/codspeed.yml`) — runs `pnpm -F @real-router/core bench` on `push: master` (baseline) + `pull_request` (compare) + `workflow_dispatch` (backtest). Two corrections vs the original plan below:
+Update (2026-06-26): the `CodSpeedHQ/action@v4` workflow **is now committed** (`.github/workflows/codspeed.yml`) — runs the core hot-path suite on `push: master` (baseline) + `pull_request` (compare) + `workflow_dispatch` (backtest). Three corrections vs the original plan below:
 - **`mode: simulation` is mandatory.** The v4 action's `mode` input is `required` with no default — omitting it fails the run before any bench executes (the original draft workflow omitted it). `simulation` = Valgrind callgrind instruction counts, the deterministic gate instrument (vs `walltime`, which needs dedicated runners).
 - **No `CODSPEED_TOKEN` for a public repo.** The token is "only required for private repositories"; real-router is public, so the workflow runs **tokenless** — no secret, no `id-token: write` permission. The earlier "create the token" step is moot (the secret was never added, and isn't needed).
+- **Single-process entry under CI, NOT `pnpm bench`** (see next sub-section).
 
-Local verification done: the suite runs (6 files, all green) and `type-check` / `lint` / `knip` / `lint:deps` / `lint:dedupe` pass. The following require the maintainer:
+#### Single-process CodSpeed entry — process-per-file is incompatible with V8-flag injection
+
+**Problem.** The first committed workflow ran `pnpm -F @real-router/core bench` (→ `run.ts`, process-per-file). It passed `mode` but then failed all 6 files with `SyntaxError: Unexpected token '%'` in `@codspeed/core`'s `optimizeFunction` (PR #975, run 28241318066). Root cause: `simulation` requires V8 flags (`--allow-natives-syntax`, `--no-opt`, `--predictable`, …) in the **bench process's** `process.execArgv`. Verified in `@codspeed/core` source: neither core nor the tinybench plugin re-execs or sets `NODE_OPTIONS` — the CodSpeed *runner* injects flags (via `tryIntrospect` → restart) only into the process it wraps **directly**, and `--allow-natives-syntax` can't ride through `NODE_OPTIONS` anyway. Our chain `pnpm → tsx run.ts → spawn-per-file node` loses the flags on every hop, so the actual bench process starts flag-less and chokes on `optimizeFunction`'s `%OptimizeFunctionOnNextCall` native. (My stale workflow comment claimed `--trace-children` made children "inherit instrumentation" — true for Valgrind instruction-counting, but V8 execArgv flags are a separate channel that spawn does not carry.)
+
+**Solution.** CI wraps a **direct `node`** that runs the whole suite in ONE process: `node --conditions=@real-router/internal-source --import tsx tests/benchmarks/codspeed.ts` (with `working-directory: packages/core`). `codspeed.ts` imports every `*.bench.ts`'s exported `run()` and awaits them serially; CodSpeed wraps it directly, so introspection + flags apply to the code that actually runs. Each `*.bench.ts` was refactored `main()` → `export async function run()` + a `if (isMain(__filename)) run()` self-run guard (`isMain` in `fixtures.ts`; `__filename`, not `import.meta`, because `packages/core` is CJS — `import.meta` is TS1470 there). One body, two callers: local `run.ts` spawns each file directly (`isMain` true → self-runs), CI imports them (`isMain` false → driven by the entry).
+
+**Why dropping process-per-file under CI is safe.** RFC §9.2's per-file isolation guards **wall-clock** numbers against inline-cache cross-contamination. `simulation` runs JIT-off (`--no-opt --predictable`), so megamorphic call-sites can't perturb the deterministic instruction counts — isolation buys nothing there. Local `pnpm bench` keeps `run.ts` process-per-file for honest wall-clock dev. Both paths verified locally (6 suites green each); type-check / eslint / actionlint / knip pass.
+
+Local verification done: both run paths green, `type-check` / `lint` / `knip` / `lint:deps` / `lint:dedupe` pass. The following require the maintainer:
 - **Install the CodSpeed GitHub App** on the repo (https://codspeed.io) and link the project — the sole external prerequisite for results to upload. Until then the job runs green but reports nowhere.
 - Confirm the first baseline records on `master`; run a PoC regression to confirm the gate goes red and localizes (RFC §9 step 5).
 - Set per-bench thresholds *after* the first baseline (RFC §11.3 — strict ~3–5% for hot core, lenient ≥10% for edge cases).
-- Empirically confirm process isolation holds under CodSpeed instrumentation (RFC §9.2).
+- Confirm CodSpeed reports all benches as **Measured** (not "Checked") under the single-process entry, and that bench-name URIs stay unique across the 6 suites in one process.
 - `@codspeed/tinybench-plugin@5.7.1 × tinybench@6.0.2` instrumentation compatibility is only verifiable under CodSpeed (local *execution* is verified).
