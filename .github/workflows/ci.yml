@@ -84,17 +84,62 @@ jobs:
           fi
 
   # ============================================
-  # PIPELINE: Single job — test + bundle
-  # Replaces parallel lint/test + sequential build.
+  # COMPUTE-PLAN: classify affected packages → leaf | sharded matrix.
+  # Runs scripts/build-matrix.mjs, which derives affected via the native
+  # `turbo query affected --packages` API and emits `mode` + a dynamic matrix.
+  # ============================================
+
+  compute-plan:
+    name: Compute Shard Plan
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: needs.check.outputs.should_run == 'true'
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }} # 'leaf' | 'sharded'
+      matrix: ${{ steps.plan.outputs.matrix }} # always-valid JSON; {"include":[]} for leaf
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch master for Turbo comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin master:master
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Minimal install: turbo builds the affected graph from package.json +
+      # lockfile, not node_modules. --ignore-scripts is safe — @turbo/<platform>
+      # ships its binary via optionalDependencies with no postinstall, so
+      # `pnpm exec turbo` still resolves (R2.19: keep this prefix light).
+      - name: Install dependencies (minimal — turbo binary only)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build shard plan
+        id: plan
+        run: node scripts/build-matrix.mjs >> "$GITHUB_OUTPUT"
+
+  # ============================================
+  # PIPELINE-LEAF: monolithic path for small, non-core PRs (mode=leaf).
+  # Byte-identical to the historical single `pipeline` job; only the two
+  # uploaded artifact names carry a `-leaf` suffix (coverage merge, R2.4).
   # turbo run test triggers lint + type-check as deps.
   # turbo run bundle produces dist/ (cache-shared with build).
   # ============================================
 
-  pipeline:
-    name: Pipeline
+  pipeline-leaf:
+    name: Pipeline (leaf)
     runs-on: ubuntu-latest
-    needs: [check]
-    if: needs.check.outputs.should_run == 'true'
+    needs: [check, compute-plan]
+    if: needs.compute-plan.outputs.mode == 'leaf'
     outputs:
       # 'true' when turbo's affected filter actually produced package outputs.
       # A root config/docs change (e.g. package.json scripts, .jscpd.json) passes
@@ -272,7 +317,7 @@ jobs:
         if: steps.artifacts.outputs.built == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-reports
+          name: coverage-reports-leaf
           path: packages/*/coverage/
           retention-days: 1
 
@@ -280,7 +325,194 @@ jobs:
         if: steps.artifacts.outputs.built == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: dist
+          name: dist-leaf
+          path: packages/*/dist/
+          retention-days: 1
+
+  # ============================================
+  # BASE: core layer for the sharded path (mode=sharded). Validates
+  # @real-router/core... (8 packages) ONCE so shards reuse it from Remote
+  # Cache, and runs the repo-global lints + core publication lints here —
+  # they are not per-package affected-scoped, so they must run somewhere on
+  # the sharded path. turbo restores coverage/** + dist/** even on a full
+  # cache hit, so `built` is tautologically true → uploads are unconditional.
+  # ============================================
+
+  base:
+    name: Base (core layer)
+    runs-on: ubuntu-latest
+    needs: [check, compute-plan]
+    if: needs.compute-plan.outputs.mode == 'sharded'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch master for Turbo comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin master:master
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check angular dom-utils copy is in sync
+        run: |
+          node packages/angular/scripts/sync-dom-utils.mjs
+          if [ -n "$(git status --porcelain packages/angular/src/dom-utils)" ]; then
+            git status --porcelain packages/angular/src/dom-utils
+            echo "::error::packages/angular/src/dom-utils is out of sync with shared/dom-utils — run 'pnpm -F @real-router/angular bundle' (or node packages/angular/scripts/sync-dom-utils.mjs) and commit the result"
+            exit 1
+          fi
+
+      - name: Test + bundle core layer
+        run: pnpm turbo run test test:properties bundle --filter='@real-router/core...'
+
+      - name: Validate core published artifacts (publint + attw)
+        run: pnpm turbo run lint:package lint:types --filter='@real-router/core...'
+
+      - name: Check dependency consistency
+        run: pnpm lint:deps
+
+      - name: Check for duplicate dependencies
+        run: pnpm lint:dedupe
+
+      - name: Check coverage scope
+        run: pnpm lint:coverage-scope
+
+      - name: Check for unused code
+        run: pnpm lint:unused
+
+      - name: Fix coverage paths
+        run: |
+          # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
+          # Both Codecov and SonarCloud need project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
+          # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
+          # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
+          # replaces an echo|sed subshell (SC2001).
+          find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
+            while IFS= read -r -d '' lcov; do
+              pkg_dir="${lcov%/coverage/lcov.info}"
+              sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
+              # Shared-source owners (#809) emit SF:../../shared/<dir>/x.ts — the
+              # prefix above turns those into packages/<owner>/../../shared/…;
+              # collapse the parent-dir hops to repo-root-relative shared/<dir>/x.ts
+              # so Codecov components and Sonar score them at their real location.
+              sed -i -E 's|^SF:packages/[^/]+/\.\./\.\./|SF:|' "$lcov"
+            done
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-reports-base
+          path: packages/*/coverage/
+          retention-days: 1
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-base
+          path: packages/*/dist/
+          retention-days: 1
+
+  # ============================================
+  # PIPELINE-SHARDED: one runner per affected class (mode=sharded). The matrix
+  # comes from compute-plan; empty groups never enter matrix.include → their
+  # runner is not spawned. core arrives from the base job / Remote Cache as a
+  # HIT (not a rebuild). Coverage is a disjoint partition (turbo `test` has no
+  # `^test`), so per-shard lcov never overlaps base's.
+  # ============================================
+
+  pipeline-sharded:
+    name: Pipeline (shard ${{ matrix.name }})
+    runs-on: ubuntu-latest
+    needs: [check, compute-plan, base]
+    if: needs.compute-plan.outputs.mode == 'sharded'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.compute-plan.outputs.matrix || '{"include":[]}') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch master for Turbo comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin master:master
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check angular dom-utils copy is in sync
+        run: |
+          node packages/angular/scripts/sync-dom-utils.mjs
+          if [ -n "$(git status --porcelain packages/angular/src/dom-utils)" ]; then
+            git status --porcelain packages/angular/src/dom-utils
+            echo "::error::packages/angular/src/dom-utils is out of sync with shared/dom-utils — run 'pnpm -F @real-router/angular bundle' (or node packages/angular/scripts/sync-dom-utils.mjs) and commit the result"
+            exit 1
+          fi
+
+      # matrix.filter is one or more `--filter=<pkg>` tokens. Route it through an
+      # env var (no ${{ }} inside run: — keeps actionlint clean) and leave it
+      # UNQUOTED so the shell word-splits multiple filters.
+      - name: Test + bundle shard
+        env:
+          SHARD_FILTER: ${{ matrix.filter }}
+        run: pnpm turbo run test test:properties bundle $SHARD_FILTER --filter='!./examples/**'
+
+      - name: Validate shard published artifacts (publint + attw)
+        env:
+          SHARD_FILTER: ${{ matrix.filter }}
+        run: pnpm turbo run lint:package lint:types $SHARD_FILTER --filter='!./examples/**'
+
+      - name: Fix coverage paths
+        run: |
+          # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
+          # Both Codecov and SonarCloud need project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
+          # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
+          # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
+          # replaces an echo|sed subshell (SC2001).
+          find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
+            while IFS= read -r -d '' lcov; do
+              pkg_dir="${lcov%/coverage/lcov.info}"
+              sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
+              # Shared-source owners (#809) emit SF:../../shared/<dir>/x.ts — the
+              # prefix above turns those into packages/<owner>/../../shared/…;
+              # collapse the parent-dir hops to repo-root-relative shared/<dir>/x.ts
+              # so Codecov components and Sonar score them at their real location.
+              sed -i -E 's|^SF:packages/[^/]+/\.\./\.\./|SF:|' "$lcov"
+            done
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-reports-${{ matrix.name }}
+          path: packages/*/coverage/
+          retention-days: 1
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ matrix.name }}
           path: packages/*/dist/
           retention-days: 1
 
@@ -294,11 +526,19 @@ jobs:
   smoke:
     name: Package Smoke Test
     runs-on: ubuntu-latest
-    needs: [check, pipeline]
+    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded]
+    # Active path succeeded: leaf → pipeline-leaf; sharded → base + all shards
+    # (an empty matrix.include leaves pipeline-sharded 'skipped', carried by base).
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
-      needs.pipeline.result == 'success'
+      (
+        (needs.compute-plan.outputs.mode == 'leaf' &&
+          needs.pipeline-leaf.result == 'success') ||
+        (needs.compute-plan.outputs.mode == 'sharded' &&
+          needs.base.result == 'success' &&
+          (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
+      )
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -373,13 +613,24 @@ jobs:
 
   coverage:
     name: Coverage (Codecov)
-    needs: [check, pipeline]
-    if: needs.check.outputs.should_run == 'true' && needs.pipeline.outputs.built == 'true'
+    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded]
+    if: >-
+      always() &&
+      needs.check.outputs.should_run == 'true' &&
+      (
+        (needs.compute-plan.outputs.mode == 'leaf' &&
+          needs.pipeline-leaf.result == 'success' &&
+          needs.pipeline-leaf.outputs.built == 'true') ||
+        (needs.compute-plan.outputs.mode == 'sharded' &&
+          needs.base.result == 'success' &&
+          (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       checks: write
+      actions: read # listWorkflowRunArtifacts for the R2.4 integrity check
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -391,11 +642,37 @@ jobs:
         with:
           node-version: 24
 
+      # Merge every per-path coverage artifact into one tree: leaf emits a single
+      # `coverage-reports-leaf`; sharded emits `coverage-reports-base` + one
+      # `coverage-reports-<shard>` each. Coverage is a disjoint partition (turbo
+      # `test` has no `^test`), so no lcov collides on merge.
       - name: Download coverage artifacts
         uses: actions/download-artifact@v8
         with:
-          name: coverage-reports
+          pattern: coverage-reports-*
+          merge-multiple: true
           path: packages
+
+      # R2.4: a silently-lost shard upload would understate coverage and mask a
+      # gap. Assert every expected coverage artifact exists (base + one per shard).
+      - name: Verify all coverage shards uploaded
+        if: needs.compute-plan.outputs.mode == 'sharded'
+        uses: actions/github-script@v9
+        env:
+          MATRIX: ${{ needs.compute-plan.outputs.matrix }}
+        with:
+          script: |
+            const include = JSON.parse(process.env.MATRIX).include;
+            const expected = ['coverage-reports-base', ...include.map((s) => `coverage-reports-${s.name}`)];
+            const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+              per_page: 100,
+            });
+            const present = new Set(data.artifacts.map((a) => a.name));
+            const missing = expected.filter((n) => !present.has(n));
+            if (missing.length) core.setFailed(`Missing coverage artifacts: ${missing.join(', ')}`);
 
       # Collect every produced lcov dynamically — a hardcoded `files:` list drifts
       # out of sync as packages are added (#732): it had 16 stale paths (several
@@ -417,8 +694,19 @@ jobs:
 
   sonarcloud:
     name: SonarCloud
-    needs: [check, pipeline]
-    if: needs.check.outputs.should_run == 'true' && needs.pipeline.outputs.built == 'true' && github.actor != 'dependabot[bot]'
+    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded]
+    if: >-
+      always() &&
+      needs.check.outputs.should_run == 'true' &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        (needs.compute-plan.outputs.mode == 'leaf' &&
+          needs.pipeline-leaf.result == 'success' &&
+          needs.pipeline-leaf.outputs.built == 'true') ||
+        (needs.compute-plan.outputs.mode == 'sharded' &&
+          needs.base.result == 'success' &&
+          (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -433,10 +721,13 @@ jobs:
         with:
           node-version: 24
 
+      # Same per-path coverage merge as the Codecov job (leaf single artifact OR
+      # base + per-shard). check-coverage-scope --emit rescans after the merge.
       - name: Download coverage artifacts
         uses: actions/download-artifact@v8
         with:
-          name: coverage-reports
+          pattern: coverage-reports-*
+          merge-multiple: true
           path: packages
 
       - name: Cache SonarCloud packages
@@ -482,8 +773,19 @@ jobs:
 
   bundle-size:
     name: Bundle Size
-    needs: [check, pipeline]
-    if: needs.check.outputs.should_run == 'true' && needs.pipeline.outputs.built == 'true' && github.event_name == 'pull_request'
+    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded]
+    if: >-
+      always() &&
+      needs.check.outputs.should_run == 'true' &&
+      github.event_name == 'pull_request' &&
+      (
+        (needs.compute-plan.outputs.mode == 'leaf' &&
+          needs.pipeline-leaf.result == 'success' &&
+          needs.pipeline-leaf.outputs.built == 'true') ||
+        (needs.compute-plan.outputs.mode == 'sharded' &&
+          needs.base.result == 'success' &&
+          (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -497,10 +799,13 @@ jobs:
       - name: Checkout PR
         uses: actions/checkout@v7
 
+      # Merge dist from whichever path ran (dist-leaf OR dist-base + dist-<shard>);
+      # the cache-fill bundle step below fills any non-affected packages.
       - name: Download PR dist artifacts
         uses: actions/download-artifact@v8
         with:
-          name: dist
+          pattern: dist-*
+          merge-multiple: true
           path: packages
 
       - name: Install pnpm
@@ -701,7 +1006,7 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, pipeline, smoke, sonarcloud, actionlint]
+    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded, smoke, sonarcloud, actionlint]
     if: always()
     steps:
       - name: Determine result
@@ -720,17 +1025,39 @@ jobs:
             exit 0
           fi
 
-          PIPELINE="${{ needs.pipeline.result }}"
+          PLAN="${{ needs.compute-plan.result }}"
+          MODE="${{ needs.compute-plan.outputs.mode }}"
+          LEAF="${{ needs.pipeline-leaf.result }}"
+          BASE="${{ needs.base.result }}"
+          SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
           SONAR="${{ needs.sonarcloud.result }}"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base=$BASE sharded=$SHARDED smoke=$SMOKE sonar=$SONAR"
 
-          echo "pipeline=$PIPELINE smoke=$SMOKE sonarcloud=$SONAR"
+          # compute-plan gates BOTH execution paths; if it died, MODE is empty and
+          # every path job skipped — must not pass vacuously.
+          if [[ "$PLAN" != "success" ]]; then
+            echo "❌ compute-plan failed"
+            exit 1
+          fi
 
-          # SonarCloud is skipped on dependabot PRs (see job-level if) — treat skip as pass.
+          # ok(): success OR skipped. Used ONLY for smoke/sonar (sonar skips on
+          # dependabot / built==false) and an empty-include pipeline-sharded —
+          # NEVER for the job that DEFINES the active path (pipeline-leaf / base),
+          # so a real failure there cannot be masked as a skip.
           ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
 
-          if ok "$PIPELINE" && ok "$SMOKE" && ok "$SONAR" \
-            && [[ "$PIPELINE" == "success" || "$SMOKE" == "success" ]]; then
+          case "$MODE" in
+            leaf)
+              [[ "$LEAF" == "success" ]] && PATH_OK=1 || PATH_OK=0 ;;
+            sharded)
+              { [[ "$BASE" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
+            *)
+              echo "❌ unknown compute-plan mode '$MODE'"
+              exit 1 ;;
+          esac
+
+          if [[ "$PATH_OK" == "1" ]] && ok "$SMOKE" && ok "$SONAR"; then
             echo "✅ All checks passed"
             exit 0
           fi
