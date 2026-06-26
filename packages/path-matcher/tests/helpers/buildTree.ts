@@ -6,8 +6,8 @@
  * on route-tree (which depends on path-matcher at runtime).
  */
 
-import { buildParamMeta } from "../../src";
 import { createTestMatcher } from "./createTestMatcher";
+import { buildParamMeta } from "../../src";
 
 import type {
   MatcherInputNode,

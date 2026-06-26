@@ -71,18 +71,18 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // Conditional spread: exactOptionalPropertyTypes forbids setting optional
   // properties to undefined — only include properties that are defined.
   return new SegmentMatcher({
-    ...(options?.caseSensitive === undefined
-      ? undefined
-      : { caseSensitive: options.caseSensitive }),
-    ...(options?.strictTrailingSlash === undefined
-      ? undefined
-      : { strictTrailingSlash: options.strictTrailingSlash }),
-    ...(options?.strictQueryParams === undefined
-      ? undefined
-      : { strictQueryParams: options.strictQueryParams }),
-    ...(options?.urlParamsEncoding === undefined
-      ? undefined
-      : { urlParamsEncoding: options.urlParamsEncoding }),
+    ...(options?.caseSensitive !== undefined && {
+      caseSensitive: options.caseSensitive,
+    }),
+    ...(options?.strictTrailingSlash !== undefined && {
+      strictTrailingSlash: options.strictTrailingSlash,
+    }),
+    ...(options?.strictQueryParams !== undefined && {
+      strictQueryParams: options.strictQueryParams,
+    }),
+    ...(options?.urlParamsEncoding !== undefined && {
+      urlParamsEncoding: options.urlParamsEncoding,
+    }),
     parseQueryString: (qs: string) => parse(qs, qp),
     buildQueryString: (params: Record<string, unknown>) => build(params, qp),
   });

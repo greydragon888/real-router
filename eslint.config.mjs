@@ -614,10 +614,12 @@ export default tsEslint.config(
   // ============================================
   // 8. UNICORN CONFIGURATION (Modern JS/TS patterns)
   // ============================================
-  // Updated for eslint-plugin-unicorn v68.0.0
+  // Updated for eslint-plugin-unicorn v69.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
   // v68 audit (38 new rules + prevent-abbreviations→name-replacements rename):
   // .claude/unicorn-v68-rules-audit.md
+  // v69 audit (12 new rules, all in `recommended`; 3 declined below):
+  // .claude/unicorn-v69-rules-audit.md
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
@@ -851,6 +853,16 @@ export default tsEslint.config(
       "unicorn/prefer-iterator-to-array": "off",
       // `Array#toSpliced()` is ES2023 AND changes mutate→copy semantics.
       "unicorn/no-array-splice": "off",
+      // v69: `Set.prototype.difference/intersection/…` are ES2024 (Node 22+,
+      // Chrome 122+/Safari 17+/FF 127+). The 2 src hits (validation-plugin
+      // forwardTo/retrospective param-diff) are `[...a].filter(x => !b.has(x))`
+      // — same broad-runtime-target risk as prefer-iterator-to-array. No autofix
+      // here either, so adopting would be a manual rewrite onto a too-new API.
+      "unicorn/prefer-set-methods": "off",
+      // v69: `Promise.try()` is ES2025 (Node 22+, Chrome 128+). Same target risk.
+      // All current hits are in tests/bench, but declined repo-wide to keep the
+      // shipped surface off the new API by default.
+      "unicorn/prefer-promise-try": "off",
 
       // --- Low-value stylistic whose ONLY prod sites are the symlinked shared
       // sources (shared/browser-env, shared/dom-utils). Those lint under several
@@ -861,6 +873,19 @@ export default tsEslint.config(
       "unicorn/prefer-unicode-code-point-escapes": "off",
       "unicorn/prefer-global-number-constants": "off",
       "unicorn/no-declarations-before-early-exit": "off",
+
+      // ============================================
+      // v69 (#NNN) — 12 new rules, all land in `recommended`. 9 have zero hits
+      // and are adopted for free as forward-guards. 3 declined (see
+      // .claude/unicorn-v69-rules-audit.md); the two runtime-target-risk ones
+      // (prefer-set-methods, prefer-promise-try) sit in that subsection above.
+      // ============================================
+      // `Element#replaceChildren()` is widely supported (safe API, not a runtime
+      // risk), but all 38 hits are non-shipped test/property fixtures emptying a
+      // node via a `while (el.firstChild) el.removeChild(...)` loop — 0 prod
+      // sites. Modernizing test scaffolding is pure churn with no shipped value,
+      // so it is declined repo-wide rather than carved out per-file.
+      "unicorn/prefer-dom-node-replace-children": "off",
     },
   },
 
