@@ -5,16 +5,23 @@ import type { GuardFnFactory } from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
 import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
 
+// Boolean shorthand has only two possible values, so the guard and its factory
+// are module-level singletons — registering `true`/`false` reuses one cached
+// factory instead of allocating a fresh closure per call (#962).
+const TRUE_GUARD: GuardFn = () => true;
+const FALSE_GUARD: GuardFn = () => false;
+const TRUE_FACTORY: GuardFnFactory = () => TRUE_GUARD;
+const FALSE_FACTORY: GuardFnFactory = () => FALSE_GUARD;
+
 /**
  * Converts a boolean value to a guard function factory.
  * Used for the shorthand syntax where true/false is passed instead of a function.
+ * Returns one of two cached factories — no per-call allocation (#962).
  */
 function booleanToFactory<Dependencies extends DefaultDependencies>(
   value: boolean,
 ): GuardFnFactory<Dependencies> {
-  const guardFn: GuardFn = () => value;
-
-  return () => guardFn;
+  return value ? TRUE_FACTORY : FALSE_FACTORY;
 }
 
 /**
