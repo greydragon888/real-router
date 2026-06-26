@@ -1,0 +1,344 @@
+// build-matrix.test.mjs — unit tests for the CI shard planner (PoC-2 step 2b).
+//
+// Run:  node --test scripts/build-matrix.test.mjs
+//
+// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// workspace, and these run with zero install/turbo dependency. Two levels per
+// the design doc acceptance E1 (.claude/ci-acceleration-poc-ru.md §4 PoC-2):
+//   • Level 1 — affected derivation (A5): the rx-only regression that proves the
+//     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
+//   • Level 2 — classify(): a live sweep over the real packages/* tree must
+//     reproduce the companion §C buckets (8/6/3/2/2/8/3 = 32), plus synthetic
+//     edge cases driven through injected readers (NOT turbo package-filters,
+//     which give the dep tree, not affected — companion §C footgun).
+// Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.
+
+import assert from "node:assert/strict";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import {
+  buildPlan,
+  classify,
+  CORE_LAYER,
+  deriveAffected,
+  K,
+} from "./build-matrix.mjs";
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+
+/**
+ * Real name→absolute-dir map, scanned from packages/* on disk (no turbo spawn).
+ * Absolute dirs make classify()'s fs reads independent of the test's cwd.
+ * This is the snapshot the live-sweep test asserts against.
+ */
+function loadRealDirOf() {
+  const pkgsDir = join(repoRoot, "packages");
+  const dirOf = new Map();
+  for (const entry of readdirSync(pkgsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const pjPath = join(pkgsDir, entry.name, "package.json");
+    if (!existsSync(pjPath)) continue;
+    const { name } = JSON.parse(readFileSync(pjPath, "utf8"));
+    dirOf.set(name, join(pkgsDir, entry.name));
+  }
+  return dirOf;
+}
+
+const realDirOf = loadRealDirOf();
+const allPackages = [...realDirOf.keys()];
+
+// Named expectations (companion §C). Kept explicit so a re-classification is
+// caught by name, not just by an aggregate count drifting.
+const ADAPTERS = ["react", "preact", "solid", "svelte", "vue", "angular"].map(
+  (a) => `@real-router/${a}`,
+);
+const URL_PLUGINS = ["browser-plugin", "hash-plugin", "navigation-plugin"].map(
+  (p) => `@real-router/${p}`,
+);
+const SSR_PLUGINS = ["rsc-server-plugin", "ssr-data-plugin"].map(
+  (p) => `@real-router/${p}`,
+);
+const ADAPTER_SHARED = ["@real-router/route-utils", "@real-router/sources"];
+const LEAVES = [
+  "rx",
+  "memory-plugin",
+  "lifecycle-plugin",
+  "preload-plugin",
+  "validation-plugin",
+  "search-schema-plugin",
+  "logger-plugin",
+  "persistent-params-plugin",
+].map((p) => `@real-router/${p}`);
+const INTERNAL = ["browser-env", "dom-utils", "type-guards"];
+
+// ─── Level 1 — affected derivation (A5, the load-bearing invariant) ──────────
+
+test("L1: rx-only PR derives affected=[rx] WITHOUT the dependency-closure (A5)", () => {
+  // Native `turbo query affected … --packages` shape: target set only.
+  const queryJson = JSON.stringify({
+    data: {
+      affectedPackages: {
+        items: [
+          { name: "//", path: "", reason: { __typename: "GlobalDepsChanged" } },
+          {
+            name: "@real-router/rx",
+            path: "packages/rx",
+            reason: { __typename: "FileChanged" },
+          },
+          {
+            name: "router-benchmarks",
+            path: "benchmarks",
+            reason: { __typename: "DependencyChanged" },
+          },
+        ],
+      },
+    },
+  });
+  const { affected } = deriveAffected(queryJson);
+  // The whole point of A5: core/types/fsm/logger are NOT here. If they were,
+  // touchesCore would always be true and mode=leaf would never fire.
+  assert.deepEqual(affected, ["@real-router/rx"]);
+  for (const core of CORE_LAYER)
+    assert.ok(!affected.includes(core), `closure leaked ${core}`);
+});
+
+test("L1: '//' root, shared workspace and benchmarks are filtered out", () => {
+  const queryJson = JSON.stringify({
+    data: {
+      affectedPackages: {
+        items: [
+          { name: "//", path: "" },
+          { name: "@real-router/shared-sources", path: "shared" },
+          { name: "router-benchmarks", path: "benchmarks" },
+          { name: "@real-router/core", path: "packages/core" },
+        ],
+      },
+    },
+  });
+  assert.deepEqual(deriveAffected(queryJson).affected, ["@real-router/core"]);
+});
+
+test("L1: dirOf uses turbo's path verbatim (core-types quirk, not reconstructed)", () => {
+  const queryJson = JSON.stringify({
+    data: {
+      affectedPackages: {
+        items: [{ name: "@real-router/types", path: "packages/core-types" }],
+      },
+    },
+  });
+  const { affected, dirOf } = deriveAffected(queryJson);
+  assert.deepEqual(affected, ["@real-router/types"]);
+  // packages/<name> reconstruction would have produced packages/types → ENOENT.
+  assert.equal(dirOf.get("@real-router/types"), "packages/core-types");
+});
+
+test("L1: docs/empty affected derives to []", () => {
+  const queryJson = JSON.stringify({
+    data: { affectedPackages: { items: [{ name: "//", path: "" }] } },
+  });
+  assert.deepEqual(deriveAffected(queryJson).affected, []);
+});
+
+// ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
+
+test("L2: classify() buckets all real packages/* exactly 8/6/3/2/2/8/3 = 32", () => {
+  const counts = {};
+  for (const pkg of allPackages) {
+    const bucket = classify(pkg, realDirOf);
+    counts[bucket] = (counts[bucket] ?? 0) + 1;
+  }
+  assert.equal(allPackages.length, 32, "expected 32 packages/* workspaces");
+  assert.deepEqual(counts, {
+    base: 8,
+    adapter: 6,
+    "url-plugin": 3,
+    "ssr-plugin": 2,
+    "adapter-shared": 2,
+    leaf: 8,
+    internal: 3,
+  });
+});
+
+test("L2: each named package lands in its expected bucket", () => {
+  const expect = (pkg, bucket) =>
+    assert.equal(classify(pkg, realDirOf), bucket, pkg);
+  for (const p of CORE_LAYER) expect(p, "base");
+  for (const p of ADAPTERS) expect(p, "adapter"); // angular has no symlink → deps signature
+  for (const p of URL_PLUGINS) expect(p, "url-plugin");
+  for (const p of SSR_PLUGINS) expect(p, "ssr-plugin");
+  for (const p of ADAPTER_SHARED) expect(p, "adapter-shared");
+  for (const p of LEAVES) expect(p, "leaf");
+  for (const p of INTERNAL) expect(p, "internal");
+});
+
+// ─── Level 2 — classify() edge cases via injected readers (no disk/turbo) ────
+
+const noDeps = () => new Set();
+const withSymlink = (target) => ({
+  readManifestDeps: noDeps,
+  readSymlinks: () => [target],
+});
+const oneDir = new Map([["@real-router/x", "packages/x"]]);
+
+test("L2 edge: exact shared/* symlink matches its consumer class (positive control)", () => {
+  assert.equal(
+    classify(
+      "@real-router/x",
+      oneDir,
+      withSymlink("../../../shared/dom-utils"),
+    ),
+    "adapter",
+  );
+  assert.equal(
+    classify(
+      "@real-router/x",
+      oneDir,
+      withSymlink("../../../shared/browser-env"),
+    ),
+    "url-plugin",
+  );
+  assert.equal(
+    classify("@real-router/x", oneDir, withSymlink("../../../shared/ssr")),
+    "ssr-plugin",
+  );
+});
+
+test("L2 edge: shared/<x>-suffix siblings do NOT collide (endsWith, not includes)", () => {
+  // If `includes` were used these would mis-bucket as adapter/url-plugin/ssr-plugin.
+  assert.equal(
+    classify(
+      "@real-router/x",
+      oneDir,
+      withSymlink("../../../shared/dom-utils-extra"),
+    ),
+    "leaf",
+  );
+  assert.equal(
+    classify(
+      "@real-router/x",
+      oneDir,
+      withSymlink("../../../shared/browser-env-mobile"),
+    ),
+    "leaf",
+  );
+  assert.equal(
+    classify(
+      "@real-router/x",
+      oneDir,
+      withSymlink("../../../shared/ssr-helpers"),
+    ),
+    "leaf",
+  );
+});
+
+test("L2 edge: adapter recognised by deps signature alone (angular-style, no symlink)", () => {
+  const readers = {
+    readManifestDeps: () =>
+      new Set([
+        "@real-router/core",
+        "@real-router/route-utils",
+        "@real-router/sources",
+      ]),
+    readSymlinks: () => [],
+  };
+  assert.equal(classify("@real-router/x", oneDir, readers), "adapter");
+});
+
+test("L2 edge: missing turbo directory throws loudly (R2.18 SPoF, not silent skip)", () => {
+  assert.throws(
+    () => classify("@real-router/ghost", new Map()),
+    /no turbo directory for @real-router\/ghost/,
+  );
+});
+
+// ─── Routing — buildPlan() ───────────────────────────────────────────────────
+
+test("routing: small non-core PR → leaf with a VALID empty matrix (C1)", () => {
+  const plan = buildPlan(["@real-router/rx"], realDirOf);
+  assert.deepEqual(plan, { mode: "leaf", matrix: { include: [] } });
+});
+
+test("routing: empty affected → leaf with empty matrix", () => {
+  assert.deepEqual(buildPlan([], realDirOf), {
+    mode: "leaf",
+    matrix: { include: [] },
+  });
+});
+
+test("routing: K boundary — K non-core → leaf, K+1 → sharded", () => {
+  assert.equal(K, 10);
+  const tenNonCore = [...LEAVES, ...URL_PLUGINS.slice(0, 2)]; // 8 + 2 = 10
+  const elevenNonCore = [...LEAVES, ...URL_PLUGINS]; // 8 + 3 = 11
+  assert.equal(buildPlan(tenNonCore, realDirOf).mode, "leaf");
+  assert.equal(buildPlan(elevenNonCore, realDirOf).mode, "sharded");
+});
+
+test("routing: touchesCore overrides leaf even for a tiny affected set", () => {
+  // length 1 ≤ K, but base.length > 0 → must shard.
+  assert.equal(buildPlan(["@real-router/core"], realDirOf).mode, "sharded");
+});
+
+test("routing: real route-utils fanout (9 affected, no core) → leaf under K=10", () => {
+  // Empirically measured (isolated route-utils source edit, turbo 2.10.0):
+  // affected = route-utils + sources + dom-utils + 6 adapters = 9, no core layer.
+  // 9 ≤ K(10) && !touchesCore → leaf. ⚠️ This CONTRADICTS the design doc's §3
+  // "Ожидаемый эффект"/acceptance-E (which expect route-utils → sharded with 6
+  // adapter shards). That expectation predates the K=5→K=10 recalibration
+  // (companion §D). Documented here as the deliberate K=10 consequence — lower K
+  // to 5 to shard this [6..10] fanout band. Reconciliation is a calibration call.
+  const routeUtilsFanout = [
+    ...ADAPTERS,
+    "@real-router/route-utils",
+    "@real-router/sources",
+    "dom-utils",
+  ];
+  assert.equal(routeUtilsFanout.length, 9);
+  assert.equal(buildPlan(routeUtilsFanout, realDirOf).mode, "leaf");
+});
+
+test("routing: sharded matrix — adapter shards + non-empty groups only, empties omitted", () => {
+  // Synthetic >K non-core set exercising the sharded matrix shape: 6 adapters +
+  // 2 adapter-shared + 3 url-plugins = 11 > K. ssr-plugin/leaf/internal stay
+  // empty and must NOT spawn runners; base is a separate job, never a shard.
+  const affected = [...ADAPTERS, ...ADAPTER_SHARED, ...URL_PLUGINS]; // 11
+  const { mode, matrix } = buildPlan(affected, realDirOf);
+  assert.equal(mode, "sharded");
+  const names = matrix.include.map((i) => i.name);
+  for (const a of ["react", "preact", "solid", "svelte", "vue", "angular"])
+    assert.ok(names.includes(a), a);
+  assert.ok(names.includes("adapter-shared"));
+  assert.ok(names.includes("url-plugin"));
+  for (const empty of ["ssr-plugin", "leaf", "internal", "base"]) {
+    assert.ok(
+      !names.includes(empty),
+      `empty/base group ${empty} leaked into matrix`,
+    );
+  }
+  assert.equal(matrix.include.length, 8); // 6 adapters + adapter-shared + url-plugin
+  // Adapter shard carries a single-package filter.
+  assert.deepEqual(
+    matrix.include.find((i) => i.name === "react"),
+    { name: "react", filter: "--filter=@real-router/react" },
+  );
+});
+
+test("routing: full rebuild (all 32) → base excluded, 11 shards", () => {
+  const { mode, matrix } = buildPlan(allPackages, realDirOf);
+  assert.equal(mode, "sharded");
+  const names = matrix.include.map((i) => i.name);
+  assert.ok(!names.includes("base"), "base is a separate job, never a shard");
+  // 6 adapters + url-plugin + ssr-plugin + adapter-shared + leaf + internal
+  for (const g of [
+    "url-plugin",
+    "ssr-plugin",
+    "adapter-shared",
+    "leaf",
+    "internal",
+  ]) {
+    assert.ok(names.includes(g), g);
+  }
+  assert.equal(matrix.include.length, 11);
+});
