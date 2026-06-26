@@ -2,9 +2,10 @@
  * Core hot-path benchmarks — DEFAULT matcher form (no option overrides).
  *
  * Covers (RFC §6.3):
- *   Axis A — synchronous `navigate()` paths.
- *   Axis C — view-layer: `buildPath` (warm), `isActiveRoute`, `areStatesEqual`,
- *            `shouldUpdateNode`, `matchPath`.
+ *   Axis A — synchronous `navigate()` paths (incl. deactivation-guard phase and
+ *            `subscribe` success fan-out).
+ *   Axis C — view-layer: `buildPath` (warm), `isActiveRoute`, `canNavigateTo`,
+ *            `areStatesEqual`, `shouldUpdateNode`, `matchPath`.
  *   Axis B — worst-case route/tree inputs reachable under default options
  *            (splat backtracking, percent-decode, wide tree, deep nesting,
  *            constraints, optional params). HARVESTED from the removed
@@ -30,6 +31,99 @@ import { createRouter } from "../../src";
 import { getLifecycleApi, getPluginApi } from "../../src/api";
 
 import type { Route } from "../../src";
+import type { Bench } from "tinybench";
+
+/**
+ * N `router.subscribe` success listeners (1 / 3 / 5) — the real view-layer
+ * fan-out: every mounted component subscribes via useSyncExternalStore, so each
+ * commit dispatches TRANSITION_SUCCESS to N listeners synchronously. This is the
+ * most common production fan-out; `plugins-N` (onTransitionSuccess) is a
+ * neighbouring dispatch path, not a substitute for N success subscribers.
+ */
+async function addSubscribeFanout(bench: Bench): Promise<void> {
+  for (const count of [1, 3, 5]) {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "page", path: "/page" },
+    ]);
+
+    for (let s = 0; s < count; s++) {
+      router.subscribe(() => {});
+    }
+
+    await router.start("/");
+    const targets = ["page", "home"] as const;
+    let i = 0;
+
+    bench.add(`navigate/subscribe-${String(count)}`, () => {
+      void router.navigate(targets[i++ % targets.length]);
+    });
+  }
+}
+
+/**
+ * 3 passthrough deactivate guards firing EVERY iteration (deactivation phase,
+ * innermost→outermost, before LEAVE_APPROVE). `sync-guards` only exercises
+ * activation; both siblings here carry deactivate guards so leaving either route
+ * runs the full chain (AbortController alloc+release included).
+ */
+async function addDeactivateGuards(bench: Bench): Promise<void> {
+  const router = createRouter([
+    { name: "a", path: "/a" },
+    { name: "b", path: "/b" },
+  ]);
+
+  for (const name of ["a", "b"] as const) {
+    for (let g = 0; g < 3; g++) {
+      getLifecycleApi(router).addDeactivateGuard(name, passthroughGuardFactory);
+    }
+  }
+
+  await router.start("/a");
+  const targets = ["b", "a"] as const;
+  let i = 0;
+
+  bench.add("navigate/sync-deactivate-guards", () => {
+    void router.navigate(targets[i++ % targets.length]);
+  });
+}
+
+/**
+ * `canNavigateTo` — synchronous per-Link disabled-state (Navigator subset).
+ * Guardless target hits the no-guard fast path (the common Link); the navbar
+ * batch is the real fan-out (one check per rendered Link, one entry being the
+ * current route → same-state short-circuit); the guarded target exercises
+ * synchronous activation-guard evaluation (an async guard would resolve false).
+ */
+async function addCanNavigateTo(bench: Bench): Promise<void> {
+  const nav = createRouter([
+    { name: "home", path: "/" },
+    { name: "dashboard", path: "/dashboard" },
+    { name: "profile", path: "/profile" },
+    { name: "settings", path: "/settings" },
+    { name: "help", path: "/help" },
+    { name: "admin", path: "/admin" },
+  ]);
+
+  for (let g = 0; g < 3; g++) {
+    getLifecycleApi(nav).addActivateGuard("admin", passthroughGuardFactory);
+  }
+
+  await nav.start("/");
+  const navbar = ["home", "dashboard", "profile", "settings", "help"];
+
+  bench.add("state/canNavigateTo-allowed", () => {
+    keep(nav.canNavigateTo("dashboard"));
+  });
+  bench.add("state/canNavigateTo-navbar-5", () => {
+    for (const name of navbar) {
+      keep(nav.canNavigateTo(name));
+    }
+  });
+  bench.add("state/canNavigateTo-guarded", () => {
+    keep(nav.canNavigateTo("admin"));
+  });
+}
 
 async function main(): Promise<void> {
   const bench = makeBench("default");
@@ -89,6 +183,9 @@ async function main(): Promise<void> {
     });
   }
 
+  // sync-deactivate-guards: deactivation-phase guards every iteration — helper.
+  await addDeactivateGuards(bench);
+
   // deep transition: long activate/deactivate chain (nested 5 / 10).
   for (const depth of [5, 10]) {
     const router = createRouter(deepRoutes(depth));
@@ -138,6 +235,9 @@ async function main(): Promise<void> {
       void router.navigate(targets[i++ % targets.length]);
     });
   }
+
+  // N router.subscribe success listeners (1 / 3 / 5) — see helper docstring.
+  await addSubscribeFanout(bench);
 
   // N sync subscribeLeave listeners (1 / 3) — AbortController + frozen LeaveState.
   for (const count of [1, 3]) {
@@ -240,6 +340,9 @@ async function main(): Promise<void> {
       }
     });
   }
+
+  // canNavigateTo — synchronous per-Link disabled-state (Navigator) — helper.
+  await addCanNavigateTo(bench);
 
   // shouldUpdateNode — N-node batch (legitimate getTransitionPath ref-cache, §6.6.2).
   {
