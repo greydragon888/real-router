@@ -107,21 +107,14 @@ jobs:
         if: github.event_name == 'pull_request'
         run: git fetch origin master:master
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
       # Minimal install: turbo builds the affected graph from package.json +
       # lockfile, not node_modules. --ignore-scripts is safe — @turbo/<platform>
       # ships its binary via optionalDependencies with no postinstall, so
       # `pnpm exec turbo` still resolves (R2.19: keep this prefix light).
-      - name: Install dependencies (minimal — turbo binary only)
-        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Setup (pnpm + Node + minimal install)
+        uses: ./.github/actions/setup
+        with:
+          install-args: --frozen-lockfile --ignore-scripts
 
       - name: Build shard plan
         id: plan
@@ -158,17 +151,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: git fetch origin master:master
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
 
       # packages/angular/src/dom-utils is a git-tracked COPY of shared/dom-utils
       # (ng-packagr can't follow symlinks; the prebundle script re-materializes
@@ -338,17 +322,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: git fetch origin master:master
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
 
       - name: Check angular dom-utils copy is in sync
         run: |
@@ -393,17 +368,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: git fetch origin master:master
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
 
       - name: Test core layer
         run: pnpm turbo run test test:properties --filter='@real-router/core...'
@@ -451,17 +417,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
 
       - name: Check dependency consistency
         run: pnpm lint:deps
@@ -508,17 +465,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: git fetch origin master:master
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
 
       - name: Check angular dom-utils copy is in sync
         run: |
@@ -602,17 +550,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
 
       # bundle (not build) — only tsdown, no test/lint/type-check.
       # Affected + upstream → remote cache from pipeline.
@@ -870,17 +809,8 @@ jobs:
           merge-multiple: true
           path: packages
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
 
       # Fill in dist/ for packages that pipeline skipped (non-affected).
       # Affected packages already have dist from the downloaded artifact;
