@@ -245,9 +245,11 @@ describe("core/validator call-site contract", () => {
         handler,
         "addActivateGuard",
       );
+      // The hard limit is enforced at the namespace registration choke point
+      // (#961), so the validator call carries (count, methodName) — the namespace
+      // owns the limit source, not the API layer.
       expect(validator.lifecycle.validateHandlerLimit).toHaveBeenCalledWith(
         expect.any(Number),
-        expect.anything(),
         "canActivate",
       );
     });
@@ -265,10 +267,33 @@ describe("core/validator call-site contract", () => {
         handler,
         "addDeactivateGuard",
       );
+      // Limit enforced at the namespace choke point (#961): (count, methodName).
       expect(validator.lifecycle.validateHandlerLimit).toHaveBeenCalledWith(
         expect.any(Number),
-        expect.anything(),
         "canDeactivate",
+      );
+    });
+
+    it("counts unique routes across definition + external guard maps (#961)", () => {
+      // The limit check at the namespace choke point reads getHandlerCount, which
+      // dedups across the definition map (route-config guards, isFromDefinition)
+      // and the external map (getLifecycleApi). With both populated, registering
+      // a further guard exercises the union/dedup branch.
+      const lifecycle = getLifecycleApi(router);
+      const routes = getRoutesApi(router);
+
+      lifecycle.addActivateGuard("ext", () => () => true); // external map
+      routes.add([
+        { name: "def", path: "/def", canActivate: () => () => true },
+      ]); // definition map
+
+      expect(() => {
+        lifecycle.addActivateGuard("ext2", () => () => true);
+      }).not.toThrow();
+
+      expect(validator.lifecycle.validateHandlerLimit).toHaveBeenCalledWith(
+        expect.any(Number),
+        "canActivate",
       );
     });
 

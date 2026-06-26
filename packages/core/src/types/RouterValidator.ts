@@ -103,11 +103,7 @@ export interface RouterValidator {
    */
   lifecycle: {
     validateHandler: (handler: unknown, caller: string) => void;
-    validateHandlerLimit: (
-      count: number,
-      limits: unknown,
-      caller: string,
-    ) => void;
+    validateHandlerLimit: (count: number, methodName: string) => void;
     validateCountThresholds: (count: number, methodName: string) => void;
     warnOverwrite: (name: string, type: string, methodName: string) => void;
     warnAsyncGuardSync: (name: string, methodName: string) => void;

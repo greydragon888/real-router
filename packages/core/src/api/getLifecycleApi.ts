@@ -18,14 +18,9 @@ export function getLifecycleApi<
       ctx.validator?.routes.validateRouteName(name, "addActivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addActivateGuard");
 
-      const activateCount = lifecycleNamespace.getHandlerCount("activate");
-
-      ctx.validator?.lifecycle.validateHandlerLimit(
-        activateCount,
-        ctx.dependenciesGetStore().limits,
-        "canActivate",
-      );
-
+      // Handler-limit enforcement lives at the namespace registration choke point
+      // (RouteLifecycleNamespace.#registerHandler) so all paths are bounded
+      // uniformly — see #961.
       lifecycleNamespace.addCanActivate(name, handler);
     },
 
@@ -34,14 +29,6 @@ export function getLifecycleApi<
 
       ctx.validator?.routes.validateRouteName(name, "addDeactivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
-
-      const deactivateCount = lifecycleNamespace.getHandlerCount("deactivate");
-
-      ctx.validator?.lifecycle.validateHandlerLimit(
-        deactivateCount,
-        ctx.dependenciesGetStore().limits,
-        "canDeactivate",
-      );
 
       lifecycleNamespace.addCanDeactivate(name, handler);
     },

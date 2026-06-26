@@ -385,10 +385,21 @@ export class RouteLifecycleNamespace<
     if (isOverwrite) {
       this.#getValidator?.()?.lifecycle.warnOverwrite(name, type, methodName);
     } else {
-      this.#getValidator?.()?.lifecycle.validateCountThresholds(
-        this.getHandlerCount(type) + 1,
-        methodName,
-      );
+      // Single enforcement choke point for EVERY registration path: programmatic
+      // (getLifecycleApi) and route-config (getRoutesApi.add/update, where
+      // isFromDefinition=true). The hard limit throws here so route-config guards
+      // are bounded exactly like programmatic ones (#961); the approaching-limit
+      // warning follows. Only new slots count toward the limit — an overwrite
+      // leaves the count unchanged. `getHandlerCount` is read once and only when
+      // the validator is installed (opt-in), so the no-plugin path stays free.
+      const validator = this.#getValidator?.();
+
+      if (validator) {
+        const count = this.getHandlerCount(type);
+
+        validator.lifecycle.validateHandlerLimit(count, methodName);
+        validator.lifecycle.validateCountThresholds(count + 1, methodName);
+      }
     }
 
     const factory =
