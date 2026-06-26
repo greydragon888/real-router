@@ -1,5 +1,16 @@
 # @real-router/validation-plugin
 
+## 0.8.3
+
+### Patch Changes
+
+- [#974](https://github.com/greydragon888/real-router/pull/974) [`442138e`](https://github.com/greydragon888/real-router/commit/442138ed0a0deba4cb65787a062e345243230606) Thanks [@greydragon888](https://github.com/greydragon888)! - Enforce the lifecycle-handler limit on route-config guards ([#961](https://github.com/greydragon888/real-router/issues/961))
+
+  - `validateHandlerLimit` now reads `maxLifecycleHandlers` from the router options — the same source as the approaching-limit warning — instead of a caller-supplied value. Combined with the core change, the hard throw now fires for guards registered via route config, not just the programmatic API.
+
+- Updated dependencies [[`442138e`](https://github.com/greydragon888/real-router/commit/442138ed0a0deba4cb65787a062e345243230606), [`442138e`](https://github.com/greydragon888/real-router/commit/442138ed0a0deba4cb65787a062e345243230606), [`442138e`](https://github.com/greydragon888/real-router/commit/442138ed0a0deba4cb65787a062e345243230606), [`442138e`](https://github.com/greydragon888/real-router/commit/442138ed0a0deba4cb65787a062e345243230606)]:
+  - @real-router/core@0.61.2
+
 ## 0.8.2
 
 ### Patch Changes
