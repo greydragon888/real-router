@@ -310,17 +310,21 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # BASE: core layer for the sharded path (mode=sharded). Validates
-  # @real-router/core... (8 packages) ONCE so shards reuse it from Remote
-  # Cache, and runs core's publication lints (publint/attw) here. The repo-
-  # global lints (syncpack/dedupe/coverage-scope/knip) moved OUT to the parallel
-  # repo-lints job — they inflated this Amdahl prefix (R2.6), not being per-
-  # package affected-scoped. turbo restores coverage/** + dist/** even on a full
-  # cache hit, so `built` is tautologically true → uploads are unconditional.
+  # BASE — split in two so core's TESTS no longer gate the shards. Shards (and
+  # base-test) need only core's BUNDLE, not its test results (turbo `test`
+  # dependsOn `^bundle`, not `^test`). So:
+  #   base-bundle: bundle + publication lints (publint/attw) → uploads dist-base.
+  #     ONLY this gates pipeline-sharded (`needs: base-bundle`) — the fast Amdahl
+  #     prefix. Also runs the angular dom-utils sync check once.
+  #   base-test:   test + test:properties → uploads coverage-reports-base. Runs in
+  #     PARALLEL to the shards; `needs: base-bundle` only so the core-layer
+  #     ^bundle arrives as a Remote-Cache HIT (no redundant rebuild). Core's
+  #     property-test cost is now OFF the shard critical path (R2.6).
+  # Repo-global lints live in the separate parallel repo-lints job.
   # ============================================
 
-  base:
-    name: Base (core layer)
+  base-bundle:
+    name: Base bundle (core layer)
     runs-on: ubuntu-latest
     needs: [check, compute-plan]
     if: needs.compute-plan.outputs.mode == 'sharded'
@@ -355,11 +359,54 @@ jobs:
             exit 1
           fi
 
-      - name: Test + bundle core layer
-        run: pnpm turbo run test test:properties bundle --filter='@real-router/core...'
+      - name: Bundle core layer
+        run: pnpm turbo run bundle --filter='@real-router/core...'
 
       - name: Validate core published artifacts (publint + attw)
         run: pnpm turbo run lint:package lint:types --filter='@real-router/core...'
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-base
+          path: packages/*/dist/
+          retention-days: 1
+
+  # ============================================
+  # BASE-TEST: core-layer test + test:properties, PARALLEL to the shards. The
+  # heavy property-test cost no longer blocks shard fan-out — only base-bundle
+  # does. `needs: base-bundle` purely for the upstream ^bundle Remote-Cache HIT.
+  # Emits coverage-reports-base for the coverage / sonar merge.
+  # ============================================
+  base-test:
+    name: Base test (core layer)
+    runs-on: ubuntu-latest
+    needs: [check, compute-plan, base-bundle]
+    if: needs.compute-plan.outputs.mode == 'sharded'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch master for Turbo comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin master:master
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test core layer
+        run: pnpm turbo run test test:properties --filter='@real-router/core...'
 
       - name: Fix coverage paths
         run: |
@@ -384,13 +431,6 @@ jobs:
         with:
           name: coverage-reports-base
           path: packages/*/coverage/
-          retention-days: 1
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist-base
-          path: packages/*/dist/
           retention-days: 1
 
   # ============================================
@@ -445,15 +485,15 @@ jobs:
   # ============================================
   # PIPELINE-SHARDED: one runner per affected class (mode=sharded). The matrix
   # comes from compute-plan; empty groups never enter matrix.include → their
-  # runner is not spawned. core arrives from the base job / Remote Cache as a
+  # runner is not spawned. core arrives from base-bundle / Remote Cache as a
   # HIT (not a rebuild). Coverage is a disjoint partition (turbo `test` has no
-  # `^test`), so per-shard lcov never overlaps base's.
+  # `^test`), so per-shard lcov never overlaps base-test's.
   # ============================================
 
   pipeline-sharded:
     name: Pipeline (shard ${{ matrix.name }})
     runs-on: ubuntu-latest
-    needs: [check, compute-plan, base]
+    needs: [check, compute-plan, base-bundle]
     if: needs.compute-plan.outputs.mode == 'sharded'
     strategy:
       fail-fast: false
@@ -544,9 +584,9 @@ jobs:
   smoke:
     name: Package Smoke Test
     runs-on: ubuntu-latest
-    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded]
-    # Active path succeeded: leaf → pipeline-leaf; sharded → base + all shards
-    # (an empty matrix.include leaves pipeline-sharded 'skipped', carried by base).
+    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
+    # Active path succeeded: leaf → pipeline-leaf; sharded → base-bundle + base-test
+    # + all shards (empty matrix.include → pipeline-sharded 'skipped', carried by the base jobs).
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
@@ -554,7 +594,8 @@ jobs:
         (needs.compute-plan.outputs.mode == 'leaf' &&
           needs.pipeline-leaf.result == 'success') ||
         (needs.compute-plan.outputs.mode == 'sharded' &&
-          needs.base.result == 'success' &&
+          needs.base-bundle.result == 'success' &&
+          needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
       )
     steps:
@@ -631,7 +672,7 @@ jobs:
 
   coverage:
     name: Coverage (Codecov)
-    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded]
+    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
@@ -640,7 +681,8 @@ jobs:
           needs.pipeline-leaf.result == 'success' &&
           needs.pipeline-leaf.outputs.built == 'true') ||
         (needs.compute-plan.outputs.mode == 'sharded' &&
-          needs.base.result == 'success' &&
+          needs.base-bundle.result == 'success' &&
+          needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
       )
     runs-on: ubuntu-latest
@@ -712,7 +754,7 @@ jobs:
 
   sonarcloud:
     name: SonarCloud
-    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded]
+    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
@@ -722,7 +764,8 @@ jobs:
           needs.pipeline-leaf.result == 'success' &&
           needs.pipeline-leaf.outputs.built == 'true') ||
         (needs.compute-plan.outputs.mode == 'sharded' &&
-          needs.base.result == 'success' &&
+          needs.base-bundle.result == 'success' &&
+          needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
       )
     runs-on: ubuntu-latest
@@ -791,7 +834,7 @@ jobs:
 
   bundle-size:
     name: Bundle Size
-    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded]
+    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
@@ -801,7 +844,8 @@ jobs:
           needs.pipeline-leaf.result == 'success' &&
           needs.pipeline-leaf.outputs.built == 'true') ||
         (needs.compute-plan.outputs.mode == 'sharded' &&
-          needs.base.result == 'success' &&
+          needs.base-bundle.result == 'success' &&
+          needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
       )
     runs-on: ubuntu-latest
@@ -1024,7 +1068,7 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, compute-plan, pipeline-leaf, base, pipeline-sharded, repo-lints, smoke, sonarcloud, actionlint]
+    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, sonarcloud, actionlint]
     if: always()
     steps:
       - name: Determine result
@@ -1046,12 +1090,13 @@ jobs:
           PLAN="${{ needs.compute-plan.result }}"
           MODE="${{ needs.compute-plan.outputs.mode }}"
           LEAF="${{ needs.pipeline-leaf.result }}"
-          BASE="${{ needs.base.result }}"
+          BASE_BUNDLE="${{ needs.base-bundle.result }}"
+          BASE_TEST="${{ needs.base-test.result }}"
           SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
           SONAR="${{ needs.sonarcloud.result }}"
           LINTS="${{ needs.repo-lints.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base=$BASE sharded=$SHARDED smoke=$SMOKE sonar=$SONAR lints=$LINTS"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE sonar=$SONAR lints=$LINTS"
 
           # compute-plan gates BOTH execution paths; if it died, MODE is empty and
           # every path job skipped — must not pass vacuously.
@@ -1062,7 +1107,7 @@ jobs:
 
           # ok(): success OR skipped. Used ONLY for smoke/sonar (sonar skips on
           # dependabot / built==false) and an empty-include pipeline-sharded —
-          # NEVER for the job that DEFINES the active path (pipeline-leaf / base),
+          # NEVER for the job that DEFINES the active path (pipeline-leaf / base-bundle + base-test),
           # so a real failure there cannot be masked as a skip.
           ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
 
@@ -1070,7 +1115,7 @@ jobs:
             leaf)
               [[ "$LEAF" == "success" ]] && PATH_OK=1 || PATH_OK=0 ;;
             sharded)
-              { [[ "$BASE" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
+              { [[ "$BASE_BUNDLE" == "success" ]] && [[ "$BASE_TEST" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
             *)
               echo "❌ unknown compute-plan mode '$MODE'"
               exit 1 ;;
