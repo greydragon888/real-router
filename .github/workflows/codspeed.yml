@@ -1,0 +1,54 @@
+name: CodSpeed
+
+# Core hot-path benchmark gate (RFC: .claude/core-benchmark-strategy-rfc-ru.md).
+# The local part — the tinybench suite under packages/core/tests/benchmarks/
+# wired to @codspeed/tinybench-plugin via fixtures.ts (makeBench → withCodSpeed)
+# and a process-per-file runner (run.ts) — already ships on master. This is the
+# CI runner the RFC deferred as "user-gated": it needs a CodSpeed project + the
+# CODSPEED_TOKEN secret, neither of which can be created or validated locally.
+#
+# Push-to-master establishes the baseline; pull_request compares against it. The
+# regression threshold / gate semantics live in the CodSpeed project settings,
+# not here — this workflow only runs the suite under instrumentation and uploads.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  benchmarks:
+    name: Core hot-path benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Inline setup (master has no ./.github/actions/setup composite yet — it
+      # arrives with the #974 merge; switch this to `uses: ./.github/actions/setup`
+      # afterwards).
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # CodSpeedHQ/action runs the command under Valgrind callgrind with
+      # --trace-children, so the per-file child processes run.ts spawns inherit
+      # the instrumentation; the withCodSpeed-wrapped Bench in each then emits
+      # deterministic instruction counts instead of wall-clock.
+      - name: Run core hot-path benchmarks under CodSpeed
+        uses: CodSpeedHQ/action@v4
+        with:
+          run: pnpm -F @real-router/core bench
+          token: ${{ secrets.CODSPEED_TOKEN }}
