@@ -32,6 +32,8 @@ jobs:
     outputs:
       should_run: ${{ steps.changes.outputs.should_run }}
       turbo_base: ${{ steps.turbo.outputs.base }}
+      mode: ${{ steps.plan.outputs.mode }} # 'leaf' | 'sharded'; empty for docs/CI-only PRs
+      matrix: ${{ steps.plan.outputs.matrix }} # always-valid JSON; {"include":[]} for leaf
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -83,41 +85,28 @@ jobs:
             echo "base=${{ github.event.before }}" >> $GITHUB_OUTPUT
           fi
 
-  # ============================================
-  # COMPUTE-PLAN: classify affected packages → leaf | sharded matrix.
-  # Runs scripts/build-matrix.mjs, which derives affected via the native
-  # `turbo query affected --packages` API and emits `mode` + a dynamic matrix.
-  # ============================================
-
-  compute-plan:
-    name: Compute Shard Plan
-    runs-on: ubuntu-latest
-    needs: [check]
-    if: needs.check.outputs.should_run == 'true'
-    outputs:
-      mode: ${{ steps.plan.outputs.mode }} # 'leaf' | 'sharded'
-      matrix: ${{ steps.plan.outputs.matrix }} # always-valid JSON; {"include":[]} for leaf
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
+      # R2.19: the shard plan (formerly a separate compute-plan job) is folded
+      # into check so the leaf/sharded paths don't pay a serial job-prefix.
+      # Classify affected → leaf | sharded matrix via build-matrix.mjs (native
+      # `turbo query affected`). Runs only when there is code to build; for
+      # docs/CI-only PRs `mode`/`matrix` stay empty and every downstream
+      # `if: …mode == …` job is skipped.
       - name: Fetch master for Turbo comparison
-        if: github.event_name == 'pull_request'
+        if: steps.changes.outputs.should_run == 'true' && github.event_name == 'pull_request'
         run: git fetch origin master:master
 
       # Minimal install: turbo builds the affected graph from package.json +
       # lockfile, not node_modules. --ignore-scripts is safe — @turbo/<platform>
-      # ships its binary via optionalDependencies with no postinstall, so
-      # `pnpm exec turbo` still resolves (R2.19: keep this prefix light).
+      # ships its binary via optionalDependencies with no postinstall.
       - name: Setup (pnpm + Node + minimal install)
+        if: steps.changes.outputs.should_run == 'true'
         uses: ./.github/actions/setup
         with:
           install-args: --frozen-lockfile --ignore-scripts
 
       - name: Build shard plan
         id: plan
+        if: steps.changes.outputs.should_run == 'true'
         run: node scripts/build-matrix.mjs >> "$GITHUB_OUTPUT"
 
   # ============================================
@@ -131,8 +120,8 @@ jobs:
   pipeline-leaf:
     name: Pipeline (leaf)
     runs-on: ubuntu-latest
-    needs: [check, compute-plan]
-    if: needs.compute-plan.outputs.mode == 'leaf'
+    needs: [check]
+    if: needs.check.outputs.mode == 'leaf'
     outputs:
       # 'true' when turbo's affected filter actually produced package outputs.
       # A root config/docs change (e.g. package.json scripts, .jscpd.json) passes
@@ -310,8 +299,8 @@ jobs:
   base-bundle:
     name: Base bundle (core layer)
     runs-on: ubuntu-latest
-    needs: [check, compute-plan]
-    if: needs.compute-plan.outputs.mode == 'sharded'
+    needs: [check]
+    if: needs.check.outputs.mode == 'sharded'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -356,8 +345,8 @@ jobs:
   base-test:
     name: Base test (core layer)
     runs-on: ubuntu-latest
-    needs: [check, compute-plan, base-bundle]
-    if: needs.compute-plan.outputs.mode == 'sharded'
+    needs: [check, base-bundle]
+    if: needs.check.outputs.mode == 'sharded'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -441,7 +430,7 @@ jobs:
 
   # ============================================
   # PIPELINE-SHARDED: one runner per affected class (mode=sharded). The matrix
-  # comes from compute-plan; empty groups never enter matrix.include → their
+  # comes from check (R2.19); empty groups never enter matrix.include → their
   # runner is not spawned. core arrives from base-bundle / Remote Cache as a
   # HIT (not a rebuild). Coverage is a disjoint partition (turbo `test` has no
   # `^test`), so per-shard lcov never overlaps base-test's.
@@ -450,11 +439,11 @@ jobs:
   pipeline-sharded:
     name: Pipeline (shard ${{ matrix.name }})
     runs-on: ubuntu-latest
-    needs: [check, compute-plan, base-bundle]
-    if: needs.compute-plan.outputs.mode == 'sharded'
+    needs: [check, base-bundle]
+    if: needs.check.outputs.mode == 'sharded'
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.compute-plan.outputs.matrix || '{"include":[]}') }}
+      matrix: ${{ fromJson(needs.check.outputs.matrix || '{"include":[]}') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -532,16 +521,16 @@ jobs:
   smoke:
     name: Package Smoke Test
     runs-on: ubuntu-latest
-    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
+    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
     # Active path succeeded: leaf → pipeline-leaf; sharded → base-bundle + base-test
     # + all shards (empty matrix.include → pipeline-sharded 'skipped', carried by the base jobs).
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
       (
-        (needs.compute-plan.outputs.mode == 'leaf' &&
+        (needs.check.outputs.mode == 'leaf' &&
           needs.pipeline-leaf.result == 'success') ||
-        (needs.compute-plan.outputs.mode == 'sharded' &&
+        (needs.check.outputs.mode == 'sharded' &&
           needs.base-bundle.result == 'success' &&
           needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
@@ -611,15 +600,15 @@ jobs:
 
   coverage:
     name: Coverage (Codecov)
-    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
+    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
       (
-        (needs.compute-plan.outputs.mode == 'leaf' &&
+        (needs.check.outputs.mode == 'leaf' &&
           needs.pipeline-leaf.result == 'success' &&
           needs.pipeline-leaf.outputs.built == 'true') ||
-        (needs.compute-plan.outputs.mode == 'sharded' &&
+        (needs.check.outputs.mode == 'sharded' &&
           needs.base-bundle.result == 'success' &&
           needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
@@ -655,10 +644,10 @@ jobs:
       # R2.4: a silently-lost shard upload would understate coverage and mask a
       # gap. Assert every expected coverage artifact exists (base + one per shard).
       - name: Verify all coverage shards uploaded
-        if: needs.compute-plan.outputs.mode == 'sharded'
+        if: needs.check.outputs.mode == 'sharded'
         uses: actions/github-script@v9
         env:
-          MATRIX: ${{ needs.compute-plan.outputs.matrix }}
+          MATRIX: ${{ needs.check.outputs.matrix }}
         with:
           script: |
             const include = JSON.parse(process.env.MATRIX).include;
@@ -693,16 +682,16 @@ jobs:
 
   sonarcloud:
     name: SonarCloud
-    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
+    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
       github.actor != 'dependabot[bot]' &&
       (
-        (needs.compute-plan.outputs.mode == 'leaf' &&
+        (needs.check.outputs.mode == 'leaf' &&
           needs.pipeline-leaf.result == 'success' &&
           needs.pipeline-leaf.outputs.built == 'true') ||
-        (needs.compute-plan.outputs.mode == 'sharded' &&
+        (needs.check.outputs.mode == 'sharded' &&
           needs.base-bundle.result == 'success' &&
           needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
@@ -773,16 +762,16 @@ jobs:
 
   bundle-size:
     name: Bundle Size
-    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
+    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
       github.event_name == 'pull_request' &&
       (
-        (needs.compute-plan.outputs.mode == 'leaf' &&
+        (needs.check.outputs.mode == 'leaf' &&
           needs.pipeline-leaf.result == 'success' &&
           needs.pipeline-leaf.outputs.built == 'true') ||
-        (needs.compute-plan.outputs.mode == 'sharded' &&
+        (needs.check.outputs.mode == 'sharded' &&
           needs.base-bundle.result == 'success' &&
           needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
@@ -998,7 +987,7 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, compute-plan, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, sonarcloud, actionlint]
+    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, sonarcloud, actionlint]
     if: always()
     steps:
       - name: Determine result
@@ -1017,8 +1006,8 @@ jobs:
             exit 0
           fi
 
-          PLAN="${{ needs.compute-plan.result }}"
-          MODE="${{ needs.compute-plan.outputs.mode }}"
+          PLAN="${{ needs.check.result }}"
+          MODE="${{ needs.check.outputs.mode }}"
           LEAF="${{ needs.pipeline-leaf.result }}"
           BASE_BUNDLE="${{ needs.base-bundle.result }}"
           BASE_TEST="${{ needs.base-test.result }}"
@@ -1028,10 +1017,11 @@ jobs:
           LINTS="${{ needs.repo-lints.result }}"
           echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE sonar=$SONAR lints=$LINTS"
 
-          # compute-plan gates BOTH execution paths; if it died, MODE is empty and
-          # every path job skipped — must not pass vacuously.
+          # check now carries the shard plan (R2.19); if its plan step died, MODE
+          # is empty and every path job skipped — must not pass vacuously. (A
+          # change-detection failure leaves should_run empty → handled above.)
           if [[ "$PLAN" != "success" ]]; then
-            echo "❌ compute-plan failed"
+            echo "❌ check / shard plan failed"
             exit 1
           fi
 
@@ -1047,7 +1037,7 @@ jobs:
             sharded)
               { [[ "$BASE_BUNDLE" == "success" ]] && [[ "$BASE_TEST" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
             *)
-              echo "❌ unknown compute-plan mode '$MODE'"
+              echo "❌ unknown shard-plan mode '$MODE'"
               exit 1 ;;
           esac
 
