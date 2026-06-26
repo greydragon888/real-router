@@ -1,9 +1,7 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
-import { DEFAULT_LIMITS } from "../../constants";
-
 import type { RouteLifecycleDependencies } from "./types";
-import type { GuardFnFactory, Limits } from "../../types";
+import type { GuardFnFactory } from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
 import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
 
@@ -73,23 +71,10 @@ export class RouteLifecycleNamespace<
   ];
 
   #deps!: RouteLifecycleDependencies<Dependencies>;
-  #limits: Limits = DEFAULT_LIMITS;
   #getValidator: (() => RouterValidator | null) | null = null;
 
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
     this.#deps = deps;
-  }
-
-  /**
-   * Updates handler registration limits (max lifecycle handlers threshold).
-   *
-   * @param limits - Limits configuration with maxLifecycleHandlers
-   */
-  // Stryker disable next-line BlockStatement: equivalent — #limits is write-only here (stored then `void`-ed; never read). setLimits is a stub awaiting validator integration, so emptying the body has no observable effect.
-  setLimits(limits: Limits): void {
-    this.#limits = limits;
-    // eslint-disable-next-line sonarjs/void-use -- @preserve: Wave 3 validator reads limits via RouterInternals; void suppresses TS6133 until then
-    void this.#limits;
   }
 
   setValidatorGetter(getter: () => RouterValidator | null): void {

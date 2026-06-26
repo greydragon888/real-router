@@ -50,7 +50,6 @@ export class RouterWiringBuilder<
       warnListeners: this.limits.warnListeners,
       maxEventDepth: this.limits.maxEventDepth,
     });
-    this.routeLifecycle.setLimits(this.limits);
   }
 
   wireRouteLifecycleDeps(): void {
