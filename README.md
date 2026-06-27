@@ -223,7 +223,7 @@ The only standalone router that ships the **same SSR contract** across React 19,
 Navigation stays fast as your route tree grows — from 10 routes to 1000, the cost per navigation barely moves.
 The Segment Trie matcher traverses in O(segments), not O(routes).
 
-**2.3–14× faster and 1.7–8.7× fewer allocations** than TanStack Router in full client-side navigation benchmarks (identical 10-step loop, JSDOM, Vite production build):
+**2.3–14× faster and 2–9× fewer allocations** than TanStack Router in full client-side navigation benchmarks (identical 10-step loop, JSDOM, Vite production build):
 
 **Speed** (relative to TanStack Router, higher is better):
 
@@ -235,11 +235,11 @@ The Segment Trie matcher traverses in O(segments), not O(routes).
 
 **Allocations per navigation** (relative to TanStack Router, lower is better):
 
-| Framework | vs TanStack Router          |
-| --------- | --------------------------- |
-| React     | **~8.7× fewer allocations** |
-| Solid     | **~6.7× fewer allocations** |
-| Vue       | **~1.7× fewer allocations** |
+| Framework | vs TanStack Router        |
+| --------- |---------------------------|
+| React     | **~9× fewer allocations** |
+| Solid     | **~7× fewer allocations** |
+| Vue       | **~2× fewer allocations** |
 
 > Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) · [detailed tables](benchmarks/README.md#performance--vs-tanstack-router) — identical workload, JSDOM, Vite production build, `--expose-gc`. Absolute hz/heap are machine-dependent; both ratios are stable across runs (±1–3%). Memory is allocation rate per navigation (heap growth between forced GCs), not a leak claim.
 >
