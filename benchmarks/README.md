@@ -199,7 +199,11 @@ Same workload, same framework render — the delta is router work. On React/Soli
 
 **real-router's heap floor is flat in all 15 runs** (round 1 ≈ round 5, ≤ 0.3 MB drift) — it does not accumulate matches/locations between navigations. TanStack's floor grows in several scenarios under this harness (e.g. unique-location-churn +7…+21 MB across frameworks).
 
-> ⚠️ **Read the memory ratios carefully — they are harness-dependent, not a leak claim.** Per-navigation bytes are measured under our code-based `forceGC`; TanStack's own upstream bench (CodSpeed predictable-GC) is flat. The spread itself proves the dependence: solid `navigation-churn` is 0.9× (TanStack slightly *better*), solid `mount-unmount` 65× (a harness artifact). The defensible claim is **"real-router does not accumulate memory between navigations (flat floor everywhere)"**, _not_ a "×100 less memory" headline. Where both engines are flat (loader-data, vue/solid nav-churn) the honest ratio is 1.5–2.6×.
+> ⚠️ **Two distinct things here — don't conflate them.**
+> 1. **Allocation rate** (the heap bytes/nav in the table) is **stable run-to-run** (±1–3% over repeated runs) — it measures how much heap each navigation allocates before GC. TanStack allocates more per navigation (structural sharing, match objects). This is a fair, stable competitive number. The per-scenario spread (0.9×–136×) is **different workloads, not run-to-run noise**: `navigation-churn` toggles 2 static routes, `unique-location-churn` allocates fresh matches every step, `interrupted-navigations` builds + cancels guards, etc.
+> 2. **Floor growth** (does total heap *accumulate* round-to-round) is the separate leak question. real-router's floor is flat everywhere; TanStack's grows in several scenarios **under our code-based `forceGC`**, but its upstream CodSpeed bench (predictable GC) is flat — so floor-growth is harness-dependent and is **not** a "TanStack leaks" claim.
+>
+> Bottom line: *"fewer allocations per navigation"* is a defensible, stable number; *"real-router does not accumulate memory between navigations"* is the architectural claim. Do **not** read the floor-growth deltas as an absolute leak.
 
 Measured 2026-06-27 (Apple M3 Pro, jsdom). Speed: `vitest bench` (warmup 100, 10 s). Memory: 5 rounds × N navigations with double `forceGC`.
 
