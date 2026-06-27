@@ -168,6 +168,41 @@ Performance Summary:
 | 08  | Current State    | State creation, comparison, building      |
 | 12  | Stress Testing   | High load, scaling                        |
 
+## Performance — vs TanStack Router
+
+Speed (navigation throughput) and memory (churn) for `@real-router/*` vs `@tanstack/*-router`, across React / Vue / Solid. Identical 10-step navigate workload (our port of TanStack `client-nav`), run locally in jsdom — `vitest bench` for speed, a self-made `forceGC` heap harness for memory (**not** CodSpeed).
+
+```bash
+pnpm bench:vs-tanstack -- client-nav real-router react speed          # throughput
+pnpm bench:vs-tanstack -- navigation-churn real-router react memory   # memory churn
+```
+
+### Speed — navigation throughput (hz, higher = better)
+
+| Framework | real-router | tanstack | real-router faster by |
+| --------- | ----------- | -------- | --------------------- |
+| react     | 925.8       | 65.7     | **14.1×**             |
+| solid     | 978.8       | 84.4     | **11.6×**             |
+| vue       | 167.9       | 74.3     | 2.3×                  |
+
+Same workload, same framework render — the delta is router work. On React/Solid real-router is **over an order of magnitude** faster. Honest caveat: real-router's core does less per navigation (no built-in loader-lifecycle / structural-sharing that TanStack runs on every transition), so this is "faster because lighter by contract", measured fairly on the same bench. Vue's lower absolute hz is the real-router Vue adapter's reactivity overhead, not a TanStack win.
+
+### Memory — churn (heap bytes per navigation, real-router / tanstack)
+
+| Scenario                | react rr / ts | vue rr / ts | solid rr / ts |
+| ----------------------- | ------------- | ----------- | ------------- |
+| navigation-churn        | 33 / 3390     | 111 / 294   | 92 / 84       |
+| unique-location-churn   | 43 / 5834     | 125 / 4444  | 143 / 2151    |
+| mount-unmount           | 666 / 1284    | 414 / 866   | 451 / 29574   |
+| interrupted-navigations | 296 / 10501   | 746 / 5968  | 705 / 3502    |
+| loader-data-retention   | 336 / 5442    | 1069 / 1921 | 1147 / 1774   |
+
+**real-router's heap floor is flat in all 15 runs** (round 1 ≈ round 5, ≤ 0.3 MB drift) — it does not accumulate matches/locations between navigations. TanStack's floor grows in several scenarios under this harness (e.g. unique-location-churn +7…+21 MB across frameworks).
+
+> ⚠️ **Read the memory ratios carefully — they are harness-dependent, not a leak claim.** Per-navigation bytes are measured under our code-based `forceGC`; TanStack's own upstream bench (CodSpeed predictable-GC) is flat. The spread itself proves the dependence: solid `navigation-churn` is 0.9× (TanStack slightly *better*), solid `mount-unmount` 65× (a harness artifact). The defensible claim is **"real-router does not accumulate memory between navigations (flat floor everywhere)"**, _not_ a "×100 less memory" headline. Where both engines are flat (loader-data, vue/solid nav-churn) the honest ratio is 1.5–2.6×.
+
+Measured 2026-06-27 (Apple M3 Pro, jsdom). Speed: `vitest bench` (warmup 100, 10 s). Memory: 5 rounds × N navigations with double `forceGC`.
+
 ## Bundle Size — vs TanStack Router
 
 Competitive client-JS size: `@real-router/*` vs `@tanstack/*-router`, across React / Vue / Solid in `minimal` and `full` app fixtures (built as full client apps via Vite — production, esbuild-minified, es2022).
