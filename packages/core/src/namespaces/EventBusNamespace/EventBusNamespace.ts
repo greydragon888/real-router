@@ -372,8 +372,14 @@ export class EventBusNamespace {
   }
 
   /**
-   * End-user / UI-binding API for subscribing to confirmed route departures
-   * (`LEAVE_APPROVED` phase). Async listeners block the activation phase.
+   * End-user / UI-binding API for subscribing to **approved** route departures
+   * (`LEAVE_APPROVED` phase): all `canDeactivate` guards have passed, but the
+   * departure is **tentative, not committed** — an activation (`canActivate`)
+   * guard can still reject (or the target route be removed mid-transition),
+   * leaving the user on the current route (#932). Treat the leave as tentative
+   * for non-idempotent side-effects and use the payload `signal` (which aborts
+   * with the failure reason, #943) to roll back when the navigation does not
+   * commit. Async listeners block the activation phase.
    *
    * @remarks
    *
