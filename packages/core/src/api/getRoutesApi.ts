@@ -16,6 +16,7 @@ import {
 import {
   adoptRouteArtifacts,
   assertAddable,
+  assertNoDuplicateNamesInBatch,
   buildAddArtifacts,
   buildReplaceArtifacts,
   commitTreeChanges,
@@ -450,6 +451,12 @@ function replaceRoutes<
   previousTransition: TransitionMeta | undefined,
   onCommitted?: () => void,
 ): void {
+  // Reject within-batch duplicate names BEFORE building/swapping (#968) — the
+  // same silent-shadow case `assertAddable` catches for `add`. methodName is
+  // "addRoute" to match validation-plugin (which reports "addRoute" for replace
+  // batches too), so the no-plugin error is identical to the with-plugin one.
+  assertNoDuplicateNamesInBatch(routes, "", "addRoute");
+
   // Build the whole new set BEFORE touching the store.
   const artifacts = buildReplaceArtifacts(
     routes,

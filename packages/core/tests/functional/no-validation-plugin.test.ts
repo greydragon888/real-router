@@ -460,4 +460,60 @@ describe("core/without validation plugin", () => {
       router.stop();
     });
   });
+
+  describe("batch name dedup — replace() (#968)", () => {
+    it("throws on duplicate route names within a single replace() batch", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.replace([
+          { name: "x", path: "/a" },
+          { name: "x", path: "/b" },
+        ]);
+      }).toThrow('[router.addRoute] Duplicate route "x" in batch');
+
+      router.stop();
+    });
+
+    it("throws on duplicate nested child names within a single replace() batch", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.replace([
+          {
+            name: "root",
+            path: "/root",
+            children: [
+              { name: "leaf", path: "/leaf-a" },
+              { name: "leaf", path: "/leaf-b" },
+            ],
+          },
+        ]);
+      }).toThrow('[router.addRoute] Duplicate route "root.leaf" in batch');
+
+      router.stop();
+    });
+
+    it("leaves the existing tree intact when a duplicate-name replace batch is rejected (atomic)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(api.has("home")).toBe(true);
+
+      expect(() => {
+        api.replace([
+          { name: "dup", path: "/dup-a" },
+          { name: "dup", path: "/dup-b" },
+        ]);
+      }).toThrow();
+
+      // The pre-existing routes survive — replace bailed before the swap.
+      expect(api.has("home")).toBe(true);
+      expect(api.has("dup")).toBe(false);
+
+      router.stop();
+    });
+  });
 });
