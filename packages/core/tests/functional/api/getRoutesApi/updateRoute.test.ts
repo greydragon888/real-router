@@ -1,7 +1,12 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { errorCodes } from "@real-router/core";
-import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
+import {
+  cloneRouter,
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -531,6 +536,22 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(guard).not.toHaveBeenCalled();
     });
+
+    it("preserves an external canActivate guard when clearing via update (origin-selective, #952)", async () => {
+      routesApi.add({ name: "ur-ext", path: "/ur-ext" });
+
+      // EXTERNAL guard (added via the lifecycle API, not route config) — blocks.
+      getLifecycleApi(router).addActivateGuard("ur-ext", () => () => false);
+
+      expect(router.canNavigateTo("ur-ext")).toBe(false);
+
+      // Clearing the route-config (definition) guard must NOT wipe the external
+      // one. Before #952 `clearCanActivate` was origin-blind and removed both.
+      routesApi.update("ur-ext", { canActivate: null });
+
+      // External guard survives — navigation still blocked.
+      expect(router.canNavigateTo("ur-ext")).toBe(false);
+    });
   });
 
   describe("canDeactivate", () => {
@@ -611,6 +632,23 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(guard2).toHaveBeenCalled();
       expect(guard1).not.toHaveBeenCalled();
+    });
+
+    it("preserves an external canDeactivate guard when clearing via update (origin-selective, #952)", async () => {
+      routesApi.add({ name: "ur-ext-d", path: "/ur-ext-d" });
+      await router.navigate("ur-ext-d");
+
+      // EXTERNAL deactivate guard (lifecycle API, not route config) — blocks leaving.
+      getLifecycleApi(router).addDeactivateGuard("ur-ext-d", () => () => false);
+
+      expect(router.canNavigateTo("home")).toBe(false);
+
+      // Clearing the route-config (definition) guard must NOT wipe the external
+      // one — origin-blind `clearCanDeactivate` removed both before #952.
+      routesApi.update("ur-ext-d", { canDeactivate: null });
+
+      // External guard survives — still blocked from leaving.
+      expect(router.canNavigateTo("home")).toBe(false);
     });
   });
 

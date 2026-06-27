@@ -805,8 +805,12 @@ export function getRoutesApi<
 
       if (canActivate !== undefined) {
         if (canActivate === null) {
+          // `definitionOnly` (#952): update() owns the DEFINITION-origin guard
+          // (it registers with isFromDefinition=true below), so clearing it must
+          // not also wipe an external guard added via
+          // getLifecycleApi().addActivateGuard().
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.clearCanActivate(name);
+          store.lifecycleNamespace!.clearCanActivate(name, true);
         } else {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
           store.lifecycleNamespace!.addCanActivate(name, canActivate, true);
@@ -815,8 +819,9 @@ export function getRoutesApi<
 
       if (canDeactivate !== undefined) {
         if (canDeactivate === null) {
+          // Definition-only clear, symmetric with canActivate above (#952).
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.clearCanDeactivate(name);
+          store.lifecycleNamespace!.clearCanDeactivate(name, true);
         } else {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
           store.lifecycleNamespace!.addCanDeactivate(name, canDeactivate, true);

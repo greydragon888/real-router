@@ -174,15 +174,23 @@ export class RouteLifecycleNamespace<
   }
 
   /**
-   * Removes a canActivate guard for a route — both the definition and external
-   * slots. (Origin-selective clearing was removed: no caller ever needed it;
-   * `clearDefinitionGuards()` handles the definition-only case on `replace()`.)
+   * Removes a canActivate guard for a route. By default clears BOTH the
+   * definition and external slots (route removal / `clearAll` cleanup). With
+   * `definitionOnly = true` it clears ONLY the definition slot, leaving an
+   * external guard intact — `update(name, { canActivate: null })` passes this so
+   * clearing a route-config guard does not also wipe a guard registered
+   * independently via `getLifecycleApi().addActivateGuard()` (#952). When the
+   * definition is cleared but an external survives, `#recompileSlot` recompiles
+   * the slot from the external factory (external wins).
    *
    * @param name - Route name (already validated by facade)
+   * @param definitionOnly - When true, leave the external slot intact (#952)
    */
-  clearCanActivate(name: string): void {
+  clearCanActivate(name: string, definitionOnly = false): void {
     const clearedDefinition = this.#definitionActivateFactories.delete(name);
-    const clearedExternal = this.#externalActivateFactories.delete(name);
+    const clearedExternal = definitionOnly
+      ? false
+      : this.#externalActivateFactories.delete(name);
 
     if (clearedDefinition || clearedExternal) {
       this.#recompileSlot("activate", name);
@@ -190,13 +198,16 @@ export class RouteLifecycleNamespace<
   }
 
   /**
-   * Removes a canDeactivate guard for a route (both slots).
+   * Removes a canDeactivate guard for a route.
    *
-   * Symmetric counterpart to {@link clearCanActivate}.
+   * Symmetric counterpart to {@link clearCanActivate} — `definitionOnly = true`
+   * clears only the definition slot, preserving an external guard (#952).
    */
-  clearCanDeactivate(name: string): void {
+  clearCanDeactivate(name: string, definitionOnly = false): void {
     const clearedDefinition = this.#definitionDeactivateFactories.delete(name);
-    const clearedExternal = this.#externalDeactivateFactories.delete(name);
+    const clearedExternal = definitionOnly
+      ? false
+      : this.#externalDeactivateFactories.delete(name);
 
     if (clearedDefinition || clearedExternal) {
       this.#recompileSlot("deactivate", name);
