@@ -532,7 +532,6 @@ Real-Router is an **independent project** — not a fork. Built from scratch wit
 ## Quality & Testing
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=greydragon888_real-router&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=greydragon888_real-router)
-[![Mutation testing badge](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master)
 [![Vitest](https://img.shields.io/badge/tested%20with-vitest-6E9F18?style=flat-square&logo=vitest)](https://vitest.dev/)
 [![Playwright](https://img.shields.io/badge/e2e-playwright-2EAD33?style=flat-square&logo=playwright)](https://playwright.dev/)
 [![Property-Based Testing](https://img.shields.io/badge/PBT-fast--check-FF4785?style=flat-square)](https://fast-check.dev/)

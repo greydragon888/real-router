@@ -1,5 +1,6 @@
 # @real-router/logger-plugin
 
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Dlogger-plugin)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=logger-plugin)
 [![npm](https://img.shields.io/npm/v/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)
 [![npm downloads](https://img.shields.io/npm/dm/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)
 [![bundle size](https://deno.bundlejs.com/?q=@real-router/logger-plugin&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/logger-plugin&treeshake=[*])

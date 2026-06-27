@@ -1,5 +1,7 @@
 # search-params
 
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Dsearch-params)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=search-params)
+
 > Query string parsing and building with configurable format strategies.
 
 **Internal package** — consumed by `route-tree`. Not published to npm.

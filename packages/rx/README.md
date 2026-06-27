@@ -1,5 +1,6 @@
 # @real-router/rx
 
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Drx)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=rx)
 [![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)
 [![npm downloads](https://img.shields.io/npm/dm/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)
 [![bundle size](https://deno.bundlejs.com/?q=@real-router/rx&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/rx&treeshake=[*])

@@ -1,5 +1,7 @@
 # route-tree
 
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Droute-tree)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=route-tree)
+
 > Named route tree with high-performance matching and path building.
 
 **Internal package** — consumed by `@real-router/core`. Not published to npm.

@@ -51,7 +51,14 @@ export default {
   timeoutFactor: 3, // 3x safety margin
 
   // Reporters
-  reporters: ["progress", "clear-text", "html", "json"],
+  reporters: ["progress", "clear-text", "html", "json", "dashboard"],
+  // Stryker Dashboard upload (badge). API key via STRYKER_DASHBOARD_API_KEY env.
+  // version "master" → badge tracks master; run mutation on master to publish.
+  dashboard: {
+    project: "github.com/greydragon888/real-router",
+    version: "master",
+    module: "path-matcher",
+  },
   htmlReporter: {
     fileName: "reports/mutation-report.html",
   },

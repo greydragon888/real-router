@@ -1,5 +1,7 @@
 # event-emitter
 
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Devent-emitter)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=event-emitter)
+
 > Typed event emitter with listener limits, recursion protection, and per-listener error isolation.
 
 **Internal package** — consumed by `@real-router/core`. Not published to npm.

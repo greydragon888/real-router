@@ -1,5 +1,7 @@
 # @real-router/fsm
 
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Dfsm)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=fsm)
+
 > Synchronous finite state machine engine.
 
 **Internal package** — consumed by `@real-router/core`. Published to npm by historical accident — do not depend on it directly.

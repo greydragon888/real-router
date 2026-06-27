@@ -1,5 +1,6 @@
 # @real-router/core
 
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Dcore)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=core)
 [![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)
 [![npm downloads](https://img.shields.io/npm/dm/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)
 [![bundle size](https://deno.bundlejs.com/?q=@real-router/core&treeshake=[{createRouter}]&badge=detailed)](https://bundlejs.com/?q=@real-router/core&treeshake=[{createRouter}])

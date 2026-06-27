@@ -52,7 +52,14 @@ export default {
   // "json" emits the machine-readable mutation-testing-report-schema as a plain
   // JSON file — parse it directly (jq/node) instead of eval-extracting the blob
   // embedded in the multi-MB HTML report.
-  reporters: ["progress", "clear-text", "html", "json"],
+  reporters: ["progress", "clear-text", "html", "json", "dashboard"],
+  // Stryker Dashboard upload (badge). API key via STRYKER_DASHBOARD_API_KEY env.
+  // version "master" → badge tracks master; run mutation on master to publish.
+  dashboard: {
+    project: "github.com/greydragon888/real-router",
+    version: "master",
+    module: "core",
+  },
   htmlReporter: {
     fileName: "reports/mutation-report.html",
   },
