@@ -223,27 +223,22 @@ The only standalone router that ships the **same SSR contract** across React 19,
 Navigation stays fast as your route tree grows — from 10 routes to 1000, the cost per navigation barely moves.
 The Segment Trie matcher traverses in O(segments), not O(routes).
 
-**2.3–14× faster and 2.3–9.5× fewer allocations** than TanStack Router in full client-side navigation benchmarks (10-step loop, JSDOM, Vite production build):
+**2.3–14× faster navigation** than TanStack Router in full client-side benchmarks (identical 10-step loop, JSDOM, Vite production build):
 
-**Speed** (relative to TanStack Router, higher is better):
+| Framework | Speed vs TanStack Router |
+| --------- | ------------------------ |
+| React     | **~14× faster**          |
+| Solid     | **~11.5× faster**        |
+| Vue       | **~2.3× faster**         |
 
-| Framework | vs TanStack Router |
-| --------- | ------------------ |
-| React     | **~14× faster**    |
-| Solid     | **~13× faster**    |
-| Vue       | **~2.3× faster**   |
+**Memory:** real-router holds a **flat heap floor** — it does not accumulate matches or
+location state between navigations across churn, unique-location, interrupted-navigation
+and loader-retention scenarios. (Per-navigation byte ratios are harness-dependent; full
+numbers and methodology in the benchmark README.)
 
-**Memory per navigation** (relative to TanStack Router, lower is better):
-
-| Framework | vs TanStack Router          |
-| --------- | --------------------------- |
-| React     | **~9.5× fewer allocations** |
-| Solid     | **~7.7× fewer allocations** |
-| Vue       | **~2.3× fewer allocations** |
-
-> Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) — identical workload, JSDOM, Vite production build, `--expose-gc`. Absolute hz/heap numbers are machine-dependent; ratios reported here are stable across runs.
+> Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) · [detailed tables](benchmarks/README.md#performance--vs-tanstack-router) — identical workload, JSDOM, Vite production build, `--expose-gc`. Absolute hz/heap are machine-dependent; speed ratios are stable across runs.
 >
-> **Note on Vue:** the smaller speed ratio (~2.3× vs ~14×/13× for React/Solid) reflects Vue runtime overhead, not router overhead. \
+> **Note on Vue:** the smaller speed ratio (~2.3× vs ~14×/11.5× for React/Solid) reflects Vue runtime overhead, not router overhead. \
 > On this workload (44 route-state subscribers rendering `null`) Vue proxy access + scheduler dominate navigation time for both routers. \
 > Three targeted Vue-adapter rewrites were attempted and reverted after measuring only noise-level gains — see [Vue Runtime Floor](packages/vue/ARCHITECTURE.md#vue-runtime-floor-vs-tanstack-benchmark).
 
