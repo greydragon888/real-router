@@ -603,6 +603,17 @@ export class EventBusNamespace {
       this.#pendingFromState,
       this.#pendingError as RouterError | undefined,
     );
+
+    // Clear the pending payload once this FAIL action has consumed it. `#pending*`
+    // is only meaningful in the window between the sendFail()/sendFailSafe() that
+    // sets it and this emit; keeping it afterwards pins a stale State/RouterError
+    // on the instance and leaves an implicit "valid only in this window" coupling
+    // (#949). Hygiene only — every consumer overwrites the fields before
+    // re-reading (handleCancel reads what its own sendCancel just set), so there
+    // is no observable behaviour change.
+    this.#pendingToState = undefined;
+    this.#pendingFromState = undefined;
+    this.#pendingError = undefined;
   }
 
   #setupFSMActions(): void {
