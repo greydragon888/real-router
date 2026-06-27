@@ -295,9 +295,9 @@ function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
 // after the swap. Core-level build errors (async/circular forwardTo, invalid
 // path constraint) are surfaced in the build and leave the existing routes
 // untouched; a malformed guard factory is the one residual that throws
-// post-swap (known limitation). The two silent-corruption cases
-// route-tree never throws on (duplicate name vs an existing route, missing
-// parent) are caught up front by `assertAddable`.
+// post-swap (known limitation). The silent-corruption cases route-tree never
+// throws on (duplicate name vs an existing route, a name duplicated within the
+// batch, missing parent) are caught up front by `assertAddable`.
 // =============================================================================
 
 /**
@@ -383,9 +383,41 @@ function walkRouteNames<Dependencies extends DefaultDependencies>(
 }
 
 /**
- * Up-front guard for `add` against the two corruptions route-tree stays silent
- * on: a missing `parent`, and a name that collides with an EXISTING route
- * (which would otherwise be silently overwritten). Throws before any build.
+ * Rejects a route name duplicated WITHIN a single batch — the silent-overwrite
+ * case route-tree stays last-wins on (#953 for `add`, #968 for `replace`). Walks
+ * the same depth-first dotted names, but tracks them in a local Set: a name seen
+ * twice in one array means the caller's second route would silently shadow the
+ * first (`matchPath` for the first route's path becomes unreachable). Mirrors
+ * validation-plugin's batch-dup message (route-tree `checkBatchNameDuplicate`)
+ * so the no-plugin error matches the with-plugin one. `methodName` is "addRoute"
+ * for both add and replace — the plugin reports "addRoute" for replace batches
+ * too, so this keeps with/without-plugin parity.
+ */
+export function assertNoDuplicateNamesInBatch<
+  Dependencies extends DefaultDependencies,
+>(
+  routes: readonly Route<Dependencies>[],
+  parentName: string,
+  methodName: string,
+): void {
+  const seen = new Set<string>();
+
+  walkRouteNames(routes, parentName, (fullName) => {
+    if (seen.has(fullName)) {
+      throw new Error(
+        `[router.${methodName}] Duplicate route "${fullName}" in batch`,
+      );
+    }
+
+    seen.add(fullName);
+  });
+}
+
+/**
+ * Up-front guard for `add` against the corruptions route-tree stays silent on: a
+ * missing `parent`, a name that collides with an EXISTING route, and a name
+ * duplicated WITHIN the batch (any of which would otherwise be silently
+ * overwritten). Throws before any build.
  */
 export function assertAddable<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
@@ -403,6 +435,8 @@ export function assertAddable<Dependencies extends DefaultDependencies>(
       throw new Error(`[router.addRoute] Route "${fullName}" already exists`);
     }
   });
+
+  assertNoDuplicateNamesInBatch(routes, parentName ?? "", "addRoute");
 }
 
 /**

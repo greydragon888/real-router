@@ -402,4 +402,62 @@ describe("core/without validation plugin", () => {
       router.stop();
     });
   });
+
+  describe("batch name dedup — add() (#953)", () => {
+    it("throws on duplicate route names within a single add() batch", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          { name: "dupTop", path: "/dup-top-1" },
+          { name: "dupTop", path: "/dup-top-2" },
+        ]);
+      }).toThrow('[router.addRoute] Duplicate route "dupTop" in batch');
+
+      router.stop();
+    });
+
+    it("throws on duplicate nested child names within a single add() batch", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          {
+            name: "parentX",
+            path: "/parent-x",
+            children: [
+              { name: "kid", path: "/kid-a" },
+              { name: "kid", path: "/kid-b" },
+            ],
+          },
+        ]);
+      }).toThrow('[router.addRoute] Duplicate route "parentX.kid" in batch');
+
+      router.stop();
+    });
+
+    it("leaves the store untouched when a duplicate-name batch is rejected (atomic)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          { name: "atomicA", path: "/atomic-a" },
+          { name: "atomicA", path: "/atomic-a2" },
+        ]);
+      }).toThrow();
+
+      // Neither route from the rejected batch was committed (assertAddable runs
+      // before any tree/config swap, so a dup-name batch is fully atomic).
+      expect(api.has("atomicA")).toBe(false);
+      expect(getPluginApi(router).matchPath("/atomic-a")?.name).toBeUndefined();
+      expect(
+        getPluginApi(router).matchPath("/atomic-a2")?.name,
+      ).toBeUndefined();
+
+      router.stop();
+    });
+  });
 });
