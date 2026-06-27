@@ -86,6 +86,8 @@ Core contains four invariant guards that run regardless of whether validation-pl
 
 **Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.
 
+**Param-value type validation stays opt-in (validator), NOT a core guard.** Bare core tolerantly accepts param values that cannot round-trip through a URL path — a `Symbol` path-param keeps its raw identity in `state.params` (path stringifies to `/items/Symbol(x)`, never matching back), a `BigInt` coerces lossily, and a NUL/control char percent-encodes into `state.path` (`%00`). These are exotic programmer errors, so `@real-router/validation-plugin` rejects them with actionable messages (#934/#942) rather than core paying a per-navigate value-scan on the hot path. Symmetry note: a Symbol *query* value already throws a raw `TypeError` from `String(symbol)` in bare core; the plugin aligns the path-param case to a clear error too.
+
 ### Namespace Folder Structure
 
 Each namespace has its own folder with separated concerns:

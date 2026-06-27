@@ -365,6 +365,22 @@ describe("validateStartArgs — start() path validation", () => {
     await expect(router.start("/home")).resolves.toBeDefined();
   });
 
+  // #942: a NUL byte / control char in the start path is silently accepted by
+  // core (percent-encoded into state.path) — the opt-in validator rejects it
+  // with an actionable error instead.
+  it("throws TypeError when the path contains a control character (#942)", () => {
+    const raw = router as unknown as {
+      start: (path: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.start(`/items/${String.fromCodePoint(0)}`)).toThrow(
+      /control character/,
+    );
+    expect(() => raw.start(`/items/a${String.fromCodePoint(1)}b`)).toThrow(
+      TypeError,
+    );
+  });
+
   it("accepts empty string path", async () => {
     await expect(router.start("")).resolves.toBeDefined();
   });

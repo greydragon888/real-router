@@ -34,6 +34,17 @@ The `RouterValidator` interface is organized into 8 namespaces, matching core's 
 
 `validateStartArgs(undefined)` does not throw. This is intentional: the facade calls `validateStartArgs(startPath)` **before** the interceptor pipeline runs. `browser-plugin` injects `window.location` via `addInterceptor("start", ...)`, which wraps the internal `start()` call — **after** facade validation. If `undefined` were rejected, `router.start()` without an argument would fail when `browser-plugin` is installed.
 
+### Unsafe path-param value rejection (#934 / #942)
+
+`validateParams` (navigate / buildPath / canNavigateTo) and `validateStartArgs` reject param **values** and start paths that cannot safely round-trip through a URL path — these are silently accepted by bare core (validator-opt-in):
+
+| Input | Bare core (no plugin) | With plugin |
+| --- | --- | --- |
+| Symbol / BigInt param value (`{ id: Symbol() }`) | path-param: silent corruption (raw Symbol in `state.params`, non-round-tripping path); query-param: raw `TypeError` from `String(symbol)` | actionable `TypeError` naming the key: `param "id" cannot be a symbol …` |
+| Control char in a param value or start path (NUL / C0 / DEL) | percent-encoded into `state.path` (`%00`, `%01`) — a valid-but-unreadable URL | `TypeError("… must not contain control characters …")` |
+
+Value inspection is **own-property only** (mirrors `isParams`) and runs before the generic shape check so the message pinpoints the offending value rather than reporting the generic "params must be a plain object".
+
 ### Retrospective rollback on failure
 
 If the retrospective pass throws (e.g., duplicate route name in existing routes), `ctx.validator` is set back to `null` before the error propagates. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
