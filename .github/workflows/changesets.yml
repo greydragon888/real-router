@@ -68,7 +68,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # Pinned to 24.18.0 (NOT floating `24`): Node 24.17.0's security fix
+          # for CVE-2026-48931 (response queue poisoning in http.Agent) changed
+          # keep-alive socket reuse and triggers a false-positive
+          # ERR_STREAM_PREMATURE_CLOSE in node-fetch@2 — used by
+          # @changesets/changelog-github → @changesets/get-github-info against
+          # api.github.com/graphql — failing `changeset version` intermittently
+          # (~every release on 24.17.0; clean on 24.16.0). Fixed in 24.18.0
+          # (nodejs/node#64004). Relax back to `24` once runner toolcaches resolve
+          # >= 24.18.0 by default. See IMPLEMENTATION_NOTES "Pin Node 24.18.0 in
+          # changesets.yml".
+          node-version: 24.18.0
           cache: pnpm
           # NOTE: Do NOT use registry-url here!
           # It creates .npmrc with ${NODE_AUTH_TOKEN} which conflicts with OIDC.

@@ -7,6 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-27]
 
+### @real-router/core@0.61.7
+
+### Patch Changes
+
+- [#987](https://github.com/greydragon888/real-router/pull/987) [`fceb05e`](https://github.com/greydragon888/real-router/commit/fceb05e6c521481ad46d9351d822de8d9a77a573) Thanks [@greydragon888](https://github.com/greydragon888)! - Clear `EventBusNamespace` pending-error fields after emit ([#949](https://github.com/greydragon888/real-router/issues/949))
+
+  `#emitPendingError()` read `#pendingToState` / `#pendingFromState` / `#pendingError` to emit
+  `TRANSITION_ERROR` but did not clear them, leaving the last error's `State` / `RouterError`
+  pinned on the instance until the next `sendFail()` / `sendCancel()` overwrote them. The
+  fields are now cleared once consumed. State hygiene only — every consumer already overwrites
+  the fields before re-reading, so there is no observable behaviour change.
+
+- [#987](https://github.com/greydragon888/real-router/pull/987) [`fceb05e`](https://github.com/greydragon888/real-router/commit/fceb05e6c521481ad46d9351d822de8d9a77a573) Thanks [@greydragon888](https://github.com/greydragon888)! - Preserve a guard-thrown `RouterError(TRANSITION_CANCELLED)` instead of re-coding it ([#933](https://github.com/greydragon888/real-router/issues/933))
+
+  A route guard that throws `RouterError(TRANSITION_CANCELLED)` to quietly cancel a
+  transition was observed by the caller as `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE`.
+  `handleGuardError` only special-cased a `DOMException` `AbortError`, so an explicit
+  cancellation `RouterError` fell through to `rethrowAsRouterError`, whose `setCode`
+  overwrote the code — turning the intended quiet cancel into a reported transition
+  error (`onTransitionError` fired, `routeTransitionError` emitted a fail).
+
+  `handleGuardError` now preserves a thrown `RouterError` whose code is already
+  `TRANSITION_CANCELLED`, mirroring the existing `AbortError` → `TRANSITION_CANCELLED`
+  handling. Other thrown `RouterError`s (e.g. `TRANSITION_ERR`) are still re-coded as
+  before.
+
+- [#987](https://github.com/greydragon888/real-router/pull/987) [`fceb05e`](https://github.com/greydragon888/real-router/commit/fceb05e6c521481ad46d9351d822de8d9a77a573) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `EventBusNamespace.sendFailSafe()` semantics and state-branching ([#948](https://github.com/greydragon888/real-router/issues/948))
+
+  Add JSDoc clarifying that the "Safe" suffix means the error event is never dropped
+  regardless of FSM state — not that the method catches every error (errors thrown inside a
+  `TRANSITION_ERROR` listener are isolated separately via the `EventEmitter`'s
+  `onListenerError` sink). Also document why the method reads its own FSM state to choose
+  between the FSM-routed `FAIL` action (in `READY`) and a direct `TRANSITION_ERROR` emit
+  (otherwise). No behaviour change.
+
+- [#987](https://github.com/greydragon888/real-router/pull/987) [`fceb05e`](https://github.com/greydragon888/real-router/commit/fceb05e6c521481ad46d9351d822de8d9a77a573) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop a guard-thrown thenable from making the wrapped `RouterError` thenable ([#947](https://github.com/greydragon888/real-router/issues/947))
+
+  When a transition step (e.g. a route guard) throws a thenable — a non-`Error` object
+  exposing a `then` method — `wrapSyncError()` spread its own-enumerable properties onto the
+  `RouterError` metadata, filtering only the reserved keys `code` / `segment` / `path`. `then`
+  was not filtered, so the produced `RouterError` carried a `then` function and was itself
+  thenable: a consumer that `await`ed it (or passed it through `Promise.resolve`, or returned
+  it from an `async` function) had it assimilated as a Promise instead of treated as a plain
+  rejection reason.
+
+  `wrapSyncError()` now also excludes `then` from the spread. Other own properties are still
+  copied onto the error metadata.
+
+
+### @real-router/core@0.61.6
+
+### Patch Changes
+
+- [#979](https://github.com/greydragon888/real-router/pull/979) [`d160e0b`](https://github.com/greydragon888/real-router/commit/d160e0b1618ef169aea2894688b889c6f7beea4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `canNavigateTo` over-checking shared-ancestor guards that `navigate` skips ([#970](https://github.com/greydragon888/real-router/issues/970))
+
+  `canNavigateTo` built its `toState` without route-meta, so `getTransitionPath` took its meta-less fast path and (de)activated the entire route chain — including ancestor segments shared with the current route, which `navigate` leaves mounted and never re-guards. A guard on a shared parent (e.g. a `canDeactivate` "block on unsaved changes" on a section route) therefore made `canNavigateTo` return `false` for an intra-section navigation that `navigate` would resolve — a false-negative ("Link disabled though the click would succeed"). `canNavigateTo` now builds `toState` the same way `navigate` does (with route-meta and normalized params), restoring strict parity with `navigate`'s guard set. This also fixes the documented innermost-first deactivation guard order and the `normalizeParams` drift that exposed an `{ x: undefined }` key to guards.
+
+- [#979](https://github.com/greydragon888/real-router/pull/979) [`d160e0b`](https://github.com/greydragon888/real-router/commit/d160e0b1618ef169aea2894688b889c6f7beea4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Log a warning when a sync guard throws in `canNavigateTo` ([#959](https://github.com/greydragon888/real-router/issues/959))
+
+  A guard that threw inside `canNavigateTo` was caught and converted to `false` with no log, event, or re-throw — a crashed guard was indistinguishable from one that legitimately blocked the navigation. `navigate()` surfaces the same throw via `handleGuardError` → `TRANSITION_ERROR`, but the synchronous predicate has no error channel, so core now logs the throw directly via `logger.warn` (an operational signal, distinct from the opt-in `@real-router/validation-plugin` DX warnings) before returning `false`.
+
+
+### @real-router/core@0.61.5
+
+### Patch Changes
+
+- [#980](https://github.com/greydragon888/real-router/pull/980) [`6cc8376`](https://github.com/greydragon888/real-router/commit/6cc83768cce9e7cdab952bebe2394ac589e6f1cb) Thanks [@greydragon888](https://github.com/greydragon888)! - Isolate async `subscribe` listener rejections instead of leaking them ([#944](https://github.com/greydragon888/real-router/issues/944))
+
+  An `async` `router.subscribe()` listener whose Promise rejected leaked a Node `unhandledRejection` — process-fatal under `--unhandled-rejections=strict` (the Node 22+ default). The subscribe wrapper discarded the listener's return value, and the `EventEmitter`'s per-listener `try/catch` isolates only **synchronous** throws. The wrapper now attaches a `.catch` that routes a rejection to the same `onListenerError` sink a synchronous throw flows through — symmetric with `subscribeLeave`, which isolates rejections via `Promise.allSettled`. `subscribe` stays fire-and-forget: the listener's return value is ignored and `navigate()` does not await it.
+
+- [#980](https://github.com/greydragon888/real-router/pull/980) [`6cc8376`](https://github.com/greydragon888/real-router/commit/6cc83768cce9e7cdab952bebe2394ac589e6f1cb) Thanks [@greydragon888](https://github.com/greydragon888)! - Throw `ROUTER_DISPOSED` from a bound `subscribe`/`subscribeLeave` reference used after `dispose()` ([#946](https://github.com/greydragon888/real-router/issues/946))
+
+  A subscription reference captured before `dispose()` — `const s = router.subscribe.bind(router)` — bypassed the facade's `#markDisposed` swap (which replaces only `router.subscribe`, not a copy already bound out of it) and reached the live `EventBusNamespace`. Since `dispose()` had already run `clearAll()`, `emitter.on` simply recreated the listener `Set` and added the listener — which could then NEVER fire (the FSM is `DISPOSED`, no future emit): a silent no-op / stuck-UI hazard. Core now enforces the disposed state inside `EventBusNamespace.subscribe` and `subscribeLeave` themselves, so a pre-bound reference throws `RouterError(ROUTER_DISPOSED)` — consistent with a direct post-dispose call. Applied symmetrically to both end-user subscription surfaces.
+
+- [#980](https://github.com/greydragon888/real-router/pull/980) [`6cc8376`](https://github.com/greydragon888/real-router/commit/6cc83768cce9e7cdab952bebe2394ac589e6f1cb) Thanks [@greydragon888](https://github.com/greydragon888)! - Suppress a reentrant `subscribe`-navigate's `RecursionDepthError` instead of leaking it ([#945](https://github.com/greydragon888/real-router/issues/945))
+
+  A `router.navigate()` called fire-and-forget from inside a `router.subscribe()` listener self-feeds nested `TRANSITION_SUCCESS` emits until the `EventEmitter`'s `maxEventDepth` ceiling throws `RecursionDepthError`. Left un-`.catch()`ed, that rejection leaked as a Node `unhandledRejection` — process-fatal under `--unhandled-rejections=strict` (the Node 22+ default) — for two reasons: the optimistic `lastSyncResolved` flag, set _before_ `completeTransition`, was left stale-`true` when the synchronous emit threw, so the facade skipped its safety-net `.catch`; and `RecursionDepthError` was not a suppressed rejection. Core now sets `lastSyncResolved` only _after_ `completeTransition` returns (a throw routes to the suppressing `.catch`) and suppresses the bounded `RecursionDepthError` in the fire-and-forget safety net — symmetric with `subscribeLeave`, whose reentrant navigate rejects with the already-suppressed `TRANSITION_CANCELLED`. The chain stays bounded and the router stays functional afterwards.
+
+
+### @real-router/core@0.61.4
+
+### Patch Changes
+
+- [#977](https://github.com/greydragon888/real-router/pull/977) [`13f621e`](https://github.com/greydragon888/real-router/commit/13f621ede714893a2eaed5cbe08b2d3475575cdc) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject duplicate route names within a single `add()` batch ([#953](https://github.com/greydragon888/real-router/issues/953))
+
+  `getRoutesApi(router).add([...])` now throws `[router.addRoute] Duplicate route "<name>" in batch` when two routes in the same call resolve to the same full name, instead of silently keeping the last one and dropping the first (whose path became unreachable via `matchPath`). This closes the within-batch gap left by the existing `assertAddable` guard, which only checked names against the already-registered tree. The guard runs before any tree/config swap, so a rejected batch leaves the store untouched (atomic). Mirrors the message `@real-router/validation-plugin` already produces, so the error is identical with or without the plugin installed.
+
+- [#977](https://github.com/greydragon888/real-router/pull/977) [`13f621e`](https://github.com/greydragon888/real-router/commit/13f621ede714893a2eaed5cbe08b2d3475575cdc) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject sibling routes sharing a path within a single `add()` batch ([#955](https://github.com/greydragon888/real-router/issues/955))
+
+  `getRoutesApi(router).add([...])` now throws `[router.addRoute] Path "<path>" is already defined` when two routes at the same parent level in one call share a `path`, instead of silently letting the matcher resolve the collision last-wins — which left the earlier route addressable by name (`has` / `buildPath`) but unreachable by URL (`matchPath` returned the later route). The guard runs before any build (atomic) and mirrors `@real-router/validation-plugin`'s message. Scoped to within-batch collisions (the case [#955](https://github.com/greydragon888/real-router/issues/955) describes); a path colliding with an already-registered route is unchanged here and still covered by the validation plugin.
+
+- [#977](https://github.com/greydragon888/real-router/pull/977) [`13f621e`](https://github.com/greydragon888/real-router/commit/13f621ede714893a2eaed5cbe08b2d3475575cdc) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject reserved `@@`-prefixed route names in `add()` even without the validation plugin ([#954](https://github.com/greydragon888/real-router/issues/954))
+
+  `getRoutesApi(router).add({ name: "@@router/…", … })` now throws `[router.addRoute] Route name "…" uses the reserved "@@" prefix…` instead of silently registering the route. Previously this rejection lived only in `@real-router/validation-plugin`, so core accepted a reserved name in the production default (no plugin). That was silent corruption: a route named `@@router/UNKNOWN_ROUTE` makes a real URL `matchPath` to a state whose `name === UNKNOWN_ROUTE`, indistinguishable from the not-found sentinel and breaking the public `state.name === UNKNOWN_ROUTE` check. The guard runs before any tree build (atomic) and mirrors the plugin's message, so the error is identical with or without the plugin.
+
+- [#977](https://github.com/greydragon888/real-router/pull/977) [`13f621e`](https://github.com/greydragon888/real-router/commit/13f621ede714893a2eaed5cbe08b2d3475575cdc) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject duplicate route names within a single `replace()` batch ([#968](https://github.com/greydragon888/real-router/issues/968))
+
+  `getRoutesApi(router).replace([...])` now throws `[router.addRoute] Duplicate route "<name>" in batch` when two routes in the new set resolve to the same full name, instead of silently keeping the last and dropping the first (parallel to the `add()` fix in [#953](https://github.com/greydragon888/real-router/issues/953)). The check runs before the tree is built or swapped, so a rejected `replace()` leaves the existing routes intact (atomic). The `addRoute` method label matches `@real-router/validation-plugin`, which already reports `addRoute` for replace batches — so the error is identical with or without the plugin.
+
+
 ### @real-router/core@0.61.3
 
 ### Patch Changes

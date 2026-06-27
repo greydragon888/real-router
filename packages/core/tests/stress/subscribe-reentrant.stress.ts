@@ -35,11 +35,15 @@ const CHAIN = ["users", "orders", "admin.dashboard"] as const;
 //     supersession but a NESTED success-emit. It hits the `maxEventDepth`
 //     ceiling deterministically (probed: exactly 5 nested calls, throwing
 //     `RecursionDepthError` once), the depthMap unwinds cleanly, and the router
-//     stays functional. CRUCIAL FINDING (S30.2b): `RecursionDepthError` is NOT
-//     in the #721 fire-and-forget suppressed set, so a reentrant subscribe
-//     navigate left un-`.catch()`ed LEAKS an unhandledRejection. Documented and
-//     pinned below — `subscribe` reentrancy is genuinely unsafe fire-and-forget,
-//     unlike `subscribeLeave`.
+//     stays functional. Like `subscribeLeave`, it is now SAFE fire-and-forget
+//     (S30.2b): core suppresses the bounded `RecursionDepthError` — symmetric
+//     with subscribeLeave's suppressed `TRANSITION_CANCELLED` — so a reentrant
+//     subscribe navigate left un-`.catch()`ed no longer LEAKS an
+//     unhandledRejection (#945). The fix has two halves: the optimistic
+//     `lastSyncResolved` flag is set only AFTER `completeTransition` returns, so
+//     a synchronous-emit throw routes to the facade's suppressing `.catch`
+//     instead of being skipped on a stale-true flag; and `RecursionDepthError`
+//     joins the suppressed set in `Router.#onSuppressedError`.
 //
 // Discriminating power (per stress README): the (a)/(d) guards are exact COUNT
 // invariants — drop one navigate, one listener invocation, or honour-the-
@@ -211,15 +215,17 @@ describe("S30: reentrant + concurrent subscribe()", () => {
     expect(router.getState()?.name).toBe("settings.account");
   });
 
-  it("S30.2b: FINDING — un-caught reentrant subscribe navigate LEAKS RecursionDepthError (not in #721 suppressed set)", async () => {
+  it("S30.2b: un-caught reentrant subscribe navigate SUPPRESSES RecursionDepthError — no leak, router functional (#945)", async () => {
     // Counterpart to S30.2: the SAME self-feeding chain, but the reentrant
-    // navigate is fire-and-forget with NO `.catch()`. Unlike a superseded
-    // `subscribeLeave` navigate (TRANSITION_CANCELLED, suppressed by #721), the
-    // depth-ceiling `RecursionDepthError` is NOT a suppressed code, so it
-    // escapes as a process unhandledRejection. This pins the asymmetry: a
-    // reentrant `subscribe` navigate is unsafe fire-and-forget. If core ever
-    // grew suppression for it, this leak count drops to 0 and the test flips —
-    // surfacing the behavioural change deliberately.
+    // navigate is fire-and-forget with NO `.catch()`. It used to escape as a
+    // process unhandledRejection because the depth-ceiling `RecursionDepthError`
+    // was not suppressed AND a stale `lastSyncResolved` flag made the facade
+    // skip its safety-net `.catch`. Core now isolates it — symmetric with a
+    // superseded `subscribeLeave` navigate (TRANSITION_CANCELLED, suppressed by
+    // #721): the chain still saturates once, but nothing leaks (#945).
+    // Discriminating: drop either half of the fix (the post-commit flag move or
+    // the RecursionDepthError suppression) and a depth-ceiling error reappears
+    // in `leaked` — see the functional twin in observable.test.ts.
     let chainDepth = 0;
 
     const unsub = router.subscribe(() => {
@@ -234,23 +240,22 @@ describe("S30: reentrant + concurrent subscribe()", () => {
 
     unsub();
 
-    // Exactly the depth-ceiling error leaks (the chain saturates once within the
-    // captured macrotask). Discriminating: a fire-and-forget safety net that
-    // suppressed RecursionDepthError, or a chain that never recursed, both make
-    // this empty.
+    // No depth-ceiling error escapes as a process unhandledRejection — the
+    // bounded RecursionDepthError is suppressed like subscribeLeave's cancel.
     const depthLeaks = leaked.filter(
       (error) => error instanceof RecursionDepthError,
     );
 
     expect(
-      depthLeaks.length,
+      depthLeaks,
       `leaked: ${leaked.map((error) => (error instanceof Error ? error.name : String(error))).join(", ")}`,
-    ).toBeGreaterThan(0);
+    ).toStrictEqual([]);
 
-    // The chain climbed to the ceiling (5 nested subscribe calls).
+    // The chain still climbed to the ceiling (5 nested subscribe calls) — proves
+    // the reentrant path executed rather than short-circuiting before recursing.
     expect(chainDepth).toBe(5);
 
-    // Router is unharmed by the leaked rejection and stays usable.
+    // Router is unharmed by the suppressed rejection and stays usable.
     expect(router.isActive()).toBe(true);
 
     await router.navigate("home");

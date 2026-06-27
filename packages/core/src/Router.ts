@@ -7,7 +7,7 @@
  */
 
 import { logger } from "@real-router/logger";
-import { EventEmitter } from "event-emitter";
+import { EventEmitter, RecursionDepthError } from "event-emitter";
 
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
@@ -69,6 +69,14 @@ const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
   errorCodes.CANNOT_ACTIVATE,
   errorCodes.CANNOT_DEACTIVATE,
 ]);
+
+// Shared per-listener error sink: the EventEmitter reports synchronous listener
+// throws through it, and the EventBusNamespace.subscribe wrapper routes an async
+// listener's rejected Promise through the SAME sink (#944) so both failure modes
+// land in one place.
+function logListenerError(eventName: string, error: unknown): void {
+  logger.error("Router", `Error in listener for ${eventName}:`, error);
+}
 
 /**
  * Router class with integrated namespace architecture.
@@ -174,9 +182,7 @@ export class Router<
     const routerFSM = createRouterFSM();
 
     const emitter = new EventEmitter<RouterEventMap>({
-      onListenerError: (eventName, error) => {
-        logger.error("Router", `Error in listener for ${eventName}:`, error);
-      },
+      onListenerError: logListenerError,
       onListenerWarn: (eventName, count) => {
         logger.warn(
           "router.addEventListener",
@@ -185,7 +191,11 @@ export class Router<
       },
     });
 
-    this.#eventBus = new EventBusNamespace({ routerFSM, emitter });
+    this.#eventBus = new EventBusNamespace({
+      routerFSM,
+      emitter,
+      onListenerError: logListenerError,
+    });
 
     // =========================================================================
     // Wire Dependencies
@@ -564,6 +574,18 @@ export class Router<
       params ?? {},
     );
 
+    // Build `toState` exactly as `buildNavigateState` does — WITH route-meta and
+    // normalized params — so `getTransitionPath` takes its STANDARD PATH and
+    // trims the shared ancestor, mirroring navigate's guard set (#970). A
+    // meta-less `toState` makes both sides meta-less (the committed `getState()`
+    // carries no meta after a path-matched `start()`), so `getTransitionPath`
+    // takes FAST PATH 3 and (de)activates the WHOLE chain incl. shared ancestors
+    // → false-negative ("Link disabled though the click would succeed").
+    // `normalizeParams` also aligns the params guards observe with navigate's.
+    // `skipFreeze` (5th arg) mirrors the navigate guard phase, where guards see
+    // an unfrozen, transition-less `toState` (freeze happens later in
+    // `completeTransition`).
+    //
     // A capability predicate must answer, not throw: if the target path can't be
     // built from these params (e.g. a required path param is missing), the route
     // is simply unreachable with this input — return `false` rather than letting
@@ -571,7 +593,17 @@ export class Router<
     let toState: State;
 
     try {
-      toState = this.#state.makeState(resolvedName, resolvedParams);
+      const normalizedParams = normalizeParams(resolvedParams);
+      const meta = this.#routes.getMetaForState(resolvedName);
+      const path = ctx.buildPath(resolvedName, normalizedParams);
+
+      toState = this.#state.makeState(
+        resolvedName,
+        normalizedParams,
+        path,
+        meta,
+        true,
+      );
     } catch {
       return false;
     }
@@ -723,12 +755,25 @@ export class Router<
    * Pre-allocated callback for #suppressUnhandledRejection.
    * Avoids creating a new closure on every navigate() call.
    */
-  // Stryker disable next-line BlockStatement: equivalent — the handler suppresses fire-and-forget rejections by merely existing as a .catch; its body only logs UNEXPECTED errors, unreachable in core (every navigate rejection carries a suppressed RouterError code; plugin/listener throws are isolated by the EventEmitter and never reach the navigate promise).
+  // Stryker disable next-line BlockStatement: equivalent — the handler suppresses fire-and-forget rejections by merely existing as a .catch; its body only CLASSIFIES which rejections to log, and the log branch is unreachable in core (every navigate rejection is either a suppressed RouterError code or a suppressed RecursionDepthError; plugin/listener throws are isolated by the EventEmitter and never reach the navigate promise).
   static readonly #onSuppressedError = (error: unknown): void => {
     if (
       error instanceof RouterError &&
       SUPPRESSED_ERROR_CODES.has(error.code)
     ) {
+      return;
+    }
+
+    // A reentrant navigate() from inside a subscribe() listener self-feeds
+    // nested TRANSITION_SUCCESS emits until the EventEmitter's maxEventDepth
+    // ceiling throws RecursionDepthError (#945). It is bounded, deterministic,
+    // and the router stays functional afterwards — a normal fire-and-forget
+    // outcome, symmetric with subscribeLeave's reentrant navigate (which
+    // supersedes the in-flight transition and rejects with the already-
+    // suppressed TRANSITION_CANCELLED). Suppress it too so `void
+    // router.navigate()` in a listener cannot crash the process under
+    // --unhandled-rejections=strict (the Node 22+ default).
+    if (error instanceof RecursionDepthError) {
       return;
     }
 

@@ -144,6 +144,26 @@ describe("handleGuardError — AbortError detection", () => {
   });
 });
 
+describe("handleGuardError — explicit RouterError(TRANSITION_CANCELLED) is preserved", () => {
+  it("a guard that throws RouterError(TRANSITION_CANCELLED) keeps that code (not re-coded to CANNOT_ACTIVATE)", async () => {
+    // A guard that throws RouterError(TRANSITION_CANCELLED) is explicitly
+    // signalling a quiet cancel — the same intent as a thrown AbortError.
+    // It must NOT be re-coded to CANNOT_ACTIVATE (#933), otherwise the quiet
+    // cancel turns into a reported transition error.
+    const onTransitionError = vi.fn();
+    const router = routerWithActivateGuard(() => {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    });
+
+    router.usePlugin(() => ({ onTransitionError }));
+
+    const error = await navigateError(router);
+
+    expect(error?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(onTransitionError).not.toHaveBeenCalled();
+  });
+});
+
 describe("rethrowAsRouterError — RouterError keeps identity, gets re-coded", () => {
   it("re-codes a thrown RouterError instead of wrapping it (message preserved)", async () => {
     const error = await navigateError(
@@ -209,6 +229,36 @@ describe("wrapSyncError — metadata extraction (via the rejected RouterError)",
     expect(error?.segment).toBe("page"); // the real route segment, not "INJECTED"
     expect(error).not.toHaveProperty("path", "/injected");
     expect((error as unknown as { kept: string }).kept).toBe("v"); // non-reserved survives
+  });
+
+  it("does not leak `then` from a thrown thenable onto the RouterError (#947)", async () => {
+    const router = routerWithActivateGuard(() => {
+      // A thenable thrown by a guard would otherwise make the wrapped
+      // RouterError itself thenable — a foot-gun for any consumer that awaits
+      // (or Promise.resolve()s / returns from async) the error.
+      // eslint-disable-next-line @typescript-eslint/only-throw-error, unicorn/no-thenable -- deliberately throwing a thenable object to exercise wrapSyncError's `then` filter (#947)
+      throw { then: () => {}, kept: "v" };
+    });
+
+    await router.start("/");
+
+    // Capture the rejection WITHOUT returning the error from the handler: a
+    // thenable returned into a resolving position is assimilated, and a no-op
+    // `then` would hang the test — exactly the foot-gun #947 guards against.
+    let caught: unknown;
+
+    await router.navigate("page").then(
+      () => undefined,
+      (error: unknown) => {
+        caught = error;
+      },
+    );
+
+    expect(caught).toBeInstanceOf(RouterError);
+    expect((caught as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+    expect(typeof (caught as { then?: unknown }).then).not.toBe("function");
+    // The fix is surgical — non-`then` own props still flow through as metadata.
+    expect((caught as { kept: string }).kept).toBe("v");
   });
 
   it("returns base-only metadata for a primitive throw (no enumerable spread)", async () => {

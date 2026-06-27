@@ -2,12 +2,12 @@
 
 import { RecursionDepthError } from "event-emitter";
 
-import { events } from "../../constants";
+import { errorCodes, events } from "../../constants";
 import { routerEvents, routerStates } from "../../fsm";
+import { RouterError } from "../../RouterError";
 
 import type { EventBusOptions } from "./types";
 import type { RouterEvent, RouterPayloads, RouterState } from "../../fsm";
-import type { RouterError } from "../../RouterError";
 import type { EventMethodMap, RouterEventMap } from "../../types";
 import type { FSM } from "@real-router/fsm";
 import type {
@@ -89,6 +89,7 @@ function settleLeavePromises(
 export class EventBusNamespace {
   readonly #fsm: FSM<RouterState, RouterEvent, null, RouterPayloads>;
   readonly #emitter: EventEmitter<RouterEventMap>;
+  readonly #onListenerError: (eventName: string, error: unknown) => void;
   readonly #leaveListeners: LeaveFn[] = [];
 
   // Synchronous reentrancy depth of the subscribeLeave dispatch. A sync leave
@@ -106,6 +107,7 @@ export class EventBusNamespace {
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
+    this.#onListenerError = options.onListenerError;
     this.#currentToState = undefined;
     this.#setupFSMActions();
   }
@@ -255,6 +257,25 @@ export class EventBusNamespace {
     }
   }
 
+  /**
+   * Surfaces a `TRANSITION_ERROR` for callers that do **not** know — or do not
+   * control — the current FSM state: the plugin-facing `emitTransitionError`
+   * primitive (`getPluginApi`), the dispose chain, and validator / same-state
+   * rejections. It is the state-agnostic counterpart to {@link sendFail}.
+   *
+   * **What "Safe" means here.** The error event is never *dropped*, whatever the
+   * FSM state — it does **not** mean the method catches every error. Errors
+   * thrown *inside* a `TRANSITION_ERROR` listener are isolated by the
+   * `EventEmitter`'s per-listener `onListenerError` sink, not by this method.
+   *
+   * **Why it branches on its own FSM state.** When the FSM is settled in `READY`
+   * (no transition in flight) it routes through the FSM `FAIL` action via
+   * {@link sendFail}, so the error rides the normal FSM-driven emit. Otherwise —
+   * the router may be starting, mid-transition, or torn down — it emits
+   * `TRANSITION_ERROR` directly: a fire-and-forget error report from an unknown
+   * state must not drive a second FSM transition that could collide with an
+   * in-flight one. Both branches guarantee the event reaches subscribers.
+   */
   sendFailSafe(toState?: State, fromState?: State, error?: unknown): void {
     if (this.isReady()) {
       this.sendFail(toState, fromState, error);
@@ -363,10 +384,52 @@ export class EventBusNamespace {
    * gate itself, e.g. `if (!unsub) unsub = router.subscribe(fn);`.
    */
   subscribe(listener: SubscribeFn): Unsubscribe {
+    // Enforce the disposed state HERE, not only on the facade. A reference
+    // bound before dispose() (`const s = router.subscribe.bind(router)`)
+    // bypasses the facade's #markDisposed swap and reaches this method
+    // directly. Without this guard, `emitter.on` would silently re-register a
+    // listener that can never fire (clearAll already ran, FSM is DISPOSED, no
+    // future emit) — a silent no-op / stuck-UI hazard (#946).
+    if (this.isDisposed()) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
     return this.#emitter.on(
       events.TRANSITION_SUCCESS,
       (toState: State, fromState?: State) => {
-        listener({ route: toState, previousRoute: fromState });
+        // `subscribe` is fire-and-forget — the listener's return value is
+        // intentionally ignored. But the EventEmitter's per-listener try/catch
+        // isolates only SYNC throws: an async listener returns a Promise whose
+        // rejection would otherwise surface as a Node `unhandledRejection`
+        // (fatal under `--unhandled-rejections=strict`, the Node 22+ default).
+        // `SubscribeFn` is publicly typed `=> void` (fire-and-forget), but an
+        // async listener returns a Promise at runtime that must be isolated
+        // (#944). A cast to a `=> unknown` view is auto-stripped by
+        // `no-unnecessary-type-assertion` (`=> void` is assignable to
+        // `=> unknown`), so read the value as `unknown` and disable the
+        // void-expression rule for this single deliberate divergence.
+        // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- read the runtime Promise of a void-typed async listener (#944)
+        const result: unknown = listener({
+          route: toState,
+          previousRoute: fromState,
+        });
+
+        if (
+          result !== null &&
+          result !== undefined &&
+          typeof (result as PromiseLike<unknown>).then === "function"
+        ) {
+          // Route the rejection to the same `onListenerError` sink a sync throw
+          // flows through (#944) — symmetric with `subscribeLeave`, which
+          // isolates rejections via `Promise.allSettled`. `.catch(handler)`
+          // terminates the chain (not a floating promise — mirrors
+          // `Router.#suppressUnhandledRejection`).
+          Promise.resolve(result as PromiseLike<unknown>).catch(
+            (error: unknown) => {
+              this.#onListenerError(events.TRANSITION_SUCCESS, error);
+            },
+          );
+        }
       },
     );
   }
@@ -403,6 +466,13 @@ export class EventBusNamespace {
    * For idempotent registration, gate at the call site.
    */
   subscribeLeave(listener: LeaveFn): Unsubscribe {
+    // Same disposed-state enforcement as subscribe() (#946): a pre-bound
+    // reference would otherwise push onto #leaveListeners after dispose() and
+    // silently never fire (FSM is DISPOSED, no LEAVE_APPROVE emit).
+    if (this.isDisposed()) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
     this.#leaveListeners.push(listener);
 
     return () => {
@@ -533,6 +603,17 @@ export class EventBusNamespace {
       this.#pendingFromState,
       this.#pendingError as RouterError | undefined,
     );
+
+    // Clear the pending payload once this FAIL action has consumed it. `#pending*`
+    // is only meaningful in the window between the sendFail()/sendFailSafe() that
+    // sets it and this emit; keeping it afterwards pins a stale State/RouterError
+    // on the instance and leaves an implicit "valid only in this window" coupling
+    // (#949). Hygiene only — every consumer overwrites the fields before
+    // re-reading (handleCancel reads what its own sendCancel just set), so there
+    // is no observable behaviour change.
+    this.#pendingToState = undefined;
+    this.#pendingFromState = undefined;
+    this.#pendingError = undefined;
   }
 
   #setupFSMActions(): void {
