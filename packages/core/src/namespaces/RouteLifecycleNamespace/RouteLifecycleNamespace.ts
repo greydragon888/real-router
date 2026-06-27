@@ -416,6 +416,11 @@ export class RouteLifecycleNamespace<
         ? booleanToFactory<Dependencies>(handler)
         : handler;
 
+    // Capture the slot's prior factory (if any) BEFORE the overwrite, so a
+    // compile-throw can be rolled back to the previously-valid guard rather
+    // than dropping it (#963).
+    const previousFactory = targetMap.get(name);
+
     targetMap.set(name, factory);
 
     try {
@@ -429,16 +434,18 @@ export class RouteLifecycleNamespace<
 
       functions.set(name, fn);
     } catch (error) {
-      // Rollback the slot we just touched to keep storage consistent. If a
-      // cross-origin entry exists for the same name, its compiled function
-      // remains in place — recompile so navigation still sees a valid guard.
-      targetMap.delete(name);
-
-      if (otherMap.has(name)) {
-        this.#recompileSlot(type, name);
+      // Roll the slot back to its pre-call state: restore the previous factory
+      // on an overwrite (#963), else clear the slot. `#recompileSlot` then
+      // resets the compiled function from whichever origin Map still holds an
+      // entry — the restored same-origin factory, a surviving cross-origin one,
+      // or (empty slot) deletes the compiled function.
+      if (previousFactory === undefined) {
+        targetMap.delete(name);
       } else {
-        functions.delete(name);
+        targetMap.set(name, previousFactory);
       }
+
+      this.#recompileSlot(type, name);
 
       throw error;
     }
