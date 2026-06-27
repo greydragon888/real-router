@@ -442,11 +442,60 @@ export function assertNoInternalNamesInBatch<
 }
 
 /**
+ * Rejects two routes that share the same `path` at the same parent level WITHIN
+ * a single `add` batch (#955). The matcher resolves a path collision last-wins,
+ * so the earlier route stays addressable by name (`has` / `buildPath`) but is
+ * unreachable by URL (`matchPath` returns the later route) — a silent shadow.
+ * Paths only collide among siblings, so seen paths are tracked per parent
+ * fullName. Mirrors validation-plugin's message (route-tree
+ * `checkBatchPathDuplicate`) so the no-plugin error matches the with-plugin one.
+ * Scoped to the batch (not the existing tree) per #955 — the in-batch case the
+ * issue describes.
+ */
+export function assertNoDuplicatePathsInBatch<
+  Dependencies extends DefaultDependencies,
+>(
+  routes: readonly Route<Dependencies>[],
+  parentName: string,
+  methodName: string,
+): void {
+  const seenByParent = new Map<string, Set<string>>();
+
+  const walk = (
+    siblings: readonly Route<Dependencies>[],
+    parent: string,
+  ): void => {
+    for (const route of siblings) {
+      const paths = seenByParent.get(parent);
+
+      if (paths?.has(route.path)) {
+        throw new Error(
+          `[router.${methodName}] Path "${route.path}" is already defined`,
+        );
+      }
+
+      if (paths) {
+        paths.add(route.path);
+      } else {
+        seenByParent.set(parent, new Set([route.path]));
+      }
+
+      if (route.children) {
+        walk(route.children, parent ? `${parent}.${route.name}` : route.name);
+      }
+    }
+  };
+
+  walk(routes, parentName);
+}
+
+/**
  * Up-front guard for `add` against the corruptions route-tree stays silent on: a
  * missing `parent`, a name that collides with an EXISTING route, a name
- * duplicated WITHIN the batch (either would otherwise be silently overwritten),
- * and a reserved "@@"-prefixed name (which would shadow an internal/system route
- * name). Throws before any build.
+ * duplicated WITHIN the batch, a reserved "@@"-prefixed name (which would shadow
+ * an internal/system route name), and a path duplicated among siblings WITHIN
+ * the batch (any of which would otherwise be silently overwritten/shadowed).
+ * Throws before any build.
  */
 export function assertAddable<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
@@ -468,6 +517,7 @@ export function assertAddable<Dependencies extends DefaultDependencies>(
   });
 
   assertNoDuplicateNamesInBatch(routes, parentName ?? "", "addRoute");
+  assertNoDuplicatePathsInBatch(routes, parentName ?? "", "addRoute");
 }
 
 /**

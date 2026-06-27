@@ -548,4 +548,65 @@ describe("core/without validation plugin", () => {
       router.stop();
     });
   });
+
+  describe("batch path dedup — add() (#955)", () => {
+    it("throws when two routes in one add() batch share a path", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          { name: "dupPathA", path: "/dup-path" },
+          { name: "dupPathB", path: "/dup-path" },
+        ]);
+      }).toThrow('[router.addRoute] Path "/dup-path" is already defined');
+
+      router.stop();
+    });
+
+    it("throws when two sibling grandchildren in one add() batch share a path", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add({
+          name: "gp",
+          path: "/gp",
+          children: [
+            {
+              name: "mid",
+              path: "/mid",
+              children: [
+                { name: "kidA", path: "/kid" },
+                { name: "kidB", path: "/kid" },
+              ],
+            },
+          ],
+        });
+      }).toThrow('[router.addRoute] Path "/kid" is already defined');
+
+      router.stop();
+    });
+
+    it("allows distinct sibling paths in one add() batch (both reachable by URL)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          { name: "distinctX", path: "/distinct-x" },
+          { name: "distinctY", path: "/distinct-y" },
+        ]);
+      }).not.toThrow();
+
+      expect(getPluginApi(router).matchPath("/distinct-x")?.name).toBe(
+        "distinctX",
+      );
+      expect(getPluginApi(router).matchPath("/distinct-y")?.name).toBe(
+        "distinctY",
+      );
+
+      router.stop();
+    });
+  });
 });
