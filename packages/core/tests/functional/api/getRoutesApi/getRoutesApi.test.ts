@@ -261,5 +261,30 @@ describe("getRoutesApi()", () => {
       expect(caught).toBeInstanceOf(RouterError);
       expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
     });
+
+    // #982 — a `subscribeChanges` reference bound BEFORE dispose() (e.g.
+    // `const s = routes.subscribeChanges.bind(routes)`) used to reach the
+    // unguarded `EventBusNamespace.subscribeTreeChanged` and silently
+    // re-register a TREE_CHANGED listener that can never fire (the route tree
+    // is torn down during dispose, no future emit) — a silent no-op, the
+    // internal-channel counterpart of the subscribe/subscribeLeave fix (#946).
+    it("subscribeChanges should throw RouterError(ROUTER_DISPOSED)", () => {
+      const freshRouter = createTestRouter();
+      const freshApi = getRoutesApi(freshRouter);
+      const boundSubscribeChanges = freshApi.subscribeChanges.bind(freshApi);
+
+      freshRouter.dispose();
+
+      let caught: unknown;
+
+      try {
+        boundSubscribeChanges(() => undefined);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(RouterError);
+      expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
+    });
   });
 });
