@@ -140,6 +140,7 @@ export class RouteLifecycleNamespace<
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
     isFromDefinition = false,
+    precompiledFn?: GuardFn,
   ): void {
     this.#registerHandler(
       "activate",
@@ -147,6 +148,7 @@ export class RouteLifecycleNamespace<
       handler,
       isFromDefinition,
       "canActivate",
+      precompiledFn,
     );
   }
 
@@ -159,6 +161,7 @@ export class RouteLifecycleNamespace<
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
     isFromDefinition = false,
+    precompiledFn?: GuardFn,
   ): void {
     this.#registerHandler(
       "deactivate",
@@ -166,19 +169,28 @@ export class RouteLifecycleNamespace<
       handler,
       isFromDefinition,
       "canDeactivate",
+      precompiledFn,
     );
   }
 
   /**
-   * Removes a canActivate guard for a route — both the definition and external
-   * slots. (Origin-selective clearing was removed: no caller ever needed it;
-   * `clearDefinitionGuards()` handles the definition-only case on `replace()`.)
+   * Removes a canActivate guard for a route. By default clears BOTH the
+   * definition and external slots (route removal / `clearAll` cleanup). With
+   * `definitionOnly = true` it clears ONLY the definition slot, leaving an
+   * external guard intact — `update(name, { canActivate: null })` passes this so
+   * clearing a route-config guard does not also wipe a guard registered
+   * independently via `getLifecycleApi().addActivateGuard()` (#952). When the
+   * definition is cleared but an external survives, `#recompileSlot` recompiles
+   * the slot from the external factory (external wins).
    *
    * @param name - Route name (already validated by facade)
+   * @param definitionOnly - When true, leave the external slot intact (#952)
    */
-  clearCanActivate(name: string): void {
+  clearCanActivate(name: string, definitionOnly = false): void {
     const clearedDefinition = this.#definitionActivateFactories.delete(name);
-    const clearedExternal = this.#externalActivateFactories.delete(name);
+    const clearedExternal = definitionOnly
+      ? false
+      : this.#externalActivateFactories.delete(name);
 
     if (clearedDefinition || clearedExternal) {
       this.#recompileSlot("activate", name);
@@ -186,13 +198,16 @@ export class RouteLifecycleNamespace<
   }
 
   /**
-   * Removes a canDeactivate guard for a route (both slots).
+   * Removes a canDeactivate guard for a route.
    *
-   * Symmetric counterpart to {@link clearCanActivate}.
+   * Symmetric counterpart to {@link clearCanActivate} — `definitionOnly = true`
+   * clears only the definition slot, preserving an external guard (#952).
    */
-  clearCanDeactivate(name: string): void {
+  clearCanDeactivate(name: string, definitionOnly = false): void {
     const clearedDefinition = this.#definitionDeactivateFactories.delete(name);
-    const clearedExternal = this.#externalDeactivateFactories.delete(name);
+    const clearedExternal = definitionOnly
+      ? false
+      : this.#externalDeactivateFactories.delete(name);
 
     if (clearedDefinition || clearedExternal) {
       this.#recompileSlot("deactivate", name);
@@ -358,6 +373,38 @@ export class RouteLifecycleNamespace<
     return true;
   }
 
+  /**
+   * Compiles a guard factory to its `GuardFn` WITHOUT registering it — surfaces
+   * a throwing / non-function factory eagerly. The prepare-then-commit
+   * add/replace path (`adoptRouteArtifacts`) calls this for every pending guard
+   * BEFORE the store swap (#956), so a malformed factory aborts the mutation
+   * with the store untouched. The returned function is then installed via the
+   * `precompiledFn` argument of {@link addCanActivate} / {@link addCanDeactivate}
+   * — no re-compile, so a factory with compile-time side effects runs exactly
+   * once. Same boolean-shorthand handling + compile + non-function check as the
+   * inline `#registerHandler` path, so a route-config `canActivate: true`
+   * (boolean shorthand, runtime-reachable via the public route type) compiles to
+   * the cached `TRUE_GUARD`/`FALSE_GUARD` instead of throwing on a non-callable.
+   */
+  compileGuardFactory(
+    handler: GuardFnFactory<Dependencies> | boolean,
+    methodName: string,
+  ): GuardFn {
+    const factory =
+      typeof handler === "boolean"
+        ? booleanToFactory<Dependencies>(handler)
+        : handler;
+    const fn = this.#deps.compileFactory(factory);
+
+    if (typeof fn !== "function") {
+      throw new TypeError(
+        `[router.${methodName}] Factory must return a function, got ${typeof fn}`,
+      );
+    }
+
+    return fn;
+  }
+
   // =========================================================================
   // Private methods (business logic)
   // =========================================================================
@@ -376,6 +423,7 @@ export class RouteLifecycleNamespace<
     handler: GuardFnFactory<Dependencies> | boolean,
     isFromDefinition: boolean,
     methodName: string,
+    precompiledFn?: GuardFn,
   ): void {
     const factoryMaps = this.#getFactoryMaps(type);
     const functions =
@@ -416,29 +464,33 @@ export class RouteLifecycleNamespace<
         ? booleanToFactory<Dependencies>(handler)
         : handler;
 
+    // Capture the slot's prior factory (if any) BEFORE the overwrite, so a
+    // compile-throw can be rolled back to the previously-valid guard rather
+    // than dropping it (#963).
+    const previousFactory = targetMap.get(name);
+
     targetMap.set(name, factory);
 
     try {
-      const fn = this.#deps.compileFactory(factory);
-
-      if (typeof fn !== "function") {
-        throw new TypeError(
-          `[router.${methodName}] Factory must return a function, got ${typeof fn}`,
-        );
-      }
+      // A pre-validated function (from the #956 add/replace pre-compile) is
+      // installed directly — no re-compile; otherwise compile + non-function
+      // check here (`compileGuardFactory` throws on a bad factory).
+      const fn = precompiledFn ?? this.compileGuardFactory(factory, methodName);
 
       functions.set(name, fn);
     } catch (error) {
-      // Rollback the slot we just touched to keep storage consistent. If a
-      // cross-origin entry exists for the same name, its compiled function
-      // remains in place — recompile so navigation still sees a valid guard.
-      targetMap.delete(name);
-
-      if (otherMap.has(name)) {
-        this.#recompileSlot(type, name);
+      // Roll the slot back to its pre-call state: restore the previous factory
+      // on an overwrite (#963), else clear the slot. `#recompileSlot` then
+      // resets the compiled function from whichever origin Map still holds an
+      // entry — the restored same-origin factory, a surviving cross-origin one,
+      // or (empty slot) deletes the compiled function.
+      if (previousFactory === undefined) {
+        targetMap.delete(name);
       } else {
-        functions.delete(name);
+        targetMap.set(name, previousFactory);
       }
+
+      this.#recompileSlot(type, name);
 
       throw error;
     }

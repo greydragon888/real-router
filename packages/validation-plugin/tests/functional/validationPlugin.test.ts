@@ -110,20 +110,16 @@ describe("validationPlugin", () => {
       expect(() => r.usePlugin(validationPlugin())).toThrow(RangeError);
     });
 
-    it("throws TypeError during retrospective when route has async forwardTo callback", () => {
-      router = createRouter([
-        { name: "home", path: "/home" },
-        { name: "about", path: "/about" },
-      ]);
-      const routes = getRoutesApi(router);
-
-      routes.update("home", {
-        // @ts-expect-error testing async forwardTo (not allowed by type)
-        forwardTo: async () => "about",
-      });
-
-      expect(() => router.usePlugin(validationPlugin())).toThrow(TypeError);
-    });
+    // NOTE (#967): the former "retrospective catches an async forwardTo" test was
+    // removed — its scenario is now unreachable. It injected an async forwardTo
+    // via `update()` WITHOUT the plugin (relying on core silently accepting it),
+    // then registered the plugin to let the retrospective pass flag it. Core now
+    // rejects an async `forwardTo` at construct/add/update (#967), and the only
+    // other async-checked callbacks (`decode`/`encodeParams`) are stored wrapped
+    // in a sync function, so no async callback can survive into a route's stored
+    // config for the retrospective pass to catch. The throw branches of
+    // `guardNoAsyncCallbacks` remain covered by the add-with-plugin path and the
+    // direct `validators.test.ts` unit test.
   });
 
   describe("validation enabled after registration", () => {

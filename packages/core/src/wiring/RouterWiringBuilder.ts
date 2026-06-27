@@ -71,12 +71,19 @@ export class RouterWiringBuilder<
 
   wireRoutesDeps(): void {
     const routesDeps: RoutesDependencies<Dependencies> = {
-      addActivateGuard: (name, handler) => {
-        this.routeLifecycle.addCanActivate(name, handler, true);
+      addActivateGuard: (name, handler, precompiledFn) => {
+        this.routeLifecycle.addCanActivate(name, handler, true, precompiledFn);
       },
-      addDeactivateGuard: (name, handler) => {
-        this.routeLifecycle.addCanDeactivate(name, handler, true);
+      addDeactivateGuard: (name, handler, precompiledFn) => {
+        this.routeLifecycle.addCanDeactivate(
+          name,
+          handler,
+          true,
+          precompiledFn,
+        );
       },
+      compileGuard: (handler, methodName) =>
+        this.routeLifecycle.compileGuardFactory(handler, methodName),
       makeState: (name, params, path, meta) =>
         this.state.makeState(name, params, path, meta),
       getState: () => this.state.get(),

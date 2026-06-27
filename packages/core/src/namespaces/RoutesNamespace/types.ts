@@ -4,6 +4,7 @@ import type { GuardFnFactory } from "../../types";
 import type {
   DefaultDependencies,
   ForwardToCallback,
+  GuardFn,
   Params,
   SimpleState,
   State,
@@ -18,17 +19,34 @@ import type {
 export interface RoutesDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  /** Register canActivate handler for a route */
+  /**
+   * Register a canActivate handler for a route. `precompiledFn` installs an
+   * already-compiled `GuardFn` (from {@link compileGuard}) without re-invoking
+   * the factory — used by the #956 prepare-then-commit path so guards compile
+   * once, before the store swap.
+   */
   addActivateGuard: (
     name: string,
     handler: GuardFnFactory<Dependencies>,
+    precompiledFn?: GuardFn,
   ) => void;
 
-  /** Register canDeactivate handler for a route */
+  /** Register a canDeactivate handler for a route (see {@link addActivateGuard}). */
   addDeactivateGuard: (
     name: string,
     handler: GuardFnFactory<Dependencies>,
+    precompiledFn?: GuardFn,
   ) => void;
+
+  /**
+   * Compile a guard factory to its `GuardFn` WITHOUT registering it — surfaces a
+   * throwing / non-function factory eagerly so the add/replace commit can
+   * validate every guard before swapping the store (#956).
+   */
+  compileGuard: (
+    handler: GuardFnFactory<Dependencies>,
+    methodName: string,
+  ) => GuardFn;
 
   /** Create state object */
   makeState: <P extends Params = Params>(

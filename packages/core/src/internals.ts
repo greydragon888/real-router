@@ -71,6 +71,27 @@ export interface RouterInternals<
 
   readonly emitTransitionError: (error: Error) => void;
 
+  /**
+   * Emits `TRANSITION_SUCCESS` directly (no FSM transition) — used by
+   * `getRoutesApi().replace()` to notify `router.subscribe` listeners when a
+   * structural replace revalidates the active state (#950). Mirrors the success
+   * emission `completeTransition` / `navigateToNotFound` perform.
+   */
+  readonly emitTransitionSuccess: (
+    toState: State,
+    fromState: State | undefined,
+    opts?: NavigationOptions,
+  ) => void;
+
+  /**
+   * Commits the not-found (`UNKNOWN_ROUTE`) state for `path` and emits
+   * `TRANSITION_SUCCESS` — the `NavigationNamespace.navigateToNotFound`
+   * primitive. `replace()` uses it when a structural replace drops the active
+   * route, so subscribers are notified instead of the state silently clearing
+   * (#950).
+   */
+  readonly navigateToNotFound: (path: string) => State;
+
   readonly start: (path: string) => Promise<State>;
 
   /**

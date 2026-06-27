@@ -1,7 +1,12 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { errorCodes } from "@real-router/core";
-import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
+import {
+  cloneRouter,
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -77,6 +82,21 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() => {
         routesApi.update("ur-self", { forwardTo: "ur-self" });
       }).toThrow(/Circular forwardTo/);
+    });
+
+    it("rejects an async forwardTo at update time, like add/replace (#967)", () => {
+      routesApi.add({ name: "ur-async-src", path: "/ur-async-src" });
+      routesApi.add({ name: "ur-async-dst", path: "/ur-async-dst" });
+
+      // add() already rejects an async forwardTo (assertForwardToNotAsync).
+      // update() must reject the SAME input at registration with the SAME
+      // actionable error — not silently accept it and defer a generic
+      // "must return a string, got object" TypeError to navigation.
+      expect(() => {
+        routesApi.update("ur-async-src", {
+          forwardTo: (async () => "ur-async-dst") as any,
+        });
+      }).toThrow(/forwardTo callback cannot be async/);
     });
 
     it("should allow forwardTo when params match", () => {
@@ -531,6 +551,22 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(guard).not.toHaveBeenCalled();
     });
+
+    it("preserves an external canActivate guard when clearing via update (origin-selective, #952)", async () => {
+      routesApi.add({ name: "ur-ext", path: "/ur-ext" });
+
+      // EXTERNAL guard (added via the lifecycle API, not route config) — blocks.
+      getLifecycleApi(router).addActivateGuard("ur-ext", () => () => false);
+
+      expect(router.canNavigateTo("ur-ext")).toBe(false);
+
+      // Clearing the route-config (definition) guard must NOT wipe the external
+      // one. Before #952 `clearCanActivate` was origin-blind and removed both.
+      routesApi.update("ur-ext", { canActivate: null });
+
+      // External guard survives — navigation still blocked.
+      expect(router.canNavigateTo("ur-ext")).toBe(false);
+    });
   });
 
   describe("canDeactivate", () => {
@@ -611,6 +647,71 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(guard2).toHaveBeenCalled();
       expect(guard1).not.toHaveBeenCalled();
+    });
+
+    it("preserves an external canDeactivate guard when clearing via update (origin-selective, #952)", async () => {
+      routesApi.add({ name: "ur-ext-d", path: "/ur-ext-d" });
+      await router.navigate("ur-ext-d");
+
+      // EXTERNAL deactivate guard (lifecycle API, not route config) — blocks leaving.
+      getLifecycleApi(router).addDeactivateGuard("ur-ext-d", () => () => false);
+
+      expect(router.canNavigateTo("home")).toBe(false);
+
+      // Clearing the route-config (definition) guard must NOT wipe the external
+      // one — origin-blind `clearCanDeactivate` removed both before #952.
+      routesApi.update("ur-ext-d", { canDeactivate: null });
+
+      // External guard survives — still blocked from leaving.
+      expect(router.canNavigateTo("home")).toBe(false);
+    });
+  });
+
+  describe("atomicity across fields (#951)", () => {
+    it("rolls back a forwardTo set in the same update() when a guard factory throws", () => {
+      routesApi.add({ name: "ur-atom", path: "/ur-atom" });
+      routesApi.add({ name: "ur-atom-tgt", path: "/ur-atom-tgt" });
+
+      const boom: GuardFnFactory = () => {
+        throw new Error("guard boom");
+      };
+
+      // One update() carries BOTH a valid forwardTo and a throwing guard
+      // factory. Before #951 the forwardTo committed first, then the guard
+      // compile threw — leaving a partial update (forwardTo applied, guard not).
+      expect(() => {
+        routesApi.update("ur-atom", {
+          forwardTo: "ur-atom-tgt",
+          canActivate: boom,
+        });
+      }).toThrow("guard boom");
+
+      // Atomic: the forwardTo from the failed call did NOT apply.
+      expect(getPluginApi(router).forwardState("ur-atom", {}).name).toBe(
+        "ur-atom",
+      );
+    });
+
+    it("rolls back a custom field set in the same update() when async forwardTo is rejected", () => {
+      type Patch = RouteConfigUpdate & { label?: string };
+
+      routesApi.add({ name: "ur-atom2", path: "/ur-atom2" });
+      routesApi.update("ur-atom2", { label: "before" } as Patch);
+
+      // A throwing field (async forwardTo, #967) anywhere in the patch must roll
+      // back the whole update — the custom field set in the SAME call must not
+      // commit.
+      expect(() => {
+        routesApi.update("ur-atom2", {
+          label: "after",
+          forwardTo: (async () => "x") as any,
+        } as Patch);
+      }).toThrow(/forwardTo callback cannot be async/);
+
+      // Atomic: the custom field stays "before" — "after" never committed.
+      expect(getPluginApi(router).getRouteConfig("ur-atom2")).toStrictEqual({
+        label: "before",
+      });
     });
   });
 

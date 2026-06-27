@@ -306,6 +306,26 @@ describe("core/route-lifecycle/addActivateGuard", () => {
         lifecycle.addActivateGuard("items", true);
       }).not.toThrow();
     });
+
+    it("preserves the previously-valid guard when an overwrite factory throws on compile (#963)", async () => {
+      // A working guard is registered first — it blocks navigation to "users".
+      lifecycle.addActivateGuard("users", () => () => false);
+
+      expect(router.canNavigateTo("users")).toBe(false);
+
+      // The slot is then OVERWRITTEN by a factory that throws on compile. The
+      // rollback must restore the previous factory, not leave the slot empty:
+      // before #963 the catch ran `targetMap.delete(name)` + `functions.delete`,
+      // silently dropping the still-valid guard registered above.
+      expect(() => {
+        lifecycle.addActivateGuard("users", () => {
+          throw new Error("compile boom");
+        });
+      }).toThrow("compile boom");
+
+      // The original guard survived the failed overwrite — still blocks.
+      expect(router.canNavigateTo("users")).toBe(false);
+    });
   });
 
   describe("self-modification protection", () => {

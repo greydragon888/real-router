@@ -197,12 +197,13 @@ describe("Route Management (getRoutesApi) Properties", () => {
     router.stop();
   });
 
-  it("update with canActivate null: removes guard", async () => {
+  it("update with canActivate null: removes the definition guard but preserves an external one (#952)", async () => {
     const router = createFixtureRouter();
     const lifecycle = getLifecycleApi(router);
     const routesApi = getRoutesApi(router);
 
-    lifecycle.addActivateGuard("admin.settings", () => () => false);
+    // Definition guard (set via update) — update(canActivate: null) clears it.
+    routesApi.update("admin.settings", { canActivate: () => () => false });
 
     await router.start("/");
 
@@ -211,6 +212,16 @@ describe("Route Management (getRoutesApi) Properties", () => {
     routesApi.update("admin.settings", { canActivate: null });
 
     expect(router.canNavigateTo("admin.settings")).toBe(true);
+
+    // An EXTERNAL guard, by contrast, SURVIVES update(canActivate: null) — the
+    // clear is origin-selective (#952), not the old origin-blind wipe.
+    lifecycle.addActivateGuard("admin.settings", () => () => false);
+
+    expect(router.canNavigateTo("admin.settings")).toBe(false);
+
+    routesApi.update("admin.settings", { canActivate: null });
+
+    expect(router.canNavigateTo("admin.settings")).toBe(false);
 
     router.stop();
   });
