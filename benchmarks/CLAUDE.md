@@ -19,11 +19,14 @@ benchmarks/
 │   └── .bench-results/            # Text logs from bench-compare.sh (gitignored)
 ├── vs-tanstack/                   # Vitest bench: real-router vs TanStack Router (React/Vue/Solid)
 │   ├── shared/                    # jsdom, perf-utils, setup-helpers, memory-utils, vitest.setup
-│   ├── client-nav/               # scenario №1: navigation-loop (speed/flame/memory)
-│   │   ├── real-router/{react,vue,solid}/
+│   ├── client-nav/               # scenario: navigation-loop throughput (speed/flame/memory)
+│   ├── navigation-churn/         # memory churn: per-navigation retention
+│   ├── unique-location-churn/    # memory churn: unbounded match/history caches (unique URLs)
+│   ├── mount-unmount/            # memory churn: router collectable after dispose (waits render commit)
+│   │   ├── real-router/{react,vue,solid}/   # per app-set: app · setup · speed.{memory,flame} · vite.config (+tsconfig for solid)
 │   │   └── tanstack/{react,vue,solid}/
 │   ├── run.mjs                    # runner: <scenario> <engine> <framework> <mode>
-│   ├── tsconfig.json, vitest.config.ts
+│   ├── tsconfig.json · tsconfig.solid.json (solid aggregate) · vitest.config.ts
 │   └── .bench-results/            # Text logs from bench-compare-vs-tanstack.sh (gitignored)
 ├── bench-compare.sh               # Core comparison script (sudo, thermal monitoring)
 ├── bench-compare-vs-tanstack.sh   # TanStack comparison script (sudo, thermal monitoring)
