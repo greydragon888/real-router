@@ -1,5 +1,20 @@
 # @real-router/validation-plugin
 
+## 0.8.4
+
+### Patch Changes
+
+- [#997](https://github.com/greydragon888/real-router/pull/997) [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject NUL / control characters in param values and start paths ([#942](https://github.com/greydragon888/real-router/issues/942))
+
+  A NUL byte or C0/DEL control character in a param value or a `start()` path is silently percent-encoded into `state.path` (`%00`, `%01`) by bare core, admitting unreadable paths into committed state. The opt-in validator now rejects them: `validateParams` flags a control character inside a string param value, and `validateStartArgs` flags one in the start path — both with an actionable `TypeError`.
+
+- [#997](https://github.com/greydragon888/real-router/pull/997) [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject Symbol / BigInt param values with an actionable error ([#934](https://github.com/greydragon888/real-router/issues/934))
+
+  A `Symbol` (or `BigInt`) used as a navigation param value cannot round-trip through a URL path — a Symbol path-param keeps its raw identity in `state.params` (the path stringifies to `/items/Symbol(x)` and never matches back), and bare core accepts it silently. `validateParams` now inspects each param value and rejects a `symbol` / `bigint` with a precise, key-named message (`param "id" cannot be a symbol …`) instead of the generic "params must be a plain object" shape error. Value inspection is own-property only, mirroring `isParams`.
+
+- Updated dependencies [[`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee), [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee), [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee)]:
+  - @real-router/core@0.61.10
+
 ## 0.8.3
 
 ### Patch Changes

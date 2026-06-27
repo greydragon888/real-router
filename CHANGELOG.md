@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-27]
 
+### @real-router/core@0.61.10
+
+### Patch Changes
+
+- [#997](https://github.com/greydragon888/real-router/pull/997) [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee) Thanks [@greydragon888](https://github.com/greydragon888)! - Log `start()` failures under the `router.start` category, not `router.navigate` ([#931](https://github.com/greydragon888/real-router/issues/931))
+
+  A `start()` rejection that is not a suppressed `RouterError` — a start interceptor that throws after `next()` committed (the SSR/RSC loader window), or a cryptic path `TypeError` — was logged by the fire-and-forget safety net under the `router.navigate` category, so operators filtering production logs for start failures missed them. The suppressor is now split per call-site: `navigate` / `navigateToDefault` / `navigateToState` log under `router.navigate`, `start()` under `router.start`.
+
+  Also removed false `Stryker disable … unreachable` comments on the suppressor log lines. Both are reachable — a `subscribeLeave` listener throw or a Symbol path-param `TypeError` reaches the navigate line, an interceptor throw reaches the start line — and are now covered by killing tests asserting the log category.
+
+- [#997](https://github.com/greydragon888/real-router/pull/997) [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee) Thanks [@greydragon888](https://github.com/greydragon888)! - Extract start-pipeline FSM recovery into `#unwindFailedStart` ([#940](https://github.com/greydragon888/real-router/issues/940))
+
+  Internal refactor, no behavior change: the `start()` facade's inline `.catch` recovery (the two-branch FSM unwind) moves into a documented `#unwindFailedStart` method, and a comment records why the start FSM bookkeeping is deliberately split between the facade (`sendStart` before the interceptor chain, plus recovery) and `RouterLifecycleNamespace` (the `completeStart` commit). `sendStart` stays in the facade on purpose: moving it into the namespace (the interceptor target) would skip the STARTING state on a pre-`next()` interceptor throw, silently dropping the TRANSITION_ERROR that STARTING's FAIL action emits for `onTransitionError` plugins — a [#668](https://github.com/greydragon888/real-router/issues/668) regression.
+
+- [#997](https://github.com/greydragon888/real-router/pull/997) [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee) Thanks [@greydragon888](https://github.com/greydragon888)! - Guard `start()` against a non-string path with an actionable error ([#939](https://github.com/greydragon888/real-router/issues/939))
+
+  `start(undefined)` without a browser-plugin reached `matchPath(undefined)` and threw a cryptic, code-less `TypeError: Cannot read properties of undefined (reading 'codePointAt')` deep inside path-matcher.
+
+  Core now validates `typeof path === "string"` in `RouterLifecycleNamespace.start` — **after** the start interceptor chain, so a browser-plugin that injects the location (`next(path ?? getLocation())`) is unaffected; the guard only fires when nothing supplied a path. The rejection is now a clear `TypeError("[router.start] path must be a string, got undefined")`, symmetric with the `subscribe` / `navigateToNotFound` invariant guards. The FSM still recovers (STARTING → IDLE) so a subsequent well-formed `start()` succeeds.
+
+### @real-router/validation-plugin@0.8.4
+
+### Patch Changes
+
+- [#997](https://github.com/greydragon888/real-router/pull/997) [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject NUL / control characters in param values and start paths ([#942](https://github.com/greydragon888/real-router/issues/942))
+
+  A NUL byte or C0/DEL control character in a param value or a `start()` path is silently percent-encoded into `state.path` (`%00`, `%01`) by bare core, admitting unreadable paths into committed state. The opt-in validator now rejects them: `validateParams` flags a control character inside a string param value, and `validateStartArgs` flags one in the start path — both with an actionable `TypeError`.
+
+- [#997](https://github.com/greydragon888/real-router/pull/997) [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject Symbol / BigInt param values with an actionable error ([#934](https://github.com/greydragon888/real-router/issues/934))
+
+  A `Symbol` (or `BigInt`) used as a navigation param value cannot round-trip through a URL path — a Symbol path-param keeps its raw identity in `state.params` (the path stringifies to `/items/Symbol(x)` and never matches back), and bare core accepts it silently. `validateParams` now inspects each param value and rejects a `symbol` / `bigint` with a precise, key-named message (`param "id" cannot be a symbol …`) instead of the generic "params must be a plain object" shape error. Value inspection is own-property only, mirroring `isParams`.
+
+- Updated dependencies [[`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee), [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee), [`37fca02`](https://github.com/greydragon888/real-router/commit/37fca0233907e659b36d3bbc423883bc917756ee)]:
+  - @real-router/core@0.61.10
+
+
 ### @real-router/core@0.61.9
 
 ### Patch Changes
