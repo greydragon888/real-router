@@ -58,6 +58,9 @@ importers:
       '@changesets/cli':
         specifier: 2.31.0
         version: 2.31.0(@types/node@25.9.3)
+      '@codspeed/tinybench-plugin':
+        specifier: 5.7.1
+        version: 5.7.1(tinybench@6.0.2)
       '@commitlint/cli':
         specifier: 21.1.0
         version: 21.1.0(@types/node@25.9.3)(conventional-commits-parser@6.4.0)(typescript@6.0.3)
@@ -175,9 +178,15 @@ importers:
       syncpack:
         specifier: 15.3.1
         version: 15.3.1
+      tinybench:
+        specifier: 6.0.2
+        version: 6.0.2
       tsdown:
         specifier: 0.22.3
         version: 0.22.3(@arethetypeswrong/core@0.18.4)(oxc-resolver@11.21.3)(publint@0.3.21)(tsx@4.22.4)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.13))(vue-tsc@3.3.5(typescript@6.0.3))
+      tsx:
+        specifier: 4.22.4
+        version: 4.22.4
       turbo:
         specifier: 2.10.0
         version: 2.10.0
@@ -6119,21 +6128,12 @@ importers:
         specifier: workspace:^
         version: link:../core-types
     devDependencies:
-      '@codspeed/tinybench-plugin':
-        specifier: 5.7.1
-        version: 5.7.1(tinybench@6.0.2)
       event-emitter:
         specifier: workspace:^
         version: link:../event-emitter
       route-tree:
         specifier: workspace:^
         version: link:../route-tree
-      tinybench:
-        specifier: 6.0.2
-        version: 6.0.2
-      tsx:
-        specifier: 4.22.4
-        version: 4.22.4
 
   packages/core-types: {}
 

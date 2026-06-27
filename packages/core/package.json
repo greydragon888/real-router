@@ -105,10 +105,7 @@
     "@real-router/types": "workspace:^"
   },
   "devDependencies": {
-    "@codspeed/tinybench-plugin": "5.7.1",
     "event-emitter": "workspace:^",
-    "route-tree": "workspace:^",
-    "tinybench": "6.0.2",
-    "tsx": "4.22.4"
+    "route-tree": "workspace:^"
   }
 }
