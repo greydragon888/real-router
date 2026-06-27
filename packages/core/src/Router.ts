@@ -465,11 +465,22 @@ export class Router<
 
     getInternals(this).validator?.navigation.validateStartArgs(startPath);
 
+    // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
+    // design, NOT a missed consolidation (#940): `sendStart()` runs HERE, before
+    // the interceptor chain, so the STARTING window spans the whole start
+    // pipeline. A pre-`next()` interceptor throw then unwinds via STARTING →
+    // `sendFail`, which emits TRANSITION_ERROR from STARTING (EventBusNamespace
+    // FAIL action) for `onTransitionError` plugins. Moving `sendStart()` into the
+    // namespace (the interceptor *target*) would skip STARTING on a pre-`next()`
+    // throw — the namespace is never reached — silently dropping that
+    // TRANSITION_ERROR: a #668 regression. The commit (`completeStart`) lives in
+    // the namespace; recovery needs facade state (`#state`, `#lifecycle`), so it
+    // stays here in `#unwindFailedStart`.
     this.#eventBus.sendStart();
 
-    // Convert sync interceptor throws to rejections so the recovery branch in
-    // .catch is reachable; otherwise the throw escapes synchronously, FSM is
-    // left in STARTING, and the router is permanently bricked (#668).
+    // Convert sync interceptor throws to rejections so the recovery path is
+    // reachable; otherwise the throw escapes synchronously, the FSM is left in
+    // STARTING, and the router is permanently bricked (#668).
     let internalStart: Promise<State>;
 
     try {
@@ -479,25 +490,9 @@ export class Router<
       internalStart = Promise.reject(syncError);
     }
 
-    const promiseState = internalStart.catch((error: unknown) => {
-      // Unwind a READY FSM back to IDLE only when nothing was committed —
-      // e.g. an activation guard blocked the start navigation, so no
-      // TRANSITION_SUCCESS was emitted (`getState()` is undefined). If a
-      // start interceptor instead threw AFTER navigateToState committed and
-      // emitted TRANSITION_SUCCESS (the SSR/RSC loader window), `getState()`
-      // is defined: subscribers already observed the success, so rolling back
-      // would retract it (phantom success, #763). Keep the committed state —
-      // the error still surfaces via the rejection below. A throw before
-      // `next()` never reached READY and unwinds via the STARTING branch.
-      if (this.#eventBus.isReady() && this.#state.get() === undefined) {
-        this.#lifecycle.stop();
-        this.#eventBus.sendStop();
-      } else if (this.#eventBus.isStarting()) {
-        this.#eventBus.sendFail(undefined, undefined, error);
-      }
-
-      throw error;
-    });
+    const promiseState = internalStart.catch((error: unknown) =>
+      this.#unwindFailedStart(error),
+    );
 
     Router.#suppressUnhandledRejection(
       promiseState,
@@ -831,6 +826,36 @@ export class Router<
     onSuppressed: (error: unknown) => void = Router.#onSuppressedNavigateError,
   ): void {
     promise.catch(onSuppressed);
+  }
+
+  /**
+   * Settles the FSM after a failed start pipeline, then re-throws so the
+   * rejection still surfaces to the caller. Three cases, by what the pipeline
+   * reached before throwing:
+   *
+   * - **Pre-commit, READY** (`isReady()` and no committed state): an interceptor
+   *   threw after `completeStart()` reached READY but before any state committed
+   *   (e.g. an activation guard blocked the start navigation) — return READY →
+   *   IDLE via `stop()` so the router is reusable.
+   * - **Pre-commit, STARTING** (`isStarting()`): the pipeline threw before
+   *   `completeStart()` — a sync interceptor throw before `next()`, or a throw
+   *   inside the namespace before commit — so unwind STARTING → IDLE via
+   *   `sendFail`, which also emits TRANSITION_ERROR from STARTING (#668).
+   * - **Post-commit, READY with committed state** (neither branch fires): a
+   *   loader/interceptor threw AFTER `navigateToState` committed and emitted
+   *   TRANSITION_SUCCESS (the SSR/RSC loader window). Keep the committed state —
+   *   rolling back would retract an observed success ("phantom success", #763);
+   *   the error still surfaces via the re-throw.
+   */
+  #unwindFailedStart(error: unknown): never {
+    if (this.#eventBus.isReady() && this.#state.get() === undefined) {
+      this.#lifecycle.stop();
+      this.#eventBus.sendStop();
+    } else if (this.#eventBus.isStarting()) {
+      this.#eventBus.sendFail(undefined, undefined, error);
+    }
+
+    throw error;
   }
 
   #markDisposed(): void {
