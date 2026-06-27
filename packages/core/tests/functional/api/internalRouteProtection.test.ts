@@ -59,11 +59,17 @@ describe("core/internal-route-protection", () => {
     });
   });
 
-  describe("no validation plugin - @@ routes allowed", () => {
-    it("should allow adding @@ route without validation plugin", () => {
+  describe("no validation plugin - @@ routes rejected (#954)", () => {
+    // Core rejects reserved "@@"-prefixed names even without the validation
+    // plugin: registering one would let a real URL match a state whose
+    // `name === UNKNOWN_ROUTE`, silently conflating a genuine route with the
+    // not-found sentinel. The error mirrors validation-plugin's message.
+    it("should reject adding a reserved @@ route name without the validation plugin", () => {
       expect(() => {
         routesApi.add({ name: INTERNAL_NAME, path: "/system" });
-      }).not.toThrow();
+      }).toThrow(
+        `[router.addRoute] Route name "${INTERNAL_NAME}" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.`,
+      );
     });
   });
 });

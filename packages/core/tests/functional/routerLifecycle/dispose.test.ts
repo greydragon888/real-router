@@ -382,6 +382,46 @@ describe("dispose", () => {
     });
   });
 
+  // A subscription reference captured BEFORE dispose() — e.g.
+  // `const s = router.subscribe.bind(router)` — bypasses the facade's
+  // #markDisposed swap (which replaces only `router.subscribe`, not a copy
+  // already bound out of it). It used to reach the live EventBusNamespace and
+  // silently re-register a listener that can NEVER fire: dispose() already ran
+  // clearAll() and the FSM is DISPOSED, so no future emit occurs — a silent
+  // no-op / stuck-UI hazard (#946). Core now enforces the disposed state inside
+  // the namespace methods themselves, symmetrically for both end-user surfaces.
+  describe("bound subscription references throw ROUTER_DISPOSED after dispose() (#946)", () => {
+    it("a pre-bound subscribe() reference throws instead of silently no-op'ing", async () => {
+      await router.start("/home");
+      const boundSubscribe = router.subscribe.bind(router);
+
+      router.dispose();
+
+      expect(() => boundSubscribe(() => undefined)).toThrow();
+
+      try {
+        boundSubscribe(() => undefined);
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
+      }
+    });
+
+    it("a pre-bound subscribeLeave() reference throws (symmetric end-user surface)", async () => {
+      await router.start("/home");
+      const boundSubscribeLeave = router.subscribeLeave.bind(router);
+
+      router.dispose();
+
+      expect(() => boundSubscribeLeave(() => undefined)).toThrow();
+
+      try {
+        boundSubscribeLeave(() => undefined);
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
+      }
+    });
+  });
+
   describe("guardAgainstDisposed — mutating methods throw after dispose()", () => {
     beforeEach(() => {
       router.dispose();

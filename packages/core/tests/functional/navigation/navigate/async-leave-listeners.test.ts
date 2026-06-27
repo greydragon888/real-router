@@ -510,6 +510,93 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
 
       vi.useRealTimers();
     });
+
+    it("sync reentrant leave navigation is depth-bounded (maxEventDepth), not unbounded (#935)", async () => {
+      // A sync subscribeLeave listener that navigates re-enters the leave
+      // dispatch on the SAME C-stack. Unbounded it overflows (~615 deep) with a
+      // RangeError that leaks / wedges the worker. The dispatch must be bounded
+      // like the plugin onTransitionLeaveApprove path (emitter maxEventDepth),
+      // raising a controlled RecursionDepthError well before the stack overflows.
+      const errors: unknown[] = [];
+
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        (_toState, _fromState, err) => {
+          errors.push(err);
+        },
+      );
+
+      let calls = 0;
+      // Safety cap FAR below the ~615 overflow ceiling so that, WITHOUT the fix,
+      // this fails by assertion (calls reaches the cap) rather than wedging.
+      const SAFETY_CAP = 50;
+
+      router.subscribeLeave(() => {
+        calls++;
+
+        if (calls < SAFETY_CAP) {
+          // Alternate users/orders — never the current ("home") route, so no
+          // SAME_STATES short-circuit breaks the reentrant chain.
+          void router.navigate(calls % 2 === 0 ? "users" : "orders");
+        }
+      });
+
+      await router.navigate("users").catch(() => undefined);
+      await Promise.resolve();
+
+      // Bounded by maxEventDepth (default 5) — the listener fires only a handful
+      // of times, NOT the full SAFETY_CAP.
+      expect(calls).toBeLessThan(SAFETY_CAP);
+      expect(calls).toBeLessThanOrEqual(6);
+
+      // The bound surfaces as a controlled RecursionDepthError (name stable
+      // across bundle boundaries), not a RangeError stack overflow.
+      expect(
+        errors.some(
+          (err) => (err as { name?: string }).name === "RecursionDepthError",
+        ),
+      ).toBe(true);
+    });
+
+    it("maxEventDepth = 0 opts out of the reentrancy bound (mirrors the emitter) (#935)", async () => {
+      const local = createTestRouter({ limits: { maxEventDepth: 0 } });
+
+      await local.start("/home");
+
+      const errors: unknown[] = [];
+
+      getPluginApi(local).addEventListener(
+        events.TRANSITION_ERROR,
+        (_toState, _fromState, err) => {
+          errors.push(err);
+        },
+      );
+
+      let calls = 0;
+      // Bounded by the listener itself, well below the C-stack ceiling — with
+      // depth protection disabled the dispatch must NOT raise RecursionDepthError.
+      const CAP = 20;
+
+      local.subscribeLeave(() => {
+        calls++;
+
+        if (calls < CAP) {
+          void local.navigate(calls % 2 === 0 ? "users" : "orders");
+        }
+      });
+
+      await local.navigate("users").catch(() => undefined);
+      await Promise.resolve();
+
+      expect(calls).toBe(CAP);
+      expect(
+        errors.some(
+          (err) => (err as { name?: string }).name === "RecursionDepthError",
+        ),
+      ).toBe(false);
+
+      local.stop();
+    });
   });
 
   describe("no-guards path optimization", () => {
