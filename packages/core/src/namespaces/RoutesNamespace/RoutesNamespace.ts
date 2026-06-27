@@ -1,5 +1,7 @@
 // packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts
 
+import { logger } from "@real-router/logger";
+
 import { DEFAULT_ROUTE_NAME } from "./constants";
 import {
   matchSourceTrailingSlash,
@@ -83,6 +85,9 @@ export class RoutesNamespace<
 > {
   readonly #store: RoutesStore<Dependencies>;
   #cachedBuildPathOpts: CachedBuildPathOpts | undefined;
+  // Source `options` reference captured on the first #getBuildPathOptions call;
+  // used only by the dev-build immutability assertion below (#957).
+  #cachedOptionsSource: Options | undefined;
 
   get #deps(): RoutesDependencies<Dependencies> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -519,8 +524,18 @@ export class RoutesNamespace<
   #getBuildPathOptions(options?: Options): CachedBuildPathOpts {
     // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return rebuilds the identical buildPath options (deterministic) and re-caches them. (ConditionalExpression stays live: `→false` always rebuilds but a real consumer test pins the cached identity.)
     if (this.#cachedBuildPathOpts) {
+      /* v8 ignore next 5 -- @preserve: dev assertion guarding a future caller that passes per-call varying options; the sole caller (Router.buildPath, always via this.#options.get()) passes the same immutable, deep-frozen per-instance options, so this branch is unreachable through the public API by construction (#957) */
+      if (options !== this.#cachedOptionsSource) {
+        logger.warn(
+          "router.buildPath",
+          "`options` differs from the cached source reference; router options are immutable per router instance, so the first-cached buildPath options are reused (#957).",
+        );
+      }
+
       return this.#cachedBuildPathOpts;
     }
+
+    this.#cachedOptionsSource = options;
 
     const ts = options?.trailingSlash;
 
