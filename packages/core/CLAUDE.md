@@ -771,7 +771,7 @@ Key types:
 
 Cancellation: Pass `{ signal }` via `NavigationOptions` for external `AbortController` cancellation. `router.stop()`, `router.dispose()`, and concurrent navigation abort the internal controller automatically. 
 Guards receive `signal` as optional 3rd parameter for cooperative cancellation (e.g., `fetch(url, { signal })`). 
-`AbortError` thrown in guards is auto-converted to `TRANSITION_CANCELLED`.
+`AbortError` thrown in guards is auto-converted to `TRANSITION_CANCELLED`. A guard may also throw `RouterError(TRANSITION_CANCELLED)` directly to signal a quiet cancel — it is **preserved** (not re-coded to `CANNOT_ACTIVATE`/`CANNOT_DEACTIVATE`), so the navigation rejects with `TRANSITION_CANCELLED` and `onTransitionError` does **not** fire (#933). Any other thrown `RouterError` is still re-coded to the guard's `CANNOT_ACTIVATE`/`CANNOT_DEACTIVATE`.
 
 ## See Also
 
