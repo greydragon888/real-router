@@ -230,4 +230,59 @@ describe("canNavigateTo Properties", () => {
       b.stop();
     },
   );
+
+  // COMPLETENESS (the other half of PARITY, closed by #970) — canNavigateTo must
+  // not UNDER-report reachability: if navigate(to) resolves from `from`, the
+  // predicate must return true. This is the discriminating direction that
+  // exposed #970 — a guard on the SHARED ANCESTOR of `from` and `to` is trimmed
+  // by navigate (the ancestor stays mounted) but was over-checked by
+  // canNavigateTo (meta-less toState → fast path ran the whole chain), so
+  // canNavigateTo returned false while navigate resolved. Twin routers (one
+  // queried read-only, one committed) avoid the mutator-first false-green trap.
+  test.prop(
+    [
+      arbNavigableRoute,
+      arbNavigableRoute,
+      fc.option(arbGuard, { nil: undefined }),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "complete — navigate(to) resolving implies canNavigateTo(to)=true (ex-same-state)",
+    async (from, to, guard) => {
+      const params = getParamsForRoute(to);
+
+      // Twin instances: `a` answers the predicate, `b` actually commits.
+      const a = createFixtureRouter();
+      const b = createFixtureRouter();
+
+      await a.start(ROUTE_PATHS[from]);
+      await b.start(ROUTE_PATHS[from]);
+
+      if (guard) {
+        applyGuard(a, guard);
+        applyGuard(b, guard);
+      }
+
+      // Same-route is the same-state no-op (params fixed per route): navigate
+      // rejects SAME_STATES while canNavigateTo returns true by design. Skip it;
+      // distinct fixture routes always have distinct paths, so from≠to is safe.
+      if (from !== to) {
+        let resolved: boolean;
+
+        try {
+          await b.navigate(to, params);
+          resolved = true;
+        } catch {
+          resolved = false;
+        }
+
+        if (resolved) {
+          expect(a.canNavigateTo(to, params)).toBe(true);
+        }
+      }
+
+      a.stop();
+      b.stop();
+    },
+  );
 });

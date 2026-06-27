@@ -122,6 +122,53 @@ describe("getTransitionPath meta-less FAST PATH 3 — full reload via shouldUpda
   });
 });
 
+describe("getTransitionPath STANDARD PATH — asymmetric meta (to meta-less, from meta-carrying)", () => {
+  let router: Router | undefined;
+
+  afterEach(() => {
+    router?.stop();
+    router = undefined;
+  });
+
+  // The STANDARD PATH reads its param-meta from `toMetaParams ?? fromMetaParams`,
+  // so the `?? fromMetaParams` arm fires only when `toState` is meta-LESS but
+  // `fromState` carries meta. navigate() never mints a meta-less state, and
+  // `canNavigateTo` now builds `toState` WITH meta (#970), so the remaining
+  // public door to this arm is `shouldUpdateNode(node)(to, from)` fed a meta-less
+  // `router.makeState(...)` toState against a meta-CARRYING committed fromState
+  // (an adapter comparing a freshly-built target against the live `getState()`).
+  // The shared ancestor must STILL be trimmed to the intersection — NOT treated
+  // as a full reload — exactly as the symmetric meta-aware STANDARD PATH does.
+  it("trims the shared ancestor via fromMeta when only fromState carries meta (#970)", async () => {
+    router = createRouter([
+      {
+        name: "users",
+        path: "/users",
+        children: [
+          { name: "view", path: "/view/:id" },
+          { name: "list", path: "/list" },
+        ],
+      },
+    ]);
+
+    await router.start("/users/list");
+    await router.navigate("users.view", { id: "1" }); // committed → meta-carrying fromState
+
+    const from = router.getState(); // users.view{id:1}, meta-carrying
+    const api = getPluginApi(router);
+    const to = api.makeState("users.list", {}); // meta-less toState (no meta arg)
+
+    // `users` is the common ancestor → the STANDARD PATH trims it to the
+    // intersection (shouldUpdateNode("users") true via the intersection branch,
+    // NOT a full-reload membership): a meta-less fast-path-3 here would still
+    // report `users` as updated, so this asserts the STANDARD trim specifically
+    // by checking the leaves split — `view` deactivates, `list` activates.
+    expect(router.shouldUpdateNode("users")(to, from)).toBe(true);
+    expect(router.shouldUpdateNode("users.view")(to, from)).toBe(true);
+    expect(router.shouldUpdateNode("users.list")(to, from)).toBe(true);
+  });
+});
+
 describe("getTransitionPath LRU-2 cache — slot-2 hit via alternating pairs", () => {
   let router: Router | undefined;
 

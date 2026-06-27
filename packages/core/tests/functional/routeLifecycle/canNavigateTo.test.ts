@@ -309,6 +309,63 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("items", { id: "1" })).toBe(true);
   });
 
+  // ── #970: PARITY with navigate — shared-ancestor guards are trimmed ────────
+  // `canNavigateTo` must mirror `navigate`'s guard set. `navigate` does not run
+  // guards on the common ancestor of the current and target route (it stays
+  // mounted across the transition); `canNavigateTo` must skip them too. Before
+  // the fix it built `toState` WITHOUT route-meta, so `getTransitionPath` took
+  // its meta-less fast path and (de)activated the WHOLE chain incl. the shared
+  // ancestor — a false-negative ("Link disabled though the click would succeed").
+  //
+  // The committed `fromState` is established via `start(path)` ON PURPOSE: a
+  // path-matched commit carries NO route-meta, so a meta-less `toState` makes
+  // both sides meta-less and `getTransitionPath` takes FAST PATH 3 (the bug). A
+  // `navigate(name, params)` commit would carry meta (buildNavigateState) → the
+  // STANDARD PATH trims the shared ancestor and MASKS the false-negative, so the
+  // `start()` commit is load-bearing, not incidental — see probe-04.
+
+  it("mirrors navigate: a shared-ancestor activate guard does not block intra-subtree navigation (#970)", async () => {
+    const r = createTestRouter();
+
+    await r.start("/users/view/1"); // committed = users.view{id:1}, meta-less
+    getLifecycleApi(r).addActivateGuard("users", () => () => false);
+
+    // `users` is the common ancestor of users.view and users.list, so navigate
+    // does not re-activate it → its guard never runs. The predicate must agree.
+    expect(r.canNavigateTo("users.list")).toBe(true);
+    await expect(r.navigate("users.list")).resolves.toBeDefined();
+
+    r.stop();
+  });
+
+  it("mirrors navigate: a shared-ancestor deactivate guard does not block intra-subtree navigation (#970)", async () => {
+    const r = createTestRouter();
+
+    await r.start("/users/view/1"); // committed = users.view{id:1}, meta-less
+    getLifecycleApi(r).addDeactivateGuard("users", () => () => false);
+
+    // `users` stays mounted across users.view → users.list, so its deactivate
+    // guard never runs in navigate. The predicate must mirror that.
+    expect(r.canNavigateTo("users.list")).toBe(true);
+    await expect(r.navigate("users.list")).resolves.toBeDefined();
+
+    r.stop();
+  });
+
+  it("mirrors navigate from a meta-carrying state: a shared-ancestor guard is trimmed on the STANDARD path too (#970)", async () => {
+    // Counterpart to the start()-commit cases above. Here `fromState` is built by
+    // navigate() (buildNavigateState → carries route-meta), so even with a
+    // meta-less `toState` (the param-less `users.list` target) getTransitionPath
+    // takes its STANDARD PATH, not FAST PATH 3 — and the shared `users` ancestor
+    // must STILL be trimmed, mirroring navigate. This is the other half of parity
+    // (the meta-carrying `fromState` arm); the fix keeps it correct on both paths.
+    await router.navigate("users.view", { id: "1" }); // committed users.view{id:1} — meta-carrying
+    lifecycle.addActivateGuard("users", () => () => false);
+
+    expect(router.canNavigateTo("users.list")).toBe(true);
+    await expect(router.navigate("users.list")).resolves.toBeDefined();
+  });
+
   // ── Side-effect / lifecycle invariants ────────────────────────────────────
   // `canNavigateTo` is a read-only predicate: it must not mutate state, move the
   // FSM, or fire subscriptions. Verified empirically in

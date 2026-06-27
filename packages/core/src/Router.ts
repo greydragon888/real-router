@@ -564,6 +564,18 @@ export class Router<
       params ?? {},
     );
 
+    // Build `toState` exactly as `buildNavigateState` does — WITH route-meta and
+    // normalized params — so `getTransitionPath` takes its STANDARD PATH and
+    // trims the shared ancestor, mirroring navigate's guard set (#970). A
+    // meta-less `toState` makes both sides meta-less (the committed `getState()`
+    // carries no meta after a path-matched `start()`), so `getTransitionPath`
+    // takes FAST PATH 3 and (de)activates the WHOLE chain incl. shared ancestors
+    // → false-negative ("Link disabled though the click would succeed").
+    // `normalizeParams` also aligns the params guards observe with navigate's.
+    // `skipFreeze` (5th arg) mirrors the navigate guard phase, where guards see
+    // an unfrozen, transition-less `toState` (freeze happens later in
+    // `completeTransition`).
+    //
     // A capability predicate must answer, not throw: if the target path can't be
     // built from these params (e.g. a required path param is missing), the route
     // is simply unreachable with this input — return `false` rather than letting
@@ -571,7 +583,17 @@ export class Router<
     let toState: State;
 
     try {
-      toState = this.#state.makeState(resolvedName, resolvedParams);
+      const normalizedParams = normalizeParams(resolvedParams);
+      const meta = this.#routes.getMetaForState(resolvedName);
+      const path = ctx.buildPath(resolvedName, normalizedParams);
+
+      toState = this.#state.makeState(
+        resolvedName,
+        normalizedParams,
+        path,
+        meta,
+        true,
+      );
     } catch {
       return false;
     }
