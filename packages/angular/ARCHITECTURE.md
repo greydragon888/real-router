@@ -241,19 +241,20 @@ Opt-in via `provideRealRouter(router, { viewTransitions: true })`. Same wiring p
 RealLink (@Directive, selector: a[realLink])
 ├── routeName, routeParams, routeOptions, activeClassName, activeStrict, ignoreQueryParams, hash = input()
 ├── isActive = signal(false)                               # local active state
-├── href = computed(() => buildHref(...))                  # primitive-string output; Object.is dedup
+├── stableParams = createStableParams(routeParams)         # shallowEqual content-stabilization (#988)
+├── href = computed(() => buildHref(..., stableParams()))  # primitive-string output; Object.is dedup
 ├── prevActive, prevHref, prevActiveClass                  # skip-same-value caches (audit §8b)
-├── effect((onCleanup) => createActiveRouteSource + subscribeSourceToSignal + skip-same-value branch)
+├── effect((onCleanup) => createActiveRouteSource(..., stableParams()) + subscribeSourceToSignal + skip-same-value branch)
 ├── updateHref() → el.setAttribute("href", ...) iff href !== prevHref
 ├── updateActiveClass() → classList.toggle(activeClass, isActive()) iff active flipped
 └── onClick(event) → shouldNavigate(event) ∧ target≠"_blank" → navigateWithHash(...).catch(NOOP_CATCH)
 ```
 
-Subscription setup runs inside `effect(...)` scheduled from the **constructor** (#630) — signal inputs are readable inside the effect's first execution, so reading `routeName()`/`routeParams()`/`hash()` makes the source creation reactive. The previous `ngOnInit` pattern captured inputs once at mount and silently drifted under AOT signal-input bindings.
+Subscription setup runs inside `effect(...)` scheduled from the **constructor** (#630) — signal inputs are readable inside the effect's first execution, so reading `routeName()`/`stableParams()`/`hash()` makes the source creation reactive. The previous `ngOnInit` pattern captured inputs once at mount and silently drifted under AOT signal-input bindings. `routeParams` is routed through `createStableParams` (`computed` + `shallowEqual`) so an inline `[routeParams]="{ id: 1 }"` literal re-allocated on every change detection does not re-create the source or re-run `buildHref` until the param content actually changes (#988 — mirrors the Vue `<Link>` fix; behavior unchanged, stabilized params are always content-equal).
 
 ### RealLinkActive
 
-Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSourceToSignal` helper + skip-same-value `prevActive`). Applies a CSS class to any element (not just `<a>`) via `classList.toggle`. Calls `applyLinkA11y` in the constructor to set `role="link"` and `tabindex="0"` on non-interactive elements (skip-list: `<a>`, `<button>` — see [audit §5.2 Bug 4](.claude/review-2026-05-16.md) for the known a11y limitation on `<details>` / `<summary>` / native interactive elements).
+Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSourceToSignal` helper + skip-same-value `prevActive` + `createStableParams` content-stabilization of `routeParams`, #988). Applies a CSS class to any element (not just `<a>`) via `classList.toggle`. Calls `applyLinkA11y` in the constructor to set `role="link"` and `tabindex="0"` on non-interactive elements (skip-list: `<a>`, `<button>` — see [audit §5.2 Bug 4](.claude/review-2026-05-16.md) for the known a11y limitation on `<details>` / `<summary>` / native interactive elements).
 
 ## Build Notes
 

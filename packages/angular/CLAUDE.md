@@ -55,7 +55,8 @@ src/                            # Main entry — client API
 ├── internal/                   # Internal helpers (not re-exported)
 │   ├── install.ts              # installScrollRestoration + installScrollSpy + installViewTransitions — shared by providers + providersFactory
 │   ├── subscribeSourceToSignal.ts  # subscribe → setState → cleanup pattern (RealLink, RealLinkActive, RouteView)
-│   └── buildActiveRouteOptions.ts  # Build ActiveRouteSourceOptions honoring exactOptionalPropertyTypes
+│   ├── buildActiveRouteOptions.ts  # Build ActiveRouteSourceOptions honoring exactOptionalPropertyTypes
+│   └── createStableParams.ts   # shallowEqual content-stabilization for routeParams (RealLink, RealLinkActive) — #988
 ├── providers.ts                # ROUTER, NAVIGATOR, ROUTE tokens + provideRealRouter
 ├── providersFactory.ts         # provideRealRouterFactory (SSR/SSG per-request clones)
 ├── sourceToSignal.ts           # RouterSource → Signal bridge
@@ -301,7 +302,9 @@ This pattern replaces the legacy `ngOnInit`-based setup that captured input valu
 
 Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef` — no explicit `inject(DestroyRef).onDestroy(...)` wiring is required (effects self-register).
 
-**Consequence for tests**: full reactive-input verification (e.g., changing `[realLink]="signal()"` and asserting `.active` class re-binds) requires AOT compilation — JIT mode rejects signal-input template bindings with `NG0303`. Use `@analogjs/vite-plugin-angular` or e2e via Playwright against a production-mode example app.
+**`routeParams` is content-stabilized before the effect reads it (#988).** Angular re-allocates an inline `[routeParams]="{ id: 1 }"` literal on every change detection, so reading the raw input signal inside the effect would re-create the cached active-route source (`canonicalJson` cache-key churn + sub/unsub) and re-run `buildHref` on every navigation even when the param content is unchanged. `RealLink` / `RealLinkActive` route their `routeParams` through the internal `createStableParams` helper (`computed` + `shallowEqual`), which re-emits a reference-stable value until the param content actually changes — so the source-creation effect and the `href` computed bail on same-content navigations. Binding a stable reference (a component field or signal) already produced zero churn; this closes the gap for inline-literal binds. Mirrors the Vue `<Link>` fix. Behavior is unchanged — the stabilized params are always content-equal to the input. Nested-object param *values* fall back to per-render recompute (`shallowEqual` compares them by reference) — bind a stable `signal`/`computed` if it matters.
+
+**Consequence for tests**: full reactive-input verification (e.g., changing `[realLink]="signal()"` and asserting `.active` class re-binds) requires AOT compilation — JIT mode rejects signal-input template bindings with `NG0303`. Use `@analogjs/vite-plugin-angular` or e2e via Playwright against a production-mode example app. The content-stabilization is unit-tested via the JIT-safe toy pattern (`tests/functional/createStableParams.test.ts`) — a plain `signal<Params>()` drives the same `createStableParams` helper the directives feed their input signal into (the effect-re-run mechanism is identical for `input()` and `signal()`).
 
 ### No RxJS
 
@@ -379,11 +382,11 @@ Coverage thresholds are **94%/84%/94%/94%** (statements/branches/functions/lines
 | File:Lines | Why unreachable without AOT |
 |---|---|
 | `RouteView.ts:56-60,69` | `contentChildren(RouteMatch/RouteNotFound)` returns empty — structural directives on `ng-template` with signal inputs aren't registered in JIT. Verified: `view.matches().length === 0` |
-| `RealLink.ts:52-53` | Subscription callback fires only when `isActive` changes. With `routeName=""` (JIT default), `isActiveRoute("")` always returns `false` — no state transitions |
-| `RealLink.ts:80` | `setAttribute("href", href)` skipped because `buildHref(router, "", {})` always returns `undefined` for empty routeName |
-| `RealLink.ts:86` | `classList.remove(prevActiveClass)` requires class transition. `activeClassName` input stays at default `"active"` — `prevActiveClass` never changes |
-| `RealLinkActive.ts:49-50` | Same subscription callback pattern as RealLink |
-| `RealLinkActive.ts:67` | `classList.toggle` early-returns at line 63 because `realLinkActive=""` (JIT default) |
+| `RealLink.ts:99-102` | Subscription callback fires only when `isActive` changes. With `routeName=""` (JIT default), `isActiveRoute("")` always returns `false` — no state transitions |
+| `RealLink.ts:133` | `setAttribute("href", href)` skipped because `buildHref(router, "", {})` always returns `undefined` for empty routeName |
+| `RealLink.ts:143` | `classList.remove(prevActiveClass)` requires class transition. `activeClassName` input stays at default `"active"` — `prevActiveClass` never changes |
+| `RealLinkActive.ts:62` | Same subscription callback pattern as RealLink |
+| `RealLinkActive.ts:80` | `classList.toggle` early-returns at line 77 because `realLinkActive=""` (JIT default) |
 
 **What IS covered:**
 - Full `provideRealRouter` / DI wiring

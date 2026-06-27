@@ -11,6 +11,7 @@ import { createActiveRouteSource } from "@real-router/sources";
 import { applyLinkA11y } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
 import { buildActiveRouteOptions } from "../internal/buildActiveRouteOptions";
+import { createStableParams } from "../internal/createStableParams";
 import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
 import type { Params } from "@real-router/core";
@@ -26,6 +27,10 @@ export class RealLinkActive {
   private readonly router = injectRouter();
   private readonly element = inject(ElementRef).nativeElement as HTMLElement;
   private readonly isActive = signal(false);
+  // Content-stable `routeParams` (#988) — see the matching field in `RealLink`.
+  // Lets the source-creation effect bail until param content actually changes
+  // instead of churning on every fresh inline-literal binding.
+  private readonly stableParams = createStableParams(this.routeParams);
   // Skip-same-value: only touch `classList.toggle` when the active flag
   // actually flipped. Saves one DOM write per RealLinkActive per unrelated
   // navigation (review §8b MEDIUM).
@@ -43,7 +48,7 @@ export class RealLinkActive {
       const source = createActiveRouteSource(
         this.router,
         this.routeName(),
-        this.routeParams(),
+        this.stableParams(),
         buildActiveRouteOptions(
           this.activeStrict(),
           this.ignoreQueryParams(),
