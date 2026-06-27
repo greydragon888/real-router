@@ -1,5 +1,13 @@
 # @real-router/preload-plugin
 
+## 0.6.4
+
+### Patch Changes
+
+- [#1004](https://github.com/greydragon888/real-router/pull/1004) [`bd116f8`](https://github.com/greydragon888/real-router/commit/bd116f8031acf0c52b6c22340db75de2c1f6b62d) Thanks [@greydragon888](https://github.com/greydragon888)! - Suppress SonarJS S1751 false positive in `#cacheState` LRU eviction ([#971](https://github.com/greydragon888/real-router/issues/971))
+
+  The single-eviction iterator destructuring (`const [oldest] = this.#stateCache.keys()`) is correct — insertion-order eviction at the 32-entry bound, 100% branch coverage — but SonarJS S1751 flags it (and the prior `for…of`+`break`) as a one-iteration loop, reding the SonarCloud quality gate (`new_reliability_rating` C). Annotate the line with `// NOSONAR` — the repo's established convention for verified false positives — instead of churning the code form a third time. No public API, behavioral, or runtime change.
+
 ## 0.6.3
 
 ### Patch Changes
