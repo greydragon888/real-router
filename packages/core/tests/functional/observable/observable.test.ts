@@ -1,7 +1,12 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, events, UNKNOWN_ROUTE } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  RecursionDepthError,
+  UNKNOWN_ROUTE,
+} from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { captureUnhandledRejections, createTestRouter } from "../../helpers";
@@ -346,10 +351,74 @@ describe("core/observable", () => {
           void router.navigate("users");
         });
 
-        expect(leaked.length).toBeGreaterThan(0);
-        expect(leaked).toContainEqual(
+        // No process-level unhandledRejection leaked.
+        expect(leaked).toStrictEqual([]);
+
+        // The rejection was routed to onListenerError → logger.error (the same
+        // sink a synchronous listener throw flows through).
+        expect(logger.error).toHaveBeenCalledWith(
+          "Router",
+          expect.stringContaining("Error in listener for"),
           expect.objectContaining({ message: "async-subscribe-boom" }),
         );
+
+        // Router stays functional after an isolated async rejection.
+        const next = await router.navigate("orders");
+
+        expect(next.name).toBe("orders");
+      });
+
+      // (b.2) A reentrant `router.navigate()` from inside a subscribe listener
+      // self-feeds nested TRANSITION_SUCCESS emits until the EventEmitter's
+      // `maxEventDepth` (5) ceiling throws `RecursionDepthError`. Left
+      // fire-and-forget (no `.catch()`), that rejection used to leak as a Node
+      // `unhandledRejection` because `RecursionDepthError` is not a RouterError
+      // suppressed-code AND the optimistic `lastSyncResolved` flag, left stale
+      // when `completeTransition` threw, made the facade skip its suppressing
+      // `.catch` (#945). Core now suppresses it silently — symmetric with
+      // subscribeLeave, where a reentrant navigate rejects with the already-
+      // suppressed `TRANSITION_CANCELLED`. No leak, no spurious error log.
+      it("should suppress a reentrant subscribe-navigate's RecursionDepthError instead of leaking it (#945)", async () => {
+        vi.spyOn(logger, "error").mockImplementation(noop);
+
+        // Two guard-free routes rotated so every hop is a REAL transition
+        // (SAME_STATES short-circuits before TRANSITION_SUCCESS and breaks the
+        // self-feeding chain).
+        const chain = ["users", "orders"] as const;
+        let depth = 0;
+
+        router.subscribe(() => {
+          depth++;
+          // Fire-and-forget reentrant navigate — deliberately NO `.catch()`.
+          void router.navigate(chain[depth % chain.length]);
+        });
+
+        const leaked = await captureUnhandledRejections(() => {
+          void router.navigate(chain[0]);
+        });
+
+        // No RecursionDepthError escaped as a process-level unhandledRejection.
+        expect(
+          leaked.filter((error) => error instanceof RecursionDepthError),
+        ).toStrictEqual([]);
+
+        // Suppressed SILENTLY: not logged as an "Unexpected navigation error"
+        // (that would mis-classify a bounded, deterministic fire-and-forget
+        // outcome — symmetric with subscribeLeave's suppressed cancellation).
+        expect(logger.error).not.toHaveBeenCalledWith(
+          "router.navigate",
+          "Unexpected navigation error",
+          expect.anything(),
+        );
+
+        // The chain actually climbed to the depth ceiling (proves the reentrant
+        // path executed rather than short-circuiting early).
+        expect(depth).toBe(5);
+
+        // Router stays functional after the suppressed saturation.
+        const next = await router.navigate("home");
+
+        expect(next.name).toBe("home");
       });
 
       // (c) Duplicate registration of the SAME callback reference — documented

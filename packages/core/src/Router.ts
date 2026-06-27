@@ -7,7 +7,7 @@
  */
 
 import { logger } from "@real-router/logger";
-import { EventEmitter } from "event-emitter";
+import { EventEmitter, RecursionDepthError } from "event-emitter";
 
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
@@ -733,12 +733,25 @@ export class Router<
    * Pre-allocated callback for #suppressUnhandledRejection.
    * Avoids creating a new closure on every navigate() call.
    */
-  // Stryker disable next-line BlockStatement: equivalent — the handler suppresses fire-and-forget rejections by merely existing as a .catch; its body only logs UNEXPECTED errors, unreachable in core (every navigate rejection carries a suppressed RouterError code; plugin/listener throws are isolated by the EventEmitter and never reach the navigate promise).
+  // Stryker disable next-line BlockStatement: equivalent — the handler suppresses fire-and-forget rejections by merely existing as a .catch; its body only CLASSIFIES which rejections to log, and the log branch is unreachable in core (every navigate rejection is either a suppressed RouterError code or a suppressed RecursionDepthError; plugin/listener throws are isolated by the EventEmitter and never reach the navigate promise).
   static readonly #onSuppressedError = (error: unknown): void => {
     if (
       error instanceof RouterError &&
       SUPPRESSED_ERROR_CODES.has(error.code)
     ) {
+      return;
+    }
+
+    // A reentrant navigate() from inside a subscribe() listener self-feeds
+    // nested TRANSITION_SUCCESS emits until the EventEmitter's maxEventDepth
+    // ceiling throws RecursionDepthError (#945). It is bounded, deterministic,
+    // and the router stays functional afterwards — a normal fire-and-forget
+    // outcome, symmetric with subscribeLeave's reentrant navigate (which
+    // supersedes the in-flight transition and rejects with the already-
+    // suppressed TRANSITION_CANCELLED). Suppress it too so `void
+    // router.navigate()` in a listener cannot crash the process under
+    // --unhandled-rejections=strict (the Node 22+ default).
+    if (error instanceof RecursionDepthError) {
       return;
     }
 

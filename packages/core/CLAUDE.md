@@ -299,7 +299,7 @@ On error at any step: `emitTransitionError()` → `Plugin.onTransitionError()` �
 
 **`navigateToNotFound()` bypasses this pipeline entirely.** It sets state directly and emits only `TRANSITION_SUCCESS` (no `TRANSITION_START`, no guards, no FSM transition, no AbortController). Always passes `{ replace: true }` as opts.
 
-**Fire-and-forget safety:** `navigate()`, `navigateToDefault()`, and the `navigateToState()` plugin primitive internally suppress unhandled rejections for expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`, `ROUTER_NOT_STARTED`, `ROUTE_NOT_FOUND`, `CANNOT_ACTIVATE`, `CANNOT_DEACTIVATE`), so calling them without `await` is safe (#721). A guard block (or a plugin's guard-blocked `back()`/`forward()`) is an expected outcome, not an internal error — the safety net stays silent; `await` the call or use an `onTransitionError` plugin to observe a guard rejection.
+**Fire-and-forget safety:** `navigate()`, `navigateToDefault()`, and the `navigateToState()` plugin primitive internally suppress unhandled rejections for expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`, `ROUTER_NOT_STARTED`, `ROUTE_NOT_FOUND`, `CANNOT_ACTIVATE`, `CANNOT_DEACTIVATE`) plus the bounded `RecursionDepthError` raised when a reentrant navigate from a `subscribe` listener self-feeds to the `maxEventDepth` ceiling (#945), so calling them without `await` is safe (#721). A guard block (or a plugin's guard-blocked `back()`/`forward()`) is an expected outcome, not an internal error — the safety net stays silent; `await` the call or use an `onTransitionError` plugin to observe a guard rejection.
 
 ### NavigationNamespace File Structure
 

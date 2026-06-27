@@ -404,20 +404,29 @@ export class NavigationNamespace {
         this.#cleanupController(controller, false);
       }
 
-      // Stryker disable next-line BooleanLiteral: equivalent — not flagging the sync-resolved promise routes the facade to the else-branch, which attaches a harmless .catch to an already-resolved promise; there is no rejection to suppress.
+      const finalState = completeTransition(deps, {
+        toState,
+        fromState,
+        opts,
+        toDeactivate,
+        toActivate,
+        intersection,
+        canDeactivateFunctions,
+      });
+
+      // Mark sync-resolution only AFTER completeTransition returns. It emits
+      // TRANSITION_SUCCESS, and a synchronous subscribe listener can throw —
+      // e.g. a reentrant navigate() self-feeding nested emits until
+      // maxEventDepth throws RecursionDepthError (#945). Setting the flag
+      // optimistically BEFORE the emit would leave it stale-true when
+      // completeTransition throws, so the facade would read lastSyncResolved
+      // and skip its suppressing `.catch()` — the rejection would then leak as
+      // a Node unhandledRejection. Post-emit placement keeps the flag false on
+      // a throw, so control falls to catch and the facade attaches its `.catch`.
+      // Stryker disable next-line BooleanLiteral: equivalent — flipping to false routes the facade to the else-branch, which attaches a harmless .catch to an already-resolved promise; there is no rejection to suppress.
       this.lastSyncResolved = true;
 
-      return Promise.resolve(
-        completeTransition(deps, {
-          toState,
-          fromState,
-          opts,
-          toDeactivate,
-          toActivate,
-          intersection,
-          canDeactivateFunctions,
-        }),
-      );
+      return Promise.resolve(finalState);
     } catch (error) {
       this.#handleNavigateError(
         error,
