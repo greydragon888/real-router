@@ -679,7 +679,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - `createInterceptable()` — empty-array fast path skips iteration when no interceptors registered
 - FSM `canSend()` — O(1) via cached `#currentTransitions`
 - `getNavigator()` — WeakMap cache keyed by router, one frozen navigator per router instance
-- `buildPath` options cached per router instance (`#cachedBuildPathOpts`)
+- `buildPath` options cached per router instance (`#cachedBuildPathOpts`) — the cache ignores its `options` argument after the first call, valid because router options are immutable per instance (see above); a dev-build `logger.warn` asserts against a future caller passing a varying `options` reference (`#cachedOptionsSource`, #957)
 
 ### Async subscribeLeave overhead
 - **0 listeners (hot path):** on the no-guards path `#handleNoGuardsLeave` runs only `sendLeaveApprove` + a `hasLeaveListeners()` check + a `navigationId` check — no `{nav}` context, no `LeaveState`, no `AbortController` (all allocated only when listeners exist)
