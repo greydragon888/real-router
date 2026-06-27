@@ -434,7 +434,7 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 | `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths                           |
 | Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                    |
 | validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production) |
-| `static #onSuppressedError` callback    | One allocation per class, not per `navigate()` call                     |
+| `static #onSuppressed{Navigate,Start}Error` | One allocation per class, not per `navigate()`/`start()` call        |
 | Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects                         |
 | `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements                                |
 | FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                                     |

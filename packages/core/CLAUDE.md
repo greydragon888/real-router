@@ -671,7 +671,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - `nameToIDs()` has fast paths for 1-4 segments
 - Route tree is immutable (Object.freeze) — cloneRouter() rebuilds from definitions (not shared)
 - Router options are immutable — deep-frozen at construction (`OptionsNamespace`), safe to return directly
-- `static #onSuppressedError` — cached callback, one allocation per class (not per navigate)
+- `static #onSuppressedNavigateError` / `#onSuppressedStartError` — cached suppressor callbacks, one allocation per class (not per navigate/start); both share `#isExpectedRejection` for the silent-suppress classification
 - Segment cleanup uses `Array.includes()` instead of `new Set()` (1-5 elements — linear faster)
 - `createInterceptable()` — empty-array fast path skips iteration when no interceptors registered
 - FSM `canSend()` — O(1) via cached `#currentTransitions`

@@ -28,7 +28,7 @@ const TARGET_DEPTH = 1000;
 //   * SYNC listener nests each new navigate's pipeline INSIDE the previous one's
 //     leave dispatch, so the C stack grows one frame-group per hop. BEFORE #935
 //     an unbounded chain overflowed deterministically (~600s deep) with a
-//     RangeError that escaped SUPPRESSED_ERROR_CODES (Router.#onSuppressedError
+//     RangeError that escaped SUPPRESSED_ERROR_CODES (Router.#onSuppressedNavigateError
 //     logged rather than swallowed it) and could wedge the worker — so it was
 //     intentionally not asserted. #935 bounds the sync leave dispatch by
 //     maxEventDepth (default 5) — the same limit the EventEmitter applies to the

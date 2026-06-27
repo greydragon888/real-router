@@ -680,4 +680,50 @@ describe("router.start() - error handling", () => {
       localRouter.stop();
     });
   });
+
+  // #931: a start() rejection that is NOT a suppressed RouterError — a start
+  // interceptor throwing a plain Error after next() committed (the SSR/RSC
+  // loader window, #763), or a cryptic path TypeError — is surfaced by the
+  // fire-and-forget safety net under the "router.start" category, NOT
+  // "router.navigate". Operators filtering production logs for start failures
+  // must find them under the start category. (Before this fix a single shared
+  // suppressor logged every call-site, start included, as "router.navigate".)
+  describe("#931: unexpected start rejections log under router.start", () => {
+    it("logs a post-commit start-interceptor throw as router.start, not router.navigate", async () => {
+      const localRouter = createTestRouter();
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+      const removeInterceptor = getPluginApi(localRouter).addInterceptor(
+        "start",
+        async (next, path) => {
+          await next(path); // commits state + emits TRANSITION_SUCCESS
+
+          throw new Error("loader failed after commit");
+        },
+      );
+
+      await expect(localRouter.start("/home")).rejects.toThrow(
+        "loader failed after commit",
+      );
+
+      // let the fire-and-forget suppress .catch branch run
+      await Promise.resolve();
+
+      const categories = errorSpy.mock.calls.map((c) => c[0]);
+
+      expect(categories).toContain("router.start");
+      expect(categories).not.toContain("router.navigate");
+
+      const startCall = errorSpy.mock.calls.find(
+        (c) => c[0] === "router.start",
+      );
+
+      expect(startCall?.[1]).toBe("Unexpected start error");
+      expect(startCall?.[2]).toBeInstanceOf(Error);
+
+      errorSpy.mockRestore();
+      removeInterceptor();
+      localRouter.stop();
+    });
+  });
 });

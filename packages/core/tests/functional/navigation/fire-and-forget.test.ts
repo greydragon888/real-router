@@ -8,11 +8,12 @@ import type { Router } from "@real-router/core";
 
 /**
  * #721 fire-and-forget safety, POSITIVE half: navigation methods called without
- * `await` must internally suppress EXPECTED rejections so no process-level
- * `unhandledRejection` leaks. (The unexpected-error logging branch in
- * `Router.#onSuppressedError` is unreachable in core — every navigate rejection
- * carries a suppressed RouterError code, and plugin/listener throws are
- * isolated by the EventEmitter, never reaching the navigate promise.)
+ * `await` must internally suppress EXPECTED rejections (a suppressed RouterError
+ * code or a RecursionDepthError) so no process-level `unhandledRejection` leaks
+ * and no spurious "Unexpected navigation error" is logged for them. (A genuinely
+ * unexpected navigate rejection — e.g. a subscribeLeave listener that throws —
+ * is NOT suppressed and DOES log under "router.navigate"; start failures log
+ * under "router.start", #931.)
  *
  * These tests also pin the `lastSyncRejected` bookkeeping: that flag is the only
  * signal that the returned promise is a pre-suppressed cached rejection, and —
