@@ -257,6 +257,25 @@ export class EventBusNamespace {
     }
   }
 
+  /**
+   * Surfaces a `TRANSITION_ERROR` for callers that do **not** know — or do not
+   * control — the current FSM state: the plugin-facing `emitTransitionError`
+   * primitive (`getPluginApi`), the dispose chain, and validator / same-state
+   * rejections. It is the state-agnostic counterpart to {@link sendFail}.
+   *
+   * **What "Safe" means here.** The error event is never *dropped*, whatever the
+   * FSM state — it does **not** mean the method catches every error. Errors
+   * thrown *inside* a `TRANSITION_ERROR` listener are isolated by the
+   * `EventEmitter`'s per-listener `onListenerError` sink, not by this method.
+   *
+   * **Why it branches on its own FSM state.** When the FSM is settled in `READY`
+   * (no transition in flight) it routes through the FSM `FAIL` action via
+   * {@link sendFail}, so the error rides the normal FSM-driven emit. Otherwise —
+   * the router may be starting, mid-transition, or torn down — it emits
+   * `TRANSITION_ERROR` directly: a fire-and-forget error report from an unknown
+   * state must not drive a second FSM transition that could collide with an
+   * in-flight one. Both branches guarantee the event reaches subscribers.
+   */
   sendFailSafe(toState?: State, fromState?: State, error?: unknown): void {
     if (this.isReady()) {
       this.sendFail(toState, fromState, error);
@@ -584,6 +603,17 @@ export class EventBusNamespace {
       this.#pendingFromState,
       this.#pendingError as RouterError | undefined,
     );
+
+    // Clear the pending payload once this FAIL action has consumed it. `#pending*`
+    // is only meaningful in the window between the sendFail()/sendFailSafe() that
+    // sets it and this emit; keeping it afterwards pins a stale State/RouterError
+    // on the instance and leaves an implicit "valid only in this window" coupling
+    // (#949). Hygiene only — every consumer overwrites the fields before
+    // re-reading (handleCancel reads what its own sendCancel just set), so there
+    // is no observable behaviour change.
+    this.#pendingToState = undefined;
+    this.#pendingFromState = undefined;
+    this.#pendingError = undefined;
   }
 
   #setupFSMActions(): void {

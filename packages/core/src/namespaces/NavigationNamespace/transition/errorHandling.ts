@@ -33,6 +33,20 @@ export function handleGuardError(
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
+  // A guard can also signal a quiet cancel by throwing
+  // RouterError(TRANSITION_CANCELLED) directly — the same intent as a thrown
+  // AbortError. Preserve it as-is instead of letting rethrowAsRouterError
+  // overwrite the code with CANNOT_ACTIVATE / CANNOT_DEACTIVATE: that code
+  // drives the downstream suppression (routeTransitionError early-returns,
+  // fire-and-forget stays silent), so re-coding would surface the intended
+  // quiet cancel as a reported transition error (#933).
+  if (
+    error instanceof RouterError &&
+    error.code === errorCodes.TRANSITION_CANCELLED
+  ) {
+    throw error;
+  }
+
   rethrowAsRouterError(error, errorCode, segment);
 }
 
@@ -67,7 +81,15 @@ export function rethrowAsRouterError(
   throw new RouterError(errorCode, wrapSyncError(error, segment));
 }
 
-const reservedRouterErrorProps = new Set(["code", "segment", "path"]);
+// Own-enumerable keys that must never be copied from a thrown object onto the
+// RouterError metadata:
+// - `code` / `segment` / `path` are reserved — the RouterError constructor
+//   throws a TypeError on them (#39).
+// - `then` would make the RouterError itself thenable, so a consumer that
+//   awaits it (or passes it through Promise.resolve / returns it from an async
+//   function) would have it assimilated as a Promise instead of treated as a
+//   plain rejection reason (#947).
+const reservedRouterErrorProps = new Set(["code", "segment", "path", "then"]);
 
 /**
  * Wraps a synchronously thrown value into structured error metadata.
@@ -104,7 +126,8 @@ export function wrapSyncError(
     const filtered: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(thrown)) {
-      // Issue #39: Skip reserved properties to avoid RouterError constructor TypeError
+      // Skip reserved / hazardous keys: #39 (constructor TypeError on code/
+      // segment/path) and #947 (`then` would make the error thenable).
       if (!reservedRouterErrorProps.has(key)) {
         filtered[key] = value;
       }
