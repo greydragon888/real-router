@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-27]
 
+### @real-router/core@0.61.7
+
+### Patch Changes
+
+- [#987](https://github.com/greydragon888/real-router/pull/987) [`fceb05e`](https://github.com/greydragon888/real-router/commit/fceb05e6c521481ad46d9351d822de8d9a77a573) Thanks [@greydragon888](https://github.com/greydragon888)! - Clear `EventBusNamespace` pending-error fields after emit ([#949](https://github.com/greydragon888/real-router/issues/949))
+
+  `#emitPendingError()` read `#pendingToState` / `#pendingFromState` / `#pendingError` to emit
+  `TRANSITION_ERROR` but did not clear them, leaving the last error's `State` / `RouterError`
+  pinned on the instance until the next `sendFail()` / `sendCancel()` overwrote them. The
+  fields are now cleared once consumed. State hygiene only — every consumer already overwrites
+  the fields before re-reading, so there is no observable behaviour change.
+
+- [#987](https://github.com/greydragon888/real-router/pull/987) [`fceb05e`](https://github.com/greydragon888/real-router/commit/fceb05e6c521481ad46d9351d822de8d9a77a573) Thanks [@greydragon888](https://github.com/greydragon888)! - Preserve a guard-thrown `RouterError(TRANSITION_CANCELLED)` instead of re-coding it ([#933](https://github.com/greydragon888/real-router/issues/933))
+
+  A route guard that throws `RouterError(TRANSITION_CANCELLED)` to quietly cancel a
+  transition was observed by the caller as `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE`.
+  `handleGuardError` only special-cased a `DOMException` `AbortError`, so an explicit
+  cancellation `RouterError` fell through to `rethrowAsRouterError`, whose `setCode`
+  overwrote the code — turning the intended quiet cancel into a reported transition
+  error (`onTransitionError` fired, `routeTransitionError` emitted a fail).
+
+  `handleGuardError` now preserves a thrown `RouterError` whose code is already
+  `TRANSITION_CANCELLED`, mirroring the existing `AbortError` → `TRANSITION_CANCELLED`
+  handling. Other thrown `RouterError`s (e.g. `TRANSITION_ERR`) are still re-coded as
+  before.
+
+- [#987](https://github.com/greydragon888/real-router/pull/987) [`fceb05e`](https://github.com/greydragon888/real-router/commit/fceb05e6c521481ad46d9351d822de8d9a77a573) Thanks [@greydragon888](https://github.com/greydragon888)! - Document `EventBusNamespace.sendFailSafe()` semantics and state-branching ([#948](https://github.com/greydragon888/real-router/issues/948))
+
+  Add JSDoc clarifying that the "Safe" suffix means the error event is never dropped
+  regardless of FSM state — not that the method catches every error (errors thrown inside a
+  `TRANSITION_ERROR` listener are isolated separately via the `EventEmitter`'s
+  `onListenerError` sink). Also document why the method reads its own FSM state to choose
+  between the FSM-routed `FAIL` action (in `READY`) and a direct `TRANSITION_ERROR` emit
+  (otherwise). No behaviour change.
+
+- [#987](https://github.com/greydragon888/real-router/pull/987) [`fceb05e`](https://github.com/greydragon888/real-router/commit/fceb05e6c521481ad46d9351d822de8d9a77a573) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop a guard-thrown thenable from making the wrapped `RouterError` thenable ([#947](https://github.com/greydragon888/real-router/issues/947))
+
+  When a transition step (e.g. a route guard) throws a thenable — a non-`Error` object
+  exposing a `then` method — `wrapSyncError()` spread its own-enumerable properties onto the
+  `RouterError` metadata, filtering only the reserved keys `code` / `segment` / `path`. `then`
+  was not filtered, so the produced `RouterError` carried a `then` function and was itself
+  thenable: a consumer that `await`ed it (or passed it through `Promise.resolve`, or returned
+  it from an `async` function) had it assimilated as a Promise instead of treated as a plain
+  rejection reason.
+
+  `wrapSyncError()` now also excludes `then` from the spread. Other own properties are still
+  copied onto the error metadata.
+
+
 ### @real-router/core@0.61.6
 
 ### Patch Changes
