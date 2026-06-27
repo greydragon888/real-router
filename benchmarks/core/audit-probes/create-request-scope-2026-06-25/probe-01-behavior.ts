@@ -10,9 +10,9 @@
  * condition is NOT active at runtime), so a src edit won't show. Run with:
  *   NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx <this file>
  *
- * Q5 documents an OPEN error-path listener leak (listeners=1 after a clone throw
- * on a disposed base). The clone-before-attach fix was reverted (not a bug) and
- * is tracked in GitHub issue #969. When that fix lands, Q5 will read listeners=0.
+ * Q5 verifies the error path has no listener leak (listeners=0 after a clone
+ * throw on a disposed base). The clone-before-attach fix landed in #969: the
+ * "close" listener is now attached only after cloneRouter succeeds.
  */
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 import { createRequestScope } from "@real-router/core/utils";
@@ -159,11 +159,11 @@ void (async () => {
   const threwDisposed =
     threw instanceof RouterError && threw.code === errorCodes.ROUTER_DISPOSED;
   line(
-    "Q5 ERROR_PATH_LISTENER_LEAK (OPEN — tracked in issue)",
+    "Q5 ERROR_PATH_LISTENER_LEAK (FIXED #969)",
     `threw ROUTER_DISPOSED: ${threwDisposed} ; listenerCount after throw: ${listeners.size}`,
-    threwDisposed && listeners.size === 1
-      ? "OBSERVED (current behavior): close listener attached BEFORE cloneRouter throw, never detached → leaked on error path (no scope handle returned). Niche (disposed base = shutdown), not a contract bug. Fix = clone-before-attach (tracked in GitHub issue)."
-      : `CHANGED: listeners=${listeners.size} (was 1 = leaked; 0 would mean the clone-before-attach fix landed)`,
+    threwDisposed && listeners.size === 0
+      ? "CONFIRMED: clone-before-attach (#969) — the close listener is attached only after cloneRouter succeeds, so a throw on a disposed base leaves no listener stranded on the request."
+      : `REGRESSED: listeners=${listeners.size} (expected 0; 1 = the pre-#969 leak is back — listener attached before the cloneRouter throw)`,
   );
 }
 
