@@ -5,7 +5,11 @@ import { createMatcher, createRouteTree } from "route-tree";
 
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
-import { createEmptyConfig, sanitizeRoute } from "./helpers";
+import {
+  assignConfigEntries,
+  createEmptyConfig,
+  sanitizeRoute,
+} from "./helpers";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type { GuardFnFactory, Route } from "../../types";
@@ -321,15 +325,11 @@ interface RouteArtifacts<
   readonly resolvedForwardMap: Record<string, string>;
 }
 
-/** Null-proto shallow clone of a RouteConfig (preserves the 5 maps' contents). */
+/** Null-proto shallow clone of a RouteConfig (preserves every sub-map's contents). */
 function cloneConfig(config: RouteConfig): RouteConfig {
   const clone = createEmptyConfig();
 
-  Object.assign(clone.decoders, config.decoders);
-  Object.assign(clone.encoders, config.encoders);
-  Object.assign(clone.defaultParams, config.defaultParams);
-  Object.assign(clone.forwardMap, config.forwardMap);
-  Object.assign(clone.forwardFnMap, config.forwardFnMap);
+  assignConfigEntries(clone, config);
 
   return clone;
 }

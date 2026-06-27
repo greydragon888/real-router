@@ -2,6 +2,7 @@ import { routeTreeToDefinitions } from "route-tree";
 
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
+import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { Router as RouterClass } from "../Router";
 import { RouterError } from "../RouterError";
 import { getLifecycleApi } from "./getLifecycleApi";
@@ -149,12 +150,11 @@ export function cloneRouter<
     newRouter.usePlugin(...pluginFactories);
   }
 
-  // Apply cloned config directly to new store
-  Object.assign(newStore.config.decoders, routeConfig.decoders);
-  Object.assign(newStore.config.encoders, routeConfig.encoders);
-  Object.assign(newStore.config.defaultParams, routeConfig.defaultParams);
-  Object.assign(newStore.config.forwardMap, routeConfig.forwardMap);
-  Object.assign(newStore.config.forwardFnMap, routeConfig.forwardFnMap);
+  // Copy the source config + store-level maps onto the new store. The five
+  // RouteConfig sub-maps go through a single enumeration so a newly added config
+  // field is carried over automatically (#965); resolvedForwardMap and
+  // routeCustomFields are store-level (not part of RouteConfig) and stay explicit.
+  assignConfigEntries(newStore.config, routeConfig);
   Object.assign(newStore.resolvedForwardMap, resolvedForwardMap);
   Object.assign(newStore.routeCustomFields, routeCustomFields);
 
