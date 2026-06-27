@@ -2,12 +2,12 @@
 
 import { RecursionDepthError } from "event-emitter";
 
-import { events } from "../../constants";
+import { errorCodes, events } from "../../constants";
 import { routerEvents, routerStates } from "../../fsm";
+import { RouterError } from "../../RouterError";
 
 import type { EventBusOptions } from "./types";
 import type { RouterEvent, RouterPayloads, RouterState } from "../../fsm";
-import type { RouterError } from "../../RouterError";
 import type { EventMethodMap, RouterEventMap } from "../../types";
 import type { FSM } from "@real-router/fsm";
 import type {
@@ -365,6 +365,16 @@ export class EventBusNamespace {
    * gate itself, e.g. `if (!unsub) unsub = router.subscribe(fn);`.
    */
   subscribe(listener: SubscribeFn): Unsubscribe {
+    // Enforce the disposed state HERE, not only on the facade. A reference
+    // bound before dispose() (`const s = router.subscribe.bind(router)`)
+    // bypasses the facade's #markDisposed swap and reaches this method
+    // directly. Without this guard, `emitter.on` would silently re-register a
+    // listener that can never fire (clearAll already ran, FSM is DISPOSED, no
+    // future emit) — a silent no-op / stuck-UI hazard (#946).
+    if (this.isDisposed()) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
     return this.#emitter.on(
       events.TRANSITION_SUCCESS,
       (toState: State, fromState?: State) => {
@@ -437,6 +447,13 @@ export class EventBusNamespace {
    * For idempotent registration, gate at the call site.
    */
   subscribeLeave(listener: LeaveFn): Unsubscribe {
+    // Same disposed-state enforcement as subscribe() (#946): a pre-bound
+    // reference would otherwise push onto #leaveListeners after dispose() and
+    // silently never fire (FSM is DISPOSED, no LEAVE_APPROVE emit).
+    if (this.isDisposed()) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
     this.#leaveListeners.push(listener);
 
     return () => {
