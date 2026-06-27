@@ -132,6 +132,7 @@ export function createRequestScope<
   deps?: Partial<Dependencies>,
 ): RequestScope<Dependencies> {
   let detach: (() => void) | undefined;
+  let attach: (() => void) | undefined;
   let signal: AbortSignal;
 
   if (isRequestLike(request)) {
@@ -142,8 +143,16 @@ export function createRequestScope<
       controller.abort();
     };
 
-    request.on("close", onClose);
     signal = controller.signal;
+    // Clone-before-attach (#969): defer attaching the "close" listener until
+    // after cloneRouter succeeds. cloneRouter is synchronous, so no "close"
+    // macrotask can fire in the gap; and if it throws (e.g. ROUTER_DISPOSED on
+    // an already-disposed base) the helper exits without returning a scope
+    // handle — so a listener attached here would strand on the request with no
+    // way to detach it.
+    attach = () => {
+      request.on("close", onClose);
+    };
     detach = () => {
       request.removeListener?.("close", onClose);
     };
@@ -153,6 +162,10 @@ export function createRequestScope<
     ...deps,
     abortSignal: signal,
   } as Dependencies);
+
+  // The clone exists — now it is safe to attach the close listener (Node path
+  // only; `attach` is undefined for the Web path).
+  attach?.();
 
   let disposed = false;
 

@@ -47,7 +47,7 @@ describe("cloneRouter()", () => {
       { token: "original" },
     );
     // No override passed — cloneRouter must copy the SOURCE dependencies onto the
-    // clone (cloneDependencies()); the existing test above only proves overrides.
+    // clone (getCloneState().dependencies); the existing test above only proves overrides.
     const clone = cloneRouter(router);
 
     expect(getDependenciesApi(clone).get("token")).toBe("original");

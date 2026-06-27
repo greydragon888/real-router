@@ -183,6 +183,31 @@ describe("createRequestScope", () => {
 
       baseRouter.stop();
     });
+
+    it("does not leak the close listener when cloneRouter throws (#969)", () => {
+      const baseRouter = createTestRouter();
+
+      // A disposed base makes the internal cloneRouter throw ROUTER_DISPOSED —
+      // the only realistic throw on this path (shutdown scenario).
+      baseRouter.dispose();
+      const request = createFakeIncomingMessage();
+
+      let threw: unknown;
+
+      try {
+        createRequestScope(request, baseRouter);
+      } catch (error) {
+        threw = error;
+      }
+
+      // Clone-before-attach: the "close" listener is attached only AFTER
+      // cloneRouter succeeds, so when it throws the helper exits without a
+      // scope handle AND without a listener stranded on the request (there
+      // would be no way to detach it otherwise).
+      expect(threw).toBeInstanceOf(RouterError);
+      expect((threw as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
+      expect(request.listenerCount()).toBe(0);
+    });
   });
 
   describe("Web Request shape", () => {

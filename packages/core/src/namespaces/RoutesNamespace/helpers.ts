@@ -23,6 +23,24 @@ export function createEmptyConfig(): RouteConfig {
   };
 }
 
+/**
+ * Copies every {@link RouteConfig} sub-map's entries from `source` into
+ * `target` (shallow per map — entries are shared by reference). Driven by
+ * `Object.keys(source)` instead of one `Object.assign` per field, so a newly
+ * added config sub-field is carried over automatically with nothing to forget
+ * at each copy site (#965). Both configs are produced by
+ * {@link createEmptyConfig}, so every key in `source` also exists on `target`,
+ * and every value is a record object — the invariant this enumeration relies on.
+ */
+export function assignConfigEntries(
+  target: RouteConfig,
+  source: RouteConfig,
+): void {
+  for (const key of Object.keys(source) as (keyof RouteConfig)[]) {
+    Object.assign(target[key], source[key]);
+  }
+}
+
 // ============================================================================
 // Route Tree Helpers
 // ============================================================================

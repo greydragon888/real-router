@@ -212,6 +212,8 @@ router.dispose(); // Idempotent — safe to call multiple times
 
 **Not re-applied on the clone:** `extendRouter` / `addInterceptor` called **outside** a plugin factory (directly via `getPluginApi(base)`) — only plugin-factory extensions/interceptors re-run. Full reference: `wiki/clone.md`.
 
+**Per-clone footprint (#966).** A clone retains ≈ the cost of a **fresh `createRouter(routes)`** of the same size — measured ~173 KB vs ~175 KB for 50 routes (clone is in fact a touch cheaper). It rebuilds its own tree + matcher + namespaces precisely so route-CRUD on a clone never touches the base, so the footprint scales with route count, not a fixed "template" budget, and is reclaimed when the request-scoped clone is disposed. This is the price of independent-instance isolation, **not duplication to trim** — sharing the tree to shrink it would break per-clone route-CRUD isolation. (The earlier 20-80 KB "template" target was aspirational and never reflected an independent-instance cost.) Regression guard: `benchmarks/core/audit-probes/clone-router-2026-05-22/probe-09-memory-footprint.ts` asserts `clone ≈ fresh createRouter`.
+
 ### Enhanced State Object: TransitionMeta
 
 After every successful navigation, `router.getState()` includes a `transition` field:

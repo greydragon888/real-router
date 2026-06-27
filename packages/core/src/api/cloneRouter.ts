@@ -2,6 +2,7 @@ import { routeTreeToDefinitions } from "route-tree";
 
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
+import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { Router as RouterClass } from "../Router";
 import { RouterError } from "../RouterError";
 import { getLifecycleApi } from "./getLifecycleApi";
@@ -93,8 +94,11 @@ export function cloneRouter<
   const resolvedForwardMap = sourceStore.resolvedForwardMap;
   const routeCustomFields = sourceStore.routeCustomFields;
 
-  const options = ctx.cloneOptions();
-  const sourceDeps = ctx.cloneDependencies();
+  const {
+    options,
+    dependencies: sourceDeps,
+    pluginFactories,
+  } = ctx.getCloneState();
   // Origin-aware factory snapshot — definition guards are re-registered with
   // `isFromDefinition=true` on the clone so `replace()` can still strip them
   // via `clearDefinitionGuards()`. External guards take the public lifecycle
@@ -103,7 +107,6 @@ export function cloneRouter<
   const sourceLifecycleNamespace = sourceStore.lifecycleNamespace!;
   const { definition: definitionFactories, external: externalFactories } =
     sourceLifecycleNamespace.getFactoriesByOrigin();
-  const pluginFactories = ctx.getPluginFactories();
 
   const mergedDeps = {
     ...sourceDeps,
@@ -147,12 +150,11 @@ export function cloneRouter<
     newRouter.usePlugin(...pluginFactories);
   }
 
-  // Apply cloned config directly to new store
-  Object.assign(newStore.config.decoders, routeConfig.decoders);
-  Object.assign(newStore.config.encoders, routeConfig.encoders);
-  Object.assign(newStore.config.defaultParams, routeConfig.defaultParams);
-  Object.assign(newStore.config.forwardMap, routeConfig.forwardMap);
-  Object.assign(newStore.config.forwardFnMap, routeConfig.forwardFnMap);
+  // Copy the source config + store-level maps onto the new store. The five
+  // RouteConfig sub-maps go through a single enumeration so a newly added config
+  // field is carried over automatically (#965); resolvedForwardMap and
+  // routeCustomFields are store-level (not part of RouteConfig) and stay explicit.
+  assignConfigEntries(newStore.config, routeConfig);
   Object.assign(newStore.resolvedForwardMap, resolvedForwardMap);
   Object.assign(newStore.routeCustomFields, routeCustomFields);
 

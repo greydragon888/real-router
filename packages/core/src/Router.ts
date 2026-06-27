@@ -306,9 +306,11 @@ export class Router<
       // Dependencies (issue #172)
       dependenciesGetStore: () => this.#dependenciesStore,
       // Clone support (issue #173)
-      cloneOptions: () => ({ ...this.#options.get() }),
-      cloneDependencies: () => ({ ...this.#dependenciesStore.dependencies }),
-      getPluginFactories: () => this.#plugins.getAll(),
+      getCloneState: () => ({
+        options: { ...this.#options.get() },
+        dependencies: { ...this.#dependenciesStore.dependencies },
+        pluginFactories: this.#plugins.getAll(),
+      }),
       routeGetStore: () => this.#routes.getStore(),
       // Cross-namespace state (issue #174)
       getStateName: () => this.#state.get()?.name,
