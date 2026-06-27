@@ -231,6 +231,36 @@ describe("wrapSyncError — metadata extraction (via the rejected RouterError)",
     expect((error as unknown as { kept: string }).kept).toBe("v"); // non-reserved survives
   });
 
+  it("does not leak `then` from a thrown thenable onto the RouterError (#947)", async () => {
+    const router = routerWithActivateGuard(() => {
+      // A thenable thrown by a guard would otherwise make the wrapped
+      // RouterError itself thenable — a foot-gun for any consumer that awaits
+      // (or Promise.resolve()s / returns from async) the error.
+      // eslint-disable-next-line @typescript-eslint/only-throw-error, unicorn/no-thenable -- deliberately throwing a thenable object to exercise wrapSyncError's `then` filter (#947)
+      throw { then: () => {}, kept: "v" };
+    });
+
+    await router.start("/");
+
+    // Capture the rejection WITHOUT returning the error from the handler: a
+    // thenable returned into a resolving position is assimilated, and a no-op
+    // `then` would hang the test — exactly the foot-gun #947 guards against.
+    let caught: unknown;
+
+    await router.navigate("page").then(
+      () => undefined,
+      (error: unknown) => {
+        caught = error;
+      },
+    );
+
+    expect(caught).toBeInstanceOf(RouterError);
+    expect((caught as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+    expect(typeof (caught as { then?: unknown }).then).not.toBe("function");
+    // The fix is surgical — non-`then` own props still flow through as metadata.
+    expect((caught as { kept: string }).kept).toBe("v");
+  });
+
   it("returns base-only metadata for a primitive throw (no enumerable spread)", async () => {
     const error = await navigateError(
       routerWithActivateGuard(() => {
