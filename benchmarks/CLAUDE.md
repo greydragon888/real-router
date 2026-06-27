@@ -28,6 +28,9 @@ benchmarks/
 │   │   ├── real-router/{react,vue,solid}/   # per app-set: app · setup · speed.{memory,flame} · vite.config (+tsconfig for solid)
 │   │   └── tanstack/{react,vue,solid}/
 │   │   #  preload-churn NOT ported — fake-analogy (preload-plugin = transport+State-LRU, not data-cache)
+│   ├── bundle-size/              # competitive client-JS size (raw/gzip/brotli) — NOT memory
+│   │   ├── {real-router,tanstack}/{react,vue,solid}/{minimal,full}/  # index.html · main · vite.config (app build, no plugins → 1:1 adapter surface)
+│   │   └── measure.mjs           # build fixtures (vite), then `node vs-tanstack/bundle-size/measure.mjs` → gzip/brotli table
 │   ├── run.mjs                    # runner: <scenario> <engine> <framework> <mode>
 │   ├── tsconfig.json · tsconfig.solid.json (solid aggregate) · vitest.config.ts
 │   └── .bench-results/            # Text logs from bench-compare-vs-tanstack.sh (gitignored)

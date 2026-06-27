@@ -4518,6 +4518,14 @@ Concretely:
 2. **knip needs the bench files as project+entry.** The old `index.ts` *imported* the leaf benches, so knip saw `mitata` used. The new `run.ts` *spawns* files instead of importing them, so `tinybench`/`@codspeed/tinybench-plugin` looked unused. Fixed with a `packages/core` knip workspace block whose `entry` + `project` include `tests/benchmarks/*.ts` (a dependency counts as used only when imported by a **project** file).
 3. **`tsx` added as an explicit `core` devDep** (the RFC listed only `tinybench` + the plugin) — see "runs from `src`" above.
 
+   **Update (2026-06-27): `tinybench`, `@codspeed/tinybench-plugin`, AND `tsx` moved core → root devDeps.** Core's bench files import the first two and invoke `tsx` as a CLI; all three resolve cleanly from root:
+   - **imported-as-module** (`tinybench`/plugin) — node walks up `packages/core/node_modules` → root `node_modules` (pnpm isolated linker).
+   - **invoked-as-CLI** (`tsx tests/benchmarks/run.ts`) — pnpm prepends BOTH the package's `.bin` AND the **root** `node_modules/.bin` to PATH for any package script, so a CLI declared only at root is still found (empirically verified: `pnpm -F @real-router/core bench` stays green with `tsx` removed from core). `node --import tsx codspeed.ts` (CI) resolves `tsx` as a module by the same upward walk.
+
+   Verified clean: both bench paths green, `tsc`, `knip` (no "unlisted"/"unused"/binary), `eslint` import-x, `syncpack`, `dedupe`.
+
+   **The 23 SSR examples KEEP their own `tsx`** — NOT for any CLI/PATH reason (root would resolve fine in-monorepo) but for **self-containment**: examples are starter templates users copy OUT of the repo, and a copied example must declare its own `tsx` to run standalone. **Rule (corrected): the CLI-vs-module distinction does NOT gate placement — pnpm puts root `.bin` on PATH, so both resolve from root. What gates it is internal-vs-distributable: internal-package tooling deps can centralize at root; distributable example deps stay explicit.**
+
 ### CI runner — committed; CodSpeed App install is the only remaining human step
 
 Update (2026-06-26): the `CodSpeedHQ/action@v4` workflow **is now committed** (`.github/workflows/codspeed.yml`) — runs the core hot-path suite on `push: master` (baseline) + `pull_request` (compare) + `workflow_dispatch` (backtest). Three corrections vs the original plan below:
@@ -4578,3 +4586,15 @@ Local verification done: both run paths green, `type-check` / `lint` / `knip` / 
 - **`preload-churn` — DROPPED as a fake-analogy.** Reading `preload-plugin` end-to-end showed the divergence is deeper than the audit's S1: real-router's preload-plugin is a **transport layer** (hover → fire-and-forget `preload.fn`) plus a pre-resolved **State** cache (href→State, bounded LRU 32, evicted on `TREE_CHANGED` / `getPreloadedState` delete-on-read). TanStack's `preloadRoute` caches **loader data** (gcTime 0, evicted on nav commit). Different mechanisms under one name — an honest real-router test would measure "State-cache LRU bounded under hover-churn", not TanStack's data-cache; plus it needs new deps (browser-plugin + preload-plugin). Per `feedback_competitor_feature_analogies`, marked 🔴 in `.claude/EXPANSION_PROPOSAL.md` §6.6 rather than forcing a misleading comparison.
 
 **Honesty caveat (unchanged).** Real-router flat across all ported scenarios; TanStack grows under this code-based forceGC harness (interrupted ~10.5 KB/nav, loader-data ~5.4 KB/nav) while its upstream file-based + CodSpeed bench is flat — equivalence artifact, not a claimed leak.
+
+## vs-tanstack — Phase 3 competitive bundle-size (2026-06-27)
+
+**Problem.** Final roadmap item: competitive client-JS size for real-router vs TanStack — the one **honest 1:1 axis** (the memory comparisons carry a forceGC-harness artifact; bundle size does not, since both build through the same vite/framework baseline).
+
+**Solution.** `bundle-size/<engine>/<framework>/<variant>/` app fixtures (`index.html` + `main` + `vite.config`), `variant ∈ {minimal, full}`, built as full client apps (framework + router + app bundled, minified, es2022). Total emitted client JS is measured in raw/gzip/brotli by `measure.mjs` (gzip primary, matching TanStack's methodology). minimal = router + 1 route + "hello world"; full = a broad **adapter surface** (Link / RouteView / route hooks). **Plugins (memory/lifecycle) were removed from `full`** after a first run showed they inflated real-router by +3.7–4.7 KB gzip — TanStack's full has no opt-in-plugin analogue (its loader/history are built in), so including them is not a 1:1 surface comparison; full now measures adapter-surface vs adapter-surface.
+
+**Result (gzip Δ = real-router − tanstack):** minimal react −0.9 / vue +0.1 / solid −4.1 KB; full react +0.7 / vue +1.7 / solid +0.6 KB. real-router is competitive-to-lighter on minimal (notably Solid: 30.6 vs 34.7 KB) and within ~2 KB on full. Unlike the memory scenarios this is a clean 1:1 — same vite/framework baseline, no harness artifact.
+
+**Not a CI gate.** Like the rest of vs-tanstack, bundle-size is local: `vite build` each fixture, then `node vs-tanstack/bundle-size/measure.mjs`. Root `size-limit` stays the per-package gate; this is the competitive cross-router view. Solid fixtures are type-checked by the `tsconfig.solid.json` aggregate (glob already covers `bundle-size/*/solid/**`); react/vue by the root pass.
+
+This completes the vs-tanstack expansion roadmap (Phases 0–3): per-scenario restructure + runner, 5 ported memory/client churn scenarios (× 3 frameworks × 2 engines), and competitive bundle-size. SSR (Q2) and preload-churn (fake-analogy) deliberately out of scope.
