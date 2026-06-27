@@ -545,6 +545,7 @@ Real-Router treats testing as a first-class engineering concern, not an aftertho
 - **Stress testing** — 500+ dedicated stress tests across core, plugins, and all 6 framework adapters: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle validation, subscription fanout granularity, and full SPA simulations
 - **Playwright e2e testing** — 1000+ end-to-end test cases across 100+ Playwright suites covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, and async guards
 - **Mutation testing** — [Stryker](https://stryker-mutator.io/) mutates source code and verifies that tests catch every mutation, ensuring test suite quality beyond line coverage
+- **Continuous performance benchmarking** — core hot-path navigation gated by [CodSpeed](https://codspeed.io/) on every PR: deterministic CPU-instruction-count measurement (not wall-clock) catches regressions before merge
 
 ## Development
 
