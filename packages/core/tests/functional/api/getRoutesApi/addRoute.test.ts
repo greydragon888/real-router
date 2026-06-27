@@ -1563,11 +1563,12 @@ describe("core/routes/addRoute", () => {
     });
   });
 
-  // A guard factory that throws on compile surfaces during adoptRouteArtifacts'
-  // guard-registration loop, which runs AFTER the tree swap. This is the
-  // throwing-guard-factory path of prepare-then-commit (issue #698).
+  // A guard factory that throws on compile now surfaces during the PRE-SWAP
+  // compile in adoptRouteArtifacts (#956): pending guards are compiled before
+  // the tree/config swap, so a throwing factory aborts add()/replace() with the
+  // store untouched — full prepare-then-commit atomicity (issue #698).
   describe("guard factory that throws on compile", () => {
-    it("propagates the factory error out of add()", () => {
+    it("propagates the factory error out of add() and leaves the store untouched (#956)", () => {
       const router = createTestRouter();
       const api = getRoutesApi(router);
 
@@ -1579,16 +1580,37 @@ describe("core/routes/addRoute", () => {
         api.add({ name: "boomRoute", path: "/boom", canActivate: boom });
       }).toThrow("guard factory boom");
 
-      // KNOWN LIMITATION (documented in routesStore.ts adoptRouteArtifacts):
-      // guards are compiled/registered AFTER the tree/config swap, so the new
-      // route is already in the tree even though add() threw. prepare-then-commit
-      // is atomic for core build errors (async/circular forwardTo, invalid path
-      // constraint — those throw in the build, before any swap) but NOT for a
-      // guard factory that throws on compile. This pins the current behaviour —
-      // restoring full atomicity for guards would flip this assertion to false.
-      expect(api.has("boomRoute")).toBe(true);
+      // ATOMIC (#956): guard factories are compiled BEFORE the tree swap, so a
+      // throwing factory aborts add() with the route NOT in the tree. (Before
+      // #956 the swap ran first and the route leaked in despite the throw.)
+      expect(api.has("boomRoute")).toBe(false);
 
       router.dispose();
+    });
+
+    it("is atomic across a multi-route batch and preserves unrelated external guards (#956)", () => {
+      // Pre-existing EXTERNAL guard on a route NOT in the failing batch.
+      lifecycle.addActivateGuard("users", () => () => false);
+
+      expect(router.canNavigateTo("users")).toBe(false);
+
+      const boom: GuardFnFactory = () => {
+        throw new Error("guard factory boom");
+      };
+
+      expect(() => {
+        routesApi.add([
+          { name: "alpha", path: "/alpha" }, // valid, no guard
+          { name: "beta", path: "/beta", canActivate: boom }, // throws on compile
+        ]);
+      }).toThrow("guard factory boom");
+
+      // NEITHER route from the batch landed — the whole add is rolled back.
+      expect(routesApi.has("alpha")).toBe(false);
+      expect(routesApi.has("beta")).toBe(false);
+
+      // The unrelated external guard is untouched.
+      expect(router.canNavigateTo("users")).toBe(false);
     });
   });
 

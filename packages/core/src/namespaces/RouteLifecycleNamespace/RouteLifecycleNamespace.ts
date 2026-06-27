@@ -140,6 +140,7 @@ export class RouteLifecycleNamespace<
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
     isFromDefinition = false,
+    precompiledFn?: GuardFn,
   ): void {
     this.#registerHandler(
       "activate",
@@ -147,6 +148,7 @@ export class RouteLifecycleNamespace<
       handler,
       isFromDefinition,
       "canActivate",
+      precompiledFn,
     );
   }
 
@@ -159,6 +161,7 @@ export class RouteLifecycleNamespace<
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
     isFromDefinition = false,
+    precompiledFn?: GuardFn,
   ): void {
     this.#registerHandler(
       "deactivate",
@@ -166,6 +169,7 @@ export class RouteLifecycleNamespace<
       handler,
       isFromDefinition,
       "canDeactivate",
+      precompiledFn,
     );
   }
 
@@ -358,6 +362,38 @@ export class RouteLifecycleNamespace<
     return true;
   }
 
+  /**
+   * Compiles a guard factory to its `GuardFn` WITHOUT registering it — surfaces
+   * a throwing / non-function factory eagerly. The prepare-then-commit
+   * add/replace path (`adoptRouteArtifacts`) calls this for every pending guard
+   * BEFORE the store swap (#956), so a malformed factory aborts the mutation
+   * with the store untouched. The returned function is then installed via the
+   * `precompiledFn` argument of {@link addCanActivate} / {@link addCanDeactivate}
+   * — no re-compile, so a factory with compile-time side effects runs exactly
+   * once. Same boolean-shorthand handling + compile + non-function check as the
+   * inline `#registerHandler` path, so a route-config `canActivate: true`
+   * (boolean shorthand, runtime-reachable via the public route type) compiles to
+   * the cached `TRUE_GUARD`/`FALSE_GUARD` instead of throwing on a non-callable.
+   */
+  compileGuardFactory(
+    handler: GuardFnFactory<Dependencies> | boolean,
+    methodName: string,
+  ): GuardFn {
+    const factory =
+      typeof handler === "boolean"
+        ? booleanToFactory<Dependencies>(handler)
+        : handler;
+    const fn = this.#deps.compileFactory(factory);
+
+    if (typeof fn !== "function") {
+      throw new TypeError(
+        `[router.${methodName}] Factory must return a function, got ${typeof fn}`,
+      );
+    }
+
+    return fn;
+  }
+
   // =========================================================================
   // Private methods (business logic)
   // =========================================================================
@@ -376,6 +412,7 @@ export class RouteLifecycleNamespace<
     handler: GuardFnFactory<Dependencies> | boolean,
     isFromDefinition: boolean,
     methodName: string,
+    precompiledFn?: GuardFn,
   ): void {
     const factoryMaps = this.#getFactoryMaps(type);
     const functions =
@@ -424,13 +461,10 @@ export class RouteLifecycleNamespace<
     targetMap.set(name, factory);
 
     try {
-      const fn = this.#deps.compileFactory(factory);
-
-      if (typeof fn !== "function") {
-        throw new TypeError(
-          `[router.${methodName}] Factory must return a function, got ${typeof fn}`,
-        );
-      }
+      // A pre-validated function (from the #956 add/replace pre-compile) is
+      // installed directly — no re-compile; otherwise compile + non-function
+      // check here (`compileGuardFactory` throws on a bad factory).
+      const fn = precompiledFn ?? this.compileGuardFactory(factory, methodName);
 
       functions.set(name, fn);
     } catch (error) {

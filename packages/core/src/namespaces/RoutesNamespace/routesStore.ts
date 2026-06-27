@@ -10,7 +10,7 @@ import { createEmptyConfig, sanitizeRoute } from "./helpers";
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type { GuardFnFactory, Route } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
-import type { DefaultDependencies, Params } from "@real-router/types";
+import type { DefaultDependencies, GuardFn, Params } from "@real-router/types";
 import type {
   CreateMatcherOptions,
   Matcher,
@@ -289,15 +289,14 @@ function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
 // only swap it into the store once every core-level error has surfaced from the
 // build itself (async/circular forwardTo throw in registerAllRouteHandlers /
 // refreshForwardMap; invalid path constraint throws in rebuildTree). The store
-// is mutated only by `adoptRouteArtifacts`: its tree/config assignments cannot
-// throw, but it also compiles and registers the prepared guards, so a guard
-// factory that throws on compile (or returns a non-function) surfaces there —
-// after the swap. Core-level build errors (async/circular forwardTo, invalid
-// path constraint) are surfaced in the build and leave the existing routes
-// untouched; a malformed guard factory is the one residual that throws
-// post-swap (known limitation). The silent-corruption cases route-tree never
-// throws on (duplicate name vs an existing route, a name duplicated within the
-// batch, missing parent) are caught up front by `assertAddable`.
+// is mutated only by `adoptRouteArtifacts`, which compiles every prepared guard
+// factory BEFORE the swap (#956): a factory that throws on compile (or returns a
+// non-function) aborts there, with the store still untouched. So all error
+// classes — core-level build errors AND malformed guard factories — surface
+// before any mutation, leaving the existing routes intact (full atomicity). The
+// silent-corruption cases route-tree never throws on (duplicate name vs an
+// existing route, a name duplicated within the batch, missing parent) are caught
+// up front by `assertAddable`.
 // =============================================================================
 
 /**
@@ -607,19 +606,60 @@ export function buildReplaceArtifacts<Dependencies extends DefaultDependencies>(
 }
 
 /**
- * Commits prepared artifacts into the store in place. The tree/config
- * assignments are pure and cannot throw; guard registration is deferred to here
- * (the build collected guards without compiling) and compiles each factory, so
- * it WILL re-throw if a guard factory throws on compile (or returns a
- * non-function) — the one residual that can throw after the swap (known
- * limitation; for well-formed guards adopt is the atomic swap point).
- * `depsStore` is always set on a wired router, which is the only path that
- * reaches `add`/`replace`.
+ * Compiles every pending guard factory up front, returning
+ * `[name, factory, compiledFn]` triples for installation. THROWS from `compile`
+ * on the first factory that throws on compile or returns a non-function — the
+ * pre-swap validation that makes `adoptRouteArtifacts` atomic for malformed
+ * guards (#956). Compiling here (not at install) means a factory with
+ * compile-time side effects runs exactly once.
+ */
+function compilePendingGuards<Dependencies extends DefaultDependencies>(
+  pending: Map<string, GuardFnFactory<Dependencies>>,
+  compile: (
+    handler: GuardFnFactory<Dependencies>,
+    methodName: string,
+  ) => GuardFn,
+  methodName: string,
+): [string, GuardFnFactory<Dependencies>, GuardFn][] {
+  const compiled: [string, GuardFnFactory<Dependencies>, GuardFn][] = [];
+
+  for (const [name, factory] of pending) {
+    compiled.push([name, factory, compile(factory, methodName)]);
+  }
+
+  return compiled;
+}
+
+/**
+ * Commits prepared artifacts into the store in place. Every pending guard
+ * factory is compiled BEFORE the tree/config swap (#956): a factory that throws
+ * on compile (or returns a non-function) aborts here with the store untouched,
+ * so `add`/`replace` are atomic for malformed guards too — not just core build
+ * errors. The tree/config assignments are pure and cannot throw; the
+ * pre-compiled guards are then installed without re-compiling (the factory ran
+ * once, at the pre-compile above). `depsStore` is always set on a wired router,
+ * which is the only path that reaches `add`/`replace`.
  */
 export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   artifacts: RouteArtifacts<Dependencies>,
 ): void {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- depsStore is set once the router is wired; add/replace only run on a wired router (constructor-time registration uses createRoutesStore)
+  const deps = store.depsStore!;
+
+  // Pre-swap compile: surfaces a malformed guard factory before any mutation.
+  const compiledActivate = compilePendingGuards(
+    artifacts.pendingCanActivate,
+    deps.compileGuard,
+    "canActivate",
+  );
+  const compiledDeactivate = compilePendingGuards(
+    artifacts.pendingCanDeactivate,
+    deps.compileGuard,
+    "canDeactivate",
+  );
+
+  // Atomic swap — pure assignments, cannot throw.
   store.definitions.length = 0;
 
   for (const def of artifacts.definitions) {
@@ -633,15 +673,13 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store.urlParamsCache.clear();
   store.resolvedForwardMap = artifacts.resolvedForwardMap;
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- depsStore is set once the router is wired; add/replace only run on a wired router (constructor-time registration uses createRoutesStore)
-  const deps = store.depsStore!;
-
-  for (const [name, handler] of artifacts.pendingCanActivate) {
-    deps.addActivateGuard(name, handler);
+  // Install pre-compiled guards — no re-compile, no throw.
+  for (const [name, factory, fn] of compiledActivate) {
+    deps.addActivateGuard(name, factory, fn);
   }
 
-  for (const [name, handler] of artifacts.pendingCanDeactivate) {
-    deps.addDeactivateGuard(name, handler);
+  for (const [name, factory, fn] of compiledDeactivate) {
+    deps.addDeactivateGuard(name, factory, fn);
   }
 }
 
