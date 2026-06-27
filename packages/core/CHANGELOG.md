@@ -1,5 +1,21 @@
 # @real-router/core
 
+## 0.61.11
+
+### Patch Changes
+
+- [#1000](https://github.com/greydragon888/real-router/pull/1000) [`2b6aa28`](https://github.com/greydragon888/real-router/commit/2b6aa287fb1a29cf5deb8d98ec57f7635cb2a917) Thanks [@greydragon888](https://github.com/greydragon888)! - Assert per-instance options immutability in `RoutesNamespace.#getBuildPathOptions` ([#957](https://github.com/greydragon888/real-router/issues/957))
+
+  `#getBuildPathOptions` caches its result on the first call and returns it on every subsequent call, ignoring the `options` argument. This is safe because the sole caller (`Router.buildPath`) always passes the same immutable, deep-frozen per-instance options (`this.#options.get()`). A dev-build assertion now logs a warning if a future caller passes a differing `options` reference, making the cache-ignores-argument contract explicit and catchable. No behavior change for supported usage.
+
+- [#1000](https://github.com/greydragon888/real-router/pull/1000) [`2b6aa28`](https://github.com/greydragon888/real-router/commit/2b6aa287fb1a29cf5deb8d98ec57f7635cb2a917) Thanks [@greydragon888](https://github.com/greydragon888)! - Inline `Object.freeze` for `REPLACE_OPTS` ([#941](https://github.com/greydragon888/real-router/issues/941))
+
+  Combine the split declaration + `Object.freeze` of `REPLACE_OPTS` in `RouterLifecycleNamespace` into a single `const … = Object.freeze(…)` form (matching the `REVALIDATE_OPTS` house style in `api/getRoutesApi.ts`), removing the window where a future edit could insert a mutation between declaration and freeze. Behaviorally inert — the constant was already frozen at runtime.
+
+- [#1000](https://github.com/greydragon888/real-router/pull/1000) [`2b6aa28`](https://github.com/greydragon888/real-router/commit/2b6aa287fb1a29cf5deb8d98ec57f7635cb2a917) Thanks [@greydragon888](https://github.com/greydragon888)! - Inline `Object.freeze` for `FROZEN_ACTIVATED` / `FROZEN_REPLACE_OPTS` ([#937](https://github.com/greydragon888/real-router/issues/937))
+
+  Combine the split declaration + `Object.freeze` of the module-level constants in `NavigationNamespace` into a single `const … = Object.freeze(…)` form, removing the window where a future edit could insert a mutation between declaration and freeze. Behaviorally inert — both constants were already frozen at runtime.
+
 ## 0.61.10
 
 ### Patch Changes
