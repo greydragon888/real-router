@@ -144,6 +144,26 @@ describe("handleGuardError — AbortError detection", () => {
   });
 });
 
+describe("handleGuardError — explicit RouterError(TRANSITION_CANCELLED) is preserved", () => {
+  it("a guard that throws RouterError(TRANSITION_CANCELLED) keeps that code (not re-coded to CANNOT_ACTIVATE)", async () => {
+    // A guard that throws RouterError(TRANSITION_CANCELLED) is explicitly
+    // signalling a quiet cancel — the same intent as a thrown AbortError.
+    // It must NOT be re-coded to CANNOT_ACTIVATE (#933), otherwise the quiet
+    // cancel turns into a reported transition error.
+    const onTransitionError = vi.fn();
+    const router = routerWithActivateGuard(() => {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    });
+
+    router.usePlugin(() => ({ onTransitionError }));
+
+    const error = await navigateError(router);
+
+    expect(error?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(onTransitionError).not.toHaveBeenCalled();
+  });
+});
+
 describe("rethrowAsRouterError — RouterError keeps identity, gets re-coded", () => {
   it("re-codes a thrown RouterError instead of wrapping it (message preserved)", async () => {
     const error = await navigateError(

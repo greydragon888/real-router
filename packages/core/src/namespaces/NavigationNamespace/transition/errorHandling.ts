@@ -33,6 +33,20 @@ export function handleGuardError(
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
+  // A guard can also signal a quiet cancel by throwing
+  // RouterError(TRANSITION_CANCELLED) directly — the same intent as a thrown
+  // AbortError. Preserve it as-is instead of letting rethrowAsRouterError
+  // overwrite the code with CANNOT_ACTIVATE / CANNOT_DEACTIVATE: that code
+  // drives the downstream suppression (routeTransitionError early-returns,
+  // fire-and-forget stays silent), so re-coding would surface the intended
+  // quiet cancel as a reported transition error (#933).
+  if (
+    error instanceof RouterError &&
+    error.code === errorCodes.TRANSITION_CANCELLED
+  ) {
+    throw error;
+  }
+
   rethrowAsRouterError(error, errorCode, segment);
 }
 
