@@ -1,5 +1,5 @@
 ---
-"@real-router/core": minor
+"@real-router/core": patch
 ---
 
 Fix: `add()` / `replace()` are now atomic for a guard factory that throws on compile (#956)

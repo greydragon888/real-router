@@ -1,5 +1,5 @@
 ---
-"@real-router/core": minor
+"@real-router/core": patch
 ---
 
 Fix: `update(name, { canActivate: null })` no longer clears an external guard (origin-selective clear) (#952)

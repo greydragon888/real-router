@@ -1,5 +1,5 @@
 ---
-"@real-router/core": minor
+"@real-router/core": patch
 ---
 
 Fix: `update()` is now atomic across its whole field set (prepare-then-commit) (#951)

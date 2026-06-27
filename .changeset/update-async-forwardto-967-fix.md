@@ -1,5 +1,5 @@
 ---
-"@real-router/core": minor
+"@real-router/core": patch
 ---
 
 Fix: `update(name, { forwardTo })` rejects an async callback at update time (parity with add/replace) (#967)

@@ -1,5 +1,5 @@
 ---
-"@real-router/core": minor
+"@real-router/core": patch
 ---
 
 Fix: guard registration rollback preserves the previously-valid guard on overwrite-then-throw (#963)

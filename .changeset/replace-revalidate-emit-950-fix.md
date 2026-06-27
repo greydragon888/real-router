@@ -1,5 +1,5 @@
 ---
-"@real-router/core": minor
+"@real-router/core": patch
 ---
 
 Fix: `replace()` notifies `router.subscribe` listeners when it revalidates the active state (#950)
