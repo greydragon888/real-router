@@ -266,4 +266,54 @@ describe("subscribeLeave signal — cancellation contract (#722)", () => {
       expect(router.getState()?.name).toBe("users");
     });
   });
+
+  // #943: on the FAILURE path the leave signal must abort with a reason that
+  // carries router/error context — consistent with the cancellation path, which
+  // aborts with RouterError(TRANSITION_CANCELLED). Before the fix the failure
+  // path called `controller.abort()` with no argument, so `signal.reason` was a
+  // generic DOMException [AbortError] with no router context.
+  describe("MUST carry a meaningful reason on the failure path (#943)", () => {
+    it("no-guards path: sync leave throw aborts the signal with the thrown error as reason", async () => {
+      const router = (active = guardFreeRouter());
+
+      await router.start("/");
+
+      const boom = new Error("leave boom");
+      let signal: AbortSignal | undefined;
+
+      router.subscribeLeave((payload) => {
+        signal = payload.signal;
+
+        throw boom;
+      });
+
+      await expect(router.navigate("users")).rejects.toThrow("leave boom");
+
+      expect(signal?.aborted).toBe(true);
+      expect(signal?.reason).toBe(boom);
+    });
+
+    it("guard path: a rejecting activation guard aborts the signal with RouterError(CANNOT_ACTIVATE)", async () => {
+      const router = (active = createRouter(ROUTES));
+
+      getLifecycleApi(router).addActivateGuard("users", () => () => false);
+
+      await router.start("/");
+
+      let signal: AbortSignal | undefined;
+
+      router.subscribeLeave((payload) => {
+        signal = payload.signal;
+      });
+
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
+
+      expect(signal?.aborted).toBe(true);
+      expect((signal?.reason as { code?: string } | undefined)?.code).toBe(
+        errorCodes.CANNOT_ACTIVATE,
+      );
+    });
+  });
 });

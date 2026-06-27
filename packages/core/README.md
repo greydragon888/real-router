@@ -84,7 +84,7 @@ controller.abort();
 | Method                     | Returns       | Description                                                                                                                                                   |
 | -------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `subscribe(listener)`      | `Unsubscribe` | Listen to successful transitions                                                                                                                              |
-| `subscribeLeave(listener)` | `Unsubscribe` | Subscribe to confirmed route departures. Listener may return `Promise<void>` to block the pipeline (exit animations). Receives `AbortSignal` for cancellation |
+| `subscribeLeave(listener)` | `Unsubscribe` | Subscribe to **approved** route departures — tentative, not committed: an activation guard can still reject. Listener may return `Promise<void>` to block the pipeline (exit animations). Receives an `AbortSignal` that aborts (with the failure reason) if the navigation does not commit |
 | `usePlugin(...plugins)`    | `Unsubscribe` | Register plugin factories                                                                                                                                     |
 
 ```typescript
@@ -92,7 +92,8 @@ const unsub = router.subscribe(({ route, previousRoute }) => {
   console.log(previousRoute?.name, "->", route.name);
 });
 
-// Save scroll position when leaving a route (fires ONLY when departure is confirmed)
+// Save scroll position when leaving a route (fires when departure is approved —
+// tentative: an activation guard can still keep you on the current route)
 const unsubLeave = router.subscribeLeave(({ route }) => {
   if (route.name === "products") {
     sessionStorage.setItem("products:scroll", String(window.scrollY));
