@@ -300,8 +300,10 @@ export class PreloadPlugin {
       this.#stateCache.delete(href);
     } else if (this.#stateCache.size >= STATE_CACHE_LIMIT) {
       // Evict the oldest (first-inserted) entry. size >= LIMIT > 0, so the
-      // iterator yields at least one key — destructuring it is safe.
-      const [oldest] = this.#stateCache.keys();
+      // iterator yields at least one key — destructuring it is safe. This is
+      // an intentional single-eviction idiom, not a real loop; SonarJS S1751
+      // flags this form (and the prior for-of+break) as a false positive (#971).
+      const [oldest] = this.#stateCache.keys(); // NOSONAR -- intentional single-eviction LRU idiom, not a real loop
 
       this.#stateCache.delete(oldest);
     }
