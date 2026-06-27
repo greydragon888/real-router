@@ -93,8 +93,11 @@ export function cloneRouter<
   const resolvedForwardMap = sourceStore.resolvedForwardMap;
   const routeCustomFields = sourceStore.routeCustomFields;
 
-  const options = ctx.cloneOptions();
-  const sourceDeps = ctx.cloneDependencies();
+  const {
+    options,
+    dependencies: sourceDeps,
+    pluginFactories,
+  } = ctx.getCloneState();
   // Origin-aware factory snapshot — definition guards are re-registered with
   // `isFromDefinition=true` on the clone so `replace()` can still strip them
   // via `clearDefinitionGuards()`. External guards take the public lifecycle
@@ -103,7 +106,6 @@ export function cloneRouter<
   const sourceLifecycleNamespace = sourceStore.lifecycleNamespace!;
   const { definition: definitionFactories, external: externalFactories } =
     sourceLifecycleNamespace.getFactoriesByOrigin();
-  const pluginFactories = ctx.getPluginFactories();
 
   const mergedDeps = {
     ...sourceDeps,

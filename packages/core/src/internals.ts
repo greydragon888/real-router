@@ -124,10 +124,15 @@ export interface RouterInternals<
   // Dependencies (issue #172)
   readonly dependenciesGetStore: () => DependenciesStore<D>;
 
-  // Clone support (issue #173)
-  readonly cloneOptions: () => Options;
-  readonly cloneDependencies: () => Record<string, unknown>;
-  readonly getPluginFactories: () => PluginFactory<D>[];
+  // Clone support (issue #173, consolidated #964). One accessor for the
+  // source-side snapshot a clone carries over besides the route store, so a new
+  // clone-relevant subsystem is wired in a single place instead of being spread
+  // across separate methods.
+  readonly getCloneState: () => {
+    options: Options;
+    dependencies: Record<string, unknown>;
+    pluginFactories: PluginFactory<D>[];
+  };
 
   // Consolidated route data store (issue #174 Phase 2)
   readonly routeGetStore: () => RoutesStore<D>;
