@@ -46,7 +46,7 @@ No boolean flags (`#started`, `#active`, `#navigating` removed).
 
 ### Validation Pattern
 
-Validation has two tiers: **invariant protection** in core (structural guards + 3 invariant guards) and **DX validation** opt-in via @real-router/validation-plugin. The plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
+Validation has two tiers: **invariant protection** in core (structural guards + 4 invariant guards) and **DX validation** opt-in via @real-router/validation-plugin. The plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
 
 **Facade methods** and **standalone API functions** call through the optional validator using optional chaining:
 
@@ -77,10 +77,11 @@ Structural guards remain in namespace folders (`OptionsNamespace/validators.ts`,
 
 ### Invariant Guards (always active, no plugin required)
 
-Core contains three invariant guards that run regardless of whether validation-plugin is installed:
+Core contains four invariant guards that run regardless of whether validation-plugin is installed:
 
 - **`subscribe(listener)`** — validates `typeof listener === "function"`. Prevents deferred crash (non-function stored in EventEmitter, crash on next navigation). Includes actionable hint: "For Observable pattern use observable(router) from @real-router/rx". (`subscribeLeave` validates the same way but **without** the rx hint — `@real-router/rx` exposes the Observable pattern for success transitions (`observable(router)`, `state$`, `events$`), not for leave events.)
 - **`navigateToNotFound(path)`** — validates `typeof path === "string"` when path is provided. Prevents silent state corruption (`state.path = 42`).
+- **`start(path)`** (in `RouterLifecycleNamespace.start`, #939) — validates `typeof path === "string"`. Runs **after** the start interceptor chain, so a browser-plugin's location injection (`next(path ?? getLocation())`) still wins; it only fires when nothing supplied a path. Without it, `start(undefined)` with no browser-plugin reached `matchPath(undefined)` and threw a cryptic, code-less `TypeError: …codePointAt` deep in path-matcher. Symmetric with `navigateToNotFound`'s type guard. (The facade-level `validateStartArgs` validator deliberately permits `undefined` for the browser-plugin-override case — this guard is the post-override backstop.)
 - **`claimContextNamespace(namespace)`** (on `PluginApi`, `getPluginApi.ts`) — throws `CONTEXT_NAMESPACE_ALREADY_CLAIMED` when a namespace is already claimed by another plugin. Prevents silent corruption: without it two plugins writing the same `state.context.<namespace>` would clobber each other's data.
 
 **Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.

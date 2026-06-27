@@ -45,6 +45,22 @@ export class RouterLifecycleNamespace {
     const deps = this.#deps;
     const options = deps.getOptions();
 
+    // Invariant guard (#939): core is platform-agnostic, so the caller must
+    // provide a string path. Without a browser-plugin start interceptor to
+    // inject a location, a non-string `startPath` (e.g. `start(undefined)`)
+    // would otherwise reach matchPath() and throw a cryptic, code-less
+    // `TypeError: …codePointAt` deep inside path-matcher. This guard runs AFTER
+    // the interceptor chain (browser-plugin substitutes the location upstream),
+    // so it only fires when nothing supplied a path — turning the cryptic crash
+    // into an actionable error. Symmetric with the subscribe / navigateToNotFound
+    // type guards; the validator deliberately permits `undefined` at the facade
+    // for exactly the browser-plugin-override case.
+    if (typeof startPath !== "string") {
+      throw new TypeError(
+        `[router.start] path must be a string, got ${typeof startPath}`,
+      );
+    }
+
     const matchedState = deps.matchPath(startPath);
 
     if (!matchedState && !options.allowNotFound) {

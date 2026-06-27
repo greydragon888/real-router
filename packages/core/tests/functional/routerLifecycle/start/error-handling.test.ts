@@ -650,19 +650,14 @@ describe("router.start() - error handling", () => {
 
   // #8 / #4: start(undefined) with NO browser-plugin. Core is platform-agnostic:
   // `start(path)` requires a string, and without browser-plugin's `start`
-  // interceptor nothing injects a location. Passing `undefined` reaches the
-  // path-string machinery and throws a cryptic, code-less TypeError
-  // ("Cannot read properties of undefined (reading 'codePointAt')") — the
-  // invariant guard for #4 that would turn this into an actionable error is a
-  // KNOWN GAP and is NOT yet added. This test deliberately does NOT pin the
-  // error message/shape (a future guard will change it); it pins the thing that
-  // must NOT regress: the Bug #1 fix that recovers the FSM out of STARTING back
-  // to IDLE on a start-pipeline throw, so the router is reusable afterwards.
+  // interceptor nothing injects a location. The actionable error shape is now
+  // pinned by the #939 guard tests above; this test pins the orthogonal
+  // invariant that must NOT regress: the Bug #1 FSM recovery that unwinds
+  // STARTING back to IDLE on a start-pipeline throw, so the router is reusable.
   describe("#8: start(undefined) without browser-plugin recovers the FSM", () => {
     it("rejects, leaves the FSM recovered (isActive false), and a later start() succeeds", async () => {
       const localRouter = createTestRouter(); // no browser-plugin
 
-      // Rejects (cryptic, code-less today — do not assert message/code: #4 gap).
       await expect(localRouter.start(undefined as never)).rejects.toThrow();
 
       // Regression we pin (#1 fix): the half-started FSM unwound STARTING → IDLE
@@ -723,6 +718,52 @@ describe("router.start() - error handling", () => {
 
       errorSpy.mockRestore();
       removeInterceptor();
+      localRouter.stop();
+    });
+  });
+
+  // #939: start(undefined) without a browser-plugin reached matchPath(undefined)
+  // and threw a cryptic, code-less `TypeError: Cannot read properties of
+  // undefined (reading 'codePointAt')` deep inside path-matcher. Core now guards
+  // the path type — but the guard must sit AFTER the start interceptor chain (in
+  // RouterLifecycleNamespace.start), because a browser-plugin interceptor
+  // legitimately substitutes the location for an undefined caller path. A guard
+  // in the facade BEFORE the interceptors would reject that valid case.
+  describe("#939: invariant guard on start path type", () => {
+    it("rejects start(undefined) with an actionable TypeError, not a cryptic codePointAt crash", async () => {
+      const localRouter = createTestRouter();
+
+      await expect(localRouter.start(undefined as never)).rejects.toThrow(
+        /\[router\.start\] path must be a string, got undefined/,
+      );
+
+      // No regression of the #1 FSM recovery: STARTING unwound back to IDLE.
+      expect(localRouter.isActive()).toBe(false);
+      expect(localRouter.getState()).toBeUndefined();
+
+      // The guarded rejection is a plain TypeError (a programmer-error invariant,
+      // symmetric with subscribe / navigateToNotFound), not a RouterError.
+      await expect(
+        localRouter.start(undefined as never),
+      ).rejects.toBeInstanceOf(TypeError);
+
+      localRouter.stop();
+    });
+
+    it("does NOT break a browser-plugin-style start interceptor that injects the path", async () => {
+      const localRouter = createTestRouter();
+
+      // mimic browser-plugin: substitute a location when the caller passes none.
+      // The guard sits after this interceptor, so the injected string passes.
+      getPluginApi(localRouter).addInterceptor("start", (next, path) =>
+        next(path ?? "/home"),
+      );
+
+      const state = await localRouter.start(undefined as never);
+
+      expect(state.name).toBe("home");
+      expect(localRouter.isActive()).toBe(true);
+
       localRouter.stop();
     });
   });
