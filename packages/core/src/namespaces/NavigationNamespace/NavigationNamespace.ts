@@ -24,12 +24,10 @@ import type {
   TransitionMeta,
 } from "@real-router/types";
 
-const FROZEN_ACTIVATED: string[] = [constants.UNKNOWN_ROUTE];
-
-Object.freeze(FROZEN_ACTIVATED);
-const FROZEN_REPLACE_OPTS: NavigationOptions = { replace: true };
-
-Object.freeze(FROZEN_REPLACE_OPTS);
+const FROZEN_ACTIVATED: string[] = Object.freeze([
+  constants.UNKNOWN_ROUTE,
+]) as unknown as string[];
+const FROZEN_REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 
 function forceReplaceFromUnknown(
   opts: NavigationOptions,
