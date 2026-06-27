@@ -84,22 +84,22 @@ src/
 
 ## Key Differences from React, Preact, and Solid Adapters
 
-| Aspect                      | React                              | Preact                                     | Solid                                                   | Vue                                                  |
-| --------------------------- | ---------------------------------- | ------------------------------------------ | ------------------------------------------------------- | ---------------------------------------------------- |
-| Reactivity model            | Re-renders (virtual DOM diffing)   | Re-renders (virtual DOM diffing)           | Fine-grained signals (no re-renders)                    | Proxy-based refs (targeted DOM updates)              |
-| External store subscription | `useSyncExternalStore` (native)    | Custom polyfill (`useState` + `useEffect`) | `createSignalFromSource` (`createSignal` + `onCleanup`) | `useRefFromSource` (`shallowRef` + `onScopeDispose`) |
-| Hook/composable return      | Values (`RouteState`)              | Values (`RouteState`)                      | Accessors (`Accessor<RouteState>`)                      | `{ navigator, route: Ref, previousRoute: Ref }`      |
-| `memo()`                    | Required for optimization          | Required for optimization                  | Not needed — components run once                        | Not needed — Vue tracks ref dependencies             |
-| Params stabilization        | `canonicalJson` in sources         | `canonicalJson` in sources                 | `canonicalJson` in sources                              | `canonicalJson` in sources                           |
-| Active class on Link        | `className` string concat          | `className` string concat                  | `classList` object                                      | `class` string concat                                |
-| `keepAlive` / Activity      | React 19.2+                        | Not available                              | Not available                                           | Vue native `<KeepAlive>` (all versions)              |
-| Context mechanism           | `createContext` + Provider         | `createContext` + Provider                 | `createContext` + Provider                              | `provide` / `inject` + `InjectionKey`                |
-| Context count               | 2 (React), 3 (Preact)              | 3                                          | 2                                                       | 3                                                    |
-| Components                  | JSX (.tsx)                         | JSX (.tsx)                                 | JSX (.tsx)                                              | `defineComponent` + `h()` (.ts)                      |
-| Build tool                  | tsdown                             | tsdown                                     | rollup + babel-preset-solid                             | tsdown                                               |
-| Peer dependency             | `react` >= 19.0.0                  | `preact` >= 10.0.0                         | `solid-js` >= 1.7.0                                     | `vue` >= 3.3.0                                       |
-| Children access             | `{children}` / slots               | `{children}` / slots                       | slots                                                   | `slots.default?.()`                                  |
-| File extensions             | .tsx                               | .tsx                                       | .tsx                                                    | .ts                                                  |
+| Aspect                      | React                            | Preact                                     | Solid                                                   | Vue                                                  |
+| --------------------------- | -------------------------------- | ------------------------------------------ | ------------------------------------------------------- | ---------------------------------------------------- |
+| Reactivity model            | Re-renders (virtual DOM diffing) | Re-renders (virtual DOM diffing)           | Fine-grained signals (no re-renders)                    | Proxy-based refs (targeted DOM updates)              |
+| External store subscription | `useSyncExternalStore` (native)  | Custom polyfill (`useState` + `useEffect`) | `createSignalFromSource` (`createSignal` + `onCleanup`) | `useRefFromSource` (`shallowRef` + `onScopeDispose`) |
+| Hook/composable return      | Values (`RouteState`)            | Values (`RouteState`)                      | Accessors (`Accessor<RouteState>`)                      | `{ navigator, route: Ref, previousRoute: Ref }`      |
+| `memo()`                    | Required for optimization        | Required for optimization                  | Not needed — components run once                        | Not needed — Vue tracks ref dependencies             |
+| Params stabilization        | `canonicalJson` in sources       | `canonicalJson` in sources                 | `canonicalJson` in sources                              | `canonicalJson` in sources                           |
+| Active class on Link        | `className` string concat        | `className` string concat                  | `classList` object                                      | `class` string concat                                |
+| `keepAlive` / Activity      | React 19.2+                      | Not available                              | Not available                                           | Vue native `<KeepAlive>` (all versions)              |
+| Context mechanism           | `createContext` + Provider       | `createContext` + Provider                 | `createContext` + Provider                              | `provide` / `inject` + `InjectionKey`                |
+| Context count               | 2 (React), 3 (Preact)            | 3                                          | 2                                                       | 3                                                    |
+| Components                  | JSX (.tsx)                       | JSX (.tsx)                                 | JSX (.tsx)                                              | `defineComponent` + `h()` (.ts)                      |
+| Build tool                  | tsdown                           | tsdown                                     | rollup + babel-preset-solid                             | tsdown                                               |
+| Peer dependency             | `react` >= 19.0.0                | `preact` >= 10.0.0                         | `solid-js` >= 1.7.0                                     | `vue` >= 3.3.0                                       |
+| Children access             | `{children}` / slots             | `{children}` / slots                       | slots                                                   | `slots.default?.()`                                  |
+| File extensions             | .tsx                             | .tsx                                       | .tsx                                                    | .ts                                                  |
 
 ### useRefFromSource
 
@@ -201,39 +201,43 @@ RouteView (defineComponent)
 
 Vue's proxy-based reactivity eliminates most of the optimization work needed in React/Preact:
 
-| Optimization              | React/Preact                        | Vue                                                            |
-| ------------------------- | ----------------------------------- | -------------------------------------------------------------- |
-| Prevent re-renders        | `memo()` + comparators              | Not needed — Vue tracks ref dependencies automatically         |
-| Stable object references  | `canonicalJson` in sources          | Same — in `@real-router/sources`                               |
-| Stable callbacks          | `useCallback`                       | Not needed — closures are stable in setup()                    |
-| Node-scoped subscriptions | Cached `createRouteNodeSource`      | Same — in `@real-router/sources`                               |
-| Shared eager sources      | `getTransitionSource` / `createDismissableError` | Same — in `@real-router/sources`                  |
-| Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`     | Same — avoids allocation for default props                     |
-| keepAlive wrapper cache   | N/A                                 | `Map<string, Component>` per RouteView instance, `markRaw`     |
+| Optimization              | React/Preact                                     | Vue                                                        |
+| ------------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| Prevent re-renders        | `memo()` + comparators                           | Not needed — Vue tracks ref dependencies automatically     |
+| Stable object references  | `canonicalJson` in sources                       | Same — in `@real-router/sources`                           |
+| Stable callbacks          | `useCallback`                                    | Not needed — closures are stable in setup()                |
+| Node-scoped subscriptions | Cached `createRouteNodeSource`                   | Same — in `@real-router/sources`                           |
+| Shared eager sources      | `getTransitionSource` / `createDismissableError` | Same — in `@real-router/sources`                           |
+| Frozen singletons         | `EMPTY_PARAMS`, `EMPTY_OPTIONS`                  | Same — avoids allocation for default props                 |
+| keepAlive wrapper cache   | N/A                                              | `Map<string, Component>` per RouteView instance, `markRaw` |
 
 The main performance primitive is `useRefFromSource`: it creates a `shallowRef` that only updates when the underlying source emits, and Vue's scheduler batches DOM updates automatically.
 
 ### Vue Runtime Floor (vs-tanstack Benchmark)
 
-The `vs-tanstack` benchmark (`benchmarks/vs-tanstack/real-router/vue`) exercises a 10-step navigation loop with 44 route-state subscribers (`useRoute`/`useRouteNode`/nanostores), each rendering `null`. On this workload Real-Router's Vue adapter is ~**6× slower in absolute terms** than React/Solid despite sharing the same `@real-router/sources` router layer.
+The `vs-tanstack` benchmark (`benchmarks/vs-tanstack/client-nav/real-router/vue`) exercises a 10-step navigation loop with ~44 route-state subscribers (`useRoute`/`useRouteNode`/nanostores, each rendering `null`) **plus a 20-`<Link>` panel that re-renders on every navigation**. Real-Router's Vue adapter was historically ~6× slower in absolute terms than React/Solid despite sharing the same `@real-router/sources` router layer.
 
-**Root cause is Vue runtime, not adapter overhead.** Empirically verified via three targeted rewrites (all reverted after negative results — see `benchmarks/.bench-results/vs-tanstack/2026-04-18-report.md`):
+**Where the cost actually is — measured by router-free control apps (2026-06-27, CPU-profiled):**
 
-| Hypothesis                                                   | Predicted gain | Measured Δ     | Verdict    |
-| ------------------------------------------------------------ | -------------: | -------------: | ---------- |
-| Replace `computed()` in `useRouteNode` with direct `shallowRef` writes | 10–15 %        | +0.6 %          | Within noise (RME ±0.9 %) |
-| Replace `watch([...])` dep-array getter with `watchEffect` in `Link` |  3– 5 %        | +0.35 %         | Within noise |
-| Eliminate `Object.keys(attrs)` rest-spread in `Link.render`   |  3– 5 %        | +0.36 %         | Within noise |
+- **Bare Vue is _not_ the problem.** 47 components reading one `shallowRef`, no router, runs at ~0.034 ms/nav — the same as the equivalent React app (~0.032). Vue's component-update machinery is not intrinsically slow.
+- **Subscribers are nearly free.** 20 null-returning `useRoute` subscribers cost ~0.006 ms/nav.
+- **`<Link>` is the bottleneck.** 20 real `<Link>`s cost ~0.146 ms/nav. The parent panel hands each Link a fresh `{ id }` literal every render; the Link then re-ran `canonicalJson(routeParams)` + `buildHref` on every navigation because both keyed off the raw, reference-changing prop.
 
-The proposed micro-optimizations are valid in principle, but V8 JIT on a 10-second hot benchmark inlines/elides them below the measurement floor. The dominant cost on this workload is:
+**The fixable lever (shipped).** Content-stabilize `routeParams` with `shallowEqual` (the same contract as the React adapter's `Link` `memo`) so same-shape navigations skip `canonicalJson` and `buildHref` entirely. Formal `vitest bench`, same-session A/B: **168.95 → 201.49 hz (+19.3 %, RME ±0.9 %)** — an order of magnitude above the noise floor.
 
-1. Vue **proxy-based prop access** on every tracked getter (`.value`, `props.*`) — JS-level overhead that no adapter rewrite can avoid.
-2. Vue **scheduler** batching 44 effects per navigation with its own bookkeeping.
-3. **Render-phase VNode creation** for 44 components that return `null` — no DOM work, but the framework still walks the render graph.
+**Three _other_ rewrites that were genuinely noise** (2026-04-18, see `benchmarks/.bench-results/vs-tanstack/2026-04-18-report.md`). They targeted the subscriber/scheduler path or the wrong `Link` mechanism — **not** the param-recompute lever above:
 
-When the TanStack Router adapter uses `useParams({ select })` the workload is similar — TanStack-Vue is only ~2.2× faster than TanStack-React in absolute terms, confirming that the ceiling is Vue-runtime rather than router-agnostic. Against TanStack-Vue, Real-Router still wins (~2.3×), but the gap is compressed compared to React/Solid (~14×/13×) because router overhead is no longer the bottleneck.
+| Hypothesis                                                             | Predicted gain | Measured Δ | Verdict                   |
+| ---------------------------------------------------------------------- | -------------: | ---------: | ------------------------- |
+| Replace `computed()` in `useRouteNode` with direct `shallowRef` writes |        10–15 % |     +0.6 % | Within noise (RME ±0.9 %) |
+| Replace `watch([...])` dep-array getter with `watchEffect` in `Link`   |         3– 5 % |    +0.35 % | Within noise              |
+| Eliminate `Object.keys(attrs)` rest-spread in `Link.render`            |         3– 5 % |    +0.36 % | Within noise              |
 
-**Takeaway for consumers:** for Vue apps with many small route-state subscribers, expect absolute navigation time to be dominated by Vue runtime, not by the router. Real-Router retains the architectural wins (node-scoped subscriptions, fewer allocations — see `heapUsed` results in the benchmark report), but they appear as absolute memory reduction rather than as a large hz ratio.
+> **Correction.** These three measurements were real, but the conclusion once drawn from them — _"root cause is Vue runtime, the adapter can't help"_ — was an over-generalization. It pinned the cost on 44 null-returning subscribers (which the control apps show are nearly free) and missed the `Link` param-stabilization lever (which the control apps show is the actual bottleneck, and which yields +19 %). Do **not** read the 2026-04-18 report as "the Vue adapter is at its floor."
+
+**What remains Vue-bound after the fix.** Even optimized, the Vue app is still ~5× slower than React/Solid in absolute terms (~0.50 vs ~0.10 ms/nav). Since bare Vue ≈ bare React, this residual is _not_ raw Vue speed — it is the **volume and per-update cost of router-driven Vue component re-renders** (each `<Link>`'s render effect + `<a>` patch, RouteView re-evaluation, the nanostores loader-data cascade) plus Vue's reference-based prop diffing, which — unlike `React.memo` — cannot fully bail a child component out when its parent re-renders with a fresh literal. These are runtime/integration costs, not further adapter inefficiencies. TanStack-Vue sits in the same Vue-runtime budget (it is only ~2.2× faster than TanStack-React absolute), so against TanStack-Vue Real-Router's win is compressed (~2.3×) versus React/Solid (~14×/11.5×) — the router is simply a smaller slice of a Vue-render-dominated total.
+
+**Takeaway for consumers:** the adapter now memoizes `routeParams` by content, so inline `:routeParams="{ id }"` literals are cheap; nested-object param values still benefit from a stable `ref`/`computed` (see CLAUDE.md "Object Params and Memoization"). Beyond that, absolute navigation time on Link-heavy pages is dominated by Vue's per-component reactive-render volume, not by the router — Real-Router's architectural wins (node-scoped subscriptions, fewer allocations) show up as memory reduction. See [`benchmarks/vs-tanstack/ADAPTER_PERFORMANCE.md`](../../benchmarks/vs-tanstack/ADAPTER_PERFORMANCE.md) for the full cross-framework methodology and decomposition.
 
 ## Data Flow
 
@@ -276,19 +280,19 @@ tests/
 
 54 stress tests across 11 files in `tests/stress/` validate behavior under extreme conditions:
 
-| Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                        |
-| ----------------------- | ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------- | ------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Mount/unmount lifecycle | 1 file             | 10 tests   | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 + post-toggle navigation works; router stop/restart; navigate during teardown; 10 000 navigate cycles — bounded heap; rapid `start/stop` × 100 with no navigations between — no FSM/event-bus leak |
-| Memory mount/unmount    | 1 file             | 3 tests    | Steady-state heap baselines for `useRouterTransition`/`useRouteNode`/`RouterErrorBoundary` (delta-per-iter reported)                                                                    |
-| Subscription fanout     | 1 file             | 4 tests    | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; 30 useRouteNode('users') — granular scoping; concurrent mount/unmount     |
-| Link mass rendering     | 1 file             | 6 tests    | 200 Links mount — correct DOM; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; 100 dynamic routeName updates                                        |
-| keepAlive cycling       | 1 file             | 5 tests    | 10 keepAlive segments × 100 round-robin navs — state preserved via Vue `<KeepAlive>`; wrapper cache bounded (markRaw reuse); mixed keepAlive/non-keepAlive — both modes count > 0; DOM element count stability |
-| v-link directive        | 1 file             | 4 tests    | 200 v-link elements — cursor:pointer + role + tabindex; mount/unmount × 100 cycles — bounded heap (WeakMap cleanup); v-link update × 100 — final-route navigation still works; click navigation after mass mount |
-| Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                  |
-| Transition hook         | 1 file             | 6 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck; mid-transition `router.stop()` — no unhandled rejections; mixed-duration concurrent guards (10/40/80 ms) — no zombie isTransitioning, last navigate wins |
-| shouldUpdateCache       | 1 file             | 5 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                         |
-| Suspense + lazy         | 1 file             | 3 tests    | 50 navs across two lazy `<RouteView.Match fallback>` segments — fallbacks never stuck after resolve; 100 mount/unmount cycles of a lazy Match — bounded heap; 50 fallback→content cycles per segment — bounded heap |
-| Combined SPA            | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; keepAlive tabs + 30 Links; remount after unmount                                                        |
+| Memory mount/unmount    | 1 file             | 3 tests    | Steady-state heap baselines for `useRouterTransition`/`useRouteNode`/`RouterErrorBoundary` (delta-per-iter reported)                                                                                                                                                                                                                                        |
+| Subscription fanout     | 1 file             | 4 tests    | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; 30 useRouteNode('users') — granular scoping; concurrent mount/unmount                                                                                                                                                                         |
+| Link mass rendering     | 1 file             | 6 tests    | 200 Links mount — correct DOM; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; 100 dynamic routeName updates                                                                                                                                                                                                            |
+| keepAlive cycling       | 1 file             | 5 tests    | 10 keepAlive segments × 100 round-robin navs — state preserved via Vue `<KeepAlive>`; wrapper cache bounded (markRaw reuse); mixed keepAlive/non-keepAlive — both modes count > 0; DOM element count stability                                                                                                                                              |
+| v-link directive        | 1 file             | 4 tests    | 200 v-link elements — cursor:pointer + role + tabindex; mount/unmount × 100 cycles — bounded heap (WeakMap cleanup); v-link update × 100 — final-route navigation still works; click navigation after mass mount                                                                                                                                            |
+| Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                                                                                                                                                                      |
+| Transition hook         | 1 file             | 6 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck; mid-transition `router.stop()` — no unhandled rejections; mixed-duration concurrent guards (10/40/80 ms) — no zombie isTransitioning, last navigate wins                                                    |
+| shouldUpdateCache       | 1 file             | 5 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                                                                                                                                                                                             |
+| Suspense + lazy         | 1 file             | 3 tests    | 50 navs across two lazy `<RouteView.Match fallback>` segments — fallbacks never stuck after resolve; 100 mount/unmount cycles of a lazy Match — bounded heap; 50 fallback→content cycles per segment — bounded heap                                                                                                                                         |
+| Combined SPA            | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; keepAlive tabs + 30 Links; remount after unmount                                                                                                                                                                                                                            |
 
 ## See Also
 

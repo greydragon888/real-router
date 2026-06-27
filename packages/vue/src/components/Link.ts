@@ -1,4 +1,4 @@
-import { canonicalJson, createActiveRouteSource } from "@real-router/sources";
+import { createActiveRouteSource } from "@real-router/sources";
 import { defineComponent, h, computed, shallowRef, watch } from "vue";
 
 import { useRouter } from "../composables/useRouter";
@@ -8,6 +8,7 @@ import {
   buildHref,
   buildActiveClassName,
   navigateWithHash,
+  shallowEqual,
 } from "../dom-utils";
 
 import type { Params, NavigationOptions } from "@real-router/core";
@@ -105,37 +106,52 @@ export const Link = defineComponent({
 
     const isActive = shallowRef(false);
 
-    // watch with an explicit dep getter recreates the source ONLY when the
-    // structural identity of routeName/routeParams/strict/ignoreQueryParams/
-    // hash changes — not on every parent rerender that hands a fresh
-    // `routeParams` literal with the same shape.
+    // Content-stable `routeParams` reference. A parent that hands an inline
+    // `:routeParams="{ id: 1 }"` literal allocates a fresh object on every
+    // render; keying the derivations below off that raw reference would re-run
+    // `buildHref` and re-subscribe the ActiveRouteSource on every unrelated
+    // parent update. `shallowEqual` collapses structurally-equal params to a
+    // stable reference (Object.is per key, order-insensitive — the same
+    // contract as the React adapter's Link `memo` comparator), so the `href`
+    // computed and the active `watch` bail out until params content actually
+    // changes.
     //
-    // Hot-path note: inline `:routeParams="{ id: 1 }"` in a parent template
-    // allocates a new object each render. Comparing by reference would
-    // tear down + recreate the ActiveRouteSource subscription on every
-    // unrelated parent state change. `canonicalJson(routeParams)` collapses
-    // structurally-equal objects to the same key-order-stable string, so the
-    // subscription persists across re-renders that don't change shape.
-    // (The source's own per-router cache uses the same canonical key under
-    // the hood — this watch dep just mirrors it at the consumer layer.)
+    // Hot path on Link-heavy pages: this replaces a per-navigation
+    // `canonicalJson` (JSON.stringify + key sort) with a per-navigation
+    // `shallowEqual` (no allocation), and lets same-shape navigations skip
+    // `buildHref` entirely. Nested-object param VALUES fall back to per-render
+    // recompute (shallowEqual compares them by reference) — stabilize with a
+    // `ref`/`computed` if it matters, exactly as documented for the React Link.
+    let cachedParams: Params = props.routeParams;
+    const stableParams = computed<Params>(() => {
+      const next = props.routeParams;
+
+      if (!shallowEqual(cachedParams, next)) {
+        cachedParams = next;
+      }
+
+      return cachedParams;
+    });
+
+    // Recreate the ActiveRouteSource ONLY when the Link's identity
+    // (routeName / params content / strict / ignoreQueryParams / hash) changes.
+    // `stableParams` already absorbs same-content param churn, so this dep
+    // array is reference-stable across navigations that don't change shape and
+    // the subscription persists.
     watch(
       () =>
         [
           props.routeName,
-          canonicalJson(props.routeParams),
+          stableParams.value,
           props.activeStrict,
           props.ignoreQueryParams,
           props.hash,
         ] as const,
       (
-        [routeName, _paramsKey, activeStrict, ignoreQueryParams, hash],
+        [routeName, routeParams, activeStrict, ignoreQueryParams, hash],
         _prev,
         onCleanup,
       ) => {
-        // Re-read the raw `routeParams` ref when constructing the source —
-        // canonicalJson was only used for change-detection above, the source
-        // factory still wants the live object.
-        const routeParams = props.routeParams;
         // Hash-aware active (#532): pass hash through so tab links with the
         // same routeName but different `hash` props don't all light up.
         const source = createActiveRouteSource(
@@ -162,7 +178,7 @@ export const Link = defineComponent({
       buildHref(
         router,
         props.routeName,
-        props.routeParams,
+        stableParams.value,
         props.hash === undefined ? undefined : { hash: props.hash },
       ),
     );

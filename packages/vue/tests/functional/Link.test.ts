@@ -488,6 +488,46 @@ describe("Link component", () => {
 
       expect(wrapper.find("a").classes()).toContain("active");
     });
+
+    it("should update href when routeParams CONTENT changes, and bail out on equal re-renders (shallowEqual memo)", async () => {
+      const currentParams = ref<{ id: number }>({ id: 1 });
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    Link,
+                    {
+                      routeName: "items.item",
+                      routeParams: currentParams.value,
+                    },
+                    { default: () => "Item" },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      expect(wrapper.find("a").attributes("href")).toBe("/items/1");
+
+      // Content change → the content-stable params memo updates, href follows.
+      currentParams.value = { id: 2 };
+      await flushPromises();
+
+      expect(wrapper.find("a").attributes("href")).toBe("/items/2");
+
+      // Fresh object literal with identical content → shallowEqual bail-out:
+      // the params reference stays stable, so href does not recompute or change.
+      currentParams.value = { id: 2 };
+      await flushPromises();
+
+      expect(wrapper.find("a").attributes("href")).toBe("/items/2");
+    });
   });
 
   describe("Default prop factories", () => {
