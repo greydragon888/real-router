@@ -13,8 +13,8 @@
 
 2. **Проанализируй изменения:**
    ```bash
-   git diff main...HEAD --stat
-   git diff main...HEAD
+   git diff master...HEAD --stat
+   git diff master...HEAD
    ```
 
 3. **Определи затронутые публичные пакеты:**
