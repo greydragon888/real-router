@@ -1,5 +1,7 @@
 // packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts
 
+import { RecursionDepthError } from "event-emitter";
+
 import { events } from "../../constants";
 import { routerEvents, routerStates } from "../../fsm";
 
@@ -88,6 +90,13 @@ export class EventBusNamespace {
   readonly #fsm: FSM<RouterState, RouterEvent, null, RouterPayloads>;
   readonly #emitter: EventEmitter<RouterEventMap>;
   readonly #leaveListeners: LeaveFn[] = [];
+
+  // Synchronous reentrancy depth of the subscribeLeave dispatch. A sync leave
+  // listener that calls navigate() re-enters `awaitLeaveListeners` on the same
+  // C-stack; bounded by `#maxEventDepth` to a controlled RecursionDepthError
+  // instead of a stack overflow (#935). 0 = disabled (mirrors the emitter).
+  #maxEventDepth = 0;
+  #leaveDispatchDepth = 0;
 
   #currentToState: State | undefined;
   #pendingToState: State | undefined;
@@ -363,8 +372,14 @@ export class EventBusNamespace {
   }
 
   /**
-   * End-user / UI-binding API for subscribing to confirmed route departures
-   * (`LEAVE_APPROVED` phase). Async listeners block the activation phase.
+   * End-user / UI-binding API for subscribing to **approved** route departures
+   * (`LEAVE_APPROVED` phase): all `canDeactivate` guards have passed, but the
+   * departure is **tentative, not committed** — an activation (`canActivate`)
+   * guard can still reject (or the target route be removed mid-transition),
+   * leaving the user on the current route (#932). Treat the leave as tentative
+   * for non-idempotent side-effects and use the payload `signal` (which aborts
+   * with the failure reason, #943) to roll back when the navigation does not
+   * commit. Async listeners block the activation phase.
    *
    * @remarks
    *
@@ -412,6 +427,27 @@ export class EventBusNamespace {
       return undefined;
     }
 
+    // Bound SYNCHRONOUS reentrancy: a sync subscribeLeave listener that calls
+    // navigate() re-enters this dispatch on the same C-stack, one navigate
+    // pipeline nested per hop. Unbounded, it overflows the stack (~615 deep)
+    // with a RangeError that escapes the SUPPRESSED_ERROR_CODES net and can leak
+    // as an unhandled rejection / wedge the worker (#935). Throw a controlled
+    // RecursionDepthError BEFORE that happens — the same sentinel and limit
+    // (`#maxEventDepth`) the EventEmitter applies to the plugin
+    // `onTransitionLeaveApprove` path, so both reentrancy routes are bounded
+    // identically. ASYNC reentrancy is unaffected: an async listener unwinds the
+    // stack at its first `await`, which runs after this sync loop's `finally`
+    // resets the counter, so the reentrant navigate sees depth 0. 0 = disabled
+    // (mirrors the EventEmitter's maxEventDepth === 0 opt-out).
+    if (
+      this.#maxEventDepth > 0 &&
+      this.#leaveDispatchDepth >= this.#maxEventDepth
+    ) {
+      throw new RecursionDepthError(
+        `Maximum recursion depth (${this.#maxEventDepth}) exceeded for subscribeLeave`,
+      );
+    }
+
     // Freeze the payload wrapper so listeners cannot mutate it (`payload.route`
     // is already deep-frozen via the State immutability invariant; this closes
     // the wrapper-mutation gap surfaced by audit `probe-05-payload-frozen`).
@@ -432,19 +468,28 @@ export class EventBusNamespace {
     // redundant and silently revert it).
     const snapshot = [...this.#leaveListeners];
 
-    for (const listener of snapshot) {
-      try {
-        const result = listener(leaveState);
+    // Elevated across the SYNC dispatch only: a reentrant sync navigate nests
+    // its own `awaitLeaveListeners` here and sees the raised depth; the `finally`
+    // restores it before any async tail (returned promise) runs.
+    this.#leaveDispatchDepth++;
 
-        if (result !== undefined && typeof result.then === "function") {
-          promises ??= [];
-          promises.push(result);
-        }
-      } catch (error: unknown) {
-        if (firstSyncError === undefined) {
-          firstSyncError = error;
+    try {
+      for (const listener of snapshot) {
+        try {
+          const result = listener(leaveState);
+
+          if (result !== undefined && typeof result.then === "function") {
+            promises ??= [];
+            promises.push(result);
+          }
+        } catch (error: unknown) {
+          if (firstSyncError === undefined) {
+            firstSyncError = error;
+          }
         }
       }
+    } finally {
+      this.#leaveDispatchDepth--;
     }
 
     if (promises === undefined) {
@@ -468,6 +513,7 @@ export class EventBusNamespace {
     warnListeners: number;
     maxEventDepth: number;
   }): void {
+    this.#maxEventDepth = limits.maxEventDepth;
     this.#emitter.setLimits(limits);
   }
 

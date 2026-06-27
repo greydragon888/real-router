@@ -447,6 +447,7 @@ export class NavigationNamespace {
     const externalSignal = nav.opts.signal;
     let onExternalAbort: (() => void) | undefined;
     let succeeded = false;
+    let failureReason: unknown;
 
     try {
       if (externalSignal) {
@@ -482,6 +483,8 @@ export class NavigationNamespace {
 
       return state;
     } catch (error) {
+      failureReason = error;
+
       routeTransitionError(deps, error, nav.toState, nav.fromState);
 
       throw error;
@@ -500,8 +503,9 @@ export class NavigationNamespace {
       }
 
       // Success drops the controller without aborting (the subscribeLeave signal
-      // must stay unaborted); cancel/error aborts it so captured signals fire.
-      this.#cleanupController(controller, !succeeded);
+      // must stay unaborted); cancel/error aborts it with the originating reason
+      // so captured signals expose the real cause via `signal.reason` (#943).
+      this.#cleanupController(controller, !succeeded, failureReason);
     }
   }
 
@@ -513,7 +517,7 @@ export class NavigationNamespace {
     fromState: State | undefined,
   ): void {
     if (controller) {
-      this.#cleanupController(controller, true);
+      this.#cleanupController(controller, true, error);
     }
 
     if (transitionStarted && toState) {
@@ -551,8 +555,10 @@ export class NavigationNamespace {
           controller.signal,
         );
       } catch (error) {
-        // A sync listener threw — the navigation fails; abort the leave signal.
-        this.#cleanupController(controller, true);
+        // A sync listener threw — the navigation fails; abort the leave signal
+        // with the thrown value so a listener that captured the signal sees the
+        // real cause via `signal.reason`, not a generic AbortError (#943).
+        this.#cleanupController(controller, true, error);
 
         throw error;
       }
@@ -600,10 +606,21 @@ export class NavigationNamespace {
    * navigation is cancelled or errors — never on success (#722). On the success
    * path pass `cancelled = false`: the reference is dropped without aborting, so
    * a listener that captured the signal still sees `aborted === false`.
+   *
+   * On the failure/cancellation path (`cancelled = true`) pass the originating
+   * `reason` so `signal.reason` carries router/error context (a `RouterError`,
+   * or the value a sync leave listener threw) — consistent with the cancellation
+   * abort `RouterError(TRANSITION_CANCELLED)`, not a generic `AbortError` (#943).
+   * `abort()` is idempotent: a controller already aborted by a superseding
+   * navigation keeps its first (also-meaningful) reason.
    */
-  #cleanupController(controller: AbortController, cancelled: boolean): void {
+  #cleanupController(
+    controller: AbortController,
+    cancelled: boolean,
+    reason?: unknown,
+  ): void {
     if (cancelled) {
-      controller.abort();
+      controller.abort(reason);
     }
 
     // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — controller identity-guard; cleanup correctness is enforced by #abortPreviousNavigation + the navigationId/isCurrentNav checks. Full suite stays green with `=== → !==` (nulls the wrong controller) and with the body removed (ref never nulled), so no mutant here is observable.

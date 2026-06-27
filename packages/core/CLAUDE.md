@@ -276,7 +276,7 @@ router.navigate(name, params, opts)
   ├── Guard pipeline (executeGuardPipeline)
   │   ├── Deactivation guards (innermost → outermost)
   │   ├── LEAVE_APPROVE phase: FSM forceState(LEAVE_APPROVED) + emitTransitionLeaveApprove()
-  │   │   └── subscribeLeave() callbacks fire here (confirmed departure, before activation)
+  │   │   └── subscribeLeave() callbacks fire here (approved/tentative departure, before activation — activation can still reject)
   │   └── Activation guards (outermost → innermost)
   │   Returns: undefined (all sync) | Promise<void> (async detected)
   │
@@ -575,7 +575,7 @@ const nav = getNavigator(router);
 | `isActiveRoute`     | Check if a route is active                                   |
 | `canNavigateTo`     | Check whether a route's guards would allow navigation — **synchronous, returns `boolean`** (never a Promise). An async guard on the path can't be evaluated synchronously, so it resolves to `false` (core stays silent; `@real-router/validation-plugin` logs a warning). Guards are invoked with `signal === undefined` (no AbortController — unlike `navigate`). Returns `true` for the current route (same-state is a no-op, not a guard rejection); before `start()` it runs the target's **activation** guards only (nothing to deactivate, so a blocking *deactivate* guard is not consulted). Throws `ROUTER_DISPOSED` after `dispose()` |
 | `subscribe`         | Subscribe to successful transitions. Fire-and-forget: returned Promises ignored, `navigate()` does not wait for async listener bodies. Throws `TypeError` when `listener` is not a function |
-| `subscribeLeave`    | Subscribe to confirmed route departures (LEAVE_APPROVED phase). Listener receives `{ route: fromState, nextRoute: toState, signal: AbortSignal }`. Async listeners are awaited — the activation phase blocks until all Promises settle. Throws `TypeError` when `listener` is not a function |
+| `subscribeLeave`    | Subscribe to **approved** route departures (LEAVE_APPROVED phase) — tentative, not committed: an activation guard can still reject. Listener receives `{ route: fromState, nextRoute: toState, signal: AbortSignal }` (the signal aborts with the failure reason if the navigation does not commit). Async listeners are awaited — the activation phase blocks until all Promises settle. Throws `TypeError` when `listener` is not a function |
 | `isLeaveApproved`   | Returns `true` when FSM is in LEAVE_APPROVED state (deactivation done, activation pending) |
 
 **Transition-in-flight signal.** `isLeaveApproved()` (public, on router and navigator) returns `true` only in the LEAVE_APPROVED phase (deactivation done, activation pending). There is **no public `isTransitioning()` method on the Router class today** — `isTransitioning()` exists only internally (`RouterInternals`, spanning TRANSITION_STARTED + LEAVE_APPROVED) for cross-namespace plumbing. Whether to promote it to the public surface is an open research question (ROI vs. `isLeaveApproved()` + `getState()` already covering the observable cases) — see issue #924.

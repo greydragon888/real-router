@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-27]
+
+### @real-router/core@0.61.3
+
+### Patch Changes
+
+- [#978](https://github.com/greydragon888/real-router/pull/978) [`4753d17`](https://github.com/greydragon888/real-router/commit/4753d17aeeb0a5313f2484bbe7dc4c5448c8a2e2) Thanks [@greydragon888](https://github.com/greydragon888)! - Correct the `subscribeLeave` contract: departures are approved, not confirmed ([#932](https://github.com/greydragon888/real-router/issues/932))
+
+  `subscribeLeave` fires in the `LEAVE_APPROVED` phase — after all `canDeactivate` guards pass, but **before** activation guards run — so the departure is **approved (tentative), not committed**: an activation (`canActivate`) guard can still reject, or the target route be removed mid-transition, leaving the user on the current route. The docs previously described this as a "confirmed" departure, which is misleading. Corrected the JSDoc, the core API reference, and the README to describe the departure as tentative and to point at the payload `signal` (now informative on failure — see [#943](https://github.com/greydragon888/real-router/issues/943)) as the rollback channel. Behavior is unchanged — documentation fix.
+
+- [#978](https://github.com/greydragon888/real-router/pull/978) [`4753d17`](https://github.com/greydragon888/real-router/commit/4753d17aeeb0a5313f2484bbe7dc4c5448c8a2e2) Thanks [@greydragon888](https://github.com/greydragon888)! - Bound synchronous reentrant `subscribeLeave` navigation ([#935](https://github.com/greydragon888/real-router/issues/935))
+
+  A sync `subscribeLeave` listener that calls `navigate()` re-enters the leave dispatch on the same call stack, nesting one navigation pipeline per hop. Unbounded, it overflowed the C stack (~615 deep) with a `RangeError` that escaped the fire-and-forget suppression net and could leak as an unhandled rejection or wedge the worker.
+
+  The leave dispatch is now depth-bounded by `maxEventDepth` (default 5) — the same limit the event emitter already applies to the plugin `onTransitionLeaveApprove` path — raising a controlled `RecursionDepthError` before the stack overflows, so both reentrancy routes are bounded identically. **Async** reentrant `subscribeLeave` navigation is unaffected (it unwinds the stack at each `await`), and `maxEventDepth: 0` opts out of the bound (mirroring the emitter).
+
+- [#978](https://github.com/greydragon888/real-router/pull/978) [`4753d17`](https://github.com/greydragon888/real-router/commit/4753d17aeeb0a5313f2484bbe7dc4c5448c8a2e2) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `subscribeLeave` `signal.reason` on the failure path ([#943](https://github.com/greydragon888/real-router/issues/943))
+
+  When a navigation fails after the `LEAVE_APPROVED` phase — a sync `subscribeLeave` listener throws, or an activation guard rejects — the leave `signal` now aborts with the originating error as `signal.reason`: a `RouterError` (e.g. `CANNOT_ACTIVATE`) or the exact value the listener threw, instead of a generic `DOMException [AbortError]`. This makes the failure path consistent with the cancellation path, which already aborts with `RouterError(TRANSITION_CANCELLED)`. A listener that stashes the `signal` and inspects `reason` asynchronously can now tell _why_ the departure was reverted.
+
 ## [2026-06-26]
 
 ### @real-router/core@0.61.2
