@@ -45,6 +45,9 @@ setGlobal(
   "cancelAnimationFrame",
   dom.window.cancelAnimationFrame.bind(dom.window),
 );
+// jsdom doesn't implement scrollTo; routers (TanStack) may call it on navigation.
+dom.window.scrollTo = (() => {}) as typeof globalThis.scrollTo;
+setGlobal("scrollTo", dom.window.scrollTo);
 
 export { dom };
 
