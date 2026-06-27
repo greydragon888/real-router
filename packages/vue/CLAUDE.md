@@ -446,6 +446,28 @@ Works with both `keepAlive` and non-`keepAlive` modes. Without `fallback`, no `<
 <Link routeName="users" /> // Active even if ?page=2 differs
 ```
 
+### Object Params and Memoization
+
+`<Link>` stabilizes `routeParams` by **content** (`shallowEqual` — `Object.is`
+per key, key-order-insensitive), so an inline `:routeParams="{ id: 1 }"` literal
+that a parent re-creates on every render does **not** re-run `buildHref` or
+re-subscribe the active source. This is the hot path on Link-heavy pages and the
+same contract as the React adapter's `Link` `memo`.
+
+Caveat: nested object/array param **values** are compared by reference, not deep:
+
+```typescript
+// flat params — stable across re-renders, recomputes only on real change
+<Link routeName="items.item" :routeParams="{ id: 1 }" /> // {id:1} ≡ {id:1}
+
+// nested value — fresh ref each render → href/active recompute every render
+<Link routeName="search" :routeParams="{ filters: [1, 2] }" />
+
+// stabilize nested params with a ref/computed if it matters:
+const params = computed(() => ({ filters: [1, 2] }));
+<Link routeName="search" :routeParams="params" />
+```
+
 ### `<Link hash>` Prop (#532)
 
 `hash?: string` — URL fragment (decoded, no leading `#`). Tri-state:
@@ -541,7 +563,7 @@ See also: [Vue Integration — Server-Side Rendering](https://github.com/greydra
 - `RouterErrorBoundary` uses `createDismissableError` — shared error source with integrated dismissal state (no local `useRouterError` composable)
 - `useIsActiveRoute` uses cached `createActiveRouteSource` — params hashed via `canonicalJson` (key-order-insensitive)
 - No `memo()` needed — Vue tracks ref dependencies automatically
-- `Link` uses `computed()` for `href` and `class` derivation, `useIsActiveRoute` for active state
+- `Link` content-stabilizes `routeParams` with `shallowEqual` (Object.is per key, order-insensitive — the same contract as the React adapter's `Link` `memo`), so an inline `:routeParams="{ id }"` literal from a re-rendering parent does **not** re-run `buildHref` or `canonicalJson` every navigation; `href` and active-class are `computed()` off the stabilized params + `useIsActiveRoute`. Same-shape navigations skip both derivations entirely (~18% faster on the Link-heavy `vs-tanstack` Vue bench)
 - All WeakMap caches live in `@real-router/sources` — auto-evicted on router GC, no local caches in this adapter
 - `EMPTY_PARAMS` and `EMPTY_OPTIONS` frozen singletons avoid allocation for default props
 - keepAlive wrapper components cached with `markRaw` to prevent Vue from proxying them
