@@ -18,11 +18,31 @@ name: CodSpeed
 # regression threshold / gate semantics live in the CodSpeed project settings,
 # not here — this workflow only runs the suite under instrumentation and uploads.
 
+# ⏸ TEMPORARILY DISABLED (2026-06-27). The `simulation` gate is invalid on
+# GitHub's heterogeneous `ubuntu-latest` pool: base and head land on different
+# CPUs (AMD EPYC vs Intel Xeon), so callgrind emits different instruction counts
+# and every PR red-flags with phantom ±30–4000% swings — proven by master→master
+# runs drifting ±34% with zero code change
+# (root cause: https://codspeed.io/blog/unrelated-benchmark-regression).
+#
+# TO RE-ENABLE (planned in 1–2 months, once an x64 4-core GitHub Large Runner is
+# rented for consistent hardware — ~$0.012/min):
+#   1. Uncomment the `push` + `pull_request` triggers below.
+#   2. Change `runs-on: ubuntu-latest` → the larger-runner label (e.g. `runs-on:
+#      [self-hosted, linux, x64, codspeed-4core]` or the GitHub larger-runner
+#      group name). Same x64 arch → no harness/baseline rebuild, `simulation`
+#      stays as-is.
+# Alternative (free): transfer the repo to a GitHub org and switch to
+# `runs-on: codspeed-macro` + `mode: walltime` (Macro Runners are org-only and
+# walltime-only — needs a harness rebuild and a fresh baseline).
+#
+# Kept on `workflow_dispatch` so the suite can still be run manually meanwhile;
+# CodSpeed is NOT a required status check, so disabling it does not gate merges.
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+  # push:
+  #   branches: [master]
+  # pull_request:
+  #   branches: [master]
   # Lets CodSpeed trigger a backtest run to seed the initial baseline data.
   workflow_dispatch:
 
