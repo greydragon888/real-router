@@ -18,6 +18,8 @@ setGlobal("document", dom.window.document);
 setGlobal("self", dom.window);
 setGlobal("navigator", dom.window.navigator);
 setGlobal("location", dom.window.location);
+// TanStack's setupScrollRestoration reads the global `history` on router init.
+setGlobal("history", dom.window.history);
 setGlobal("HTMLElement", dom.window.HTMLElement);
 setGlobal("Element", dom.window.Element);
 setGlobal("Node", dom.window.Node);
@@ -46,7 +48,7 @@ setGlobal(
   dom.window.cancelAnimationFrame.bind(dom.window),
 );
 // jsdom doesn't implement scrollTo; routers (TanStack) may call it on navigation.
-dom.window.scrollTo = (() => {}) as typeof globalThis.scrollTo;
+dom.window.scrollTo = () => {};
 setGlobal("scrollTo", dom.window.scrollTo);
 
 export { dom };
