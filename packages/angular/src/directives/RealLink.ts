@@ -12,6 +12,7 @@ import { createActiveRouteSource } from "@real-router/sources";
 import { buildHref, navigateWithHash, shouldNavigate } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
 import { buildActiveRouteOptions } from "../internal/buildActiveRouteOptions";
+import { createStableParams } from "../internal/createStableParams";
 import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
 import type { Params, NavigationOptions } from "@real-router/core";
@@ -43,6 +44,13 @@ export class RealLink {
   private readonly anchor = inject(ElementRef)
     .nativeElement as HTMLAnchorElement;
   private readonly isActive = signal(false);
+  // Content-stable `routeParams` (#988). Angular re-allocates an inline
+  // `[routeParams]="{ id: 1 }"` literal on every change detection, so the raw
+  // signal input changes identity each navigation even when the param content
+  // is unchanged. Feeding the stabilized signal to the `href` computed and the
+  // source-creation effect lets both bail (Object.is on the cached reference)
+  // until param content actually changes — mirrors the Vue `<Link>` fix.
+  private readonly stableParams = createStableParams(this.routeParams);
   // `href` is computed from signal inputs only — Angular's default Object.is
   // equality already collapses repeated `string` results, so no custom
   // comparator is required (review §8b note 3 — applies after verifying that
@@ -53,7 +61,7 @@ export class RealLink {
     return buildHref(
       this.router,
       this.routeName(),
-      this.routeParams(),
+      this.stableParams(),
       hashValue === undefined ? undefined : { hash: hashValue },
     );
   });
@@ -74,7 +82,7 @@ export class RealLink {
       const source = createActiveRouteSource(
         this.router,
         this.routeName(),
-        this.routeParams(),
+        this.stableParams(),
         buildActiveRouteOptions(
           this.activeStrict(),
           this.ignoreQueryParams(),

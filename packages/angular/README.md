@@ -430,6 +430,20 @@ Navigation directive for `<a>` elements. Handles click events, sets `href`, and 
 
 Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/hash-examples/link-hash/`](../../examples/web/react/hash-examples/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
 
+#### Object `routeParams` — content-stabilized
+
+`RealLink` and `RealLinkActive` stabilize `routeParams` by **content** (`shallowEqual` — `Object.is` per key, key-order-insensitive), so an inline `[routeParams]="{ id: '123' }"` literal that Angular re-allocates on every change detection does **not** re-create the active-route source or re-run `buildHref` until the param content actually changes (#988). Binding a stable reference (a component field or signal) was already churn-free; this closes the gap for inline literals.
+
+Caveat: nested object/array param **values** are compared by reference, not deep — stabilize them with a `signal`/`computed` if it matters:
+
+```ts
+// flat params — stable across change detection, recompute only on real change
+@Component({ template: `<a realLink routeName="items.item" [routeParams]="{ id }" />` })
+// nested value — fresh ref each CD → href/active recompute every CD; stabilize:
+readonly params = computed(() => ({ filters: [1, 2] }));
+// <a realLink routeName="search" [routeParams]="params()" />
+```
+
 ### `[realLinkActive]`
 
 Applies an active CSS class to any element when a route is active. Use this when you need active state on a non-`<a>` element, or when the clickable element and the styled element are different.
@@ -708,6 +722,8 @@ The adapter is signal-first and does not depend on Zone.js. It works with `provi
 ### Reactive Source Setup via `effect()` (#630)
 
 `RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources inside `effect(...)` blocks scheduled from the **constructor** (not `ngOnInit`). Reading signal inputs inside `effect()` makes the source-creation REACTIVE — when `[realLink]`, `[routeParams]`, `[hash]`, `[realLinkActive]`, or `[routeNode]` change in AOT, the effect tears down the previous source via `onCleanup` and creates a new one with the current input values. The legacy `ngOnInit` setup captured inputs once at mount and produced a real AOT bug (#630). Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef`.
+
+In `RealLink` / `RealLinkActive`, `[routeParams]` is routed through `shallowEqual` content-stabilization before the effect reads it, so an inline-literal binding re-allocated on every change detection only re-creates the source on real content change (see [Object `routeParams`](#object-routeparams--content-stabilized), #988).
 
 ## Signal Bridge
 
