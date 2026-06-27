@@ -17,12 +17,10 @@
    git diff master...HEAD
    ```
 
-3. **Определи затронутые публичные пакеты:**
-   - `@real-router/core`, `@real-router/react`, `@real-router/browser-plugin`
-   - `@real-router/helpers`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`
-   - `@real-router/logger`, `@real-router/types`
-
-   НЕ включай private: `route-tree`, `search-params`, `type-guards`, `router-benchmarks`
+3. **Определи затронутые публичные пакеты по полю `private` в их `package.json`, а не по статическому списку** — список пакетов дрейфует (адаптеры `vue`/`solid`/`svelte`/`preact`/`angular`, новые плагины), и хардкод устаревает:
+   - Для каждого затронутого пакета: `node -p "require('./packages/<pkg>/package.json').private || 'PUBLIC'"`. `PUBLIC` → changeset нужен; `true` → пропусти (для private-пакета changeset делается на его публичного consumer'а, чьё поведение изменилось).
+   - Все `packages/*` без `"private": true` — публичные (на текущий момент: `core`, `core-types`/`types`, `helpers`, `logger`, все адаптеры `react`/`preact`/`solid`/`vue`/`svelte`/`angular`, все `*-plugin`, `sources`, `path-matcher`).
+   - НЕ включай private: `route-tree`, `search-params`, `type-guards`, `router-benchmarks` (и любой другой с `"private": true`).
 
 4. **Определи тип изменения:**
    - `major` — breaking changes
