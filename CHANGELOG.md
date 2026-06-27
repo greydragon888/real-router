@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-27]
 
+### @real-router/core@0.61.6
+
+### Patch Changes
+
+- [#979](https://github.com/greydragon888/real-router/pull/979) [`d160e0b`](https://github.com/greydragon888/real-router/commit/d160e0b1618ef169aea2894688b889c6f7beea4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `canNavigateTo` over-checking shared-ancestor guards that `navigate` skips ([#970](https://github.com/greydragon888/real-router/issues/970))
+
+  `canNavigateTo` built its `toState` without route-meta, so `getTransitionPath` took its meta-less fast path and (de)activated the entire route chain — including ancestor segments shared with the current route, which `navigate` leaves mounted and never re-guards. A guard on a shared parent (e.g. a `canDeactivate` "block on unsaved changes" on a section route) therefore made `canNavigateTo` return `false` for an intra-section navigation that `navigate` would resolve — a false-negative ("Link disabled though the click would succeed"). `canNavigateTo` now builds `toState` the same way `navigate` does (with route-meta and normalized params), restoring strict parity with `navigate`'s guard set. This also fixes the documented innermost-first deactivation guard order and the `normalizeParams` drift that exposed an `{ x: undefined }` key to guards.
+
+- [#979](https://github.com/greydragon888/real-router/pull/979) [`d160e0b`](https://github.com/greydragon888/real-router/commit/d160e0b1618ef169aea2894688b889c6f7beea4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Log a warning when a sync guard throws in `canNavigateTo` ([#959](https://github.com/greydragon888/real-router/issues/959))
+
+  A guard that threw inside `canNavigateTo` was caught and converted to `false` with no log, event, or re-throw — a crashed guard was indistinguishable from one that legitimately blocked the navigation. `navigate()` surfaces the same throw via `handleGuardError` → `TRANSITION_ERROR`, but the synchronous predicate has no error channel, so core now logs the throw directly via `logger.warn` (an operational signal, distinct from the opt-in `@real-router/validation-plugin` DX warnings) before returning `false`.
+
+
 ### @real-router/core@0.61.5
 
 ### Patch Changes
