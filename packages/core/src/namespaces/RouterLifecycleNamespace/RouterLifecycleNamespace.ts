@@ -6,9 +6,7 @@ import { RouterError } from "../../RouterError";
 import type { RouterLifecycleDependencies } from "./types";
 import type { NavigationOptions, State } from "@real-router/types";
 
-const REPLACE_OPTS: NavigationOptions = { replace: true };
-
-Object.freeze(REPLACE_OPTS);
+const REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 
 /**
  * Independent namespace for managing router lifecycle.
