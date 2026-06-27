@@ -327,13 +327,16 @@ describe("core/observable", () => {
         expect(next.name).toBe("orders");
       });
 
-      // (b) An async listener whose returned Promise rejects is NOT caught by
-      // core (subscribe is fire-and-forget) — it leaks as a process-level
-      // `unhandledRejection`. This is the documented Bug #2 (intentionally not
-      // fixed here). Asserted via the repo's captureUnhandledRejections helper,
-      // which detaches/restores ambient listeners so the leak cannot fail the
-      // wider run. See packages/core/CLAUDE.md "subscribe" fire-and-forget note.
-      it("should leak an async listener's rejection as unhandledRejection (Bug #2)", async () => {
+      // (b) An async listener whose returned Promise rejects is ISOLATED by
+      // core: the subscribe wrapper attaches a `.catch` that routes the
+      // rejection to the same `onListenerError` sink as a synchronous throw
+      // (#944). It must NOT leak as a process-level `unhandledRejection` (fatal
+      // under `--unhandled-rejections=strict`, the Node 22+ default). Asserted
+      // via the repo's captureUnhandledRejections helper. Symmetric with
+      // subscribeLeave, which isolates rejections via `Promise.allSettled`.
+      it("should isolate an async listener's rejection instead of leaking it (#944)", async () => {
+        vi.spyOn(logger, "error").mockImplementation(noop);
+
         // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fire-and-forget async listener under test
         router.subscribe(async () => {
           throw new Error("async-subscribe-boom");

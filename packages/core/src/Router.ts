@@ -70,6 +70,14 @@ const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
   errorCodes.CANNOT_DEACTIVATE,
 ]);
 
+// Shared per-listener error sink: the EventEmitter reports synchronous listener
+// throws through it, and the EventBusNamespace.subscribe wrapper routes an async
+// listener's rejected Promise through the SAME sink (#944) so both failure modes
+// land in one place.
+function logListenerError(eventName: string, error: unknown): void {
+  logger.error("Router", `Error in listener for ${eventName}:`, error);
+}
+
 /**
  * Router class with integrated namespace architecture.
  *
@@ -174,9 +182,7 @@ export class Router<
     const routerFSM = createRouterFSM();
 
     const emitter = new EventEmitter<RouterEventMap>({
-      onListenerError: (eventName, error) => {
-        logger.error("Router", `Error in listener for ${eventName}:`, error);
-      },
+      onListenerError: logListenerError,
       onListenerWarn: (eventName, count) => {
         logger.warn(
           "router.addEventListener",
@@ -185,7 +191,11 @@ export class Router<
       },
     });
 
-    this.#eventBus = new EventBusNamespace({ routerFSM, emitter });
+    this.#eventBus = new EventBusNamespace({
+      routerFSM,
+      emitter,
+      onListenerError: logListenerError,
+    });
 
     // =========================================================================
     // Wire Dependencies
