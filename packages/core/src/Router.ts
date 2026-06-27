@@ -264,6 +264,10 @@ export class Router<
       emitTransitionError: (error) => {
         this.#eventBus.sendFailSafe(undefined, this.#state.get(), error);
       },
+      emitTransitionSuccess: (toState, fromState, opts) => {
+        this.#eventBus.emitTransitionSuccess(toState, fromState, opts);
+      },
+      navigateToNotFound: (path) => this.#navigation.navigateToNotFound(path),
       start: createInterceptable(
         "start",
         (path: string) => {

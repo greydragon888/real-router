@@ -1,7 +1,12 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter, errorCodes, RouterError } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  RouterError,
+  UNKNOWN_ROUTE,
+} from "@real-router/core";
 import {
   getLifecycleApi,
   getPluginApi,
@@ -558,16 +563,39 @@ describe("core/routes/replaceRoutes", () => {
       expect(router.getState()?.name).toBe("index");
     });
 
-    it("should clear state if current route removed from new tree", async () => {
+    it("notifies router.subscribe listeners when replace() revalidates the active state (#950)", async () => {
+      await router.navigate("index");
+
+      const seen: (string | undefined)[] = [];
+
+      router.subscribe(({ route }) => seen.push(route?.name));
+
+      routesApi.replace([
+        { name: "index", path: "/" },
+        { name: "about", path: "/about" },
+      ]);
+
+      // Before #950 the revalidation wrote state without emitting, so the
+      // listener stayed silent and adapters rendered the pre-replace state.
+      expect(seen).toContain("index");
+    });
+
+    it("surfaces UNKNOWN_ROUTE and notifies subscribers if the active route is removed from the new tree (#950)", async () => {
       await router.navigate("index");
 
       expect(router.getState()?.name).toBe("index");
 
-      // Replace without home
+      const seen: (string | undefined)[] = [];
+
+      router.subscribe(({ route }) => seen.push(route?.name));
+
+      // Replace without index — the active route no longer matches.
       routesApi.replace([{ name: "completely-new", path: "/completely-new" }]);
 
-      // State is cleared — home no longer exists
-      expect(router.getState()).toBeUndefined();
+      // Dropped route surfaces as not-found (was a silent clear before #950),
+      // and the subscriber is notified.
+      expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
+      expect(seen).toContain(UNKNOWN_ROUTE);
     });
 
     it("should not throw when state is undefined (router not started)", () => {
@@ -582,14 +610,16 @@ describe("core/routes/replaceRoutes", () => {
       expect(getPluginApi(unstartedRouter).matchPath("/new")?.name).toBe("new");
     });
 
-    it("should clear state after replace([]) when router was navigated", async () => {
+    it("surfaces UNKNOWN_ROUTE after replace([]) when router was navigated (#950)", async () => {
       await router.navigate("index");
 
       expect(router.getState()?.name).toBe("index");
 
       routesApi.replace([]);
 
-      expect(router.getState()).toBeUndefined();
+      // The active route is gone with no replacement — not-found, not a silent
+      // clear (#950).
+      expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
     });
   });
 

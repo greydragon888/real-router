@@ -33,10 +33,12 @@ import type { GuardFnFactory, Route } from "../types";
 import type {
   DefaultDependencies,
   ForwardToCallback,
+  GuardFn,
+  NavigationOptions,
   Params,
   RouteConfigUpdate,
   Router,
-  TransitionMeta,
+  State,
   TreeChangedEvent,
   TreeStructuralPatch,
 } from "@real-router/types";
@@ -45,6 +47,14 @@ import type { RouteDefinition, RouteTree } from "route-tree";
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Opts attached to the `TRANSITION_SUCCESS` emitted by `replace()` when it
+ * revalidates the active state (#950). `replace` does not push history, so it
+ * is a replace-type success — matching `navigateToNotFound`'s opts for the
+ * dropped-route branch.
+ */
+const REVALIDATE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 
 /**
  * Clears all config entries and lifecycle handlers for a removed route
@@ -458,8 +468,7 @@ function replaceRoutes<
   store: RoutesStore<Dependencies>,
   routes: Route<Dependencies>[],
   ctx: RouterInternals<Dependencies>,
-  currentPath: string | undefined,
-  previousTransition: TransitionMeta | undefined,
+  currentState: State | undefined,
   onCommitted?: () => void,
 ): void {
   // Reject within-batch duplicate names BEFORE building/swapping (#968) — the
@@ -484,18 +493,30 @@ function replaceRoutes<
   // yet revalidated, so the handler sees the new tree and the still-old state.
   onCommitted?.();
 
-  // Revalidate state (preserve transition from previous state)
-  if (currentPath !== undefined) {
-    const revalidated = ctx.matchPath(currentPath, ctx.getOptions());
+  // Revalidate the active state against the new tree AND notify subscribers
+  // (#950). A structural replace can change or drop the currently-active state;
+  // emitting TRANSITION_SUCCESS makes router.subscribe / useSyncExternalStore
+  // adapters re-render instead of rendering the pre-replace state. (This is the
+  // one structural mutation that emits a transition event — clear() stays a
+  // silent reset; the asymmetry is deliberate, see #950.)
+  if (currentState !== undefined) {
+    const revalidated = ctx.matchPath(currentState.path, ctx.getOptions());
 
     if (revalidated) {
-      ctx.setState({
+      // Path still matches — commit the revalidated state (preserving the prior
+      // transition meta) and emit so subscribers see it.
+      const nextState: State = {
         ...revalidated,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- previousTransition is guaranteed defined: currentPath is only set when getState() returned a state, which always has transition
-        transition: previousTransition!,
-      });
+        transition: currentState.transition,
+      };
+
+      ctx.setState(nextState);
+      ctx.emitTransitionSuccess(nextState, currentState, REVALIDATE_OPTS);
     } else {
-      ctx.clearState();
+      // The active route no longer exists in the new tree — surface it as
+      // not-found (commits UNKNOWN_ROUTE + emits TRANSITION_SUCCESS) so the
+      // change is observable, rather than silently clearing the state.
+      ctx.navigateToNotFound(currentState.path);
     }
   }
 }
@@ -575,6 +596,37 @@ function commitScalarConfig<
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided encoder violates its return type
         encoder(params) ?? params;
     }
+  }
+}
+
+/**
+ * COMMIT step for one guard field of an update (#951). `undefined` is a no-op;
+ * `null` clears the DEFINITION-origin guard only, preserving an external guard
+ * (#952); a factory installs together with its PREPARE-phase `precompiledFn`
+ * (no re-compile — #956 seam). Extracted from `update()` so its prepare/commit
+ * orchestration stays within the cognitive-complexity budget.
+ */
+function commitGuardUpdate<Dependencies extends DefaultDependencies>(
+  lifecycle: RouteLifecycleNamespace<Dependencies>,
+  kind: "activate" | "deactivate",
+  name: string,
+  value: GuardFnFactory<Dependencies> | null | undefined,
+  precompiledFn: GuardFn | undefined,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (kind === "activate") {
+    if (value === null) {
+      lifecycle.clearCanActivate(name, true);
+    } else {
+      lifecycle.addCanActivate(name, value, true, precompiledFn);
+    }
+  } else if (value === null) {
+    lifecycle.clearCanDeactivate(name, true);
+  } else {
+    lifecycle.addCanDeactivate(name, value, true, precompiledFn);
   }
 }
 
@@ -845,27 +897,17 @@ export function getRoutesApi<
         encodeParams,
       });
 
-      if (canActivate !== undefined) {
-        if (canActivate === null) {
-          // `definitionOnly` (#952): update() owns the DEFINITION-origin guard,
-          // so clearing it must not wipe an external guard added via
-          // getLifecycleApi().addActivateGuard().
-          lifecycle.clearCanActivate(name, true);
-        } else {
-          // Install the factory together with its precompiled function — no
-          // re-compile, so the prepare-phase invocation is the only one.
-          lifecycle.addCanActivate(name, canActivate, true, activateFn);
-        }
-      }
-
-      if (canDeactivate !== undefined) {
-        if (canDeactivate === null) {
-          // Definition-only clear, symmetric with canActivate above (#952).
-          lifecycle.clearCanDeactivate(name, true);
-        } else {
-          lifecycle.addCanDeactivate(name, canDeactivate, true, deactivateFn);
-        }
-      }
+      // Install the guards from their PREPARE-phase precompiled functions; a
+      // `null` clears the definition-origin guard only (#952). See
+      // commitGuardUpdate.
+      commitGuardUpdate(lifecycle, "activate", name, canActivate, activateFn);
+      commitGuardUpdate(
+        lifecycle,
+        "deactivate",
+        name,
+        canDeactivate,
+        deactivateFn,
+      );
 
       // Conditional emit: structural fields only, built from the destructured
       // locals (so user getters are not re-invoked). A guard-only or empty
@@ -956,8 +998,7 @@ export function getRoutesApi<
         store,
         routeArray,
         ctx,
-        currentState?.path,
-        currentState?.transition,
+        currentState,
         before === undefined
           ? undefined
           : () => {
