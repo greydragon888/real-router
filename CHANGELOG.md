@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-27]
 
+### @real-router/core@0.61.8
+
+### Patch Changes
+
+- [#992](https://github.com/greydragon888/real-router/pull/992) [`22aa1e4`](https://github.com/greydragon888/real-router/commit/22aa1e42fcc53dcabeb786d48a7bef59f923cd23) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: `add()` / `replace()` are now atomic for a guard factory that throws on compile ([#956](https://github.com/greydragon888/real-router/issues/956))
+
+  A guard factory passed via route config to `add`/`replace` that threw on compile (or returned a non-function) used to throw **after** the tree/config swap in `adoptRouteArtifacts`, leaving the store torn — the new route(s) were already in the tree even though the call rejected. `adoptRouteArtifacts` now compiles every pending guard factory **before** the swap, so a malformed factory aborts the mutation with the store untouched — completing the prepare-then-commit atomicity of [#698](https://github.com/greydragon888/real-router/issues/698) (previously atomic only for core build errors, not for guard factories). Guards are compiled once: the pre-compiled function is installed without re-invoking the factory, so a factory with compile-time side effects still runs exactly once.
+
+- [#992](https://github.com/greydragon888/real-router/pull/992) [`22aa1e4`](https://github.com/greydragon888/real-router/commit/22aa1e42fcc53dcabeb786d48a7bef59f923cd23) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: `update(name, { canActivate: null })` no longer clears an external guard (origin-selective clear) ([#952](https://github.com/greydragon888/real-router/issues/952))
+
+  `clearCanActivate` / `clearCanDeactivate` were origin-blind — they deleted both the definition-sourced and the external guard for a route. So `update(name, { canActivate: null })` (which only manages the route-config / definition guard) also wiped a guard registered independently via `getLifecycleApi().addActivateGuard()`. Both clear methods now take a `definitionOnly` flag, and `update`'s `canActivate: null` / `canDeactivate: null` branches pass it — clearing only the definition slot and recompiling the surviving external guard. Route removal / `clearAll` keep clearing both slots (the default).
+
+- [#992](https://github.com/greydragon888/real-router/pull/992) [`22aa1e4`](https://github.com/greydragon888/real-router/commit/22aa1e42fcc53dcabeb786d48a7bef59f923cd23) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: guard registration rollback preserves the previously-valid guard on overwrite-then-throw ([#963](https://github.com/greydragon888/real-router/issues/963))
+
+  Registering a guard onto a slot that already held one, with a factory that throws on compile, used to leave the slot empty — the rollback ran `targetMap.delete(name)` + `functions.delete(name)`, silently dropping the still-valid previous guard. `#registerHandler` now captures the slot's prior factory before the overwrite and, on a compile throw, restores it (recompiling its function via `#recompileSlot`) instead of clearing the slot. A failed overwrite via `addActivateGuard` / `addDeactivateGuard` now leaves the previously-registered guard intact.
+
+- [#992](https://github.com/greydragon888/real-router/pull/992) [`22aa1e4`](https://github.com/greydragon888/real-router/commit/22aa1e42fcc53dcabeb786d48a7bef59f923cd23) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: `replace()` notifies `router.subscribe` listeners when it revalidates the active state ([#950](https://github.com/greydragon888/real-router/issues/950))
+
+  `getRoutesApi(router).replace(routes)` revalidated the currently-active state at the end of the swap by writing it directly (`setState` / `clearState`) without emitting a transition event — only the internal `TREE_CHANGED` fired. So `router.subscribe` / `useSyncExternalStore` adapters kept rendering the pre-replace state. Revalidation now emits `TRANSITION_SUCCESS`: when the active path still matches it commits the revalidated state and emits; when the active route was dropped it routes through `navigateToNotFound` (commits `UNKNOWN_ROUTE`, emits) instead of silently clearing.
+
+  **Behavior change:** after a `replace()` that drops the active route, `getState()` is now `UNKNOWN_ROUTE` (was `undefined`), and plugins' `onTransitionSuccess` fires for a `replace()` revalidation. `clear()` stays a silent structural reset (the asymmetry is intentional — `clear` has no next state for adapters to render; `replace` does).
+
+- [#992](https://github.com/greydragon888/real-router/pull/992) [`22aa1e4`](https://github.com/greydragon888/real-router/commit/22aa1e42fcc53dcabeb786d48a7bef59f923cd23) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: `update(name, { forwardTo })` rejects an async callback at update time (parity with add/replace) ([#967](https://github.com/greydragon888/real-router/issues/967))
+
+  `add` / `replace` reject an async `forwardTo` callback at registration (`assertForwardToNotAsync` → "forwardTo callback cannot be async for route …"), but `update`'s path stored it silently — the failure then surfaced at navigation as a generic `TypeError: forwardTo callback must return a string, got object`. `updateForwardTo` now runs the same `assertForwardToNotAsync` check first, so `update(name, { forwardTo: async () => … })` throws the actionable, route-named error at registration, matching `add`/`replace`.
+
+- [#992](https://github.com/greydragon888/real-router/pull/992) [`22aa1e4`](https://github.com/greydragon888/real-router/commit/22aa1e42fcc53dcabeb786d48a7bef59f923cd23) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: `update()` is now atomic across its whole field set (prepare-then-commit) ([#951](https://github.com/greydragon888/real-router/issues/951))
+
+  `update(name, updates)` applied its fields sequentially, so a throw partway through left a partial update — most notably a `forwardTo` committed first, then a guard-factory registration threw, leaving the new `forwardTo` live while the guard change was not (and likewise a custom field committed before a rejected async `forwardTo`). `update()` now runs a PREPARE phase that computes and validates every field into locals — an async/cyclic `forwardTo` ([#967](https://github.com/greydragon888/real-router/issues/967)), a guard factory that throws on compile, and a throwing custom-field getter all surface here — followed by a COMMIT phase of pure, non-throwing writes. A failing `update()` therefore leaves the route's prior config fully intact. Guard factories are compiled once during PREPARE and installed without re-invoking (reusing the [#956](https://github.com/greydragon888/real-router/issues/956) compile-then-install seam), so a factory side effect still runs exactly once.
+
+
 ### @real-router/vue@0.15.8
 
 ### Patch Changes
