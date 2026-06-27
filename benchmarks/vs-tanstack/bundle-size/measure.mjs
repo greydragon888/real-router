@@ -1,12 +1,20 @@
 #!/usr/bin/env node
 /**
  * Bundle-size measurement for vs-tanstack fixtures. Builds are done separately
- * (vite build per fixture); this script measures the emitted client JS of every
- * built fixture and prints a comparison table in raw/gzip/brotli. Gzip is the
- * primary competitive signal (matches TanStack's bundle-size methodology).
+ * (vite build per fixture); this script measures the emitted client JS.
  *
- * Run from the benchmarks/ workspace root:
+ * TWO metrics, because the raw total is misleading on its own:
+ *  - TOTAL client JS — the whole app bundle, framework runtime included. This is
+ *    what TanStack's bundle-size methodology reports, but it is dominated by the
+ *    framework (react-dom ~59 KB gzip, vue ~23 KB, solid ~3 KB), so the absolute
+ *    number looks huge and hides the router's actual contribution.
+ *  - ROUTER-ATTRIBUTABLE = total − framework baseline (the `_baseline/<fw>`
+ *    fixture: same framework, "hello world", no router). This is the real
+ *    "size of the router + adapter" and the PRIMARY competitive signal here.
+ *
+ * Gzip is the primary compression metric. Run from the benchmarks/ workspace:
  *   node vs-tanstack/bundle-size/measure.mjs
+ * (build every fixture incl. _baseline/<fw> first, e.g. via the vite build loop)
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -15,14 +23,16 @@ import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 const ENGINES = ["real-router", "tanstack"];
 const FRAMEWORKS = ["react", "vue", "solid"];
 const VARIANTS = ["minimal", "full"];
+const ROOT = "vs-tanstack/bundle-size";
 
 function measureDist(distDir) {
-  if (!existsSync(distDir)) {
+  const assetsDir = join(distDir, "assets");
+  const dir = existsSync(assetsDir) ? assetsDir : distDir;
+
+  if (!existsSync(dir)) {
     return undefined;
   }
 
-  const assetsDir = join(distDir, "assets");
-  const dir = existsSync(assetsDir) ? assetsDir : distDir;
   const files = readdirSync(dir).filter((file) => file.endsWith(".js"));
 
   let raw = 0;
@@ -46,54 +56,60 @@ function kib(bytes) {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-const rows = [];
+const baseline = {};
 
 for (const framework of FRAMEWORKS) {
+  baseline[framework] = measureDist(`${ROOT}/_baseline/${framework}/dist`);
+}
+
+console.log("\n=== framework runtime baseline (gzip, no router) ===\n");
+for (const framework of FRAMEWORKS) {
+  const b = baseline[framework];
+
+  console.log(`  ${framework.padEnd(6)} ${b ? kib(b.gzip) : "— (not built)"}`);
+}
+
+console.log(
+  "\n=== ROUTER-ATTRIBUTABLE (primary) = total − framework baseline ===\n",
+);
+console.log(
+  "fixture".padEnd(26) +
+    "total".padStart(10) +
+    "router gz".padStart(11) +
+    "router br".padStart(11),
+);
+
+for (const framework of FRAMEWORKS) {
+  const base = baseline[framework];
+
   for (const variant of VARIANTS) {
     const measured = {};
 
     for (const engine of ENGINES) {
-      measured[engine] = measureDist(
-        `vs-tanstack/bundle-size/${engine}/${framework}/${variant}/dist`,
+      const m = measureDist(`${ROOT}/${engine}/${framework}/${variant}/dist`);
+      measured[engine] = m;
+
+      const label = `${engine} ${framework} ${variant}`;
+      const routerGz = m && base ? kib(m.gzip - base.gzip) : "—";
+      const routerBr = m && base ? kib(m.brotli - base.brotli) : "—";
+
+      console.log(
+        label.padEnd(26) +
+          (m ? kib(m.gzip) : "—").padStart(10) +
+          routerGz.padStart(11) +
+          routerBr.padStart(11),
       );
     }
 
-    rows.push({ framework, variant, measured });
-  }
-}
+    const [a, b] = ENGINES.map((engine) => measured[engine]);
 
-console.log("\n=== vs-tanstack bundle-size (client JS, gzip = primary) ===\n");
-console.log(
-  "fixture".padEnd(26) +
-    "raw".padStart(11) +
-    "gzip".padStart(11) +
-    "brotli".padStart(11) +
-    "chunks".padStart(8),
-);
+    if (a && b && base) {
+      const delta = a.gzip - b.gzip; // framework baseline cancels in the delta
+      const sign = delta < 0 ? "" : "+";
 
-for (const { framework, variant, measured } of rows) {
-  for (const engine of ENGINES) {
-    const m = measured[engine];
-    const label = `${engine} ${framework} ${variant}`;
-
-    console.log(
-      label.padEnd(26) +
-        (m ? kib(m.raw).padStart(11) : "—".padStart(11)) +
-        (m ? kib(m.gzip).padStart(11) : "—".padStart(11)) +
-        (m ? kib(m.brotli).padStart(11) : "—".padStart(11)) +
-        (m ? String(m.chunks).padStart(8) : "—".padStart(8)),
-    );
-  }
-
-  const [a, b] = ENGINES.map((engine) => measured[engine]);
-
-  if (a && b) {
-    const delta = a.gzip - b.gzip;
-    const sign = delta < 0 ? "" : "+";
-
-    console.log(
-      `  → real-router − tanstack (gzip): ${sign}${kib(delta)}`.padEnd(26) +
-        "\n",
-    );
+      console.log(
+        `  → real-router − tanstack (router gzip): ${sign}${kib(delta)}\n`,
+      );
+    }
   }
 }
