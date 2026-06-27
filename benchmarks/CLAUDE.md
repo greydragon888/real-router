@@ -23,8 +23,11 @@ benchmarks/
 │   ├── navigation-churn/         # memory churn: per-navigation retention
 │   ├── unique-location-churn/    # memory churn: unbounded match/history caches (unique URLs)
 │   ├── mount-unmount/            # memory churn: router collectable after dispose (waits render commit)
+│   ├── interrupted-navigations/  # memory churn: superseded navs (slow canActivate + fast interrupt)
+│   ├── loader-data-retention/    # memory churn: departed-route context payload (claimContextNamespace)
 │   │   ├── real-router/{react,vue,solid}/   # per app-set: app · setup · speed.{memory,flame} · vite.config (+tsconfig for solid)
 │   │   └── tanstack/{react,vue,solid}/
+│   │   #  preload-churn NOT ported — fake-analogy (preload-plugin = transport+State-LRU, not data-cache)
 │   ├── run.mjs                    # runner: <scenario> <engine> <framework> <mode>
 │   ├── tsconfig.json · tsconfig.solid.json (solid aggregate) · vitest.config.ts
 │   └── .bench-results/            # Text logs from bench-compare-vs-tanstack.sh (gitignored)
