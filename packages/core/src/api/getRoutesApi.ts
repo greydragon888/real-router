@@ -91,16 +91,25 @@ function clearRouteConfigurations<
 }
 
 /**
- * Updates forwardTo for a route in config and returns the refreshed resolved
- * forward map (REPLACE semantics — caller must call ctx.setResolvedForwardMap).
+ * PREPARE step for a `forwardTo` update (#951 atomicity): computes the new
+ * forward maps and the resolved forward chain into LOCALS and returns them
+ * WITHOUT touching the store. A throw here — an async `forwardTo` (#967) or a
+ * cycle surfaced by `refreshForwardMap` — aborts `update()` before any field is
+ * committed. The caller writes the returned bundle into the store in its COMMIT
+ * phase. (Mirrors the build-then-swap shape of #698, but the swap is deferred to
+ * the caller so it can be sequenced with the other prepared fields.)
  */
-function updateForwardTo<
+function prepareForwardTo<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   name: string,
   forwardTo: string | ForwardToCallback<Dependencies> | null,
   config: RouteConfig,
-): Record<string, string> {
+): {
+  forwardMap: RouteConfig["forwardMap"];
+  forwardFnMap: RouteConfig["forwardFnMap"];
+  resolved: Record<string, string>;
+} {
   // #967: reject an async forwardTo at update time — parity with add/replace
   // (registerForwardTo runs the same check on the build path). A no-op for
   // string/null. Without this the async callback is stored silently and
@@ -108,9 +117,6 @@ function updateForwardTo<
   // from #resolveDynamicForward at navigation. Runs first, before any clone.
   assertForwardToNotAsync(forwardTo, name);
 
-  // Prepare-then-commit (issue #698): apply the change to CLONES of the forward
-  // maps, resolve the chain (a cycle throws here), and only then swap the clones
-  // in — so a rejected update never leaves config.forwardMap poisoned.
   const forwardMap = Object.assign(
     Object.create(null) as RouteConfig["forwardMap"],
     config.forwardMap,
@@ -133,10 +139,7 @@ function updateForwardTo<
 
   const resolved = refreshForwardMap({ ...config, forwardMap });
 
-  config.forwardMap = forwardMap;
-  config.forwardFnMap = forwardFnMap;
-
-  return resolved;
+  return { forwardMap, forwardFnMap, resolved };
 }
 
 /**
@@ -525,28 +528,23 @@ function removeRoute<
 }
 
 /**
- * Updates a route's configuration in place.
+ * COMMIT step for the scalar config fields of an update (#951): writes
+ * `defaultParams` / `decodeParams` / `encodeParams` in place. These assignments
+ * are pure and never throw, so they run in the COMMIT phase after every throwing
+ * field has been validated in PREPARE. `forwardTo` is handled separately — it
+ * has its own throwing prepare step ({@link prepareForwardTo}).
  */
-function updateRouteConfig<
+function commitScalarConfig<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   store: RoutesStore<Dependencies>,
   name: string,
   updates: {
-    forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
     defaultParams?: Params | null | undefined;
     decodeParams?: ((params: Params) => Params) | null | undefined;
     encodeParams?: ((params: Params) => Params) | null | undefined;
   },
 ): void {
-  if (updates.forwardTo !== undefined) {
-    store.resolvedForwardMap = updateForwardTo(
-      name,
-      updates.forwardTo,
-      store.config,
-    );
-  }
-
   if (updates.defaultParams !== undefined) {
     if (updates.defaultParams === null) {
       delete store.config.defaultParams[name];
@@ -581,28 +579,34 @@ function updateRouteConfig<
 }
 
 /**
- * Patches a route's plugin-defined **custom fields** — the `update` counterpart
- * to how `add`/`replace` register them (`registerSingleRouteHandlers`). A custom
- * field is any patch key not in {@link STANDARD_ROUTE_KEYS}.
+ * PREPARE step for a route's plugin-defined **custom fields** (#951) — the
+ * `update` counterpart to how `add`/`replace` register them
+ * (`registerSingleRouteHandlers`). A custom field is any patch key not in
+ * {@link STANDARD_ROUTE_KEYS}.
  *
- * Semantics mirror the structural fields in {@link updateRouteConfig}:
- * shallow-merge by patch key, `null` removes a single field, `undefined` is a
- * no-op (leaves the field untouched). When the merge empties the record, the
- * whole entry is dropped so `getRouteConfig` returns `undefined` — symmetric
- * with `add`, which only stores a record when at least one custom field exists.
+ * Computes the merged record and RETURNS it for the caller to commit;
+ * `undefined` means no custom-field key was present, so the caller leaves the
+ * store untouched. Semantics mirror the scalar fields in
+ * {@link commitScalarConfig}: shallow-merge by patch key, `null` removes a
+ * single field, `undefined` is a no-op (leaves the field untouched). When the
+ * merge empties the record, the caller drops the whole entry so `getRouteConfig`
+ * returns `undefined` — symmetric with `add`, which only stores a record when at
+ * least one custom field exists.
  *
- * The merged record is written as a **fresh object**, never mutated in place:
- * `cloneRouter` shares per-route custom-field records by reference
- * (`Object.assign`), so replacing the reference keeps a clone isolated from
- * post-clone updates on the source.
+ * Reading the custom-field getters HERE (in PREPARE, not at commit) is what lets
+ * a throwing getter abort the whole update before any field is written. The
+ * merged record is a **fresh object**, never mutated in place: `cloneRouter`
+ * shares per-route custom-field records by reference (`Object.assign`), so
+ * replacing the reference keeps a clone isolated from post-clone updates on the
+ * source.
  */
-function updateRouteCustomFields<
+function prepareCustomFields<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   store: RoutesStore<Dependencies>,
   name: string,
   updates: RouteConfigUpdate<Dependencies>,
-): void {
+): Record<string, unknown> | undefined {
   let next: Record<string, unknown> | undefined;
 
   // `Object.keys` (not `Object.entries`): a value is read only AFTER the
@@ -633,15 +637,7 @@ function updateRouteCustomFields<
     }
   }
 
-  if (next === undefined) {
-    return;
-  }
-
-  if (Object.keys(next).length > 0) {
-    store.routeCustomFields[name] = next;
-  } else {
-    delete store.routeCustomFields[name];
-  }
+  return next;
 }
 
 /**
@@ -795,17 +791,55 @@ export function getRoutesApi<
 
       ctx.validator?.routes.validateUpdateRoute(name, updates, store);
 
-      // Custom (plugin-defined) fields — patched symmetrically with add/replace.
-      // Written before the structural config so a throwing custom-field getter
-      // aborts the update before any store write (atomic), mirroring how a
-      // throwing structural getter aborts at the destructuring above. Consumers
-      // read these lazily via getRouteConfig (lifecycle hooks, preload,
-      // searchSchema), so no TREE_CHANGED is needed — the next read sees the new
-      // value; the emit below stays structural-only by design (О-7).
-      updateRouteCustomFields(store, name, updates);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+      const lifecycle = store.lifecycleNamespace!;
 
-      updateRouteConfig(store, name, {
-        forwardTo,
+      // ===== PREPARE — compute every change into LOCALS. Any throw here aborts
+      // update() before a single store write, so the whole field set is applied
+      // all-or-nothing (#951): an async/cyclic forwardTo (#967), a guard factory
+      // that throws on compile, or a throwing custom-field getter all leave the
+      // route's prior config fully intact.
+      const forwardToPlan =
+        forwardTo === undefined
+          ? undefined
+          : prepareForwardTo(name, forwardTo, store.config);
+
+      const nextCustomFields = prepareCustomFields(store, name, updates);
+
+      // Guard factories are compiled NOW (a throwing factory surfaces in
+      // PREPARE); the precompiled function is installed in COMMIT without
+      // re-invoking the factory, so a factory side effect runs exactly once
+      // (reuses the #956 compile-then-install seam). Compiled after the other
+      // prepares so a throw upstream skips invoking the factory at all.
+      const activateFn =
+        canActivate === undefined || canActivate === null
+          ? undefined
+          : lifecycle.compileGuardFactory(canActivate, "canActivate");
+      const deactivateFn =
+        canDeactivate === undefined || canDeactivate === null
+          ? undefined
+          : lifecycle.compileGuardFactory(canDeactivate, "canDeactivate");
+
+      // ===== COMMIT — pure writes from here; nothing below throws.
+      // Custom (plugin-defined) fields. Consumers read these lazily via
+      // getRouteConfig (lifecycle hooks, preload, searchSchema), so no
+      // TREE_CHANGED is needed — the next read sees the new value; the emit below
+      // stays structural-only by design (О-7).
+      if (nextCustomFields !== undefined) {
+        if (Object.keys(nextCustomFields).length > 0) {
+          store.routeCustomFields[name] = nextCustomFields;
+        } else {
+          delete store.routeCustomFields[name];
+        }
+      }
+
+      if (forwardToPlan !== undefined) {
+        store.config.forwardMap = forwardToPlan.forwardMap;
+        store.config.forwardFnMap = forwardToPlan.forwardFnMap;
+        store.resolvedForwardMap = forwardToPlan.resolved;
+      }
+
+      commitScalarConfig(store, name, {
         defaultParams,
         decodeParams,
         encodeParams,
@@ -813,26 +847,23 @@ export function getRoutesApi<
 
       if (canActivate !== undefined) {
         if (canActivate === null) {
-          // `definitionOnly` (#952): update() owns the DEFINITION-origin guard
-          // (it registers with isFromDefinition=true below), so clearing it must
-          // not also wipe an external guard added via
+          // `definitionOnly` (#952): update() owns the DEFINITION-origin guard,
+          // so clearing it must not wipe an external guard added via
           // getLifecycleApi().addActivateGuard().
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.clearCanActivate(name, true);
+          lifecycle.clearCanActivate(name, true);
         } else {
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.addCanActivate(name, canActivate, true);
+          // Install the factory together with its precompiled function — no
+          // re-compile, so the prepare-phase invocation is the only one.
+          lifecycle.addCanActivate(name, canActivate, true, activateFn);
         }
       }
 
       if (canDeactivate !== undefined) {
         if (canDeactivate === null) {
           // Definition-only clear, symmetric with canActivate above (#952).
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.clearCanDeactivate(name, true);
+          lifecycle.clearCanDeactivate(name, true);
         } else {
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.addCanDeactivate(name, canDeactivate, true);
+          lifecycle.addCanDeactivate(name, canDeactivate, true, deactivateFn);
         }
       }
 

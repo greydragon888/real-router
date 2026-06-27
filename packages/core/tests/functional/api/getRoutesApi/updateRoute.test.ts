@@ -667,6 +667,54 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
   });
 
+  describe("atomicity across fields (#951)", () => {
+    it("rolls back a forwardTo set in the same update() when a guard factory throws", () => {
+      routesApi.add({ name: "ur-atom", path: "/ur-atom" });
+      routesApi.add({ name: "ur-atom-tgt", path: "/ur-atom-tgt" });
+
+      const boom: GuardFnFactory = () => {
+        throw new Error("guard boom");
+      };
+
+      // One update() carries BOTH a valid forwardTo and a throwing guard
+      // factory. Before #951 the forwardTo committed first, then the guard
+      // compile threw — leaving a partial update (forwardTo applied, guard not).
+      expect(() => {
+        routesApi.update("ur-atom", {
+          forwardTo: "ur-atom-tgt",
+          canActivate: boom,
+        });
+      }).toThrow("guard boom");
+
+      // Atomic: the forwardTo from the failed call did NOT apply.
+      expect(getPluginApi(router).forwardState("ur-atom", {}).name).toBe(
+        "ur-atom",
+      );
+    });
+
+    it("rolls back a custom field set in the same update() when async forwardTo is rejected", () => {
+      type Patch = RouteConfigUpdate & { label?: string };
+
+      routesApi.add({ name: "ur-atom2", path: "/ur-atom2" });
+      routesApi.update("ur-atom2", { label: "before" } as Patch);
+
+      // A throwing field (async forwardTo, #967) anywhere in the patch must roll
+      // back the whole update — the custom field set in the SAME call must not
+      // commit.
+      expect(() => {
+        routesApi.update("ur-atom2", {
+          label: "after",
+          forwardTo: (async () => "x") as any,
+        } as Patch);
+      }).toThrow(/forwardTo callback cannot be async/);
+
+      // Atomic: the custom field stays "before" — "after" never committed.
+      expect(getPluginApi(router).getRouteConfig("ur-atom2")).toStrictEqual({
+        label: "before",
+      });
+    });
+  });
+
   describe("custom fields", () => {
     // RouteConfigUpdate is a closed interface; plugins augment it with their
     // own custom fields (symmetric with how they augment Route). Core itself
