@@ -1,3 +1,4 @@
+import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
@@ -200,7 +201,11 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("users.view", { id: "0" })).toBe(false);
   });
 
-  it("should return false if guard throws", async () => {
+  it("logs a warning and returns false when a sync guard throws (#959)", async () => {
+    const warnSpy = vi
+      .spyOn(logger, "warn")
+      .mockImplementation(() => undefined);
+
     lifecycle.addActivateGuard("admin", () => () => {
       throw new Error("Guard error");
     });
@@ -209,6 +214,17 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     const result = router.canNavigateTo("admin");
 
     expect(result).toBe(false);
+    // #959: a throwing guard must NOT vanish silently. Without observability a
+    // crashed guard is indistinguishable from one that legitimately blocked
+    // (`false`). navigate() surfaces the same throw via TRANSITION_ERROR; the
+    // sync predicate has no error channel, so core logs it directly.
+    expect(warnSpy).toHaveBeenCalledWith(
+      "router.canNavigateTo",
+      expect.stringContaining("admin"),
+      expect.any(Error),
+    );
+
+    warnSpy.mockRestore();
   });
 
   it("should handle transition from deeply nested route", async () => {
