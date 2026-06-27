@@ -267,6 +267,7 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | 9   | Listener error isolation           | A throwing handler is reported via `onListenerError`; other handlers still run and the CRUD caller never sees a re-throw (except the `RecursionDepthError` carve-out from #6).                          |
 | 10  | FIFO + snapshot delivery           | Handlers fire in registration order. A handler registered re-entrantly during emit `E1` is not invoked for `E1` (snapshot iteration); it participates from the next event onward.                       |
 | 11  | dispose silences the channel       | `router.dispose()` releases all `TREE_CHANGED` listeners (step 4 of cleanup) before the internal route teardown — no event is emitted during disposal (the public `clear()` wrapper is bypassed).      |
+| 12  | subscribe-after-dispose throws     | A `subscribeChanges` reference used after `dispose()` — including one bound before disposal (`const s = routes.subscribeChanges.bind(routes)`) — throws `RouterError(ROUTER_DISPOSED)` instead of silently re-registering a listener that can never fire (the route tree is torn down during dispose). The internal-route-tree counterpart of the `subscribe`/`subscribeLeave` guard (#946). Verified functionally in `tests/functional/api/getRoutesApi/getRoutesApi.test.ts`. |
 
 ## getDependenciesApi (CRUD)
 

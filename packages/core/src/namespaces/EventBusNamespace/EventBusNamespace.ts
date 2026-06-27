@@ -189,6 +189,20 @@ export class EventBusNamespace {
   subscribeTreeChanged(
     handler: (event: TreeChangedEvent) => void,
   ): Unsubscribe {
+    // Same disposed-state enforcement as subscribe()/subscribeLeave() (#946),
+    // completing the guard across all three subscription primitives — extended
+    // here to the internal route-tree channel (#982). A `subscribeChanges`
+    // reference bound before dispose() (`const s = routes.subscribeChanges
+    // .bind(routes)`) reaches this method via the getRoutesApi delegate, which
+    // — unlike its add/remove/update siblings — does not itself check
+    // isDisposed(). Without this guard, `emitter.on` would re-register a
+    // TREE_CHANGED listener that can never fire (clearAll already ran, the FSM
+    // is DISPOSED, the route tree is torn down, no future emit) — a silent
+    // no-op, the internal-channel counterpart of the #946 hazard.
+    if (this.isDisposed()) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
     return this.#emitter.on(TREE_CHANGED, (event: TreeChangedEvent) => {
       handler(event);
     });

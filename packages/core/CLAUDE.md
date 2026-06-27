@@ -499,7 +499,7 @@ const unsubscribe = routes.subscribeChanges((event) => {
 | **Clone isolation** | A cloned router has an independent emitter; mutations never cross the clone boundary. |
 | **Scope** | Internal-only channel: `TREE_CHANGED` is not in the public `EventName` union / `events.*` registry / `Plugin` interface. There is no `router.subscribeTree()` and no `addEventListener` path — by design (tree mutations are infrastructural, not app-level). |
 
-`dispose()` releases all `subscribeChanges` listeners (during the `clearAll` events step) before the route teardown, so no event fires during disposal.
+`dispose()` releases all `subscribeChanges` listeners (during the `clearAll` events step) before the route teardown, so no event fires during disposal. After disposal, `subscribeChanges` throws `RouterError(ROUTER_DISPOSED)` — including via a reference bound before `dispose()` (`const s = routes.subscribeChanges.bind(routes)`) — rather than silently re-registering a listener that can never fire (#982). This mirrors the `router.subscribe` / `subscribeLeave` guard (#946) and the sibling `getRoutesApi` mutators (`add` / `remove` / `update` / `clear`), which all throw `ROUTER_DISPOSED` after `dispose()`.
 
 ### Recommended pattern: declarative reactive cache invalidation
 
