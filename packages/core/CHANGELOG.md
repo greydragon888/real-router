@@ -1,5 +1,38 @@
 # @real-router/core
 
+## 0.61.9
+
+### Patch Changes
+
+- [#995](https://github.com/greydragon888/real-router/pull/995) [`a70833c`](https://github.com/greydragon888/real-router/commit/a70833cfcba7a0a9e493b9ec52a7885af775d46b) Thanks [@greydragon888](https://github.com/greydragon888)! - Drive cloneRouter/cloneConfig config copy by a single enumeration ([#965](https://github.com/greydragon888/real-router/issues/965))
+
+  Internal refactor — no public API or behavior change. The per-route
+  `RouteConfig` sub-maps were copied with one `Object.assign` per field in two
+  places (`cloneRouter` and `cloneConfig`), so a newly added sub-field could be
+  silently missed at either site. Both now go through a shared
+  `assignConfigEntries(target, source)` helper that enumerates the config keys, so
+  a new sub-field is carried over automatically.
+
+- [#995](https://github.com/greydragon888/real-router/pull/995) [`a70833c`](https://github.com/greydragon888/real-router/commit/a70833cfcba7a0a9e493b9ec52a7885af775d46b) Thanks [@greydragon888](https://github.com/greydragon888)! - Consolidate `cloneRouter` clone-state into a single `getCloneState()` accessor ([#964](https://github.com/greydragon888/real-router/issues/964))
+
+  Internal refactor — no public API or behavior change. `cloneRouter` previously
+  read its clone snapshot through three separate `RouterInternals` methods
+  (`cloneOptions`, `cloneDependencies`, `getPluginFactories`). These collapse into
+  one `getCloneState()` returning `{ options, dependencies, pluginFactories }`, so a
+  new clone-relevant subsystem is wired in a single place. The general-purpose
+  `routeGetStore` accessor is unchanged.
+
+- [#995](https://github.com/greydragon888/real-router/pull/995) [`a70833c`](https://github.com/greydragon888/real-router/commit/a70833cfcba7a0a9e493b9ec52a7885af775d46b) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `createRequestScope` close-listener leak when `cloneRouter` throws ([#969](https://github.com/greydragon888/real-router/issues/969))
+
+  `createRequestScope` (the SSR per-request helper) attached the Node `"close"`
+  listener to the request _before_ calling `cloneRouter`. If `cloneRouter` threw
+  (e.g. `ROUTER_DISPOSED` on an already-disposed base), the helper exited via the
+  exception without returning a scope handle, so the listener could never be
+  detached — it leaked on the request object. The listener is now attached only
+  after `cloneRouter` succeeds (clone-before-attach); `cloneRouter` is synchronous,
+  so no `"close"` event can fire in the gap. The Web (`RequestLike`) branch is
+  unaffected — it never attaches a listener.
+
 ## 0.61.8
 
 ### Patch Changes
