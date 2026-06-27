@@ -380,3 +380,80 @@ describe("validateParams — canNavigateTo() params validation", () => {
     expect(() => router.canNavigateTo("home", {})).not.toThrow();
   });
 });
+
+// #934 / #942: param VALUES that cannot safely round-trip through a URL path.
+// Core silently accepts these without the plugin (a Symbol path-param keeps the
+// raw Symbol in state.params, a control char is percent-encoded into the path);
+// the opt-in validator rejects them with an actionable, value-specific message
+// instead of the generic "params must be a plain object" shape error.
+describe("validateParams — invalid param VALUES (#934 / #942)", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createValidationRouter();
+    await router.start("/home");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throws an actionable TypeError naming a Symbol param value (#934)", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("items", { id: Symbol("x") })).toThrow(
+      /param "id" cannot be a symbol/,
+    );
+  });
+
+  it("throws an actionable TypeError naming a BigInt param value (#934)", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("items", { id: 10n })).toThrow(
+      /param "id" cannot be a bigint/,
+    );
+  });
+
+  it("rejects a control character inside a param string value (#942)", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() =>
+      raw.navigate("items", { id: `a${String.fromCodePoint(1)}b` }),
+    ).toThrow(/control character/);
+  });
+
+  it("still accepts ordinary string / number / boolean param values", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("items", { id: "42" })).not.toThrow();
+    expect(() => raw.navigate("items", { id: 42 })).not.toThrow();
+    expect(() => raw.navigate("items", { id: true })).not.toThrow();
+  });
+
+  it("inspects OWN properties only — an inherited Symbol is skipped (mirrors isParams)", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    // An inherited (non-own) Symbol on the prototype must NOT trigger the
+    // value-specific message — value validation is own-property only, like
+    // isParams. The object still fails isParams for its custom prototype, so it
+    // surfaces the generic shape error instead.
+    const proto = { ghost: Symbol("inherited") };
+    const params = Object.create(proto) as Record<string, unknown>;
+
+    params.id = "valid";
+
+    expect(() => raw.navigate("items", params)).toThrow(
+      /params must be a plain object/,
+    );
+  });
+});

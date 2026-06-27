@@ -75,4 +75,25 @@ describe("fire-and-forget guard-block suppression (#721)", () => {
       expect.anything(),
     );
   });
+
+  // Contrapositive of the suppressed cases above (#931): a genuinely unexpected
+  // navigate rejection MUST be logged — and under "router.navigate", not
+  // "router.start". A subscribeLeave listener throwing synchronously rejects
+  // navigate() with the ORIGINAL error (it is NOT re-coded to a suppressed
+  // TRANSITION_CANCELLED), so the fire-and-forget safety net surfaces it. This
+  // is the killing test the old false "unreachable" Stryker-disable masked.
+  it("logs a non-suppressed navigate rejection (subscribeLeave throw) under router.navigate", async () => {
+    router.subscribeLeave(() => {
+      throw new Error("leave boom");
+    });
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+    void router.navigate("users");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      ...UNEXPECTED_ERROR_LOG,
+      expect.objectContaining({ message: "leave boom" }),
+    );
+  });
 });

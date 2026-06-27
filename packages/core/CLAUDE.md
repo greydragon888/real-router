@@ -46,7 +46,7 @@ No boolean flags (`#started`, `#active`, `#navigating` removed).
 
 ### Validation Pattern
 
-Validation has two tiers: **invariant protection** in core (structural guards + 3 invariant guards) and **DX validation** opt-in via @real-router/validation-plugin. The plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
+Validation has two tiers: **invariant protection** in core (structural guards + 4 invariant guards) and **DX validation** opt-in via @real-router/validation-plugin. The plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
 
 **Facade methods** and **standalone API functions** call through the optional validator using optional chaining:
 
@@ -77,13 +77,16 @@ Structural guards remain in namespace folders (`OptionsNamespace/validators.ts`,
 
 ### Invariant Guards (always active, no plugin required)
 
-Core contains three invariant guards that run regardless of whether validation-plugin is installed:
+Core contains four invariant guards that run regardless of whether validation-plugin is installed:
 
 - **`subscribe(listener)`** — validates `typeof listener === "function"`. Prevents deferred crash (non-function stored in EventEmitter, crash on next navigation). Includes actionable hint: "For Observable pattern use observable(router) from @real-router/rx". (`subscribeLeave` validates the same way but **without** the rx hint — `@real-router/rx` exposes the Observable pattern for success transitions (`observable(router)`, `state$`, `events$`), not for leave events.)
 - **`navigateToNotFound(path)`** — validates `typeof path === "string"` when path is provided. Prevents silent state corruption (`state.path = 42`).
+- **`start(path)`** (in `RouterLifecycleNamespace.start`, #939) — validates `typeof path === "string"`. Runs **after** the start interceptor chain, so a browser-plugin's location injection (`next(path ?? getLocation())`) still wins; it only fires when nothing supplied a path. Without it, `start(undefined)` with no browser-plugin reached `matchPath(undefined)` and threw a cryptic, code-less `TypeError: …codePointAt` deep in path-matcher. Symmetric with `navigateToNotFound`'s type guard. (The facade-level `validateStartArgs` validator deliberately permits `undefined` for the browser-plugin-override case — this guard is the post-override backstop.)
 - **`claimContextNamespace(namespace)`** (on `PluginApi`, `getPluginApi.ts`) — throws `CONTEXT_NAMESPACE_ALREADY_CLAIMED` when a namespace is already claimed by another plugin. Prevents silent corruption: without it two plugins writing the same `state.context.<namespace>` would clobber each other's data.
 
 **Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.
+
+**Param-value type validation stays opt-in (validator), NOT a core guard.** Bare core tolerantly accepts param values that cannot round-trip through a URL path — a `Symbol` path-param keeps its raw identity in `state.params` (path stringifies to `/items/Symbol(x)`, never matching back), a `BigInt` coerces lossily, and a NUL/control char percent-encodes into `state.path` (`%00`). These are exotic programmer errors, so `@real-router/validation-plugin` rejects them with actionable messages (#934/#942) rather than core paying a per-navigate value-scan on the hot path. Symmetry note: a Symbol *query* value already throws a raw `TypeError` from `String(symbol)` in bare core; the plugin aligns the path-param case to a clear error too.
 
 ### Namespace Folder Structure
 
@@ -671,7 +674,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - `nameToIDs()` has fast paths for 1-4 segments
 - Route tree is immutable (Object.freeze) — cloneRouter() rebuilds from definitions (not shared)
 - Router options are immutable — deep-frozen at construction (`OptionsNamespace`), safe to return directly
-- `static #onSuppressedError` — cached callback, one allocation per class (not per navigate)
+- `static #onSuppressedNavigateError` / `#onSuppressedStartError` — cached suppressor callbacks, one allocation per class (not per navigate/start); both share `#isExpectedRejection` for the silent-suppress classification
 - Segment cleanup uses `Array.includes()` instead of `new Set()` (1-5 elements — linear faster)
 - `createInterceptable()` — empty-array fast path skips iteration when no interceptors registered
 - FSM `canSend()` — O(1) via cached `#currentTransitions`

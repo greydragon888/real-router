@@ -54,7 +54,7 @@ import type { CreateMatcherOptions } from "route-tree";
 
 const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
 
-// Module-level so #onSuppressedError allocates nothing per navigate() call.
+// Module-level so #isExpectedRejection allocates nothing per navigate()/start() call.
 // These are expected navigation outcomes owned by the caller, not internal
 // bugs — the safety net stays silent for them and lets awaiting callers see
 // the rejection. CANNOT_ACTIVATE / CANNOT_DEACTIVATE belong here: a guard
@@ -465,11 +465,22 @@ export class Router<
 
     getInternals(this).validator?.navigation.validateStartArgs(startPath);
 
+    // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
+    // design, NOT a missed consolidation (#940): `sendStart()` runs HERE, before
+    // the interceptor chain, so the STARTING window spans the whole start
+    // pipeline. A pre-`next()` interceptor throw then unwinds via STARTING →
+    // `sendFail`, which emits TRANSITION_ERROR from STARTING (EventBusNamespace
+    // FAIL action) for `onTransitionError` plugins. Moving `sendStart()` into the
+    // namespace (the interceptor *target*) would skip STARTING on a pre-`next()`
+    // throw — the namespace is never reached — silently dropping that
+    // TRANSITION_ERROR: a #668 regression. The commit (`completeStart`) lives in
+    // the namespace; recovery needs facade state (`#state`, `#lifecycle`), so it
+    // stays here in `#unwindFailedStart`.
     this.#eventBus.sendStart();
 
-    // Convert sync interceptor throws to rejections so the recovery branch in
-    // .catch is reachable; otherwise the throw escapes synchronously, FSM is
-    // left in STARTING, and the router is permanently bricked (#668).
+    // Convert sync interceptor throws to rejections so the recovery path is
+    // reachable; otherwise the throw escapes synchronously, the FSM is left in
+    // STARTING, and the router is permanently bricked (#668).
     let internalStart: Promise<State>;
 
     try {
@@ -479,27 +490,14 @@ export class Router<
       internalStart = Promise.reject(syncError);
     }
 
-    const promiseState = internalStart.catch((error: unknown) => {
-      // Unwind a READY FSM back to IDLE only when nothing was committed —
-      // e.g. an activation guard blocked the start navigation, so no
-      // TRANSITION_SUCCESS was emitted (`getState()` is undefined). If a
-      // start interceptor instead threw AFTER navigateToState committed and
-      // emitted TRANSITION_SUCCESS (the SSR/RSC loader window), `getState()`
-      // is defined: subscribers already observed the success, so rolling back
-      // would retract it (phantom success, #763). Keep the committed state —
-      // the error still surfaces via the rejection below. A throw before
-      // `next()` never reached READY and unwinds via the STARTING branch.
-      if (this.#eventBus.isReady() && this.#state.get() === undefined) {
-        this.#lifecycle.stop();
-        this.#eventBus.sendStop();
-      } else if (this.#eventBus.isStarting()) {
-        this.#eventBus.sendFail(undefined, undefined, error);
-      }
+    const promiseState = internalStart.catch((error: unknown) =>
+      this.#unwindFailedStart(error),
+    );
 
-      throw error;
-    });
-
-    Router.#suppressUnhandledRejection(promiseState);
+    Router.#suppressUnhandledRejection(
+      promiseState,
+      Router.#onSuppressedStartError,
+    );
 
     return promiseState;
   }
@@ -758,42 +756,106 @@ export class Router<
   }
 
   /**
-   * Pre-allocated callback for #suppressUnhandledRejection.
-   * Avoids creating a new closure on every navigate() call.
+   * Classifies a fire-and-forget rejection as an EXPECTED outcome that must
+   * stay silent (no log). Shared by the navigate and start suppressors so the
+   * suppression contract lives in one place.
+   *
+   * - A suppressed RouterError code is a normal caller-owned navigation result
+   *   (a guard block, SAME_STATES, ROUTER_NOT_STARTED, …) — see
+   *   SUPPRESSED_ERROR_CODES (#721).
+   * - A RecursionDepthError is the bounded ceiling hit by a reentrant
+   *   navigate() that self-feeds nested TRANSITION_SUCCESS emits from a
+   *   subscribe() listener (#945). It is deterministic and the router stays
+   *   functional afterwards — symmetric with subscribeLeave's reentrant
+   *   navigate (which rejects with the already-suppressed TRANSITION_CANCELLED).
+   *   Suppress it so `void router.navigate()` in a listener cannot crash the
+   *   process under --unhandled-rejections=strict (the Node 22+ default).
    */
-  // Stryker disable next-line BlockStatement: equivalent — the handler suppresses fire-and-forget rejections by merely existing as a .catch; its body only CLASSIFIES which rejections to log, and the log branch is unreachable in core (every navigate rejection is either a suppressed RouterError code or a suppressed RecursionDepthError; plugin/listener throws are isolated by the EventEmitter and never reach the navigate promise).
-  static readonly #onSuppressedError = (error: unknown): void => {
-    if (
-      error instanceof RouterError &&
-      SUPPRESSED_ERROR_CODES.has(error.code)
-    ) {
+  static #isExpectedRejection(error: unknown): boolean {
+    return (
+      (error instanceof RouterError &&
+        SUPPRESSED_ERROR_CODES.has(error.code)) ||
+      error instanceof RecursionDepthError
+    );
+  }
+
+  /**
+   * Pre-allocated suppressor for navigate / navigateToDefault / navigateToState.
+   * Avoids creating a new closure on every navigate() call.
+   *
+   * The log line IS reachable (contrary to the pre-#931 "unreachable" comment):
+   * a subscribeLeave listener that throws (sync or async) rejects navigate()
+   * with the original NON-suppressed error — not re-coded to TRANSITION_CANCELLED
+   * — and a Symbol path-param's stringify TypeError is likewise non-suppressed.
+   * Both surface here under "router.navigate". Tested in guard-block-suppression
+   * (negative) and the positive case below.
+   */
+  static readonly #onSuppressedNavigateError = (error: unknown): void => {
+    if (Router.#isExpectedRejection(error)) {
       return;
     }
 
-    // A reentrant navigate() from inside a subscribe() listener self-feeds
-    // nested TRANSITION_SUCCESS emits until the EventEmitter's maxEventDepth
-    // ceiling throws RecursionDepthError (#945). It is bounded, deterministic,
-    // and the router stays functional afterwards — a normal fire-and-forget
-    // outcome, symmetric with subscribeLeave's reentrant navigate (which
-    // supersedes the in-flight transition and rejects with the already-
-    // suppressed TRANSITION_CANCELLED). Suppress it too so `void
-    // router.navigate()` in a listener cannot crash the process under
-    // --unhandled-rejections=strict (the Node 22+ default).
-    if (error instanceof RecursionDepthError) {
-      return;
-    }
-
-    // Stryker disable next-line StringLiteral: unreachable — the "Unexpected navigation error" log fires only for a non-suppressed navigate rejection, which cannot occur in core (see the #onSuppressedError contract above).
     logger.error("router.navigate", "Unexpected navigation error", error);
   };
 
   /**
-   * Fire-and-forget safety: prevents unhandled rejection warnings
-   * when navigate/navigateToDefault is called without await.
-   * Expected errors are silently suppressed; unexpected ones are logged.
+   * Pre-allocated suppressor for start(). Its failures must surface under their
+   * own "router.start" category rather than being misattributed to
+   * "router.navigate" (#931). The log line is reachable: a start interceptor
+   * that throws a plain Error after next() committed (the SSR/RSC loader window,
+   * #763) — or a cryptic path TypeError — is neither a suppressed RouterError
+   * nor a RecursionDepthError.
    */
-  static #suppressUnhandledRejection(promise: Promise<State>): void {
-    promise.catch(Router.#onSuppressedError);
+  static readonly #onSuppressedStartError = (error: unknown): void => {
+    if (Router.#isExpectedRejection(error)) {
+      return;
+    }
+
+    logger.error("router.start", "Unexpected start error", error);
+  };
+
+  /**
+   * Fire-and-forget safety: prevents unhandled rejection warnings when
+   * navigate/navigateToDefault/start is called without await. Expected errors
+   * are silently suppressed; unexpected ones are logged under `onSuppressed`'s
+   * category — navigate by default; start() passes #onSuppressedStartError so
+   * its failures are logged as "router.start", not "router.navigate" (#931).
+   */
+  static #suppressUnhandledRejection(
+    promise: Promise<State>,
+    onSuppressed: (error: unknown) => void = Router.#onSuppressedNavigateError,
+  ): void {
+    promise.catch(onSuppressed);
+  }
+
+  /**
+   * Settles the FSM after a failed start pipeline, then re-throws so the
+   * rejection still surfaces to the caller. Three cases, by what the pipeline
+   * reached before throwing:
+   *
+   * - **Pre-commit, READY** (`isReady()` and no committed state): an interceptor
+   *   threw after `completeStart()` reached READY but before any state committed
+   *   (e.g. an activation guard blocked the start navigation) — return READY →
+   *   IDLE via `stop()` so the router is reusable.
+   * - **Pre-commit, STARTING** (`isStarting()`): the pipeline threw before
+   *   `completeStart()` — a sync interceptor throw before `next()`, or a throw
+   *   inside the namespace before commit — so unwind STARTING → IDLE via
+   *   `sendFail`, which also emits TRANSITION_ERROR from STARTING (#668).
+   * - **Post-commit, READY with committed state** (neither branch fires): a
+   *   loader/interceptor threw AFTER `navigateToState` committed and emitted
+   *   TRANSITION_SUCCESS (the SSR/RSC loader window). Keep the committed state —
+   *   rolling back would retract an observed success ("phantom success", #763);
+   *   the error still surfaces via the re-throw.
+   */
+  #unwindFailedStart(error: unknown): never {
+    if (this.#eventBus.isReady() && this.#state.get() === undefined) {
+      this.#lifecycle.stop();
+      this.#eventBus.sendStop();
+    } else if (this.#eventBus.isStarting()) {
+      this.#eventBus.sendFail(undefined, undefined, error);
+    }
+
+    throw error;
   }
 
   #markDisposed(): void {

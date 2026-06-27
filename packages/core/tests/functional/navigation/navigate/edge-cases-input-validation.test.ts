@@ -86,10 +86,12 @@ describe("router.navigate() - edge cases input validation", () => {
     });
 
     it("rejects a Symbol param VALUE with a TypeError (Symbol→string is illegal)", async () => {
-      // FINDING: a Symbol-valued, non-path param is NOT caught by a RouterError
-      // validation path — it reaches URL/query serialization (String(symbol))
-      // and throws a raw `TypeError: Cannot convert a Symbol value to a string`.
-      // The rejection therefore carries NO `code`; it is a native TypeError.
+      // CORE-WITHOUT-PLUGIN behavior: a Symbol-valued, non-path param is NOT
+      // caught by a RouterError validation path — it reaches URL/query
+      // serialization (String(symbol)) and throws a raw `TypeError: Cannot
+      // convert a Symbol value to a string`. The rejection carries NO `code`; it
+      // is a native TypeError. (@real-router/validation-plugin rejects it earlier
+      // with an actionable message, #934 — this pins the bare-core asymmetry.)
       const sym = Symbol("boundary");
 
       let error: unknown;
@@ -118,14 +120,15 @@ describe("router.navigate() - edge cases input validation", () => {
       expect(recovered.name).toBe("users");
     });
 
-    it("FINDING: a Symbol used as a PATH param is silently stringified into the path (params keeps the raw Symbol)", async () => {
-      // SECOND FINDING (URL-corruption-adjacent): unlike a Symbol query value
-      // (TypeError above), a Symbol bound to the `:id` PATH segment does NOT
-      // throw. The matcher template-literal-stringifies it into the URL
-      // (`/items/Symbol(path-id)`), producing a corrupt-but-non-throwing path —
-      // while `state.params.id` keeps the ORIGINAL Symbol (no coercion, no
-      // validation). Navigation "succeeds" with a path that can never round-trip
-      // back to that Symbol. Asserted here to pin the actual (surprising) behavior.
+    it("core (no validation-plugin) accepts a Symbol PATH param — validator-opt-in; the plugin rejects it (#934)", async () => {
+      // CORE-WITHOUT-PLUGIN behavior (validator-opt-in): unlike a Symbol query
+      // value (TypeError above), a Symbol bound to the `:id` PATH segment does
+      // NOT throw in bare core. The matcher template-literal-stringifies it into
+      // the URL (`/items/Symbol(path-id)`) while `state.params.id` keeps the
+      // ORIGINAL Symbol — a path that can never round-trip back. Core stays
+      // platform-agnostic and tolerant by design; @real-router/validation-plugin
+      // now REJECTS a Symbol path-param with an actionable message (#934). This
+      // pins the bare-core behavior the plugin guards.
       const sym = Symbol("path-id");
 
       const state = await router.navigate("items", {

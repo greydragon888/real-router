@@ -43,7 +43,7 @@ const CHAIN = ["users", "orders", "admin.dashboard"] as const;
 //     `lastSyncResolved` flag is set only AFTER `completeTransition` returns, so
 //     a synchronous-emit throw routes to the facade's suppressing `.catch`
 //     instead of being skipped on a stale-true flag; and `RecursionDepthError`
-//     joins the suppressed set in `Router.#onSuppressedError`.
+//     joins the suppressed set in `Router.#isExpectedRejection`.
 //
 // Discriminating power (per stress README): the (a)/(d) guards are exact COUNT
 // invariants — drop one navigate, one listener invocation, or honour-the-
