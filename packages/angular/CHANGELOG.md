@@ -1,5 +1,15 @@
 # @real-router/angular
 
+## 0.11.8
+
+### Patch Changes
+
+- [#1006](https://github.com/greydragon888/real-router/pull/1006) [`13776df`](https://github.com/greydragon888/real-router/commit/13776df00a9a2498f3dd1311d7a149b5d95f8cd9) Thanks [@greydragon888](https://github.com/greydragon888)! - Content-stabilize `RealLink` / `RealLinkActive` route params ([#988](https://github.com/greydragon888/real-router/issues/988))
+
+  The directives created their active-route source inside a constructor `effect()` (the [#630](https://github.com/greydragon888/real-router/issues/630) reactivity fix) that read `routeParams()` directly. Angular re-allocates an inline `[routeParams]="{ id: 1 }"` literal on every change detection, so the raw signal input changed identity each navigation even when the param content was unchanged — re-running the effect, tearing down and re-creating the cached active-route source (`canonicalJson` cache-key churn + sub/unsub) and re-running `buildHref`, once per navigation per directive.
+
+  A new internal `createStableParams` helper collapses structurally-equal params to a reference-stable value via `shallowEqual` (the same contract as the Vue `<Link>` fix and the React `Link` `memo` comparator), so the source-creation effect and the `href` computed only re-run on real content change. Behavior is unchanged — the stabilized params are always content-equal to the input; binding a stable reference still produces zero churn.
+
 ## 0.11.7
 
 ### Patch Changes
