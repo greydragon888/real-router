@@ -84,6 +84,21 @@ describe("core/routes/routeTree/updateRoute", () => {
       }).toThrow(/Circular forwardTo/);
     });
 
+    it("rejects an async forwardTo at update time, like add/replace (#967)", () => {
+      routesApi.add({ name: "ur-async-src", path: "/ur-async-src" });
+      routesApi.add({ name: "ur-async-dst", path: "/ur-async-dst" });
+
+      // add() already rejects an async forwardTo (assertForwardToNotAsync).
+      // update() must reject the SAME input at registration with the SAME
+      // actionable error — not silently accept it and defer a generic
+      // "must return a string, got object" TypeError to navigation.
+      expect(() => {
+        routesApi.update("ur-async-src", {
+          forwardTo: (async () => "ur-async-dst") as any,
+        });
+      }).toThrow(/forwardTo callback cannot be async/);
+    });
+
     it("should allow forwardTo when params match", () => {
       routesApi.add({ name: "ur-old", path: "/ur-old/:id" });
       routesApi.add({ name: "ur-new", path: "/ur-new/:id" });

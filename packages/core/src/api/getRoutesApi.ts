@@ -16,6 +16,7 @@ import {
 import {
   adoptRouteArtifacts,
   assertAddable,
+  assertForwardToNotAsync,
   assertNoDuplicateNamesInBatch,
   buildAddArtifacts,
   buildReplaceArtifacts,
@@ -100,6 +101,13 @@ function updateForwardTo<
   forwardTo: string | ForwardToCallback<Dependencies> | null,
   config: RouteConfig,
 ): Record<string, string> {
+  // #967: reject an async forwardTo at update time — parity with add/replace
+  // (registerForwardTo runs the same check on the build path). A no-op for
+  // string/null. Without this the async callback is stored silently and
+  // surfaces later as a generic "must return a string, got object" TypeError
+  // from #resolveDynamicForward at navigation. Runs first, before any clone.
+  assertForwardToNotAsync(forwardTo, name);
+
   // Prepare-then-commit (issue #698): apply the change to CLONES of the forward
   // maps, resolve the chain (a cycle throws here), and only then swap the clones
   // in — so a rejected update never leaves config.forwardMap poisoned.

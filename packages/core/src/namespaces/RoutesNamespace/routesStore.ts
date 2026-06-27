@@ -138,10 +138,15 @@ export function refreshForwardMap(config: RouteConfig): Record<string, string> {
 /**
  * Throws if `forwardTo` is an async function (native or transpiled). Async
  * forwardTo callbacks break the synchronous matchPath/buildPath contract.
- * Runs inside `registerForwardTo`, which the prepare-phase build invokes via
- * `registerAllRouteHandlers` — so the check fires before any store mutation.
+ * Runs inside `registerForwardTo` (the add/replace build path, before any store
+ * mutation) AND inside `getRoutesApi`'s `updateForwardTo` (the update path), so
+ * `update(name, { forwardTo: async })` is rejected at registration with the same
+ * actionable error instead of deferring a generic TypeError to navigation (#967).
  */
-function assertForwardToNotAsync(forwardTo: unknown, fullName: string): void {
+export function assertForwardToNotAsync(
+  forwardTo: unknown,
+  fullName: string,
+): void {
   if (typeof forwardTo !== "function") {
     return;
   }
