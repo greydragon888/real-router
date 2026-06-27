@@ -168,6 +168,35 @@ Performance Summary:
 | 08  | Current State    | State creation, comparison, building      |
 | 12  | Stress Testing   | High load, scaling                        |
 
+## Bundle Size — vs TanStack Router
+
+Competitive client-JS size: `@real-router/*` vs `@tanstack/*-router`, across React / Vue / Solid in `minimal` and `full` app fixtures (built as full client apps via Vite — production, esbuild-minified, es2022).
+
+```bash
+pnpm bench:bundle-size   # builds every fixture, prints the table below
+```
+
+**Two metrics.** The raw total client JS is framework-dominated — react-dom alone is ~59 KB gzip — so the absolute number is mostly the framework, not the router. The primary signal is **router-attributable = total − framework baseline** (`_baseline/<fw>`: same framework, "hello world", no router) — the real weight of `core + ui-adapter`.
+
+**Framework runtime baseline** (gzip, no router): React 59.2 · Vue 23.4 · Solid 2.7 KB.
+
+**Router-attributable** — the size of the router itself (KB):
+
+| Fixture       | real-router gzip | tanstack gzip | Δ gzip   | real-router brotli | tanstack brotli |
+| ------------- | ---------------- | ------------- | -------- | ------------------ | --------------- |
+| react minimal | **26.4**         | 27.3          | **−0.9** | 23.1               | 24.1            |
+| react full    | 28.2             | 27.5          | +0.7     | 24.7               | 24.3            |
+| vue minimal   | 29.4             | 29.3          | +0.1     | 25.7               | 25.9            |
+| vue full      | 31.2             | 29.5          | +1.7     | 27.3               | 26.1            |
+| solid minimal | **27.9**         | 32.0          | **−4.1** | 24.7               | 28.9            |
+| solid full    | 32.8             | 32.2          | +0.6     | 29.1               | 29.1            |
+
+`minimal` = router + 1 route; `full` = broad adapter surface (Link / RouteView / route hooks), no plugins — a 1:1 surface comparison vs TanStack's built-in surface.
+
+**Reading:** real-router's router weight (core + ui-adapter, no env/browser-plugin) is ~26–29 KB gzip — **at parity with TanStack on React/Vue (within ±1.7 KB), ~4 KB lighter on Solid**. real-router is modular: plugins (browser / memory / lifecycle / preload / …) are opt-in and add only what you use, whereas TanStack's loader / history / preload sit in the baseline always. Adding `environment-plugin` puts the minimal real-router stack near ~35 KB gzip.
+
+Total client JS (framework + router — TanStack's own methodology) is printed alongside in the `measure.mjs` output. Measured 2026-06-27.
+
 ## Directory Structure
 
 ```

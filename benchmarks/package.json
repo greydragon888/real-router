@@ -12,6 +12,7 @@
     "bench:vs-tanstack": "node vs-tanstack/run.mjs",
     "bench:vs-tanstack:real-router": "node vs-tanstack/run.mjs client-nav real-router react speed",
     "bench:vs-tanstack:tanstack": "node vs-tanstack/run.mjs client-nav tanstack react speed",
+    "bench:bundle-size": "node vs-tanstack/bundle-size/build-all.mjs",
     "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
     "bench:type-check": "tsc --noEmit && tsc --noEmit -p vs-tanstack/tsconfig.solid.json",
     "bench:lint": "eslint --cache core/ vs-tanstack/ --fix --max-warnings 0"
