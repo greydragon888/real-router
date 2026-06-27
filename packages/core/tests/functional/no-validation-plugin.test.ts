@@ -402,4 +402,211 @@ describe("core/without validation plugin", () => {
       router.stop();
     });
   });
+
+  describe("batch name dedup — add() (#953)", () => {
+    it("throws on duplicate route names within a single add() batch", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          { name: "dupTop", path: "/dup-top-1" },
+          { name: "dupTop", path: "/dup-top-2" },
+        ]);
+      }).toThrow('[router.addRoute] Duplicate route "dupTop" in batch');
+
+      router.stop();
+    });
+
+    it("throws on duplicate nested child names within a single add() batch", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          {
+            name: "parentX",
+            path: "/parent-x",
+            children: [
+              { name: "kid", path: "/kid-a" },
+              { name: "kid", path: "/kid-b" },
+            ],
+          },
+        ]);
+      }).toThrow('[router.addRoute] Duplicate route "parentX.kid" in batch');
+
+      router.stop();
+    });
+
+    it("leaves the store untouched when a duplicate-name batch is rejected (atomic)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          { name: "atomicA", path: "/atomic-a" },
+          { name: "atomicA", path: "/atomic-a2" },
+        ]);
+      }).toThrow();
+
+      // Neither route from the rejected batch was committed (assertAddable runs
+      // before any tree/config swap, so a dup-name batch is fully atomic).
+      expect(api.has("atomicA")).toBe(false);
+      expect(getPluginApi(router).matchPath("/atomic-a")?.name).toBeUndefined();
+      expect(
+        getPluginApi(router).matchPath("/atomic-a2")?.name,
+      ).toBeUndefined();
+
+      router.stop();
+    });
+  });
+
+  describe("batch name dedup — replace() (#968)", () => {
+    it("throws on duplicate route names within a single replace() batch", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.replace([
+          { name: "x", path: "/a" },
+          { name: "x", path: "/b" },
+        ]);
+      }).toThrow('[router.addRoute] Duplicate route "x" in batch');
+
+      router.stop();
+    });
+
+    it("throws on duplicate nested child names within a single replace() batch", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.replace([
+          {
+            name: "root",
+            path: "/root",
+            children: [
+              { name: "leaf", path: "/leaf-a" },
+              { name: "leaf", path: "/leaf-b" },
+            ],
+          },
+        ]);
+      }).toThrow('[router.addRoute] Duplicate route "root.leaf" in batch');
+
+      router.stop();
+    });
+
+    it("leaves the existing tree intact when a duplicate-name replace batch is rejected (atomic)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(api.has("home")).toBe(true);
+
+      expect(() => {
+        api.replace([
+          { name: "dup", path: "/dup-a" },
+          { name: "dup", path: "/dup-b" },
+        ]);
+      }).toThrow();
+
+      // The pre-existing routes survive — replace bailed before the swap.
+      expect(api.has("home")).toBe(true);
+      expect(api.has("dup")).toBe(false);
+
+      router.stop();
+    });
+  });
+
+  describe("reserved @@ route names — add() (#954)", () => {
+    it("rejects a reserved @@ route name without the validation plugin", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add({ name: "@@router/custom", path: "/system" });
+      }).toThrow(
+        '[router.addRoute] Route name "@@router/custom" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.',
+      );
+
+      router.stop();
+    });
+
+    it("rejects a reserved @@ name nested in a child route", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add({
+          name: "publicParent",
+          path: "/public-parent",
+          children: [{ name: "@@secret", path: "/secret" }],
+        });
+      }).toThrow(
+        '[router.addRoute] Route name "@@secret" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.',
+      );
+
+      router.stop();
+    });
+  });
+
+  describe("batch path dedup — add() (#955)", () => {
+    it("throws when two routes in one add() batch share a path", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          { name: "dupPathA", path: "/dup-path" },
+          { name: "dupPathB", path: "/dup-path" },
+        ]);
+      }).toThrow('[router.addRoute] Path "/dup-path" is already defined');
+
+      router.stop();
+    });
+
+    it("throws when two sibling grandchildren in one add() batch share a path", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add({
+          name: "gp",
+          path: "/gp",
+          children: [
+            {
+              name: "mid",
+              path: "/mid",
+              children: [
+                { name: "kidA", path: "/kid" },
+                { name: "kidB", path: "/kid" },
+              ],
+            },
+          ],
+        });
+      }).toThrow('[router.addRoute] Path "/kid" is already defined');
+
+      router.stop();
+    });
+
+    it("allows distinct sibling paths in one add() batch (both reachable by URL)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([
+          { name: "distinctX", path: "/distinct-x" },
+          { name: "distinctY", path: "/distinct-y" },
+        ]);
+      }).not.toThrow();
+
+      expect(getPluginApi(router).matchPath("/distinct-x")?.name).toBe(
+        "distinctX",
+      );
+      expect(getPluginApi(router).matchPath("/distinct-y")?.name).toBe(
+        "distinctY",
+      );
+
+      router.stop();
+    });
+  });
 });
