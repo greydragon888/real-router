@@ -516,4 +516,36 @@ describe("core/without validation plugin", () => {
       router.stop();
     });
   });
+
+  describe("reserved @@ route names — add() (#954)", () => {
+    it("rejects a reserved @@ route name without the validation plugin", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add({ name: "@@router/custom", path: "/system" });
+      }).toThrow(
+        '[router.addRoute] Route name "@@router/custom" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.',
+      );
+
+      router.stop();
+    });
+
+    it("rejects a reserved @@ name nested in a child route", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add({
+          name: "publicParent",
+          path: "/public-parent",
+          children: [{ name: "@@secret", path: "/secret" }],
+        });
+      }).toThrow(
+        '[router.addRoute] Route name "@@secret" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.',
+      );
+
+      router.stop();
+    });
+  });
 });

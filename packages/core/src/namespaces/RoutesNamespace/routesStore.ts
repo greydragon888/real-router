@@ -413,17 +413,48 @@ export function assertNoDuplicateNamesInBatch<
   });
 }
 
+const INTERNAL_ROUTE_PREFIX = "@@";
+
+/**
+ * Rejects routes whose (bare) name uses the reserved "@@" prefix — internal /
+ * system names such as UNKNOWN_ROUTE (`"@@router/UNKNOWN_ROUTE"`). Without this
+ * guard a public `add` could register a route whose name equals the not-found
+ * sentinel, so a real URL would `matchPath` to a state with `name ===
+ * UNKNOWN_ROUTE`, silently conflating a genuine route with "not found" (#954).
+ * Checks the BARE leaf name (the prefix is on the leaf, not the dotted fullName)
+ * and recurses children. Mirrors validation-plugin's `throwIfInternalRoute`
+ * message so the no-plugin error matches the with-plugin one.
+ */
+export function assertNoInternalNamesInBatch<
+  Dependencies extends DefaultDependencies,
+>(routes: readonly Route<Dependencies>[], methodName: string): void {
+  for (const route of routes) {
+    if (route.name.startsWith(INTERNAL_ROUTE_PREFIX)) {
+      throw new Error(
+        `[router.${methodName}] Route name "${route.name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`,
+      );
+    }
+
+    if (route.children) {
+      assertNoInternalNamesInBatch(route.children, methodName);
+    }
+  }
+}
+
 /**
  * Up-front guard for `add` against the corruptions route-tree stays silent on: a
- * missing `parent`, a name that collides with an EXISTING route, and a name
- * duplicated WITHIN the batch (any of which would otherwise be silently
- * overwritten). Throws before any build.
+ * missing `parent`, a name that collides with an EXISTING route, a name
+ * duplicated WITHIN the batch (either would otherwise be silently overwritten),
+ * and a reserved "@@"-prefixed name (which would shadow an internal/system route
+ * name). Throws before any build.
  */
 export function assertAddable<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   routes: readonly Route<Dependencies>[],
   parentName: string | undefined,
 ): void {
+  assertNoInternalNamesInBatch(routes, "addRoute");
+
   if (parentName !== undefined && !store.matcher.hasRoute(parentName)) {
     throw new Error(
       `[router.addRoute] Parent route "${parentName}" does not exist`,
