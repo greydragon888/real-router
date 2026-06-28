@@ -1,5 +1,5 @@
 import { getNavigator } from "@real-router/core";
-import { createRouteSource, getErrorSource } from "@real-router/sources";
+import { createRouteSource, primeErrorSource } from "@real-router/sources";
 import { createSelector, onCleanup, onMount } from "solid-js";
 
 import { RouterContext, RouteContext } from "./context";
@@ -69,7 +69,7 @@ export function RouterProvider(
   // boot navigation) is still captured. The boundary's createDismissableError
   // reuses this cached source and catches up (#765); without it the error source
   // is created lazily on boundary mount — after the error — and never sees it.
-  getErrorSource(props.router);
+  primeErrorSource(props.router);
 
   const routeSignal = createSignalFromSource(routeSource);
 

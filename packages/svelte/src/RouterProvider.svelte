@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getNavigator } from "@real-router/core";
-  import { createRouteSource, getErrorSource } from "@real-router/sources";
+  import { createRouteSource, primeErrorSource } from "@real-router/sources";
   import {
     createRouteAnnouncer,
     createScrollRestoration,
@@ -111,7 +111,7 @@
   // reuses this cached source and catches up (#765); without it the error source
   // is created lazily on boundary mount — after the error — and never sees it.
   // svelte-ignore state_referenced_locally
-  getErrorSource(router);
+  primeErrorSource(router);
   const reactive = createReactiveSource(source);
   const routeContext = createRouteContext(navigator, reactive);
 

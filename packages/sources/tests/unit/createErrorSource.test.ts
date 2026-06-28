@@ -2,7 +2,7 @@ import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createErrorSource } from "../../src";
+import { createErrorSource, getErrorSource, primeErrorSource } from "../../src";
 
 import type { Router } from "@real-router/core";
 
@@ -279,6 +279,49 @@ describe("createErrorSource", () => {
     expect(listener).not.toHaveBeenCalled();
     expect(() => {
       unsubscribe();
+    }).not.toThrow();
+  });
+});
+
+describe("primeErrorSource (#778)", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createRouter([
+      { name: "home", path: "/" },
+      { name: "dashboard", path: "/dashboard" },
+    ]);
+    await router.start("/");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("eagerly subscribes the error source so an error fired before getErrorSource is captured", async () => {
+    // Prime BEFORE the error. Without it, the first getErrorSource call AFTER
+    // the error would create the eager source too late and miss it (the #778
+    // boundary-after-error window).
+    primeErrorSource(router);
+
+    await expect(router.navigate("nonexistent")).rejects.toThrow();
+
+    // getErrorSource returns the SAME cached source the prime created — it was
+    // subscribed in time, so it captured the error.
+    const snap = getErrorSource(router).getSnapshot();
+
+    expect(snap.error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+  });
+
+  it("is a no-op (does not throw) for a router with no internals-registry entry", () => {
+    // An Object.create-derived router-like (a test stub, or a not-yet-registered
+    // clone) has a fresh identity → getPluginApi/getInternals throws. prime must
+    // swallow it so a Provider eagerly priming the error source never crashes on
+    // a router the lazy route source would tolerate.
+    const stub = Object.create(router) as Router;
+
+    expect(() => {
+      primeErrorSource(stub);
     }).not.toThrow();
   });
 });

@@ -1,5 +1,5 @@
 import { getNavigator } from "@real-router/core";
-import { createRouteSource, getErrorSource } from "@real-router/sources";
+import { createRouteSource, primeErrorSource } from "@real-router/sources";
 import { useEffect, useMemo } from "preact/hooks";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
@@ -127,7 +127,7 @@ export const RouterProvider: FunctionComponent<RouteProviderProps> = ({
   // reuses this cached source and catches up (#765); without it the error source
   // is created lazily on boundary mount — after the error — and never sees it.
   useEffect(() => {
-    getErrorSource(router);
+    primeErrorSource(router);
   }, [router]);
 
   // useSyncExternalStore manages the router subscription lifecycle:

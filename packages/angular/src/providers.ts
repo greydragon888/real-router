@@ -5,7 +5,7 @@ import {
   type EnvironmentProviders,
 } from "@angular/core";
 import { getNavigator, type Router, type Navigator } from "@real-router/core";
-import { createRouteSource, getErrorSource } from "@real-router/sources";
+import { createRouteSource, primeErrorSource } from "@real-router/sources";
 
 import {
   installScrollRestoration,
@@ -57,7 +57,7 @@ export function provideRealRouter(
     // (#765); without it the error source is created lazily on boundary init —
     // after the error — and never sees it.
     provideEnvironmentInitializer(() => {
-      getErrorSource(router);
+      primeErrorSource(router);
     }),
   ];
 

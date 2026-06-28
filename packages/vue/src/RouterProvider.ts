@@ -1,4 +1,4 @@
-import { getErrorSource } from "@real-router/sources";
+import { primeErrorSource } from "@real-router/sources";
 import { defineComponent, onScopeDispose, provide, watch } from "vue";
 
 import { NavigatorKey, RouteKey, RouterKey } from "./context";
@@ -152,7 +152,7 @@ export const RouterProvider = defineComponent({
     // createDismissableError reuses this cached source and catches up (#765);
     // without it the error source is created lazily on boundary mount — after the
     // error — and never sees it.
-    getErrorSource(props.router);
+    primeErrorSource(props.router);
 
     const { navigator, route, previousRoute, unsubscribe } =
       setupRouteProvision(props.router);
