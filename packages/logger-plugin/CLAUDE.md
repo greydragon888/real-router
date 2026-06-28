@@ -48,7 +48,7 @@ Follows the same pattern as `BrowserPlugin` and `PersistentParamsPlugin`. The cl
 
 ### Pre-computed flags avoid runtime branching
 
-All `config.level` checks are resolved once in the constructor into boolean flags (`#logLifecycle`, `#logTransition`, `#logWarning`, `#logError`). Hooks only check booleans, never compare strings at runtime.
+All `config.level` checks are resolved once in the constructor into boolean flags (`#logLifecycle`, `#logTransition`, `#logError`). Hooks only check booleans, never compare strings at runtime. (The cancel branch's `console.warn` is gated by `#logTransition` — there is no separate `#logWarning` field.)
 
 ### `#resetTransitionState()` ordering
 
@@ -90,7 +90,7 @@ src/
 ├── factory.ts              — loggerPluginFactory: validates options, merges defaults,
 │                             returns PluginFactory → new LoggerPlugin(config).getPlugin()
 ├── plugin.ts               — LoggerPlugin class: pre-computes flags in constructor,
-│                             getPlugin() returns Plugin with 6 lifecycle hooks + teardown
+│                             getPlugin() returns Plugin with 7 lifecycle hooks + teardown
 ├── validation.ts           — validateOptions: level, context, boolean flags (TypeError)
 ├── constants.ts            — LOGGER_CONTEXT, ERROR_PREFIX, DEFAULT_CONFIG
 ├── types.ts                — LoggerPluginConfig, LogLevel
