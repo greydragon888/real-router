@@ -1,5 +1,5 @@
 import { getNavigator } from "@real-router/core";
-import { createRouteSource } from "@real-router/sources";
+import { createRouteSource, getErrorSource } from "@real-router/sources";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
@@ -125,6 +125,15 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   // ABOVE any Activity boundary — see the "Keep RouterProvider above any
   // <Activity> / keepAlive boundary" gotcha in CLAUDE.md.
   const store = useMemo(() => createRouteSource(router), [router]);
+
+  // #778 P2: eagerly create the per-router error source so a navigation error
+  // that fires BEFORE a RouterErrorBoundary mounts (a lazy app shell, a failed
+  // boot navigation) is still captured. The boundary's createDismissableError
+  // reuses this cached source and catches up (#765); without it the error source
+  // is created lazily on boundary mount — after the error — and never sees it.
+  useEffect(() => {
+    getErrorSource(router);
+  }, [router]);
   // Use snapshot reference directly. createRouteSource via stabilizeState
   // returns the SAME snapshot reference when route.path is unchanged, so
   // useMemo below sees stable deps for idempotent navigations and
