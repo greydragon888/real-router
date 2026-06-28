@@ -1,16 +1,19 @@
 import {
   createEnvironmentInjector,
+  effect,
   EnvironmentInjector,
   runInInjectionContext,
+  signal,
 } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { createRouter } from "@real-router/core";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { createActiveRouteSource } from "@real-router/sources";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { injectRouteNode } from "../../src/functions/injectRouteNode";
 import { provideRealRouter } from "../../src/providers";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 
 const routes = [
   { name: "home", path: "/" },
@@ -83,5 +86,64 @@ describe("reactive lifecycle (#778)", () => {
     expect(node2.routeState().route?.params.id).toBe("42");
 
     scope2.destroy();
+  });
+
+  // #766 angular-specific (lowest-threshold path in the series): the #630
+  // effect-rebuild means a SINGLE `<a realLink [routeParams]="sig()">` re-creates
+  // its active source on every param change. Before the lazy fix each unique key
+  // left a permanent router subscription (eager + no-op destroy), so one reused
+  // directive in a virtual list walked toward the 10000-listener crash. JIT
+  // can't bind a directive signal-input (NG0303), so we drive the exact effect
+  // body RealLink runs — create + subscribe + onCleanup — and assert the count
+  // stays bounded as params cycle.
+  it("P3: a single directive cycling [routeParams] keeps router subscriptions bounded", () => {
+    const parent = TestBed.inject(EnvironmentInjector);
+
+    let active = 0;
+    const realSubscribe = router.subscribe.bind(router);
+
+    vi.spyOn(router, "subscribe").mockImplementation((listener) => {
+      active++;
+      const unsubscribe = realSubscribe(listener);
+
+      return () => {
+        active--;
+        unsubscribe();
+      };
+    });
+
+    const params = signal<Params>({ id: "0" });
+    const scope = createEnvironmentInjector([], parent);
+
+    runInInjectionContext(scope, () => {
+      effect((onCleanup) => {
+        const source = createActiveRouteSource(
+          router,
+          "users.view",
+          params(),
+          {},
+        );
+        const unsubscribe = source.subscribe(() => {});
+
+        onCleanup(() => {
+          unsubscribe();
+        });
+      });
+    });
+
+    TestBed.tick();
+
+    for (let i = 1; i <= 200; i++) {
+      params.set({ id: String(i) });
+      TestBed.tick();
+    }
+
+    // Lazy connection (#766): each effect re-run releases the previous source's
+    // subscription (onLastUnsubscribe), so ONE directive cycling 200 distinct
+    // params holds at most one active router subscription — not 200.
+    expect(active).toBeLessThanOrEqual(1);
+
+    scope.destroy();
+    vi.restoreAllMocks();
   });
 });
