@@ -60,7 +60,7 @@ src/
 │   ├── HttpStatusCode.tsx      # /ssr — writes code into the nearest sink during render
 │   └── HttpStatusProvider.tsx  # /ssr — provides HttpStatusSink via Solid context
 ├── directives/                 # Directives
-│   └── link.tsx                # use:link directive
+│   └── link.tsx                # use:link directive + JSX.Directives augmentation (shipped to consumers, #976)
 ├── utils/
 │   ├── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 │   └── createMountedSignal.ts  # createSignal(false) + onMount(true) — drives ClientOnly/ServerOnly
@@ -79,8 +79,7 @@ src/
 ├── index.tsx                   # Main entry — client API
 ├── ssr.tsx                     # SSR-feature subpath — client/server boundary components, deferred-data hooks, HTTP status sink
 ├── types.ts
-├── constants.ts
-└── directives.d.ts             # JSX.Directives augmentation for use:link
+└── constants.ts
 ```
 
 ### Build (rollup + babel-preset-solid)
@@ -487,7 +486,8 @@ For reactive navigation links, use the `<Link>` component instead.
 > `vitest.config.mts` runs `vite-plugin-solid` — the **same** `babel-preset-solid` pipeline
 > as production — so the JSX compiles for real (the earlier claim that "vitest does not
 > provide a Solid JSX compile pipeline in isolation" was wrong; the plugin is in the config).
-> The test uses the object-literal form `{ routeName: signal() }` with the signal read inside.
+> The test uses the object-literal form `{ routeName: signal() }` with the signal read inside —
+> the only valid `use:link` form (see "use:link Takes the OBJECT Form" below; #976).
 > `examples/web/solid/use-link-directive` remains as an additional end-to-end pin (full Vite
 > build + browser), no longer the only one.
 
@@ -498,24 +498,37 @@ The `link` directive calls `useRouter()` internally, so it must be used inside a
 ```tsx
 // CORRECT — inside RouterProvider
 <RouterProvider router={router}>
-  <a use:link={() => ({ routeName: "home" })}>Home</a>
+  <a use:link={{ routeName: "home" }}>Home</a>
 </RouterProvider>
 
 // WRONG — outside RouterProvider, useRouter() throws
-<a use:link={() => ({ routeName: "home" })}>Home</a>
+<a use:link={{ routeName: "home" }}>Home</a>
 ```
 
-The directive expects an accessor (`() => options`). Solid's `babel-preset-solid` also auto-wraps an object literal at compile time, so both forms are accepted:
+### use:link Takes the OBJECT Form, Not an Accessor (#976)
+
+Pass the options **object** directly. Solid's compiler wraps a directive value
+into an accessor at compile time (`use:link={X}` → `link(el, () => X)`), so the
+value you write IS the options object the directive reads:
 
 ```tsx
-// Accessor — explicit, recommended (plays well with reactive values inside)
-<a use:link={() => ({ routeName: "users", routeParams: { id: "123" } })}>User</a>
-
-// Object literal — accepted; babel-preset-solid wraps it into an accessor
+// CORRECT — object form (canonical). babel wraps it into the accessor.
 <a use:link={{ routeName: "users", routeParams: { id: "123" } }}>User</a>
+
+// WRONG — accessor form double-wraps into `() => (() => options)`, so the
+// directive receives a FUNCTION instead of the options. The <a> never gets an
+// href and clicks navigate nowhere. TypeScript rejects this with TS2322.
+<a use:link={() => ({ routeName: "users", routeParams: { id: "123" } })}>User</a>
 ```
 
-Either way the directive captures the options **once** at init (see "use:link Options Are Captured Once" above) — reactive values inside the object/accessor are NOT tracked. For reactive route switching, use the `<Link>` component instead.
+The `JSX.Directives.link` augmentation (in `src/directives/link.tsx`) types the
+value as `LinkDirectiveOptions | undefined` and is shipped in the published
+declarations, so consumers get the same TS2322 on the accessor form that the
+package's own tests do — the form is rejected uniformly everywhere.
+
+The directive captures the options **once** at init (see "use:link Options Are
+Captured Once" above) — reactive values inside the object are NOT tracked. For
+reactive route switching, use the `<Link>` component instead.
 
 ### Hook Caching via `@real-router/sources`
 

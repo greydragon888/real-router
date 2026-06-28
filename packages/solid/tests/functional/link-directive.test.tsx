@@ -11,6 +11,7 @@ import { RouterProvider, link } from "@real-router/solid";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
+import type { LinkDirectiveOptions } from "@real-router/solid";
 import type { JSX } from "solid-js";
 
 describe("link directive", () => {
@@ -873,6 +874,35 @@ describe("link directive", () => {
       // and the directive does not preventDefault on <div> anyway.)
       expect(consumerSpy.mock.results[0]?.value).toBe(false);
       expect(navigateSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // #976 — type contract: the OBJECT form is the only valid `use:link` value.
+  // Solid's compiler wraps the value into an accessor (`use:link={X}` →
+  // `link(el, () => X)`), so the value IS the options object. The ACCESSOR form
+  // `use:link={() => ({...})}` double-wraps into `() => (() => opts)`, so the
+  // directive receives a function — broken at runtime (no href, no nav) AND
+  // correctly rejected by the type. Widening JSX.Directives["link"] to also
+  // accept a function (#976 open question #2) would re-introduce that runtime
+  // bug; these compile-time assertions fail the package type-check if it ever
+  // happens (they sit in `tests/` which `tsc --noEmit` checks).
+  describe("use:link value type contract (#976)", () => {
+    it("accepts the object form, rejects the accessor form", () => {
+      type LinkValue = JSX.Directives["link"];
+      type ObjectFormAssignable = LinkDirectiveOptions extends LinkValue
+        ? true
+        : false;
+      type AccessorFormAssignable =
+        (() => LinkDirectiveOptions) extends LinkValue ? true : false;
+
+      // Object form IS assignable; accessor form is NOT. If the type is
+      // widened to accept the accessor form, AccessorFormAssignable becomes
+      // `true` and the `false` annotation below stops type-checking.
+      const objectFormAssignable: ObjectFormAssignable = true;
+      const accessorFormAssignable: AccessorFormAssignable = false;
+
+      expect(objectFormAssignable).toBe(true);
+      expect(accessorFormAssignable).toBe(false);
     });
   });
 

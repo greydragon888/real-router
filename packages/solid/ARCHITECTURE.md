@@ -50,7 +50,6 @@ src/
 ├── context.ts                  # Two Solid contexts (RouterContext, RouteContext)
 ├── types.ts                    # RouteState, LinkProps
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
-├── directives.d.ts             # JSX.Directives augmentation for use:link
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (see root CLAUDE.md)
 │   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
 │   ├── route-announcer.ts      # createRouteAnnouncer (a11y aria-live region)
@@ -64,7 +63,7 @@ src/
 ├── createSignalFromSource.ts   # Signal bridge — converts RouterSource to Solid Accessor
 ├── createStoreFromSource.ts    # Store bridge — converts RouterSource to Solid store (reconcile)
 ├── directives/
-│   └── link.tsx                # use:link directive
+│   └── link.tsx                # use:link directive + JSX.Directives augmentation (shipped to consumers, #976)
 ├── hooks/
 │   ├── useRouter.tsx           # Router + Navigator from context (never reactive)
 │   ├── useNavigator.tsx        # Navigator from context (never reactive)
