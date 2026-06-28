@@ -453,8 +453,39 @@ export class NavigationNamespace {
 
     const externalSignal = nav.opts.signal;
     let onExternalAbort: (() => void) | undefined;
+    let onInternalAbort: (() => void) | undefined;
     let succeeded = false;
     let failureReason: unknown;
+
+    // #1018: race the guard completion against the controller's abort so a
+    // non-cooperative guard whose Promise never settles (and ignores `signal`)
+    // cannot wedge navigate() forever. `abortRace` RESOLVES on abort, so the
+    // post-race `isActive()` check below throws TRANSITION_CANCELLED — the same
+    // path that already handles a guard which swallows the abort and resolves
+    // `true`. `stop()`/`dispose()`/supersede all abort the controller. Mirrors
+    // the leave-path protection `settleLeavePromises` (#663/#673).
+    const abortRace = new Promise<void>((resolve) => {
+      if (controller.signal.aborted) {
+        resolve();
+
+        return;
+      }
+
+      onInternalAbort = () => {
+        resolve();
+      };
+
+      controller.signal.addEventListener("abort", onInternalAbort, {
+        once: true,
+      });
+    });
+
+    // Consume `guardCompletion` when the abort wins the race: a slow or
+    // never-settling guard that settles later then has no awaiter, which would
+    // surface as an unhandled rejection without this catch.
+    guardCompletion.catch(() => {
+      /* settlement consumed — the race already decided the navigation */
+    });
 
     try {
       if (externalSignal) {
@@ -478,7 +509,7 @@ export class NavigationNamespace {
         });
       }
 
-      await guardCompletion;
+      await Promise.race([guardCompletion, abortRace]);
 
       if (!isActive()) {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
@@ -507,6 +538,14 @@ export class NavigationNamespace {
       if (onExternalAbort) {
         // Stryker disable next-line StringLiteral: equivalent — cleanup event name is redundant (listener is `{ once: true }` and the signal is discarded), so a wrong name removes nothing observable.
         externalSignal?.removeEventListener("abort", onExternalAbort);
+      }
+
+      // Detach the abort-race listener before #cleanupController aborts the
+      // controller below, so the cleanup abort cannot re-fire it. `undefined`
+      // only when the controller was already aborted at setup (the early-resolve
+      // branch above registered no listener).
+      if (onInternalAbort) {
+        controller.signal.removeEventListener("abort", onInternalAbort);
       }
 
       // Success drops the controller without aborting (the subscribeLeave signal

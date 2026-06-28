@@ -322,9 +322,12 @@ describe("useRouterTransition", () => {
 
     expect(result.current.isLeaveApproved).toBe(false);
 
+    let navPromise!: Promise<unknown>;
+
+    // TRANSITION_START/LEAVE_APPROVE fire synchronously within navigate(); await
+    // the navigation's actual settlement instead of counting microtask flushes.
     await act(async () => {
-      void router.navigate("dashboard");
-      await Promise.resolve();
+      navPromise = router.navigate("dashboard");
     });
 
     expect(result.current.isTransitioning).toBe(true);
@@ -332,8 +335,7 @@ describe("useRouterTransition", () => {
 
     await act(async () => {
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
     });
 
     expect(result.current.isTransitioning).toBe(false);

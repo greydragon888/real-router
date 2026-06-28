@@ -245,8 +245,13 @@ describe("router.navigate() - concurrent navigation", () => {
 
       await vi.runAllTimersAsync();
 
+      // stop() at 50ms precedes the guard's failure at 100ms, so cancellation
+      // wins — the guard await is raced against the abort (#1018). Before #1018
+      // the navigation hung on the guard and surfaced its CANNOT_ACTIVATE; now
+      // stop() rejects immediately with TRANSITION_CANCELLED (matching this
+      // test's name, "prioritize cancellation over other errors").
       await expect(promise).rejects.toMatchObject({
-        code: errorCodes.CANNOT_ACTIVATE,
+        code: errorCodes.TRANSITION_CANCELLED,
       });
 
       await router.start("/home");
@@ -480,8 +485,11 @@ describe("router.navigate() - concurrent navigation", () => {
 
       await vi.runAllTimersAsync();
 
+      // stop() at 20ms precedes the slow guard's verdict at 40ms; the guard
+      // await is raced against the abort (#1018), so cancellation wins with
+      // TRANSITION_CANCELLED instead of waiting for the guard's CANNOT_ACTIVATE.
       await expect(promise).rejects.toMatchObject({
-        code: errorCodes.CANNOT_ACTIVATE,
+        code: errorCodes.TRANSITION_CANCELLED,
       });
 
       await router.start("/home");
@@ -511,8 +519,11 @@ describe("router.navigate() - concurrent navigation", () => {
 
       await vi.runAllTimersAsync();
 
+      // stop() at 10ms precedes the guard's rejection at 20ms; the guard await is
+      // raced against the abort (#1018), so cancellation wins (this test's name:
+      // "prioritise cancellation errors") instead of the guard's CANNOT_ACTIVATE.
       await expect(promise).rejects.toMatchObject({
-        code: errorCodes.CANNOT_ACTIVATE,
+        code: errorCodes.TRANSITION_CANCELLED,
       });
 
       await router.start("/home");
