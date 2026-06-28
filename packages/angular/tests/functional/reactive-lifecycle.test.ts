@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-extraneous-class -- Angular test host components use empty classes with @Component decorators */
 import {
+  Component,
   createEnvironmentInjector,
   effect,
   EnvironmentInjector,
@@ -6,12 +8,14 @@ import {
   signal,
 } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { createRouter } from "@real-router/core";
 import { createActiveRouteSource } from "@real-router/sources";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { RouterErrorBoundary } from "../../src/components/RouterErrorBoundary";
 import { injectRouteNode } from "../../src/functions/injectRouteNode";
-import { provideRealRouter } from "../../src/providers";
+import { provideRealRouter, ROUTER } from "../../src/providers";
 
 import type { Params, Router } from "@real-router/core";
 
@@ -145,5 +149,44 @@ describe("reactive lifecycle (#778)", () => {
 
     scope.destroy();
     vi.restoreAllMocks();
+  });
+
+  // #765 1.2 manifestation: a navigation error that fires BEFORE a
+  // RouterErrorBoundary is instantiated (the ordinary load order — a lazily
+  // rendered error region, or a failed boot navigation) is invisible to a
+  // boundary that creates its error source lazily on init, AFTER the error.
+  // provideRealRouter now eagerly creates the per-router error source at
+  // bootstrap (a provideEnvironmentInitializer), so it captures the error from
+  // app init; the boundary's createDismissableError catches up (#765) and
+  // renders the error.
+  it("P2: a RouterErrorBoundary instantiated AFTER a navigation error shows the error", async () => {
+    @Component({
+      template: `<router-error-boundary
+        ><span>app</span></router-error-boundary
+      >`,
+      imports: [RouterErrorBoundary],
+    })
+    class BoundaryHost {}
+
+    // Instantiate the environment injector so the #778 P2 initializer eagerly
+    // subscribes getErrorSource BEFORE the error fires.
+    TestBed.inject(ROUTER);
+
+    // Navigation error BEFORE the boundary is created.
+    await router.navigate("nonexistent").catch(() => {});
+
+    // Now create the boundary (e.g. a lazily-rendered error region).
+    const fixture = TestBed.createComponent(BoundaryHost);
+
+    fixture.detectChanges();
+
+    const boundary = fixture.debugElement.query(
+      By.directive(RouterErrorBoundary),
+    ).componentInstance as RouterErrorBoundary;
+
+    const ctx = boundary.errorContext();
+
+    expect(ctx).not.toBeNull();
+    expect(ctx!.$implicit.code).toBe("ROUTE_NOT_FOUND");
   });
 });

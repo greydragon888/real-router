@@ -1,5 +1,16 @@
 # @real-router/angular
 
+## 0.11.10
+
+### Patch Changes
+
+- [#1022](https://github.com/greydragon888/real-router/pull/1022) [`e458bbb`](https://github.com/greydragon888/real-router/commit/e458bbbb9cc622b944c45c800e65bf93d6048849) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(angular): RouterErrorBoundary instantiated after an error shows the error ([#778](https://github.com/greydragon888/real-router/issues/778))
+
+  `provideRealRouter` now eagerly creates the per-router error source at bootstrap (via a `provideEnvironmentInitializer`), so a navigation error that fires BEFORE a `RouterErrorBoundary` is instantiated (a lazily-rendered error region, a failed boot navigation — the ordinary load order) is captured and surfaced once the boundary is created. Previously the boundary created the error source lazily on init — after the error had already fired with no subscriber — so it never rendered. Pairs with the [#765](https://github.com/greydragon888/real-router/issues/765) reconnect-reconcile fix: the boundary's `createDismissableError` catches up to the already-captured error on first subscribe.
+
+- Updated dependencies [[`e458bbb`](https://github.com/greydragon888/real-router/commit/e458bbbb9cc622b944c45c800e65bf93d6048849)]:
+  - @real-router/sources@0.10.0
+
 ## 0.11.9
 
 ### Patch Changes
