@@ -260,6 +260,28 @@ describe("@real-router/logger-plugin", () => {
       // Should use groups if available
       expect(consoleGroupSpy).toHaveBeenCalled();
     });
+
+    it("should NOT open a group at level 'none' (#794)", async () => {
+      router.usePlugin(loggerPluginFactory({ level: "none" }));
+      await router.start("/");
+
+      await router.navigate("users");
+      await router.navigate("admin");
+
+      // A console.group is itself console output — at level "none" the plugin
+      // must be completely silent, with no empty expandable groups.
+      expect(consoleGroupSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT open a group at level 'errors' (#794)", async () => {
+      router.usePlugin(loggerPluginFactory({ level: "errors" }));
+      await router.start("/");
+
+      await router.navigate("users");
+
+      // Transition logging is gated off; the group must be too.
+      expect(consoleGroupSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("Edge Cases", () => {

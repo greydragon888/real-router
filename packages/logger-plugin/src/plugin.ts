@@ -79,7 +79,14 @@ export class LoggerPlugin {
       },
 
       onTransitionStart: (toState: State, fromState?: State) => {
-        this.#groups.open("Router transition");
+        // A console.group is itself console output — open it only when the
+        // transition log below will populate it, so level "none"/"errors" stay
+        // silent instead of emitting an empty expandable group per transition
+        // (#794). Close (#resetTransitionState) is idempotent, so it is unchanged.
+        if (this.#logTransition) {
+          this.#groups.open("Router transition");
+        }
+
         this.#transitionStartTime = this.#shouldShowTiming ? now() : null;
 
         const fromRoute = formatRouteName(fromState);
