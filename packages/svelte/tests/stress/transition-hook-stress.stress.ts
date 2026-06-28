@@ -53,15 +53,16 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
     await tick();
 
     for (let i = 0; i < 50; i++) {
-      void router.navigate("target");
-      await Promise.resolve();
+      const navPromise = router.navigate("target");
+
       await tick();
 
       expect(snapshot.isTransitioning).toBe(true);
 
+      // Await the navigation's actual settlement (deterministic) instead of a
+      // fixed flush count; tick() flushes Svelte's render for the assertion.
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
       await tick();
 
       expect(snapshot.isTransitioning).toBe(false);

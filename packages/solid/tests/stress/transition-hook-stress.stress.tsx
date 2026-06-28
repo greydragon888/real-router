@@ -80,15 +80,18 @@ describe("S7 — useRouterTransition stress (Solid)", () => {
     ));
 
     for (let i = 0; i < 50; i++) {
-      void router.navigate("target");
-      await Promise.resolve();
+      const navPromise = router.navigate("target");
+
+      // Solid has no tick(); one microtask flushes its reactive effect so the
+      // consumer reflects the synchronously-emitted TRANSITION_START.
       await Promise.resolve();
 
       expect(snapshot.isTransitioning).toBe(true);
 
+      // Await the navigation's actual settlement (deterministic) instead of a
+      // fixed flush count, then flush Solid's effect once for the final state.
       getResolveGuard()(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
       await Promise.resolve();
 
       expect(snapshot.isTransitioning).toBe(false);

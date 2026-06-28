@@ -62,17 +62,18 @@ describe("R7 — useRouterTransition stress", () => {
     );
 
     for (let i = 0; i < 50; i++) {
+      let navPromise!: Promise<unknown>;
+
+      // Await the navigation's actual settlement instead of counting flushes.
       await act(async () => {
-        void router.navigate("target");
-        await Promise.resolve();
+        navPromise = router.navigate("target");
       });
 
       expect(snapshot.isTransitioning).toBe(true);
 
       await act(async () => {
         resolveGuard(true);
-        await Promise.resolve();
-        await Promise.resolve();
+        await navPromise;
       });
 
       expect(snapshot.isTransitioning).toBe(false);

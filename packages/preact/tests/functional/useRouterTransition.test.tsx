@@ -60,17 +60,19 @@ describe("useRouterTransition", () => {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
+    let navPromise!: Promise<unknown>;
+
+    // TRANSITION_START fires synchronously within navigate(); act() flushes the
+    // resulting re-render, so no microtask-counting is needed.
     await act(async () => {
-      void router.navigate("dashboard");
-      await Promise.resolve();
+      navPromise = router.navigate("dashboard");
     });
 
     expect(result.current.isTransitioning).toBe(true);
 
     await act(async () => {
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
     });
   });
 
@@ -120,9 +122,6 @@ describe("useRouterTransition", () => {
 
     await act(async () => {
       const p1 = router.navigate("dashboard");
-
-      await Promise.resolve();
-
       const p2 = router.navigate("settings");
 
       resolveGuard(true);
@@ -147,17 +146,17 @@ describe("useRouterTransition", () => {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
+    let navPromise!: Promise<unknown>;
+
     await act(async () => {
-      void router.navigate("dashboard");
-      await Promise.resolve();
+      navPromise = router.navigate("dashboard");
     });
 
     expect(result.current.toRoute?.name).toBe("dashboard");
 
     await act(async () => {
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
     });
   });
 
@@ -175,17 +174,17 @@ describe("useRouterTransition", () => {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
+    let navPromise!: Promise<unknown>;
+
     await act(async () => {
-      void router.navigate("dashboard");
-      await Promise.resolve();
+      navPromise = router.navigate("dashboard");
     });
 
     expect(result.current.fromRoute?.name).toBe("home");
 
     await act(async () => {
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
     });
   });
 
@@ -216,7 +215,6 @@ describe("useRouterTransition", () => {
 
     await act(async () => {
       p1 = router.navigate("dashboard");
-      await Promise.resolve();
     });
 
     expect(result.current.toRoute).not.toBeNull();
@@ -224,9 +222,6 @@ describe("useRouterTransition", () => {
 
     await act(async () => {
       const p2 = router.navigate("settings");
-
-      await Promise.resolve();
-      await Promise.resolve();
 
       resolveGuard(true);
       await p2;
@@ -277,9 +272,10 @@ describe("useRouterTransition", () => {
       </RouterProvider>,
     );
 
+    let navPromise!: Promise<unknown>;
+
     await act(async () => {
-      void router.navigate("dashboard");
-      await Promise.resolve();
+      navPromise = router.navigate("dashboard");
     });
 
     fireEvent.click(screen.getByTestId("show"));
@@ -288,8 +284,7 @@ describe("useRouterTransition", () => {
 
     await act(async () => {
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
     });
   });
 
@@ -309,18 +304,20 @@ describe("useRouterTransition", () => {
 
     expect(result.current.isLeaveApproved).toBe(false);
 
+    let navPromise!: Promise<unknown>;
+
     await act(async () => {
-      void router.navigate("dashboard");
-      await Promise.resolve();
+      navPromise = router.navigate("dashboard");
     });
 
     expect(result.current.isTransitioning).toBe(true);
     expect(result.current.isLeaveApproved).toBe(true);
 
+    // Resolve the guard and await the navigation's actual settlement rather than
+    // a fixed number of microtask flushes — robust to the exact tick count.
     await act(async () => {
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
     });
 
     expect(result.current.isTransitioning).toBe(false);

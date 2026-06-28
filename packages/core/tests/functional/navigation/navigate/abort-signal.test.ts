@@ -645,4 +645,51 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       expect(state.name).toBe("users");
     });
   });
+
+  // =========================================================================
+  // Non-cooperative never-settling guard (#1018)
+  // =========================================================================
+  // A guard whose Promise never settles AND ignores its `signal` must not wedge
+  // navigate() forever. stop()/dispose()/supersede abort the internal
+  // controller; the guard await is raced against that abort so the parked
+  // navigation rejects with TRANSITION_CANCELLED instead of hanging. Mirrors the
+  // leave-path protection (#663/#673) — see never-settle-guard.stress.ts.
+
+  describe("non-cooperative never-settling guard (#1018)", () => {
+    it("15. stop() rejects a navigation parked on a never-settling activation guard", async () => {
+      lifecycle.addActivateGuard(
+        "users",
+        () => () => new Promise<boolean>(() => {}),
+      );
+
+      const nav = router.navigate("users");
+
+      // navigate() parks synchronously at the never-settling guard; stop()
+      // cancels the parked navigation via the abort-race.
+      router.stop();
+
+      await expect(nav).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+      expect(router.isActive()).toBe(false);
+    });
+
+    it("16. a superseding navigate() rejects one parked on a never-settling guard", async () => {
+      lifecycle.addActivateGuard(
+        "users",
+        () => () => new Promise<boolean>(() => {}),
+      );
+
+      const parked = router.navigate("users");
+
+      // `profile` has no guard → it commits; the parked `users` nav must reject
+      // via the abort-race rather than hang forever.
+      await router.navigate("profile");
+
+      await expect(parked).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+      expect(router.getState()?.name).toBe("profile");
+    });
+  });
 });
