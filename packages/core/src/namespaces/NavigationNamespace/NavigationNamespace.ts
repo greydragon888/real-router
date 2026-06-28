@@ -501,6 +501,15 @@ export class NavigationNamespace {
         // is detached explicitly in `finally` instead.
         onExternalAbort = () => {
           controller.abort(externalSignal.reason);
+          // #1030: return the FSM to READY, symmetric with stop/dispose/supersede.
+          // Without this an external `opts.signal` abort only aborts the controller
+          // and leaves the FSM stuck in TRANSITION_STARTED / LEAVE_APPROVED:
+          // isTransitioning() stays true (route-CRUD silently blocked) and
+          // isLeaveApproved() is falsely true until the next navigation.
+          // onExternalAbort only fires while the navigation is in flight (the
+          // listener is removed in `finally` once it settles), so the FSM is
+          // always cancellable here; cancelNavigation sends CANCEL → READY.
+          deps.cancelNavigation();
         };
         // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant: the per-navigation signal aborts at most once and is discarded unaborted on success, and the `finally` block explicitly removeEventListener's it.
         externalSignal.addEventListener("abort", onExternalAbort, {
