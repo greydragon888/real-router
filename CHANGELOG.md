@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-28]
 
+### @real-router/logger-plugin@0.5.15
+
+### Patch Changes
+
+- [#1015](https://github.com/greydragon888/real-router/pull/1015) [`f7563ba`](https://github.com/greydragon888/real-router/commit/f7563ba198e15a336dc886e91b433028a39f7224) Thanks [@greydragon888](https://github.com/greydragon888)! - Skip the Performance API branch of `onTransitionError`/`onTransitionCancel` when the transition slot was already cleared ([#793](https://github.com/greydragon888/real-router/issues/793))
+
+  With `usePerformanceMarks: true`, an out-of-band terminal — a guard-redirect (core emits a `cancel` + `error` pair, the `error` landing after the redirect target's `success` already reset the slot) or a `ROUTE_NOT_FOUND` with no preceding start — used to `mark`/`measure` against an empty `#startMarkName`, producing a garbage empty-label `router:transition-error:` mark and a `console.warn("Failed to create performance measure")` on every such redirect / not-found. The perf branch is now gated on a non-empty start mark, so an unpaired terminal leaves no mark and emits no warning. The `console.error` log for the error itself is unchanged.
+
+- [#1015](https://github.com/greydragon888/real-router/pull/1015) [`f7563ba`](https://github.com/greydragon888/real-router/commit/f7563ba198e15a336dc886e91b433028a39f7224) Thanks [@greydragon888](https://github.com/greydragon888)! - Gate the `"Router transition"` console group on the transition log level ([#794](https://github.com/greydragon888/real-router/issues/794))
+
+  `onTransitionStart` opened a `console.group` unconditionally, so at `level: "none"` (and `"errors"`) the plugin still emitted an empty, expandable group on every transition — a `console.group` is itself console output, breaking the "completely silent" guarantee of INVARIANTS Completeness Inv 3. The group is now opened only when `#logTransition` is set (i.e. it will actually be populated); the idempotent close path is unchanged. The Inv 3 / Level-Filtering property assertions were extended to also verify no `console.group`/`console.groupEnd` calls at `level: "none"`/`"errors"`.
+
+- [#1015](https://github.com/greydragon888/real-router/pull/1015) [`f7563ba`](https://github.com/greydragon888/real-router/commit/f7563ba198e15a336dc886e91b433028a39f7224) Thanks [@greydragon888](https://github.com/greydragon888)! - Clear the plugin's own Performance API marks/measures by name so the User Timing buffer stays bounded ([#795](https://github.com/greydragon888/real-router/issues/795))
+
+  With `usePerformanceMarks: true`, the plugin created ~3 marks + 1 measure per transition (`transition-start`, the standalone `leave-approved`, the terminal `transition-end`/`-cancel`/`-error`, and the `transition:*` measure) and never cleared them — the User Timing buffer is unbounded per spec, so a long dev session accumulated tens of thousands of entries. The tracker's `measure()` now clears its start/end marks and the measure by name (in a `finally`, so a failed measure still reclaims its inputs), and the standalone `leave-approved` mark — never an endpoint of a measure — is cleared in `#resetTransitionState`. Only the plugin's own names are cleared, so the app's marks/measures are untouched; the trace events already emitted to an in-progress DevTools recording are unaffected.
+
+
 ### @real-router/preload-plugin@0.6.5
 
 ### Patch Changes
