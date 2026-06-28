@@ -75,17 +75,19 @@ describe("useRouterTransition stress (Preact)", () => {
     );
 
     for (let i = 0; i < 50; i++) {
+      let navPromise!: Promise<unknown>;
+
+      // TRANSITION_START fires synchronously within navigate(); await the
+      // navigation's actual settlement rather than counting microtask flushes.
       await act(async () => {
-        void router.navigate("target");
-        await Promise.resolve();
+        navPromise = router.navigate("target");
       });
 
       expect(snapshot.isTransitioning).toBe(true);
 
       await act(async () => {
         asyncGuardResolve(true);
-        await Promise.resolve();
-        await Promise.resolve();
+        await navPromise;
       });
 
       expect(snapshot.isTransitioning).toBe(false);
@@ -120,12 +122,15 @@ describe("useRouterTransition stress (Preact)", () => {
     );
 
     await act(async () => {
+      const navs: Promise<unknown>[] = [];
+
       for (let i = 1; i <= 50; i++) {
-        void router.navigate(`route${i % 50}`);
+        navs.push(router.navigate(`route${i % 50}`).catch(() => {}));
       }
 
-      await Promise.resolve();
-      await Promise.resolve();
+      // Await every concurrent navigation's actual settlement rather than
+      // counting microtask flushes.
+      await Promise.all(navs);
     });
 
     expect(snapshot.isTransitioning).toBe(false);
@@ -274,9 +279,10 @@ describe("useRouterTransition stress (Preact)", () => {
     );
 
     for (let i = 0; i < 50; i++) {
+      // Fire the guarded nav (superseded by the next navigation); no microtask
+      // flush needed — the settle assertion below awaits the cancelling nav.
       await act(async () => {
-        void router.navigate("guarded");
-        await Promise.resolve();
+        void router.navigate("guarded").catch(() => {});
       });
 
       await act(async () => {

@@ -48,15 +48,14 @@ describe("createTransitionSource", () => {
 
     const source = createTransitionSource(router);
 
-    void router.navigate("dashboard");
-    // Wait for microtask so TRANSITION_START fires
-    await Promise.resolve();
+    // TRANSITION_START fires synchronously within navigate() (before the async
+    // activate guard suspends), so the snapshot is observable without any flush.
+    const navPromise = router.navigate("dashboard");
 
     expect(source.getSnapshot().isTransitioning).toBe(true);
 
     resolveGuard(true);
-    await Promise.resolve();
-    await Promise.resolve();
+    await navPromise;
   });
 
   it("toRoute contains target state upon TRANSITION_START", async () => {
@@ -71,8 +70,8 @@ describe("createTransitionSource", () => {
 
     const source = createTransitionSource(router);
 
-    void router.navigate("dashboard");
-    await Promise.resolve();
+    // TRANSITION_START fires synchronously within navigate().
+    const navPromise = router.navigate("dashboard");
 
     const snapshot = source.getSnapshot();
 
@@ -80,8 +79,7 @@ describe("createTransitionSource", () => {
     expect(snapshot.toRoute!.name).toBe("dashboard");
 
     resolveGuard(true);
-    await Promise.resolve();
-    await Promise.resolve();
+    await navPromise;
   });
 
   it("fromRoute contains source state upon TRANSITION_START", async () => {
@@ -96,8 +94,8 @@ describe("createTransitionSource", () => {
 
     const source = createTransitionSource(router);
 
-    void router.navigate("dashboard");
-    await Promise.resolve();
+    // TRANSITION_START fires synchronously within navigate().
+    const navPromise = router.navigate("dashboard");
 
     const snapshot = source.getSnapshot();
 
@@ -105,8 +103,7 @@ describe("createTransitionSource", () => {
     expect(snapshot.fromRoute!.name).toBe("home");
 
     resolveGuard(true);
-    await Promise.resolve();
-    await Promise.resolve();
+    await navPromise;
   });
 
   it("fromRoute === null if fromState is undefined (first transition)", () => {
@@ -180,14 +177,11 @@ describe("createTransitionSource", () => {
 
     const p1 = router.navigate("dashboard");
 
-    await Promise.resolve();
-
+    // TRANSITION_START fires synchronously within navigate().
     expect(source.getSnapshot().isTransitioning).toBe(true);
 
     // Cancel by navigating elsewhere (settings has no guard)
     const p2 = router.navigate("settings");
-
-    await Promise.resolve();
 
     resolveGuard(true);
     await p2;
@@ -217,12 +211,9 @@ describe("createTransitionSource", () => {
 
     const navPromise = router.navigate("dashboard");
 
-    await Promise.resolve();
-    await Promise.resolve();
-
-    // After START + LEAVE_APPROVE land but the activate guard is blocked,
-    // the listener has been notified exactly twice. This is deterministic:
-    // both events call updateSnapshot which always notifies.
+    // START + LEAVE_APPROVE fire synchronously within navigate() (before the
+    // async activate guard suspends), so the listener has already been notified
+    // exactly twice — both events call updateSnapshot which always notifies.
     const callsBeforeResolve = listener.mock.calls.length;
 
     expect(callsBeforeResolve).toBe(2);
@@ -265,15 +256,13 @@ describe("createTransitionSource", () => {
 
     source.destroy();
 
-    void router.navigate("dashboard");
-    await Promise.resolve();
+    const navPromise = router.navigate("dashboard");
 
     expect(listener).not.toHaveBeenCalled();
     expect(source.getSnapshot().isTransitioning).toBe(false);
 
     resolveGuard(true);
-    await Promise.resolve();
-    await Promise.resolve();
+    await navPromise;
   });
 
   it("destroy() prevents further updates", async () => {
@@ -312,16 +301,12 @@ describe("createTransitionSource", () => {
 
     const p1 = router.navigate("dashboard");
 
-    await Promise.resolve();
-
+    // TRANSITION_START fires synchronously within navigate().
     expect(source.getSnapshot().toRoute).not.toBeNull();
     expect(source.getSnapshot().toRoute!.name).toBe("dashboard");
 
     // New navigation cancels previous
     const p2 = router.navigate("settings");
-
-    await Promise.resolve();
-    await Promise.resolve();
 
     resolveGuard(true);
     await p2;
@@ -355,12 +340,13 @@ describe("createTransitionSource", () => {
     });
 
     let reentrantDone = false;
+    let reentrantNav!: Promise<unknown>;
 
     router.usePlugin(() => ({
       onTransitionStart() {
         if (!reentrantDone) {
           reentrantDone = true;
-          void router.navigate("dashboard");
+          reentrantNav = router.navigate("dashboard").catch(() => {});
         }
       },
     }));
@@ -392,9 +378,10 @@ describe("createTransitionSource", () => {
       resolve(true);
     }
 
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    // Await the reentrant navigation's actual settlement rather than counting a
+    // fixed number of microtask flushes — robust to the exact tick choreography
+    // (this hangs to the test timeout if a navigation genuinely never settles).
+    await reentrantNav;
 
     // 1. Reentrancy actually happened — the plugin fired the second nav, so
     //    the router emitted at least two TRANSITION_START events.
@@ -615,8 +602,7 @@ describe("createTransitionSource", () => {
 
     const source = createTransitionSource(router);
 
-    void router.navigate("dashboard");
-    await Promise.resolve();
+    const navPromise = router.navigate("dashboard");
 
     const snapshotAtDestroy = source.getSnapshot();
 
@@ -630,8 +616,7 @@ describe("createTransitionSource", () => {
     expect(source.getSnapshot().isTransitioning).toBe(true);
 
     resolveGuard(true);
-    await Promise.resolve();
-    await Promise.resolve();
+    await navPromise;
   });
 
   it("post-destroy: subscribe returns no-op unsubscribe", () => {
@@ -687,15 +672,13 @@ describe("createTransitionSource", () => {
 
     const source = createTransitionSource(router);
 
-    void router.navigate("dashboard");
-    await Promise.resolve();
+    // TRANSITION_LEAVE_APPROVE is emitted synchronously within navigate().
+    const navPromise = router.navigate("dashboard");
 
-    // After TRANSITION_LEAVE_APPROVE is emitted, isLeaveApproved should be true
     expect(source.getSnapshot().isLeaveApproved).toBe(true);
 
     resolveGuard(true);
-    await Promise.resolve();
-    await Promise.resolve();
+    await navPromise;
   });
 
   it("isLeaveApproved === false upon TRANSITION_SUCCESS", async () => {
@@ -722,14 +705,10 @@ describe("createTransitionSource", () => {
 
     const p1 = router.navigate("dashboard");
 
-    await Promise.resolve();
-
-    // After TRANSITION_LEAVE_APPROVE is emitted, isLeaveApproved should be true
+    // TRANSITION_LEAVE_APPROVE is emitted synchronously within navigate().
     expect(source.getSnapshot().isLeaveApproved).toBe(true);
 
     const p2 = router.navigate("settings");
-
-    await Promise.resolve();
 
     resolveGuard(true);
 

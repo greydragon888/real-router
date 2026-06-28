@@ -49,8 +49,8 @@ describe("createTransitionSource — state machine", () => {
 
       const source = createTransitionSource(router);
 
-      void router.navigate(routeName, paramsForRoute(routeName));
-      await Promise.resolve();
+      // TRANSITION_START fires synchronously within navigate().
+      const navPromise = router.navigate(routeName, paramsForRoute(routeName));
 
       const snapshot = source.getSnapshot();
 
@@ -58,8 +58,7 @@ describe("createTransitionSource — state machine", () => {
       expect(snapshot.toRoute?.name).toStrictEqual(routeName);
 
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
 
       router.stop();
       source.destroy();
@@ -132,9 +131,6 @@ describe("createTransitionSource — state machine", () => {
         routeName === "admin.settings" ? "users.list" : "admin.settings";
 
       const p1 = router.navigate(routeName, paramsForRoute(routeName));
-
-      await Promise.resolve();
-
       const p2 = router.navigate(cancelTarget);
 
       resolveGuard(true);
@@ -169,14 +165,16 @@ describe("createTransitionSource — state machine", () => {
 
       const source = createTransitionSource(router);
 
-      void router.navigate(secondRoute, paramsForRoute(secondRoute));
-      await Promise.resolve();
+      // TRANSITION_START fires synchronously within navigate().
+      const navPromise = router.navigate(
+        secondRoute,
+        paramsForRoute(secondRoute),
+      );
 
       expect(source.getSnapshot().fromRoute?.name).toStrictEqual(firstRoute);
 
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
 
       router.stop();
       source.destroy();
@@ -221,17 +219,15 @@ describe("createTransitionSource — state machine", () => {
 
       source.subscribe(listener);
 
-      void router.navigate(routeName, paramsForRoute(routeName));
-      await Promise.resolve();
+      const navPromise = router.navigate(routeName, paramsForRoute(routeName));
 
       // Async-guarded nav: TRANSITION_START + TRANSITION_LEAVE_APPROVE fire
-      // before the activate guard is awaited → exactly 2 notifications.
+      // synchronously within navigate(), before the activate guard is awaited
+      // → exactly 2 notifications.
       expect(listener).toHaveBeenCalledTimes(2);
 
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
 
       // + TRANSITION_SUCCESS once the guard resolves → exactly 3 total.
       expect(listener).toHaveBeenCalledTimes(3);
@@ -260,16 +256,14 @@ describe("createTransitionSource — isLeaveApproved monotonicity", () => {
 
       const source = createTransitionSource(router);
 
-      void router.navigate(routeName, paramsForRoute(routeName));
-      await Promise.resolve();
+      const navPromise = router.navigate(routeName, paramsForRoute(routeName));
 
-      // After LEAVE_APPROVE (deactivate guards passed) the flag is true.
+      // LEAVE_APPROVE fires synchronously within navigate() (deactivate guards
+      // passed) → the flag is true.
       expect(source.getSnapshot().isLeaveApproved).toBe(true);
 
       resolveGuard(true);
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      await navPromise;
 
       // After SUCCESS the IDLE snapshot is restored — isLeaveApproved=false.
       expect(source.getSnapshot().isLeaveApproved).toBe(false);
@@ -324,9 +318,7 @@ describe("createTransitionSource — isLeaveApproved monotonicity", () => {
 
       const p1 = router.navigate(routeName, paramsForRoute(routeName));
 
-      await Promise.resolve();
-
-      // We're past LEAVE_APPROVE, so flag is true here.
+      // LEAVE_APPROVE fires synchronously within navigate(), so flag is true.
       expect(source.getSnapshot().isLeaveApproved).toBe(true);
 
       const p2 = router.navigate(cancelTarget);
@@ -377,8 +369,7 @@ describe("createTransitionSource — concurrent navigation", () => {
 
       const p1 = router.navigate(routeName, paramsForRoute(routeName));
 
-      await Promise.resolve();
-
+      // TRANSITION_START fires synchronously within navigate().
       expect(source.getSnapshot().toRoute?.name).toStrictEqual(routeName);
 
       const p2 = router.navigate(cancelTarget);
@@ -448,12 +439,7 @@ describe("createTransitionSource — concurrent navigation", () => {
       const source = createTransitionSource(router);
 
       const p1 = router.navigate(first, paramsForRoute(first));
-
-      await Promise.resolve();
-
       const p2 = router.navigate(second, paramsForRoute(second));
-
-      await Promise.resolve();
 
       // `finisher` is unguarded, so it resolves promptly and cancels both
       // pending guards via the router's abort signal.
@@ -498,8 +484,7 @@ describe("createTransitionSource — concurrent navigation", () => {
 
       const p1 = router.navigate(routeName, paramsForRoute(routeName));
 
-      await Promise.resolve();
-
+      // TRANSITION_START fires synchronously within navigate().
       const snapshot = source.getSnapshot();
 
       expect(snapshot.isTransitioning).toBe(true);

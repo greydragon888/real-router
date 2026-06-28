@@ -114,17 +114,17 @@ describe(
 
         expect(ProfiledHook).toHaveRenderedTimes(1);
 
+        let navPromise!: Promise<unknown>;
+
         await act(async () => {
-          void asyncRouter.navigate("dashboard");
-          await Promise.resolve();
+          navPromise = asyncRouter.navigate("dashboard");
         });
 
         expect(ProfiledHook).toHaveRenderedTimes(2);
 
         await act(async () => {
           resolveGuard(true);
-          await Promise.resolve();
-          await Promise.resolve();
+          await navPromise;
         });
 
         expect(ProfiledHook).toHaveRenderedTimes(3);
@@ -166,17 +166,17 @@ describe(
 
         expect(ProfiledHook).toHaveRenderedTimes(1);
 
+        let navPromise!: Promise<unknown>;
+
         await act(async () => {
-          void asyncRouter.navigate("dashboard").catch(() => {});
-          await Promise.resolve();
+          navPromise = asyncRouter.navigate("dashboard").catch(() => {});
         });
 
         expect(ProfiledHook).toHaveRenderedTimes(2);
 
         await act(async () => {
           resolveGuard(false);
-          await Promise.resolve();
-          await Promise.resolve();
+          await navPromise;
         });
 
         expect(ProfiledHook).toHaveRenderedTimes(3);
@@ -332,15 +332,15 @@ describe(
         expect(ProfiledHook).toHaveRenderedTimes(1);
 
         for (const [i, route] of routes.entries()) {
+          let navPromise!: Promise<unknown>;
+
           await act(async () => {
-            void asyncRouter.navigate(route);
-            await Promise.resolve();
+            navPromise = asyncRouter.navigate(route);
           });
 
           await act(async () => {
             resolvers[i](true);
-            await Promise.resolve();
-            await Promise.resolve();
+            await navPromise;
           });
         }
 
