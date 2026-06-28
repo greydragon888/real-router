@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-28]
 
+### @real-router/sources@0.9.0
+
+### Minor Changes
+
+- [#1017](https://github.com/greydragon888/real-router/pull/1017) [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(sources): make createActiveRouteSource lazy to close the listener-limit crash ([#766](https://github.com/greydragon888/real-router/issues/766))
+
+  `createActiveRouteSource` previously connected to the router **eagerly** at construction and cached every distinct `(name | params | options)` key with a no-op `destroy()`, so each unique key held a permanent `router.subscribe` handle that survived all Link unmounts. A long-lived router with per-item-params Links (infinite feed, virtualized table, pagination by id) accumulated handles until the `EventEmitter` listener limit (10000) threw in the render path.
+
+  It now uses the **lazy connection** the docs already promised: subscribe on the first listener, disconnect on the last, reconcile the snapshot on re-subscribe (same pattern as `createRouteNodeSource` / [#765](https://github.com/greydragon888/real-router/issues/765)). The cache entry stays (a cheap closure) but holds no router subscription while it has zero listeners — unmounted Links stop costing a listener, and creating an unbounded number of unique keys no longer crashes.
+
+  **BREAKING:** the snapshot no longer updates while the source has zero subscribers (the previously-undocumented eager behaviour). Consumers that read `getSnapshot()` without subscribing must subscribe first; framework adapters (which bridge via `useSyncExternalStore` / signals) are unaffected.
+
+### Patch Changes
+
+- [#1017](https://github.com/greydragon888/real-router/pull/1017) [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(sources): isolate listener exceptions in createActiveNameSelector ([#767](https://github.com/greydragon888/real-router/issues/767))
+
+  `createActiveNameSelector`'s notification loop had no per-listener exception isolation: a single throwing listener aborted notifications to the remaining listeners of the same route name AND every later name in the iteration, leaving their cached active state stale (a sibling `Link`'s active class frozen until the next related navigation). The loop now wraps each `listener()` in `try/catch` and re-throws asynchronously via `queueMicrotask` — mirroring `BaseSource.notify` (INVARIANTS "BaseSource 3"). One broken Link no longer freezes its siblings.
+
+- [#1017](https://github.com/greydragon888/real-router/pull/1017) [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(sources): freeze INITIAL_SNAPSHOT + docs cleanup ([#768](https://github.com/greydragon888/real-router/issues/768))
+
+  `createErrorSource`'s shared `INITIAL_SNAPSHOT` singleton (returned by every error source until the first error) is now `Object.freeze`d — mirroring `createTransitionSource`'s frozen `IDLE_SNAPSHOT` — so a consumer can no longer mutate it and corrupt the shared singleton for every error source of every router. Plus documentation fixes: INVARIANTS "Cache Identity 3" now states the hash-aware contract precisely (non-empty hash → `false`; `hash: ""` → `true` under no URL plugin), the ARCHITECTURE filtering-pipeline diagram shows the `hashFlip` pre-filter branch ([#532](https://github.com/greydragon888/real-router/issues/532)), the `canonicalJson` JSDoc notes the `Date` ↔ ISO-string cache-key collision, and a stale `createRouteSource` test comment is corrected.
+
+- [#1017](https://github.com/greydragon888/real-router/pull/1017) [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(sources): reconcile lazy sources on reconnect — missed navigations/errors are caught up on re-subscribe ([#765](https://github.com/greydragon888/real-router/issues/765))
+
+  `createRouteSource` now reconciles its snapshot with the current router state on first subscribe — previously only `createRouteNodeSource` did — so a navigation that lands while the source has **zero subscribers** (a `RouterProvider` under a React `<Activity>` hide→navigate→show cycle, or all `.current` readers gated behind a Svelte `{#if}`) is caught up on re-subscribe instead of replaying a stale route. The reconcile fires only when the route actually changed (no spurious re-render on a no-nav hide/show); `previousRoute` resets to `undefined` on catch-up, since the real previous route can't be reconstructed outside a live subscribe payload. `createDismissableError` likewise catches up on first subscribe, so a `RouterErrorBoundary` mounting after a boot-time navigation error now observes it.
+
+### @real-router/angular@0.11.9
+
+### Patch Changes
+
+- Updated dependencies [[`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7)]:
+  - @real-router/sources@0.9.0
+
+### @real-router/preact@0.15.8
+
+### Patch Changes
+
+- Updated dependencies [[`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7)]:
+  - @real-router/sources@0.9.0
+
+### @real-router/react@0.27.8
+
+### Patch Changes
+
+- Updated dependencies [[`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7)]:
+  - @real-router/sources@0.9.0
+
+### @real-router/solid@0.15.1
+
+### Patch Changes
+
+- Updated dependencies [[`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7)]:
+  - @real-router/sources@0.9.0
+
+### @real-router/svelte@0.13.9
+
+### Patch Changes
+
+- Updated dependencies [[`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7)]:
+  - @real-router/sources@0.9.0
+
+### @real-router/vue@0.15.9
+
+### Patch Changes
+
+- Updated dependencies [[`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7), [`ae58937`](https://github.com/greydragon888/real-router/commit/ae5893744e103794d0aca15e3bdf7da32e1552e7)]:
+  - @real-router/sources@0.9.0
+
+
 ### @real-router/logger-plugin@0.5.15
 
 ### Patch Changes
