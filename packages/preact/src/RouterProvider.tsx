@@ -1,5 +1,5 @@
 import { getNavigator } from "@real-router/core";
-import { createRouteSource } from "@real-router/sources";
+import { createRouteSource, getErrorSource } from "@real-router/sources";
 import { useEffect, useMemo } from "preact/hooks";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
@@ -120,6 +120,15 @@ export const RouterProvider: FunctionComponent<RouteProviderProps> = ({
   // change identity and trigger an unsubscribe/resubscribe loop on every
   // render. `useMemo([router])` gives one source per router-instance lifetime.
   const store = useMemo(() => createRouteSource(router), [router]);
+
+  // #778 P2: eagerly create the per-router error source so a navigation error
+  // that fires BEFORE a RouterErrorBoundary mounts (a lazy app shell, a failed
+  // boot navigation) is still captured. The boundary's createDismissableError
+  // reuses this cached source and catches up (#765); without it the error source
+  // is created lazily on boundary mount — after the error — and never sees it.
+  useEffect(() => {
+    getErrorSource(router);
+  }, [router]);
 
   // useSyncExternalStore manages the router subscription lifecycle:
   // subscribe connects to router on first listener, unsubscribes on last.

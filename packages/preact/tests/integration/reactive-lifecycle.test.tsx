@@ -1,7 +1,12 @@
 import { render, screen, act } from "@testing-library/preact";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { useRoute, useRouteNode, RouterProvider } from "@real-router/preact";
+import {
+  useRoute,
+  useRouteNode,
+  RouterErrorBoundary,
+  RouterProvider,
+} from "@real-router/preact";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
@@ -103,5 +108,43 @@ describe("reactive lifecycle (#778)", () => {
     rerender(<Tree show />);
 
     expect(screen.getByTestId("node").textContent).toBe("users.view");
+  });
+
+  // #765 1.2 manifestation: a navigation error that fires BEFORE a
+  // RouterErrorBoundary mounts (the ordinary load order — a lazy app shell, or a
+  // failed boot navigation) is invisible to a boundary that creates its error
+  // source lazily on mount, AFTER the error. RouterProvider now eagerly creates
+  // the per-router error source, so it captures the error from Provider mount;
+  // the boundary's createDismissableError catches up (#765) and shows the
+  // fallback.
+  it("P2: a RouterErrorBoundary mounted AFTER a navigation error shows the fallback", async () => {
+    await router.start("/users/list");
+
+    const Shell = ({ withBoundary }: { withBoundary: boolean }) => (
+      <RouterProvider router={router}>
+        {withBoundary ? (
+          <RouterErrorBoundary
+            fallback={(error) => <div data-testid="fb">{error.code}</div>}
+          >
+            <div>app</div>
+          </RouterErrorBoundary>
+        ) : (
+          <div>app</div>
+        )}
+      </RouterProvider>
+    );
+
+    const { rerender } = render(<Shell withBoundary={false} />);
+
+    // Navigation error BEFORE the boundary mounts.
+    await act(async () => {
+      await router.navigate("nonexistent").catch(() => {});
+    });
+
+    // Mount the boundary now (e.g. a lazily-loaded app shell).
+    rerender(<Shell withBoundary />);
+
+    expect(screen.getByTestId("fb")).not.toBeNull();
+    expect(screen.getByTestId("fb").textContent).toBe("ROUTE_NOT_FOUND");
   });
 });
