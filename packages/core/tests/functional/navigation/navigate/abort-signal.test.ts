@@ -664,9 +664,8 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
 
       const nav = router.navigate("users");
 
-      // Let the navigation reach and park in its never-settling guard await.
-      await Promise.resolve();
-
+      // navigate() parks synchronously at the never-settling guard; stop()
+      // cancels the parked navigation via the abort-race.
       router.stop();
 
       await expect(nav).rejects.toMatchObject({
@@ -682,8 +681,6 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       );
 
       const parked = router.navigate("users");
-
-      await Promise.resolve();
 
       // `profile` has no guard → it commits; the parked `users` nav must reject
       // via the abort-race rather than hang forever.
