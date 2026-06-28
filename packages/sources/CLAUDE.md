@@ -15,6 +15,7 @@
 | `getTransitionSource(router)` | Transition state — **per-router cached**, safe for adapters |
 | `createErrorSource(router)` | Navigation error observable — **non-cached** advanced-use factory |
 | `getErrorSource(router)` | Navigation error — **per-router cached**, safe for adapters |
+| `primeErrorSource(router)` | **Side-effect only** (returns `void`) — eagerly create+subscribe `getErrorSource` IF the router is registered, else no-op. Adapters' `RouterProvider` call it at mount so a boundary mounting after an error still sees it (#778), without crashing on a router-like with no internals (test stub / `Object.create` clone). `getErrorSource` stays strict (throws); this is the don't-crash-the-Provider wrapper. |
 | `createDismissableError(router)` | Dismissable error wrapper over `getErrorSource` — **per-router cached**, snapshot includes `resetError` |
 | `createActiveNameSelector(router)` | O(1) active-name checker — **per-router cached** shared selector (Link fast-path) |
 

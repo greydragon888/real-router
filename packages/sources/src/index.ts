@@ -19,7 +19,11 @@ export {
   getTransitionSource,
 } from "./createTransitionSource";
 
-export { createErrorSource, getErrorSource } from "./createErrorSource";
+export {
+  createErrorSource,
+  getErrorSource,
+  primeErrorSource,
+} from "./createErrorSource";
 
 export { createDismissableError } from "./createDismissableError";
 

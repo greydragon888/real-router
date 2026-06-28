@@ -2,7 +2,12 @@ import { act, render, screen } from "@testing-library/react";
 import { Activity } from "react";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { Link, RouterProvider, useRoute } from "@real-router/react";
+import {
+  Link,
+  RouterErrorBoundary,
+  RouterProvider,
+  useRoute,
+} from "@real-router/react";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
@@ -17,7 +22,9 @@ describe("reactive lifecycle (#778)", () => {
   beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
     await router.start();
-    await router.navigate("users.list");
+    // .catch: browser-plugin shares jsdom's window.location across tests, so a
+    // prior test may have left us on /users/list → SAME_STATES (harmless here).
+    await router.navigate("users.list").catch(() => {});
   });
 
   afterEach(() => {
@@ -121,5 +128,45 @@ describe("reactive lifecycle (#778)", () => {
     expect(active).toBeLessThanOrEqual(2);
 
     vi.restoreAllMocks();
+  });
+
+  // #765 1.2 manifestation: a navigation error that fires BEFORE a
+  // RouterErrorBoundary mounts (the ordinary load order — a lazy app shell, or
+  // a failed boot navigation) is invisible to a boundary that creates its error
+  // source lazily on mount, AFTER the error. RouterProvider now eagerly creates
+  // the per-router error source, so it captures the error from Provider mount;
+  // the boundary's createDismissableError catches up (#765) and shows the
+  // fallback.
+  it("P2: a RouterErrorBoundary mounted AFTER a navigation error shows the fallback", async () => {
+    const Shell = ({
+      withBoundary,
+    }: {
+      withBoundary: boolean;
+    }): React.JSX.Element => (
+      <RouterProvider router={router}>
+        {withBoundary ? (
+          <RouterErrorBoundary
+            fallback={(error) => <div data-testid="fb">{error.code}</div>}
+          >
+            <div>app</div>
+          </RouterErrorBoundary>
+        ) : (
+          <div>app</div>
+        )}
+      </RouterProvider>
+    );
+
+    const { rerender } = render(<Shell withBoundary={false} />);
+
+    // Navigation error BEFORE the boundary mounts.
+    await act(async () => {
+      await router.navigate("nonexistent").catch(() => {});
+    });
+
+    // Mount the boundary now (e.g. a lazily-loaded app shell).
+    rerender(<Shell withBoundary />);
+
+    expect(screen.getByTestId("fb")).not.toBeNull();
+    expect(screen.getByTestId("fb").textContent).toBe("ROUTE_NOT_FOUND");
   });
 });

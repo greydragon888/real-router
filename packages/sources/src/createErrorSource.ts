@@ -113,3 +113,25 @@ export function getErrorSource(
 
   return cached;
 }
+
+/**
+ * Eagerly create (and thus subscribe) the per-router error source IF the router
+ * supports the plugin API — used by framework adapters' `RouterProvider` to
+ * capture a navigation error that fires BEFORE a `RouterErrorBoundary` mounts
+ * (#778). A router-like without an internals-registry entry (a test stub, an
+ * `Object.create`-derived object, or anything not produced by `createRouter`)
+ * makes `getErrorSource` throw via `getPluginApi`; here that degrades to a no-op.
+ *
+ * The asymmetry is deliberate: `createRouteSource` tolerates such routers (it is
+ * lazy and only touches `router.subscribe`), so a Provider that eagerly primes
+ * the stricter error source must not crash where the route source would not. A
+ * boundary mounting later still creates the error source lazily and surfaces a
+ * genuine invalid-router error there.
+ */
+export function primeErrorSource(router: Router): void {
+  try {
+    getErrorSource(router);
+  } catch {
+    // Router has no internals-registry entry — nothing to prime eagerly.
+  }
+}

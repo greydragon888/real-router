@@ -3,7 +3,11 @@ import { render, screen } from "@solidjs/testing-library";
 import { createSignal, Show } from "solid-js";
 import { describe, afterEach, it, expect } from "vitest";
 
-import { createSignalFromSource } from "@real-router/solid";
+import {
+  createSignalFromSource,
+  RouterErrorBoundary,
+  RouterProvider,
+} from "@real-router/solid";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
@@ -63,5 +67,41 @@ describe("reactive lifecycle (#778)", () => {
     setShow(true);
 
     expect(screen.getByTestId("reader").textContent).toBe("about");
+  });
+
+  // #765 1.2 manifestation: a navigation error that fires BEFORE a
+  // RouterErrorBoundary mounts (the ordinary load order — a lazy app shell, or a
+  // failed boot navigation) is invisible to a boundary that creates its error
+  // source lazily on mount, AFTER the error. RouterProvider now eagerly creates
+  // the per-router error source, so it captures the error from Provider mount;
+  // the boundary's createDismissableError catches up (#765) and shows the
+  // fallback.
+  it("P2: a RouterErrorBoundary mounted AFTER a navigation error shows the fallback", async () => {
+    router = createTestRouterWithADefaultRouter();
+
+    await router.start();
+
+    const [show, setShow] = createSignal(false);
+
+    render(() => (
+      <RouterProvider router={router}>
+        <Show when={show()} fallback={<div>app</div>}>
+          <RouterErrorBoundary
+            fallback={(error) => <div data-testid="fb">{error.code}</div>}
+          >
+            <div>app</div>
+          </RouterErrorBoundary>
+        </Show>
+      </RouterProvider>
+    ));
+
+    // Navigation error BEFORE the boundary mounts.
+    await router.navigate("nonexistent").catch(() => {});
+
+    // Mount the boundary now (e.g. a lazily-loaded app shell).
+    setShow(true);
+
+    expect(screen.getByTestId("fb")).not.toBeNull();
+    expect(screen.getByTestId("fb").textContent).toBe("ROUTE_NOT_FOUND");
   });
 });
