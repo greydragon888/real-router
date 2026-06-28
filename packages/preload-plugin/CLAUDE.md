@@ -18,7 +18,7 @@
 3. On `touchstart`: finds the anchor, starts a `TOUCH_PRELOAD_DELAY` (100ms) timer
 4. On `touchmove`: cancels the touch timer if vertical scroll > `TOUCH_SCROLL_THRESHOLD` (10px)
 5. On timer fire: calls `router.matchUrl?.(anchor.href)` → `api.getRouteConfig(name)?.preload`
-6. Calls `preload(params)` as fire-and-forget; errors silently caught
+6. Calls `preload(params)` as fire-and-forget; errors silently caught (async rejection, synchronous throw, or non-Promise return)
 
 Ghost mouse event suppression: touch devices fire a synthetic `mouseover` after `touchstart`. The plugin records the last touch target/timestamp and suppresses any `mouseover` from the same target within 2500ms.
 
@@ -51,11 +51,11 @@ Intended consumer pattern: a custom `<FastLink>` wrapper reads the cached State 
 
 The cache is also populated when a hovered route has no `preload` factory — the State is still useful for fast navigation. The 32-entry bound covers viewport-visible link counts; oldest evicted on overflow, re-hovering same `href` refreshes recency.
 
-Cache cleared on `onStop` and `teardown` (via `#cleanup`), and also on **structural tree mutations** (`remove`/`replace`/`clear` via the `TREE_CHANGED` subscription) — otherwise `getPreloadedState(href)` could hand a consumer a `State` pointing at a route that no longer exists, and `navigateToState` would commit a navigation to a removed route. The cache is href-keyed (not name-keyed), so it is cleared wholesale on any structural mutation and repopulates on the next hover. The extension is removed in `teardown`.
+Cache cleared on `onStop` and `teardown` (via `#cleanup`), and also on **any structural tree mutation** (`add`/`update`/`remove`/`replace`/`clear` via the `TREE_CHANGED` subscription) — otherwise `getPreloadedState(href)` could hand a consumer a `State` built with stale resolution: a removed route that no longer exists, an `update` that changed `forwardTo`/`defaultParams`, or an `add` that intercepts an already-cached href. `navigateToState` would then commit the stale snapshot. The cache is href-keyed (not name-keyed) and has no lazy revalidation path (it is read externally), so it is cleared wholesale on any structural mutation and repopulates on the next hover (#805). The extension is removed in `teardown`.
 
 ### Fire-and-forget
 
-`preload(params)` is called without awaiting. Return values and errors are discarded. The plugin is a transport layer only — it does not cache, deduplicate, or track preload status.
+`preload(params)` is called without awaiting, through `#runPreload`. Return values and errors are discarded — and "errors" means all three escape modes: a rejected promise, a **synchronous throw** before the promise is created, and a **non-Promise return** (`#runPreload` guards the sync call with `try/catch` and normalizes the return via `Promise.resolve` before `.catch`). Without this, a misbehaving user `preload` fn would surface as an `uncaughtException` from the `setTimeout` callback with no user code in the stack (#806). The plugin is a transport layer only — it does not cache, deduplicate, or track preload status.
 
 ### Event delegation
 
@@ -73,7 +73,7 @@ The factory function checks `typeof document === "undefined"` before instantiati
 
 `#compiledPreloads` caches compiled preload functions by `state.name`. The `PreloadFnFactory(router, getDependency)` call happens at most once per route name for the lifetime of the plugin instance. **Config-change invalidation is lazy:** on the next hover/touch, `#resolvePreload` re-reads `getRouteConfig` and recompiles when the `factory` reference differs (so `update`/`replace` that swap the factory are picked up automatically). If the factory throws, the result is not cached and the factory is retried on next hover/touch.
 
-**Removed-route cleanup (TREE_CHANGED):** the plugin subscribes to `getRoutesApi(router).subscribeChanges()` and deletes `#compiledPreloads` entries for routes removed via `remove`/`replace`, and clears the whole map on `clear`. Without this, those entries would be unreachable dead memory until teardown (`matchUrl` never resolves a removed route, so the lazy path can't reclaim them). `add`/`update` need no handling — lazy revalidation covers them.
+**Removed-route cleanup (TREE_CHANGED):** the plugin subscribes to `getRoutesApi(router).subscribeChanges()` and deletes `#compiledPreloads` entries for routes removed via `remove`/`replace`, and clears the whole map on `clear`. Without this, those entries would be unreachable dead memory until teardown (`matchUrl` never resolves a removed route, so the lazy path can't reclaim them). `add`/`update` need no `#compiledPreloads` handling — lazy revalidation covers them. (The href-keyed `#stateCache` is different: it has no lazy path, so the same `TREE_CHANGED` handler clears it wholesale on **every** structural op — see the State-cache gotcha above, #805.)
 
 ### Module augmentation
 

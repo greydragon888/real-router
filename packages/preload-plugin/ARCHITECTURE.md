@@ -56,7 +56,8 @@ DOM event (mouseover / touchstart)
     │
     ├── empty touches guard (touchstart/touchmove only) → skip if event.touches.length === 0
     │
-    └── setTimeout(delay) → preload(state.params).catch(() => {})
+    └── setTimeout(delay) → #runPreload: try{ preload(state.params) } catch → return
+                            → Promise.resolve(result).catch(() => {})  (swallows sync-throw / non-Promise / rejection)
 ```
 
 ## Ghost Event Suppression
