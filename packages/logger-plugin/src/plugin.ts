@@ -142,7 +142,11 @@ export class LoggerPlugin {
       },
 
       onTransitionCancel: (toState: State, fromState?: State) => {
-        if (this.#usePerf) {
+        // Skip the perf branch when the slot was already cleared by a prior
+        // terminal (e.g. a redirect target's success) — an out-of-band cancel
+        // has no start mark to measure against, only an unpaired empty-label
+        // mark + a failing measure (#793).
+        if (this.#usePerf && this.#startMarkName !== "") {
           const label = this.#transitionLabel;
           const cancelMark = `router:transition-cancel:${label}`;
 
@@ -173,7 +177,11 @@ export class LoggerPlugin {
         fromState: State | undefined,
         err: RouterError,
       ) => {
-        if (this.#usePerf) {
+        // Skip the perf branch when the slot was already cleared by a prior
+        // terminal (guard-redirect double terminal, or a ROUTE_NOT_FOUND with
+        // no preceding start) — there is no start mark to measure against, so
+        // measuring would only emit an empty-label mark + a console.warn (#793).
+        if (this.#usePerf && this.#startMarkName !== "") {
           const label = this.#transitionLabel;
           const errorMark = `router:transition-error:${label}`;
 

@@ -631,6 +631,64 @@ describe("@real-router/logger-plugin", () => {
     });
   });
 
+  describe("out-of-band terminal on a cleared slot (#793)", () => {
+    let perfMarkSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      perfMarkSpy = vi.spyOn(performance, "mark");
+    });
+
+    it("does not create an empty-label error mark or warn on ROUTE_NOT_FOUND after a successful transition", async () => {
+      router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+      await router.start("/");
+      // A successful transition clears the perf slot (#startMarkName = "").
+      await router.navigate("users");
+
+      perfMarkSpy.mockClear();
+      warnSpy.mockClear();
+
+      // The not-found error is an out-of-band terminal with no preceding start.
+      await expect(router.navigate("nonexistent")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+
+      expect(perfMarkSpy).not.toHaveBeenCalledWith("router:transition-error:");
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Failed to create performance measure"),
+        expect.anything(),
+      );
+    });
+
+    it("does not create an empty-label error mark or warn on a guard-redirect", async () => {
+      // Classic guard-redirect: guard navigates elsewhere and returns false.
+      // Core emits a double terminal (cancel + error) for the one redirect; the
+      // late error lands after the redirect target's success cleared the slot.
+      lifecycle.addActivateGuard("users", () => () => {
+        void router.navigate("admin");
+
+        return false;
+      });
+      router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+      await router.start("/");
+
+      perfMarkSpy.mockClear();
+      warnSpy.mockClear();
+
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
+
+      // Let the redirect's success + the trailing out-of-band error settle.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(perfMarkSpy).not.toHaveBeenCalledWith("router:transition-error:");
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Failed to create performance measure"),
+        expect.anything(),
+      );
+    });
+  });
+
   describe("Multiple error codes", () => {
     it("should log CANNOT_ACTIVATE error code", async () => {
       lifecycle.addActivateGuard("users", () => () => false);
