@@ -331,10 +331,13 @@ describe("subscribe order (listener added before onFirstSubscribe)", () => {
   test.prop([arbListenerCount], { numRuns: NUM_RUNS.standard })(
     "first listener is registered BEFORE onFirstSubscribe runs (no missed notifications)",
     async (extraListeners) => {
-      // Drive the BaseSource invariant: if `onFirstSubscribe` itself triggered
-      // an `updateSnapshot`, the just-added listener must observe it. We can't
-      // see onFirstSubscribe directly, but we can prove the contract via the
-      // "reconcile on reconnect" path that exercises it (#605 reload bypass).
+      // Drive the BaseSource invariant: a listener added before onFirstSubscribe
+      // must observe any updateSnapshot that onFirstSubscribe triggers. This
+      // test exercises the INITIAL-snapshot path — the source is created after
+      // the nav, so the first subscribe seeds the connection without changing
+      // the snapshot. The reconcile-on-reconnect path (where onFirstSubscribe
+      // DOES updateSnapshot and the just-added listener must catch it) is
+      // covered by the "reconnect reconcile (#765)" describe.
       const router = await createStartedRouter();
 
       // Prime the router to a non-initial state so reconnect has something

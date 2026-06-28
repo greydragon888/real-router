@@ -95,13 +95,13 @@ The predicate is created once per source instance — safe, because `createRoute
 
 ```
 Router event
-  → areRoutesRelated pre-filter
-  → isActiveRoute check
+  → pre-filter: areRoutesRelated (new/prev route) OR hashFlip (#532)
+  → isActiveRoute check (+ state.context.url.hash equality when opts.hash is set)
   → Object.is dedup guard
   → listener notification
 ```
 
-`areRoutesRelated` is a cheap string comparison that skips the `isActiveRoute` call entirely when the navigated route is unrelated to the tracked route.
+`areRoutesRelated` is a cheap string comparison that skips the `isActiveRoute` call entirely when the navigated route is unrelated to the tracked route. Hash-aware sources (`opts.hash` set) add a third pre-filter branch — `hashFlip` — that passes the filter on a same-path, different-hash transition (`state.context.url.hashChanged`), which the route comparison alone would miss.
 
 ## Internal Modules
 

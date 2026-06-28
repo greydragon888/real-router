@@ -7,12 +7,16 @@ import { noopDestroy } from "./internal/noopDestroy.js";
 import type { RouterErrorSnapshot, RouterSource } from "./types.js";
 import type { Router, State, RouterError } from "@real-router/core";
 
-const INITIAL_SNAPSHOT: RouterErrorSnapshot = {
+// Frozen shared singleton — returned by every error source's getSnapshot()
+// until the first error. Mirrors createTransitionSource's IDLE_SNAPSHOT: a
+// consumer mutating it would corrupt the shared singleton for every error
+// source of every router (#768).
+const INITIAL_SNAPSHOT: RouterErrorSnapshot = Object.freeze({
   error: null,
   toRoute: null,
   fromRoute: null,
   version: 0,
-};
+});
 
 const errorSourceCache = new WeakMap<
   Router,

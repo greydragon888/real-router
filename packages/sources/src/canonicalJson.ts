@@ -19,7 +19,11 @@
  * Edge cases:
  * - Arrays preserve order (canonical: index-ordered already).
  * - `undefined` values are dropped (standard JSON behaviour).
- * - `Date` is serialized via its `toJSON` method (ISO string).
+ * - `Date` is serialized via its `toJSON` method (ISO string). **Collision
+ *   caveat:** `{ d: new Date(0) }` and `{ d: "1970-01-01T00:00:00.000Z" }`
+ *   produce the **same** cache key (both reduce to the ISO string), so the two
+ *   inputs share one cached source. Harmless in practice — `Date` params are
+ *   exotic and `isActiveRoute` stringifies them identically post-encoding.
  * - `Symbol` becomes `undefined` (standard JSON behaviour).
  * - `BigInt` throws via `JSON.stringify` defaults.
  * - `Map`, `Set`, `RegExp`, `WeakMap`, `WeakSet` would silently collapse to
