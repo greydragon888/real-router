@@ -711,6 +711,40 @@ describe("@real-router/logger-plugin", () => {
     });
   });
 
+  describe("perf entry accumulation (#795)", () => {
+    afterEach(() => {
+      performance.clearMarks();
+      performance.clearMeasures();
+    });
+
+    it("clears its own marks/measures so the User Timing buffer stays bounded across navigations", async () => {
+      performance.clearMarks();
+      performance.clearMeasures();
+
+      router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+      await router.start("/");
+
+      const N = 30;
+
+      for (let i = 0; i < N; i++) {
+        await router.navigate(i % 2 ? "users" : "admin");
+      }
+
+      const routerMarks = performance
+        .getEntriesByType("mark")
+        .filter((entry) => entry.name.startsWith("router:"));
+      const routerMeasures = performance
+        .getEntriesByType("measure")
+        .filter((entry) => entry.name.startsWith("router:"));
+
+      // Pre-fix this grows ~3 marks + 1 measure per navigation (~94 / ~31 for
+      // N=30). Post-fix only the standalone `router:start` mark survives until
+      // the router stops — everything else is cleared by name as it terminates.
+      expect(routerMarks.length).toBeLessThanOrEqual(4);
+      expect(routerMeasures.length).toBeLessThanOrEqual(1);
+    });
+  });
+
   describe("Multiple error codes", () => {
     it("should log CANNOT_ACTIVATE error code", async () => {
       lifecycle.addActivateGuard("users", () => () => false);

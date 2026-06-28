@@ -243,6 +243,16 @@ export class LoggerPlugin {
 
   #resetTransitionState(): void {
     this.#groups.close();
+
+    // The leave-approved mark is a standalone timeline marker — never an
+    // endpoint of a measure — so measure()'s name-based cleanup cannot reclaim
+    // it. Clear it here (the single chokepoint every terminal runs through) so
+    // the User Timing buffer stays bounded across navigations. Skipped when the
+    // slot was already cleared by a prior terminal (empty label). (#795)
+    if (this.#usePerf && this.#transitionLabel !== "") {
+      this.#perf.clearMarks(`router:leave-approved:${this.#transitionLabel}`);
+    }
+
     this.#transitionLabel = "";
     this.#startMarkName = "";
     this.#transitionStartTime = null;
