@@ -1,5 +1,17 @@
 # @real-router/preload-plugin
 
+## 0.6.5
+
+### Patch Changes
+
+- [#1013](https://github.com/greydragon888/real-router/pull/1013) [`4388ea6`](https://github.com/greydragon888/real-router/commit/4388ea661e47cc63c530af3b4f6b1bdb82359282) Thanks [@greydragon888](https://github.com/greydragon888)! - Isolate synchronous throws / non-Promise returns from a preload function ([#806](https://github.com/greydragon888/real-router/issues/806))
+
+  The fire-and-forget call `preload.fn(params).catch(() => {})` only caught a **promise rejection**. A `preload` function that threw synchronously — or returned a non-Promise — escaped before `.catch`, surfacing as an `uncaughtException` from the `setTimeout` callback (a global uncaught with no user code in the stack, hard to diagnose), despite the documented "errors silently caught" contract. Both timers now route through a shared `#runPreload` that guards the synchronous call with `try/catch` and normalizes the return via `Promise.resolve` before attaching `.catch`.
+
+- [#1013](https://github.com/greydragon888/real-router/pull/1013) [`4388ea6`](https://github.com/greydragon888/real-router/commit/4388ea661e47cc63c530af3b4f6b1bdb82359282) Thanks [@greydragon888](https://github.com/greydragon888)! - Invalidate the pre-resolved State cache on structural `routes.update`/`add` ([#805](https://github.com/greydragon888/real-router/issues/805))
+
+  A structural tree mutation — `forwardTo`/`defaultParams`/`encodeParams`/`decodeParams` via `routes.update`, or an `add` that intercepts an already-cached href — previously left `getPreloadedState(href)` returning a stale snapshot built with the old resolution. A `<FastLink>` consumer would then commit the pre-mutation `State`, bypassing the fresh config. `#onTreeChanged` now clears the href-keyed snapshot cache on **any** structural op, matching the existing `remove`/`replace`/`clear` behavior. `#compiledPreloads` is untouched — its lazy factory-reference revalidation already covers `add`/`update`.
+
 ## 0.6.4
 
 ### Patch Changes
