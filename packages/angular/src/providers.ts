@@ -5,7 +5,7 @@ import {
   type EnvironmentProviders,
 } from "@angular/core";
 import { getNavigator, type Router, type Navigator } from "@real-router/core";
-import { createRouteSource } from "@real-router/sources";
+import { createRouteSource, getErrorSource } from "@real-router/sources";
 
 import {
   installScrollRestoration,
@@ -50,6 +50,15 @@ export function provideRealRouter(
         navigator,
       }),
     },
+    // #778 P2: eagerly create the per-router error source at bootstrap so a
+    // navigation error that fires BEFORE a RouterErrorBoundary is instantiated
+    // (a lazily-rendered shell, a failed boot navigation) is still captured. The
+    // boundary's createDismissableError reuses this cached source and catches up
+    // (#765); without it the error source is created lazily on boundary init —
+    // after the error — and never sees it.
+    provideEnvironmentInitializer(() => {
+      getErrorSource(router);
+    }),
   ];
 
   if (options?.scrollRestoration) {
