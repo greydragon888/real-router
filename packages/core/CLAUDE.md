@@ -664,6 +664,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - **`getFunctions()` cached tuple** — `RouteLifecycleNamespace` returns pre-allocated `[deactivate, activate]` array (no alloc per navigate)
 - **Segment array reuse** — `toActivate`/`toDeactivate` reuse arrays from `getTransitionPath()`
 - **`buildNavigateState()`** — single-pass state construction (merged forwardState + buildPath + makeState)
+- **Empty-params reuse** — `normalizeParams()` returns the shared frozen `EMPTY_PARAMS` singleton when nothing survives (empty input, or all values `undefined`), so `makeState`'s `params === EMPTY_PARAMS` branch reuses it: an empty-params navigation allocates **zero** transient `{}` (lazy allocation in `normalizeParams` + singleton reuse, #1027)
 - **Single-pass freeze** — `freezeStateInPlace` consolidated into one recursive traversal
 
 ### General
