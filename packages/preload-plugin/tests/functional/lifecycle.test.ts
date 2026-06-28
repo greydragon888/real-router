@@ -355,7 +355,8 @@ describe("preload-plugin — lifecycle", () => {
 
     const routesApi = getRoutesApi(router);
 
-    // add / update: the no-op fall-through branches of the TREE_CHANGED handler.
+    // add / update: no eager #compiledPreloads cleanup (lazy factory-reference
+    // revalidation); they hit the default branch, which invalidates #stateCache (#805).
     routesApi.add({ name: "added", path: "/added" });
     routesApi.update("home", { defaultParams: { a: "1" } });
 
@@ -407,6 +408,72 @@ describe("preload-plugin — lifecycle", () => {
 
     // The stale snapshot must be gone — otherwise a <FastLink> click would
     // navigate to a route that no longer exists.
+    expect(router.getPreloadedState?.(anchor.href)).toBeUndefined();
+
+    router.stop();
+  });
+
+  it("invalidates the pre-resolved state cache on a structural routes.update (#805)", async () => {
+    const { router } = createTestRouter([
+      { name: "home", path: "/" },
+      { name: "promo", path: "/promo" },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "view", path: "/:id" }],
+      },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    // Hover caches a State snapshot for /promo (control: it IS cached).
+    const anchor = createAnchor("/promo");
+
+    fireMouseOver(anchor);
+
+    expect(router.getPreloadedState?.(anchor.href)).toBeDefined();
+
+    // Re-hover to repopulate (single-use consumed it), then a structural update
+    // (forwardTo/defaultParams) — core emits TREE_CHANGED op:"update".
+    fireMouseOver(createAnchor("/promo"));
+    getRoutesApi(router).update("promo", {
+      forwardTo: "users.view",
+      defaultParams: { id: "42" },
+    });
+
+    // The stale pre-update snapshot must be gone — otherwise a <FastLink> click
+    // commits the pre-forward State and bypasses the fresh forwardTo/defaultParams.
+    expect(router.getPreloadedState?.(anchor.href)).toBeUndefined();
+
+    router.stop();
+  });
+
+  it("invalidates the pre-resolved state cache when add() intercepts a cached href (#805 §5)", async () => {
+    const { router } = createTestRouter([
+      { name: "home", path: "/" },
+      { name: "catchall", path: "/*rest" },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    // /promo currently resolves to the catch-all → the cached snapshot points
+    // at "catchall" (control).
+    const anchor = createAnchor("/promo");
+
+    fireMouseOver(anchor);
+
+    expect(router.getPreloadedState?.(anchor.href)?.name).toBe("catchall");
+
+    // Re-hover to repopulate, then add a more-specific /promo route. matchUrl
+    // now resolves /promo to the new exact route, so the catch-all snapshot is
+    // stale and must be dropped.
+    fireMouseOver(createAnchor("/promo"));
+    getRoutesApi(router).add({ name: "promo", path: "/promo" });
+
     expect(router.getPreloadedState?.(anchor.href)).toBeUndefined();
 
     router.stop();

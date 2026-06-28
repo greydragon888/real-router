@@ -153,8 +153,15 @@ export class PreloadPlugin {
 
         break;
       }
-      // "add" / "update": lazy factory-reference revalidation in
-      // #resolvePreload handles these — no eager cleanup needed.
+      default: {
+        // "add" / "update" (and any future structural op): `#compiledPreloads`
+        // is lazily revalidated in `#resolvePreload` (factory-reference compare)
+        // so it needs no eager cleanup — but `#stateCache` has no lazy path; it
+        // is read externally via `getPreloadedState`. Any structural mutation can
+        // restale a cached href — `update` changes resolution, `add` can intercept
+        // an already-cached href — so drop the snapshots wholesale. (#805)
+        this.#invalidateStateCache();
+      }
     }
   }
 
