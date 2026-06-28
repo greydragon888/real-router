@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-28]
 
+### @real-router/angular@0.11.11
+
+### Patch Changes
+
+- [#1024](https://github.com/greydragon888/real-router/pull/1024) [`2caf59f`](https://github.com/greydragon888/real-router/commit/2caf59fa2e5d71a47349be96e1b93f6276d048c7) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop splitting the active-route source cache key for no-params `realLink` / `realLinkActive` ([#776](https://github.com/greydragon888/real-router/issues/776))
+
+  The `routeParams` input on the `RealLink` and `RealLinkActive` directives now defaults to `undefined` (not `{}`). `@real-router/sources` keys the cache as `params === undefined ? "" : canonicalJson(params)`, so a no-params `<a realLink>` / `[realLinkActive]` and a manual `injectIsActiveRoute(name)` now share ONE cached source (one router subscription) instead of splitting into two entries (`"{}"` vs `""`). Navigation and href building default to a frozen empty-params object locally; active-state, href and navigation behaviour are unchanged.
+
+### @real-router/preact@0.15.10
+
+### Patch Changes
+
+- [#1024](https://github.com/greydragon888/real-router/pull/1024) [`2caf59f`](https://github.com/greydragon888/real-router/commit/2caf59fa2e5d71a47349be96e1b93f6276d048c7) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop splitting the active-route source cache key for a no-params `<Link>` ([#776](https://github.com/greydragon888/real-router/issues/776))
+
+  `<Link>` no longer defaults `routeParams` to `EMPTY_PARAMS` (`{}`) before calling the active-route source. `@real-router/sources` keys the cache as `params === undefined ? "" : canonicalJson(params)`, so a no-params `<Link routeName="x">` and a manual `useIsActiveRoute("x")` now share ONE cached source (one router subscription) instead of splitting into two entries (`"{}"` vs `""`). Active-state, href and navigation behaviour are unchanged.
+
+### @real-router/react@0.27.10
+
+### Patch Changes
+
+- [#1024](https://github.com/greydragon888/real-router/pull/1024) [`2caf59f`](https://github.com/greydragon888/real-router/commit/2caf59fa2e5d71a47349be96e1b93f6276d048c7) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop splitting the active-route source cache key for a no-params `<Link>` / `<InkLink>` ([#776](https://github.com/greydragon888/real-router/issues/776))
+
+  `<Link>` and `<InkLink>` no longer default `routeParams` to `EMPTY_PARAMS` (`{}`) before calling the active-route source. `@real-router/sources` keys the cache as `params === undefined ? "" : canonicalJson(params)`, so a no-params `<Link routeName="x">` and a manual `useIsActiveRoute("x")` now resolve the SAME cached source — one router subscription, not two distinct entries (`"{}"` vs `""`). Navigation and href building still default to `EMPTY_PARAMS` locally where a concrete object is required; active-state, href and navigation behaviour are unchanged.
+
+### @real-router/solid@0.15.3
+
+### Patch Changes
+
+- [#1024](https://github.com/greydragon888/real-router/pull/1024) [`2caf59f`](https://github.com/greydragon888/real-router/commit/2caf59fa2e5d71a47349be96e1b93f6276d048c7) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop splitting the active-route source cache key on the slow-path `<Link>` ([#776](https://github.com/greydragon888/real-router/issues/776))
+
+  The `<Link>` slow path (taken for custom `activeStrict` / `ignoreQueryParams` / `hash`) now passes the raw `routeParams` (possibly `undefined`) into `createActiveRouteSource` instead of the merged `EMPTY_PARAMS` (`{}`) default. A no-params slow-path Link therefore shares ONE cached source with a manual `createActiveRouteSource(router, name, undefined)` (key `""`) instead of keying `"{}"`. The `routeSelector` fast path and navigation/href behaviour are unchanged.
+
+### @real-router/svelte@0.13.11
+
+### Patch Changes
+
+- [#1024](https://github.com/greydragon888/real-router/pull/1024) [`2caf59f`](https://github.com/greydragon888/real-router/commit/2caf59fa2e5d71a47349be96e1b93f6276d048c7) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop splitting the active-route source cache key for a no-params `<Link>` ([#776](https://github.com/greydragon888/real-router/issues/776))
+
+  `<Link>` no longer defaults `routeParams` to `EMPTY_PARAMS` (`{}`) before calling the active-route source. `@real-router/sources` keys the cache as `params === undefined ? "" : canonicalJson(params)`, so a no-params `<Link routeName="x">` and a manual `useIsActiveRoute("x")` now share ONE cached source (one router subscription) instead of splitting into two entries (`"{}"` vs `""`). Active-state, href and navigation behaviour are unchanged.
+
+### @real-router/vue@0.15.11
+
+### Patch Changes
+
+- [#1024](https://github.com/greydragon888/real-router/pull/1024) [`2caf59f`](https://github.com/greydragon888/real-router/commit/2caf59fa2e5d71a47349be96e1b93f6276d048c7) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop splitting the active-route source cache key for a no-params `<Link>` ([#776](https://github.com/greydragon888/real-router/issues/776))
+
+  The `<Link>` `routeParams` prop now defaults to `undefined` (not `EMPTY_PARAMS`) before the active-route source call. `@real-router/sources` keys the cache as `params === undefined ? "" : canonicalJson(params)`, so a no-params `<Link routeName="x">` and a manual `useIsActiveRoute("x")` now share ONE cached source (one router subscription) instead of splitting into two entries (`"{}"` vs `""`). Navigation and href building default to `EMPTY_PARAMS` locally; active-state, href and navigation behaviour are unchanged.
+
+
 ### @real-router/core@0.61.13
 
 ### Patch Changes

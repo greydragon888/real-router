@@ -1,5 +1,13 @@
 # @real-router/angular
 
+## 0.11.11
+
+### Patch Changes
+
+- [#1024](https://github.com/greydragon888/real-router/pull/1024) [`2caf59f`](https://github.com/greydragon888/real-router/commit/2caf59fa2e5d71a47349be96e1b93f6276d048c7) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop splitting the active-route source cache key for no-params `realLink` / `realLinkActive` ([#776](https://github.com/greydragon888/real-router/issues/776))
+
+  The `routeParams` input on the `RealLink` and `RealLinkActive` directives now defaults to `undefined` (not `{}`). `@real-router/sources` keys the cache as `params === undefined ? "" : canonicalJson(params)`, so a no-params `<a realLink>` / `[realLinkActive]` and a manual `injectIsActiveRoute(name)` now share ONE cached source (one router subscription) instead of splitting into two entries (`"{}"` vs `""`). Navigation and href building default to a frozen empty-params object locally; active-state, href and navigation behaviour are unchanged.
+
 ## 0.11.10
 
 ### Patch Changes
