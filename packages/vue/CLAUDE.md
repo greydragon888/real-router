@@ -266,6 +266,42 @@ Route snapshots are frozen objects. `useRefFromSource` (`useRoute` path) and `se
 
 Don't swap `shallowRef` for `ref` in `useRefFromSource` — the deep proxy would fail on frozen route snapshots at runtime.
 
+### Storing the Router in `reactive()` / Pinia — wrap it in `markRaw`
+
+Core identifies a router by **object identity** in an internal `WeakMap`
+(`getInternals` / `getPluginApi`). Putting the router into a Vue `reactive()`
+store — **including Pinia state** — wraps it in a reactive `Proxy`, and that
+proxy is a *different* object than the WeakMap key. Any code that goes through
+the WeakMap API (`RouterErrorBoundary`, `useRouteUtils`, `useRouterTransition`,
+plugin internals) then throws:
+
+```
+TypeError: [real-router] Invalid router instance — not found in internals registry
+```
+
+The failure is **point-wise and confusing**: bound facade methods
+(`router.navigate`, `router.buildPath`, …) keep working because they captured
+`this` at construction, so only the WeakMap-backed surfaces break — you get a
+half-working router rather than a clean crash.
+
+```ts
+import { markRaw, reactive } from "vue";
+
+// WRONG — the reactive proxy breaks getInternals / getPluginApi
+const store = reactive({ router });
+
+// CORRECT — markRaw keeps the original instance out of the proxy
+const store = reactive({ router: markRaw(router) });
+// Pinia: return markRaw(router) from the store's state factory.
+```
+
+`markRaw` is the Vue canon for non-proxyable instances. Passing the router as a
+plain `<RouterProvider :router="router">` prop is safe (Vue does not deep-proxy
+prop *values*) — the breakage is specifically about making the instance itself
+reactive. A defensive `toRaw(props.router)` inside `RouterProvider` /
+`createRouterPlugin` would also harden the rare case where a parent has already
+wrapped it.
+
 ### onScopeDispose for Cleanup
 
 `useRefFromSource` calls `onScopeDispose` — it must be called inside a Vue reactive scope (component `setup()`, `effectScope()`, etc.). Don't call it at module level.
@@ -393,6 +429,24 @@ When `keepAlive` is enabled (on `<RouteView>` or on an individual `<RouteView.Ma
 ```
 
 `RouteView.Match.keepAlive` takes precedence over the parent `<RouteView keepAlive>` — use it for fine-grained control when only some routes need state preservation.
+
+### `<KeepAlive>` deactivated subtrees stay fresh — immune to #765
+
+Vue is the **only** adapter where a sleeping (deactivated) subtree is *outside*
+the reconnect-staleness window. `useRefFromSource` bridges via `shallowRef` +
+`onScopeDispose`; under native `<KeepAlive>` a deactivated component keeps its
+**effect scope alive** (Vue disposes scopes on `unmount`, not on deactivate). The
+bridge subscription therefore stays connected to the router while the subtree
+sleeps — a navigation during deactivation is applied to the `shallowRef` as
+usual, and re-activating shows the **fresh** state with no dependence on source
+reconcile.
+
+Contrast: React `<Activity>` detaches effects on hide and so *opens* the stale
+window ([#765](https://github.com/greydragon888/real-router/issues/765)); Solid
+and Svelte have no keepAlive analogue. This is a real, guaranteed advantage of
+the Vue adapter — with one cost worth knowing: subscriptions of sleeping subtrees
+keep firing (bounded by the number of `<KeepAlive>`d nodes), so kept-alive
+components are not "paused" with respect to router updates.
 
 ### Match `fallback` Prop (Suspense)
 

@@ -48,12 +48,19 @@ export function createSignalFromSource<T>(
     setValue(sync);
   });
 
-  // Re-read after subscribe: lazy sources reconcile their snapshot in
-  // onFirstSubscribe (when reused after disconnect via cache). Listener
-  // is not notified for that internal update, so we must sync manually.
-  // No-op when snapshot is unchanged (signal equality check). Wrapped
-  // because this is still init-phase: a throw here ALSO tears down the
-  // owner, same as the initial read above.
+  // Re-read after subscribe — a defensive safety net, NOT a notification fix.
+  // The earlier rationale here ("the source reconciles in onFirstSubscribe but
+  // the listener isn't notified, so sync manually") was WRONG: BaseSource adds
+  // the listener to #listeners BEFORE running onFirstSubscribe, so a reconciling
+  // source (cached createRouteNodeSource) DOES deliver that update to us — the
+  // setValue here is then a no-op (signal equality check). Keep it anyway as
+  // defense-in-depth: it costs one equality-checked no-op, and it shields us
+  // from sources whose snapshot is fresh at subscribe time without a separate
+  // emit, and from non-reconciling sources (createRouteSource — #765) where
+  // getSnapshot() is simply the freshest value available. Do NOT "optimize it
+  // away" by trusting a notification that some sources won't send. Wrapped
+  // because this is still init-phase: a throw here ALSO tears down the owner,
+  // same as the initial read above.
   try {
     setValue(sync);
   } catch (error) {

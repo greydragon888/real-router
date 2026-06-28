@@ -536,15 +536,26 @@ All source caches live inside `@real-router/sources` — no local WeakMaps in th
 
 | Hook / Component                  | Source factory                                        |
 | --------------------------------- | ----------------------------------------------------- |
-| `useRoute()`                      | cached `createRouteSource(router)` — shared root snapshot for every consumer |
-| `useRouteStore()`                 | cached `createRouteSource(router)` — same shared root, wrapped via `createStoreFromSource` |
+| `useRoute()`                      | **non-cached** `createRouteSource(router)` — `RouterProvider` builds ONE instance and shares it via `RouteContext`; every `useRoute()` reads that same signal (shared per-Provider through context, **not** via the sources cache) |
+| `useRouteStore()`                 | **non-cached** `createRouteSource(router)` — a **fresh** source per call: each consumer gets its own router subscription + reconcile pass (NOT shared — see the note below) |
 | `useRouteNode(name)`              | cached `createRouteNodeSource(router, nodeName)`      |
 | `useRouteNodeStore(name)`         | cached `createRouteNodeSource(router, nodeName)`      |
 | `useRouterTransition()`           | cached `getTransitionSource(router)`                  |
 | `RouterErrorBoundary`             | cached `createDismissableError(router)` — shared error source with integrated dismissal state |
 | Link (slow path)                  | cached `createActiveRouteSource(router, name, params, opts)` — params hashed via `canonicalJson` (key-order-insensitive) |
 
-Routers are WeakMap keys in sources, so per-router state is automatically released when the router is GC'd — no explicit teardown needed. Lazy sources (`createRouteNodeSource`, `createRouteSource`) disconnect from the router when their last listener unsubscribes; on re-subscription, they reconcile their snapshot so signals never observe stale values.
+> **`useRoute()` vs `useRouteStore()` sharing.** `useRoute()` is shared
+> per-`RouterProvider`: the Provider builds one `createRouteSource` and hands the
+> same accessor to every `useRoute()` consumer through `RouteContext` — one
+> router subscription for the whole tree. `useRouteStore()` is **not** shared:
+> it calls `createRouteSource(router)` itself on every invocation (the factory
+> is non-cached by design), so N store consumers create **N** sources → N router
+> subscriptions and N reconcile passes per navigation. The lifecycle is still
+> correct (each bridge's `onCleanup` removes its own subscription — no leak), but
+> for a single shared store call `useRouteStore()` once high in the tree and pass
+> the store down through your own context.
+
+Routers are WeakMap keys in sources, so per-router state is automatically released when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes. On re-subscription **`createRouteNodeSource` reconciles** its snapshot (so node signals never observe stale values), but **`createRouteSource` does NOT** ([#765](https://github.com/greydragon888/real-router/issues/765)): a lifted `createRouteSource` bridged through `createSignalFromSource` and re-subscribed after a disconnect (e.g. the only reader behind a `<Show>` toggled off → navigate → on) replays the **stale** pre-disconnect snapshot. Keep the Provider's source mounted (don't gate the sole reader behind `<Show>`) until the sources fix lands.
 
 ## SSR
 

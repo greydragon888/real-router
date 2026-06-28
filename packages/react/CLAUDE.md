@@ -493,6 +493,45 @@ const LazyUsers = lazy(() => import('./UsersPage'));
 </RouteView.Match>
 ```
 
+### Keep `RouterProvider` above any `<Activity>` / keepAlive boundary
+
+`RouterProvider` subscribes to the router via `useSyncExternalStore`
+(subscribe-on-first-listener, unsubscribe-on-last). React 19's `<Activity>` —
+the same API behind `RouteView`'s `keepAlive` — **detaches the effects of a
+hidden subtree**, which drops that subscription. If the Provider itself sits
+*under* an `<Activity>` (or keepAlive) boundary, a `hide → router.navigate(...)
+→ show` sequence renders the **stale** previous route: the navigation lands
+while the source is disconnected, and on re-show `createRouteSource` replays its
+last snapshot until the next navigation. `useMemo(() => createRouteSource(router),
+[router])` survives the hide/show, so the source is never recreated to pick up
+what it missed.
+
+```tsx
+// WRONG — Provider under Activity: hide → navigate → show shows the stale route
+<Activity mode={mode}>
+  <RouterProvider router={router}>
+    <App />
+  </RouterProvider>
+</Activity>
+
+// CORRECT — Provider above the boundary (the typical app already mounts it at
+// the root). keepAlive on an individual RouteView.Match stays fine — the
+// Provider remains mounted and subscribed the whole time.
+<RouterProvider router={router}>
+  <Activity mode={mode}>
+    <App />
+  </Activity>
+</RouterProvider>
+```
+
+Most apps mount `RouterProvider` at the root, so the real exposure is
+non-standard compositions and `keepAlive`-wrapped app-in-app layouts. The root
+cause is in `@real-router/sources` — `createRouteSource` does not reconcile its
+snapshot on re-subscribe ([#765](https://github.com/greydragon888/real-router/issues/765));
+once that lands, the window closes and this caveat can be softened.
+`useIsActiveRoute` / `Link` are **immune** — their source is eager and keeps its
+snapshot live even with zero subscribers.
+
 ### Ink entry constraints
 
 `@real-router/react/ink` is a **different runtime target** from main/legacy, not a different React version. Constraints:

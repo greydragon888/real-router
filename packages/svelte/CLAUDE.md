@@ -281,6 +281,25 @@ Files with the `.svelte.ts` extension use Runes (`$state`, `$derived`, `$effect`
 <p>{route.current?.name}</p>
 ```
 
+**Corollary — all readers gone → subscription dropped → stale on re-show.**
+The laziness cuts both ways. When **every** `.current` reader disappears at once
+— e.g. the whole app sits behind a plain `{#if loggedIn}` login-gate — the last
+subscriber unwinds and the underlying `createRouteSource` disconnects from the
+router. A navigation that happens *while hidden* (a post-login deep-link
+redirect, a restored route) is missed; when the gate re-opens, the first
+`.current` read replays the **stale** pre-navigation snapshot until the next
+navigation. Unlike React (needs `<Activity>`) or Solid (needs a lifted-source
+composition), Svelte reaches this with an ordinary `{#if}` around the readers —
+the widest reachability in the adapter series, and a realistic auth-flow pattern.
+
+The window stays closed as long as **any** mounted reader is alive (a single
+`RouteView`, a `useRoute()` consumer, or a template `{route.current}` anywhere),
+so it only bites when literally all of them are gated off together. Root cause is
+`@real-router/sources` ([#765](https://github.com/greydragon888/real-router/issues/765)
+— `createRouteSource` doesn't reconcile on re-subscribe); once it lands this
+collapses to "the subscription drops with no readers, and reconcile catches up
+on the next read."
+
 ### Snippet Names Must Be Valid JS Identifiers
 
 `RouteView` uses rest `$props()` to collect named snippets. Snippet names must be valid JavaScript identifiers and must match the route segment name exactly. `notFound` is reserved for the fallback:

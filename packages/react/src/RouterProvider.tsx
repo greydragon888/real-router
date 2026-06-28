@@ -116,6 +116,14 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   // useSyncExternalStore manages the router subscription lifecycle:
   // subscribe connects to router on first listener, unsubscribes on last.
   // This is Strict Mode safe — no useEffect cleanup needed.
+  //
+  // Caveat (#765): that same first-listener/last-listener contract opens a
+  // stale window if THIS Provider is mounted under a React <Activity> /
+  // keepAlive boundary — hiding detaches the subscription, a navigation while
+  // hidden is missed, and re-show replays createRouteSource's stale snapshot
+  // (createRouteSource does not reconcile on re-subscribe). Keep RouterProvider
+  // ABOVE any Activity boundary — see the "Keep RouterProvider above any
+  // <Activity> / keepAlive boundary" gotcha in CLAUDE.md.
   const store = useMemo(() => createRouteSource(router), [router]);
   // Use snapshot reference directly. createRouteSource via stabilizeState
   // returns the SAME snapshot reference when route.path is unchanged, so
