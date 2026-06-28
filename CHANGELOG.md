@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-28]
 
+### @real-router/core@0.61.14
+
+### Patch Changes
+
+- [#1028](https://github.com/greydragon888/real-router/pull/1028) [`fac6afa`](https://github.com/greydragon888/real-router/commit/fac6afae8f8971b1c930e14b46b452739bd2c58e) Thanks [@greydragon888](https://github.com/greydragon888)! - Reuse the `EMPTY_PARAMS` singleton for empty-params navigations ([#1027](https://github.com/greydragon888/real-router/issues/1027))
+
+  `normalizeParams` now returns the shared frozen `EMPTY_PARAMS` singleton when the result is empty (empty input, or every value `undefined`) instead of always allocating a fresh `{}`. This lets `makeState`'s `params === EMPTY_PARAMS` reuse branch fire, so a navigation to a route with no params (and no `defaultParams`) allocates zero transient objects instead of two.
+
+  Behavior-preserving: `state.params` is still an empty frozen object and the `undefined`-strip contract is unchanged.
+
+
 ### @real-router/angular@0.11.11
 
 ### Patch Changes
