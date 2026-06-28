@@ -128,13 +128,12 @@ describe("router.navigate() - error state recovery", () => {
           ),
       );
 
-      try {
-        await router.navigate("users");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect(error?.message).toBe("Async canActivate error");
-      }
+      // Must REJECT — a bare try/catch here would pass with zero assertions if a
+      // regression resolved the navigation instead (the catch block never runs).
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+        message: "Async canActivate error",
+      });
     });
 
     it("should handle Promise rejection in canDeactivate guard", async () => {
@@ -150,13 +149,12 @@ describe("router.navigate() - error state recovery", () => {
           ),
       );
 
-      try {
-        await router.navigate("home");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        expect(error?.message).toBe("Async canDeactivate error");
-      }
+      // Must REJECT — see the canActivate sibling above; a masking catch would
+      // make a swallowed-rejection regression pass vacuously.
+      await expect(router.navigate("home")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
+        message: "Async canDeactivate error",
+      });
     });
 
     it("should handle Promise rejection in middleware", async () => {
@@ -200,15 +198,12 @@ describe("router.navigate() - error state recovery", () => {
       // Stop router during transition
       router.stop();
 
-      // Wait for timeout to complete
-      await new Promise((resolve) => setTimeout(resolve, 60));
-
-      // Navigation should have been cancelled
-      try {
-        await navPromise;
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-      }
+      // Navigation must reject with TRANSITION_CANCELLED. The previous masking
+      // catch would silently pass if stop() ever stopped cancelling the
+      // in-flight navigation (the exact regression this test guards).
+      await expect(navPromise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
     });
   });
 });

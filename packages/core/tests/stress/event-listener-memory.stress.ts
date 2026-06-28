@@ -129,6 +129,34 @@ describe("S2. Event listener memory leaks", () => {
     router.dispose();
   });
 
+  it("should not leak memory during 9,000 add/remove cycles of a single subscribeLeave listener", async () => {
+    const router = createStressRouter(5);
+
+    await router.start("/route0");
+
+    const before = takeHeapSnapshot();
+
+    for (let i = 0; i < 9000; i++) {
+      const unsub = router.subscribeLeave(() => {});
+
+      unsub();
+    }
+
+    const after = takeHeapSnapshot();
+    const delta = after - before;
+
+    // subscribeLeave listeners live in a FLAT array (`#leaveListeners`) with NO
+    // hard cap (unlike the EventEmitter's add/remove path the tests above cover),
+    // so a broken unsubscribe would grow it without bound. Mutation-validated
+    // 2026-06-28: healthy (cleanup runs) ~28 KB, leak (skip unsub → 9,000 live
+    // closures) ~597 KB. Threshold 0.15 MB sits >3x below the leak (×3.9) and
+    // >3x above healthy (×5.5).
+    expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(0.15 * MB);
+
+    router.stop();
+    router.dispose();
+  });
+
   it("should not leak memory during 9,000 cycles of interleaved subscribe/navigate/unsubscribe", async () => {
     const router = createStressRouter(5);
 

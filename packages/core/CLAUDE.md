@@ -313,7 +313,7 @@ namespaces/NavigationNamespace/
 ├── NavigationNamespace.ts     — navigate(), #finishAsyncNavigation()
 ├── constants.ts               — cached error instances (CACHED_*_REJECTION)
 ├── types.ts                   — NavigationContext, NavigationDependencies
-├── validators.ts              — argument validation
+├── index.ts                   — exports
 └── transition/
     ├── guardPhase.ts          — executeGuardPipeline(), runGuards(), resolveRemainingGuards()
     ├── completeTransition.ts  — completeTransition(), buildTransitionMeta()

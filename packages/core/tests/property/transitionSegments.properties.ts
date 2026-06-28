@@ -364,4 +364,165 @@ describe("navigate() → transition.segments Properties", () => {
 
     router.stop();
   });
+
+  // N-8: forceReplaceFromUnknown must OVERRIDE an explicit `{ replace: false }`,
+  // not merely fill in undefined opts. The test above passes undefined opts, so
+  // the override branch (caller asked for replace:false, core forces it true)
+  // never executed. A regression that "respected the caller" would push a 404
+  // into history. Other caller opts (reload) must survive the force.
+  test.prop(
+    [
+      arbNavigableRoute,
+      fc.constantFrom(
+        undefined,
+        { replace: false },
+        { replace: false, reload: true },
+      ),
+    ],
+    { numRuns: NUM_RUNS.fast },
+  )(
+    "from UNKNOWN_ROUTE: replace is forced true even over an explicit {replace:false}, other opts preserved",
+    async (target, opts) => {
+      const router = createFixtureRouter({ allowNotFound: true });
+
+      await router.start("/nonexistent-path");
+
+      expect(router.getState()!.name).toBe(UNKNOWN_ROUTE);
+
+      const state = await router.navigate(
+        target,
+        getParamsForRoute(target),
+        opts,
+      );
+
+      // Forced regardless of the caller's explicit `replace: false`.
+      expect(state.transition.replace).toBe(true);
+
+      // A non-replace option set by the caller rides through untouched.
+      if (opts && "reload" in opts) {
+        expect(state.transition.reload).toBe(true);
+      }
+
+      router.stop();
+    },
+  );
+
+  // N-8/§6.5: the `isSameNavigation` bypass matrix. Re-navigating to the CURRENT
+  // route rejects SAME_STATES — UNLESS `reload` OR `force` is set. The `force`
+  // branch of `isSameNavigation` had no property coverage at all.
+  test.prop(
+    [
+      arbNavigableRoute,
+      fc.constantFrom(
+        {},
+        { reload: true },
+        { force: true },
+        { reload: true, force: true },
+      ),
+    ],
+    { numRuns: NUM_RUNS.fast },
+  )(
+    "same-route navigate rejects SAME_STATES iff neither reload nor force is set",
+    async (target, opts) => {
+      const params = getParamsForRoute(target);
+      const router = createFixtureRouter();
+
+      await router.start(router.buildPath(target, params));
+
+      expect(router.getState()?.name).toBe(target);
+
+      if ("reload" in opts || "force" in opts) {
+        const state = await router.navigate(target, params, opts);
+
+        expect(state.name).toBe(target);
+      } else {
+        await expect(
+          router.navigate(target, params, opts),
+        ).rejects.toMatchObject({ code: errorCodes.SAME_STATES });
+      }
+
+      router.stop();
+    },
+  );
+
+  // N-9: a sync guard (`() => true`) and an async guard
+  // (`() => Promise.resolve(true)`) drive navigate down its two distinct code
+  // paths (optimistic-sync vs async-tail). The COMMITTED state must be
+  // structurally identical regardless of which path ran — a race or ordering bug
+  // in the async tail would diverge here.
+  test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.fast })(
+    "sync vs async activation guard produce a structurally identical final state",
+    async (target) => {
+      fc.pre(target !== "home");
+
+      const params = getParamsForRoute(target);
+
+      const syncRouter = createFixtureRouter();
+      const asyncRouter = createFixtureRouter();
+
+      await syncRouter.start("/");
+      await asyncRouter.start("/");
+
+      getLifecycleApi(syncRouter).addActivateGuard(target, () => () => true);
+      getLifecycleApi(asyncRouter).addActivateGuard(
+        target,
+        () => () => Promise.resolve(true),
+      );
+
+      const sync = await syncRouter.navigate(target, params);
+      const async = await asyncRouter.navigate(target, params);
+
+      expect(async.name).toBe(sync.name);
+      expect(async.path).toBe(sync.path);
+      expect(async.params).toStrictEqual(sync.params);
+      expect([...async.transition.segments.activated]).toStrictEqual([
+        ...sync.transition.segments.activated,
+      ]);
+      expect([...async.transition.segments.deactivated]).toStrictEqual([
+        ...sync.transition.segments.deactivated,
+      ]);
+      expect(async.transition.segments.intersection).toBe(
+        sync.transition.segments.intersection,
+      );
+
+      syncRouter.stop();
+      asyncRouter.stop();
+    },
+  );
+
+  // N-10/§6.3: a PRE-aborted external signal propagates its abort REASON onto
+  // the rejection (`#abortPreviousNavigation` throws TRANSITION_CANCELLED with
+  // `{ reason: externalSignal.reason }`). The existing AbortSignal property pins
+  // only the code. Generalizes the fixed-route functional test (abort-signal
+  // test 14) over arbitrary navigable targets. NOTE: holds for the PRE-aborted
+  // path only — a mid-flight abort yields a bare TRANSITION_CANCELLED (the
+  // reason then lives on signal.reason, not the rejection).
+  test.prop([arbNavigableRoute, fc.string({ minLength: 1, maxLength: 30 })], {
+    numRuns: NUM_RUNS.fast,
+  })(
+    "pre-aborted signal propagates the abort reason onto the TRANSITION_CANCELLED rejection",
+    async (target, message) => {
+      fc.pre(target !== "users.view");
+
+      const router = await createStartedRouter("/users/abc");
+      const controller = new AbortController();
+      const reason = new Error(message);
+
+      controller.abort(reason);
+
+      const error = await router
+        .navigate(target, getParamsForRoute(target), {
+          signal: controller.signal,
+        })
+        .catch((error_: unknown) => error_);
+
+      expect(error).toBeInstanceOf(RouterError);
+      expect(error).toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+        reason,
+      });
+
+      router.stop();
+    },
+  );
 });

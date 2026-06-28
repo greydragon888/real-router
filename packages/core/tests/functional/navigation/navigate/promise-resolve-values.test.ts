@@ -46,6 +46,8 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("profile", {}, {});
 
         expect(promiseDeactivateGuard).toHaveBeenCalledTimes(1);
+        // The transition did not just run the guard — it reached the target.
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle multiple promise-based canDeactivate guards", async () => {
@@ -64,6 +66,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
     });
 
@@ -76,6 +79,7 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("profile", {}, {});
 
         expect(promiseActivateGuard).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle multiple promise-based canActivate guards", async () => {
@@ -89,6 +93,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("settings.account");
       });
     });
 
@@ -101,6 +106,7 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("orders.pending", {}, {});
 
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("orders.pending");
       });
 
       it("should handle multiple promise-based middleware", async () => {
@@ -114,6 +120,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(promiseMiddleware1).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle promise middleware with guards", async () => {
@@ -127,6 +134,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(syncGuard).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("orders");
       });
     });
   });
@@ -147,6 +155,7 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("profile", {}, {});
 
         expect(deactivateGuard).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle multiple canDeactivate guards returning true", async () => {
@@ -165,6 +174,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(guard1).toHaveBeenCalledTimes(1);
         expect(guard2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
     });
 
@@ -177,6 +187,7 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("profile", {}, {});
 
         expect(activateGuard).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle multiple canActivate guards returning true", async () => {
@@ -190,6 +201,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(guard1).toHaveBeenCalledTimes(1);
         expect(guard2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("settings.account");
       });
     });
 
@@ -202,6 +214,7 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("orders.pending", {}, {});
 
         expect(middleware).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("orders.pending");
       });
 
       it("should handle multiple middleware returning true", async () => {
@@ -215,6 +228,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(middleware1).toHaveBeenCalledTimes(1);
         expect(middleware2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle middleware returning true with guards", async () => {
@@ -228,17 +242,25 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(guard).toHaveBeenCalledTimes(1);
         expect(middleware).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("orders");
       });
     });
   });
 
-  describe("guards and middleware returning valid State", () => {
+  // Plugins are OBSERVERS, not redirectors (see core CLAUDE.md "Guards vs
+  // Plugins": Can transform state = No). A State returned from an
+  // `onTransitionSuccess` hook is IGNORED by core — navigation commits to the
+  // requested target regardless. These tests pin that contract; the redirect
+  // State always names a DIFFERENT route than the target so the assertion is
+  // discriminating (a regression that honoured the returned State would change
+  // getState().name and fail here).
+  describe("onTransitionSuccess plugin returning a State (sync) is ignored", () => {
     beforeEach(() => {
       vi.spyOn(logger, "error").mockImplementation(noop);
     });
 
-    describe("canDeactivate returns valid State", () => {
-      it("should update toState when middleware returns new state", async () => {
+    describe("sync onTransitionSuccess returning State", () => {
+      it("should ignore a State returned from a sync onTransitionSuccess plugin", async () => {
         const redirectState = {
           name: "settings",
           params: {},
@@ -250,15 +272,16 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: redirectingMiddleware,
         }));
 
-        await router.navigate("orders.pending", {}, {});
+        const state = await router.navigate("orders.pending", {}, {});
 
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
 
-        // Note: Expected behavior is that result state should be the redirect state
-        // Actual behavior may differ due to known issues with state handling
+        // The returned State ("settings") is ignored — the target stands.
+        expect(state.name).toBe("orders.pending");
+        expect(router.getState()?.name).toBe("orders.pending");
       });
 
-      it("should handle multiple middleware with state redirects", async () => {
+      it("should ignore States returned from multiple sync onTransitionSuccess plugins", async () => {
         const firstMiddleware = vi.fn().mockReturnValue(true);
         const redirectState = {
           name: "profile",
@@ -272,13 +295,16 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: redirectingMiddleware,
         }));
 
-        await router.navigate("orders", {}, {});
+        const state = await router.navigate("orders", {}, {});
 
         expect(firstMiddleware).toHaveBeenCalledTimes(1);
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
+
+        expect(state.name).toBe("orders");
+        expect(router.getState()?.name).toBe("orders");
       });
 
-      it("should handle middleware redirect with guards", async () => {
+      it("should ignore a State returned from a sync onTransitionSuccess plugin (with guards)", async () => {
         const guard = vi.fn().mockReturnValue(true);
         const redirectState = {
           name: "orders",
@@ -292,10 +318,13 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: redirectingMiddleware,
         }));
 
-        await router.navigate("profile", {}, {});
+        const state = await router.navigate("profile", {}, {});
 
         expect(guard).toHaveBeenCalledTimes(1);
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
+
+        expect(state.name).toBe("profile");
+        expect(router.getState()?.name).toBe("profile");
       });
     });
   });
@@ -319,6 +348,7 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("profile", {}, {});
 
         expect(promiseDeactivateGuard).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle multiple promise-based canDeactivate guards returning true", async () => {
@@ -337,6 +367,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
     });
 
@@ -349,6 +380,7 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("profile", {}, {});
 
         expect(promiseActivateGuard).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle multiple promise-based canActivate guards returning true", async () => {
@@ -362,6 +394,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("settings.account");
       });
     });
 
@@ -374,6 +407,7 @@ describe("router.navigate() - promise resolve values", () => {
         await router.navigate("orders.pending", {}, {});
 
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("orders.pending");
       });
 
       it("should handle multiple promise-based middleware returning true", async () => {
@@ -387,6 +421,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(promiseMiddleware1).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware2).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("profile");
       });
 
       it("should handle promise middleware with promise guards", async () => {
@@ -400,17 +435,20 @@ describe("router.navigate() - promise resolve values", () => {
 
         expect(promiseGuard).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("orders");
       });
     });
   });
 
-  describe("guards and middleware returning Promise.resolve(State)", () => {
+  // Async counterpart of the sync block above: a State resolved from an async
+  // `onTransitionSuccess` hook is likewise ignored (plugins are observers).
+  describe("onTransitionSuccess plugin returning a State (async) is ignored", () => {
     beforeEach(() => {
       vi.spyOn(logger, "error").mockImplementation(noop);
     });
 
-    describe("canDeactivate returns Promise.resolve(State)", () => {
-      it("should update toState when middleware returns Promise.resolve(State)", async () => {
+    describe("async onTransitionSuccess returning State", () => {
+      it("should ignore a State returned from an async onTransitionSuccess plugin", async () => {
         const redirectState = {
           name: "settings",
           params: {},
@@ -424,15 +462,15 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: promiseRedirectMiddleware,
         }));
 
-        await router.navigate("orders.pending", {}, {});
+        const state = await router.navigate("orders.pending", {}, {});
 
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);
 
-        // Note: Expected behavior is that result state should be the redirect state
-        // Combination of Promise + State handling may have issues
+        expect(state.name).toBe("orders.pending");
+        expect(router.getState()?.name).toBe("orders.pending");
       });
 
-      it("should handle multiple promise middleware with state redirects", async () => {
+      it("should ignore States returned from multiple async onTransitionSuccess plugins", async () => {
         const firstPromiseMiddleware = vi.fn().mockResolvedValue(true);
         const redirectState = {
           name: "profile",
@@ -450,13 +488,16 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: promiseRedirectMiddleware,
         }));
 
-        await router.navigate("orders", {}, {});
+        const state = await router.navigate("orders", {}, {});
 
         expect(firstPromiseMiddleware).toHaveBeenCalledTimes(1);
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);
+
+        expect(state.name).toBe("orders");
+        expect(router.getState()?.name).toBe("orders");
       });
 
-      it("should handle promise middleware redirect with promise guards", async () => {
+      it("should ignore a State returned from an async onTransitionSuccess plugin (with promise guards)", async () => {
         const promiseGuard = vi.fn().mockResolvedValue(true);
         const redirectState = {
           name: "orders",
@@ -472,10 +513,13 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: promiseRedirectMiddleware,
         }));
 
-        await router.navigate("profile", {}, {});
+        const state = await router.navigate("profile", {}, {});
 
         expect(promiseGuard).toHaveBeenCalledTimes(1);
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);
+
+        expect(state.name).toBe("profile");
+        expect(router.getState()?.name).toBe("profile");
       });
     });
   });

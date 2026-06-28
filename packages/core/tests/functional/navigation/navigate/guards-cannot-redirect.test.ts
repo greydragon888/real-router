@@ -174,19 +174,17 @@ describe("router.navigate() - guards cannot redirect", () => {
         vi.useRealTimers();
       });
 
-      it("should return error for auth-protected routes", async () => {
+      it("should reject with CANNOT_ACTIVATE for auth-protected routes", async () => {
         router.stop();
 
-        // Start router with auth-protected path - should fail with error
-        try {
-          const state = await router.start("/auth-protected");
-
-          // If we reach here, it should have fallen back to default route
-          expect(state?.name).toBe("home");
-        } catch (error: any) {
-          // Or it should have returned an error
-          expect(error).toBeDefined();
-        }
+        // `auth-protected`'s async canActivate rejects, so start() cannot commit
+        // and rejects with CANNOT_ACTIVATE — guards cannot redirect; the rejected
+        // object's `attemptedRedirect` is merely carried as RouterError metadata.
+        // The previous either-outcome catch accepted BOTH a "home" fallback AND
+        // any error (`toBeDefined`), so it pinned neither code nor behaviour.
+        await expect(router.start("/auth-protected")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+        });
       });
     });
 
