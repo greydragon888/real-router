@@ -110,7 +110,7 @@
 | --- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Params equivalent under `canonicalJson` hit the same cache entry                           | `{a:1, b:2}` and reordered `{b:2, a:1}` deterministically yield the same source instance.                                         |
 | 2   | Different routers are isolated under the same `(name, params, options)` key                | WeakMap keying prevents cross-router cache collisions.                                                                            |
-| 3   | Hash-aware monotonicity under no-url-plugin fixture                                        | When `opts.hash !== undefined` and the router has no URL-publishing plugin, the snapshot is `false` across every navigation (#532). |
+| 3   | Hash-aware monotonicity under no-url-plugin fixture                                        | When `opts.hash` is a **non-empty** string and the router has no URL-publishing plugin, the snapshot is `false` across every navigation — `readContextHash` returns `""`, which never equals a non-empty fragment. Exception: `opts.hash === ""` matches the empty fragment, so an active route returns `true` even with no plugin (#532). |
 | 4   | Hash-aware variants are cache-isolated from hash-less variants                             | The same `(name, params, options-without-hash)` and `(name, params, options-with-hash)` calls return different instances.         |
 
 ## createActiveRouteSource — Destroy

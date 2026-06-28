@@ -92,6 +92,57 @@ describe("createActiveNameSelector", () => {
     unsubAdmin();
   });
 
+  it("isolates throwing listeners — same-name siblings and later names still notified (#767)", async () => {
+    const selector = createActiveNameSelector(router);
+    const thrown = new Error("boom");
+    const sameNameSurvivor = vi.fn();
+    const otherNameSurvivor = vi.fn();
+
+    // Capture the asynchronously re-thrown error before vitest's default
+    // uncaughtException handler fails the test (mirrors BaseSource isolation).
+    const rethrown: unknown[] = [];
+    const previousListeners = [...process.listeners("uncaughtException")];
+
+    process.removeAllListeners("uncaughtException");
+    const captureHandler = (error: unknown): void => {
+      rethrown.push(error);
+    };
+
+    process.on("uncaughtException", captureHandler);
+
+    try {
+      // Two "users" listeners (throwing first), then a DIFFERENT name "home"
+      // whose active state also flips on the same navigation. Iteration order:
+      // "users" (subscribed first) before "home". Without per-listener
+      // isolation, the throw unwinds both nested loops → the same-name sibling
+      // AND every later name are skipped.
+      selector.subscribe("users", () => {
+        throw thrown;
+      });
+      selector.subscribe("users", sameNameSurvivor);
+      selector.subscribe("home", otherNameSurvivor);
+
+      // home → users.list: "users" flips false→true, "home" flips true→false.
+      await router.navigate("users.list");
+
+      // Same-name sibling notified despite the first listener throwing.
+      expect(sameNameSurvivor).toHaveBeenCalledTimes(1);
+      // A listener of a later-iterated name is NOT skipped by the throw.
+      expect(otherNameSurvivor).toHaveBeenCalledTimes(1);
+
+      // Drain the microtask queue so the queueMicrotask(throw) lands.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(rethrown).toStrictEqual([thrown]);
+    } finally {
+      process.removeListener("uncaughtException", captureHandler);
+      for (const listener of previousListeners) {
+        process.on("uncaughtException", listener);
+      }
+    }
+  });
+
   it("N listeners for the same name share one router subscription", async () => {
     const originalSubscribe = router.subscribe.bind(router);
     const subscribeSpy = vi.spyOn(router, "subscribe");

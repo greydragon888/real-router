@@ -33,6 +33,16 @@ describe("createErrorSource", () => {
     });
   });
 
+  it("initial snapshot is frozen — shared singleton cannot be corrupted by a consumer (#768)", () => {
+    // INITIAL_SNAPSHOT is shared across every error source of every router
+    // until the first error. Mirrors the frozen IDLE_SNAPSHOT of
+    // createTransitionSource — a consumer mutating it would corrupt the shared
+    // singleton for all consumers.
+    const source = createErrorSource(router);
+
+    expect(Object.isFrozen(source.getSnapshot())).toBe(true);
+  });
+
   it("TRANSITION_ERROR updates snapshot", async () => {
     const lifecycle = getLifecycleApi(router);
 

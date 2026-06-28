@@ -127,28 +127,38 @@ describe("createRouteSources", () => {
     const source = createRouteSource(router);
     const listener = vi.fn();
 
-    // Step 1: pre-fill source with route="/users" and previousRoute="/" by
-    // navigating before subscribe so the initial snapshot reflects post-nav.
+    source.subscribe(listener);
+
+    // Settle into a steady state where route AND previousRoute share path
+    // "/users": the first force-nav flips previousRoute from "/" to "/users"
+    // (path change → update fires), after which both fields sit on "/users".
+    await router.navigate("users");
+    await router.navigate("users", {}, { force: true });
+
+    const callsAfterSetup = listener.mock.calls.length;
+
+    // A fully idempotent force-nav now: route "/users" and previousRoute
+    // "/users" both stabilize to prev (matched paths, no reload) → no update.
+    await router.navigate("users", {}, { force: true });
+
+    expect(listener).toHaveBeenCalledTimes(callsAfterSetup);
+  });
+
+  it("navigation before first subscribe is reconciled on subscribe (#765)", async () => {
+    const source = createRouteSource(router);
+    const listener = vi.fn();
+
+    // Navigate while the lazy source has ZERO listeners (never connected) — the
+    // snapshot is stale until the catch-up reconcile on first subscribe.
     await router.navigate("users");
 
     source.subscribe(listener);
 
-    // Step 2: force-navigate to "/users" again — path unchanged. With my
-    // fix, transition.reload is unset → stabilizer returns prev for both
-    // route and previousRoute (matched paths). False branch hit, source
-    // listener NOT called.
-    await router.navigate("users", {}, { force: true });
-
-    // After force-nav: prev.previousRoute had path "/" (initial), but
-    // next.previousRoute has path "/users". Paths differ → stabilizer
-    // returns next → update fires.
-    expect(listener).toHaveBeenCalledTimes(1);
-
-    // Step 3: force-navigate again — now prev.previousRoute and
-    // next.previousRoute both have path "/users", and same for route.
-    // Both branches stabilize to prev → false branch hit.
-    await router.navigate("users", {}, { force: true });
-
+    // onFirstSubscribe reconciles route to the current state; the listener
+    // (added before onFirstSubscribe by BaseSource) observes the catch-up.
+    // previousRoute is undefined — a catch-up is a snap, not an observed nav.
+    expect(source.getSnapshot().route?.name).toBe("users");
+    expect(source.getSnapshot().previousRoute).toBeUndefined();
     expect(listener).toHaveBeenCalledTimes(1);
   });
 

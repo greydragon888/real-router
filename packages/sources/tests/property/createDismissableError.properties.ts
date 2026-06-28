@@ -202,4 +202,28 @@ describe("createDismissableError — invariants", () => {
       router.stop();
     },
   );
+
+  test.prop([arbMissingRoute], { numRuns: NUM_RUNS.standard })(
+    "error that occurred before first subscribe is caught up on subscribe (#765 reconnect staleness)",
+    async (route) => {
+      const router = await createStartedRouter();
+      const source = createDismissableError(router); // zero subscribers
+
+      // Error event while the wrapper has ZERO subscribers. The eager underlying
+      // getErrorSource captures it; the wrapper snapshot stays stale until the
+      // catch-up reconcile on first subscribe (BUG #765.2).
+      await router.navigate(route).catch(() => {});
+
+      const listener = vi.fn();
+      const unsub = source.subscribe(listener);
+
+      // Without the catch-up, getSnapshot() returns { error: null, version: 0 }.
+      expect(source.getSnapshot().error).not.toBeNull();
+      // The listener (added before onFirstSubscribe) receives the reconcile.
+      expect(listener).toHaveBeenCalled();
+
+      unsub();
+      router.stop();
+    },
+  );
 });

@@ -66,6 +66,23 @@ export function createDismissableError(
         unsubFromError = errorSource.subscribe(() => {
           source.updateSnapshot(buildDismissableSnapshot());
         });
+
+        // Catch up: the eager underlying error source may already hold (or have
+        // since cleared) an error that changed while this wrapper had zero
+        // subscribers — at first-ever subscribe, or after a disconnect/reconnect
+        // cycle (onLastUnsubscribe below). Without this, a RouterErrorBoundary
+        // mounting AFTER a boot-time error would never see it (#765.2). Guard on
+        // the resolved `error` so the common no-error case stays a no-op: the
+        // listener was added before this callback (BaseSource ordering), so an
+        // unconditional updateSnapshot would notify it redundantly and break the
+        // "subscribers fire only on state-relevant actions" contract. The
+        // `version` field can skip values for an error cycle fully missed during
+        // a disconnect — harmless, monotonicity still holds.
+        const caughtUp = buildDismissableSnapshot();
+
+        if (caughtUp.error !== source.getSnapshot().error) {
+          source.updateSnapshot(caughtUp);
+        }
       },
       onLastUnsubscribe: () => {
         disconnect();

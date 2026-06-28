@@ -69,6 +69,32 @@ describe("createDismissableError", () => {
     unsub();
   });
 
+  it("error before first subscribe is caught up on subscribe (#765.2)", async () => {
+    const source = createDismissableError(router); // zero subscribers
+
+    // Error while the wrapper has ZERO subscribers — only the eager underlying
+    // getErrorSource captures it; the wrapper snapshot stays stale until the
+    // catch-up reconcile on first subscribe.
+    await expect(router.navigate("nonexistent")).rejects.toThrow(
+      /ROUTE_NOT_FOUND/,
+    );
+
+    let notified = 0;
+    const unsub = source.subscribe(() => {
+      notified++;
+    });
+
+    const snap = source.getSnapshot();
+
+    expect(snap.error).not.toBeNull();
+    expect(snap.error!.code).toBe("ROUTE_NOT_FOUND");
+    // The listener (added before onFirstSubscribe by BaseSource) observes the
+    // catch-up notification.
+    expect(notified).toBe(1);
+
+    unsub();
+  });
+
   it("resetError() hides current error", async () => {
     const source = createDismissableError(router);
     const unsub = source.subscribe(() => {});

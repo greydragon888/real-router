@@ -17,7 +17,12 @@ import {
 
 import type { Router } from "@real-router/core";
 
-describe("S3. Eager subscription — shared cached sources do not leak", () => {
+// S3. Shared cached sources do not leak. createActiveRouteSource is now lazy
+// (#766) — it connects on first listener and disconnects on last — while
+// createTransitionSource / createErrorSource stay eager (S3.7/S3.8). The heap
+// guards below hold for both: a shared cached source collapses every event into
+// one rolling snapshot with no per-call/per-event accumulation.
+describe("S3. Shared cached sources do not leak", () => {
   let router: Router;
 
   beforeEach(async () => {
@@ -157,7 +162,7 @@ describe("S3. Eager subscription — shared cached sources do not leak", () => {
     expect(delta).toBeLessThan(MB / 4);
   });
 
-  it("S3.5: lazy RouteSource auto-cleanup + eager ActiveRouteSource cached share — heap bounded", async () => {
+  it("S3.5: lazy RouteSource auto-cleanup + lazy ActiveRouteSource cached share — heap bounded", async () => {
     const heapBaseline = takeHeapSnapshot();
 
     const routeSources = createManySources(() => createRouteSource(router), 50);

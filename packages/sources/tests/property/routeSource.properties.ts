@@ -331,10 +331,13 @@ describe("subscribe order (listener added before onFirstSubscribe)", () => {
   test.prop([arbListenerCount], { numRuns: NUM_RUNS.standard })(
     "first listener is registered BEFORE onFirstSubscribe runs (no missed notifications)",
     async (extraListeners) => {
-      // Drive the BaseSource invariant: if `onFirstSubscribe` itself triggered
-      // an `updateSnapshot`, the just-added listener must observe it. We can't
-      // see onFirstSubscribe directly, but we can prove the contract via the
-      // "reconcile on reconnect" path that exercises it (#605 reload bypass).
+      // Drive the BaseSource invariant: a listener added before onFirstSubscribe
+      // must observe any updateSnapshot that onFirstSubscribe triggers. This
+      // test exercises the INITIAL-snapshot path — the source is created after
+      // the nav, so the first subscribe seeds the connection without changing
+      // the snapshot. The reconcile-on-reconnect path (where onFirstSubscribe
+      // DOES updateSnapshot and the just-added listener must catch it) is
+      // covered by the "reconnect reconcile (#765)" describe.
       const router = await createStartedRouter();
 
       // Prime the router to a non-initial state so reconnect has something
@@ -382,6 +385,52 @@ describe("subscribe order (listener added before onFirstSubscribe)", () => {
 
       // The re-subscribed listener must see the post-reconnect navigation.
       expect(listener2).toHaveBeenCalledTimes(1);
+
+      unsub2();
+      router.stop();
+    },
+  );
+});
+
+// ===
+
+describe("reconnect reconcile (#765)", () => {
+  test.prop([arbNavigation], { numRuns: NUM_RUNS.async })(
+    "navigation while disconnected (zero subscribers) is reconciled on re-subscribe",
+    async (nav) => {
+      fc.pre(nav.name !== "home" && nav.name !== "admin.dashboard");
+
+      const router = await createStartedRouter();
+      const source = createRouteSource(router);
+
+      // Connect, observe a navigation, then fully unsubscribe → disconnect.
+      const unsub1 = source.subscribe(vi.fn());
+
+      await router.navigate("admin.dashboard");
+
+      expect(source.getSnapshot().route?.name).toBe("admin.dashboard");
+
+      unsub1();
+
+      // Navigation while the source has ZERO subscribers — the disconnected
+      // source never sees it (BUG #765: stale snapshot survives reconnect).
+      await router.navigate(nav.name, nav.params);
+
+      // Re-subscribe (Activity show / RouteView remount). onFirstSubscribe must
+      // reconcile the snapshot with the current router state, not replay the
+      // pre-disconnect snapshot.
+      const listener2 = vi.fn();
+      const unsub2 = source.subscribe(listener2);
+
+      expect(source.getSnapshot().route?.name).toBe(nav.name);
+      expect(source.getSnapshot().route?.name).toBe(router.getState()?.name);
+      // `previousRoute` resets to undefined on a catch-up reconcile — it is a
+      // snap to current state, not an observed navigation (mirrors
+      // createRouteNodeSource's `computeSnapshot(next?.previousRoute)`).
+      expect(source.getSnapshot().previousRoute).toBeUndefined();
+      // BaseSource registers the listener BEFORE onFirstSubscribe, so the
+      // reconcile's updateSnapshot reaches the just-added listener.
+      expect(listener2).toHaveBeenCalled();
 
       unsub2();
       router.stop();
