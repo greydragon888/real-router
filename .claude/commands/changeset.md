@@ -22,10 +22,11 @@
    - Все `packages/*` без `"private": true` — публичные (на текущий момент: `core`, `core-types`/`types`, `helpers`, `logger`, все адаптеры `react`/`preact`/`solid`/`vue`/`svelte`/`angular`, все `*-plugin`, `sources`, `path-matcher`).
    - НЕ включай private: `route-tree`, `search-params`, `type-guards`, `router-benchmarks` (и любой другой с `"private": true`).
 
-4. **Определи тип изменения:**
+4. **Определи тип изменения** (следуй таблице bump в [.changeset/README.md](../../.changeset/README.md); pre-1.0: breaking → `minor`):
    - `major` — breaking changes
    - `minor` — новая функциональность
    - `patch` — исправления, рефакторинг
+   - **Багфикс, ужесточающий публичный контракт** (тип / валидация / сигнатура), из-за которого ранее компилировавшийся или проходивший код консьюмера теперь падает — это `minor`, **не** `patch`: «fix» по намерению, но breaking по surface (сужение публичного контракта). «Bug fix → patch» из таблицы — только для фиксов, не меняющих публичную поверхность.
 
 5. **Задавай вопросы ТОЛЬКО если** из issue и кода неоднозначно понятно, что реализовано (например, исправление стороннего бага).
 
