@@ -607,6 +607,30 @@ Tracked in #809 (widen the owner packages' coverage include to the realpath'd `s
 and then revisit this section's `shared/**` Sonar exclusion + the guard's check for it).
 **Resolved by #809** — see the next section.
 
+### Sonar: test code is fully excluded from analysis
+
+**Problem.** The `Compute Sonar scope` step sets `sonar.tests=packages/*/tests`, so every test file
+lands in Sonar's **test source set** and gets test-specific rules (`S2699` "assertion always
+succeeds/fails", `S5863`, …) raised as **Code Smells / Maintainability** issues against the test code
+(observed on `packages/solid/tests/functional/link-directive.test.tsx`). Tests are not production
+code; linting their assertions for maintainability is noise that clutters the SonarCloud issue list.
+
+**Solution.** Widen `sonar.test.exclusions` in `sonar-project.properties` from the bench-only list to
+the whole test set: `**/tests/**` plus every test-file suffix (`*.test.*`, `*.spec.*`, `*.stress.ts`,
+`*.properties.ts`, `*.bench.ts`, `benchmarks`). `**/tests/**` already covers all current test files
+(every one lives under a `packages/*/tests` dir); the suffix patterns are belt-and-suspenders for
+symmetry and to future-proof any co-located test placed next to `src/`.
+A file declared in `sonar.tests` but matched by `sonar.test.exclusions` is dropped — not analysed as
+test code, and not re-classified as a source (`sonar.sources` is `packages/*/src` + `shared/*`, no
+overlap). `sonar.test.exclusions` is **not** one of the four `-D` args the CI step overrides
+(`projectVersion`/`sonar.sources`/`sonar.tests`/`reportPaths`), so the properties-file value wins.
+
+**Why this knob, not the others.** `sonar.exclusions` filters the **main** source set, which never
+contained tests, so it can't drop test-set files; `sonar.test.exclusions` is the only lever for the
+test set. Coverage is unaffected — it comes from the lcov `reportPaths`, and tests were already in
+`sonar.coverage.exclusions` (scoring) and `sonar.cpd.exclusions` (duplication). No drift guard reads
+`sonar.test.exclusions`, so widening it is self-contained.
+
 ### Shared sources are owner-measured at 100% (#809)
 
 **Problem.** The #732 residual above: `shared/{browser-env,dom-utils,ssr}` code shipped in every
