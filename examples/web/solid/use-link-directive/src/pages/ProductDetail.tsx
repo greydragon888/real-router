@@ -25,7 +25,7 @@ export function ProductDetail(): JSX.Element {
           <code>&lt;div&gt;</code> card.
         </p>
       </div>
-      <a use:link={() => ({ routeName: "home" })}>← Back to Home</a>
+      <a use:link={{ routeName: "home" }}>← Back to Home</a>
     </div>
   );
 }

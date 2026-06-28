@@ -34,11 +34,11 @@ export function Home(): JSX.Element {
         <For each={products}>
           {(product) => (
             <div
-              use:link={() => ({
+              use:link={{
                 routeName: "products.detail",
                 routeParams: { id: product.id },
                 activeClassName: "active",
-              })}
+              }}
               class="card"
               style={{ cursor: "pointer" }}
             >
@@ -51,19 +51,19 @@ export function Home(): JSX.Element {
 
       <h2 style={{ "margin-top": "24px" }}>Anchor with use:link (gets href)</h2>
       <a
-        use:link={() => ({
+        use:link={{
           routeName: "settings",
           activeClassName: "active",
-        })}
+        }}
       >
         Go to Settings (anchor — gets href for SEO)
       </a>
 
       <h2 style={{ "margin-top": "24px" }}>Button with use:link</h2>
       <button
-        use:link={() => ({
+        use:link={{
           routeName: "settings",
-        })}
+        }}
       >
         Go to Settings (button — no href)
       </button>

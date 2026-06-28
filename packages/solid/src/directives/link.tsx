@@ -17,6 +17,23 @@ export interface LinkDirectiveOptions<P extends Params = Params> {
   ignoreQueryParams?: boolean;
 }
 
+// `use:link` value type. Solid's compiler wraps the value into an accessor
+// (`use:link={X}` → `link(el, () => X)`), so the value IS the options object —
+// hence the OBJECT form `use:link={{ routeName }}` is canonical. The accessor
+// form `use:link={() => ({ routeName })}` double-wraps into `() => (() => opts)`,
+// so the directive receives a function and silently fails (no href, no nav).
+// The augmentation lives HERE (not in a standalone .d.ts) so tsc emits it and
+// rollup-plugin-dts bundles it into the published types — consumers get the same
+// strict `use:link` typing the package compiles against. See #976.
+declare module "solid-js" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace JSX {
+    interface Directives {
+      link: LinkDirectiveOptions | undefined;
+    }
+  }
+}
+
 export function link<P extends Params = Params>(
   element: HTMLElement,
   accessor: () => LinkDirectiveOptions<P>,

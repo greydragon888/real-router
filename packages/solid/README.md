@@ -413,21 +413,21 @@ Low-level directive for adding navigation to any element. Automatically handles 
 ```tsx
 import { link } from "@real-router/solid";
 
-<a use:link={() => ({ routeName: "users.profile", routeParams: { id: "123" }, activeClassName: "active" })}>
+<a use:link={{ routeName: "users.profile", routeParams: { id: "123" }, activeClassName: "active" }}>
   User Profile
 </a>
 
-<button use:link={() => ({ routeName: "home" })}>
+<button use:link={{ routeName: "home" }}>
   Go Home
 </button>
 
 <div
-  use:link={() => ({
+  use:link={{
     routeName: "settings",
     activeClassName: "active",
     activeStrict: false,
     ignoreQueryParams: true,
-  })}
+  }}
   role="link"
   tabindex="0"
 >
@@ -450,17 +450,19 @@ The directive automatically sets `href` on `<a>` elements and adds `role="link"`
 
 > **Must be used inside `<RouterProvider>`.** The directive calls `useRouter()` internally and will throw if the host element is mounted outside the provider tree. See CLAUDE.md gotcha *"use:link Requires useRouter Context"* for the failure mode and the canonical wrapping pattern.
 
-**Accessor or object literal — both work.** The directive expects an accessor (`() => options`), and that's the form that gives you static-analysis friendliness across editors. Solid's `babel-preset-solid` also auto-wraps an object literal at compile time, so `use:link={{ routeName: "home" }}` is accepted too:
+**Pass the options object directly — not an accessor (#976).** Solid's compiler wraps a directive value into an accessor at compile time (`use:link={X}` → `link(el, () => X)`), so the value you write *is* the options object:
 
 ```tsx
-// Accessor form (recommended — explicit, plays well with reactive values)
-<a use:link={() => ({ routeName: "home" })}>Home</a>
-
-// Object-literal form (accepted — babel-preset-solid wraps it for you)
+// CORRECT — object form (canonical)
 <a use:link={{ routeName: "home" }}>Home</a>
+
+// WRONG — accessor form double-wraps into `() => (() => options)`, so the
+// directive receives a function: the <a> gets no href and clicks go nowhere.
+// TypeScript rejects it with TS2322.
+<a use:link={() => ({ routeName: "home" })}>Home</a>
 ```
 
-Either way the directive captures the options **once** at init (see CLAUDE.md "use:link Options Are Captured Once"). For reactive route switching, use the `<Link>` component instead.
+The directive captures the options **once** at init (see CLAUDE.md "use:link Options Are Captured Once"). For reactive route switching, use the `<Link>` component instead.
 
 ## Solid-Specific Patterns
 

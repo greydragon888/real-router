@@ -20,7 +20,7 @@ export function Settings(): JSX.Element {
           accessibility.
         </p>
       </div>
-      <a use:link={() => ({ routeName: "home" })}>← Back to Home</a>
+      <a use:link={{ routeName: "home" }}>← Back to Home</a>
     </div>
   );
 }
