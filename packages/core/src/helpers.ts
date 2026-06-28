@@ -1,6 +1,6 @@
 // packages/core/src/helpers.ts
 
-import { DEFAULT_LIMITS } from "./constants";
+import { DEFAULT_LIMITS, EMPTY_PARAMS } from "./constants";
 
 import type { Limits } from "./types";
 import type { Params, State, LimitsConfig } from "@real-router/types";
@@ -62,8 +62,13 @@ export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
  * - The contract is verifiable at core's own test surface (doesn't depend on
  *   engine behavior for regression detection)
  *
- * Single pass. Always returns a fresh object when input is defined
- * (reference identity is not preserved — callers must not rely on it).
+ * Single pass. When nothing survives (empty input, or every value `undefined`)
+ * it returns the shared frozen `EMPTY_PARAMS` singleton, so `makeState`'s
+ * `params === EMPTY_PARAMS` reuse branch fires and an empty-params navigation
+ * allocates zero transient `{}` (#1027); a non-empty input returns a fresh
+ * object. Either way reference identity is not preserved across calls, and the
+ * result MUST be treated as read-only — callers must not mutate it (the empty
+ * case is a shared frozen singleton).
  */
 export function normalizeParams(params: Params): Params;
 
@@ -78,7 +83,7 @@ export function normalizeParams(
     return params;
   }
 
-  const normalized: Params = {};
+  let normalized: Params | undefined;
 
   for (const key in params) {
     if (!Object.hasOwn(params, key)) {
@@ -88,9 +93,13 @@ export function normalizeParams(
     const value = params[key];
 
     if (value !== undefined) {
+      // Lazy allocation: an all-empty / all-undefined input costs zero objects.
+      normalized ??= {};
       normalized[key] = value;
     }
   }
 
-  return normalized;
+  // Reuse the shared singleton when nothing survived so makeState's
+  // `params === EMPTY_PARAMS` reuse branch fires (#1027).
+  return normalized ?? EMPTY_PARAMS;
 }
