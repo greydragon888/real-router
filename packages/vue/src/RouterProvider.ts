@@ -1,3 +1,4 @@
+import { getErrorSource } from "@real-router/sources";
 import { defineComponent, onScopeDispose, provide, watch } from "vue";
 
 import { NavigatorKey, RouteKey, RouterKey } from "./context";
@@ -144,6 +145,14 @@ export const RouterProvider = defineComponent({
     // RouterProviders behave like nested DI scopes (LIFO). Release on unmount
     // restores the outer router for any v-link still mounted in the parent.
     const releaseDirective = pushDirectiveRouter(props.router);
+
+    // #778 P2: eagerly create the per-router error source at Provider mount so a
+    // navigation error that fires BEFORE a RouterErrorBoundary mounts (a lazy app
+    // shell, a failed boot navigation) is still captured. The boundary's
+    // createDismissableError reuses this cached source and catches up (#765);
+    // without it the error source is created lazily on boundary mount — after the
+    // error — and never sees it.
+    getErrorSource(props.router);
 
     const { navigator, route, previousRoute, unsubscribe } =
       setupRouteProvision(props.router);

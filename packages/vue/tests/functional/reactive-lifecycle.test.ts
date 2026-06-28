@@ -2,11 +2,12 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, afterEach, it, expect } from "vitest";
 import { defineComponent, h, KeepAlive, nextTick, ref } from "vue";
 
+import { RouterErrorBoundary } from "../../src/components/RouterErrorBoundary";
 import { useRouteNode } from "../../src/composables/useRouteNode";
 import { RouterProvider } from "../../src/RouterProvider";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, RouterError } from "@real-router/core";
 
 // Reactive-lifecycle regression invariants (#778) — the gap the audit flagged:
 // INVARIANTS/property suites cover only pure functions, none asserts that the
@@ -91,6 +92,63 @@ describe("reactive lifecycle (#778)", () => {
     await flushPromises();
 
     expect(wrapper.find("[data-testid='node']").text()).toBe("none");
+
+    wrapper.unmount();
+  });
+
+  // #765 1.2 manifestation: a navigation error that fires BEFORE a
+  // RouterErrorBoundary mounts (the ordinary load order — a lazy app shell, or a
+  // failed boot navigation) is invisible to a boundary that creates its error
+  // source lazily on mount, AFTER the error. RouterProvider now eagerly creates
+  // the per-router error source, so it captures the error from Provider mount;
+  // the boundary's createDismissableError catches up (#765) and shows the
+  // fallback.
+  it("P2: a RouterErrorBoundary mounted AFTER a navigation error shows the fallback", async () => {
+    router = createTestRouterWithADefaultRouter();
+
+    await router.start();
+
+    const showBoundary = ref(false);
+    const App = defineComponent({
+      setup() {
+        return () =>
+          h(
+            RouterProvider,
+            { router },
+            {
+              default: () =>
+                showBoundary.value
+                  ? h(
+                      RouterErrorBoundary,
+                      {
+                        fallback: (error: RouterError) =>
+                          h("div", { "data-testid": "fb" }, error.code),
+                      },
+                      { default: () => h("div", "app") },
+                    )
+                  : h("div", "app"),
+            },
+          );
+      },
+    });
+
+    const wrapper = mount(App);
+
+    await nextTick();
+    await flushPromises();
+
+    // Navigation error BEFORE the boundary mounts.
+    await router.navigate("nonexistent").catch(() => {});
+    await nextTick();
+    await flushPromises();
+
+    // Mount the boundary now (e.g. a lazily-loaded app shell).
+    showBoundary.value = true;
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='fb']").exists()).toBe(true);
+    expect(wrapper.find("[data-testid='fb']").text()).toBe("ROUTE_NOT_FOUND");
 
     wrapper.unmount();
   });
