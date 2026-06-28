@@ -96,6 +96,43 @@ describe("performance-marks utilities", () => {
         );
       });
 
+      it("should clear its own start/end marks and the measure by name (#795)", () => {
+        const clearMarksSpy = vi
+          .spyOn(performance, "clearMarks")
+          .mockImplementation(noop);
+        const clearMeasuresSpy = vi
+          .spyOn(performance, "clearMeasures")
+          .mockImplementation(noop);
+        const tracker = createPerformanceTracker(true, TEST_CONTEXT);
+
+        tracker.measure("test-measure", "start-mark", "end-mark");
+
+        expect(clearMarksSpy).toHaveBeenCalledWith("start-mark");
+        expect(clearMarksSpy).toHaveBeenCalledWith("end-mark");
+        expect(clearMeasuresSpy).toHaveBeenCalledWith("test-measure");
+      });
+
+      it("should still clear its entries when measure throws (#795)", () => {
+        measureSpy.mockImplementation(() => {
+          throw new Error("Marks not found");
+        });
+
+        const clearMarksSpy = vi
+          .spyOn(performance, "clearMarks")
+          .mockImplementation(noop);
+        const clearMeasuresSpy = vi
+          .spyOn(performance, "clearMeasures")
+          .mockImplementation(noop);
+        const tracker = createPerformanceTracker(true, TEST_CONTEXT);
+
+        tracker.measure("test-measure", "start-mark", "end-mark");
+
+        expect(warnSpy).toHaveBeenCalled();
+        expect(clearMarksSpy).toHaveBeenCalledWith("start-mark");
+        expect(clearMarksSpy).toHaveBeenCalledWith("end-mark");
+        expect(clearMeasuresSpy).toHaveBeenCalledWith("test-measure");
+      });
+
       it("should handle measure errors gracefully", () => {
         measureSpy.mockImplementation(() => {
           throw new Error("Marks not found");
@@ -111,6 +148,17 @@ describe("performance-marks utilities", () => {
           `[${TEST_CONTEXT}] Failed to create performance measure: test`,
           expect.any(Error),
         );
+      });
+
+      it("clearMarks should clear a mark by name (#795)", () => {
+        const clearMarksSpy = vi
+          .spyOn(performance, "clearMarks")
+          .mockImplementation(noop);
+        const tracker = createPerformanceTracker(true, TEST_CONTEXT);
+
+        tracker.clearMarks("router:leave-approved:a→b");
+
+        expect(clearMarksSpy).toHaveBeenCalledWith("router:leave-approved:a→b");
       });
 
       it("should handle multiple marks", () => {
@@ -156,6 +204,17 @@ describe("performance-marks utilities", () => {
         tracker.measure("test", "start", "end");
 
         expect(warnSpy).not.toHaveBeenCalled();
+      });
+
+      it("should not clear marks (#795)", () => {
+        const clearMarksSpy = vi
+          .spyOn(performance, "clearMarks")
+          .mockImplementation(noop);
+        const tracker = createPerformanceTracker(false, TEST_CONTEXT);
+
+        tracker.clearMarks("test");
+
+        expect(clearMarksSpy).not.toHaveBeenCalled();
       });
     });
 

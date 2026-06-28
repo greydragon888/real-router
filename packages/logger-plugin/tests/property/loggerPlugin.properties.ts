@@ -79,9 +79,10 @@ describe("completeness: each transition generates log entries", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(noop);
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
       const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
-
-      vi.spyOn(console, "group").mockImplementation(noop);
-      vi.spyOn(console, "groupEnd").mockImplementation(noop);
+      const groupSpy = vi.spyOn(console, "group").mockImplementation(noop);
+      const groupEndSpy = vi
+        .spyOn(console, "groupEnd")
+        .mockImplementation(noop);
 
       const router = await createLoggerRouter({ level: "none" });
 
@@ -94,6 +95,11 @@ describe("completeness: each transition generates log entries", () => {
       expect(logSpy).not.toHaveBeenCalled();
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
+      // A console.group is itself console output — "completely silent" (Inv 3)
+      // means no group is opened either (#794). The group/groupEnd spies are
+      // intentionally not cleared, so this also covers the start transition.
+      expect(groupSpy).not.toHaveBeenCalled();
+      expect(groupEndSpy).not.toHaveBeenCalled();
 
       router.stop();
     },
@@ -329,7 +335,8 @@ describe("level filtering", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
       vi.spyOn(console, "error").mockImplementation(noop);
-      vi.spyOn(console, "group").mockImplementation(noop);
+      const groupSpy = vi.spyOn(console, "group").mockImplementation(noop);
+
       vi.spyOn(console, "groupEnd").mockImplementation(noop);
 
       const router = await createLoggerRouter({ level: "errors" });
@@ -342,6 +349,8 @@ describe("level filtering", () => {
       // No transition logs at all
       expect(logSpy).not.toHaveBeenCalled();
       expect(warnSpy).not.toHaveBeenCalled();
+      // Transition logging is gated off, so the group is too (#794).
+      expect(groupSpy).not.toHaveBeenCalled();
 
       router.stop();
     },

@@ -8,7 +8,7 @@
 | --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Transition start is always logged at level:all   | Every `navigate()` call with `level: "all"` produces at least one log entry containing `"Transition:"`. The plugin never silently drops transition events.          |
 | 2   | Transition success is always logged at level:all | Every successful navigation produces a log entry containing `"Transition success"`. Both the start and the completion of a transition are always recorded together. |
-| 3   | No output at level:none                          | With `level: "none"`, no calls to `console.log`, `console.warn`, or `console.error` are made for any navigation. The plugin is completely silent.                   |
+| 3   | No output at level:none                          | With `level: "none"`, no calls to `console.log`, `console.warn`, `console.error`, `console.group`, or `console.groupEnd` are made for any navigation. The plugin is completely silent — a `console.group` is itself console output, so the group is never opened. |
 
 ## No-Throw
 
@@ -31,7 +31,7 @@
 | #   | Invariant                                                       | Description                                                                                                                                                                                   |
 | --- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `level:"transitions"` suppresses lifecycle, retains transitions | With `level: "transitions"`, no `"Router started"` or `"Router stopped"` messages appear, but `"Transition"` messages are still logged. Lifecycle output is gated by the `logLifecycle` flag. |
-| 2   | `level:"errors"` suppresses transition logs                     | With `level: "errors"`, no `console.log` or `console.warn` calls occur during navigation. Only error-level output remains enabled.                                                            |
+| 2   | `level:"errors"` suppresses transition logs                     | With `level: "errors"`, no `console.log`, `console.warn`, or `console.group` calls occur during navigation. Only error-level output remains enabled.                                          |
 
 ## Params Diff
 

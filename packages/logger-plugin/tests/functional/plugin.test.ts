@@ -260,6 +260,28 @@ describe("@real-router/logger-plugin", () => {
       // Should use groups if available
       expect(consoleGroupSpy).toHaveBeenCalled();
     });
+
+    it("should NOT open a group at level 'none' (#794)", async () => {
+      router.usePlugin(loggerPluginFactory({ level: "none" }));
+      await router.start("/");
+
+      await router.navigate("users");
+      await router.navigate("admin");
+
+      // A console.group is itself console output — at level "none" the plugin
+      // must be completely silent, with no empty expandable groups.
+      expect(consoleGroupSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT open a group at level 'errors' (#794)", async () => {
+      router.usePlugin(loggerPluginFactory({ level: "errors" }));
+      await router.start("/");
+
+      await router.navigate("users");
+
+      // Transition logging is gated off; the group must be too.
+      expect(consoleGroupSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("Edge Cases", () => {
@@ -628,6 +650,98 @@ describe("@real-router/logger-plugin", () => {
       expect(perfMarkSpy).not.toHaveBeenCalledWith(
         expect.stringContaining("router:transition"),
       );
+    });
+  });
+
+  describe("out-of-band terminal on a cleared slot (#793)", () => {
+    let perfMarkSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      perfMarkSpy = vi.spyOn(performance, "mark");
+    });
+
+    it("does not create an empty-label error mark or warn on ROUTE_NOT_FOUND after a successful transition", async () => {
+      router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+      await router.start("/");
+      // A successful transition clears the perf slot (#startMarkName = "").
+      await router.navigate("users");
+
+      perfMarkSpy.mockClear();
+      warnSpy.mockClear();
+
+      // The not-found error is an out-of-band terminal with no preceding start.
+      await expect(router.navigate("nonexistent")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+
+      expect(perfMarkSpy).not.toHaveBeenCalledWith("router:transition-error:");
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Failed to create performance measure"),
+        expect.anything(),
+      );
+    });
+
+    it("does not create an empty-label error mark or warn on a guard-redirect", async () => {
+      // Classic guard-redirect: guard navigates elsewhere and returns false.
+      // Core emits a double terminal (cancel + error) for the one redirect; the
+      // late error lands after the redirect target's success cleared the slot.
+      lifecycle.addActivateGuard("users", () => () => {
+        void router.navigate("admin");
+
+        return false;
+      });
+      router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+      await router.start("/");
+
+      perfMarkSpy.mockClear();
+      warnSpy.mockClear();
+
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
+
+      // Let the redirect's success + the trailing out-of-band error settle.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(perfMarkSpy).not.toHaveBeenCalledWith("router:transition-error:");
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Failed to create performance measure"),
+        expect.anything(),
+      );
+    });
+  });
+
+  describe("perf entry accumulation (#795)", () => {
+    afterEach(() => {
+      performance.clearMarks();
+      performance.clearMeasures();
+    });
+
+    it("clears its own marks/measures so the User Timing buffer stays bounded across navigations", async () => {
+      performance.clearMarks();
+      performance.clearMeasures();
+
+      router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+      await router.start("/");
+
+      const N = 30;
+
+      for (let i = 0; i < N; i++) {
+        await router.navigate(i % 2 ? "users" : "admin");
+      }
+
+      const routerMarks = performance
+        .getEntriesByType("mark")
+        .filter((entry) => entry.name.startsWith("router:"));
+      const routerMeasures = performance
+        .getEntriesByType("measure")
+        .filter((entry) => entry.name.startsWith("router:"));
+
+      // Pre-fix this grows ~3 marks + 1 measure per navigation (~94 / ~31 for
+      // N=30). Post-fix only the standalone `router:start` mark survives until
+      // the router stops — everything else is cleared by name as it terminates.
+      expect(routerMarks.length).toBeLessThanOrEqual(4);
+      expect(routerMeasures.length).toBeLessThanOrEqual(1);
     });
   });
 
