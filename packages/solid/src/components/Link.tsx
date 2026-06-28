@@ -81,7 +81,16 @@ export function Link<P extends Params = Params>(
         createActiveRouteSource(
           router,
           local.routeName,
-          local.routeParams,
+          // Pass `props.routeParams` (NOT `local.routeParams`) into the active
+          // source. When the consumer omits params, `local.routeParams` is the
+          // mergeProps default EMPTY_PARAMS ({}), which `createActiveRouteSource`
+          // keys as "{}" — splitting an omitted-params slow-path Link from the
+          // canonical undefined key "" used by a manual
+          // createActiveRouteSource(router, name, undefined, opts) and opening a
+          // second eager subscription for the same question (#776). The raw
+          // `props.routeParams` is `undefined` here, so both share one source.
+          // `local.routeParams` (concrete EMPTY_PARAMS) stays for nav/href below.
+          props.routeParams,
           buildActiveOptions(),
         ),
       );

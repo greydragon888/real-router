@@ -30,10 +30,19 @@ import type { Params } from "@real-router/core";
  * `signal`/`computed` if it matters, exactly as documented for the Vue/React
  * Link.
  *
+ * Accepts (and preserves) `undefined`: an omitted `routeParams` input must reach
+ * `createActiveRouteSource` as `undefined` so it keys the active source as "" and
+ * shares one cached source with a manual `injectIsActiveRoute(name)`, rather than
+ * EMPTY_PARAMS ({}) which keys "{}" and opens a second eager subscription (#776).
+ * `undefined` is its own reference-stable value (`Object.is(undefined, undefined)`),
+ * so a stable no-params input never re-runs the effect.
+ *
  * @param read - reads the raw params (the directive's `routeParams` input).
- * @returns a `Signal<Params>` that only changes identity on real content change.
+ * @returns a `Signal<Params | undefined>` that only changes identity on real content change.
  */
-export function createStableParams(read: () => Params): Signal<Params> {
+export function createStableParams(
+  read: () => Params | undefined,
+): Signal<Params | undefined> {
   let cached: Params | undefined;
 
   return computed(() => {

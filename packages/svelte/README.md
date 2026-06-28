@@ -181,7 +181,7 @@ Navigation link with automatic active state detection. Uses `$derived` for href 
 | Prop                | Type                | Default     | Description                             |
 | ------------------- | ------------------- | ----------- | --------------------------------------- |
 | `routeName`         | `string`            | required    | Target route name                       |
-| `routeParams`       | `Params`            | `{}`        | Route parameters                        |
+| `routeParams`       | `Params`            | `undefined` | Route parameters (omitted → `undefined`, shares one active-route source with `useIsActiveRoute(name)`, #776) |
 | `routeOptions`      | `NavigationOptions` | `{}`        | Navigation options (replace, etc.)      |
 | `class`             | `string`            | `undefined` | CSS class                               |
 | `activeClassName`   | `string`            | `"active"`  | Class added when route is active        |

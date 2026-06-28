@@ -55,7 +55,7 @@ function areLinkPropsEqual(
 export const Link: FunctionComponent<LinkProps> = memo(
   ({
     routeName,
-    routeParams = EMPTY_PARAMS,
+    routeParams,
     routeOptions = EMPTY_OPTIONS,
     className,
     activeClassName = "active",
@@ -74,6 +74,14 @@ export const Link: FunctionComponent<LinkProps> = memo(
     // change caught by shallowEqual), so they're safe to use directly in hook
     // deps without useStableValue.
 
+    // Pass `routeParams` straight through (possibly `undefined`) — do NOT default
+    // to EMPTY_PARAMS before the active-route call. `createActiveRouteSource` keys
+    // `params === undefined` as "" but EMPTY_PARAMS ({}) as "{}", so a no-params
+    // `<Link>` and a manual `useIsActiveRoute(routeName)` only share ONE cached
+    // source (one router subscription) when both pass `undefined`; defaulting here
+    // would split the same question into a second eager subscription (#776).
+    // `shallowEqual(undefined, undefined)` keeps the memo fast-path unchanged.
+    //
     // Hash-aware active (#532) — see useIsActiveRoute for the contract.
     const isActive = useIsActiveRoute(
       routeName,
@@ -83,6 +91,9 @@ export const Link: FunctionComponent<LinkProps> = memo(
       hash,
     );
 
+    // Navigation/href building need a concrete params object — default here only.
+    const paramsForNav = routeParams ?? EMPTY_PARAMS;
+
     // `buildHref` is a cheap synchronous call (route-tree lookup + string
     // concat). Wrapping it in `useMemo` allocates a deps array on every
     // render that does not bail out — and on bail-out the function body
@@ -91,7 +102,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
     const href = buildHref(
       router,
       routeName,
-      routeParams,
+      paramsForNav,
       hash === undefined ? undefined : { hash },
     );
 
@@ -112,7 +123,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
       navigateWithHash(
         router,
         routeName,
-        routeParams,
+        paramsForNav,
         hash,
         routeOptions,
       ).catch(() => {});

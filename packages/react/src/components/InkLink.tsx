@@ -58,7 +58,7 @@ function areInkLinkPropsEqual(
 
 const InkLinkImpl: FC<InkLinkProps> = ({
   routeName,
-  routeParams = EMPTY_PARAMS,
+  routeParams,
   routeOptions = EMPTY_OPTIONS,
   activeStrict = false,
   ignoreQueryParams = true,
@@ -78,12 +78,21 @@ const InkLinkImpl: FC<InkLinkProps> = ({
     ...(id !== undefined && { id }),
     ...(autoFocus !== undefined && { autoFocus }),
   });
+
+  // Pass `routeParams` straight through (possibly `undefined`) so a no-params
+  // `<InkLink>` and a manual `useIsActiveRoute(routeName)` share ONE cached
+  // active-route source — `createActiveRouteSource` keys `undefined` as "" but
+  // EMPTY_PARAMS ({}) as "{}", so defaulting before the call would split the
+  // same question into a second eager subscription (#776).
   const isRouteActive = useIsActiveRoute(
     routeName,
     routeParams,
     activeStrict,
     ignoreQueryParams,
   );
+
+  // Navigation needs a concrete params object — default here only.
+  const paramsForNav = routeParams ?? EMPTY_PARAMS;
 
   // No useCallback: `useInput` consumes the handler via its own internal
   // ref; a stable identity provides no cache-bail-out benefit here. Same
@@ -92,7 +101,7 @@ const InkLinkImpl: FC<InkLinkProps> = ({
     (_input, key) => {
       if (key.return) {
         onSelect?.();
-        router.navigate(routeName, routeParams, routeOptions).catch(() => {});
+        router.navigate(routeName, paramsForNav, routeOptions).catch(() => {});
       }
     },
     { isActive: isFocused },

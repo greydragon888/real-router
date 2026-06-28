@@ -101,11 +101,11 @@ describe("buildActiveClassName — Property Tests", () => {
     );
   });
 
-  describe("Invariant 3: active class present at most once", () => {
+  describe("Invariant 3: buildActiveClassName never ADDS a duplicate of the active token (§5.4-consistent)", () => {
     test.prop([arbActiveClassName, arbBaseClassName], {
       numRuns: NUM_RUNS.standard,
     })(
-      "no duplicate activeClassName when already in base",
+      "active token count is preserved from base (added once iff absent)",
       (activeClassName, baseClassName) => {
         const result = buildActiveClassName(
           true,
@@ -118,9 +118,19 @@ describe("buildActiveClassName — Property Tests", () => {
         const tokens = result!.split(/\s+/).filter(Boolean);
         const occurrences = tokens.filter((t) => t === activeClassName).length;
 
-        // Invariant: regardless of whether activeClassName was already in base,
-        // it must appear exactly once in the result.
-        expect(occurrences).toBe(1);
+        // §5.4 behaviour lock: buildActiveClassName dedupes ONLY the active
+        // token it would add — it preserves pre-existing duplicates in base
+        // (see the "Behaviour lock … (review §5.4)" suite below). So the active
+        // token appears exactly once when it was absent from base, and exactly
+        // as many times as it already did when present — NOT collapsed to 1.
+        // The earlier `toBe(1)` contradicted §5.4 and flakily failed when the
+        // generator produced a base repeating the active token (e.g. active
+        // "c" + base " \tc  c \t" → "c c").
+        const baseOccurrences = (baseClassName.match(/\S+/g) ?? []).filter(
+          (t) => t === activeClassName,
+        ).length;
+
+        expect(occurrences).toBe(baseOccurrences === 0 ? 1 : baseOccurrences);
       },
     );
   });

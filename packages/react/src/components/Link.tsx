@@ -36,7 +36,7 @@ function areLinkPropsEqual(
 
 const LinkImpl: FC<LinkProps> = ({
   routeName,
-  routeParams = EMPTY_PARAMS,
+  routeParams,
   routeOptions = EMPTY_OPTIONS,
   className,
   activeClassName = "active",
@@ -55,6 +55,15 @@ const LinkImpl: FC<LinkProps> = ({
 
   const router = useRouter();
 
+  // Pass `routeParams` straight through (possibly `undefined`) — do NOT default
+  // to EMPTY_PARAMS before the active-route call. `createActiveRouteSource` keys
+  // params as `params === undefined ? "" : canonicalJson(params)`, so a no-params
+  // `<Link>` and a manual `useIsActiveRoute(routeName)` both key "" and share ONE
+  // cached source (one router subscription). Defaulting to EMPTY_PARAMS ({}) here
+  // would key "{}" and split the same logical question into a second eager
+  // subscription (#776). `shallowEqual(undefined, undefined)` keeps the memo
+  // fast-path, so the comparison behaviour is unchanged.
+  //
   // When `hash` prop is set, active state requires both route AND hash to
   // match (#532). Without this, three tab links sharing routeName="settings"
   // would all be marked active by route-name alone, defeating tab semantics.
@@ -66,13 +75,16 @@ const LinkImpl: FC<LinkProps> = ({
     hash,
   );
 
+  // Navigation/href building need a concrete params object — default here only.
+  const paramsForNav = routeParams ?? EMPTY_PARAMS;
+
   // No useMemo: outer memo()+shallowEqual prevents Link re-render unless a
   // prop actually changed. When this body runs, either `hash` differs from
   // last render or another prop changed — in both cases the `{ hash }` alloc
   // is unavoidable. The useMemo wrapper added one closure + deps slot per
   // render without saving an allocation.
   const hashOption = hash === undefined ? undefined : { hash };
-  const href = buildHref(router, routeName, routeParams, hashOption);
+  const href = buildHref(router, routeName, paramsForNav, hashOption);
 
   // useCallback was wasteful: 7 deps recreated the closure on every meaningful
   // render anyway, and `<a onClick>` does not benefit from a stable function
@@ -92,7 +104,7 @@ const LinkImpl: FC<LinkProps> = ({
     }
 
     evt.preventDefault();
-    navigateWithHash(router, routeName, routeParams, hash, routeOptions).catch(
+    navigateWithHash(router, routeName, paramsForNav, hash, routeOptions).catch(
       () => {},
     );
   };
