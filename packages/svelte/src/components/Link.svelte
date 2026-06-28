@@ -14,7 +14,7 @@
 
   let {
     routeName,
-    routeParams = EMPTY_PARAMS,
+    routeParams,
     routeOptions = EMPTY_OPTIONS,
     class: className = undefined,
     activeClassName = "active",
@@ -47,6 +47,13 @@
   } = $props();
 
   const router = useRouter();
+  // Pass `routeParams` straight through (possibly `undefined`) — do NOT default
+  // to EMPTY_PARAMS before the active-route call. `createActiveRouteSource` keys
+  // `params === undefined` as "" but EMPTY_PARAMS ({}) as "{}", so a no-params
+  // `<Link>` and a manual `useIsActiveRoute(routeName)` only share ONE cached
+  // source (one router subscription) when both pass `undefined`; defaulting here
+  // would split the same question into a second eager subscription (#776).
+  //
   // Hash-aware active (#532): tab links sharing routeName but differing in
   // hash should only light up the matching variant.
   // svelte-ignore state_referenced_locally
@@ -59,11 +66,12 @@
     hash,
   );
 
+  // Navigation/href building need a concrete params object — default here only.
   const href = $derived(
     buildHref(
       router,
       routeName,
-      routeParams,
+      routeParams ?? EMPTY_PARAMS,
       hash !== undefined ? { hash } : undefined,
     ),
   );
@@ -86,9 +94,13 @@
     }
 
     evt.preventDefault();
-    navigateWithHash(router, routeName, routeParams, hash, routeOptions).catch(
-      NOOP,
-    );
+    navigateWithHash(
+      router,
+      routeName,
+      routeParams ?? EMPTY_PARAMS,
+      hash,
+      routeOptions,
+    ).catch(NOOP);
   }
 </script>
 

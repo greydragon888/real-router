@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+import { createActiveRouteSource } from "@real-router/sources";
 import { render, screen } from "@solidjs/testing-library";
 import { fireEvent } from "@testing-library/dom";
 import { userEvent } from "@testing-library/user-event";
@@ -995,6 +996,37 @@ describe("Link component", () => {
       await router.navigate("items.item", { id: 6 });
 
       expect(router.getState()?.params).toStrictEqual({ id: 6 });
+    });
+  });
+
+  describe("no-params active-route source dedup (#776)", () => {
+    it("a no-params slow-path <Link> shares the canonical undefined-params source (cache key '', not '{}')", () => {
+      // Solid's <Link> takes the O(1) routeSelector fast path for default options +
+      // no params, so the cache-key split only bites the SLOW path. `activeStrict`
+      // forces the slow path WITHOUT params: the source must be built with `undefined`
+      // (key ""), shared with a manual createActiveRouteSource(router, name, undefined,
+      // { strict: true }) — NOT local.routeParams === EMPTY_PARAMS ({}) which keys "{}"
+      // and splits the same question into a second eager subscription (#776).
+      //
+      // Discriminator: a cache HIT returns the shared source without re-running
+      // router.isActiveRoute; a cache MISS constructs a fresh source and calls it once.
+      render(
+        () => (
+          <Link routeName="users" activeStrict data-testid="link">
+            Users
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      createActiveRouteSource(router, "users", undefined, {
+        strict: true,
+        ignoreQueryParams: true,
+      });
+
+      expect(isActiveRouteSpy).not.toHaveBeenCalled();
     });
   });
 });

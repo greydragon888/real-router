@@ -1,3 +1,4 @@
+import { createActiveRouteSource } from "@real-router/sources";
 import { Text } from "ink";
 import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -310,5 +311,27 @@ describe("InkLink", () => {
     await flushInk();
 
     expect(lastFrame()).toContain("Labeled");
+  });
+
+  it("no-params <InkLink> shares the canonical undefined-params active source (#776)", () => {
+    // Mirror of the DOM Link dedup guard: a no-params `<InkLink>` must NOT default
+    // routeParams to EMPTY_PARAMS ({}) before the active-route call, or it keys "{}"
+    // and splits from the canonical undefined key "" used by useIsActiveRoute(name).
+    // Discriminator: a cache HIT skips construction (no router.isActiveRoute); a MISS
+    // constructs a fresh source and calls isActiveRoute once.
+    render(
+      <InkRouterProvider router={router}>
+        <InkLink routeName="users.list">Users</InkLink>
+      </InkRouterProvider>,
+    );
+
+    const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+    createActiveRouteSource(router, "users.list", undefined, {
+      strict: false,
+      ignoreQueryParams: true,
+    });
+
+    expect(isActiveRouteSpy).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+import { createActiveRouteSource } from "@real-router/sources";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { defineComponent, h, ref } from "vue";
@@ -608,5 +609,29 @@ describe("Link component", () => {
     );
 
     consoleError.mockRestore();
+  });
+
+  describe("no-params active-route source dedup (#776)", () => {
+    it("a no-params <Link> shares the canonical undefined-params source (cache key '', not '{}')", () => {
+      // A no-params `<Link routeName="users">` and a manual `useIsActiveRoute("users")`
+      // (params === undefined) ask ONE logical question and must resolve the SAME
+      // cached active-route source — one router subscription, not two (#766).
+      // `createActiveRouteSource` keys params as
+      // `params === undefined ? "" : canonicalJson(params)`, so a `routeParams` prop
+      // that defaults to EMPTY_PARAMS ({}) before the source call keys "{}" and splits.
+      //
+      // Discriminator: a cache HIT returns the shared source without re-running
+      // `router.isActiveRoute`; a cache MISS constructs a fresh source and calls it once.
+      mountLink(router, { routeName: "users" });
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      createActiveRouteSource(router, "users", undefined, {
+        strict: false,
+        ignoreQueryParams: true,
+      });
+
+      expect(isActiveRouteSpy).not.toHaveBeenCalled();
+    });
   });
 });

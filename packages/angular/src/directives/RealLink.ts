@@ -19,6 +19,12 @@ import type { Params, NavigationOptions } from "@real-router/core";
 
 const NOOP_CATCH = (): void => {};
 
+// Frozen no-params singleton — used where navigation/href building need a
+// concrete object. The `routeParams` input itself defaults to `undefined` (NOT
+// this), so the active-route source keys "" and dedups with a manual
+// `injectIsActiveRoute(name)` instead of keying "{}" (#776).
+const EMPTY_PARAMS = Object.freeze({});
+
 @Directive({
   selector: "a[realLink]",
   host: {
@@ -27,7 +33,12 @@ const NOOP_CATCH = (): void => {};
 })
 export class RealLink {
   readonly routeName = input<string>("");
-  readonly routeParams = input<Params>({});
+  // Default `undefined` (NOT {}): an omitted `routeParams` must reach
+  // `createActiveRouteSource` (via `stableParams`) as `undefined` so the active
+  // source keys "" and shares ONE cached source / router subscription with a
+  // manual `injectIsActiveRoute(name)`. Defaulting to {} keys "{}" and splits
+  // the same logical question into a second eager subscription (#776).
+  readonly routeParams = input<Params | undefined>(undefined);
   readonly routeOptions = input<NavigationOptions>({});
   readonly activeClassName = input<string>("active");
   readonly activeStrict = input(false);
@@ -61,7 +72,7 @@ export class RealLink {
     return buildHref(
       this.router,
       this.routeName(),
-      this.stableParams(),
+      this.stableParams() ?? EMPTY_PARAMS,
       hashValue === undefined ? undefined : { hash: hashValue },
     );
   });
@@ -120,7 +131,7 @@ export class RealLink {
     navigateWithHash(
       this.router,
       this.routeName(),
-      this.routeParams(),
+      this.routeParams() ?? EMPTY_PARAMS,
       this.hash(),
       this.routeOptions(),
     ).catch(NOOP_CATCH);

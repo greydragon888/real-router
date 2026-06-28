@@ -20,7 +20,12 @@ import type { Params } from "@real-router/core";
 export class RealLinkActive {
   readonly realLinkActive = input<string>("");
   readonly routeName = input<string>("");
-  readonly routeParams = input<Params>({});
+  // Default `undefined` (NOT {}): an omitted `routeParams` must reach
+  // `createActiveRouteSource` (via `stableParams`) as `undefined` so the active
+  // source keys "" and shares ONE cached source with a manual
+  // `injectIsActiveRoute(name)`, instead of keying "{}" and opening a second
+  // eager subscription for the same question (#776). Mirrors `RealLink`.
+  readonly routeParams = input<Params | undefined>(undefined);
   readonly activeStrict = input(false);
   readonly ignoreQueryParams = input(true);
 

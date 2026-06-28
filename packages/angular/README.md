@@ -414,7 +414,7 @@ Navigation directive for `<a>` elements. Handles click events, sets `href`, and 
 | Input               | Type                | Default    | Description                            |
 | ------------------- | ------------------- | ---------- | -------------------------------------- |
 | `routeName`         | `string`            | `""`       | Target route name                      |
-| `routeParams`       | `Params`            | `{}`       | Route parameters                       |
+| `routeParams`       | `Params`            | `undefined`| Route parameters (omitted → `undefined`, shares one active-route source with `injectIsActiveRoute(name)`, #776) |
 | `routeOptions`      | `NavigationOptions` | `{}`       | Navigation options (replace, etc.)     |
 | `activeClassName`   | `string`            | `"active"` | CSS class applied when route is active |
 | `activeStrict`      | `boolean`           | `false`    | Exact match only (no ancestor match)   |
@@ -449,7 +449,7 @@ readonly params = computed(() => ({ filters: [1, 2] }));
 Applies an active CSS class to any element when a route is active. Use this when you need active state on a non-`<a>` element, or when the clickable element and the styled element are different.
 
 ```html
-<li [realLinkActive]="'active'" routeName="users" [routeParams]="{}">
+<li [realLinkActive]="'active'" routeName="users">
   <a realLink routeName="users">Users</a>
 </li>
 ```
@@ -458,7 +458,7 @@ Applies an active CSS class to any element when a route is active. Use this when
 | ------------------- | --------- | ------- | -------------------------------------- |
 | `realLinkActive`    | `string`  | `""`    | CSS class to apply when active         |
 | `routeName`         | `string`  | `""`    | Route to watch                         |
-| `routeParams`       | `Params`  | `{}`    | Route parameters                       |
+| `routeParams`       | `Params`  | `undefined` | Route parameters (omitted → `undefined`, #776) |
 | `activeStrict`      | `boolean` | `false` | Exact match only                       |
 | `ignoreQueryParams` | `boolean` | `true`  | Query params don't affect active state |
 

@@ -62,9 +62,16 @@ export const Link = defineComponent({
       type: String,
       required: true,
     },
+    // Default `undefined` (NOT EMPTY_PARAMS): an omitted `routeParams` must reach
+    // `createActiveRouteSource` as `undefined` so it keys the active source as ""
+    // and shares ONE cached source (one router subscription) with a manual
+    // `useIsActiveRoute(routeName)`. Defaulting to EMPTY_PARAMS ({}) here would key
+    // "{}" and split the same logical question into a second eager subscription
+    // (#776). Navigation/href default to EMPTY_PARAMS locally where a concrete
+    // object is required.
     routeParams: {
       type: Object as PropType<Params>,
-      default: () => EMPTY_PARAMS,
+      default: undefined,
     },
     routeOptions: {
       type: Object as PropType<NavigationOptions>,
@@ -122,8 +129,10 @@ export const Link = defineComponent({
     // `buildHref` entirely. Nested-object param VALUES fall back to per-render
     // recompute (shallowEqual compares them by reference) — stabilize with a
     // `ref`/`computed` if it matters, exactly as documented for the React Link.
-    let cachedParams: Params = props.routeParams;
-    const stableParams = computed<Params>(() => {
+    // `Params | undefined`: `undefined` (no params) is preserved end-to-end so the
+    // active source keys "" (see the `routeParams` prop default note, #776).
+    let cachedParams: Params | undefined = props.routeParams;
+    const stableParams = computed<Params | undefined>(() => {
       const next = props.routeParams;
 
       if (!shallowEqual(cachedParams, next)) {
@@ -178,7 +187,7 @@ export const Link = defineComponent({
       buildHref(
         router,
         props.routeName,
-        stableParams.value,
+        stableParams.value ?? EMPTY_PARAMS,
         props.hash === undefined ? undefined : { hash: props.hash },
       ),
     );
@@ -208,7 +217,7 @@ export const Link = defineComponent({
       navigateWithHash(
         router,
         props.routeName,
-        props.routeParams,
+        props.routeParams ?? EMPTY_PARAMS,
         props.hash,
         props.routeOptions,
       ).catch(() => {});

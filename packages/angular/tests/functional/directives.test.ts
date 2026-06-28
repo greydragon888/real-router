@@ -2,6 +2,7 @@
 import { Component, Directive, input, type OnInit } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { createRouter } from "@real-router/core";
+import { createActiveRouteSource } from "@real-router/sources";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { RealLink } from "../../src/directives/RealLink";
@@ -384,6 +385,45 @@ describe("RealLink directive", () => {
 
       expect(anchor.hasAttribute("href")).toBe(false);
     });
+
+    it("a no-params <a realLink> shares the canonical undefined-params source (cache key '', not '{}') (#776)", () => {
+      // A no-params `<a realLink>` and a manual `injectIsActiveRoute(name)`
+      // (params === undefined) ask ONE logical question and must resolve the SAME
+      // cached active-route source — one router subscription, not two (#766).
+      // `createActiveRouteSource` keys params as
+      // `params === undefined ? "" : canonicalJson(params)`, so a `routeParams`
+      // input that defaults to {} keys "{}" and splits the source.
+      //
+      // JIT TestBed cannot bind signal inputs, so `routeName` stays at its default
+      // "" (the documented 94% ceiling) — that is fine: the cache-key SPLIT under
+      // test is on the params axis, observable for any fixed routeName. The
+      // canonical lookup below uses the same "" name.
+      //
+      // Discriminator: a cache HIT returns the shared source without re-running
+      // `router.isActiveRoute`; a cache MISS constructs a fresh source and calls it once.
+      @Component({
+        template: `<a realLink>Link</a>`,
+        imports: [RealLink],
+      })
+      class TestHost {}
+
+      TestBed.configureTestingModule({
+        imports: [TestHost],
+        providers: [provideRealRouter(router)],
+      });
+      const fixture = TestBed.createComponent(TestHost);
+
+      fixture.detectChanges();
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      createActiveRouteSource(router, "", undefined, {
+        strict: false,
+        ignoreQueryParams: true,
+      });
+
+      expect(isActiveRouteSpy).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -461,6 +501,36 @@ describe("RealLinkActive directive", () => {
       const div = fixture.nativeElement.querySelector("div");
 
       expect(div.classList).toHaveLength(0);
+    });
+
+    it("a no-params [realLinkActive] shares the canonical undefined-params source (cache key '', not '{}') (#776)", () => {
+      // Same dedup contract as <a realLink>: a no-params `[realLinkActive]` must NOT
+      // default routeParams to {} before the active-route call, or it keys "{}" and
+      // splits from the canonical undefined key "" — a second eager subscription for
+      // the same question (#776). JIT keeps routeName at its "" default (signal
+      // inputs are not bindable); the canonical lookup uses the same "" name.
+      @Component({
+        template: `<div realLinkActive>Item</div>`,
+        imports: [RealLinkActive],
+      })
+      class TestHost {}
+
+      TestBed.configureTestingModule({
+        imports: [TestHost],
+        providers: [provideRealRouter(router)],
+      });
+      const fixture = TestBed.createComponent(TestHost);
+
+      fixture.detectChanges();
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      createActiveRouteSource(router, "", undefined, {
+        strict: false,
+        ignoreQueryParams: true,
+      });
+
+      expect(isActiveRouteSpy).not.toHaveBeenCalled();
     });
 
     it("subscription callback fires on every navigation (spy via router.subscribe)", async () => {

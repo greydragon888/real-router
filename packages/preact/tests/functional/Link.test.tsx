@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+import { createActiveRouteSource } from "@real-router/sources";
 import { screen, render, act, fireEvent } from "@testing-library/preact";
 import { userEvent } from "@testing-library/user-event";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
@@ -1157,6 +1158,36 @@ describe("Link component", () => {
 
       expect(screen.getByTestId("link-profile")).toHaveClass("active");
       expect(screen.getByTestId("link-account")).not.toHaveClass("active");
+    });
+  });
+
+  describe("no-params active-route source dedup (#776)", () => {
+    it("a no-params <Link> shares the canonical undefined-params source (cache key '', not '{}')", () => {
+      // A no-params `<Link routeName="users">` and a manual `useIsActiveRoute("users")`
+      // (params === undefined) ask ONE logical question and must resolve the SAME
+      // cached active-route source — one router subscription, not two (#766).
+      // `createActiveRouteSource` keys params as
+      // `params === undefined ? "" : canonicalJson(params)`, so defaulting routeParams
+      // to EMPTY_PARAMS ({}) before the call keys "{}" and splits the source.
+      //
+      // Discriminator: a cache HIT returns the shared source without re-running
+      // `router.isActiveRoute`; a cache MISS constructs a fresh source and calls it
+      // once for its initial value.
+      render(
+        <Link routeName="users" data-testid="link">
+          Users
+        </Link>,
+        { wrapper },
+      );
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      createActiveRouteSource(router, "users", undefined, {
+        strict: false,
+        ignoreQueryParams: true,
+      });
+
+      expect(isActiveRouteSpy).not.toHaveBeenCalled();
     });
   });
 });

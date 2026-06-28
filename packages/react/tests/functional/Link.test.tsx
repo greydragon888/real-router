@@ -1,5 +1,6 @@
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
+import { createActiveRouteSource } from "@real-router/sources";
 import { screen, render, act, fireEvent } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -818,6 +819,43 @@ describe("Link component", () => {
           hashChange: true,
         },
       );
+    });
+  });
+
+  describe("no-params active-route source dedup (#776)", () => {
+    it("a no-params <Link> shares the canonical undefined-params source (cache key '', not '{}')", () => {
+      // A no-params `<Link routeName="users">` and a manual `useIsActiveRoute("users")`
+      // (params === undefined) ask ONE logical question — they must resolve the SAME
+      // cached active-route source so they share a single router subscription (#766),
+      // not two. `createActiveRouteSource` keys params as
+      // `params === undefined ? "" : canonicalJson(params)`, so defaulting routeParams
+      // to EMPTY_PARAMS ({}) before the call keys "{}", splitting from the canonical
+      // undefined key "".
+      //
+      // Discriminator (no module spying, timing-robust): a cache HIT returns the shared
+      // source without re-running `computeActive` → `router.isActiveRoute`; a cache MISS
+      // constructs a fresh source and calls `isActiveRoute` exactly once for its initial
+      // value. So if the canonical undefined-params lookup is a HIT, the Link already
+      // owns that exact instance.
+      render(
+        <Link routeName="users" data-testid="link">
+          Users
+        </Link>,
+        { wrapper },
+      );
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      // Exactly what `useIsActiveRoute("users")` builds internally.
+      createActiveRouteSource(router, "users", undefined, {
+        strict: false,
+        ignoreQueryParams: true,
+      });
+
+      // GREEN: the Link created this same "" entry → cache hit → no recompute.
+      // RED (bug): the Link created a "{}" entry → this misses → constructs a second
+      // source and calls isActiveRoute once.
+      expect(isActiveRouteSpy).not.toHaveBeenCalled();
     });
   });
 });
