@@ -210,6 +210,54 @@ describe("preload-plugin — hover", () => {
     router.stop();
   });
 
+  it("silently catches a synchronously-thrown error from preload function (#806)", async () => {
+    const preloadFn = vi.fn(() => {
+      throw new Error("sync-boom");
+    });
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: () => preloadFn },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+
+    fireMouseOver(anchor);
+
+    // A synchronous throw fires before `.catch` is reached. It must not escape
+    // the setTimeout callback (in a real app it surfaces as an uncaughtException
+    // with no user code in the stack); the fire-and-forget contract swallows it.
+    await expect(waitForTimer(65)).resolves.toBeUndefined();
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    router.stop();
+  });
+
+  it("silently tolerates a non-Promise return from preload function (#806)", async () => {
+    // A JS consumer ignoring the `() => Promise<unknown>` type returns undefined.
+    const preloadFn = vi.fn(() => undefined as unknown as Promise<unknown>);
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: () => preloadFn },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+
+    fireMouseOver(anchor);
+
+    // Without normalization, `undefined.catch(...)` throws synchronously
+    // (`.catch of undefined`) and escapes the timer callback.
+    await expect(waitForTimer(65)).resolves.toBeUndefined();
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    router.stop();
+  });
+
   it("supports custom delay option", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([
