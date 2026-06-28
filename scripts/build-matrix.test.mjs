@@ -281,14 +281,16 @@ test("routing: touchesCore overrides leaf even for a tiny affected set", () => {
   assert.equal(buildPlan(["@real-router/core"], realDirOf).mode, "sharded");
 });
 
-test("routing: real route-utils fanout (9 affected, no core) → leaf under K=10", () => {
+test("routing: route-utils fanout (intermediate amplifier) → sharded despite ≤ K", () => {
   // Empirically measured (isolated route-utils source edit, turbo 2.10.0):
   // affected = route-utils + sources + dom-utils + 6 adapters = 9, no core layer.
-  // 9 ≤ K(10) && !touchesCore → leaf. ⚠️ This CONTRADICTS the design doc's §3
-  // "Ожидаемый эффект"/acceptance-E (which expect route-utils → sharded with 6
-  // adapter shards). That expectation predates the K=5→K=10 recalibration
-  // (companion §D). Documented here as the deliberate K=10 consequence — lower K
-  // to 5 to shard this [6..10] fanout band. Reconciliation is a calibration call.
+  // 9 ≤ K(10), so the COUNT alone would route to leaf — but route-utils/sources
+  // are intermediate fanout amplifiers (every change invalidates all 6 HEAVY
+  // adapters), so the monolith would serialize the whole adapter cohort (~15m
+  // observed on a sources-only PR, #1017). `touchesAdapterShared` forces the
+  // sharded path regardless of count, restoring the design doc's §3 intent
+  // (route-utils → sharded with the adapter shards) that the K=5→K=10
+  // recalibration had inverted.
   const routeUtilsFanout = [
     ...ADAPTERS,
     "@real-router/route-utils",
@@ -296,7 +298,33 @@ test("routing: real route-utils fanout (9 affected, no core) → leaf under K=10
     "dom-utils",
   ];
   assert.equal(routeUtilsFanout.length, 9);
-  assert.equal(buildPlan(routeUtilsFanout, realDirOf).mode, "leaf");
+  assert.equal(buildPlan(routeUtilsFanout, realDirOf).mode, "sharded");
+});
+
+test("routing: sources-only fanout (7 affected, ≤ K) → sharded (#1017 regression)", () => {
+  // The #1017 regression: a sources-only PR fans out to the 6 adapters
+  // (sources + 6 = 7 ≤ K, no core), was routed to leaf → the monolith serialized
+  // all 6 adapters (~15m). touchesAdapterShared now forces sharded so the adapter
+  // shards run in parallel.
+  const sourcesFanout = [...ADAPTERS, "@real-router/sources"];
+  assert.equal(sourcesFanout.length, 7);
+  const { mode, matrix } = buildPlan(sourcesFanout, realDirOf);
+  assert.equal(mode, "sharded");
+  const names = matrix.include.map((i) => i.name);
+  for (const a of ["react", "preact", "solid", "svelte", "vue", "angular"])
+    assert.ok(names.includes(a), a);
+  assert.ok(names.includes("adapter-shared"));
+  assert.equal(matrix.include.length, 7); // 6 adapters + adapter-shared
+});
+
+test("routing: touchesAdapterShared overrides leaf even for a tiny affected set", () => {
+  // Symmetric with the touchesCore override: sources/route-utils alone is length
+  // 1 ≤ K with no core layer, but is a fanout amplifier → must shard.
+  assert.equal(buildPlan(["@real-router/sources"], realDirOf).mode, "sharded");
+  assert.equal(
+    buildPlan(["@real-router/route-utils"], realDirOf).mode,
+    "sharded",
+  );
 });
 
 test("routing: sharded matrix — adapter shards + non-empty groups only, empties omitted", () => {

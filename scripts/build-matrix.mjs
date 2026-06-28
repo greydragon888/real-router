@@ -174,9 +174,11 @@ export function groupAffected(affected, dirOf, readers = defaultReaders) {
 /**
  * Decide leaf vs sharded and, if sharded, emit the matrix include[].
  *
- * Leaf: `affected.length <= K && !touchesCore`. The matrix is still a VALID but
- * empty `{ include: [] }` — an empty string would make `fromJson('')` crash the
- * workflow parse even when the sharded job's `if:` is false (companion C1).
+ * Leaf: `affected.length <= K && !touchesCore && !touchesAdapterShared`. The
+ * matrix is still a VALID but empty `{ include: [] }` — an empty string would
+ * make `fromJson('')` crash the workflow parse even when the sharded job's `if:`
+ * is false (companion C1). `touchesAdapterShared` (sources/route-utils) forces
+ * sharded like `touchesCore`: both are fanout amplifiers over the heavy adapters.
  *
  * Sharded: each adapter is its own shard (1 adapter = 1 shard, R2.10); the other
  * non-empty groups become one shard each. `base` is handled by a separate job,
@@ -187,8 +189,15 @@ export function groupAffected(affected, dirOf, readers = defaultReaders) {
 export function buildPlan(affected, dirOf, readers = defaultReaders) {
   const groups = groupAffected(affected, dirOf, readers);
   const touchesCore = groups.base.length > 0;
+  // sources / route-utils are intermediate fanout amplifiers: a change to either
+  // invalidates ALL 6 (heavy) adapters, so however few packages turbo reports
+  // (sources alone fans out to 7, route-utils to 9 — both ≤ K), the monolithic
+  // leaf path would serialize the entire adapter cohort (~15m observed on a
+  // sources-only PR, #1017). Force the sharded path so the adapter shards run in
+  // parallel — same rationale as touchesCore, just one layer down the graph.
+  const touchesAdapterShared = groups["adapter-shared"].length > 0;
 
-  if (affected.length <= K && !touchesCore) {
+  if (affected.length <= K && !touchesCore && !touchesAdapterShared) {
     return { mode: "leaf", matrix: { include: [] } };
   }
 

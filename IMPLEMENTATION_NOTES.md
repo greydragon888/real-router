@@ -4637,3 +4637,18 @@ This completes the vs-tanstack expansion roadmap (Phases 0–3): per-scenario re
 - **Not pinning back to 24.16.0** — that drops the CVE-2026-48931 security fix; 24.18.0 keeps it and adds the premature-close fix.
 - **Not `check-latest: true`** (which would preserve the floating minor) — right after a floated minor shipped this breakage, a deterministic exact pin avoids auto-floating into the next surprise. Relax back to `24` (or add `check-latest`) once runner toolcaches resolve ≥ 24.18.0 by default.
 - **Not switching to `@changesets/changelog-git`** (no GitHub API) — that eliminates the network call entirely but also drops the changelog's PR/author enrichment; unnecessary once Node is fixed.
+
+## CI shard router — sources/route-utils force the sharded path (build-matrix.mjs) (2026-06-28)
+
+**Problem.** The horizontal-sharding planner `scripts/build-matrix.mjs` (PoC-2; design lives in the local, gitignored `.claude/ci-acceleration-poc-ru.md`) routes a PR to the fast monolithic **leaf** path when `affected.length <= K (10) && !touchesCore`. But `@real-router/sources` and `@real-router/route-utils` are **intermediate fanout amplifiers**: a change to either invalidates **all 6 (heavy) adapters** (react/preact/solid/vue/svelte/angular). turbo reports only `sources + 6 = 7` affected (or `route-utils → 9`) — both `≤ K` and not core-layer — so the router picked **leaf**, and the monolith **serialized the whole adapter cohort on one 4-vCPU runner → ~15 min** (observed on the sources-only PR #1017). `build-matrix.test.mjs` even pinned this as a known, deferred "calibration call" (route-utils fanout → leaf), contradicting the design doc's §3 intent.
+
+**Solution.** Add a second routing override, symmetric with `touchesCore`:
+
+```js
+const touchesAdapterShared = groups["adapter-shared"].length > 0; // sources/route-utils
+if (affected.length <= K && !touchesCore && !touchesAdapterShared) { /* leaf */ }
+```
+
+`adapter-shared` is the classifier's existing bucket for exactly these two packages. When either is affected the planner now forces **sharded** regardless of count — the 6 adapter shards run in parallel (~5–8 min wall) instead of serializing. The pinning test was flipped to assert sharded; two regression tests added (sources-only → sharded; the override fires in isolation). `node --test scripts/build-matrix.test.mjs` → 19/19.
+
+**Why this and not raising K.** Lowering `K` (10→5) — the alternative the old test comment floated — is a blunt count-based instrument: it would also shard a benign 6-light-leaf change (6 core-leaves, which the monolith handles in ~2 min). The real signal is **weight, not count**: only sources/route-utils fan out to the heavy adapter cohort. `touchesAdapterShared` is surgical — it shards exactly the amplifier case and leaves every other `≤ K` PR on the fast leaf path. Same rationale as `touchesCore`, one layer down the dependency graph. `K`-calibration for genuine multi-leaf PRs stays an independent knob. **New package note:** a future package that consumes `sources`/`route-utils` but isn't an adapter would also amplify — extend the `adapter-shared` bucket (or the override) if that ever happens.
