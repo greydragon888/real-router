@@ -231,7 +231,7 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
     regexpSource.destroy();
   });
 
-  it("non-cached fallback: destroy() unwinds the router subscription (no leak)", async () => {
+  it("non-cached fallback: lazy connect + destroy() unwinds the router subscription (no leak)", async () => {
     const bigintParams = { id: 1n } as unknown as Record<string, string>;
     const originalSubscribe = router.subscribe.bind(router);
     const unsubscribeSpies: ReturnType<typeof vi.fn>[] = [];
@@ -248,6 +248,11 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
     });
 
     const source = createActiveRouteSource(router, "users", bigintParams);
+
+    // Lazy (#766): no router subscription until the first listener subscribes.
+    expect(unsubscribeSpies).toHaveLength(0);
+
+    source.subscribe(() => {});
 
     expect(unsubscribeSpies).toHaveLength(1);
     expect(unsubscribeSpies[0]).not.toHaveBeenCalled();

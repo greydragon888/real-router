@@ -11,10 +11,12 @@ import type { RouterSource } from "@real-router/sources";
  * S12 createActiveRouteSource cache growth (audit-2026-05-16 §7 #6).
  *
  * Documents the current behaviour of the per-router cache in
- * `createActiveRouteSource`: it grows unboundedly for the lifetime of the
- * router. Each unique `(routeName, canonicalJson(params), options)` triple
- * adds an eagerly-subscribed `BaseSource` that holds a `router.subscribe`
- * handle until the router itself is garbage-collected.
+ * `createActiveRouteSource`: the cache grows unboundedly in ENTRIES for the
+ * lifetime of the router (one per unique `(routeName, canonicalJson(params),
+ * options)` triple). Since #766 each entry is **lazy** — a cheap closure that
+ * holds a `router.subscribe` handle only while it has listeners, releasing it
+ * on the last unsubscribe — so unmounted Links cost zero router subscriptions
+ * (S12.5 crosses the 10 000-listener limit without crashing).
  *
  * In SPAs with per-resource active-link checks (e.g. `<Link to="users.view"
  * params={{ id: userId }}>` rendered for thousands of users), the cache can
@@ -111,5 +113,25 @@ describe("S12 createActiveRouteSource cache growth", () => {
     for (const u of unsubs) {
       u();
     }
+  });
+
+  it("S12.5: >10 000 unique sources with mount/unmount do not crash the render path (lazy connection, #766)", () => {
+    // Regression for the eager-subscription crash: each unique cache key used to
+    // open a PERMANENT router.subscribe handle at construction (no-op destroy on
+    // the cached wrapper), so a long-lived router with per-item-params Links
+    // accumulated handles until the EventEmitter listener limit (10000) threw in
+    // the render path. With lazy connection a source holds a router subscription
+    // only while it has listeners, so a mount→unmount cycle nets zero — peak
+    // listener count stays at 1 no matter how many unique keys are created.
+    const COUNT = 10_050; // crosses the 10 000 listener limit
+
+    expect(() => {
+      for (let i = 0; i < COUNT; i++) {
+        const source = createActiveRouteSource(router, "users.view", { id: i });
+        const unsub = source.subscribe(() => {});
+
+        unsub(); // Link unmounts → onLastUnsubscribe disconnects from the router
+      }
+    }).not.toThrow();
   });
 });

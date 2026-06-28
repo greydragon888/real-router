@@ -168,55 +168,88 @@ function buildActiveRouteSource(
 
   let routerUnsubscribe: (() => void) | undefined;
 
+  const disconnect = (): void => {
+    const unsub = routerUnsubscribe;
+
+    routerUnsubscribe = undefined;
+    unsub?.();
+  };
+
   const source = new BaseSource(initialValue, {
-    onDestroy: () => {
-      routerUnsubscribe?.();
-      routerUnsubscribe = undefined;
+    onFirstSubscribe: () => {
+      // Reconcile before connecting: while disconnected (zero listeners) the
+      // source missed navigations, so the active boolean may be stale.
+      // Recompute against the current router state and notify the just-added
+      // listener — BaseSource registers it before onFirstSubscribe. Mirrors the
+      // reconnect reconcile of createRouteNodeSource / createRouteSource (#765).
+      const reconciled = computeActive(
+        router,
+        routeName,
+        params,
+        strict,
+        ignoreQueryParams,
+        hash,
+      );
+
+      if (!Object.is(source.getSnapshot(), reconciled)) {
+        source.updateSnapshot(reconciled);
+      }
+
+      // Lazy connection (#766): subscribe on the FIRST listener, disconnect on
+      // the LAST (onLastUnsubscribe). Previously this source subscribed eagerly
+      // at construction with a no-op destroy on the cached wrapper, so every
+      // unique cache key held a PERMANENT router subscription that survived all
+      // Link unmounts — a long-lived router with per-item-params Links
+      // accumulated handles until the EventEmitter listener limit (10000)
+      // crashed the render path. The cache entry still lives with the router
+      // (cheap: a closure), but now holds no subscription while it has zero
+      // listeners; the non-cached fallback (BigInt / circular params) likewise
+      // detaches through `disconnect`.
+      routerUnsubscribe = router.subscribe((next) => {
+        const isNewRelated = areRoutesRelated(routeName, next.route.name);
+        const isPrevRelated =
+          next.previousRoute &&
+          areRoutesRelated(routeName, next.previousRoute.name);
+
+        // Hash-aware sources also flip on same-path-different-hash transitions.
+        // The route comparison alone misses these (route is identical), but the
+        // hash claim updated, so we must re-evaluate. Detect via the
+        // `hashChanged` flag published by URL plugins.
+        const hashFlip =
+          hash !== undefined &&
+          ((
+            next.route.context as
+              | { url?: { hashChanged?: boolean } }
+              | undefined
+          )?.url?.hashChanged ??
+            false);
+
+        if (!isNewRelated && !isPrevRelated && !hashFlip) {
+          return;
+        }
+
+        // If new route is not related, we know the route is inactive —
+        // avoid calling isActiveRoute for the optimization. (Hash check would
+        // also fail without route-match, so this short-circuit holds for
+        // hash-aware sources too.)
+        const newValue = isNewRelated
+          ? computeActive(
+              router,
+              routeName,
+              params,
+              strict,
+              ignoreQueryParams,
+              hash,
+            )
+          : false;
+
+        if (!Object.is(source.getSnapshot(), newValue)) {
+          source.updateSnapshot(newValue);
+        }
+      });
     },
-  });
-
-  // Eager connection: subscribe to router immediately. For the cached path,
-  // the returned wrapper has a no-op destroy and the handle lives with the
-  // router (released on router GC). For the non-cached fallback (BigInt /
-  // circular params), the handle is unwound through `onDestroy` above.
-  routerUnsubscribe = router.subscribe((next) => {
-    const isNewRelated = areRoutesRelated(routeName, next.route.name);
-    const isPrevRelated =
-      next.previousRoute &&
-      areRoutesRelated(routeName, next.previousRoute.name);
-
-    // Hash-aware sources also flip on same-path-different-hash transitions.
-    // The route comparison alone misses these (route is identical), but the
-    // hash claim updated, so we must re-evaluate. Detect via the `hashChanged`
-    // flag published by URL plugins.
-    const hashFlip =
-      hash !== undefined &&
-      ((next.route.context as { url?: { hashChanged?: boolean } } | undefined)
-        ?.url?.hashChanged ??
-        false);
-
-    if (!isNewRelated && !isPrevRelated && !hashFlip) {
-      return;
-    }
-
-    // If new route is not related, we know the route is inactive —
-    // avoid calling isActiveRoute for the optimization. (Hash check would
-    // also fail without route-match, so this short-circuit holds for
-    // hash-aware sources too.)
-    const newValue = isNewRelated
-      ? computeActive(
-          router,
-          routeName,
-          params,
-          strict,
-          ignoreQueryParams,
-          hash,
-        )
-      : false;
-
-    if (!Object.is(source.getSnapshot(), newValue)) {
-      source.updateSnapshot(newValue);
-    }
+    onLastUnsubscribe: disconnect,
+    onDestroy: disconnect,
   });
 
   return source;

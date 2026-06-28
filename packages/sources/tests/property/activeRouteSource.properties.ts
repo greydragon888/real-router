@@ -63,6 +63,9 @@ describe("boolean tracking", () => {
         options,
       );
 
+      // Lazy source tracks navigations only while subscribed (#766).
+      source.subscribe(() => {});
+
       await executeNavigations(router, navigations).catch(() => undefined);
 
       expect(source.getSnapshot()).toStrictEqual(
@@ -220,6 +223,9 @@ describe("areRoutesRelated filter", () => {
         params,
         options,
       );
+
+      // Lazy source tracks navigations only while subscribed (#766).
+      source.subscribe(() => {});
 
       for (const nav of navigations) {
         await router.navigate(nav.name, nav.params).catch(() => undefined);
@@ -499,6 +505,82 @@ describe("destroy (cached shared source — no-op)", () => {
 
       unsubscribe();
 
+      router.stop();
+    },
+  );
+});
+
+describe("lazy connection (#766)", () => {
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "no router subscription before first source.subscribe()",
+    async (routeName) => {
+      const router = await createStartedRouter();
+      const spy = vi.spyOn(router, "subscribe");
+
+      createActiveRouteSource(router, routeName, paramsForRoute(routeName));
+
+      expect(spy).not.toHaveBeenCalled();
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
+    "connects on first listener, disconnects on last, reconnects on re-subscribe",
+    async (routeName) => {
+      const router = await createStartedRouter();
+      const spy = vi.spyOn(router, "subscribe");
+
+      const source = createActiveRouteSource(
+        router,
+        routeName,
+        paramsForRoute(routeName),
+      );
+
+      const unsub1 = source.subscribe(() => {});
+
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      unsub1();
+
+      // Re-subscribe after the last listener left creates a fresh router
+      // subscription (the previous one was released on onLastUnsubscribe).
+      const unsub2 = source.subscribe(() => {});
+
+      expect(spy).toHaveBeenCalledTimes(2);
+
+      unsub2();
+      router.stop();
+    },
+  );
+
+  test.prop([fc.constantFrom("users.list", "users.view", "users.edit")], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "active state changed while disconnected is reconciled on re-subscribe",
+    async (childRoute) => {
+      const router = await createStartedRouter();
+      const source = createActiveRouteSource(router, "users");
+
+      // Connect at "home" (users inactive), then drop the last listener.
+      const unsub1 = source.subscribe(() => {});
+
+      expect(source.getSnapshot()).toBe(false);
+
+      unsub1();
+
+      // Navigate to a "users.*" descendant while the source has ZERO listeners.
+      await router.navigate(childRoute, paramsForRoute(childRoute));
+
+      // Re-subscribe: onFirstSubscribe reconciles the active boolean to the
+      // current router state (true) instead of replaying the stale `false`.
+      const listener = vi.fn();
+      const unsub2 = source.subscribe(listener);
+
+      expect(source.getSnapshot()).toBe(true);
+      expect(listener).toHaveBeenCalled();
+
+      unsub2();
       router.stop();
     },
   );

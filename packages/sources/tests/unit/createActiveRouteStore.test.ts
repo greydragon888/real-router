@@ -78,6 +78,9 @@ describe("createActiveRouteSources", () => {
 
     source.subscribe(listener);
 
+    // Ignore the reconcile-on-subscribe isActiveRoute call (#766 lazy connect).
+    spy.mockClear();
+
     // Navigate home → admin (unrelated to users)
     await router.navigate("admin");
 
@@ -93,6 +96,9 @@ describe("createActiveRouteSources", () => {
     const source = createActiveRouteSource(router, "users", undefined, {
       strict: false,
     });
+
+    // Lazy source tracks navigations only while subscribed (#766).
+    source.subscribe(() => {});
 
     await router.navigate("users.view", { id: "1" });
 
@@ -112,7 +118,10 @@ describe("createActiveRouteSources", () => {
   it("ignoreQueryParams=true (default): isActiveRoute called with ignoreQueryParams=true", async () => {
     const spy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "users");
+    const source = createActiveRouteSource(router, "users");
+
+    // Lazy: connect so the subscribe handler runs on navigation (#766).
+    source.subscribe(() => {});
 
     spy.mockClear();
 
@@ -124,9 +133,12 @@ describe("createActiveRouteSources", () => {
   it("ignoreQueryParams=false: isActiveRoute called with ignoreQueryParams=false", async () => {
     const spy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "users", undefined, {
+    const source = createActiveRouteSource(router, "users", undefined, {
       ignoreQueryParams: false,
     });
+
+    // Lazy: connect so the subscribe handler runs on navigation (#766).
+    source.subscribe(() => {});
 
     spy.mockClear();
 
@@ -275,6 +287,32 @@ describe("createActiveRouteSources", () => {
     unsubscribe();
   });
 
+  it("reconnect: active state changed while disconnected is reconciled on re-subscribe (#766)", async () => {
+    const source = createActiveRouteSource(router, "users");
+
+    // Connect at "home" (users inactive), then drop the last listener so the
+    // lazy source disconnects from the router.
+    const unsub1 = source.subscribe(() => {});
+
+    expect(source.getSnapshot()).toBe(false);
+
+    unsub1();
+
+    // Navigate into the "users" subtree while the source has ZERO listeners.
+    await router.navigate("users.view", { id: "1" });
+
+    // Re-subscribe: onFirstSubscribe reconciles the boolean to the current
+    // router state (true) instead of replaying the stale `false`, and notifies
+    // the just-added listener.
+    const listener = vi.fn();
+    const unsub2 = source.subscribe(listener);
+
+    expect(source.getSnapshot()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsub2();
+  });
+
   describe("hash-aware active state (#532)", () => {
     function makeRouterWithUrlContext(initialHash = ""): Router {
       const r = createRouter([
@@ -391,6 +429,9 @@ describe("createActiveRouteSources", () => {
 
       const source = createActiveRouteSource(r, "settings");
 
+      // Lazy source tracks navigations only while subscribed (#766).
+      source.subscribe(() => {});
+
       expect(source.getSnapshot()).toBe(true);
 
       // Navigate to ensure subscribe path runs with hash === undefined —
@@ -413,6 +454,10 @@ describe("createActiveRouteSources", () => {
       const source = createActiveRouteSource(r, "settings", undefined, {
         hash: "billing",
       });
+
+      // Lazy: subscribe so the handler runs on navigation and exercises the
+      // hashFlip branch with a missing state.context.url (#766).
+      source.subscribe(() => {});
 
       // No URL plugin → state.context.url undefined → readContextHash returns ""
       // → does not equal "billing" → not active.
