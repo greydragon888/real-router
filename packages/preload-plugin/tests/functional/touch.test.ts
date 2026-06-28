@@ -343,6 +343,29 @@ describe("preload-plugin — touch", () => {
     router.stop();
   });
 
+  it("silently catches a synchronously-thrown error from preload function on touch (#806)", async () => {
+    const preloadFn = vi.fn(() => {
+      throw new Error("sync-boom");
+    });
+    const { router } = createTestRouter([
+      { name: "home", path: "/", preload: () => preloadFn },
+    ]);
+
+    setupMatchUrl(router);
+    cleanup = router.usePlugin(preloadPluginFactory());
+    await router.start("/");
+
+    const anchor = createAnchor("/");
+
+    fireTouchStart(anchor);
+
+    // The synchronous throw must not escape the touch timer callback.
+    await expect(waitForTimer(TOUCH_PRELOAD_DELAY)).resolves.toBeUndefined();
+    expect(preloadFn).toHaveBeenCalledTimes(1);
+
+    router.stop();
+  });
+
   it("handles touchstart with empty touches array gracefully", async () => {
     const preloadFn = vi.fn().mockResolvedValue(undefined);
     const { router } = createTestRouter([

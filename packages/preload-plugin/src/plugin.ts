@@ -153,8 +153,15 @@ export class PreloadPlugin {
 
         break;
       }
-      // "add" / "update": lazy factory-reference revalidation in
-      // #resolvePreload handles these — no eager cleanup needed.
+      default: {
+        // "add" / "update" (and any future structural op): `#compiledPreloads`
+        // is lazily revalidated in `#resolvePreload` (factory-reference compare)
+        // so it needs no eager cleanup — but `#stateCache` has no lazy path; it
+        // is read externally via `getPreloadedState`. Any structural mutation can
+        // restale a cached href — `update` changes resolution, `add` can intercept
+        // an already-cached href — so drop the snapshots wholesale. (#805)
+        this.#invalidateStateCache();
+      }
     }
   }
 
@@ -191,7 +198,7 @@ export class PreloadPlugin {
 
     this.#hoverTimer = setTimeout(() => {
       this.#hoverTimer = null;
-      preload.fn(preload.params).catch(() => {});
+      this.#runPreload(preload);
     }, this.#options.delay);
   };
 
@@ -212,7 +219,7 @@ export class PreloadPlugin {
 
     this.#touchTimer = setTimeout(() => {
       this.#touchTimer = null;
-      preload.fn(preload.params).catch(() => {});
+      this.#runPreload(preload);
     }, TOUCH_PRELOAD_DELAY);
   };
 
@@ -227,6 +234,29 @@ export class PreloadPlugin {
       this.#cancelTouch();
     }
   };
+
+  // Fire-and-forget invocation of a resolved preload. The plugin is a transport
+  // layer only — return values and errors are discarded. The `try/catch` guards
+  // the *synchronous* call: a user fn that throws before returning would escape
+  // and surface as an `uncaughtException` from the timer callback with no user
+  // code in the stack. `Promise.resolve` then normalizes a non-Promise return
+  // (a JS consumer ignoring `() => Promise`) so `.catch` can swallow a rejection
+  // without a `.catch of undefined` TypeError. (#806)
+  #runPreload(preload: { fn: PreloadFn; params: Params }): void {
+    let result: unknown;
+
+    try {
+      // The declared `() => Promise<unknown>` is the happy-path contract; a JS
+      // consumer can ignore it (the whole reason for this guard), so the result
+      // is treated as `unknown` and normalized below rather than assumed thenable.
+      result = (preload.fn as (params: Params) => unknown)(preload.params);
+    } catch {
+      // sync-throw from a user fn — same fire-and-forget contract
+      return;
+    }
+
+    void Promise.resolve(result).catch(() => {});
+  }
 
   #findAnchor(target: EventTarget | null): HTMLAnchorElement | null {
     return target instanceof Element
