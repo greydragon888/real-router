@@ -109,8 +109,21 @@ export function createActiveNameSelector(router: Router): ActiveNameSelector {
         }
 
         activeByName.set(routeName, nextActive);
+        // Per-listener exception isolation — mirrors `BaseSource.notify`
+        // (INVARIANTS "BaseSource 3"). Without it, one throwing Link listener
+        // would abort notifications to the remaining listeners of this name AND
+        // every later name in the iteration, leaving their `activeByName` state
+        // stale (#767). `activeByName.set` already ran above, so the per-name
+        // diff is committed before any listener fires. Re-throw asynchronously
+        // so the genuine bug still surfaces to global error handlers.
         for (const listener of listeners) {
-          listener();
+          try {
+            listener();
+          } catch (error) {
+            queueMicrotask(() => {
+              throw error;
+            });
+          }
         }
       }
     });
