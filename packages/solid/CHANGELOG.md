@@ -1,5 +1,13 @@
 # @real-router/solid
 
+## 0.15.3
+
+### Patch Changes
+
+- [#1024](https://github.com/greydragon888/real-router/pull/1024) [`2caf59f`](https://github.com/greydragon888/real-router/commit/2caf59fa2e5d71a47349be96e1b93f6276d048c7) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop splitting the active-route source cache key on the slow-path `<Link>` ([#776](https://github.com/greydragon888/real-router/issues/776))
+
+  The `<Link>` slow path (taken for custom `activeStrict` / `ignoreQueryParams` / `hash`) now passes the raw `routeParams` (possibly `undefined`) into `createActiveRouteSource` instead of the merged `EMPTY_PARAMS` (`{}`) default. A no-params slow-path Link therefore shares ONE cached source with a manual `createActiveRouteSource(router, name, undefined)` (key `""`) instead of keying `"{}"`. The `routeSelector` fast path and navigation/href behaviour are unchanged.
+
 ## 0.15.2
 
 ### Patch Changes
