@@ -16,6 +16,9 @@ import {
   adoptRouteArtifacts,
   assertAddable,
   assertNoDuplicateNamesInBatch,
+  assertNoDuplicatePathsInBatch,
+  assertNoInternalNamesInBatch,
+  assertNoInternalRouteName,
   buildAddArtifacts,
   buildReplaceArtifacts,
   commitRouteUpdate,
@@ -428,11 +431,15 @@ function replaceRoutes<
   currentState: State | undefined,
   onCommitted?: () => void,
 ): void {
-  // Reject within-batch duplicate names BEFORE building/swapping (#968) — the
-  // same silent-shadow case `assertAddable` catches for `add`. methodName is
-  // "addRoute" to match validation-plugin (which reports "addRoute" for replace
-  // batches too), so the no-plugin error is identical to the with-plugin one.
+  // Reject the silent-corruption cases `assertAddable` catches for `add`, BEFORE
+  // building/swapping, so bare-core parity is symmetric (#1047): within-batch
+  // duplicate names (#968), reserved "@@" names (#954), and within-batch
+  // duplicate paths (#955). methodName is "addRoute" to match validation-plugin
+  // (which reports "addRoute" for replace batches too), so the no-plugin error
+  // is identical to the with-plugin one.
+  assertNoInternalNamesInBatch(routes, "addRoute");
   assertNoDuplicateNamesInBatch(routes, "", "addRoute");
+  assertNoDuplicatePathsInBatch(routes, "", "addRoute");
 
   // Build the whole new set BEFORE touching the store.
   const artifacts = buildReplaceArtifacts(
@@ -610,6 +617,9 @@ export function getRoutesApi<
 
       ctx.validator?.routes.validateRemoveRouteArgs(name);
       ctx.validator?.routes.throwIfInternalRoute(name, "removeRoute");
+      // Always-on parity backstop (#1047 / #238): a reserved "@@" name is
+      // internal and cannot be removed, with or without the validation-plugin.
+      assertNoInternalRouteName(name, "removeRoute");
 
       const canRemove = validateRemoveRoute(
         name,
@@ -648,6 +658,9 @@ export function getRoutesApi<
 
       ctx.validator?.routes.validateUpdateRouteBasicArgs(name, updates);
       ctx.validator?.routes.throwIfInternalRoute(name, "updateRoute");
+      // Always-on parity backstop (#1047 / #238): a reserved "@@" name is
+      // internal and cannot be updated, with or without the validation-plugin.
+      assertNoInternalRouteName(name, "updateRoute");
 
       ctx.validator?.routes.validateUpdateRoutePropertyTypes(name, updates);
 

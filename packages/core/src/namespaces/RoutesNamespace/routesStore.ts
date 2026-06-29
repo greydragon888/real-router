@@ -426,24 +426,39 @@ export function assertNoDuplicateNamesInBatch<
 const INTERNAL_ROUTE_PREFIX = "@@";
 
 /**
- * Rejects routes whose (bare) name uses the reserved "@@" prefix — internal /
- * system names such as UNKNOWN_ROUTE (`"@@router/UNKNOWN_ROUTE"`). Without this
- * guard a public `add` could register a route whose name equals the not-found
- * sentinel, so a real URL would `matchPath` to a state with `name ===
- * UNKNOWN_ROUTE`, silently conflating a genuine route with "not found" (#954).
- * Checks the BARE leaf name (the prefix is on the leaf, not the dotted fullName)
- * and recurses children. Mirrors validation-plugin's `throwIfInternalRoute`
- * message so the no-plugin error matches the with-plugin one.
+ * Rejects a single (bare) route name that uses the reserved "@@" prefix —
+ * internal / system names such as UNKNOWN_ROUTE (`"@@router/UNKNOWN_ROUTE"`).
+ * Mutating such a name would let a real URL `matchPath` to a state with
+ * `name === UNKNOWN_ROUTE`, silently conflating a genuine route with "not
+ * found". This always-on guard protected all four mutators (#238) until the
+ * validation-extraction (`d1ebff80`) demoted it to the opt-in
+ * validation-plugin; only `add` was restored (#954), so `remove`/`update`
+ * regained it via this helper (#1047). Mirrors validation-plugin's
+ * `throwIfInternalRoute` message so the no-plugin error matches the with-plugin
+ * one.
+ */
+export function assertNoInternalRouteName(
+  name: string,
+  methodName: string,
+): void {
+  if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
+    throw new Error(
+      `[router.${methodName}] Route name "${name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`,
+    );
+  }
+}
+
+/**
+ * Batch counterpart to {@link assertNoInternalRouteName}: rejects any route in
+ * the batch (recursing children) whose BARE leaf name uses the reserved "@@"
+ * prefix (the prefix is on the leaf, not the dotted fullName). Used by `add`
+ * (#954) and `replace` (#1047).
  */
 export function assertNoInternalNamesInBatch<
   Dependencies extends DefaultDependencies,
 >(routes: readonly Route<Dependencies>[], methodName: string): void {
   for (const route of routes) {
-    if (route.name.startsWith(INTERNAL_ROUTE_PREFIX)) {
-      throw new Error(
-        `[router.${methodName}] Route name "${route.name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`,
-      );
-    }
+    assertNoInternalRouteName(route.name, methodName);
 
     if (route.children) {
       assertNoInternalNamesInBatch(route.children, methodName);
