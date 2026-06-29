@@ -196,7 +196,11 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
 
       await vi.advanceTimersByTimeAsync(200);
 
-      await expect(firstNav).rejects.toThrow();
+      // Superseded by secondNav → must reject with TRANSITION_CANCELLED, not just
+      // "some error" (a codeless `.rejects.toThrow()` would pass on any rejection).
+      await expect(firstNav).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       await secondNav;
 
@@ -209,14 +213,20 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
   describe("signal", () => {
     it("signal passed to listener, signal.aborted === false initially", async () => {
       let receivedSignal: AbortSignal | undefined;
+      let abortedAtCallTime: boolean | undefined;
 
       router.subscribeLeave(({ signal }) => {
         receivedSignal = signal;
+        // Capture at call time: a successful navigation never aborts the signal
+        // (#722), so it also stays false afterwards — assert the "initially false"
+        // the title promises, which the bare instanceof check never verified.
+        abortedAtCallTime = signal.aborted;
       });
 
       await router.navigate("users");
 
       expect(receivedSignal).toBeInstanceOf(AbortSignal);
+      expect(abortedAtCallTime).toBe(false);
     });
 
     it("concurrent navigation aborts signal (no guards path)", async () => {

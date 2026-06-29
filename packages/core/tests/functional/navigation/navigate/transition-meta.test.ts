@@ -1,5 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { errorCodes } from "@real-router/core";
+
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -146,7 +148,11 @@ describe("router.navigate() - TransitionMeta on state.transition", () => {
 
   describe("blocked navigation", () => {
     it("should not update state when guard blocks navigation", async () => {
-      await expect(router.navigate("admin-protected")).rejects.toThrow();
+      // `admin-protected` has `canActivate: () => () => false` → CANNOT_ACTIVATE.
+      // Codeless `.rejects.toThrow()` would also pass on the wrong error code.
+      await expect(router.navigate("admin-protected")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
 
       expect(router.getState()?.name).toBe("home");
     });

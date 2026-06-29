@@ -152,7 +152,8 @@ describe("router.navigate() - concurrent navigation", () => {
         expect.objectContaining({
           name: "profile",
         }),
-        expect.any(Object),
+        // fromState is the committed start route — assert it, not `any(Object)`.
+        expect.objectContaining({ name: "home" }),
       );
 
       unsubCancel();

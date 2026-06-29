@@ -50,7 +50,9 @@ describe("router.navigate() - route not found", () => {
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(
         undefined,
-        expect.any(Object),
+        // fromState is the committed start route — assert it, not `any(Object)`,
+        // so a regression passing the wrong fromState is caught.
+        expect.objectContaining({ name: "home" }),
         expect.objectContaining({
           code: errorCodes.ROUTE_NOT_FOUND,
         }),

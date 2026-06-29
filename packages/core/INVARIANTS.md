@@ -557,3 +557,4 @@ Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and 
 | `tests/property/getStaticPaths.properties.ts`           | 1          | SSG leaf-path enumeration (model-based)         |
 | `tests/property/tree-changed.properties.ts`             | 6          | TREE_CHANGED atomicity, op discriminator, replace diff, nested-subtree flatten, update conditional emit |
 | `tests/property/cancellation.properties.ts`             | 1          | Navigation cancellation — random cancel sequences |
+| `tests/property/empty-params-reuse.properties.ts`       | 1          | All-undefined param dict → shared EMPTY_PARAMS singleton (#1027/#1028) |

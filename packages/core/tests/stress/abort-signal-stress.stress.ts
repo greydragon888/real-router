@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
@@ -211,5 +211,75 @@ describe("S10: AbortController / Signal stress", () => {
     // correctness is covered discriminatingly by the #722 suite, not here.
     expect(router.getState()?.name).toBe(`route${lastTarget}`);
     expect(delta).toBeLessThan(1 * MB);
+  }, 30_000);
+
+  it("S10.5: one shared external signal reused across 100 async navigations — every bridged 'abort' listener is removed (no accumulation)", async () => {
+    // Every async navigation bridges its external `opts.signal` by adding an
+    // `onExternalAbort` listener in `#finishAsyncNavigation` and removing it in
+    // `finally` on settle (#722/#1030). All S10 tests above pass a FRESH
+    // controller per navigation, so listener cleanup on a LONG-LIVED shared
+    // signal — the realistic "one AbortController for the whole session" pattern
+    // — was never exercised. Here ONE never-aborted signal is shared across 100
+    // superseding async navigations; every listener it accrues must be removed.
+    //
+    // DISCRIMINATING POWER: drop the `finally` removeEventListener and `removed`
+    // falls below `adds` — on a real shared signal the `onExternalAbort` closures
+    // (each capturing a dead navigation) would pile up unboundedly. Counting
+    // add/remove on the shared signal catches that directly (a GC-masked heap
+    // line could not).
+    const lifecycle = getLifecycleApi(router);
+
+    // Make the targets async so each navigation reaches the external-signal
+    // bridge in #finishAsyncNavigation.
+    lifecycle.addActivateGuard("route1", delayedResolveGuardFactory);
+    lifecycle.addActivateGuard("route2", delayedResolveGuardFactory);
+    lifecycle.addActivateGuard("route3", delayedResolveGuardFactory);
+
+    const controller = new AbortController();
+    const { signal } = controller;
+    const addSpy = vi.spyOn(signal, "addEventListener");
+    const removeSpy = vi.spyOn(signal, "removeEventListener");
+
+    const targets = ["route1", "route2", "route3"] as const;
+
+    let prev = router.navigate(targets[0], {}, { signal });
+
+    prev.catch(() => {});
+
+    for (let i = 1; i < 100; i++) {
+      // Let `prev` reach its async guard (and bridge the shared signal) before
+      // the next navigation supersedes it.
+      await Promise.resolve();
+
+      const next = router.navigate(targets[i % targets.length], {}, { signal });
+
+      next.catch(() => {});
+      await prev.catch(() => {});
+      prev = next;
+    }
+
+    // A guard-free route supersedes the last in-flight navigation so it settles
+    // (releasing its listener) and then commits.
+    const final = router.navigate("route9", {}, { signal });
+
+    await prev.catch(() => {});
+    await final.catch(() => {});
+
+    const addedAbortListeners = addSpy.mock.calls.filter(
+      ([type]) => type === "abort",
+    ).length;
+    const removedAbortListeners = removeSpy.mock.calls.filter(
+      ([type]) => type === "abort",
+    ).length;
+
+    // The async bridge actually ran (otherwise the test proves nothing)...
+    expect(addedAbortListeners).toBeGreaterThan(0);
+    // ...and every listener it added to the shared signal was removed on settle —
+    // no accumulation on a long-lived reused signal.
+    expect(removedAbortListeners).toBe(addedAbortListeners);
+    // The shared signal was never aborted, so it remains usable, and the router
+    // committed the final guard-free navigation.
+    expect(signal.aborted).toBe(false);
+    expect(router.getState()?.name).toBe("route9");
   }, 30_000);
 });

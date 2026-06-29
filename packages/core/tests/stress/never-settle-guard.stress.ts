@@ -127,4 +127,49 @@ describe("S31: never-settling canActivate guard does not wedge the pipeline", ()
     await expect(nav).rejects.toThrow(RouterError);
     expect(router.isActive()).toBe(false);
   }, 30_000);
+
+  it("S31.4: an external opts.signal abort releases a navigation parked on a never-settling guard, recovering the FSM each time ×200", async () => {
+    // The third cancellation source (after supersede/S31.1 and stop/dispose
+    // S31.2/S31.3): an external `opts.signal`. Its abort takes a longer path than
+    // the others — `onExternalAbort` → `cancelNavigation` → FSM `CANCEL` →
+    // `handleCancel` aborts the internal controller → the #1018 abort-race wakes
+    // the parked navigation (#1030). This stresses that whole bridge against a
+    // NEVER-settling guard, which S31.1-3 did not (they trigger the internal
+    // abort directly via supersede/stop/dispose).
+    //
+    // DISCRIMINATING POWER: remove either the abort-race (#1018) or the external
+    // → `cancelNavigation` routing (#1030) and the never-settling guard leaves
+    // `await nav` pending forever — `await expect(...).rejects` hangs to the
+    // per-test timeout → hard FAIL.
+    const N = 200;
+
+    for (let i = 0; i < N; i++) {
+      const controller = new AbortController();
+      const nav = router.navigate("users", {}, { signal: controller.signal });
+
+      // Let the navigation park in its never-settling activation guard
+      // (FSM in LEAVE_APPROVED) before the external abort lands.
+      await Promise.resolve();
+      controller.abort(new Error(`external abort ${i}`));
+
+      // Note: the post-race throw is a bare RouterError(TRANSITION_CANCELLED) —
+      // the abort `reason` is carried on the internal controller's signal.reason
+      // (observable by a captured leave/guard signal), not re-attached to this
+      // rejection, so we assert the code only.
+      await expect(nav).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      // FSM recovered to READY every cycle (#1030): not stuck mid-leave, so
+      // route-CRUD is not silently blocked and the next navigation can start.
+      expect(router.isActive()).toBe(true);
+      expect(router.isLeaveApproved()).toBe(false);
+    }
+
+    // Still fully usable after 200 external-abort cycles: a guard-free route
+    // commits normally.
+    await router.navigate("settings.account");
+
+    expect(router.getState()?.name).toBe("settings.account");
+  }, 30_000);
 });

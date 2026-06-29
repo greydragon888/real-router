@@ -9,11 +9,17 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, RouterError } from "@real-router/core";
+import type { Router } from "@real-router/core";
+
+// NOTE: the callback-style navigation API (`navigate(name, params, opts, done)`)
+// was removed — `navigate()` is Promise-only now. These tests historically
+// guarded that API (Issues #53/#58); they are kept because they still exercise
+// the polymorphic ARGUMENT FORMS (`undefined` / `null` / `{}` / populated opts)
+// and post-error resilience. Titles describe the Promise behavior, not callbacks.
 
 let router: Router;
 
-describe("router.navigate() - edge cases callback", () => {
+describe("router.navigate() - edge cases (argument forms & error resilience)", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
@@ -26,8 +32,8 @@ describe("router.navigate() - edge cases callback", () => {
     vi.clearAllMocks();
   });
 
-  describe("callback error handling", () => {
-    it("should not crash when callback throws sync error", async () => {
+  describe("error resilience — router stays operational", () => {
+    it("stays operational after a normal navigation", async () => {
       await router.navigate("users");
 
       // Router should continue working
@@ -35,41 +41,35 @@ describe("router.navigate() - edge cases callback", () => {
       expect(router.getState()?.name).toBe("users");
     });
 
-    it("should not crash when callback throws on route not found", async () => {
-      try {
-        await router.navigate("nonexistent");
-      } catch {
-        // Expected error
-      }
+    it("stays operational after a route-not-found rejection", async () => {
+      await expect(router.navigate("nonexistent")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       // Router should still be operational
       expect(router.isActive()).toBe(true);
     });
 
-    it("should not crash when callback throws on same states error", async () => {
+    it("stays operational after a same-states rejection", async () => {
       await router.navigate("users");
 
       expect(router.getState()?.name).toBe("users");
 
-      // Navigate to same route without force/reload
-      try {
-        await router.navigate("users");
-      } catch {
-        // Expected SAME_STATES error
-      }
+      // Navigate to same route without force/reload → SAME_STATES rejection.
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.SAME_STATES,
+      });
 
       // Router should still be operational
       expect(router.isActive()).toBe(true);
     });
 
-    it("should not crash when router not started and callback throws", async () => {
+    it("rejects with ROUTER_NOT_STARTED after stop()", async () => {
       router.stop();
 
-      try {
-        await router.navigate("users");
-      } catch {
-        // Expected NOT_STARTED error
-      }
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.ROUTER_NOT_STARTED,
+      });
 
       // Router should not have crashed
       expect(router.isActive()).toBe(false);
@@ -77,8 +77,8 @@ describe("router.navigate() - edge cases callback", () => {
   });
 
   describe("edge cases - section 12 analysis", () => {
-    describe("recursive navigate from callback", () => {
-      it("should handle navigate called from callback without stack overflow", async () => {
+    describe("repeated navigation", () => {
+      it("should handle navigate called repeatedly without stack overflow", async () => {
         let depth = 0;
         const maxDepth = 10;
 
@@ -103,62 +103,55 @@ describe("router.navigate() - edge cases callback", () => {
         expect(router.isActive()).toBe(true);
       });
 
-      it("should allow navigation from success callback", async () => {
-        const firstCallback = vi.fn();
-        const secondCallback = vi.fn();
-
+      it("should allow a follow-up navigation after one completes", async () => {
+        // A second navigation issued AFTER the first has settled commits
+        // normally (this is the supported "navigation after navigation" path —
+        // the reentrant SYNCHRONOUS form from a listener is banned, see
+        // reentrant-ban.test.ts). The old test self-invoked two `vi.fn()` mocks
+        // and asserted they were called with what it had just passed — a
+        // tautology that exercised no router behavior.
         const state1 = await router.navigate("users");
 
-        firstCallback(undefined, state1);
+        expect(state1.name).toBe("users");
 
-        // Navigate again after first completes
         const state2 = await router.navigate("orders");
 
-        secondCallback(undefined, state2);
-
-        expect(firstCallback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
-        expect(secondCallback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "orders" }),
-        );
+        expect(state2.name).toBe("orders");
         expect(router.getState()?.name).toBe("orders");
       });
     });
   });
 
-  describe("Issue #53: Callback lost when navigate called with (name, params, undefined, callback)", () => {
-    // Issue #53: When navigate() is called with the form:
+  describe("Issue #53: opts argument is honored in every form", () => {
+    // Issue #53 (historical, callback era): when navigate() was called as
     //   router.navigate('route', { id: 1 }, undefined, callback)
-    // The callback was being ignored because the argument parsing logic
-    // only checked the callback inside the `if (optsOrDone)` block, which doesn't
-    // execute when optsOrDone is undefined/falsy.
+    // the trailing callback was dropped because parsing only looked for it
+    // inside `if (optsOrDone)`. The callback API is gone; these now assert the
+    // polymorphic OPTS forms (undefined / null / {} / populated) all resolve.
 
-    describe("Callback should be called in all argument forms", () => {
-      it("should call callback when opts is undefined: navigate(name, params, undefined, callback)", async () => {
+    describe("opts in every form resolves", () => {
+      it("resolves when opts is undefined: navigate(name, params, undefined)", async () => {
         const state = await router.navigate("users", { id: 1 }, undefined);
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
       });
 
-      it("should call callback when opts is null: navigate(name, params, null, callback)", async () => {
+      it("resolves when opts is null: navigate(name, params, null)", async () => {
         const state = await router.navigate("users", { id: 1 }, null as any);
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
       });
 
-      it("should call callback when opts is empty object: navigate(name, params, {}, callback)", async () => {
+      it("resolves when opts is empty object: navigate(name, params, {})", async () => {
         const state = await router.navigate("users", { id: 1 }, {});
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
       });
 
-      it("should call callback when opts has values: navigate(name, params, opts, callback)", async () => {
+      it("honors opts when populated: navigate(name, params, { replace: true })", async () => {
         const state = await router.navigate(
           "users",
           { id: 1 },
@@ -167,22 +160,21 @@ describe("router.navigate() - edge cases callback", () => {
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
+        // The populated opts must actually take effect, not just be accepted.
+        expect(state.transition?.replace).toBe(true);
       });
     });
 
-    describe("Callback receives correct arguments", () => {
-      it("should pass error to callback when route not found with undefined opts", async () => {
-        try {
-          await router.navigate("nonexistent", {}, undefined);
-
-          expect.fail("Should have thrown");
-        } catch (error) {
-          expect(error).toBeDefined();
-          expect((error as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        }
+    describe("resolution / rejection carries the right value", () => {
+      it("rejects with ROUTE_NOT_FOUND when route missing and opts undefined", async () => {
+        await expect(
+          router.navigate("nonexistent", {}, undefined),
+        ).rejects.toMatchObject({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        });
       });
 
-      it("should pass state to callback on successful navigation with undefined opts", async () => {
+      it("resolves with the committed state on success with undefined opts", async () => {
         const state = await router.navigate(
           "users.view",
           { id: "123" },
@@ -248,7 +240,7 @@ describe("router.navigate() - edge cases callback", () => {
         expect(state.name).toBe("users");
       });
 
-      it("should work: navigate(name, callback)", async () => {
+      it("should work: navigate(name) — single-arg form", async () => {
         const state = await router.navigate("users");
 
         expect(state).toBeDefined();
@@ -262,7 +254,7 @@ describe("router.navigate() - edge cases callback", () => {
         expect(router.getState()?.params).toStrictEqual({ id: "456" });
       });
 
-      it("should work: navigate(name, params, callback)", async () => {
+      it("should work: navigate(name, params) — with nested id", async () => {
         const state = await router.navigate("users.view", { id: "789" });
 
         expect(state).toBeDefined();
@@ -291,16 +283,14 @@ describe("router.navigate() - edge cases callback", () => {
     });
   });
 
-  describe("Issue #58: Callback not lost with undefined opts (verifies 12.1 fix)", () => {
+  describe("Issue #58: undefined opts does not drop the navigation (verifies 12.1 fix)", () => {
     /**
-     * Issue #58 / 12.1: Verify callback is not lost when navigate is called as:
-     * navigate(name, params, undefined, callback)
-     *
-     * Previously, if optsOrDone was undefined/falsy, the callback parameter was ignored.
-     * The fix changed `else if (optsOrDone)` to just `else` to capture the callback properly.
+     * Issue #58 / 12.1 (historical, callback era): a falsy `optsOrDone` used to
+     * drop the trailing callback. The callback API is gone; these verify the
+     * `navigate(name, params, undefined)` form still resolves/rejects correctly.
      */
 
-    it("should call callback when opts is undefined", async () => {
+    it("resolves when opts is undefined", async () => {
       const freshRouter = createTestRouter();
 
       await freshRouter.start("/home");
@@ -314,7 +304,7 @@ describe("router.navigate() - edge cases callback", () => {
       freshRouter.stop();
     });
 
-    it("should call callback when opts is null", async () => {
+    it("resolves when opts is null", async () => {
       const freshRouter = createTestRouter();
 
       await freshRouter.start("/home");
@@ -327,20 +317,17 @@ describe("router.navigate() - edge cases callback", () => {
       freshRouter.stop();
     });
 
-    it("should call callback with error when navigation fails", async () => {
+    it("rejects with ROUTE_NOT_FOUND when navigation fails", async () => {
       const freshRouter = createTestRouter();
 
       await freshRouter.start("/home");
 
       // Navigate to non-existent route
-      try {
-        await freshRouter.navigate("nonexistent", {}, undefined);
-
-        expect.fail("Should have thrown");
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect((error as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(
+        freshRouter.navigate("nonexistent", {}, undefined),
+      ).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       freshRouter.stop();
     });
@@ -352,26 +339,23 @@ describe("router.navigate() - edge cases callback", () => {
 
       // Form 1: navigate(name)
       await freshRouter.navigate("users");
-      // No callback to verify, just shouldn't throw
 
-      // Form 2: navigate(name, callback) - callback pattern removed, just navigate
+      // Form 2: navigate(name, params)
       await freshRouter.navigate("users.view", { id: "0" });
 
       // Form 3: navigate(name, params)
       await freshRouter.navigate("users.view", { id: "1" });
-      // No callback to verify
 
-      // Form 4: navigate(name, params, callback) - callback pattern removed
+      // Form 4: navigate(name, params)
       await freshRouter.navigate("users.view", { id: "2" });
 
       // Form 5: navigate(name, params, opts)
       await freshRouter.navigate("users", {}, { reload: true });
-      // No callback to verify
 
-      // Form 6: navigate(name, params, opts, callback) - callback pattern removed
+      // Form 6: navigate(name, params, opts)
       await freshRouter.navigate("users", {}, { reload: true });
 
-      // Form 7: navigate(name, params, undefined, callback) - the bug case - callback pattern removed
+      // Form 7: navigate(name, params, undefined) - the historical bug case
       await freshRouter.navigate("users.view", { id: "3" }, undefined);
 
       expect(freshRouter.getState()?.name).toBe("users.view");
