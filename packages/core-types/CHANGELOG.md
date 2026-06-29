@@ -1,5 +1,21 @@
 # @real-router/types
 
+## 0.38.0
+
+### Minor Changes
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `maxEventDepth` from `LimitsConfig` ([#1033](https://github.com/greydragon888/real-router/issues/1033))
+
+  **Breaking change (pre-1.0).** `maxEventDepth` is no longer a router limit — the event emitter now coalesces re-entrant emits (depth ≤ 1) instead of bounding recursion depth, so the option had no remaining effect. Remove `maxEventDepth` from any `createRouter(routes, { limits })` call.
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `REENTRANT_TREE_MUTATION` error code
+
+  Error code for the reentrant route-CRUD ban ([#1032](https://github.com/greydragon888/real-router/issues/1032)) — thrown when a CRUD op (`add`/`remove`/`update`/`clear`/`replace`) is called synchronously from inside a `subscribeChanges` handler.
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `REENTRANT_NAVIGATION` error code ([#1030](https://github.com/greydragon888/real-router/issues/1030))
+
+  New member on `ErrorCodeKeys` and `ErrorCodeToValueMap` for the banned synchronous reentrant navigation guard. The runtime value ships in `@real-router/core`'s `errorCodes`; see its changelog for behavior and migration.
+
 ## 0.37.0
 
 ### Minor Changes
