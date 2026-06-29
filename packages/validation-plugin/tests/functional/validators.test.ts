@@ -147,7 +147,6 @@ describe("options validators", () => {
             maxPlugins: 10,
             maxListeners: 30,
             warnListeners: 20,
-            maxEventDepth: 5,
             maxLifecycleHandlers: 100,
           },
           "test",

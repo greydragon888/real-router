@@ -80,7 +80,6 @@ function makeDeps(
       maxPlugins: 50,
       maxListeners: 10_000,
       warnListeners: 1000,
-      maxEventDepth: 50,
       maxLifecycleHandlers: 200,
     },
   };
@@ -618,7 +617,6 @@ describe("validateDependenciesStructure", () => {
           maxPlugins: 50,
           maxListeners: 10_000,
           warnListeners: 1000,
-          maxEventDepth: 50,
           maxLifecycleHandlers: 200,
         },
       });
@@ -631,7 +629,6 @@ describe("validateDependenciesStructure", () => {
           maxPlugins: 50,
           maxListeners: 10_000,
           warnListeners: 1000,
-          maxEventDepth: 50,
           maxLifecycleHandlers: 200,
         },
       });
@@ -710,7 +707,6 @@ describe("validateLimitsConsistency", () => {
         maxPlugins: 50,
         maxListeners: 10_000,
         warnListeners: 1000,
-        maxEventDepth: 50,
         maxLifecycleHandlers: 200,
       },
     });
@@ -731,7 +727,6 @@ describe("validateLimitsConsistency", () => {
         maxPlugins: 50,
         maxListeners: 10_000,
         warnListeners: 1000,
-        maxEventDepth: 50,
         maxLifecycleHandlers: 200,
       },
     });

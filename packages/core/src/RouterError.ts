@@ -78,7 +78,7 @@ export class RouterError extends Error {
 
     // Subclasses don't auto-set `name`; without this `error.name` inherits
     // "Error", breaking `error.name === "RouterError"` checks at catch sites that
-    // can't `instanceof` across bundle boundaries (cf. `RecursionDepthError`).
+    // can't `instanceof` across bundle boundaries.
     this.name = "RouterError";
 
     this.code = code;

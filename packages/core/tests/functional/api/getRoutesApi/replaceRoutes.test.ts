@@ -799,6 +799,30 @@ describe("core/routes/replaceRoutes", () => {
 
       unsub();
     });
+
+    it("coalesces a runaway replace-from-subscribe loop — no recursion, no throw", () => {
+      // A subscribe (TRANSITION_SUCCESS) listener that replaces UNCONDITIONALLY:
+      // each replace revalidates the active state and would re-emit
+      // TRANSITION_SUCCESS (#950), re-entering the listener. The emitter coalesces
+      // that re-entrant SUCCESS emit (#1033) — the listener runs exactly once, no
+      // recursion, no error. (Before #1033 this path was severed by the emitter's
+      // `maxEventDepth` depth bound throwing RecursionDepthError; that machinery
+      // is gone.) The reentrant replace's mutation still commits; only its
+      // redundant nested re-notification is coalesced.
+      let depth = 0;
+      const unsub = router.subscribe(() => {
+        depth += 1;
+        routesApi.replace([{ name: "home", path: "/home" }]);
+      });
+
+      expect(() => {
+        routesApi.replace([{ name: "home", path: "/home" }]);
+      }).not.toThrow();
+
+      expect(depth).toBe(1); // re-entrant SUCCESS coalesced — listener ran once
+
+      unsub();
+    });
   });
 
   // ============================================================================

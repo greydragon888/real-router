@@ -1,15 +1,14 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import {
-  errorCodes,
-  events,
-  RecursionDepthError,
-  UNKNOWN_ROUTE,
-} from "@real-router/core";
+import { errorCodes, events, UNKNOWN_ROUTE } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { captureUnhandledRejections, createTestRouter } from "../../helpers";
+import {
+  captureSyncThrow,
+  captureUnhandledRejections,
+  createTestRouter,
+} from "../../helpers";
 
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -368,28 +367,20 @@ describe("core/observable", () => {
         expect(next.name).toBe("orders");
       });
 
-      // (b.2) A reentrant `router.navigate()` from inside a subscribe listener
-      // self-feeds nested TRANSITION_SUCCESS emits until the EventEmitter's
-      // `maxEventDepth` (5) ceiling throws `RecursionDepthError`. Left
-      // fire-and-forget (no `.catch()`), that rejection used to leak as a Node
-      // `unhandledRejection` because `RecursionDepthError` is not a RouterError
-      // suppressed-code AND the optimistic `lastSyncResolved` flag, left stale
-      // when `completeTransition` threw, made the facade skip its suppressing
-      // `.catch` (#945). Core now suppresses it silently — symmetric with
-      // subscribeLeave, where a reentrant navigate rejects with the already-
-      // suppressed `TRANSITION_CANCELLED`. No leak, no spurious error log.
-      it("should suppress a reentrant subscribe-navigate's RecursionDepthError instead of leaking it (#945)", async () => {
+      // (b.2) RFC §4: a reentrant `router.navigate()` from inside a subscribe
+      // listener is BANNED — it throws REENTRANT_NAVIGATION synchronously, which
+      // the emit's per-listener `onListenerError` isolation routes to the logger.
+      // The self-feed never starts, so the old #945 `RecursionDepthError` ceiling
+      // is unreachable and nothing leaks as a process `unhandledRejection`.
+      it("bans a reentrant subscribe-navigate (REENTRANT_NAVIGATION via onListenerError); no self-feed, no leak", async () => {
         vi.spyOn(logger, "error").mockImplementation(noop);
 
-        // Two guard-free routes rotated so every hop is a REAL transition
-        // (SAME_STATES short-circuits before TRANSITION_SUCCESS and breaks the
-        // self-feeding chain).
         const chain = ["users", "orders"] as const;
         let depth = 0;
 
         router.subscribe(() => {
           depth++;
-          // Fire-and-forget reentrant navigate — deliberately NO `.catch()`.
+          // Fire-and-forget reentrant navigate — banned; throws into onListenerError.
           void router.navigate(chain[depth % chain.length]);
         });
 
@@ -397,25 +388,20 @@ describe("core/observable", () => {
           void router.navigate(chain[0]);
         });
 
-        // No RecursionDepthError escaped as a process-level unhandledRejection.
-        expect(
-          leaked.filter((error) => error instanceof RecursionDepthError),
-        ).toStrictEqual([]);
+        // No self-feed → nothing leaks (no process unhandledRejection).
+        expect(leaked).toStrictEqual([]);
 
-        // Suppressed SILENTLY: not logged as an "Unexpected navigation error"
-        // (that would mis-classify a bounded, deterministic fire-and-forget
-        // outcome — symmetric with subscribeLeave's suppressed cancellation).
-        expect(logger.error).not.toHaveBeenCalledWith(
-          "router.navigate",
-          "Unexpected navigation error",
-          expect.anything(),
+        // The reentrant throw was routed to onListenerError → logger.error.
+        expect(logger.error).toHaveBeenCalledWith(
+          "Router",
+          expect.stringContaining("Error in listener for"),
+          expect.objectContaining({ code: errorCodes.REENTRANT_NAVIGATION }),
         );
 
-        // The chain actually climbed to the depth ceiling (proves the reentrant
-        // path executed rather than short-circuiting early).
-        expect(depth).toBe(5);
+        // The listener fired ONCE (the original commit) — no recursion.
+        expect(depth).toBe(1);
 
-        // Router stays functional after the suppressed saturation.
+        // Router stays functional.
         const next = await router.navigate("home");
 
         expect(next.name).toBe("home");
@@ -561,34 +547,31 @@ describe("core/observable", () => {
         // no freshRouter.stop()/dispose() in cleanup — already disposed
       });
 
-      // (i) A listener that issues a reentrant navigate() does not crash the
-      // emit cycle (depth tracking tolerates it); the reentrant navigation
-      // commits and becomes the final state.
-      it("should tolerate a reentrant navigate() from within a listener", async () => {
+      // (i) RFC §4: a synchronous reentrant navigate() from within a subscribe
+      // listener is banned — it throws REENTRANT_NAVIGATION; the reentrant target
+      // never commits and the original navigation stands.
+      it("bans a reentrant navigate() from within a listener", async () => {
         const seen: string[] = [];
         let reentered = false;
+        let captured: unknown;
 
         router.subscribe((payload) => {
           seen.push(payload.route.name);
 
           if (!reentered && payload.route.name === "users") {
             reentered = true;
-            void router.navigate("orders").catch(noop);
+            captured = captureSyncThrow(() => router.navigate("orders"));
           }
         });
 
-        await expect(router.navigate("users")).resolves.toMatchObject({
-          name: "users",
-        });
+        const state = await router.navigate("users");
 
-        // allow the reentrant navigation's microtasks to flush
-        await Promise.resolve();
-        await new Promise((resolve) => {
-          setTimeout(resolve, 0);
+        expect(captured).toMatchObject({
+          code: errorCodes.REENTRANT_NAVIGATION,
         });
-
-        expect(seen).toStrictEqual(["users", "orders"]);
-        expect(router.getState()?.name).toBe("orders");
+        expect(state.name).toBe("users");
+        expect(seen).toStrictEqual(["users"]);
+        expect(router.getState()?.name).toBe("users");
       });
     });
 

@@ -43,11 +43,11 @@ describe("router.navigate() - edge cases input validation", () => {
 
   describe("edge cases - invalid input types (analysis 10.1.3)", () => {
     it("should handle empty string as route name", async () => {
-      try {
-        await router.navigate("");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      // Must REJECT with ROUTE_NOT_FOUND — the previous try/catch asserted inside
+      // the catch, so a regression that resolved `navigate("")` passed vacuously.
+      await expect(router.navigate("")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       // Router should still be operational
       expect(router.isActive()).toBe(true);

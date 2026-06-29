@@ -7,35 +7,24 @@ import type {
 const DEFAULT_LIMITS: EventEmitterLimits = {
   maxListeners: 0,
   warnListeners: 0,
-  maxEventDepth: 0,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 type AnyCallback = Function;
 
 /**
- * Sentinel error for recursion depth violations.
- * Re-thrown from the per-listener catch so it propagates to the caller.
- */
-export class RecursionDepthError extends Error {
-  constructor(message?: string) {
-    super(message);
-    // Without this, `error.name` inherits "Error" (subclasses don't auto-set
-    // it), breaking `error.name === "RecursionDepthError"` checks at catch sites
-    // that can't `instanceof` across bundle boundaries.
-    this.name = "RecursionDepthError";
-  }
-}
-
-/**
  * Generic typed event emitter with listener limits, duplicate detection,
- * recursion depth protection, and per-listener error isolation.
+ * re-entrancy coalescing, and per-listener error isolation.
  *
- * All features are opt-in via constructor options and limits.
+ * All limits are opt-in via constructor options.
  */
 export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   readonly #callbacks = new Map<string, Set<AnyCallback>>();
-  #depthMap: Map<string, number> | null = null;
+  // Names currently being dispatched. A re-entrant `emit` of an event already
+  // on this set is coalesced to a no-op (see `emit`), so an event can never
+  // re-enter its own dispatch — recursion is structurally impossible (depth ≤ 1)
+  // with no depth bound and no stack-overflow path (#1033).
+  readonly #dispatching = new Set<string>();
   #warnedEvents: Set<string> | null = null;
   #limits: EventEmitterLimits = DEFAULT_LIMITS;
   readonly #onListenerError:
@@ -148,9 +137,14 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
   /**
    * Emits an event, calling all registered listeners with the provided args.
+   *
    * Uses snapshot iteration — listeners added/removed during emit don't affect
-   * the current invocation. Per-listener errors are caught and reported via
-   * the onListenerError callback. RecursionDepthError is re-thrown.
+   * the current invocation. Per-listener errors are caught and reported via the
+   * `onListenerError` callback; other listeners still run.
+   *
+   * Re-entrant emit is coalesced: emitting an event that is already being
+   * dispatched (a listener that synchronously re-emits the same event) is a
+   * no-op, so dispatch never recurses into itself (#1033).
    *
    * Uses explicit params instead of rest params to avoid V8 array materialization.
    * Extra undefined args are harmless — JS functions ignore extra arguments.
@@ -168,24 +162,48 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       return;
     }
 
-    // arguments.length is O(1) in V8 strict mode — no deopt
-    const argc = arguments.length - 1;
-
-    if (this.#limits.maxEventDepth === 0) {
-      this.#emitFast(set, eventName, argc, arg1, arg2, arg3, arg4);
-
+    // Coalesce a re-entrant emit of an in-flight event (depth ≤ 1, #1033).
+    if (this.#dispatching.has(eventName)) {
       return;
     }
 
-    this.#emitWithDepthTracking(set, eventName, argc, arg1, arg2, arg3, arg4);
+    // arguments.length is O(1) in V8 strict mode — no deopt
+    const argc = arguments.length - 1;
+
+    this.#dispatching.add(eventName);
+
+    try {
+      // Single-listener fast path — skip the [...set] snapshot allocation.
+      if (set.size === 1) {
+        const [cb] = set;
+
+        try {
+          this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
+        } catch (error) {
+          this.#onListenerError?.(eventName, error);
+        }
+      } else {
+        const listeners = [...set];
+
+        for (const cb of listeners) {
+          try {
+            this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
+          } catch (error) {
+            this.#onListenerError?.(eventName, error);
+          }
+        }
+      }
+    } finally {
+      this.#dispatching.delete(eventName);
+    }
   }
 
   /**
-   * Removes all listeners and resets the depth map.
+   * Removes all listeners and resets dispatch state.
    */
   clearAll(): void {
     this.#callbacks.clear();
-    this.#depthMap = null;
+    this.#dispatching.clear();
     this.#warnedEvents = null;
   }
 
@@ -196,46 +214,19 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     return this.#callbacks.get(eventName)?.size ?? 0;
   }
 
+  /**
+   * Returns whether the given event is currently being dispatched (an `emit`
+   * for it is on the stack). Single source of truth for "is this event
+   * in-flight" — consumers read it to reject re-entrant operations that would
+   * trigger such an emit (the emit itself would be coalesced regardless).
+   */
+  isDispatching(eventName: keyof TEventMap & string): boolean {
+    return this.#dispatching.has(eventName);
+  }
+
   // ===========================================================================
   // Private methods
   // ===========================================================================
-
-  /**
-   * Fast emit path — no depth tracking, no try/finally overhead.
-   * Used when maxEventDepth === 0 (depth protection disabled).
-   */
-  #emitFast(
-    set: Set<AnyCallback>,
-    eventName: string,
-    argc: number,
-    arg1: unknown,
-    arg2: unknown,
-    arg3: unknown,
-    arg4: unknown,
-  ): void {
-    // Stryker disable next-line BlockStatement: equivalent — emptying the single-listener fast path falls through to the `[...set]` fallback below, which calls the lone listener identically (proven by injection: forcing the fallback leaves the suite green). The fast path is a perf shortcut only; the `→true`/`→false` ConditionalExpression variants on this line ARE killed by the multi-listener tests.
-    if (set.size === 1) {
-      const [cb] = set;
-
-      try {
-        this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
-      } catch (error) {
-        this.#handleListenerError(eventName, error);
-      }
-
-      return;
-    }
-
-    const listeners = [...set];
-
-    for (const cb of listeners) {
-      try {
-        this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
-      } catch (error) {
-        this.#handleListenerError(eventName, error);
-      }
-    }
-  }
 
   /**
    * Calls a listener with the correct number of arguments.
@@ -277,86 +268,6 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
           arg3,
           arg4,
         );
-      }
-    }
-  }
-
-  /**
-   * Routes a listener error to onListenerError — except RecursionDepthError,
-   * which is a sentinel that must ALWAYS propagate to the caller: it aborts a
-   * runaway recursion and must never be absorbed by per-listener isolation.
-   * Shared by both emit paths (fast + depth-tracking) so the "always re-thrown"
-   * contract cannot diverge between them.
-   */
-  #handleListenerError(eventName: string, error: unknown): void {
-    if (error instanceof RecursionDepthError) {
-      throw error;
-    }
-
-    this.#onListenerError?.(eventName, error);
-  }
-
-  /**
-   * Emit path with recursion depth tracking and protection.
-   * Used when maxEventDepth > 0.
-   */
-  #emitWithDepthTracking(
-    set: Set<AnyCallback>,
-    eventName: string,
-    argc: number,
-    arg1: unknown,
-    arg2: unknown,
-    arg3: unknown,
-    arg4: unknown,
-  ): void {
-    this.#depthMap ??= new Map();
-    const depthMap = this.#depthMap;
-    const depth = depthMap.get(eventName) ?? 0;
-
-    if (depth >= this.#limits.maxEventDepth) {
-      throw new RecursionDepthError(
-        `Maximum recursion depth (${this.#limits.maxEventDepth}) exceeded for event: ${eventName}`,
-      );
-    }
-
-    try {
-      depthMap.set(eventName, depth + 1);
-
-      // Single-listener fast path — mirrors #emitFast: skip the [...set]
-      // snapshot allocation for one listener. The router runs on this path
-      // (maxEventDepth = 5), so single-subscriber events hit it on every emit
-      // (measured ~10% faster for 1 listener; see audit 2026-06-20 §2.1).
-      if (set.size === 1) {
-        const [cb] = set;
-
-        try {
-          this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
-        } catch (error) {
-          this.#handleListenerError(eventName, error);
-        }
-      } else {
-        const listeners = [...set];
-
-        for (const cb of listeners) {
-          try {
-            this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
-          } catch (error) {
-            this.#handleListenerError(eventName, error);
-          }
-        }
-      }
-    } finally {
-      // Safe: depthMap.set() at try start guarantees the value exists
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const remaining = depthMap.get(eventName)! - 1;
-
-      // Stryker disable next-line ConditionalExpression,EqualityOperator: equivalent — delete-at-0 is depthMap heap-hygiene only (#750). A later emit reads `depthMap.get(name) ?? 0`, so an absent entry and a retained `{name → 0}` are indistinguishable: no functional test can observe the delete-vs-set choice. The dynamic-name heap leak from never deleting is guarded by tests/stress S2 (invisible to Stryker).
-      if (remaining === 0) {
-        // Outermost frame — release the entry so dynamic event names don't
-        // accumulate {name → 0} records unbounded. See #750.
-        depthMap.delete(eventName);
-      } else {
-        depthMap.set(eventName, remaining);
       }
     }
   }

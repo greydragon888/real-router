@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { errorCodes, events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter } from "../../../helpers";
+import { captureSyncThrow, createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -196,7 +196,11 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
 
       await vi.advanceTimersByTimeAsync(200);
 
-      await expect(firstNav).rejects.toThrow();
+      // Superseded by secondNav → must reject with TRANSITION_CANCELLED, not just
+      // "some error" (a codeless `.rejects.toThrow()` would pass on any rejection).
+      await expect(firstNav).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       await secondNav;
 
@@ -209,14 +213,20 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
   describe("signal", () => {
     it("signal passed to listener, signal.aborted === false initially", async () => {
       let receivedSignal: AbortSignal | undefined;
+      let abortedAtCallTime: boolean | undefined;
 
       router.subscribeLeave(({ signal }) => {
         receivedSignal = signal;
+        // Capture at call time: a successful navigation never aborts the signal
+        // (#722), so it also stays false afterwards — assert the "initially false"
+        // the title promises, which the bare instanceof check never verified.
+        abortedAtCallTime = signal.aborted;
       });
 
       await router.navigate("users");
 
       expect(receivedSignal).toBeInstanceOf(AbortSignal);
+      expect(abortedAtCallTime).toBe(false);
     });
 
     it("concurrent navigation aborts signal (no guards path)", async () => {
@@ -460,26 +470,26 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
   });
 
   describe("reentrant navigation", () => {
-    it("reentrant navigate from sync leave listener: original cancelled, reentrant succeeds (no guards)", async () => {
-      let fired = false;
-      let reentrantPromise: Promise<unknown> | undefined;
+    it("sync reentrant navigate from a leave listener is banned (REENTRANT_NAVIGATION); original completes", async () => {
+      // RFC §4: a synchronous navigate() from inside a subscribeLeave listener
+      // runs while the leave dispatch is on the stack (isProcessing) → it throws
+      // REENTRANT_NAVIGATION at the facade instead of superseding the original.
+      let captured: unknown;
 
       router.subscribeLeave(({ nextRoute }) => {
-        if (nextRoute.name === "users" && !fired) {
-          fired = true;
-          reentrantPromise = router.navigate("orders");
+        if (nextRoute.name === "users") {
+          captured = captureSyncThrow(() => router.navigate("orders"));
         }
       });
 
-      const original = router.navigate("users");
+      const state = await router.navigate("users");
 
-      await expect(original).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
+      expect(captured).toMatchObject({
+        code: errorCodes.REENTRANT_NAVIGATION,
       });
-
-      await reentrantPromise;
-
-      expect(router.getState()?.name).toBe("orders");
+      // The original navigation was NOT superseded — it committed normally.
+      expect(state.name).toBe("users");
+      expect(router.getState()?.name).toBe("users");
     });
 
     it("reentrant navigate from async leave listener: original cancelled", async () => {
@@ -509,93 +519,6 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
       expect(router.getState()?.name).toBe("orders");
 
       vi.useRealTimers();
-    });
-
-    it("sync reentrant leave navigation is depth-bounded (maxEventDepth), not unbounded (#935)", async () => {
-      // A sync subscribeLeave listener that navigates re-enters the leave
-      // dispatch on the SAME C-stack. Unbounded it overflows (~615 deep) with a
-      // RangeError that leaks / wedges the worker. The dispatch must be bounded
-      // like the plugin onTransitionLeaveApprove path (emitter maxEventDepth),
-      // raising a controlled RecursionDepthError well before the stack overflows.
-      const errors: unknown[] = [];
-
-      getPluginApi(router).addEventListener(
-        events.TRANSITION_ERROR,
-        (_toState, _fromState, err) => {
-          errors.push(err);
-        },
-      );
-
-      let calls = 0;
-      // Safety cap FAR below the ~615 overflow ceiling so that, WITHOUT the fix,
-      // this fails by assertion (calls reaches the cap) rather than wedging.
-      const SAFETY_CAP = 50;
-
-      router.subscribeLeave(() => {
-        calls++;
-
-        if (calls < SAFETY_CAP) {
-          // Alternate users/orders — never the current ("home") route, so no
-          // SAME_STATES short-circuit breaks the reentrant chain.
-          void router.navigate(calls % 2 === 0 ? "users" : "orders");
-        }
-      });
-
-      await router.navigate("users").catch(() => undefined);
-      await Promise.resolve();
-
-      // Bounded by maxEventDepth (default 5) — the listener fires only a handful
-      // of times, NOT the full SAFETY_CAP.
-      expect(calls).toBeLessThan(SAFETY_CAP);
-      expect(calls).toBeLessThanOrEqual(6);
-
-      // The bound surfaces as a controlled RecursionDepthError (name stable
-      // across bundle boundaries), not a RangeError stack overflow.
-      expect(
-        errors.some(
-          (err) => (err as { name?: string }).name === "RecursionDepthError",
-        ),
-      ).toBe(true);
-    });
-
-    it("maxEventDepth = 0 opts out of the reentrancy bound (mirrors the emitter) (#935)", async () => {
-      const local = createTestRouter({ limits: { maxEventDepth: 0 } });
-
-      await local.start("/home");
-
-      const errors: unknown[] = [];
-
-      getPluginApi(local).addEventListener(
-        events.TRANSITION_ERROR,
-        (_toState, _fromState, err) => {
-          errors.push(err);
-        },
-      );
-
-      let calls = 0;
-      // Bounded by the listener itself, well below the C-stack ceiling — with
-      // depth protection disabled the dispatch must NOT raise RecursionDepthError.
-      const CAP = 20;
-
-      local.subscribeLeave(() => {
-        calls++;
-
-        if (calls < CAP) {
-          void local.navigate(calls % 2 === 0 ? "users" : "orders");
-        }
-      });
-
-      await local.navigate("users").catch(() => undefined);
-      await Promise.resolve();
-
-      expect(calls).toBe(CAP);
-      expect(
-        errors.some(
-          (err) => (err as { name?: string }).name === "RecursionDepthError",
-        ),
-      ).toBe(false);
-
-      local.stop();
     });
   });
 

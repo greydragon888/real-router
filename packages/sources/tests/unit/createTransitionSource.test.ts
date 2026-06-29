@@ -329,27 +329,18 @@ describe("createTransitionSource", () => {
     ]);
   });
 
-  it("reentrant TRANSITION_START produces fresh snapshots each call (post-#605 dedup is unreachable, but every snapshot must be a new reference)", async () => {
+  it("concurrent (superseding) TRANSITION_START events each produce a fresh snapshot (post-#605 dedup is unreachable, but every snapshot must be a new reference)", async () => {
+    // RFC §4 bans reentrant navigate from a listener, so multiple TRANSITION_START
+    // events within one settle are produced by CONCURRENT (superseding) navigation
+    // instead: a first nav suspends on an async guard, a second supersedes it.
     const lifecycle = getLifecycleApi(router);
-    const resolvers: ((value: boolean) => void)[] = [];
+    let resolveDashboard!: (value: boolean) => void;
 
     lifecycle.addActivateGuard("dashboard", () => () => {
       return new Promise<boolean>((resolve) => {
-        resolvers.push(resolve);
+        resolveDashboard = resolve;
       });
     });
-
-    let reentrantDone = false;
-    let reentrantNav!: Promise<unknown>;
-
-    router.usePlugin(() => ({
-      onTransitionStart() {
-        if (!reentrantDone) {
-          reentrantDone = true;
-          reentrantNav = router.navigate("dashboard").catch(() => {});
-        }
-      },
-    }));
 
     const source = createTransitionSource(router);
     // Capture the IDLE_SNAPSHOT singleton before any nav — used below as the
@@ -372,19 +363,19 @@ describe("createTransitionSource", () => {
 
     source.subscribe(listener);
 
-    void router.navigate("dashboard").catch(() => {});
+    // First nav suspends on the async dashboard guard → TRANSITION_START #1.
+    const first = router.navigate("dashboard").catch(() => {});
+    // A concurrent nav supersedes it → TRANSITION_START #2 (no reentrancy).
+    const second = router.navigate("settings");
 
-    for (const resolve of resolvers) {
-      resolve(true);
-    }
+    // Drain the now-superseded dashboard guard.
+    resolveDashboard(true);
 
-    // Await the reentrant navigation's actual settlement rather than counting a
-    // fixed number of microtask flushes — robust to the exact tick choreography
-    // (this hangs to the test timeout if a navigation genuinely never settles).
-    await reentrantNav;
+    await first;
+    await second;
 
-    // 1. Reentrancy actually happened — the plugin fired the second nav, so
-    //    the router emitted at least two TRANSITION_START events.
+    // 1. Two TRANSITION_START events fired — the original plus the superseding
+    //    concurrent navigation.
     expect(startEvents).toHaveBeenCalledTimes(2);
 
     // 2. The source settled back to IDLE after all transitions resolved.

@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { RecursionDepthError, RouterError } from "@real-router/core";
+import { RouterError } from "@real-router/core";
 
 import { captureUnhandledRejections, createTestRouter } from "../helpers";
 
@@ -12,34 +12,17 @@ import type { Router } from "@real-router/core";
 const CHAIN = ["users", "orders", "admin.dashboard"] as const;
 const TARGET_DEPTH = 1000;
 
-// A reentrant `subscribeLeave` listener that navigates is a documented edge: the
-// ORIGINAL navigation is cancelled (TRANSITION_CANCELLED) and the reentrant one
-// proceeds (see tests/functional/navigation/navigate/async-leave-listeners.test.ts,
-// "reentrant navigation"). The functional suite only covers a SINGLE reentrant
-// hop. This stress suite drives that into a SELF-FEEDING chain to stress the
-// #navigationId invariant across many supersession/cancellation cycles.
+// An ASYNC `subscribeLeave` listener that navigates `await`s before re-navigating,
+// so the navigate runs AFTER the leave dispatch settled — it is NOT reentrant and
+// is allowed: it supersedes the original (TRANSITION_CANCELLED) and proceeds. S29.1
+// drives 1000 deferred hops to prove the chain runs flat (no stack overflow), the
+// #navigationId invariant holds, and not one superseded navigation leaks an
+// unhandled rejection. (A SYNC reentrant navigate from a leave listener is banned —
+// REENTRANT_NAVIGATION, RFC §4 — covered functionally by reentrant-ban.test.ts.)
 //
-// IMPORTANT — async vs sync reentrancy are NOT symmetric:
-//
-//   * ASYNC listener (S29.1) `await`s before re-navigating, so each hop UNWINDS
-//     the call stack before the next pipeline starts. 1000 hops run flat — this
-//     is the supported pattern and the primary guard here.
-//
-//   * SYNC listener nests each new navigate's pipeline INSIDE the previous one's
-//     leave dispatch, so the C stack grows one frame-group per hop. BEFORE #935
-//     an unbounded chain overflowed deterministically (~600s deep) with a
-//     RangeError that escaped SUPPRESSED_ERROR_CODES (Router.#onSuppressedNavigateError
-//     logged rather than swallowed it) and could wedge the worker — so it was
-//     intentionally not asserted. #935 bounds the sync leave dispatch by
-//     maxEventDepth (default 5) — the same limit the EventEmitter applies to the
-//     plugin onTransitionLeaveApprove path — raising a controlled
-//     RecursionDepthError BEFORE the overflow. S29.2 now drives that previously
-//     untestable unbounded case and asserts every burst terminates safely AND
-//     the depth counter resets between bursts.
-//
-// These are throughput / correctness guards, not heap-leak guards: there is no
-// cleanup cycle to skip and no simulatable retention leak, so no heap snapshot
-// (per the CLAUDE.md discrimination rule — a heap delta here would be theatre).
+// Throughput / correctness guard, not a heap-leak guard: no cleanup cycle to skip
+// and no simulatable retention leak, so no heap snapshot (per the CLAUDE.md
+// discrimination rule — a heap delta here would be theatre).
 describe("S29: reentrant subscribeLeave navigation", () => {
   let router: Router;
 
@@ -121,71 +104,6 @@ describe("S29: reentrant subscribeLeave navigation", () => {
 
     // (d) No stuck transition — the router is fully usable afterwards: a fresh
     //     navigation to an unrelated route commits cleanly.
-    await router.navigate("settings.account");
-
-    expect(router.getState()?.name).toBe("settings.account");
-    expect(router.isActive()).toBe(true);
-  }, 30_000);
-
-  it("S29.2: repeated unbounded sync reentrant bursts stay bounded — depth counter resets, no overflow (#935)", async () => {
-    // SYNC listener with NO exit condition other than the depth bound — the exact
-    // antipattern that overflowed the C stack before #935. The dispatch is now
-    // bounded by maxEventDepth (default 5), so each burst raises a controlled
-    // RecursionDepthError instead of overflowing. Drive MANY bursts to prove
-    // (a) every burst terminates safely (the bound holds, no RangeError), and
-    // (b) `#leaveDispatchDepth` resets to 0 after each burst — a leaked counter
-    // (a broken `finally`) would make later bursts bound at depth 0 (firing the
-    // listener 0 times), which `minPerBurst > 0` catches.
-    const BURSTS = 100;
-    // Per-burst guard cap, FAR below the ~600s overflow ceiling, so a regression
-    // that drops the bound fails by assertion here rather than wedging the worker.
-    const GUARD_CAP = 50;
-    const perBurst: number[] = [];
-    const depthErrors: RecursionDepthError[] = [];
-    let burstCount = 0;
-
-    const unsub = router.subscribeLeave(() => {
-      burstCount++;
-
-      if (burstCount < GUARD_CAP) {
-        void router
-          .navigate(CHAIN[burstCount % CHAIN.length])
-          .catch((error: unknown) => {
-            // The hop that hits the depth limit rejects with RecursionDepthError;
-            // the superseded hops reject with TRANSITION_CANCELLED (ignored here).
-            if (error instanceof RecursionDepthError) {
-              depthErrors.push(error);
-            }
-          });
-      }
-    });
-
-    for (let i = 0; i < BURSTS; i++) {
-      burstCount = 0;
-      // Every burst starts from the committed "home" state (no hop commits — the
-      // chain self-cancels), so the target is never SAME_STATES.
-      await router.navigate(CHAIN[i % CHAIN.length]).catch(() => {});
-      perBurst.push(burstCount);
-    }
-
-    unsub();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    const maxPerBurst = Math.max(...perBurst);
-    const minPerBurst = Math.min(...perBurst);
-
-    // Every burst bounded at maxEventDepth (the listener fired a small, constant
-    // number of times) — none approached the C-stack ceiling.
-    expect(maxPerBurst).toBeLessThanOrEqual(6);
-    // Counter reset between bursts: no burst started already saturated.
-    expect(minPerBurst).toBeGreaterThan(0);
-    expect(maxPerBurst).toBe(minPerBurst);
-
-    // The bound is real (a RecursionDepthError, not a RangeError) and fired on
-    // every burst.
-    expect(depthErrors).toHaveLength(BURSTS);
-
-    // Router survived 100 bounded storms — a fresh navigation still commits.
     await router.navigate("settings.account");
 
     expect(router.getState()?.name).toBe("settings.account");

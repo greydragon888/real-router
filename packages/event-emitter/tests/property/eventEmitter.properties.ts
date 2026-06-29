@@ -17,7 +17,7 @@ import {
   type TestEventMap,
   type EventName,
 } from "./helpers";
-import { EventEmitter, RecursionDepthError } from "../../src/EventEmitter.js";
+import { EventEmitter } from "../../src/EventEmitter.js";
 
 describe("EventEmitter Property-Based Tests", () => {
   describe("delivery — all listeners receive emitted data", () => {
@@ -244,21 +244,14 @@ describe("EventEmitter Property-Based Tests", () => {
   });
 
   describe("snapshot — listener added during emit is not called", () => {
-    // Covers both #emitFast (maxEventDepth=0) and #emitWithDepthTracking (>0).
     // Initial existing-listener count is varied so size=1 (the historic bug)
-    // and size>=2 paths in both branches are exercised symmetrically.
-    test.prop(
-      [
-        arbEventName,
-        arbData,
-        fc.constantFrom(0, 5),
-        fc.integer({ min: 0, max: 4 }),
-      ],
-      { numRuns: NUM_RUNS.lifecycle },
-    )(
+    // and size>=2 dispatch paths are exercised symmetrically.
+    test.prop([arbEventName, arbData, fc.integer({ min: 0, max: 4 })], {
+      numRuns: NUM_RUNS.lifecycle,
+    })(
       "listener added inside emit handler is not invoked in the current emit",
-      (eventName, data, maxEventDepth, extraListenerCount) => {
-        const emitter = createTestEmitter(maxEventDepth);
+      (eventName, data, extraListenerCount) => {
+        const emitter = createTestEmitter();
         const [laterListener] = createUniqueListeners(1);
         const existingListeners = createUniqueListeners(extraListenerCount);
 
@@ -478,7 +471,7 @@ describe("EventEmitter Property-Based Tests", () => {
       "registering more than maxListeners throws",
       (eventName, maxListeners) => {
         const emitter = new EventEmitter<TestEventMap>({
-          limits: { maxListeners, warnListeners: 0, maxEventDepth: 0 },
+          limits: { maxListeners, warnListeners: 0 },
         });
 
         const listeners = createUniqueListeners(maxListeners + 1);
@@ -509,28 +502,38 @@ describe("EventEmitter Property-Based Tests", () => {
     );
   });
 
-  describe("depth tracking — resets after successful emit", () => {
+  describe("in-flight guard release — same event re-emits after dispatch", () => {
     test.prop([arbEventName, arbData, arbData], {
       numRuns: NUM_RUNS.lifecycle,
     })(
-      "depth counter resets to zero after emit completes",
+      "the re-entrancy guard releases after dispatch, so a later emit of the same event fires",
       (eventName, data1, data2) => {
-        const emitter = new EventEmitter<TestEventMap>({
-          limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
-        });
+        const emitter = createTestEmitter();
         const [listener] = createUniqueListeners(1);
 
-        emitter.on(eventName, listener.fn);
+        // The listener re-emits the SAME event during its own dispatch. That
+        // re-entrant emit is coalesced to a no-op (depth ≤ 1), but the guard
+        // must release in the `finally`, so each *separate* outer emit runs the
+        // listener exactly once.
+        const reentrant = (data: number) => {
+          listener.fn(data);
+          emitter.emit(eventName, data);
+        };
 
-        // First emit — depth goes 0→1→0
+        emitter.on(eventName, reentrant);
+
         emitter.emit(eventName, data1);
 
         expect(listener.getCallCount()).toBe(1);
+        expect(listener.getLastData()).toBe(data1);
 
-        // Second emit should succeed (depth is back to 0)
+        // Guard released after the first dispatch — a second emit fires again.
         emitter.emit(eventName, data2);
 
         expect(listener.getCallCount()).toBe(2);
+        expect(listener.getLastData()).toBe(data2);
+
+        emitter.off(eventName, reentrant);
       },
     );
   });
@@ -578,7 +581,6 @@ describe("EventEmitter Property-Based Tests", () => {
           limits: {
             maxListeners: 0,
             warnListeners: warnThreshold,
-            maxEventDepth: 0,
           },
           onListenerWarn: (event, count) => {
             warnings.push({ event, count });
@@ -620,7 +622,6 @@ describe("EventEmitter Property-Based Tests", () => {
           limits: {
             maxListeners: 0,
             warnListeners: warnThreshold,
-            maxEventDepth: 0,
           },
           onListenerWarn: (event, count) => {
             warnings.push({ event, count });
@@ -790,7 +791,6 @@ describe("EventEmitter Property-Based Tests", () => {
           limits: {
             maxListeners,
             warnListeners: maxListeners,
-            maxEventDepth: 0,
           },
           onListenerWarn: (_event, count) => {
             warnings.push(count);
@@ -820,82 +820,108 @@ describe("EventEmitter Property-Based Tests", () => {
   });
 
   // ===========================================================================
-  // maxEventDepth boundary — exactly D nested levels succeed, (D+1)th throws
+  // Coalesce — a re-entrant same-event emit is a no-op (depth ≤ 1)
   // ===========================================================================
 
-  describe("maxEventDepth boundary — exact recursion depth", () => {
-    test.prop([arbEventName, fc.integer({ min: 1, max: 6 }), arbData], {
-      numRuns: NUM_RUNS.lifecycle,
-    })(
-      "a self-recursive emit nests exactly maxEventDepth levels before throwing",
-      (eventName, maxEventDepth, data) => {
-        const emitter = new EventEmitter<TestEventMap>({
-          limits: { maxListeners: 0, warnListeners: 0, maxEventDepth },
-        });
+  describe("coalesce — re-entrant same-event emit runs the listener exactly once", () => {
+    test.prop(
+      [
+        arbEventName,
+        fc.integer({ min: 1, max: 6 }),
+        fc.integer({ min: 0, max: 4 }),
+        arbData,
+      ],
+      { numRuns: NUM_RUNS.lifecycle },
+    )(
+      "a listener that re-emits the same event never re-enters dispatch (depth ≤ 1)",
+      (eventName, reEmitAttempts, extraCount, data) => {
+        const emitter = createTestEmitter();
 
         let depth = 0;
         let maxObserved = 0;
+        let reentrantCalls = 0;
 
-        emitter.on(eventName, () => {
+        const selfEmitter = (d: number) => {
           depth++;
           maxObserved = Math.max(maxObserved, depth);
+          reentrantCalls++;
 
-          try {
-            emitter.emit(eventName, data);
-          } finally {
-            depth--;
+          // Every re-entrant emit of the in-flight event is coalesced away,
+          // no matter how many times it is attempted — no recursion, no throw.
+          for (let i = 0; i < reEmitAttempts; i++) {
+            emitter.emit(eventName, d);
           }
-        });
+
+          depth--;
+        };
+
+        emitter.on(eventName, selfEmitter);
+
+        // Extra co-listeners exercise both the size===1 fast path and the
+        // size>=2 snapshot path of dispatch.
+        const extra = createUniqueListeners(extraCount);
+
+        for (const { fn } of extra) {
+          emitter.on(eventName, fn);
+        }
 
         expect(() => {
           emitter.emit(eventName, data);
-        }).toThrow(RecursionDepthError);
-        expect(maxObserved).toBe(maxEventDepth);
+        }).not.toThrow();
+
+        // The self-emitting listener ran once; recursion never deepened past 1.
+        expect(reentrantCalls).toBe(1);
+        expect(maxObserved).toBe(1);
+
+        // Coalescing the re-entrant emit does not suppress the original
+        // dispatch: every co-registered listener still fired exactly once.
+        for (const { getCallCount } of extra) {
+          expect(getCallCount()).toBe(1);
+        }
+
+        emitter.off(eventName, selfEmitter);
+
+        for (const { fn } of extra) {
+          emitter.off(eventName, fn);
+        }
       },
     );
   });
 
   // ===========================================================================
-  // RecursionDepthError is always re-thrown — on the fast AND depth paths
+  // Coalesce is per-event — a DIFFERENT event emitted from a listener still fires
   // ===========================================================================
 
-  describe("RecursionDepthError propagation — both emit paths", () => {
+  describe("coalesce is per-event — a different event emitted from a listener fires", () => {
     test.prop(
-      [
-        arbEventName,
-        fc.integer({ min: 0, max: 5 }),
-        fc.integer({ min: 0, max: 5 }),
-      ],
+      [arbDistinctEventPair, fc.integer({ min: 1, max: 5 }), arbData, arbData],
       { numRuns: NUM_RUNS.lifecycle },
     )(
-      "a listener throwing RecursionDepthError is re-thrown from emit on any path",
-      (eventName, maxEventDepth, laterCount) => {
-        const errors: unknown[] = [];
-        const emitter = new EventEmitter<TestEventMap>({
-          limits: { maxListeners: 0, warnListeners: 0, maxEventDepth },
-          onListenerError: (_event, error) => {
-            errors.push(error);
-          },
-        });
-        const later = createUniqueListeners(laterCount);
+      "while event A is in flight, emitting a different event B still dispatches B's listeners",
+      ([eventA, eventB], bListenerCount, dataA, dataB) => {
+        const emitter = createTestEmitter();
+        const bListeners = createUniqueListeners(bListenerCount);
 
-        emitter.on(eventName, () => {
-          throw new RecursionDepthError("sentinel");
-        });
-
-        for (const { fn } of later) {
-          emitter.on(eventName, fn);
+        for (const { fn } of bListeners) {
+          emitter.on(eventB, fn);
         }
 
-        expect(() => {
-          emitter.emit(eventName, 0);
-        }).toThrow(RecursionDepthError);
-        // Sentinel never routed to onListenerError, and it halts iteration.
-        expect(errors).toHaveLength(0);
+        // A's listener emits B while A is being dispatched. The in-flight guard
+        // is keyed per event name, so B is NOT suppressed — it dispatches fully.
+        const aListener = (_data: number) => {
+          emitter.emit(eventB, dataB);
+        };
 
-        for (const { getCallCount } of later) {
-          expect(getCallCount()).toBe(0);
+        emitter.on(eventA, aListener);
+
+        emitter.emit(eventA, dataA);
+
+        for (const { getCallCount, getLastData } of bListeners) {
+          expect(getCallCount()).toBe(1);
+          expect(getLastData()).toBe(dataB);
         }
+
+        emitter.off(eventA, aListener);
       },
     );
   });
@@ -1020,7 +1046,6 @@ describe("EventEmitter Property-Based Tests", () => {
           limits: {
             maxListeners: 0,
             warnListeners: warnThreshold,
-            maxEventDepth: 0,
           },
           onListenerWarn: (_event, count) => {
             warnings.push(count);

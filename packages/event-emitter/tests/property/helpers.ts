@@ -52,14 +52,8 @@ export const arbNonFunction: fc.Arbitrary<unknown> = fc.oneof(
   fc.constant(Symbol("test")),
 );
 
-export function createTestEmitter(
-  maxEventDepth = 0,
-): EventEmitter<TestEventMap> {
-  return new EventEmitter<TestEventMap>(
-    maxEventDepth === 0
-      ? undefined
-      : { limits: { maxListeners: 0, warnListeners: 0, maxEventDepth } },
-  );
+export function createTestEmitter(): EventEmitter<TestEventMap> {
+  return new EventEmitter<TestEventMap>();
 }
 
 /**

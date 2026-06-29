@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { events, errorCodes } from "@real-router/core";
 import { getPluginApi, getLifecycleApi } from "@real-router/core/api";
 
-import { createTestRouter } from "../../../helpers";
+import { captureSyncThrow, createTestRouter } from "../../../helpers";
 
 import type { Router, State, RouterError } from "@real-router/core";
 
@@ -24,13 +24,17 @@ describe("router.navigate() - events listeners", () => {
 
   describe("Issue #52: Recursive event listeners", () => {
     describe("TRANSITION_START event pollution", () => {
-      it("should demonstrate current behavior: analytics fires for all redirects", async () => {
+      it("ban eliminates redirect recursion — reentrant navigate throws, analytics fires once", async () => {
+        // The #52 "recursive listener pollution" is resolved by RFC §4: a
+        // synchronous redirect-via-navigate() from a TRANSITION_START listener
+        // throws REENTRANT_NAVIGATION instead of re-entering the pipeline.
         const freshRouter = createTestRouter();
         const analyticsLog: string[] = [];
+        let captured: unknown;
 
         await freshRouter.start("/home");
 
-        // Side-effect listener (analytics) - should ideally fire once
+        // Side-effect listener (analytics) — now fires exactly once.
         getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
@@ -38,34 +42,32 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        // Guard listener that triggers redirect
+        // Listener that attempts a sync redirect → banned.
         getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             if (toState.name === "admin") {
-              // Redirect to login - triggers recursive TRANSITION_START
-              void freshRouter.navigate("users");
+              captured = captureSyncThrow(() => freshRouter.navigate("users"));
             }
           },
         );
 
-        // Navigate to admin (redirect in TRANSITION_START listener cancels it)
-        await expect(freshRouter.navigate("admin")).rejects.toMatchObject({
-          code: errorCodes.TRANSITION_CANCELLED,
-        });
+        const state = await freshRouter.navigate("admin");
 
-        // TRANSITION_START fires synchronously for both admin and users
-        expect(analyticsLog).toStrictEqual([
-          "analytics:admin",
-          "analytics:users",
-        ]);
+        expect(captured).toMatchObject({
+          code: errorCodes.REENTRANT_NAVIGATION,
+        });
+        // No recursion: the original navigation committed, analytics fired once.
+        expect(state.name).toBe("admin");
+        expect(analyticsLog).toStrictEqual(["analytics:admin"]);
 
         freshRouter.stop();
       });
 
-      it("should demonstrate nested redirects cause exponential listener calls", async () => {
+      it("ban prevents redirect chains — first reentrant hop throws, no chain", async () => {
         const freshRouter = createTestRouter();
         const callLog: string[] = [];
+        let captured: unknown;
 
         await freshRouter.start("/home");
 
@@ -77,29 +79,26 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        // Chain of redirects: admin -> profile -> users
+        // Attempted chain admin -> profile -> users: the first hop is banned.
         getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             if (toState.name === "admin") {
-              void freshRouter.navigate("profile");
-            } else if (toState.name === "profile") {
-              void freshRouter.navigate("users");
+              captured = captureSyncThrow(() =>
+                freshRouter.navigate("profile"),
+              );
             }
           },
         );
 
-        // Redirect chain in TRANSITION_START listener cancels admin
-        await expect(freshRouter.navigate("admin")).rejects.toMatchObject({
-          code: errorCodes.TRANSITION_CANCELLED,
-        });
+        const state = await freshRouter.navigate("admin");
 
-        // TRANSITION_START fires synchronously for each redirect in the chain
-        expect(callLog).toStrictEqual([
-          "effect:admin",
-          "effect:profile",
-          "effect:users",
-        ]);
+        expect(captured).toMatchObject({
+          code: errorCodes.REENTRANT_NAVIGATION,
+        });
+        // No chain — TRANSITION_START fired once, for the original only.
+        expect(state.name).toBe("admin");
+        expect(callLog).toStrictEqual(["effect:admin"]);
 
         freshRouter.stop();
       });
@@ -173,11 +172,12 @@ describe("router.navigate() - events listeners", () => {
     });
 
     describe("Multiple listeners interaction", () => {
-      it("should execute all listeners at each recursion level", async () => {
+      it("all listeners fire once for a single transition — banned redirect adds no level", async () => {
         const freshRouter = createTestRouter();
         const listener1Calls: string[] = [];
         const listener2Calls: string[] = [];
         const listener3Calls: string[] = [];
+        let captured: unknown;
 
         await freshRouter.start("/home");
 
@@ -197,36 +197,38 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        // Listener 3: redirect guard
+        // Listener 3: attempts a sync redirect → banned (RFC §4).
         getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             listener3Calls.push(toState.name);
 
             if (toState.name === "admin") {
-              void freshRouter.navigate("users");
+              captured = captureSyncThrow(() => freshRouter.navigate("users"));
             }
           },
         );
 
-        // Redirect in TRANSITION_START listener cancels admin navigation
-        await expect(freshRouter.navigate("admin")).rejects.toMatchObject({
-          code: errorCodes.TRANSITION_CANCELLED,
-        });
+        const state = await freshRouter.navigate("admin");
 
-        // All 3 listeners fire for both admin and users
-        expect(listener1Calls).toStrictEqual(["admin", "users"]);
-        expect(listener2Calls).toStrictEqual(["admin", "users"]);
-        expect(listener3Calls).toStrictEqual(["admin", "users"]);
+        expect(captured).toMatchObject({
+          code: errorCodes.REENTRANT_NAVIGATION,
+        });
+        expect(state.name).toBe("admin");
+        // No recursion level — all 3 listeners fire exactly once, for "admin".
+        expect(listener1Calls).toStrictEqual(["admin"]);
+        expect(listener2Calls).toStrictEqual(["admin"]);
+        expect(listener3Calls).toStrictEqual(["admin"]);
 
         freshRouter.stop();
       });
     });
 
     describe("Order of execution", () => {
-      it("should maintain listener registration order at each level", async () => {
+      it("listeners fire in registration order for a single transition (no recursion level)", async () => {
         const freshRouter = createTestRouter();
         const executionOrder: string[] = [];
+        let captured: unknown;
 
         await freshRouter.start("/home");
 
@@ -243,7 +245,7 @@ describe("router.navigate() - events listeners", () => {
             executionOrder.push(`second:${toState.name}`);
 
             if (toState.name === "admin") {
-              void freshRouter.navigate("users");
+              captured = captureSyncThrow(() => freshRouter.navigate("users"));
             }
           },
         );
@@ -255,20 +257,16 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        // Redirect in TRANSITION_START listener cancels admin navigation
-        await expect(freshRouter.navigate("admin")).rejects.toMatchObject({
-          code: errorCodes.TRANSITION_CANCELLED,
-        });
+        const state = await freshRouter.navigate("admin");
 
-        // Order shows: all listeners for admin, then all for users
+        expect(captured).toMatchObject({
+          code: errorCodes.REENTRANT_NAVIGATION,
+        });
+        expect(state.name).toBe("admin");
+        // No recursion level — all three listeners fire once, in order, for "admin".
         expect(executionOrder).toStrictEqual([
           "first:admin",
           "second:admin",
-          // Recursion happens here (navigate to users)
-          "first:users",
-          "second:users",
-          "third:users",
-          // Then third listener for admin completes
           "third:admin",
         ]);
 
@@ -276,10 +274,11 @@ describe("router.navigate() - events listeners", () => {
       });
     });
 
-    describe("Recursion depth tracking", () => {
-      it("should track all states in redirect chain", async () => {
+    describe("No redirect chain under the §4 ban", () => {
+      it("first reentrant redirect throws — chain never starts", async () => {
         const freshRouter = createTestRouter();
         const redirects: string[] = [];
+        let captured: unknown;
 
         await freshRouter.start("/home");
 
@@ -288,22 +287,21 @@ describe("router.navigate() - events listeners", () => {
           (toState: State) => {
             redirects.push(toState.name);
 
-            // Redirect chain: users -> orders -> profile
+            // Attempted chain users -> orders -> profile: the first hop is banned.
             if (toState.name === "users") {
-              void freshRouter.navigate("orders");
-            } else if (toState.name === "orders") {
-              void freshRouter.navigate("profile");
+              captured = captureSyncThrow(() => freshRouter.navigate("orders"));
             }
           },
         );
 
-        // Redirect chain in TRANSITION_START listener cancels users navigation
-        await expect(freshRouter.navigate("users")).rejects.toMatchObject({
-          code: errorCodes.TRANSITION_CANCELLED,
-        });
+        const state = await freshRouter.navigate("users");
 
-        // All redirects in the chain are tracked via synchronous TRANSITION_START events
-        expect(redirects).toStrictEqual(["users", "orders", "profile"]);
+        expect(captured).toMatchObject({
+          code: errorCodes.REENTRANT_NAVIGATION,
+        });
+        expect(state.name).toBe("users");
+        // No chain — only the original TRANSITION_START fired.
+        expect(redirects).toStrictEqual(["users"]);
 
         freshRouter.stop();
       });

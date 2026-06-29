@@ -9,7 +9,7 @@ import {
 } from "vitest";
 
 import { errorCodes } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -690,6 +690,116 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         code: errorCodes.TRANSITION_CANCELLED,
       });
       expect(router.getState()?.name).toBe("profile");
+    });
+  });
+
+  // =========================================================================
+  // FSM recovery after external-signal cancellation (#1030)
+  // =========================================================================
+
+  describe("FSM recovery after external-signal cancellation (#1030)", () => {
+    it("17. external signal abort mid-async-guard recovers the FSM — isLeaveApproved false, route-CRUD not blocked", async () => {
+      const controller = new AbortController();
+
+      // Async ACTIVATE guard parks the navigation in LEAVE_APPROVED.
+      lifecycle.addActivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 100);
+          }),
+      );
+
+      const nav = router.navigate("users", {}, { signal: controller.signal });
+
+      await new Promise((resolve) => setTimeout(resolve, 10)); // reach the guard
+      controller.abort(new Error("external abort"));
+
+      await expect(nav).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      // The cancelled navigation must leave the FSM back in READY — not stuck in
+      // LEAVE_APPROVED. Before #1030, `onExternalAbort` only aborted the
+      // controller and never called `cancelNavigation`, so the FSM never returned
+      // to READY and `isLeaveApproved()` stayed falsely true.
+      expect(router.isLeaveApproved()).toBe(false);
+
+      // `isTransitioning()` must be false → route-CRUD is not silently blocked.
+      // Before the fix `replace()` was a logged no-op (FSM still "transitioning").
+      const routes = getRoutesApi(router);
+
+      routes.replace([{ name: "fresh", path: "/fresh" }]);
+
+      expect(routes.get("fresh")).toBeDefined(); // replace() took effect
+      expect(routes.get("home")).toBeUndefined(); // old tree swapped out
+    });
+
+    it("18. external signal abort mid-async-DEACTIVATE-guard recovers the FSM (from TRANSITION_STARTED)", async () => {
+      // Commit `users` first so leaving it runs a deactivate guard; the abort
+      // then lands BEFORE LEAVE_APPROVED → FSM is in TRANSITION_STARTED.
+      await router.navigate("users");
+
+      const controller = new AbortController();
+
+      lifecycle.addDeactivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 100);
+          }),
+      );
+
+      const nav = router.navigate("profile", {}, { signal: controller.signal });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      controller.abort(new Error("external abort"));
+
+      await expect(nav).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      // Recovered from TRANSITION_STARTED → route-CRUD works, state unchanged.
+      expect(router.isLeaveApproved()).toBe(false);
+      expect(router.getState()?.name).toBe("users");
+
+      const routes = getRoutesApi(router);
+
+      routes.replace([{ name: "fresh", path: "/fresh" }]);
+
+      expect(routes.get("fresh")).toBeDefined();
+    });
+
+    it("19. external signal abort emits onTransitionCancel (symmetric with stop/supersede)", async () => {
+      const onCancel = vi.fn();
+
+      router.usePlugin(() => ({ onTransitionCancel: onCancel }));
+
+      const controller = new AbortController();
+
+      lifecycle.addActivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 100);
+          }),
+      );
+
+      const nav = router.navigate("users", {}, { signal: controller.signal });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      controller.abort(new Error("external abort"));
+      await nav.catch(() => undefined);
+
+      // The fix routes through cancelNavigation → exactly one TRANSITION_CANCEL,
+      // like stop()/supersede. Previously an external abort emitted none.
+      expect(onCancel).toHaveBeenCalledTimes(1);
     });
   });
 });

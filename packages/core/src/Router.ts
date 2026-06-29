@@ -7,7 +7,7 @@
  */
 
 import { logger } from "@real-router/logger";
-import { EventEmitter, RecursionDepthError } from "event-emitter";
+import { EventEmitter } from "event-emitter";
 
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
@@ -195,6 +195,12 @@ export class Router<
       routerFSM,
       emitter,
       onListenerError: logListenerError,
+      // The FSM CANCEL action aborts the in-flight
+      // navigation controller via this injected effect — "FSM CANCEL ⟹
+      // controller aborted" in one place. `#navigation` is constructed above.
+      abortController: (reason) => {
+        this.#navigation.abortCurrentController(reason);
+      },
     });
 
     // =========================================================================
@@ -250,6 +256,7 @@ export class Router<
         },
         subscribe: (handler) => this.#eventBus.subscribeTreeChanged(handler),
         listenerCount: () => this.#eventBus.treeChangedListenerCount(),
+        isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
       },
       buildPath: createBinaryInterceptable(
         "buildPath",
@@ -280,6 +287,8 @@ export class Router<
         // unhandled-rejection suppression and lastSync* bookkeeping used by
         // the public Router.navigate facade so plugin call-sites can
         // fire-and-forget the returned promise (popstate handlers do).
+        this.#assertNotReentrant();
+
         const promiseState = this.#navigation.navigateToState(
           state,
           navOpts ?? EMPTY_OPTS,
@@ -503,7 +512,8 @@ export class Router<
   }
 
   stop(): this {
-    this.#navigation.abortCurrentNavigation();
+    // SendCancelIfPossible → FSM CANCEL → the CANCEL action
+    // aborts the in-flight controller (waking the pipeline). No separate abort.
     this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (!this.#eventBus.isReady() && !this.#eventBus.isTransitioning()) {
@@ -522,7 +532,7 @@ export class Router<
       return;
     }
 
-    this.#navigation.abortCurrentNavigation();
+    // the FSM CANCEL action aborts the in-flight controller.
     this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
@@ -686,6 +696,8 @@ export class Router<
     routeParams?: Params,
     options?: NavigationOptions,
   ): Promise<State> {
+    this.#assertNotReentrant();
+
     const ctx = getInternals(this);
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);
@@ -714,6 +726,8 @@ export class Router<
   }
 
   navigateToDefault(options?: NavigationOptions): Promise<State> {
+    this.#assertNotReentrant();
+
     const ctx = getInternals(this);
 
     ctx.validator?.navigation.validateNavigateToDefaultArgs(options);
@@ -739,6 +753,8 @@ export class Router<
   }
 
   navigateToNotFound(path?: string): State {
+    this.#assertNotReentrant();
+
     if (!this.#eventBus.isActive()) {
       throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
     }
@@ -760,22 +776,21 @@ export class Router<
    * stay silent (no log). Shared by the navigate and start suppressors so the
    * suppression contract lives in one place.
    *
-   * - A suppressed RouterError code is a normal caller-owned navigation result
-   *   (a guard block, SAME_STATES, ROUTER_NOT_STARTED, …) — see
-   *   SUPPRESSED_ERROR_CODES (#721).
-   * - A RecursionDepthError is the bounded ceiling hit by a reentrant
-   *   navigate() that self-feeds nested TRANSITION_SUCCESS emits from a
-   *   subscribe() listener (#945). It is deterministic and the router stays
-   *   functional afterwards — symmetric with subscribeLeave's reentrant
-   *   navigate (which rejects with the already-suppressed TRANSITION_CANCELLED).
-   *   Suppress it so `void router.navigate()` in a listener cannot crash the
-   *   process under --unhandled-rejections=strict (the Node 22+ default).
+   * A suppressed RouterError code is a normal caller-owned navigation result
+   * (a guard block, SAME_STATES, ROUTER_NOT_STARTED, …) — see
+   * SUPPRESSED_ERROR_CODES (#721).
+   *
+   * The #945 RecursionDepthError carve-out is gone: a reentrant navigate() from a
+   * listener can no longer self-feed — it throws REENTRANT_NAVIGATION
+   * synchronously at the facade (RFC navigation-cancellation-unification §4), so
+   * navigate()'s promise never rejects with a recursion error (re-entrant emits
+   * are coalesced at the emitter, #1033; reentrant route-CRUD throws
+   * REENTRANT_TREE_MUTATION to the CRUD caller, #1032 — not through a navigate
+   * promise).
    */
   static #isExpectedRejection(error: unknown): boolean {
     return (
-      (error instanceof RouterError &&
-        SUPPRESSED_ERROR_CODES.has(error.code)) ||
-      error instanceof RecursionDepthError
+      error instanceof RouterError && SUPPRESSED_ERROR_CODES.has(error.code)
     );
   }
 
@@ -803,8 +818,7 @@ export class Router<
    * own "router.start" category rather than being misattributed to
    * "router.navigate" (#931). The log line is reachable: a start interceptor
    * that throws a plain Error after next() committed (the SSR/RSC loader window,
-   * #763) — or a cryptic path TypeError — is neither a suppressed RouterError
-   * nor a RecursionDepthError.
+   * #763) — or a cryptic path TypeError — is not a suppressed RouterError.
    */
   static readonly #onSuppressedStartError = (error: unknown): void => {
     if (Router.#isExpectedRejection(error)) {
@@ -826,6 +840,22 @@ export class Router<
     onSuppressed: (error: unknown) => void = Router.#onSuppressedNavigateError,
   ): void {
     promise.catch(onSuppressed);
+  }
+
+  /**
+   * Rejects a synchronous reentrant navigation — `navigate` /
+   * `navigateToDefault` / `navigateToState` / `navigateToNotFound` called from
+   * inside a transition-event listener while a transition is being dispatched
+   * (RFC navigation-cancellation-unification §4). Throws synchronously: inside a
+   * listener the emit's `onListenerError` isolation surfaces it (visible,
+   * non-fatal); a DEFERRED (async / microtask) navigate from a listener runs
+   * after dispatch settles and is allowed. Always-on core invariant guard (not
+   * validator-gated).
+   */
+  #assertNotReentrant(): void {
+    if (this.#eventBus.isProcessing()) {
+      throw new RouterError(errorCodes.REENTRANT_NAVIGATION);
+    }
   }
 
   /**

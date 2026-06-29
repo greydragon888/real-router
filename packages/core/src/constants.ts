@@ -37,6 +37,8 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   ROUTER_DISPOSED: "DISPOSED", // Router has been disposed
   PLUGIN_CONFLICT: "PLUGIN_CONFLICT", // Plugin tried to extend router with already-existing property
   CONTEXT_NAMESPACE_ALREADY_CLAIMED: "CONTEXT_NAMESPACE_ALREADY_CLAIMED", // Plugin tried to claim a context namespace already owned by another plugin
+  REENTRANT_NAVIGATION: "REENTRANT_NAVIGATION", // navigate() called synchronously from inside a transition-event listener (banned — use await/async listener)
+  REENTRANT_TREE_MUTATION: "REENTRANT_TREE_MUTATION", // route-CRUD called synchronously from inside a subscribeChanges handler (banned — use await/async/queueMicrotask)
 });
 
 /**
@@ -82,7 +84,6 @@ export const DEFAULT_LIMITS = {
   maxPlugins: 50,
   maxListeners: 10_000,
   warnListeners: 1000,
-  maxEventDepth: 5,
   maxLifecycleHandlers: 200,
 } as const;
 

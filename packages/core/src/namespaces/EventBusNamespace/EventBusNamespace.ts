@@ -1,7 +1,5 @@
 // packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts
 
-import { RecursionDepthError } from "event-emitter";
-
 import { errorCodes, events } from "../../constants";
 import { routerEvents, routerStates } from "../../fsm";
 import { RouterError } from "../../RouterError";
@@ -90,24 +88,36 @@ export class EventBusNamespace {
   readonly #fsm: FSM<RouterState, RouterEvent, null, RouterPayloads>;
   readonly #emitter: EventEmitter<RouterEventMap>;
   readonly #onListenerError: (eventName: string, error: unknown) => void;
+  // Effect of the FSM CANCEL action: aborts the in-flight navigation's
+  // controller. Wired to NavigationNamespace.
+  readonly #abortController: (reason?: unknown) => void;
   readonly #leaveListeners: LeaveFn[] = [];
 
-  // Synchronous reentrancy depth of the subscribeLeave dispatch. A sync leave
-  // listener that calls navigate() re-enters `awaitLeaveListeners` on the same
-  // C-stack; bounded by `#maxEventDepth` to a controlled RecursionDepthError
-  // instead of a stack overflow (#935). 0 = disabled (mirrors the emitter).
-  #maxEventDepth = 0;
-  #leaveDispatchDepth = 0;
+  // Depth of the synchronous transition-dispatch window — elevated while a
+  // transition event is being emitted (`emitTransition*`) or a `subscribeLeave`
+  // listener batch runs. `isProcessing()` reads it so the navigation facade can
+  // reject a synchronous reentrant navigate() from inside a transition listener
+  // with REENTRANT_NAVIGATION (RFC navigation-cancellation-unification §4). A
+  // counter (not a boolean) tolerates legitimately-nested transition emits. The
+  // ceiling-bounded "allow reentrant navigate, throw RecursionDepthError at
+  // `maxEventDepth`" behaviour (#935/#945) is gone: such a navigate now throws
+  // REENTRANT_NAVIGATION at depth 1, before it can recurse. (The emitter's old
+  // `maxEventDepth` depth-bound is gone too — re-entrant emits are coalesced to a
+  // no-op at the emitter, #1033 — so no event can re-enter its own dispatch.)
+  #dispatchDepth = 0;
 
   #currentToState: State | undefined;
   #pendingToState: State | undefined;
   #pendingFromState: State | undefined;
   #pendingError: unknown;
+  // Abort reason for the pending CANCEL — read by handleCancel, set by sendCancel.
+  #pendingCancelReason: unknown;
 
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
     this.#onListenerError = options.onListenerError;
+    this.#abortController = options.abortController;
     this.#currentToState = undefined;
     this.#setupFSMActions();
   }
@@ -144,7 +154,12 @@ export class EventBusNamespace {
   }
 
   emitTransitionStart(toState: State, fromState?: State): void {
-    this.#emitter.emit(events.TRANSITION_START, toState, fromState);
+    this.#dispatchDepth++;
+    try {
+      this.#emitter.emit(events.TRANSITION_START, toState, fromState);
+    } finally {
+      this.#dispatchDepth--;
+    }
   }
 
   emitTransitionSuccess(
@@ -152,7 +167,12 @@ export class EventBusNamespace {
     fromState?: State,
     opts?: NavigationOptions,
   ): void {
-    this.#emitter.emit(events.TRANSITION_SUCCESS, toState, fromState, opts);
+    this.#dispatchDepth++;
+    try {
+      this.#emitter.emit(events.TRANSITION_SUCCESS, toState, fromState, opts);
+    } finally {
+      this.#dispatchDepth--;
+    }
   }
 
   emitTransitionError(
@@ -160,25 +180,60 @@ export class EventBusNamespace {
     fromState?: State,
     error?: RouterError,
   ): void {
-    this.#emitter.emit(events.TRANSITION_ERROR, toState, fromState, error);
+    this.#dispatchDepth++;
+    try {
+      this.#emitter.emit(events.TRANSITION_ERROR, toState, fromState, error);
+    } finally {
+      this.#dispatchDepth--;
+    }
   }
 
   emitTransitionCancel(toState: State, fromState?: State): void {
-    this.#emitter.emit(events.TRANSITION_CANCEL, toState, fromState);
+    this.#dispatchDepth++;
+    try {
+      this.#emitter.emit(events.TRANSITION_CANCEL, toState, fromState);
+    } finally {
+      this.#dispatchDepth--;
+    }
   }
 
   emitTransitionLeaveApprove(toState: State, fromState?: State): void {
-    this.#emitter.emit(events.TRANSITION_LEAVE_APPROVE, toState, fromState);
+    this.#dispatchDepth++;
+    try {
+      this.#emitter.emit(events.TRANSITION_LEAVE_APPROVE, toState, fromState);
+    } finally {
+      this.#dispatchDepth--;
+    }
+  }
+
+  /**
+   * True while a transition event is being dispatched synchronously — an
+   * `emitTransition*` call or a `subscribeLeave` listener batch is on the stack.
+   * The navigation facade reads this to reject a synchronous reentrant
+   * navigate() from inside a transition listener (RFC §4).
+   */
+  isProcessing(): boolean {
+    return this.#dispatchDepth > 0;
   }
 
   /**
    * Emits the internal `TREE_CHANGED` event after a structural route-tree
-   * mutation. Reuses the shared `EventEmitter` — so depth tracking
-   * (`maxEventDepth`) and per-listener error isolation (`onListenerError`)
-   * apply automatically.
+   * mutation. Reuses the shared `EventEmitter` — so re-entrancy coalescing
+   * (#1033) and per-listener error isolation (`onListenerError`) apply
+   * automatically.
    */
   emitTreeChanged(event: TreeChangedEvent): void {
     this.#emitter.emit(TREE_CHANGED, event);
+  }
+
+  /**
+   * True while a `TREE_CHANGED` event is being dispatched synchronously.
+   * Delegates to the emitter's own in-flight tracking (#1034) — `getRoutesApi`
+   * reads this to reject reentrant route-CRUD from a `subscribeChanges` handler
+   * (#1032).
+   */
+  isEmittingTreeChanged(): boolean {
+    return this.#emitter.isDispatching(TREE_CHANGED);
   }
 
   /**
@@ -245,10 +300,11 @@ export class EventBusNamespace {
     this.#fsm.forceState(routerStates.READY);
     this.emitTransitionSuccess(state, fromState, opts);
 
-    // Stryker disable next-line BlockStatement: equivalent — not clearing #currentToState leaves a stale State ref, but after READY it is only read by sendCancelIfPossible while canCancel() (transitioning), so the stale value is never observed. CE/EqualityOperator siblings stay live (the #308 reentrant-preserve invariant is killed by reentrant-currentToState-wipe.test.ts).
-    if (this.#currentToState === state) {
-      this.#currentToState = undefined;
-    }
+    // Nav committed — clear so a later stop()/dispose() cannot cancel a finished
+    // navigation. Unconditional now that synchronous reentrant navigate is banned
+    // (RFC §4): nothing can replace #currentToState during the emit above, so the
+    // #308 reentrant-preserve guard is no longer needed.
+    this.#currentToState = undefined;
   }
 
   sendLeaveApprove(toState: State, fromState?: State): void {
@@ -258,17 +314,14 @@ export class EventBusNamespace {
   }
 
   sendFail(toState?: State, fromState?: State, error?: unknown): void {
-    const prev = this.#currentToState;
-
     this.#pendingToState = toState;
     this.#pendingFromState = fromState;
     this.#pendingError = error;
     this.#fsm.send(routerEvents.FAIL);
 
-    // Stryker disable next-line BlockStatement: equivalent — not clearing #currentToState leaves a stale State ref, unobservable after FAIL settles (see L213). CE/EqualityOperator siblings stay live (#308 reentrant-currentToState-wipe.test.ts).
-    if (this.#currentToState === prev) {
-      this.#currentToState = undefined;
-    }
+    // Nav failed — clear (unconditional; synchronous reentrant navigate is
+    // banned (RFC §4), so nothing replaces #currentToState during the emit).
+    this.#currentToState = undefined;
   }
 
   /**
@@ -298,17 +351,15 @@ export class EventBusNamespace {
     }
   }
 
-  sendCancel(toState: State, fromState?: State): void {
-    const prev = this.#currentToState;
-
+  sendCancel(toState: State, fromState?: State, reason?: unknown): void {
     this.#pendingToState = toState;
     this.#pendingFromState = fromState;
+    this.#pendingCancelReason = reason;
     this.#fsm.send(routerEvents.CANCEL);
 
-    // Stryker disable next-line BlockStatement: equivalent — not clearing #currentToState leaves a stale State ref, unobservable after CANCEL settles (see L213). CE/EqualityOperator siblings stay live (#308 reentrant-currentToState-wipe.test.ts).
-    if (this.#currentToState === prev) {
-      this.#currentToState = undefined;
-    }
+    // Nav cancelled — clear (unconditional; synchronous reentrant navigate is
+    // banned (RFC §4), so nothing replaces #currentToState during the emit).
+    this.#currentToState = undefined;
   }
 
   canBeginTransition(): boolean {
@@ -352,10 +403,6 @@ export class EventBusNamespace {
 
   isStarting(): boolean {
     return this.#fsm.getState() === routerStates.STARTING;
-  }
-
-  getCurrentToState(): State | undefined {
-    return this.#currentToState;
   }
 
   /**
@@ -511,27 +558,6 @@ export class EventBusNamespace {
       return undefined;
     }
 
-    // Bound SYNCHRONOUS reentrancy: a sync subscribeLeave listener that calls
-    // navigate() re-enters this dispatch on the same C-stack, one navigate
-    // pipeline nested per hop. Unbounded, it overflows the stack (~615 deep)
-    // with a RangeError that escapes the SUPPRESSED_ERROR_CODES net and can leak
-    // as an unhandled rejection / wedge the worker (#935). Throw a controlled
-    // RecursionDepthError BEFORE that happens — the same sentinel and limit
-    // (`#maxEventDepth`) the EventEmitter applies to the plugin
-    // `onTransitionLeaveApprove` path, so both reentrancy routes are bounded
-    // identically. ASYNC reentrancy is unaffected: an async listener unwinds the
-    // stack at its first `await`, which runs after this sync loop's `finally`
-    // resets the counter, so the reentrant navigate sees depth 0. 0 = disabled
-    // (mirrors the EventEmitter's maxEventDepth === 0 opt-out).
-    if (
-      this.#maxEventDepth > 0 &&
-      this.#leaveDispatchDepth >= this.#maxEventDepth
-    ) {
-      throw new RecursionDepthError(
-        `Maximum recursion depth (${this.#maxEventDepth}) exceeded for subscribeLeave`,
-      );
-    }
-
     // Freeze the payload wrapper so listeners cannot mutate it (`payload.route`
     // is already deep-frozen via the State immutability invariant; this closes
     // the wrapper-mutation gap surfaced by audit `probe-05-payload-frozen`).
@@ -552,10 +578,12 @@ export class EventBusNamespace {
     // redundant and silently revert it).
     const snapshot = [...this.#leaveListeners];
 
-    // Elevated across the SYNC dispatch only: a reentrant sync navigate nests
-    // its own `awaitLeaveListeners` here and sees the raised depth; the `finally`
-    // restores it before any async tail (returned promise) runs.
-    this.#leaveDispatchDepth++;
+    // Elevated across the SYNC leave-listener dispatch: `isProcessing()` reads
+    // it, so a sync subscribeLeave listener that calls navigate() is rejected
+    // with REENTRANT_NAVIGATION at the facade (RFC §4). The `finally` restores it
+    // before any async tail (returned promise) runs, so a DEFERRED navigate from
+    // an async listener (after its first `await`) sees depth 0 and is allowed.
+    this.#dispatchDepth++;
 
     try {
       for (const listener of snapshot) {
@@ -573,7 +601,7 @@ export class EventBusNamespace {
         }
       }
     } finally {
-      this.#leaveDispatchDepth--;
+      this.#dispatchDepth--;
     }
 
     if (promises === undefined) {
@@ -592,23 +620,23 @@ export class EventBusNamespace {
     this.#leaveListeners.length = 0;
   }
 
-  setLimits(limits: {
-    maxListeners: number;
-    warnListeners: number;
-    maxEventDepth: number;
-  }): void {
-    this.#maxEventDepth = limits.maxEventDepth;
+  setLimits(limits: { maxListeners: number; warnListeners: number }): void {
     this.#emitter.setLimits(limits);
   }
 
-  sendCancelIfPossible(fromState: State | undefined): void {
+  // Single guarded entry point for routing a cancel into the FSM `CANCEL` action
+  // — used by every source: stop/dispose (RouterLifecycle) pass no reason;
+  // supersede / external `opts.signal` (via the wiring `cancelNavigation` dep)
+  // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
+  // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
+  sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
     const toState = this.#currentToState;
 
     if (!this.canCancel() || toState === undefined) {
       return;
     }
 
-    this.sendCancel(toState, fromState);
+    this.sendCancel(toState, fromState, reason);
   }
 
   #emitPendingError(): void {
@@ -646,6 +674,17 @@ export class EventBusNamespace {
     // emit for the zero-allocation hot path.
     const handleCancel = () => {
       const toState = this.#pendingToState;
+      const reason = this.#pendingCancelReason;
+
+      this.#pendingCancelReason = undefined;
+
+      // (RFC navigation-cancellation-unification §5): the FSM CANCEL
+      // action OWNS the abort. Aborting the in-flight controller wakes the parked
+      // async pipeline (#1018) and rejects navigate() — the post-race local
+      // isActive() sees signal.aborted; `reason` surfaces as the leave signal's
+      // reason (#943). Order: (i) abort (wake) then (ii) emit TRANSITION_CANCEL.
+      // No cycle: onInternalAbort is wake-only, it does not re-enter cancel.
+      this.#abortController(reason);
 
       /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
       if (toState === undefined) {

@@ -512,6 +512,16 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 
 ---
 
+## Navigation cancellation
+
+Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and the `CANCEL` action aborts the in-flight controller (RFC `navigation-cancellation-unification` §5). See `EventBusNamespace.handleCancel` → `NavigationNamespace.abortCurrentController`.
+
+| #   | Invariant                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Cancellation wakes the nav & settles FSM | For any random sequence of suspended navigations cancelled by `stop` / `dispose` / external `opts.signal`, each cancelled navigation rejects (the CANCEL action's controller-abort wakes the parked async pipeline, #1018) and the FSM is left settled — never stuck in `TRANSITION_STARTED`/`LEAVE_APPROVED` (`isLeaveApproved() === false`; `stop` → IDLE, external → READY); route-CRUD blocked-while-transitioning (#1030) works after. Verified **discriminating**: the guards never settle, so removing the abort hangs every cancellation. |
+
+---
+
 ## Test Files
 
 | File                                                    | Invariants | Category                                      |
@@ -546,3 +556,5 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | `tests/property/serializeRouterState.properties.ts`     | 7          | SSR transport (XSS-safe JSON, transition strip) |
 | `tests/property/getStaticPaths.properties.ts`           | 1          | SSG leaf-path enumeration (model-based)         |
 | `tests/property/tree-changed.properties.ts`             | 6          | TREE_CHANGED atomicity, op discriminator, replace diff, nested-subtree flatten, update conditional emit |
+| `tests/property/cancellation.properties.ts`             | 1          | Navigation cancellation — random cancel sequences |
+| `tests/property/empty-params-reuse.properties.ts`       | 1          | All-undefined param dict → shared EMPTY_PARAMS singleton (#1027/#1028) |

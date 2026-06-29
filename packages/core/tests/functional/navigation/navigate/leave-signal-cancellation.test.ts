@@ -3,6 +3,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { createRouter, errorCodes, events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
+import { captureSyncThrow } from "../../../helpers";
+
 import type { Route, Router } from "@real-router/core";
 
 // Contract (packages/core/CLAUDE.md): the `subscribeLeave` payload `signal`
@@ -232,28 +234,33 @@ describe("subscribeLeave signal — cancellation contract (#722)", () => {
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("plugin navigating during LEAVE_APPROVE cancels a listener-less navigation", async () => {
+    it("plugin sync-navigating during LEAVE_APPROVE is banned (REENTRANT_NAVIGATION); original completes", async () => {
+      // RFC §4: a synchronous navigate() from inside a LEAVE_APPROVE listener is
+      // rejected at the facade; the original navigation is not superseded.
       const router = (active = guardFreeRouter());
 
       await router.start("/");
 
       let reentered = false;
+      let captured: unknown;
 
       getPluginApi(router).addEventListener(
         events.TRANSITION_LEAVE_APPROVE,
         (toState) => {
           if (toState?.name === "users" && !reentered) {
             reentered = true;
-            void router.navigate("orders");
+            captured = captureSyncThrow(() => router.navigate("orders"));
           }
         },
       );
 
-      await expect(router.navigate("users")).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
-      });
+      const state = await router.navigate("users");
 
-      expect(router.getState()?.name).toBe("orders");
+      expect(captured).toMatchObject({
+        code: errorCodes.REENTRANT_NAVIGATION,
+      });
+      expect(state.name).toBe("users");
+      expect(router.getState()?.name).toBe("users");
     });
 
     it("no leave listeners, no guards: navigation completes on the sync hot path", async () => {

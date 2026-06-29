@@ -78,4 +78,26 @@ export async function captureUnhandledRejections(
   return captured;
 }
 
+/**
+ * Captures a SYNCHRONOUS throw from a navigation method and returns the thrown
+ * value (or `undefined` if it did not throw synchronously). Used to assert the
+ * banned-reentrant-navigation guard (RFC §4), which throws REENTRANT_NAVIGATION
+ * synchronously — before the Promise is created — when a navigation method is
+ * called from inside a transition listener.
+ *
+ * The lint suppression is justified and centralized here: `fn` is a
+ * Promise-returning navigation method, but in the tested path it throws
+ * synchronously (the guard runs before the pipeline), so there is no Promise to
+ * await or float.
+ */
+export function captureSyncThrow(fn: () => unknown): unknown {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+
+  return undefined;
+}
+
 export { DEFAULT_TRANSITION } from "../../src/constants";

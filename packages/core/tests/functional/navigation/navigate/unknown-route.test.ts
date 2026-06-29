@@ -191,12 +191,15 @@ describe("router.navigate() - unknown route", () => {
 
       await strictRouter.navigate("profile");
 
-      // Try to navigate to non-existent route
-      try {
-        await strictRouter.navigate("non-existent", {});
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      // Try to navigate to non-existent route — must REJECT with ROUTE_NOT_FOUND.
+      // The old try/catch masked it: a regression resolving the navigation would
+      // skip the catch, and the "stay on current route" check below stays green
+      // anyway (the target was never committed), so the error was never asserted.
+      await expect(
+        strictRouter.navigate("non-existent", {}),
+      ).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       // Should stay on current route
       expect(strictRouter.getState()?.name).toBe("profile");

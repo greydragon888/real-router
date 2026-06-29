@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { events, errorCodes } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter } from "../../../helpers";
+import { captureSyncThrow, createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -174,29 +174,31 @@ describe("router.navigate() - events transition leave approve (RFC §9.2)", () =
       unsubLeave();
     });
 
-    it("reentrant navigate from LEAVE_APPROVE listener supersedes original navigation", async () => {
+    it("reentrant navigate from a LEAVE_APPROVE listener is banned (REENTRANT_NAVIGATION); original completes", async () => {
+      // RFC §4: a synchronous navigate() from inside a TRANSITION_LEAVE_APPROVE
+      // listener runs while the emit is on the stack (isProcessing) → it throws
+      // REENTRANT_NAVIGATION at the facade instead of superseding the original.
       let leaveApproveCalledForUsers = false;
-      let reentrantNavPromise: Promise<unknown> | undefined;
+      let captured: unknown;
 
       const unsubLeave = getPluginApi(router).addEventListener(
         events.TRANSITION_LEAVE_APPROVE,
         (toState) => {
           if (toState.name === "users" && !leaveApproveCalledForUsers) {
             leaveApproveCalledForUsers = true;
-            reentrantNavPromise = router.navigate("orders");
+            captured = captureSyncThrow(() => router.navigate("orders"));
           }
         },
       );
 
-      const originalNav = router.navigate("users");
+      const state = await router.navigate("users");
 
-      await expect(originalNav).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
+      expect(captured).toMatchObject({
+        code: errorCodes.REENTRANT_NAVIGATION,
       });
-
-      await reentrantNavPromise;
-
-      expect(router.getState()?.name).toBe("orders");
+      // Original navigation was NOT superseded — it committed normally.
+      expect(state.name).toBe("users");
+      expect(router.getState()?.name).toBe("users");
       expect(leaveApproveCalledForUsers).toBe(true);
 
       unsubLeave();

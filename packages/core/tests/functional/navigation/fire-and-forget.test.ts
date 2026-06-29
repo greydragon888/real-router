@@ -9,7 +9,7 @@ import type { Router } from "@real-router/core";
 /**
  * #721 fire-and-forget safety, POSITIVE half: navigation methods called without
  * `await` must internally suppress EXPECTED rejections (a suppressed RouterError
- * code or a RecursionDepthError) so no process-level `unhandledRejection` leaks
+ * code) so no process-level `unhandledRejection` leaks
  * and no spurious "Unexpected navigation error" is logged for them. (A genuinely
  * unexpected navigate rejection — e.g. a subscribeLeave listener that throws —
  * is NOT suppressed and DOES log under "router.navigate"; start failures log

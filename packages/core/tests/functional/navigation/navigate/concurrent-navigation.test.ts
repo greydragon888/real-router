@@ -12,7 +12,7 @@ import {
 import { errorCodes, events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
-import { createTestRouter } from "../../../helpers";
+import { captureSyncThrow, createTestRouter } from "../../../helpers";
 
 import type { Router, State } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -152,7 +152,8 @@ describe("router.navigate() - concurrent navigation", () => {
         expect.objectContaining({
           name: "profile",
         }),
-        expect.any(Object),
+        // fromState is the committed start route — assert it, not `any(Object)`.
+        expect.objectContaining({ name: "home" }),
       );
 
       unsubCancel();
@@ -790,42 +791,30 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should cancel when TRANSITION_START listener triggers async reentrant navigate on no-guard route", async () => {
-      vi.useFakeTimers();
+    it("sync reentrant navigate from a TRANSITION_START listener is banned (REENTRANT_NAVIGATION); original completes", async () => {
+      // RFC §4: a synchronous navigate() from inside a TRANSITION_START listener
+      // is rejected at the facade instead of superseding the in-flight one.
+      let captured: unknown;
 
-      lifecycle.addActivateGuard(
-        "users",
-        () => () =>
-          new Promise<boolean>((resolve) =>
-            setTimeout(() => {
-              resolve(true);
-            }, 100),
-          ),
-      );
-
-      // TRANSITION_START listener redirects to "users" (with async guard)
       const unsub = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         (toState: State) => {
           if (toState.name === "orders") {
-            void router.navigate("users");
+            captured = captureSyncThrow(() => router.navigate("users"));
           }
         },
       );
 
-      // "orders" has NO guards — navigation ID detects superseded navigation
-      const result = router.navigate("orders");
+      // "orders" has NO guards — it completes (not superseded by the banned call).
+      const state = await router.navigate("orders");
 
-      await vi.runAllTimersAsync();
-
-      await expect(result).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
+      expect(captured).toMatchObject({
+        code: errorCodes.REENTRANT_NAVIGATION,
       });
-
-      expect(router.getState()?.name).toBe("users");
+      expect(state.name).toBe("orders");
+      expect(router.getState()?.name).toBe("orders");
 
       unsub();
-      vi.useRealTimers();
     });
 
     it("should cancel when sync guard triggers reentrant navigate to different route", async () => {

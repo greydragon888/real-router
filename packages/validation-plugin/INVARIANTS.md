@@ -30,7 +30,6 @@ Invariants verified by property-based tests (`tests/property/`). Each invariant 
 | `maxPlugins`           | 0   | 1,000   |
 | `maxListeners`         | 0   | 100,000 |
 | `warnListeners`        | 0   | 100,000 |
-| `maxEventDepth`        | 0   | 100     |
 | `maxLifecycleHandlers` | 0   | 10,000  |
 
 ## validateCloneArgs
@@ -159,10 +158,8 @@ Invariants verified by property-based tests (`tests/property/`). Each invariant 
 | #   | Invariant                                                                          | Runs |
 | --- | ---------------------------------------------------------------------------------- | ---- |
 | 1   | Valid `maxDependencies` integer in `[0, 10000]` never throws                       | 50   |
-| 2   | Valid `maxEventDepth` integer in `[0, 100]` never throws                           | 50   |
-| 3   | Non-integer values (float, NaN, Infinity, string, boolean, null) throw `TypeError` | 50   |
-| 4   | `maxDependencies` out of bounds always throws `RangeError`                         | 50   |
-| 5   | `maxEventDepth` out of bounds always throws `RangeError`                           | 50   |
+| 2   | Non-integer values (float, NaN, Infinity, string, boolean, null) throw `TypeError` | 50   |
+| 3   | `maxDependencies` out of bounds always throws `RangeError`                         | 50   |
 
 ## Cross-cutting: Idempotency
 

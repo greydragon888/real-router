@@ -7,7 +7,7 @@ import {
   getPluginApi,
 } from "@real-router/core/api";
 
-import { createTestRouter } from "../helpers";
+import { captureSyncThrow, createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
@@ -210,26 +210,28 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubSuccess();
     });
 
-    it("reentrant navigate from subscribeLeave() on no-guards path: original cancelled, reentrant nav succeeds", async () => {
-      let reentrantNavPromise: Promise<unknown> | undefined;
+    it("sync reentrant navigate from subscribeLeave() is banned (REENTRANT_NAVIGATION); original completes", async () => {
+      // RFC §4: a synchronous navigate() from inside a subscribeLeave listener
+      // runs while the leave dispatch is on the stack → REENTRANT_NAVIGATION at
+      // the facade, instead of superseding the original.
+      let captured: unknown;
       let fired = false;
 
       const unsubLeave = router.subscribeLeave(({ nextRoute }) => {
         if (nextRoute.name === "users" && !fired) {
           fired = true;
-          reentrantNavPromise = router.navigate("orders");
+          captured = captureSyncThrow(() => router.navigate("orders"));
         }
       });
 
-      const originalNav = router.navigate("users");
+      const finalState = await router.navigate("users");
 
-      await expect(originalNav).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
+      expect(captured).toMatchObject({
+        code: errorCodes.REENTRANT_NAVIGATION,
       });
-
-      await reentrantNavPromise;
-
-      expect(router.getState()?.name).toBe("orders");
+      // Original navigation was NOT superseded — it committed normally.
+      expect(finalState.name).toBe("users");
+      expect(router.getState()?.name).toBe("users");
 
       unsubLeave();
     });

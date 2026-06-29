@@ -31,6 +31,9 @@ describe("router.navigate() - edge cases proxy", () => {
         const state = await router.navigate("users", {}, optsWithGetter);
 
         expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
+        // The getter's `replace: true` must actually be honored — without this
+        // the test passed even if the opts object were ignored entirely.
+        expect(state.transition?.replace).toBe(true);
       });
     });
 
@@ -84,6 +87,9 @@ describe("router.navigate() - edge cases proxy", () => {
         const state = await router.navigate("users", {}, proxyOpts);
 
         expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
+        // The Proxy's `replace: true` must reach the transition — otherwise the
+        // test proves only that navigation didn't crash, not that opts were read.
+        expect(state.transition?.replace).toBe(true);
       });
 
       it("should handle plain objects that mimic Proxy behavior", async () => {
@@ -101,6 +107,7 @@ describe("router.navigate() - edge cases proxy", () => {
             name: "users",
           }),
         );
+        expect(state.transition?.replace).toBe(true);
       });
     });
   });

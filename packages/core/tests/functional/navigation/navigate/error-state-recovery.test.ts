@@ -91,28 +91,19 @@ describe("router.navigate() - error state recovery", () => {
           ),
       );
 
-      // First navigation fails
-      try {
-        await router.navigate("home");
-      } catch (error) {
-        expect(error).toBeDefined();
-      }
+      // First navigation MUST reject with CANNOT_ACTIVATE. A bare try/catch with
+      // `expect(error).toBeDefined()` was vacuous: if a regression resolved the
+      // navigation the catch never runs, and the recovery check below stays green
+      // regardless — so the rejection itself was never actually asserted.
+      await expect(router.navigate("home")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
 
       // Can start new navigation after error (router is not stuck)
       // Navigate to a different route without guards
       await router.navigate("orders");
 
       expect(router.getState()?.name).toBe("orders");
-    });
-
-    it("should do nothing when cancel() called after navigation complete", async () => {
-      await router.navigate("users");
-
-      // Navigation completes synchronously (no guards)
-      expect(router.getState()?.name).toBe("users");
-
-      // State should still be users
-      expect(router.getState()?.name).toBe("users");
     });
   });
 

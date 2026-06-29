@@ -733,15 +733,6 @@ describe("validateLimitValue — property-based", () => {
     }).not.toThrow();
   });
 
-  test.prop([fc.integer({ min: 0, max: 100 })], { numRuns: NUM_RUNS.standard })(
-    "valid maxEventDepth integer in bounds never throws",
-    (value) => {
-      expect(() => {
-        validateLimitValue("maxEventDepth", value, "test");
-      }).not.toThrow();
-    },
-  );
-
   test.prop(
     [
       fc.oneof(
@@ -766,14 +757,6 @@ describe("validateLimitValue — property-based", () => {
   })("maxDependencies out of bounds always throws RangeError", (value) => {
     expect(() => {
       validateLimitValue("maxDependencies", value, "test");
-    }).toThrow(RangeError);
-  });
-
-  test.prop([fc.oneof(fc.integer({ max: -1 }), fc.integer({ min: 101 }))], {
-    numRuns: NUM_RUNS.standard,
-  })("maxEventDepth out of bounds always throws RangeError", (value) => {
-    expect(() => {
-      validateLimitValue("maxEventDepth", value, "test");
     }).toThrow(RangeError);
   });
 });

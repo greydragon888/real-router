@@ -42,7 +42,6 @@ const LIMIT_BOUNDS = {
   maxPlugins: { min: 0, max: 1000 },
   maxListeners: { min: 0, max: 100_000 },
   warnListeners: { min: 0, max: 100_000 },
-  maxEventDepth: { min: 0, max: 100 },
   maxLifecycleHandlers: { min: 0, max: 10_000 },
 } as const;
 
@@ -124,9 +123,6 @@ const validLimitsArbitrary = fc
       nil: undefined,
     }),
     warnListeners: fc.option(fc.integer({ min: 0, max: 100_000 }), {
-      nil: undefined,
-    }),
-    maxEventDepth: fc.option(fc.integer({ min: 0, max: 100 }), {
       nil: undefined,
     }),
     maxLifecycleHandlers: fc.option(fc.integer({ min: 0, max: 10_000 }), {

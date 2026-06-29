@@ -102,48 +102,41 @@ describe("router.navigate() - edge cases params", () => {
     // -------------------------------------------------------------------------
 
     describe("null and undefined params handling", () => {
-      // TDD tests: These test the CORRECT expected behavior after the fix
-      // The polymorphic logic should correctly handle falsy params values
+      // The polymorphic argument logic must treat falsy `params` (null /
+      // undefined) as empty params and resolve normally. (Titles formerly
+      // referenced a `callback` argument — that API was removed; navigate() is
+      // Promise-only.)
 
-      it("should call callback when params is null", async () => {
-        // When paramsOrDone is null, it should be treated as empty params
-        // and the callback in position 3 should be called
+      it("treats null params as empty params and resolves", async () => {
         // @ts-expect-error - testing runtime behavior with null
         const state = await router.navigate("users", null);
 
-        // Callback SHOULD be called with success
         expect(state).toStrictEqual(
           expect.objectContaining({ name: "users", params: {} }),
         );
       });
 
-      it("should call callback when params is undefined", async () => {
-        // When paramsOrDone is undefined, it should be treated as empty params
-        // and the callback in position 3 should be called
+      it("treats undefined params as empty params and resolves", async () => {
         const state = await router.navigate("users");
 
-        // Callback SHOULD be called with success
         expect(state).toStrictEqual(
           expect.objectContaining({ name: "users", params: {} }),
         );
       });
 
-      it("should call callback with 4 args when params is undefined", async () => {
-        // 4-argument form: navigate(name, params, opts, callback)
-        // Even with undefined params, callback should be called
+      it("resolves with empty params object: navigate(name, {})", async () => {
         const state = await router.navigate("users", {});
 
-        // Callback SHOULD be called
         expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
-      it("should call callback with 4 args when params is null", async () => {
-        // 4-argument form with null params
+      it("honors opts when params is null: navigate(name, null, { replace: true })", async () => {
         // @ts-expect-error - testing runtime behavior with null
         const state = await router.navigate("users", null, { replace: true });
 
-        // Callback SHOULD be called
         expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
+        // null params must not swallow the opts — `replace` must still apply.
+        expect(state.transition?.replace).toBe(true);
       });
 
       it("should correctly handle empty object {} as params (truthy)", async () => {
