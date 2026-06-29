@@ -106,13 +106,6 @@ export class EventBusNamespace {
   // no-op at the emitter, #1033 — so no event can re-enter its own dispatch.)
   #dispatchDepth = 0;
 
-  // Depth of the synchronous TREE_CHANGED dispatch window — elevated while
-  // emitTreeChanged() runs. isEmittingTreeChanged() reads it so getRoutesApi can
-  // reject reentrant route-CRUD from a subscribeChanges handler with
-  // REENTRANT_TREE_MUTATION (#1032). Separate from #dispatchDepth: route-CRUD
-  // from a *transition* listener (not a TREE_CHANGED dispatch) stays allowed.
-  #treeDispatchDepth = 0;
-
   #currentToState: State | undefined;
   #pendingToState: State | undefined;
   #pendingFromState: State | undefined;
@@ -230,21 +223,17 @@ export class EventBusNamespace {
    * automatically.
    */
   emitTreeChanged(event: TreeChangedEvent): void {
-    this.#treeDispatchDepth++;
-    try {
-      this.#emitter.emit(TREE_CHANGED, event);
-    } finally {
-      this.#treeDispatchDepth--;
-    }
+    this.#emitter.emit(TREE_CHANGED, event);
   }
 
   /**
-   * True while a `TREE_CHANGED` event is being dispatched synchronously (an
-   * `emitTreeChanged` call is on the stack). `getRoutesApi` reads this to reject
-   * reentrant route-CRUD from a `subscribeChanges` handler (#1032).
+   * True while a `TREE_CHANGED` event is being dispatched synchronously.
+   * Delegates to the emitter's own in-flight tracking (#1034) — `getRoutesApi`
+   * reads this to reject reentrant route-CRUD from a `subscribeChanges` handler
+   * (#1032).
    */
   isEmittingTreeChanged(): boolean {
-    return this.#treeDispatchDepth > 0;
+    return this.#emitter.isDispatching(TREE_CHANGED);
   }
 
   /**
@@ -414,10 +403,6 @@ export class EventBusNamespace {
 
   isStarting(): boolean {
     return this.#fsm.getState() === routerStates.STARTING;
-  }
-
-  getCurrentToState(): State | undefined {
-    return this.#currentToState;
   }
 
   /**
@@ -639,14 +624,19 @@ export class EventBusNamespace {
     this.#emitter.setLimits(limits);
   }
 
-  sendCancelIfPossible(fromState: State | undefined): void {
+  // Single guarded entry point for routing a cancel into the FSM `CANCEL` action
+  // — used by every source: stop/dispose (RouterLifecycle) pass no reason;
+  // supersede / external `opts.signal` (via the wiring `cancelNavigation` dep)
+  // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
+  // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
+  sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
     const toState = this.#currentToState;
 
     if (!this.canCancel() || toState === undefined) {
       return;
     }
 
-    this.sendCancel(toState, fromState);
+    this.sendCancel(toState, fromState, reason);
   }
 
   #emitPendingError(): void {

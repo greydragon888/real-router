@@ -214,6 +214,16 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     return this.#callbacks.get(eventName)?.size ?? 0;
   }
 
+  /**
+   * Returns whether the given event is currently being dispatched (an `emit`
+   * for it is on the stack). Single source of truth for "is this event
+   * in-flight" — consumers read it to reject re-entrant operations that would
+   * trigger such an emit (the emit itself would be coalesced regardless).
+   */
+  isDispatching(eventName: keyof TEventMap & string): boolean {
+    return this.#dispatching.has(eventName);
+  }
+
   // ===========================================================================
   // Private methods
   // ===========================================================================

@@ -646,6 +646,25 @@ describe("EventEmitter", () => {
 
       expect(laterCb).not.toHaveBeenCalled();
     });
+
+    it("isDispatching(event) — true for the in-flight event during dispatch, false otherwise", () => {
+      const emitter = createEmitter();
+      let duringSelf: boolean | undefined;
+      let duringOther: boolean | undefined;
+
+      emitter.on("click", () => {
+        duringSelf = emitter.isDispatching("click");
+        duringOther = emitter.isDispatching("hover");
+      });
+
+      expect(emitter.isDispatching("click")).toBe(false); // not dispatching yet
+
+      emitter.emit("click", 1, 2);
+
+      expect(duringSelf).toBe(true); // in-flight during its own dispatch
+      expect(duringOther).toBe(false); // a different, idle event
+      expect(emitter.isDispatching("click")).toBe(false); // released after
+    });
   });
 
   // ===========================================================================

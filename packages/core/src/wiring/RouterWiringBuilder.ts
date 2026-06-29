@@ -187,14 +187,7 @@ export class RouterWiringBuilder<
         this.eventBus.sendNavigate(toState, fromState);
       },
       cancelNavigation: (reason) => {
-        const toState = this.eventBus.getCurrentToState();
-
-        /* v8 ignore next -- @preserve: getCurrentToState() guaranteed set before TRANSITION_STARTED */
-        if (toState === undefined) {
-          return;
-        }
-
-        this.eventBus.sendCancel(toState, this.state.get(), reason);
+        this.eventBus.sendCancelIfPossible(this.state.get(), reason);
       },
       sendTransitionDone: (state, fromState, opts) => {
         this.eventBus.sendComplete(state, fromState, opts);
