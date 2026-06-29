@@ -45,7 +45,6 @@ describe("core/limits — with validationPlugin", () => {
           maxPlugins: 10,
           maxDependencies: 50,
           maxListeners: 30,
-          maxEventDepth: 5,
           maxLifecycleHandlers: 100,
         },
       });
@@ -145,24 +144,6 @@ describe("core/limits — with validationPlugin", () => {
           getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
         }
       }).not.toThrow();
-    });
-
-    it("should allow unlimited event depth when maxEventDepth = 0", async () => {
-      router = createRouter([{ name: "home", path: "/" }], {
-        limits: { maxEventDepth: 0 },
-        defaultRoute: "home",
-      });
-      router.usePlugin(validationPlugin());
-
-      let startEventReceived = false;
-
-      getPluginApi(router).addEventListener(events.ROUTER_START, () => {
-        startEventReceived = true;
-      });
-
-      await router.start("/home");
-
-      expect(startEventReceived).toBe(true);
     });
 
     it("should allow unlimited lifecycle handlers when maxLifecycleHandlers = 0", () => {
@@ -326,7 +307,6 @@ describe("core/limits — with validationPlugin", () => {
           maxPlugins: 0,
           maxDependencies: 0,
           maxListeners: 0,
-          maxEventDepth: 0,
           maxLifecycleHandlers: 0,
         },
       });

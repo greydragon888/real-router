@@ -37,7 +37,6 @@ describe("core/limits (integration via public API)", () => {
             maxPlugins: 10,
             maxDependencies: 50,
             maxListeners: 30,
-            maxEventDepth: 5,
             maxLifecycleHandlers: 100,
           },
         });
@@ -146,26 +145,6 @@ describe("core/limits (integration via public API)", () => {
           getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
         }
       }).not.toThrow();
-    });
-
-    it("should allow unlimited event depth when maxEventDepth = 0", async () => {
-      const router = createRouter([{ name: "home", path: "/" }], {
-        limits: { maxEventDepth: 0 },
-        defaultRoute: "home",
-      });
-
-      // Add listener BEFORE start to ensure event is emitted
-      let startEventReceived = false;
-
-      getPluginApi(router).addEventListener(events.ROUTER_START, () => {
-        startEventReceived = true;
-      });
-
-      // Start router - this triggers ROUTER_START event with maxEventDepth=0
-      await router.start("/home");
-
-      // Verify event was actually received (confirms event path was executed)
-      expect(startEventReceived).toBe(true);
     });
 
     it("should allow unlimited lifecycle handlers when maxLifecycleHandlers = 0", () => {
@@ -314,7 +293,6 @@ describe("core/limits (integration via public API)", () => {
           maxPlugins: 0,
           maxDependencies: 0,
           maxListeners: 0,
-          maxEventDepth: 0,
           maxLifecycleHandlers: 0,
         },
       });

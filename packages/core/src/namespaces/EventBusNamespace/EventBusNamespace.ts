@@ -101,8 +101,9 @@ export class EventBusNamespace {
   // counter (not a boolean) tolerates legitimately-nested transition emits. The
   // ceiling-bounded "allow reentrant navigate, throw RecursionDepthError at
   // `maxEventDepth`" behaviour (#935/#945) is gone: such a navigate now throws
-  // REENTRANT_NAVIGATION at depth 1, before it can recurse. The emitter keeps its
-  // own `maxEventDepth` for reentrant route-CRUD, which stays allowed-but-bounded.
+  // REENTRANT_NAVIGATION at depth 1, before it can recurse. (The emitter's old
+  // `maxEventDepth` depth-bound is gone too — re-entrant emits are coalesced to a
+  // no-op at the emitter, #1033 — so no event can re-enter its own dispatch.)
   #dispatchDepth = 0;
 
   // Depth of the synchronous TREE_CHANGED dispatch window — elevated while
@@ -224,9 +225,9 @@ export class EventBusNamespace {
 
   /**
    * Emits the internal `TREE_CHANGED` event after a structural route-tree
-   * mutation. Reuses the shared `EventEmitter` — so depth tracking
-   * (`maxEventDepth`) and per-listener error isolation (`onListenerError`)
-   * apply automatically.
+   * mutation. Reuses the shared `EventEmitter` — so re-entrancy coalescing
+   * (#1033) and per-listener error isolation (`onListenerError`) apply
+   * automatically.
    */
   emitTreeChanged(event: TreeChangedEvent): void {
     this.#treeDispatchDepth++;
@@ -634,11 +635,7 @@ export class EventBusNamespace {
     this.#leaveListeners.length = 0;
   }
 
-  setLimits(limits: {
-    maxListeners: number;
-    warnListeners: number;
-    maxEventDepth: number;
-  }): void {
+  setLimits(limits: { maxListeners: number; warnListeners: number }): void {
     this.#emitter.setLimits(limits);
   }
 

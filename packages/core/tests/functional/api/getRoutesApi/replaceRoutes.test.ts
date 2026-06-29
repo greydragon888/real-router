@@ -4,7 +4,6 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import {
   createRouter,
   errorCodes,
-  RecursionDepthError,
   RouterError,
   UNKNOWN_ROUTE,
 } from "@real-router/core";
@@ -801,14 +800,15 @@ describe("core/routes/replaceRoutes", () => {
       unsub();
     });
 
-    it("bounds a runaway replace-from-subscribe loop with RecursionDepthError", () => {
+    it("coalesces a runaway replace-from-subscribe loop — no recursion, no throw", () => {
       // A subscribe (TRANSITION_SUCCESS) listener that replaces UNCONDITIONALLY:
-      // each replace revalidates the active state and re-emits TRANSITION_SUCCESS
-      // (#950), re-entering the listener → runaway recursion. This is the path
-      // that keeps the EventEmitter `maxEventDepth` guard (RecursionDepthError)
-      // load-bearing AFTER the reentrant-CRUD ban (#1032): that ban blocks CRUD
-      // during a TREE_CHANGED dispatch, NOT this SUCCESS re-emit (replace from a
-      // transition listener is allowed). `maxEventDepth` (5) severs the loop.
+      // each replace revalidates the active state and would re-emit
+      // TRANSITION_SUCCESS (#950), re-entering the listener. The emitter coalesces
+      // that re-entrant SUCCESS emit (#1033) — the listener runs exactly once, no
+      // recursion, no error. (Before #1033 this path was severed by the emitter's
+      // `maxEventDepth` depth bound throwing RecursionDepthError; that machinery
+      // is gone.) The reentrant replace's mutation still commits; only its
+      // redundant nested re-notification is coalesced.
       let depth = 0;
       const unsub = router.subscribe(() => {
         depth += 1;
@@ -817,9 +817,9 @@ describe("core/routes/replaceRoutes", () => {
 
       expect(() => {
         routesApi.replace([{ name: "home", path: "/home" }]);
-      }).toThrow(RecursionDepthError);
+      }).not.toThrow();
 
-      expect(depth).toBeGreaterThan(0);
+      expect(depth).toBe(1); // re-entrant SUCCESS coalesced — listener ran once
 
       unsub();
     });

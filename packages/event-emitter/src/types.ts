@@ -1,7 +1,6 @@
 export interface EventEmitterLimits {
   maxListeners: number;
   warnListeners: number;
-  maxEventDepth: number;
 }
 
 export interface EventEmitterOptions {

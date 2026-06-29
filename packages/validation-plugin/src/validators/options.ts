@@ -42,7 +42,6 @@ interface LimitsConfig {
   maxPlugins: number;
   maxListeners: number;
   warnListeners: number;
-  maxEventDepth: number;
   maxLifecycleHandlers: number;
 }
 
@@ -53,7 +52,6 @@ const LIMIT_BOUNDS = {
   maxPlugins: { min: 0, max: 1000 },
   maxListeners: { min: 0, max: 100_000 },
   warnListeners: { min: 0, max: 100_000 },
-  maxEventDepth: { min: 0, max: 100 },
   maxLifecycleHandlers: { min: 0, max: 10_000 },
 } as const;
 

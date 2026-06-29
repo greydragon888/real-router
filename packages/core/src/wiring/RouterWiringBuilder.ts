@@ -47,7 +47,6 @@ export class RouterWiringBuilder<
     this.eventBus.setLimits({
       maxListeners: this.limits.maxListeners,
       warnListeners: this.limits.warnListeners,
-      maxEventDepth: this.limits.maxEventDepth,
     });
   }
 

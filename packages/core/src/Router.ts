@@ -783,9 +783,10 @@ export class Router<
    * The #945 RecursionDepthError carve-out is gone: a reentrant navigate() from a
    * listener can no longer self-feed — it throws REENTRANT_NAVIGATION
    * synchronously at the facade (RFC navigation-cancellation-unification §4), so
-   * navigate()'s promise never rejects with RecursionDepthError. Reentrant
-   * route-CRUD still throws it, but that propagates to the CRUD caller, not
-   * through a navigate promise.
+   * navigate()'s promise never rejects with a recursion error (re-entrant emits
+   * are coalesced at the emitter, #1033; reentrant route-CRUD throws
+   * REENTRANT_TREE_MUTATION to the CRUD caller, #1032 — not through a navigate
+   * promise).
    */
   static #isExpectedRejection(error: unknown): boolean {
     return (

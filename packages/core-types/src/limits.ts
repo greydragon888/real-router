@@ -36,14 +36,6 @@ export interface LimitsConfig {
   warnListeners: number;
 
   /**
-   * Maximum depth of nested event propagation.
-   * Prevents infinite recursion in event handling chains.
-   *
-   * @default 5
-   */
-  maxEventDepth: number;
-
-  /**
    * Maximum number of lifecycle handlers (canActivate/canDeactivate) per route.
    * Controls guard function stack to prevent excessive validation overhead.
    *

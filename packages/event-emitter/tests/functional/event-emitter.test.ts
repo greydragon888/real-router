@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { EventEmitter, RecursionDepthError } from "../../src/EventEmitter.js";
+import { EventEmitter } from "../../src/EventEmitter.js";
 
 import type { EventEmitterOptions } from "../../src/types.js";
 
@@ -341,7 +341,7 @@ describe("EventEmitter", () => {
   describe("maxListeners", () => {
     it("should enforce limit and throw Error containing 'Listener limit'", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 2, warnListeners: 0, maxEventDepth: 0 },
+        limits: { maxListeners: 2, warnListeners: 0 },
       });
 
       emitter.on("click", vi.fn());
@@ -352,7 +352,7 @@ describe("EventEmitter", () => {
 
     it("should include limit number in error message", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 1, warnListeners: 0, maxEventDepth: 0 },
+        limits: { maxListeners: 1, warnListeners: 0 },
       });
 
       emitter.on("reset", vi.fn());
@@ -362,7 +362,7 @@ describe("EventEmitter", () => {
 
     it("should not throw when maxListeners is 0 (unlimited)", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 0 },
+        limits: { maxListeners: 0, warnListeners: 0 },
       });
 
       for (let i = 0; i < 100; i++) {
@@ -374,7 +374,7 @@ describe("EventEmitter", () => {
 
     it("should apply limit per event, not globally", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 1, warnListeners: 0, maxEventDepth: 0 },
+        limits: { maxListeners: 1, warnListeners: 0 },
       });
 
       emitter.on("click", vi.fn());
@@ -395,7 +395,7 @@ describe("EventEmitter", () => {
     it("should call onListenerWarn at threshold", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 2, maxEventDepth: 0 },
+        limits: { maxListeners: 0, warnListeners: 2 },
         onListenerWarn,
       });
 
@@ -417,7 +417,7 @@ describe("EventEmitter", () => {
     it("should not warn when warnListeners is 0", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 0 },
+        limits: { maxListeners: 0, warnListeners: 0 },
         onListenerWarn,
       });
 
@@ -431,7 +431,7 @@ describe("EventEmitter", () => {
     it("should not throw (only warn)", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 1, maxEventDepth: 0 },
+        limits: { maxListeners: 0, warnListeners: 1 },
         onListenerWarn,
       });
 
@@ -444,7 +444,7 @@ describe("EventEmitter", () => {
 
     it("should not error when no onListenerWarn callback provided", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 1, maxEventDepth: 0 },
+        limits: { maxListeners: 0, warnListeners: 1 },
         // no onListenerWarn
       });
 
@@ -459,7 +459,7 @@ describe("EventEmitter", () => {
     it("should warn exactly once across off/on churn around the threshold", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 2, maxEventDepth: 0 },
+        limits: { maxListeners: 0, warnListeners: 2 },
         onListenerWarn,
       });
 
@@ -479,7 +479,7 @@ describe("EventEmitter", () => {
     it("should warn again after clearAll() resets the warn latch", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 2, maxEventDepth: 0 },
+        limits: { maxListeners: 0, warnListeners: 2 },
         onListenerWarn,
       });
 
@@ -501,7 +501,7 @@ describe("EventEmitter", () => {
     it("should warn again after off() removes the last listener (latch released with the Set)", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 2, maxEventDepth: 0 },
+        limits: { maxListeners: 0, warnListeners: 2 },
         onListenerWarn,
       });
 
@@ -527,80 +527,82 @@ describe("EventEmitter", () => {
   });
 
   // ===========================================================================
-  // maxEventDepth
+  // re-entrancy (coalesce)
   // ===========================================================================
 
-  describe("maxEventDepth", () => {
-    it("should throw Error containing 'Maximum recursion depth' on recursive emit", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
-      });
+  describe("re-entrancy (coalesce)", () => {
+    it("coalesces a re-entrant emit of the SAME event — no-op, no throw, no recursion", () => {
+      const emitter = createEmitter();
+
+      let calls = 0;
 
       emitter.on("reset", () => {
-        emitter.emit("reset"); // recursive
+        calls += 1;
+        emitter.emit("reset"); // re-entrant: coalesced to a no-op
       });
 
       expect(() => {
         emitter.emit("reset");
-      }).toThrow("Maximum recursion depth");
+      }).not.toThrow();
+
+      // The listener ran once; the nested same-event emit did not re-enter.
+      expect(calls).toBe(1);
     });
 
-    it("should include depth number in error message", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 3 },
-      });
-
-      emitter.on("reset", () => {
-        emitter.emit("reset");
-      });
-
-      expect(() => {
-        emitter.emit("reset");
-      }).toThrow("(3)");
-    });
-
-    it("should not check depth when maxEventDepth is 0 (unlimited)", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 0 },
-      });
-
-      let count = 0;
-
-      emitter.on("reset", () => {
-        count++;
-        if (count < 5) {
-          emitter.emit("reset");
-        }
-      });
-
-      emitter.emit("reset");
-
-      expect(count).toBe(5);
-    });
-
-    it("should track depth per event, not globally", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
-      });
+    it("coalesce is per-event — a DIFFERENT event emitted from a listener still fires", () => {
+      const emitter = createEmitter();
 
       emitter.on("click", (_x, _y) => {
-        emitter.emit("hover", "from-click"); // different event — depth 0
+        emitter.emit("hover", "from-click"); // different event — not coalesced
       });
 
       const hoverCb = vi.fn();
 
       emitter.on("hover", hoverCb);
 
-      // click emits hover — each at depth 0, no recursion error
       emitter.emit("click", 1, 2);
 
       expect(hoverCb).toHaveBeenCalledWith("from-click");
     });
 
-    it("should call listener with 3 args when depth tracking is on", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+    it("releases the in-flight guard after dispatch — the same event emits again (incl. after a listener error)", () => {
+      const onListenerError = vi.fn();
+      const emitter = createEmitter({ onListenerError });
+
+      emitter.on("reset", () => {
+        throw new Error("boom");
       });
+
+      emitter.emit("reset"); // dispatch completes; the finally releases the guard
+      emitter.emit("reset"); // not coalesced — a fresh, separate dispatch
+
+      expect(onListenerError).toHaveBeenCalledTimes(2);
+    });
+
+    it("deeply re-entrant chain still resolves — each event coalesces independently (no overflow)", () => {
+      const emitter = createEmitter();
+      const order: string[] = [];
+
+      // click → hover → click: click's re-emit (via hover) is coalesced; hover
+      // fires once.
+      emitter.on("click", () => {
+        order.push("click");
+        emitter.emit("hover", "h");
+      });
+      emitter.on("hover", () => {
+        order.push("hover");
+        emitter.emit("click", 1, 2); // click is in-flight → coalesced
+      });
+
+      expect(() => {
+        emitter.emit("click", 1, 2);
+      }).not.toThrow();
+
+      expect(order).toStrictEqual(["click", "hover"]);
+    });
+
+    it("calls a listener with 3 args", () => {
+      const emitter = createEmitter();
       const cb = vi.fn();
 
       emitter.on("submit", cb);
@@ -609,10 +611,18 @@ describe("EventEmitter", () => {
       expect(cb).toHaveBeenCalledWith("save", { id: 1 }, true);
     });
 
-    it("should snapshot multiple listeners when depth tracking is on", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
-      });
+    it("calls a listener with 4+ args", () => {
+      const emitter = createEmitter();
+      const cb = vi.fn();
+
+      emitter.on("complex", cb);
+      emitter.emit("complex", "a", "b", "c", "d");
+
+      expect(cb).toHaveBeenCalledWith("a", "b", "c", "d");
+    });
+
+    it("snapshots multiple listeners — fires each with the args", () => {
+      const emitter = createEmitter();
       const cb1 = vi.fn();
       const cb2 = vi.fn();
 
@@ -624,10 +634,8 @@ describe("EventEmitter", () => {
       expect(cb2).toHaveBeenCalledWith(1, 2);
     });
 
-    it("should use snapshot iteration with depth tracking — size=1 listener added during emit NOT called", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
-      });
+    it("snapshot iteration — a single listener added during emit is NOT called in that emit", () => {
+      const emitter = createEmitter();
       const laterCb = vi.fn();
 
       emitter.on("reset", () => {
@@ -637,85 +645,6 @@ describe("EventEmitter", () => {
       emitter.emit("reset");
 
       expect(laterCb).not.toHaveBeenCalled();
-    });
-
-    it("should call listener with 4+ args when depth tracking is on", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
-      });
-      const cb = vi.fn();
-
-      emitter.on("complex", cb);
-      emitter.emit("complex", "a", "b", "c", "d");
-
-      expect(cb).toHaveBeenCalledWith("a", "b", "c", "d");
-    });
-
-    it("should decrement depth after emit completes (including after error)", () => {
-      const onListenerError = vi.fn();
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
-        onListenerError,
-      });
-
-      emitter.on("reset", () => {
-        throw new Error("boom");
-      });
-
-      emitter.emit("reset"); // depth goes 0→1→0
-
-      // Should be able to emit again (depth back to 0)
-      emitter.emit("reset");
-
-      expect(onListenerError).toHaveBeenCalledTimes(2);
-    });
-
-    it("should throw at EXACTLY maxEventDepth, not one level deeper (>= boundary)", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
-      });
-
-      let calls = 0;
-
-      emitter.on("reset", () => {
-        calls += 1;
-        emitter.emit("reset"); // recursive
-      });
-
-      expect(() => {
-        emitter.emit("reset");
-      }).toThrow("Maximum recursion depth");
-
-      // maxEventDepth: 1 → the listener runs once (depth 0), the nested emit at
-      // depth 1 hits `1 >= 1` and throws. A `depth > maxEventDepth` mutant allows
-      // one extra level, so the listener would run twice before the throw.
-      expect(calls).toBe(1);
-    });
-
-    it("should fully recover depth after a legal recursion completes (every unwind frame decrements)", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 2 },
-      });
-
-      let calls = 0;
-
-      emitter.on("reset", () => {
-        calls += 1;
-        if (calls === 1) {
-          emitter.emit("reset"); // recurse exactly once: depth 0 → 1, then unwind
-        }
-      });
-
-      emitter.emit("reset"); // legal recursion to depth 1 — must unwind back to 0
-
-      // If the unwind `else` branch fails to write the decremented depth back,
-      // the entry is left at an elevated value and a FRESH legal emit starts above
-      // 0 and throws spuriously. The recovery emit must run cleanly to prove the
-      // depth was fully released.
-      expect(() => {
-        emitter.emit("reset");
-      }).not.toThrow();
-      expect(calls).toBe(3);
     });
   });
 
@@ -742,7 +671,7 @@ describe("EventEmitter", () => {
 
     it("should reset depth map", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 1 },
+        limits: { maxListeners: 0, warnListeners: 0 },
       });
 
       let count = 0;
@@ -815,43 +744,15 @@ describe("EventEmitter", () => {
       emitter.setLimits({
         maxListeners: 2,
         warnListeners: 0,
-        maxEventDepth: 0,
       });
 
       expect(() => emitter.on("click", vi.fn())).toThrow("Listener limit");
     });
 
-    it("should take effect immediately for maxEventDepth", () => {
-      const emitter = createEmitter();
-
-      let count = 0;
-
-      emitter.on("reset", () => {
-        count++;
-        if (count < 10) {
-          emitter.emit("reset");
-        }
-      });
-
-      emitter.setLimits({
-        maxListeners: 0,
-        warnListeners: 0,
-        maxEventDepth: 2,
-      });
-
-      expect(() => {
-        emitter.emit("reset");
-      }).toThrow("Maximum recursion depth");
-    });
-
-    it("should isolate a throwing listener among several on the depth path (maxEventDepth > 0)", () => {
+    it("should isolate a throwing listener among several — others still run", () => {
       const onListenerError = vi.fn();
       const second = vi.fn();
-      // maxEventDepth > 0 → depth-tracking path; 2 listeners → multi-listener branch.
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
-        onListenerError,
-      });
+      const emitter = createEmitter({ onListenerError });
       const error = new Error("boom");
 
       emitter.on("reset", () => {
@@ -863,55 +764,6 @@ describe("EventEmitter", () => {
 
       expect(onListenerError).toHaveBeenCalledWith("reset", error);
       expect(second).toHaveBeenCalledTimes(1); // isolation — others still run
-    });
-  });
-
-  // ===========================================================================
-  // RecursionDepthError propagation on the fast path (maxEventDepth = 0)
-  // ===========================================================================
-
-  describe("RecursionDepthError propagation on the fast path", () => {
-    it("should re-throw RecursionDepthError from a single listener, not route it to onListenerError", () => {
-      const onListenerError = vi.fn();
-      // No maxEventDepth → fast path (#emitFast), single-listener branch.
-      const emitter = createEmitter({ onListenerError });
-
-      emitter.on("reset", () => {
-        throw new RecursionDepthError("nested overflow");
-      });
-
-      expect(() => {
-        emitter.emit("reset");
-      }).toThrow(RecursionDepthError);
-      expect(onListenerError).not.toHaveBeenCalled();
-    });
-
-    it("should re-throw RecursionDepthError from one of several listeners and halt iteration", () => {
-      const onListenerError = vi.fn();
-      const secondListener = vi.fn();
-      // No maxEventDepth → fast path (#emitFast), multi-listener loop branch.
-      const emitter = createEmitter({ onListenerError });
-
-      emitter.on("reset", () => {
-        throw new RecursionDepthError("nested overflow");
-      });
-      emitter.on("reset", secondListener);
-
-      expect(() => {
-        emitter.emit("reset");
-      }).toThrow(RecursionDepthError);
-      expect(onListenerError).not.toHaveBeenCalled();
-      // The sentinel halts the snapshot iteration — later listeners do not run.
-      expect(secondListener).not.toHaveBeenCalled();
-    });
-
-    it("should expose name === 'RecursionDepthError' (cross-bundle name check contract)", () => {
-      // Subclasses don't auto-set `name`; the constructor sets it explicitly so
-      // `error.name === "RecursionDepthError"` holds at catch sites that can't use
-      // `instanceof` across bundle boundaries. An empty-string mutant breaks it.
-      expect(new RecursionDepthError("overflow").name).toBe(
-        "RecursionDepthError",
-      );
     });
   });
 
@@ -954,9 +806,9 @@ describe("EventEmitter", () => {
       }).toThrow("error handler boom");
     });
 
-    it("should propagate error when onListenerError throws with depth tracking", () => {
+    it("should propagate the error when the onListenerError handler itself throws", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+        limits: { maxListeners: 0, warnListeners: 0 },
         onListenerError: () => {
           throw new Error("error handler boom");
         },
@@ -980,7 +832,7 @@ describe("EventEmitter", () => {
     it("should not warn when listener count equals maxListeners (at exact limit, no warning)", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 3, warnListeners: 3, maxEventDepth: 0 },
+        limits: { maxListeners: 3, warnListeners: 3 },
         onListenerWarn,
       });
 
@@ -997,7 +849,7 @@ describe("EventEmitter", () => {
     it("should warn at exact warnListeners boundary then throw at maxListeners", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 4, warnListeners: 2, maxEventDepth: 0 },
+        limits: { maxListeners: 4, warnListeners: 2 },
         onListenerWarn,
       });
 
@@ -1022,7 +874,7 @@ describe("EventEmitter", () => {
     it("should not warn for a registration that fails the limit (warn === max)", () => {
       const onListenerWarn = vi.fn();
       const emitter = createEmitter({
-        limits: { maxListeners: 2, warnListeners: 2, maxEventDepth: 0 },
+        limits: { maxListeners: 2, warnListeners: 2 },
         onListenerWarn,
       });
 
@@ -1047,7 +899,6 @@ describe("EventEmitter", () => {
         emitter.setLimits({
           maxListeners: 1,
           warnListeners: 0,
-          maxEventDepth: 0,
         });
       });
 
@@ -1059,25 +910,6 @@ describe("EventEmitter", () => {
         emitter.on("click", vi.fn());
       }).toThrow("Listener limit");
     });
-
-    it("should allow setLimits(maxEventDepth) inside listener with depth tracking enabled", () => {
-      const emitter = createEmitter({
-        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
-      });
-
-      emitter.on("reset", () => {
-        emitter.setLimits({
-          maxListeners: 0,
-          warnListeners: 0,
-          maxEventDepth: 10,
-        });
-      });
-
-      // Should not throw — setLimits inside listener is fine
-      emitter.emit("reset");
-
-      expect(emitter.listenerCount("reset")).toBe(1);
-    });
   });
 
   // ===========================================================================
@@ -1087,7 +919,7 @@ describe("EventEmitter", () => {
   describe("clearAll() then re-add listeners", () => {
     it("should allow re-adding listeners up to max after clearAll()", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 2, warnListeners: 0, maxEventDepth: 0 },
+        limits: { maxListeners: 2, warnListeners: 0 },
       });
 
       emitter.on("click", vi.fn());
@@ -1175,7 +1007,7 @@ describe("EventEmitter", () => {
 
     it("should apply initial limits from options", () => {
       const emitter = createEmitter({
-        limits: { maxListeners: 1, warnListeners: 0, maxEventDepth: 0 },
+        limits: { maxListeners: 1, warnListeners: 0 },
       });
 
       emitter.on("click", vi.fn());

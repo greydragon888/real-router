@@ -84,7 +84,6 @@ export const DEFAULT_LIMITS = {
   maxPlugins: 50,
   maxListeners: 10_000,
   warnListeners: 1000,
-  maxEventDepth: 5,
   maxLifecycleHandlers: 200,
 } as const;
 

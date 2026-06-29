@@ -63,7 +63,6 @@ interface LocalDependencyLimits {
   maxPlugins: number;
   maxListeners: number;
   warnListeners: number;
-  maxEventDepth: number;
   maxLifecycleHandlers: number;
 }
 
@@ -425,7 +424,6 @@ export function validateDependenciesStructure(deps: unknown): void {
     "maxPlugins",
     "maxListeners",
     "warnListeners",
-    "maxEventDepth",
     "maxLifecycleHandlers",
   ];
 

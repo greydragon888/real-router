@@ -423,17 +423,15 @@ export class NavigationNamespace {
       });
 
       // Mark sync-resolution only AFTER completeTransition returns. It emits
-      // TRANSITION_SUCCESS, and a synchronous subscribe listener can throw in a
-      // way the emitter RE-THROWS (instead of isolating via onListenerError) —
-      // i.e. reentrant route-CRUD recursing past maxEventDepth
-      // (RecursionDepthError). (A reentrant navigate() is now banned outright —
-      // REENTRANT_NAVIGATION, RFC §4 — and isolated, so it no longer reaches
-      // here.) Setting the flag optimistically BEFORE the emit would leave it
-      // stale-true when
-      // completeTransition throws, so the facade would read lastSyncResolved
-      // and skip its suppressing `.catch()` — the rejection would then leak as
-      // a Node unhandledRejection. Post-emit placement keeps the flag false on
-      // a throw, so control falls to catch and the facade attaches its `.catch`.
+      // TRANSITION_SUCCESS; listener throws are all isolated via onListenerError
+      // (the emitter re-throws nothing now that re-entrant emits are coalesced,
+      // #1033, and reentrant navigate/CRUD are banned), so the emit itself does
+      // not throw. Should completeTransition throw for any other reason, setting
+      // the flag optimistically BEFORE it would leave the flag stale-true, so the
+      // facade would read lastSyncResolved and skip its suppressing `.catch()` —
+      // the rejection would then leak as a Node unhandledRejection. Post-emit
+      // placement keeps the flag false on a throw, so control falls to catch and
+      // the facade attaches its `.catch`.
       // Stryker disable next-line BooleanLiteral: equivalent — flipping to false routes the facade to the else-branch, which attaches a harmless .catch to an already-resolved promise; there is no rejection to suppress.
       this.lastSyncResolved = true;
 

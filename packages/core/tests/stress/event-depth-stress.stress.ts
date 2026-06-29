@@ -10,9 +10,9 @@ import {
   takeHeapSnapshot,
 } from "./helpers";
 
-describe("S7: EventEmitter recursion and depth", () => {
-  it("S7.4: 1000 navigations with depth tracking — heap stable", async () => {
-    const router = createStressRouter(10, { limits: { maxEventDepth: 5 } });
+describe("S7: navigation throughput + listener-error isolation", () => {
+  it("S7.4: 1000 navigations — heap stable", async () => {
+    const router = createStressRouter(10);
 
     await router.start("/route0");
 
@@ -25,11 +25,10 @@ describe("S7: EventEmitter recursion and depth", () => {
     const after = takeHeapSnapshot();
     const delta = after - before;
 
-    // Last navigation (i=999) → route${(999 % 9) + 1} = route1: depth tracking
-    // never derailed navigation over 1000 transitions — the discriminating
-    // invariant. Heap is a throughput guard: the depth map is cleared per
-    // navigation (bounded), and per-nav state retention on this persistent
-    // router is the case validated discriminatingly by guards-stress S5.3.
+    // Last navigation (i=999) → route${(999 % 9) + 1} = route1: navigation never
+    // derailed over 1000 transitions — the discriminating invariant. Heap is a
+    // throughput guard: per-nav state retention on this persistent router is the
+    // case validated discriminatingly by guards-stress S5.3.
     expect(router.getState()?.name).toBe("route1");
     expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(2 * MB);
 
@@ -38,7 +37,7 @@ describe("S7: EventEmitter recursion and depth", () => {
   });
 
   it("S7.5: Listener throwing on TRANSITION_SUCCESS — 1000 navigations keep working", async () => {
-    const router = createStressRouter(10, { limits: { maxEventDepth: 0 } });
+    const router = createStressRouter(10);
 
     await router.start("/route0");
 
