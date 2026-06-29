@@ -65,6 +65,11 @@ export interface RouterInternals<
       handler: (event: TreeChangedEvent) => void,
     ) => Unsubscribe;
     readonly listenerCount: () => number;
+    /**
+     * True while a `TREE_CHANGED` emit is on the stack — `getRoutesApi` reads it
+     * to reject reentrant route-CRUD from a `subscribeChanges` handler (#1032).
+     */
+    readonly isEmitting: () => boolean;
   };
 
   readonly buildPath: (route: string, params?: Params) => string;

@@ -4,6 +4,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import {
   createRouter,
   errorCodes,
+  RecursionDepthError,
   RouterError,
   UNKNOWN_ROUTE,
 } from "@real-router/core";
@@ -796,6 +797,29 @@ describe("core/routes/replaceRoutes", () => {
       expect(routesApi.has("post-commit")).toBe(true);
       expect(routesApi.has("home")).toBe(false);
       expect(routesApi.has("admin.dashboard")).toBe(false);
+
+      unsub();
+    });
+
+    it("bounds a runaway replace-from-subscribe loop with RecursionDepthError", () => {
+      // A subscribe (TRANSITION_SUCCESS) listener that replaces UNCONDITIONALLY:
+      // each replace revalidates the active state and re-emits TRANSITION_SUCCESS
+      // (#950), re-entering the listener → runaway recursion. This is the path
+      // that keeps the EventEmitter `maxEventDepth` guard (RecursionDepthError)
+      // load-bearing AFTER the reentrant-CRUD ban (#1032): that ban blocks CRUD
+      // during a TREE_CHANGED dispatch, NOT this SUCCESS re-emit (replace from a
+      // transition listener is allowed). `maxEventDepth` (5) severs the loop.
+      let depth = 0;
+      const unsub = router.subscribe(() => {
+        depth += 1;
+        routesApi.replace([{ name: "home", path: "/home" }]);
+      });
+
+      expect(() => {
+        routesApi.replace([{ name: "home", path: "/home" }]);
+      }).toThrow(RecursionDepthError);
+
+      expect(depth).toBeGreaterThan(0);
 
       unsub();
     });

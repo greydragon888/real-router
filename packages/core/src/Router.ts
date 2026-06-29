@@ -256,6 +256,7 @@ export class Router<
         },
         subscribe: (handler) => this.#eventBus.subscribeTreeChanged(handler),
         listenerCount: () => this.#eventBus.treeChangedListenerCount(),
+        isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
       },
       buildPath: createBinaryInterceptable(
         "buildPath",

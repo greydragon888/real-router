@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { nodeToDefinition } from "route-tree";
 
-import { throwIfDisposed } from "./helpers";
+import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
 import { STANDARD_ROUTE_KEYS } from "../namespaces/RoutesNamespace/constants";
@@ -751,6 +751,7 @@ export function getRoutesApi<
   const api: RoutesApi<Dependencies> = {
     add: (routes, options) => {
       throwIfDisposed(ctx.isDisposed);
+      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
       const routeArray = Array.isArray(routes) ? routes : [routes];
       const parentName = options?.parent;
@@ -781,6 +782,7 @@ export function getRoutesApi<
 
     remove: (name) => {
       throwIfDisposed(ctx.isDisposed);
+      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
       ctx.validator?.routes.validateRemoveRouteArgs(name);
       ctx.validator?.routes.throwIfInternalRoute(name, "removeRoute");
@@ -818,6 +820,7 @@ export function getRoutesApi<
 
     update: (name, updates) => {
       throwIfDisposed(ctx.isDisposed);
+      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
       ctx.validator?.routes.validateUpdateRouteBasicArgs(name, updates);
       ctx.validator?.routes.throwIfInternalRoute(name, "updateRoute");
@@ -928,6 +931,7 @@ export function getRoutesApi<
 
     clear: () => {
       throwIfDisposed(ctx.isDisposed);
+      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
       const canClear = validateClearRoutes(ctx.isTransitioning());
 
@@ -967,6 +971,7 @@ export function getRoutesApi<
 
     replace: (routes) => {
       throwIfDisposed(ctx.isDisposed);
+      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
       const routeArray = Array.isArray(routes) ? routes : [routes];
 

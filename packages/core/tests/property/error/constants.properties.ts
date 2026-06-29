@@ -175,8 +175,8 @@ describe("RouterError Constants Properties", () => {
   describe("errorCodes backward compatibility", () => {
     it("errorCodes contains exact number of codes", () => {
       // If this number changes, it may break backward compatibility.
-      // 13 since REENTRANT_NAVIGATION was added (RFC navigation-cancellation §4).
-      const expectedCount = 13;
+      // 14 since REENTRANT_TREE_MUTATION was added (reentrant route-CRUD ban, #1032).
+      const expectedCount = 14;
       const actualCount = Object.keys(errorCodes).length;
 
       expect(actualCount).toBe(expectedCount);

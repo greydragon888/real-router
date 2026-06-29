@@ -105,6 +105,13 @@ export class EventBusNamespace {
   // own `maxEventDepth` for reentrant route-CRUD, which stays allowed-but-bounded.
   #dispatchDepth = 0;
 
+  // Depth of the synchronous TREE_CHANGED dispatch window — elevated while
+  // emitTreeChanged() runs. isEmittingTreeChanged() reads it so getRoutesApi can
+  // reject reentrant route-CRUD from a subscribeChanges handler with
+  // REENTRANT_TREE_MUTATION (#1032). Separate from #dispatchDepth: route-CRUD
+  // from a *transition* listener (not a TREE_CHANGED dispatch) stays allowed.
+  #treeDispatchDepth = 0;
+
   #currentToState: State | undefined;
   #pendingToState: State | undefined;
   #pendingFromState: State | undefined;
@@ -222,7 +229,21 @@ export class EventBusNamespace {
    * apply automatically.
    */
   emitTreeChanged(event: TreeChangedEvent): void {
-    this.#emitter.emit(TREE_CHANGED, event);
+    this.#treeDispatchDepth++;
+    try {
+      this.#emitter.emit(TREE_CHANGED, event);
+    } finally {
+      this.#treeDispatchDepth--;
+    }
+  }
+
+  /**
+   * True while a `TREE_CHANGED` event is being dispatched synchronously (an
+   * `emitTreeChanged` call is on the stack). `getRoutesApi` reads this to reject
+   * reentrant route-CRUD from a `subscribeChanges` handler (#1032).
+   */
+  isEmittingTreeChanged(): boolean {
+    return this.#treeDispatchDepth > 0;
   }
 
   /**

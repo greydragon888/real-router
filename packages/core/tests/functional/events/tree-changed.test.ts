@@ -1,6 +1,6 @@
 import { describe, it, expect, expectTypeOf, vi } from "vitest";
 
-import { createRouter, RecursionDepthError } from "@real-router/core";
+import { createRouter } from "@real-router/core";
 import { cloneRouter, getRoutesApi } from "@real-router/core/api";
 
 import type {
@@ -122,45 +122,6 @@ describe("core/events/tree-changed", () => {
 
     expect(hadRouteDuringHandler).toBe(true);
     expect(pathDuringHandler).toBe("/about");
-  });
-
-  // 4. Re-entrancy allowed + depth limit reuses EventEmitter.maxEventDepth (5).
-  it("allows re-entrant CRUD and throws RecursionDepthError past the depth limit", () => {
-    const router = makeRouter([{ name: "home", path: "/home" }]);
-    const routesApi = getRoutesApi(router);
-
-    let depth = 0;
-
-    routesApi.subscribeChanges(() => {
-      depth += 1;
-      routesApi.add({ name: `r${depth}`, path: `/r${depth}` });
-    });
-
-    expect(() => {
-      routesApi.add({ name: "r0", path: "/r0" });
-    }).toThrow(RecursionDepthError);
-  });
-
-  it("allows a single level of re-entrant CRUD without throwing", () => {
-    const router = makeRouter([{ name: "home", path: "/home" }]);
-    const routesApi = getRoutesApi(router);
-
-    const ops: string[] = [];
-    let reentered = false;
-
-    routesApi.subscribeChanges((event) => {
-      ops.push(event.op);
-
-      if (event.op === "add" && !reentered) {
-        reentered = true;
-        routesApi.remove("home");
-      }
-    });
-
-    routesApi.add({ name: "about", path: "/about" });
-
-    // Outer add, then the nested remove fired synchronously depth-first.
-    expect(ops).toStrictEqual(["add", "remove"]);
   });
 
   // 5. Cloned router isolation.
