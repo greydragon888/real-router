@@ -205,8 +205,28 @@ export function buildPlan(affected, dirOf, readers = defaultReaders) {
   // sources-only PR, #1017). Force the sharded path so the adapter shards run in
   // parallel — same rationale as touchesCore, just one layer down the graph.
   const touchesAdapterShared = groups["adapter-shared"].length > 0;
+  // A shared-source edit is the SAME class of fanout amplifier, one layer below
+  // sources/route-utils. The `@real-router/shared-sources` workspace (dir
+  // `shared/`) owns shared/dom-utils, shared/browser-env and shared/ssr; an edit
+  // to any of them fans out to every consumer that symlinks it — dom-utils → the
+  // 6 (heavy) adapters, browser-env → the 3 url-plugins, ssr → the 2 ssr-plugins.
+  // turbo reports those consumers but `deriveAffected` drops the `shared`
+  // workspace from `affected` (its path is `shared/`, not `packages/*`), so the
+  // consumer count alone can sit ≤ K and slip into the monolithic leaf path,
+  // which then rebuilds the heavy cohort serially (~20m on a shared/dom-utils PR,
+  // run 28393785008). `shared-sources` is still present in `dirOf` (the unfiltered
+  // name→dir map), so detect it there and force sharded — same as touchesCore /
+  // touchesAdapterShared. This keys on the shared WORKSPACE, so a direct
+  // multi-package edit that does NOT touch a shared source stays on the count
+  // path (the K-boundary leaf set with two url-plugins is unaffected).
+  const touchesSharedSources = dirOf.has("@real-router/shared-sources");
 
-  if (affected.length <= K && !touchesCore && !touchesAdapterShared) {
+  if (
+    affected.length <= K &&
+    !touchesCore &&
+    !touchesAdapterShared &&
+    !touchesSharedSources
+  ) {
     return { mode: "leaf", matrix: { include: [] } };
   }
 
