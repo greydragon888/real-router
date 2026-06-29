@@ -1,4 +1,4 @@
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 import { describe, expect, beforeAll, afterAll, vi } from "vitest";
 
 import {
@@ -101,6 +101,37 @@ describe("RouteAnnouncer — Property Tests", () => {
         const count = document.querySelectorAll(ANNOUNCER_ATTR).length;
 
         expect(count).toBe(0);
+
+        document.body.innerHTML = "";
+      },
+    );
+  });
+
+  describe("Invariant 4: destroying one of N instances keeps the shared element (#783)", () => {
+    test.prop([fc.integer({ min: 2, max: 5 })], { numRuns: NUM_RUNS.standard })(
+      "with N>=2 instances, destroying ONE does not remove the shared announcer element",
+      (n) => {
+        document.body.innerHTML = "";
+
+        const instances = Array.from({ length: n }, () => {
+          const { router } = createMockRouter();
+
+          return createRouteAnnouncer(router);
+        });
+
+        expect(document.querySelectorAll(ANNOUNCER_ATTR)).toHaveLength(1);
+
+        // Tear down exactly one — the shared element must survive for the rest.
+        instances[0].destroy();
+
+        expect(document.querySelectorAll(ANNOUNCER_ATTR)).toHaveLength(1);
+
+        // Tear down the remaining holders — only now is the element gone.
+        for (let i = 1; i < n; i++) {
+          instances[i].destroy();
+        }
+
+        expect(document.querySelectorAll(ANNOUNCER_ATTR)).toHaveLength(0);
 
         document.body.innerHTML = "";
       },

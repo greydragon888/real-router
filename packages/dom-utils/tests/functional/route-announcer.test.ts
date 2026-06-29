@@ -574,6 +574,72 @@ describe("createRouteAnnouncer", () => {
     router.stop();
   });
 
+  it("25 — #783: destroy of one provider does not silence the others (shared element ref-counted)", async () => {
+    const r1 = makeRouter();
+    const r2 = makeRouter();
+    const ann1 = setupAnnouncer(r1);
+    const ann2 = setupAnnouncer(r2);
+
+    await r1.start("/");
+    await r2.start("/");
+    vi.advanceTimersByTime(100);
+
+    expect(document.querySelectorAll(ANNOUNCER_ATTR)).toHaveLength(1);
+
+    const shared = getAnnouncerElement();
+
+    // First provider tears down. The shared aria-live element must survive for
+    // the still-mounted second provider — before the fix it was removed
+    // unconditionally, leaving the survivor writing to a detached node (screen-
+    // reader silence).
+    ann1.destroy();
+
+    expect(getAnnouncerElement()).not.toBeNull();
+    expect(getAnnouncerElement()).toBe(shared);
+    expect(shared?.isConnected).toBe(true);
+
+    // The surviving provider still announces into the live element.
+    document.title = "About Page";
+    await r2.navigate("about");
+
+    expect(getAnnouncerElement()?.textContent).toBe("Navigated to About Page");
+
+    // Last holder gone → element removed.
+    ann2.destroy();
+
+    expect(getAnnouncerElement()).toBeNull();
+
+    r1.stop();
+    r2.stop();
+  });
+
+  it("26 — #783: destroy() is idempotent and does not over-decrement the shared ref-count", async () => {
+    const r1 = makeRouter();
+    const r2 = makeRouter();
+    const ann1 = setupAnnouncer(r1);
+    const ann2 = setupAnnouncer(r2);
+
+    await r1.start("/");
+    await r2.start("/");
+
+    // Redundant destroy() calls on the first provider must be no-ops, NOT extra
+    // decrements — otherwise the count drops below the live holder count and
+    // the second provider's element is removed prematurely (or never).
+    ann1.destroy();
+    ann1.destroy();
+    ann1.destroy();
+
+    expect(getAnnouncerElement()).not.toBeNull();
+
+    // The single remaining holder removes the element exactly once.
+    ann2.destroy();
+
+    expect(getAnnouncerElement()).toBeNull();
+
+    r1.stop();
+    r2.stop();
+  });
+
   it("SSR guard — returns a NOOP instance when `document` is undefined", () => {
     const realDocument = globalThis.document;
 
