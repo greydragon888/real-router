@@ -453,7 +453,20 @@ function addRoutes<
   // config into locals (async/circular forwardTo + invalid constraint throw
   // here), then swap atomically. A rejected add leaves the store untouched.
   assertAddable(store, routes, parentName);
-  adoptRouteArtifacts(store, buildAddArtifacts(store, routes, parentName));
+
+  const artifacts = buildAddArtifacts(store, routes, parentName);
+
+  // Pre-flight the #961 handler-limit into PREPARE so a limit-exceeding batch
+  // aborts before the swap (#1046). `add` does not clear guards, so the
+  // projection runs against the live union count (clearsDefinition = false).
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  store.lifecycleNamespace!.preflightHandlerLimit(
+    artifacts.pendingCanActivate.keys(),
+    artifacts.pendingCanDeactivate.keys(),
+    false,
+  );
+
+  adoptRouteArtifacts(store, artifacts);
 }
 
 /**
@@ -482,6 +495,17 @@ function replaceRoutes<
     routes,
     store.rootPath,
     store.matcherOptions,
+  );
+
+  // Pre-flight the #961 handler-limit BEFORE clearDefinitionGuards mutates, so a
+  // limit-exceeding batch aborts with BOTH the tree and the definition guards
+  // intact (#1046). replace clears definition guards first, so the projection
+  // runs against the surviving external guards (clearsDefinition = true).
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  store.lifecycleNamespace!.preflightHandlerLimit(
+    artifacts.pendingCanActivate.keys(),
+    artifacts.pendingCanDeactivate.keys(),
+    true,
   );
 
   // Clear definition lifecycle handlers (preserve external guards), then swap.
@@ -874,6 +898,16 @@ export function getRoutesApi<
         canDeactivate === undefined || canDeactivate === null
           ? undefined
           : lifecycle.compileGuardFactory(canDeactivate, "canDeactivate");
+
+      // Pre-flight the #961 handler-limit before the COMMIT writes, so an
+      // at-limit update that adds a NEW guard slot aborts before forwardTo /
+      // scalar config land (#1046, #951). A slot is new only when `name` does
+      // not already hold a guard of that type — an overwrite does not count.
+      lifecycle.preflightHandlerLimit(
+        activateFn === undefined ? [] : [name],
+        deactivateFn === undefined ? [] : [name],
+        false,
+      );
 
       // ===== COMMIT — pure writes from here; nothing below throws.
       // Custom (plugin-defined) fields. Consumers read these lazily via
