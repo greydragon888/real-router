@@ -174,8 +174,9 @@ describe("RouterError Constants Properties", () => {
 
   describe("errorCodes backward compatibility", () => {
     it("errorCodes contains exact number of codes", () => {
-      // If this number changes, it may break backward compatibility
-      const expectedCount = 12;
+      // If this number changes, it may break backward compatibility.
+      // 13 since REENTRANT_NAVIGATION was added (RFC navigation-cancellation §4).
+      const expectedCount = 13;
       const actualCount = Object.keys(errorCodes).length;
 
       expect(actualCount).toBe(expectedCount);

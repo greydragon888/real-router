@@ -15,4 +15,12 @@ export interface EventBusOptions {
    * Node `unhandledRejection` (#944).
    */
   onListenerError: (eventName: string, error: unknown) => void;
+  /**
+   * Aborts the in-flight navigation's `AbortController` — the **effect** of the
+   * FSM `CANCEL` action (RFC navigation-cancellation-unification §5).
+   * Wired to `NavigationNamespace.abortCurrentController` so "FSM `CANCEL` ⟹
+   * controller aborted (+ pipeline woken)" holds in one place. `reason` becomes
+   * the controller's `signal.reason` (#943).
+   */
+  abortController: (reason?: unknown) => void;
 }

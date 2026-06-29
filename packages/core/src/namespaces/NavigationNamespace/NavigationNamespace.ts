@@ -271,9 +271,19 @@ export class NavigationNamespace {
     return state;
   }
 
-  abortCurrentNavigation(): void {
+  /**
+   * Aborts and releases the in-flight navigation's `AbortController` (waking the
+   * parked async pipeline via `onInternalAbort`). This is the
+   * **effect** of the FSM `CANCEL` action (`handleCancel` → injected
+   * `deps.abortCurrentController`), not something cancellation sources call
+   * directly — so "FSM `CANCEL` ⟹ controller aborted" holds in one place (RFC
+   * navigation-cancellation-unification §5). `reason` (e.g. an external
+   * `opts.signal`'s reason, #943) becomes the controller's `signal.reason`;
+   * defaults to `TRANSITION_CANCELLED`.
+   */
+  abortCurrentController(reason?: unknown): void {
     this.#currentController?.abort(
-      new RouterError(errorCodes.TRANSITION_CANCELLED),
+      reason ?? new RouterError(errorCodes.TRANSITION_CANCELLED),
     );
     this.#currentController = null;
   }
@@ -304,11 +314,11 @@ export class NavigationNamespace {
       deps.startTransition(toState, fromState);
       transitionStarted = true;
 
-      // Reentrant navigate from TRANSITION_START listener superseded this navigation
-      // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — fail-fast reentrant guard; supersession is also enforced downstream (handleNoGuardsLeave navigationId check + isCurrentNav in the guard pipeline), so dropping the throw is unobservable (full suite green with `if (false)`). The EqualityOperator mutant stays live (=== throws on every navigation).
-      if (this.#navigationId !== myId) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-      }
+      // (No post-startTransition supersession check: the only thing that could
+      // bump #navigationId during the synchronous TRANSITION_START emit is a
+      // reentrant navigate() from a START listener, which is now banned —
+      // REENTRANT_NAVIGATION, RFC §4. Real async supersession is caught in
+      // #finishAsyncNavigation / the guard pipeline's isCurrentNav checks.)
 
       const [canDeactivateFunctions, canActivateFunctions] =
         deps.getLifecycleFunctions();
@@ -413,10 +423,13 @@ export class NavigationNamespace {
       });
 
       // Mark sync-resolution only AFTER completeTransition returns. It emits
-      // TRANSITION_SUCCESS, and a synchronous subscribe listener can throw —
-      // e.g. a reentrant navigate() self-feeding nested emits until
-      // maxEventDepth throws RecursionDepthError (#945). Setting the flag
-      // optimistically BEFORE the emit would leave it stale-true when
+      // TRANSITION_SUCCESS, and a synchronous subscribe listener can throw in a
+      // way the emitter RE-THROWS (instead of isolating via onListenerError) —
+      // i.e. reentrant route-CRUD recursing past maxEventDepth
+      // (RecursionDepthError). (A reentrant navigate() is now banned outright —
+      // REENTRANT_NAVIGATION, RFC §4 — and isolated, so it no longer reaches
+      // here.) Setting the flag optimistically BEFORE the emit would leave it
+      // stale-true when
       // completeTransition throws, so the facade would read lastSyncResolved
       // and skip its suppressing `.catch()` — the rejection would then leak as
       // a Node unhandledRejection. Post-emit placement keeps the flag false on
@@ -500,16 +513,15 @@ export class NavigationNamespace {
         // because success no longer aborts the controller (#722) — the listener
         // is detached explicitly in `finally` instead.
         onExternalAbort = () => {
-          controller.abort(externalSignal.reason);
-          // #1030: return the FSM to READY, symmetric with stop/dispose/supersede.
-          // Without this an external `opts.signal` abort only aborts the controller
-          // and leaves the FSM stuck in TRANSITION_STARTED / LEAVE_APPROVED:
-          // isTransitioning() stays true (route-CRUD silently blocked) and
-          // isLeaveApproved() is falsely true until the next navigation.
-          // onExternalAbort only fires while the navigation is in flight (the
-          // listener is removed in `finally` once it settles), so the FSM is
-          // always cancellable here; cancelNavigation sends CANCEL → READY.
-          deps.cancelNavigation();
+          // (#1030): route the external abort through the FSM. The
+          // `CANCEL` action aborts the internal controller (waking THIS pipeline)
+          // with the external `reason` (#943 — surfaces via the leave signal) AND
+          // returns the FSM to READY, atomically. No direct `controller.abort`
+          // here — "FSM CANCEL ⟹ controller aborted" lives in one place
+          // (handleCancel). onExternalAbort only fires while the navigation is in
+          // flight (the listener is removed in `finally` once it settles), so the
+          // FSM is always cancellable here.
+          deps.cancelNavigation(externalSignal.reason);
         };
         // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant: the per-navigation signal aborts at most once and is discarded unaborted on success, and the `finally` block explicitly removeEventListener's it.
         externalSignal.addEventListener("abort", onExternalAbort, {
@@ -537,11 +549,11 @@ export class NavigationNamespace {
       throw error;
       // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
       // emptying the finally only skips #cleanupController, which is unobservable
-      // (defense-in-depth: abortCurrentNavigation on stop/dispose +
-      // #abortPreviousNavigation on concurrent nav; the success-path ref-release is
-      // proven unobservable — see #cleanupController's disable). It cannot be
-      // inline-`Stryker disable`d: the catch `}` and finally `{` share one line, so
-      // there is no comment position that targets the finally body. Left documented.
+      // (defense-in-depth: on a CANCEL the FSM CANCEL action already aborted+nulled
+      // the controller via abortCurrentController, RFC §5; the success-path
+      // ref-release is proven unobservable — see #cleanupController's disable). It
+      // cannot be inline-`Stryker disable`d: the catch `}` and finally `{` share one
+      // line, so there is no comment position that targets the finally body. Left documented.
     } finally {
       // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — listener cleanup is redundant: the per-navigation signal is discarded on completion, so skipping the removeEventListener leaks nothing observable.
       if (onExternalAbort) {
@@ -635,23 +647,16 @@ export class NavigationNamespace {
         );
       }
 
-      // Sync listeners settled. A reentrant navigate() may have superseded us
-      // (it already aborted this controller); surface that as a cancellation.
-      const cancelled = this.#navigationId !== myId;
-
-      this.#cleanupController(controller, cancelled);
-
-      if (cancelled) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-      }
+      // Sync listeners settled. A synchronous reentrant navigate() can no longer
+      // supersede here (banned, RFC §4), so the leave always succeeds: release the
+      // controller WITHOUT aborting (the subscribeLeave signal must stay live).
+      this.#cleanupController(controller, false);
 
       return undefined;
     }
 
-    if (this.#navigationId !== myId) {
-      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-    }
-
+    // No leave listeners: nothing synchronous could have superseded this
+    // navigation during the LEAVE_APPROVE emit (reentrant navigate is banned).
     return undefined;
   }
 
@@ -691,9 +696,8 @@ export class NavigationNamespace {
         "Concurrent navigation detected on shared router instance. " +
           "For SSR, use cloneRouter() to create isolated instance per request.",
       );
-      this.#currentController?.abort(
-        new RouterError(errorCodes.TRANSITION_CANCELLED),
-      );
+      // The FSM CANCEL action aborts the previous controller — no
+      // direct controller.abort here (RFC navigation-cancellation-unification §5).
       this.#deps.cancelNavigation();
     }
 

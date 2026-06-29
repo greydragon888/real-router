@@ -49,8 +49,13 @@ export interface NavigationDependencies {
   /** Start transition and send NAVIGATE event to routerFSM */
   startTransition: (toState: State, fromState: State | undefined) => void;
 
-  /** Cancel navigation if transition is running */
-  cancelNavigation: () => void;
+  /**
+   * Cancel the in-flight navigation via the FSM `CANCEL` event. The `CANCEL`
+   * action aborts the current controller (with `reason`, if given — surfaces as
+   * the leave signal's `reason`, #943) and emits `TRANSITION_CANCEL`. No-op when
+   * nothing is cancellable.
+   */
+  cancelNavigation: (reason?: unknown) => void;
 
   /** Send COMPLETE event to routerFSM */
   sendTransitionDone: (
