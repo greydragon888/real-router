@@ -1,5 +1,18 @@
 # @real-router/validation-plugin
 
+## 0.9.0
+
+### Minor Changes
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop `maxEventDepth` from limits validation ([#1033](https://github.com/greydragon888/real-router/issues/1033))
+
+  `maxEventDepth` was removed from `LimitsConfig` (the event emitter now coalesces re-entrant emits instead of bounding recursion depth). The validation plugin no longer recognizes or range-checks it.
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+
 ## 0.8.4
 
 ### Patch Changes

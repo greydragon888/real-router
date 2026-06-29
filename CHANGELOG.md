@@ -5,6 +5,247 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-29]
+
+### @real-router/core@0.62.0
+
+### Minor Changes
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Unify the event-reentrancy model: coalesce re-entrant emits; remove `RecursionDepthError` and `maxEventDepth` ([#1033](https://github.com/greydragon888/real-router/issues/1033))
+
+  **Breaking change (pre-1.0).** The internal event emitter no longer bounds recursion with a configurable `maxEventDepth` that throws `RecursionDepthError`. Instead, a re-entrant emit of an event already being dispatched is **coalesced** to a no-op — an event can never re-enter its own dispatch (depth ≤ 1), so recursion is structurally impossible (no stack-overflow path).
+
+  - `RecursionDepthError` is **no longer exported** from `@real-router/core` — it can never throw now. Remove any `instanceof RecursionDepthError` checks: re-entrant route-CRUD throws `REENTRANT_TREE_MUTATION` ([#1032](https://github.com/greydragon888/real-router/issues/1032)) and re-entrant navigation throws `REENTRANT_NAVIGATION` ([#1030](https://github.com/greydragon888/real-router/issues/1030)), both synchronously at the call site before mutating.
+  - The `maxEventDepth` limit is removed from `RouterOptions.limits` (see `@real-router/types`).
+  - Observable effect: `replace()` (or `navigateToNotFound()`) called from inside a transition listener no longer emits a nested `TRANSITION_SUCCESS` — its `setState` still updates the active state; only the redundant nested re-notification is coalesced. `replace()` from outside a dispatch is unaffected.
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Ban synchronous reentrant route-CRUD from `subscribeChanges` handlers ([#1032](https://github.com/greydragon888/real-router/issues/1032))
+
+  **Breaking change (pre-1.0).** A route-CRUD op — `add()` / `remove()` / `update()` / `clear()` / `replace()` on `getRoutesApi(router)` — called from **inside a `subscribeChanges` handler** (while a `TREE_CHANGED` event is being dispatched) now throws `RouterError(REENTRANT_TREE_MUTATION)` synchronously, **before mutating the tree**, instead of nesting a recursive `TREE_CHANGED` cascade.
+
+  This removes a class of non-atomic, causally-inconsistent behaviour: previously a reentrant cascade was bounded only by `maxEventDepth`, throwing `RecursionDepthError` mid-cascade and leaving a **partially-mutated tree** (a throwing `add()` had already committed routes), and downstream listeners observed events **out of causal order** (the reentrant-triggered event arrived before the triggering one). Mirrors the reentrant-`navigate` ban (`REENTRANT_NAVIGATION`).
+
+  Inside a handler the throw is surfaced by the emit's `onListenerError` isolation (visible, non-fatal), so the outer op still completes. Deferred CRUD is unaffected, and CRUD from a _transition_ listener (`router.subscribe`, not a `TREE_CHANGED` dispatch) remains allowed.
+
+  **Migration:** defer the mutation so it runs after the dispatch settles:
+
+  ```diff
+  - routes.subscribeChanges(() => { routes.add({ name: "x", path: "/x" }); });
+  + routes.subscribeChanges(() => { queueMicrotask(() => routes.add({ name: "x", path: "/x" })); });
+  ```
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Ban synchronous reentrant navigation from transition listeners ([#1030](https://github.com/greydragon888/real-router/issues/1030))
+
+  **Breaking change (pre-1.0).** A synchronous `navigate()` / `navigateToDefault()` / `navigateToState()` / `navigateToNotFound()` called from **inside a transition-event listener** (a `subscribe` callback, `subscribeLeave` listener, or plugin `onTransition*` hook) while a transition is being dispatched now throws `RouterError(REENTRANT_NAVIGATION)` instead of self-feeding or superseding the in-flight navigation. Inside a listener the throw is surfaced by the emit's `onListenerError` isolation — visible, non-fatal.
+
+  Deferred navigation from a listener is unaffected: `await navigate(...)`, an `async` listener, `queueMicrotask(...)`, or `navigate(...).catch(...)` all run after the transition settles and remain allowed. Route-CRUD from a transition listener is also unaffected — this ban is scoped to navigation.
+
+  This removes a class of state-corruption bugs ([#308](https://github.com/greydragon888/real-router/issues/308)) and the defensive `RecursionDepthError`-suppression machinery ([#945](https://github.com/greydragon888/real-router/issues/945)) on the navigation path, and makes every cancellation path return the FSM to a consistent `READY`/`IDLE` state — subsuming the interim [#1030](https://github.com/greydragon888/real-router/issues/1030) external-`opts.signal` recovery fix.
+
+  **Migration:** defer the navigation so it runs after the transition settles, or move it to the call site:
+
+  ```diff
+  - router.subscribe(() => { router.navigate("orders"); });
+  + router.subscribe(() => { queueMicrotask(() => void router.navigate("orders").catch(() => {})); });
+  + // or at the call site: await router.navigate("users"); router.navigate("orders");
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/types@0.38.0
+
+### @real-router/types@0.38.0
+
+### Minor Changes
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `maxEventDepth` from `LimitsConfig` ([#1033](https://github.com/greydragon888/real-router/issues/1033))
+
+  **Breaking change (pre-1.0).** `maxEventDepth` is no longer a router limit — the event emitter now coalesces re-entrant emits (depth ≤ 1) instead of bounding recursion depth, so the option had no remaining effect. Remove `maxEventDepth` from any `createRouter(routes, { limits })` call.
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `REENTRANT_TREE_MUTATION` error code
+
+  Error code for the reentrant route-CRUD ban ([#1032](https://github.com/greydragon888/real-router/issues/1032)) — thrown when a CRUD op (`add`/`remove`/`update`/`clear`/`replace`) is called synchronously from inside a `subscribeChanges` handler.
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `REENTRANT_NAVIGATION` error code ([#1030](https://github.com/greydragon888/real-router/issues/1030))
+
+  New member on `ErrorCodeKeys` and `ErrorCodeToValueMap` for the banned synchronous reentrant navigation guard. The runtime value ships in `@real-router/core`'s `errorCodes`; see its changelog for behavior and migration.
+
+### @real-router/validation-plugin@0.9.0
+
+### Minor Changes
+
+- [#1035](https://github.com/greydragon888/real-router/pull/1035) [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop `maxEventDepth` from limits validation ([#1033](https://github.com/greydragon888/real-router/issues/1033))
+
+  `maxEventDepth` was removed from `LimitsConfig` (the event emitter now coalesces re-entrant emits instead of bounding recursion depth). The validation plugin no longer recognizes or range-checks it.
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+
+### @real-router/angular@0.11.12
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/sources@0.10.1
+  - @real-router/route-utils@0.2.5
+
+### @real-router/browser-plugin@0.17.14
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/hash-plugin@0.7.13
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/lifecycle-plugin@0.6.3
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/logger-plugin@0.5.16
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+
+### @real-router/memory-plugin@0.4.12
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/navigation-plugin@0.7.13
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/persistent-params-plugin@0.2.15
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/preact@0.15.11
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/sources@0.10.1
+  - @real-router/route-utils@0.2.5
+
+### @real-router/preload-plugin@0.6.6
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/react@0.27.11
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/sources@0.10.1
+  - @real-router/route-utils@0.2.5
+
+### @real-router/route-utils@0.2.5
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/types@0.38.0
+
+### @real-router/rsc-server-plugin@0.2.9
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/rx@0.3.17
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+
+### @real-router/search-schema-plugin@0.4.3
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+
+### @real-router/solid@0.15.4
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/sources@0.10.1
+  - @real-router/route-utils@0.2.5
+
+### @real-router/sources@0.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/route-utils@0.2.5
+
+### @real-router/ssr-data-plugin@0.4.9
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/types@0.38.0
+
+### @real-router/svelte@0.13.12
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/sources@0.10.1
+  - @real-router/route-utils@0.2.5
+
+### @real-router/vue@0.15.12
+
+### Patch Changes
+
+- Updated dependencies [[`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5), [`7971e79`](https://github.com/greydragon888/real-router/commit/7971e7962652c924744a01350ea345b1bc6f6db5)]:
+  - @real-router/core@0.62.0
+  - @real-router/sources@0.10.1
+  - @real-router/route-utils@0.2.5
+
 ## [2026-06-28]
 
 ### @real-router/core@0.61.14
