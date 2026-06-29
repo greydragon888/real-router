@@ -354,6 +354,52 @@ describe("validateRoutePath", () => {
       });
     });
 
+    describe("Fused mid-segment markers (#1050)", () => {
+      // A `:`/`*` marker fused to a static prefix WITHIN a segment (`/a:b`,
+      // `/users/x:id`, `/a*b`): build/meta's unanchored regex extracts it as a
+      // param, but the trie honors a marker only at segment start and compiles
+      // the segment as a literal — so buildPath emits an unmatchable URL while
+      // match() rejects it. The gate rejects it (path-matcher backstops at
+      // registerTree), the sibling of the #863 name-less rejection.
+      it("should throw for a marker fused to a static prefix", () => {
+        const paths = [
+          "/a:b", // colon fused mid-segment
+          "/users/x:id", // colon after a static prefix in a nested segment
+          "/a*b", // splat fused mid-segment
+          "/users/x*rest", // splat after a static prefix
+          String.raw`/a:b<\d+>`, // fused colon carrying a constraint
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/Invalid path for route/u);
+        });
+      });
+
+      it("should NOT flag a boundary marker or a marker-led greedy name (controls)", () => {
+        const paths = [
+          "/a/:b", // boundary marker — the canonical correct form
+          "/users/:id", // boundary marker
+          "/:a:b", // marker-led: the param name is the greedy 'a:b', not a fused marker
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
+      it("should NOT flag a fused-looking marker inside a query declaration (url-path scope)", () => {
+        // Same url-path scope as #863: the query portion is not trie'd, so a
+        // `:`/`*` there is not a path marker — must not be falsely rejected.
+        expect(() => {
+          validateRoutePath("/users?x:y", routeName, methodName);
+        }).not.toThrow();
+      });
+    });
+
     describe("Absolute paths with parameterized parent", () => {
       it("should throw when parent has URL parameters", () => {
         const parentWithParams = createMockParameterizedNode(
