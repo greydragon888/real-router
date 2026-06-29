@@ -5,15 +5,6 @@
  * in every task's cache key. Touch the cache-bust marker below to
  * invalidate the remote turbo cache across all packages.
  *
- * Cache bust: 2026-06-29 — regenerate `lcov.info` for core-layer node
- * packages (event-emitter, fsm, logger, path-matcher, route-tree,
- * search-params). On a sharded run these are tested only by the base-test
- * `--filter='@real-router/core...'` closure; a stale remote turbo cache
- * entry replayed `test` without its `coverage/**` lcov, so the uploaded
- * coverage artifact omitted them and SonarCloud scored event-emitter's new
- * lines as 0% covered — failing the new-code-coverage gate (recurrence of
- * the jsdom-package case below, #470).
- *
  * Cache bust: 2026-04-18 — regenerate `lcov.info` for jsdom-environment
  * packages (browser-plugin, hash-plugin, memory-plugin, navigation-plugin,
  * browser-env, angular, preact, react, solid, svelte, vue) whose remote
