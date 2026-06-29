@@ -451,5 +451,65 @@ describe("core/validator call-site contract", () => {
         "replaceRoutes",
       );
     });
+
+    // #1046: prepare-phase handler-limit pre-flight (preflightHandlerLimit) —
+    // verify core consults the limit for a NEW guard slot BEFORE the swap/commit,
+    // and skips it for an overwrite (existing slot). The limit source is the
+    // namespace, so the validator call carries (projectedCount, "canActivate" |
+    // "canDeactivate"). Atomicity itself (no torn state on throw) is asserted in
+    // @real-router/validation-plugin's handler-limit-atomicity test (real plugin).
+    it("add (#1046): pre-flights the limit for a new canDeactivate ('canDeactivate')", () => {
+      routes.add([
+        { name: "pf-d", path: "/pf-d", canDeactivate: () => () => true },
+      ]);
+
+      expect(validator.lifecycle.validateHandlerLimit).toHaveBeenCalledWith(
+        expect.any(Number),
+        "canDeactivate",
+      );
+    });
+
+    it("update (#1046): pre-flights the limit for a NEW canActivate slot ('canActivate')", () => {
+      routes.add({ name: "pf-u", path: "/pf-u" });
+      routes.update("pf-u", { canActivate: () => () => true });
+
+      expect(validator.lifecycle.validateHandlerLimit).toHaveBeenCalledWith(
+        expect.any(Number),
+        "canActivate",
+      );
+    });
+
+    it("replace (#1046): projects the new batch onto surviving external guards", () => {
+      // An external guard survives replace's clearDefinitionGuards; the pre-flight
+      // base counts external survivors (clearsDefinition). A batch name that
+      // matches the external guard is an overwrite (not a new slot); a fresh name
+      // is a new slot — exercising both branches of the existing-name check.
+      getLifecycleApi(router).addActivateGuard("ext", () => () => true);
+
+      routes.replace([
+        { name: "ext", path: "/ext", canActivate: () => () => true },
+        { name: "pf-r", path: "/pf-r", canActivate: () => () => true },
+      ]);
+
+      expect(validator.lifecycle.validateHandlerLimit).toHaveBeenCalledWith(
+        expect.any(Number),
+        "canActivate",
+      );
+    });
+
+    it("update (#1046): overwriting an existing guard is not a new slot", () => {
+      // pf-o has a definition canActivate; updating its canActivate is an
+      // overwrite (existing slot), so the pre-flight finds no new slot and does
+      // not falsely reject — exercising the existing-name branch.
+      routes.add({
+        name: "pf-o",
+        path: "/pf-o",
+        canActivate: () => () => true,
+      });
+
+      expect(() => {
+        routes.update("pf-o", { canActivate: () => () => true });
+      }).not.toThrow();
+    });
   });
 });

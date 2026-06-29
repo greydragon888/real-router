@@ -117,6 +117,79 @@ export class RouteLifecycleNamespace<
     return names.size;
   }
 
+  /**
+   * Pre-flights the #961 handler-limit `RangeError` into the route-CRUD PREPARE
+   * phase (#1046). `#registerHandler`'s per-slot limit check throws AFTER the
+   * tree/config swap, so `add`/`replace`/`update` tore post-commit when the
+   * validator was installed and the per-type count was at `maxLifecycleHandlers`.
+   * Running the same check here — before any store mutation — restores atomicity
+   * (#951/#956/#698): a batch that would exceed the limit aborts before a single
+   * write.
+   *
+   * Only NEW slots count (an overwrite leaves the union count unchanged, mirroring
+   * `#registerHandler`). For `replace` (`clearsDefinition = true`) the definition
+   * guards are about to be cleared, so the projection runs against the surviving
+   * EXTERNAL guards only — exactly the post-clear state the install loop sees.
+   * Plugin-gated: a no-op without the validator (the limit is opt-in).
+   *
+   * @param activateNames - route names a `canActivate` would be registered for
+   * @param deactivateNames - route names a `canDeactivate` would be registered for
+   * @param clearsDefinition - true for `replace` (definition guards cleared first)
+   */
+  preflightHandlerLimit(
+    activateNames: Iterable<string>,
+    deactivateNames: Iterable<string>,
+    clearsDefinition: boolean,
+  ): void {
+    const validator = this.#getValidator?.();
+
+    if (!validator) {
+      return;
+    }
+
+    const check = (
+      type: "activate" | "deactivate",
+      names: Iterable<string>,
+      methodName: string,
+    ): void => {
+      const { definition, external } = this.#getFactoryMaps(type);
+
+      // A name already holding a guard of this type is an overwrite (no new
+      // slot, mirroring `#registerHandler`). After a definition-clear (replace)
+      // only EXTERNAL guards survive, so the existing-name check — and the base
+      // count below — run against `external` alone, matching the post-clear
+      // install state the loop sees.
+      let newSlots = 0;
+
+      for (const name of names) {
+        const isExisting = clearsDefinition
+          ? external.has(name)
+          : definition.has(name) || external.has(name);
+
+        if (!isExisting) {
+          newSlots++;
+        }
+      }
+
+      if (newSlots === 0) {
+        return;
+      }
+
+      // The install loop throws when a new-slot registration observes
+      // `count >= max`. Starting from `base` and adding `newSlots` new names,
+      // the highest pre-register count it reaches is `base + newSlots - 1` —
+      // replicate that worst case so the pre-flight throws iff the loop would.
+      const base = clearsDefinition
+        ? external.size
+        : this.getHandlerCount(type);
+
+      validator.lifecycle.validateHandlerLimit(base + newSlots - 1, methodName);
+    };
+
+    check("activate", activateNames, "canActivate");
+    check("deactivate", deactivateNames, "canDeactivate");
+  }
+
   // =========================================================================
   // Instance methods
   // =========================================================================
