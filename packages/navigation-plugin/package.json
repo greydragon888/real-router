@@ -1,6 +1,6 @@
 {
   "name": "@real-router/navigation-plugin",
-  "version": "0.7.12",
+  "version": "0.7.13",
   "type": "commonjs",
   "description": "Navigation API integration plugin for browser URL synchronization",
   "main": "./dist/cjs/index.js",
