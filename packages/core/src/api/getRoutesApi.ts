@@ -678,13 +678,9 @@ export function getRoutesApi<
       // beside the add/replace (adoptRouteArtifacts) / remove (commitTreeChanges)
       // / clear (resetStore) cores. Returns the structural fields for the
       // conditional emit below (each user getter read once inside).
-
-      const structural = commitRouteUpdate(
-        store,
-        store.lifecycleNamespace!,
-        name,
-        updates,
-      );
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+      const lifecycle = store.lifecycleNamespace!;
+      const structural = commitRouteUpdate(store, lifecycle, name, updates);
 
       // Conditional emit: structural fields only. A guard-only or empty patch
       // produces no event (О-7 + empty-patch rule).
