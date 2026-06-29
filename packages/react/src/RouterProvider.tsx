@@ -94,8 +94,10 @@ export const RouterProvider: FC<RouteProviderProps> = ({
       spy.destroy();
     };
     // scrollSpy (for scrollContainer) omitted — same rationale as
-    // scrollRestoration above: getter is invoked lazily inside the utility,
-    // identity changes don't affect resolution.
+    // scrollRestoration above: the utility consults the getter lazily
+    // (re-consulted on reconcile, so a late-mounted/changed container is
+    // honoured — #780), so a new getter reference resolving to the same
+    // element doesn't require recreating the spy.
     // eslint-disable-next-line @eslint-react/exhaustive-deps
   }, [router, spyEnabled, spySelector, spyRootMargin]);
 
