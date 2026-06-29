@@ -154,6 +154,14 @@ function getOrCreateAnnouncer(): HTMLElement {
     return existing;
   }
 
+  // Creating a FRESH element means no live instance is validly sharing one, so
+  // the ref-count restarts from zero (the caller increments immediately after).
+  // Without this, an element removed out from under live instances — a host
+  // wiping the subtree, or a consumer test whose teardown clears the DOM
+  // without calling every instance's destroy() — would leave a stale positive
+  // count that prevents the new element from ever being torn down (#783).
+  announcerRefCount = 0;
+
   const element = document.createElement("div");
 
   element.setAttribute("style", VISUALLY_HIDDEN);
