@@ -587,4 +587,68 @@ describe("createRouteAnnouncer", () => {
 
     announcer.destroy();
   });
+
+  it("does not re-announce identical text (text === lastAnnouncedText)", async () => {
+    const originalTitle = document.title;
+
+    document.title = "Same Title";
+
+    const announcer = createRouteAnnouncer(router);
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
+
+    vi.advanceTimersByTime(150);
+
+    await router.navigate("users"); // first nav after creation — initial-skip
+    await router.navigate("about"); // announces "Navigated to Same Title"
+
+    expect(element.textContent).toBe("Navigated to Same Title");
+
+    // Clear the DOM text but keep `lastAnnouncedText`; a navigation that
+    // resolves to the SAME text must early-return without re-announcing.
+    element.textContent = "";
+    await router.navigate("users");
+
+    expect(element.textContent).toBe("");
+
+    document.title = originalTitle;
+    announcer.destroy();
+  });
+
+  it("destroy() is idempotent — a second destroy() is a no-op", () => {
+    const announcer = createRouteAnnouncer(router);
+
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).not.toBeNull();
+
+    announcer.destroy();
+
+    expect(() => {
+      announcer.destroy();
+    }).not.toThrow();
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
+  });
+
+  it("falls back to location.pathname for an internal route with no h1/title", async () => {
+    const originalTitle = document.title;
+
+    document.title = "";
+
+    const announcer = createRouteAnnouncer(router);
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
+
+    vi.advanceTimersByTime(150);
+
+    await router.navigate("users"); // first nav after creation — initial-skip
+
+    // navigateToNotFound emits an @@-prefixed UNKNOWN_ROUTE → the route name is
+    // stripped to "" → resolveText falls through h1 → title → routeName to
+    // `location.pathname`.
+    router.navigateToNotFound("/missing-page");
+
+    expect(element.textContent).toBe(
+      `Navigated to ${globalThis.location.pathname}`,
+    );
+
+    document.title = originalTitle;
+    announcer.destroy();
+  });
 });

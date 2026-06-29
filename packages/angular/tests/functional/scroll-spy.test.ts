@@ -967,4 +967,127 @@ describe("createScrollSpy (Angular dom-utils copy)", () => {
       router.stop();
     });
   });
+
+  describe("edge coverage", () => {
+    it("SSR — returns NOOP when document is undefined", async () => {
+      const realDocument = globalThis.document;
+
+      vi.stubGlobal("document", undefined);
+
+      try {
+        const router = await createTestRouter();
+        const spy = createScrollSpy(router, { selector: "[id]" });
+
+        expect(ioInstances).toHaveLength(0);
+        expect(typeof spy.destroy).toBe("function");
+
+        spy.destroy();
+        router.stop();
+      } finally {
+        vi.stubGlobal("document", realDocument);
+      }
+    });
+
+    it("debounce destroy clears a pending trailing timeout", async () => {
+      const router = await createTestRouter();
+      const [s1] = setupAnchors(["section-1"]);
+      const spy = track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      // Fire only the rAF shim (0ms) so the trailing timeout is armed but not
+      // yet fired, then destroy → clears the live timeout.
+      vi.advanceTimersByTime(1);
+      spy.destroy();
+
+      expect(() => {
+        flushTimersAndRaf();
+      }).not.toThrow();
+
+      router.stop();
+    });
+
+    it("debounce reschedule clears the previous trailing timeout", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      vi.advanceTimersByTime(1); // rAF fires → trailing timeout armed
+      ioInstances[0].trigger([buildEntry(s1, 60)]);
+      vi.advanceTimersByTime(1); // second rAF fires → clears the first timeout
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+      router.stop();
+    });
+
+    it("MutationObserver destroy clears a pending reconcile timer", async () => {
+      const router = await createTestRouter();
+
+      setupAnchors(["section-1"]);
+      const spy = track(createScrollSpy(router, { selector: "[id]" }));
+
+      moInstances[0]?.trigger([]); // arms the mutation-debounce timer
+      spy.destroy();
+
+      expect(() => {
+        flushTimersAndRaf();
+      }).not.toThrow();
+
+      router.stop();
+    });
+
+    it("silences once on an invalid selector (second reconcile is a no-op)", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const router = await createTestRouter();
+
+      setupAnchors(["section-1"]);
+      track(createScrollSpy(router, { selector: "###" }));
+
+      // A second reconcile (MutationObserver) re-enters onInvalidSelector but
+      // `silenced` short-circuits it — still exactly one warning.
+      moInstances[0]?.trigger([]);
+      flushTimersAndRaf();
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain("invalid selector");
+
+      warnSpy.mockRestore();
+      router.stop();
+    });
+
+    it("no-op flush when there are no pending entries", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      setupAnchors(["section-1"]);
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([]); // empty batch → flush with empty pending map
+      flushTimersAndRaf();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+
+      router.stop();
+    });
+
+    it("skips the emit when the router has no active state", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      router.stop(); // getState() now returns undefined
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+  });
 });
