@@ -71,6 +71,25 @@ describe("validateRoute", () => {
       }).toThrow(/must be a plain object/);
     });
 
+    it("yields the clean 'plain object' error (not the getter's exception) for a route with a throwing inherited `.name` getter (#1052)", () => {
+      // A custom-prototype route reaches the twin getTypeDescription at the
+      // plain-object check (:103) — before the own-key getter scan, which uses
+      // Object.keys and so misses an INHERITED throwing getter. The twin must
+      // yield the clean TypeError, not leak the getter's exception (sibling of
+      // #903's adversarial-constructor-value case).
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- name-carrier ctor; only its throwing `.name` getter matters
+      function EvilName() {}
+      Object.defineProperty(EvilName, "name", {
+        get() {
+          throw new Error("BOOM");
+        },
+      });
+
+      expect(() => {
+        validateRoute(Object.create(EvilName.prototype), methodName);
+      }).toThrow(/must be a plain object/);
+    });
+
     it("should throw TypeError for route with getter", () => {
       const routeWithGetter = {
         get name(): string {

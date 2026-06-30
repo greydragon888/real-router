@@ -51,6 +51,45 @@ describe("Helper Functions", () => {
       expect(getTypeDescription({ constructor: {} })).toBe("object");
     });
 
+    it("returns 'object' for a throwing `constructor` / `.name` getter or Proxy (#1052)", () => {
+      // A throwing accessor (own `constructor` getter, a function constructor
+      // with a throwing `.name` getter, or a Proxy that throws on [[Get]]) must
+      // NOT crash here — the same never-crash contract as the non-function #787
+      // value above, for a throwing *getter* rather than a throwing *value*.
+      const evilCtorGetter = Object.defineProperty({}, "constructor", {
+        get() {
+          throw new Error("BOOM");
+        },
+      });
+
+      expect(getTypeDescription(evilCtorGetter)).toBe("object");
+
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- name-carrier ctor; only its throwing `.name` getter matters
+      function EvilName() {}
+      Object.defineProperty(EvilName, "name", {
+        get() {
+          throw new Error("BOOM");
+        },
+      });
+
+      expect(getTypeDescription(Object.create(EvilName.prototype))).toBe(
+        "object",
+      );
+
+      expect(
+        getTypeDescription(
+          new Proxy(
+            {},
+            {
+              get() {
+                throw new Error("BOOM");
+              },
+            },
+          ),
+        ),
+      ).toBe("object");
+    });
+
     it("returns 'object' for anonymous class instances (#787)", () => {
       // An anonymous class has an empty constructor name; fall back to "object"
       // rather than returning an empty string.
