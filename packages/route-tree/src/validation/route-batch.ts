@@ -40,14 +40,22 @@ function getTypeDescription(value: unknown): string {
   }
 
   if (typeof value === "object") {
-    // Read `constructor` defensively: an adversarial own `constructor` (null, a
-    // string, a number, …) is not a real constructor and must not crash here nor
-    // yield a non-string (#903). Only a function constructor has a usable name.
-    const ctor: unknown = (value as { constructor?: unknown }).constructor;
+    // Read `constructor`/`.name` defensively: an adversarial own `constructor`
+    // (null, a string, a number, …) is not a real constructor and must not crash
+    // here nor yield a non-string (#903); a THROWING accessor — a `constructor`
+    // getter, a function constructor with a throwing `.name` getter, or a Proxy
+    // that throws on [[Get]] — must not crash either (#1052). Both fall back to
+    // "object". (Byte-identical twin of type-guards' getTypeDescription —
+    // route-tree has no type-guards dependency, so the hardening is duplicated.)
+    try {
+      const ctor: unknown = (value as { constructor?: unknown }).constructor;
 
-    // Return constructor name for class instances
-    if (typeof ctor === "function" && ctor.name !== "Object") {
-      return ctor.name || "object"; // empty name (anonymous class) → "object"
+      // Return constructor name for class instances
+      if (typeof ctor === "function" && ctor.name !== "Object") {
+        return ctor.name || "object"; // empty name (anonymous class) → "object"
+      }
+    } catch {
+      // Throwing constructor/.name getter or Proxy [[Get]] → fall through (#1052).
     }
 
     // Plain object
