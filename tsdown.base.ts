@@ -98,6 +98,18 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // Fail on warnings in CI
     failOnWarn: "ci-only",
 
+    // Validate the published package on every bundle, consolidating the former
+    // separate `lint:package` (publint) / `lint:types` (attw) turbo tasks into
+    // the build itself — so a package can't be bundled without being validated.
+    // publint: package.json exports + file existence; attw: .d.ts resolution
+    // across node10 / node16-cjs / node16-esm / bundler (same coverage as the
+    // old `attw --pack .`). tsdown runs each ONCE after the full dist (verified
+    // on the core pilot — not per ESM/CJS config). Non-tsdown packages (solid =
+    // rollup, angular = ng-packagr, svelte = svelte-package) are NOT covered and
+    // keep their own validation. See IMPLEMENTATION_NOTES "Release-pipeline...".
+    publint: true,
+    attw: true,
+
     // Bundle specific dependencies
     ...(deps?.alwaysBundle || deps?.onlyBundle
       ? {

@@ -4741,3 +4741,23 @@ The two release workflows carried load-bearing logic inline in bash:
 DRY removes the silent-drift hazard (one changeset-rule validator, not a bash copy that can fall behind). The brittlest parsing (CHANGELOG sections, ref extraction) is isolated as pure functions out of the release-critical shell; awk-parity was demonstrated empirically at extraction time (21 package/version pairs).
 
 **Boundary — where this deliberately stops (vs the RFC's "all 8 blocks → ~30-50-line workflow"):** the `github-script` Comment/Remove steps are **context-bound** (need the GitHub API + `context.repo`) and stay in YAML — they only got *simpler* (per-file from JSON, not 4 hand-maintained per-type sections). `require-changeset`'s source-change detection (a `git diff` against the base ref) is not changeset-content validation and stays bash. And Reconcile's **gh/git orchestration** (`gh release create/list`, `gh api` tag backfill, `declare -A`, two-pass ordering) stays bash on purpose: it is release-critical, its real behaviour is **not locally verifiable** (needs GitHub + pushed tags + existing Releases), and `gh` is more natural in shell than `execSync` wrappers. Only the pure CHANGELOG-parsing came out. Net: the workflows got materially thinner and the extracted logic is tested, but "thin 30-50-line workflow" was an over-estimate — the irreducible remainder is API-bound or release-critical orchestration.
+
+## tsdown-consolidated publint/attw — validation inside `bundle`, not separate tasks (2026-06-30)
+
+### Problem
+
+Package-publishing validation was **two separate turbo tasks per public package**: `lint:package` (publint — validates `package.json` exports + file existence) and `lint:types` (`attw --pack .` — checks `.d.ts` resolution across node10 / node16-cjs / node16-esm / bundler). Both `dependsOn: ["bundle"]`, ran in pre-push + CI. ~22 packages × 2 tasks = a wide band of graph nodes that could drift from the build (you could `bundle` without validating).
+
+### Solution
+
+tsdown 0.22.3 runs publint + attw **built-in**. Added `publint: true` + `attw: true` to `commonConfig` in `tsdown.base.ts` — all **21 tsdown-built** public packages inherit it, so validation now runs as part of `bundle`. Removed the `lint:package`/`lint:types` scripts from those 21 `package.json`.
+
+Pilot on `core` proved parity + two non-obvious facts:
+- tsdown runs publint/attw **once** after the full dist (NOT per ESM/CJS config) even though the option lives in the shared `commonConfig` — so there was no need to inject it into only one format (the planned "decision A" turned out unnecessary).
+- `attw: true` (default) covers the **same 4 resolution modes** as `attw --pack .` — verdict identical ("No problems"). publint's `engines.node` suggestion is **info-level** (`ℹ`) and does NOT trip `failOnWarn: "ci-only"` — `CI=1 pnpm -F core bundle` exits 0.
+
+### Why
+
+`always` (not `ci-only`): keeps local coverage — pre-push `bundle` catches publint/attw errors before push, exactly as the old separate tasks did. Validation is now inseparable from the build (can't bundle without validating). publint `0.3.21` (already in devDeps, satisfies tsdown peer `^0.3.8`) + `@arethetypeswrong/cli 0.18.4` — no new deps.
+
+**Exceptions — NOT tsdown, deliberately keep separate validation:** `solid` (rollup) retains `lint:package`/`lint:types`; the turbo tasks stay **for it alone** (turbo run resolves to `@real-router/solid:lint:package` only — the 21 tsdown packages no longer have the scripts, turbo skips them). `angular` (ng-packagr) and `svelte` (svelte-package) never had publint/attw. The pre-push `pnpm turbo run build lint:package lint:types` line is unchanged: `build`→`bundle` validates the 21 tsdown packages inline; `lint:package`/`lint:types` cover solid. The turbo graph stays mixed — that asymmetry is the price of solid/angular/svelte not being tsdown-built, and is the reason the tasks aren't deleted outright.
