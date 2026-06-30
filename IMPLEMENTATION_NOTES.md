@@ -4705,3 +4705,19 @@ if (affected.length <= K && !touchesCore && !touchesAdapterShared) { /* leaf */ 
 ### Why
 
 A "clean" script that leaves tool caches warm is a silent correctness bug for any cold benchmark or bug reproduction — the build still succeeds, so nothing flags it; only the numbers lie (the 20x lint gap is the proof). Single-source-of-truth via `source` + `BASH_SOURCE` guard is the cheapest way to stop the two scripts re-diverging the next time a cache layer is added. To take a genuinely cold measurement: run `clean-all.sh` **then** `turbo run … --force` (the `--force` covers the turbo layer the script intentionally leaves to turbo's own invalidation; the script covers the tool layers turbo can't see).
+
+## peerDep range fix — `workspace:^` → `workspace:>=0.1.0` removes the #822 unwanted-major class (2026-06-30)
+
+### Problem
+
+Three plugins (`rsc-server-plugin`, `ssr-data-plugin`, `validation-plugin`) declared `@real-router/core` in **peerDependencies** as `workspace:^`, which pnpm publishes as `^0.62.0`. On a 0.x package `^0.x.y` is **patch-only** in semver, so any core *minor* bump (0.62 → 0.63) takes the peer out of range. With `onlyUpdatePeerDependentsWhenOutOfRange: true` (already set in `.changeset/config.json`), changesets then bumps these peer-dependents, and an out-of-range peer escalates to a **major** bump ([changesets/changesets#822](https://github.com/changesets/changesets/issues/822) — closed `completed` 2026-06-24 but with **no** code-fix; changesets 2.31 is latest and ships no option, so the workaround stays on the user). The 204-line `cap-major-bumps.mjs` post-version script existed solely to undo these unwanted majors. The 3 manifests also violated the project's own CLAUDE.md rule ("Never use `workspace:^` for peerDependencies on 0.x").
+
+### Solution
+
+- **3 manifests:** peer `workspace:^` → **`workspace:>=0.1.0`**. Keeps the local `link:../core` (workspace protocol preserved) and publishes as `>=0.1.0`, covering the whole 0.x line so core minor bumps stay in range. **NOT** a bare `>=0.1.0`: that makes pnpm resolve core from the registry (`version: 0.62.2`) instead of the workspace link — verified in lockfile, the bare form pulled published `@real-router/core` snapshots into `pnpm-lock.yaml`.
+- **`syncpack.config.mjs`:** added `dependencyTypes: ["prod", "dev"]` to the "Workspace packages use workspace:^ protocol" pinned versionGroup, excluding peer. Without this the pin forced `workspace:^` onto peer too (`DiffersToPin`), silently overriding the semverGroup that had **already** documented (in a comment, since inception) the intent "peer must NOT be forced to workspace:^ → fall through to >= ranges". The comment was intent; the pin was the override that defeated it.
+- Floor `0.1.0` (first published release), not the current `0.62.0`: for a pre-1.0 lockstep monorepo the floor is a soft bound (npm always installs latest core + latest plugin), so a "current version" floor would just read as a magic number. `syncpack lint` accepts `workspace:>=` under the `range: ">="` semverGroup (a compound `workspace:>=X <Y` would NOT pass — semverGroup `>=` is simple).
+
+### Why
+
+`cap-major` was a 204-line patch over a root cause that lived in 3 manifests breaking the project's own rule. Fixing the range removes the **class** of unwanted-major (not each instance after the fact) and lets `cap-major-bumps.mjs` be deleted — **gated** on the first real release with a core minor bump confirming no major surfaces. The fix is **load-bearing on `onlyUpdatePeerDependentsWhenOutOfRange: true`**: remove that option and changesets reverts to always-bumping peer-dependents, and the widened range no longer helps. `cap-major`'s `(no config to prevent this)` header comment is now stale — the config option exists; it is just useless for `workspace:^` on 0.x (always out-of-range on minor). 3 `patch` changesets ship the contract change to npm; until then the published peers stay `^0.62.x`.

@@ -70,7 +70,7 @@
     "react": "19.2.7"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:^",
+    "@real-router/core": "workspace:>=0.1.0",
     "react": ">=19.0.0"
   }
 }

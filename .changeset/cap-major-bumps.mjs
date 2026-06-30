@@ -12,9 +12,19 @@
  * Root cause: `workspace:^` in peerDependencies on 0.x packages
  * resolves to `^0.x.y` which is patch-only in semver. Any minor
  * bump of the peer dep goes out of range and changesets applies
- * a major bump automatically (no config to prevent this).
+ * a major bump automatically.
  *
  * See: https://github.com/changesets/changesets/issues/822
+ *
+ * DEPRECATED (2026-06-30) — root cause fixed at source. The 3 affected plugins
+ * (rsc-server-plugin, ssr-data-plugin, validation-plugin) now declare
+ * `workspace:>=0.1.0` in peerDependencies (publishes as `>=0.1.0`, stays in
+ * range on core minor bumps), so this safety net should no longer fire. The
+ * "no config to prevent this" wording above was stale anyway:
+ * `onlyUpdatePeerDependentsWhenOutOfRange: true` IS set in config.json — it is
+ * just useless for `workspace:^` on 0.x (always out-of-range on minor). This
+ * file is PENDING REMOVAL, gated on the first real release with a core minor
+ * bump confirming no major surfaces. See IMPLEMENTATION_NOTES "peerDep range fix".
  */
 
 import { execSync } from "child_process";

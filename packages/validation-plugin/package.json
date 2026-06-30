@@ -56,7 +56,7 @@
     "@real-router/logger": "workspace:^"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:>=0.1.0"
   },
   "devDependencies": {
     "route-tree": "workspace:^",

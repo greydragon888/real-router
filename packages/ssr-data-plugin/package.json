@@ -77,6 +77,6 @@
     "@real-router/types": "workspace:^"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:>=0.1.0"
   }
 }

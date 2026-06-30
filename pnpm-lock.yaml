@@ -6348,7 +6348,7 @@ importers:
   packages/rsc-server-plugin:
     dependencies:
       '@real-router/core':
-        specifier: workspace:^
+        specifier: workspace:>=0.1.0
         version: link:../core
       '@real-router/types':
         specifier: workspace:^
@@ -6451,7 +6451,7 @@ importers:
   packages/ssr-data-plugin:
     dependencies:
       '@real-router/core':
-        specifier: workspace:^
+        specifier: workspace:>=0.1.0
         version: link:../core
       '@real-router/types':
         specifier: workspace:^
