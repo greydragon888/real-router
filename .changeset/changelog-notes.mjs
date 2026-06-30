@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
  * @param {string} version
  * @returns {string} section body (may be empty), newline-joined
  */
-export function versionNotes(changelogContent, version) {
+function versionNotes(changelogContent, version) {
   const header = `## ${version}`;
   const out = [];
   let inSection = false;
@@ -54,7 +54,7 @@ export function versionNotes(changelogContent, version) {
  * @param {string} version
  * @returns {boolean}
  */
-export function versionHasOwnChanges(changelogContent, version) {
+function versionHasOwnChanges(changelogContent, version) {
   return versionNotes(changelogContent, version)
     .split(/\r?\n/)
     .filter((l) => /^- /.test(l))

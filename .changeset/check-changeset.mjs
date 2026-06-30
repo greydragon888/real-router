@@ -33,8 +33,7 @@
  *     four checks (PR-ref / multi-package / private / major) that used to live in
  *     the workflow and could silently drift from this script's rules.
  *
- * `validateChangeset` / `loadPackages` / `validateAll` are exported for reuse;
- * `main()` only runs when invoked as a CLI.
+ * `main()` only runs when invoked as a CLI (the `import.meta` guard below).
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -51,7 +50,7 @@ const VALID_LEVELS = new Set(["major", "minor", "patch"]);
  * Source of truth for "unknown package" and "private package" checks.
  * @returns {Map<string, { private: boolean, version: string }>}
  */
-export function loadPackages() {
+function loadPackages() {
   const registry = new Map();
   for (const entry of readdirSync(PKG_DIR)) {
     const pkgJsonPath = join(PKG_DIR, entry, "package.json");
@@ -78,7 +77,7 @@ export function loadPackages() {
  * @param {Map<string, { private: boolean, version: string }>} registry
  * @returns {{ errors: string[], warnings: string[] }}
  */
-export function validateChangeset(name, content, registry) {
+function validateChangeset(name, content, registry) {
   const errors = [];
   const warnings = [];
 
@@ -175,7 +174,7 @@ export function validateChangeset(name, content, registry) {
  * share this so the rules can never diverge.
  * @returns {{ file: string, errors: string[], warnings: string[] }[]}
  */
-export function validateAll() {
+function validateAll() {
   if (!existsSync(CHANGESET_DIR)) return [];
 
   const files = readdirSync(CHANGESET_DIR)

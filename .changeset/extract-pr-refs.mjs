@@ -9,8 +9,7 @@
  * historical title order like `(#1052 #123 #37 …)`), free of grep
  * `-o`/`-h`/`-P` portability quirks across runners.
  *
- * `extractRefs` / `formatRefs` are exported for reuse; the CLI block runs only
- * when invoked directly (so `import` does no I/O).
+ * The CLI block runs only when invoked directly (the `import.meta` guard).
  */
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -22,7 +21,7 @@ const CHANGESET_DIR = join(process.cwd(), ".changeset");
  * @param {string} [dir] changeset directory (defaults to ./.changeset)
  * @returns {string[]} unique `#NN` refs, lexically sorted (matches `sort -u`)
  */
-export function extractRefs(dir = CHANGESET_DIR) {
+function extractRefs(dir = CHANGESET_DIR) {
   if (!existsSync(dir)) return [];
   const files = readdirSync(dir).filter(
     (f) => f.endsWith(".md") && f !== "README.md",
@@ -40,7 +39,7 @@ export function extractRefs(dir = CHANGESET_DIR) {
  * @param {string[]} refs
  * @returns {string} `" (#1 #2)"` or `""`
  */
-export function formatRefs(refs) {
+function formatRefs(refs) {
   return refs.length > 0 ? ` (${refs.join(" ")})` : "";
 }
 
