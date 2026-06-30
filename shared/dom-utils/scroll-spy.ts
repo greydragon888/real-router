@@ -383,6 +383,17 @@ const createObserverPair = (
     onIntersection();
   };
 
+  // Build (and rebuild) the IntersectionObserver for a given root. A root is
+  // immutable once its IO is constructed, so `reconcile` recreates the IO via
+  // this same factory when the resolved container changes (#780) — one
+  // definition, two call sites.
+  const makeIo = (container: HTMLElement | null): IntersectionObserver =>
+    new IntersectionObserver(handleIntersection, {
+      root: container,
+      rootMargin,
+      threshold: 0,
+    });
+
   // Container the IntersectionObserver root + MutationObserver target are
   // built with. Both are immutable once the observer is constructed (W3C), so
   // a `scrollContainer` that resolves to a different element after creation —
@@ -392,11 +403,7 @@ const createObserverPair = (
   // `reconcile`. Tracked here so `reconcile` can compare on every run (#780).
   let observerContainer = getContainer();
 
-  let io = new IntersectionObserver(handleIntersection, {
-    root: observerContainer,
-    rootMargin,
-    threshold: 0,
-  });
+  let io = makeIo(observerContainer);
 
   const observeMatches = (): void => {
     const scope = getContainer() ?? document;
@@ -487,11 +494,7 @@ const createObserverPair = (
       observerContainer = nextContainer;
 
       io.disconnect();
-      io = new IntersectionObserver(handleIntersection, {
-        root: nextContainer,
-        rootMargin,
-        threshold: 0,
-      });
+      io = makeIo(nextContainer);
       observed.clear();
       pending.clear();
 

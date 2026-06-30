@@ -112,9 +112,7 @@ export const RouterProvider = defineComponent({
     );
 
     // Reactive scrollSpy: watch by primitives, omit scrollContainer getter
-    // identity for the same reason scrollRestoration does — the utility
-    // consults the getter lazily (re-consulted on reconcile, so a
-    // late-mounted/changed container is honoured — #780).
+    // identity for the same reason scrollRestoration does.
     watchToggleableUtility(
       () =>
         [
