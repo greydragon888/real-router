@@ -4721,3 +4721,23 @@ Three plugins (`rsc-server-plugin`, `ssr-data-plugin`, `validation-plugin`) decl
 ### Why
 
 `cap-major` was a 204-line patch over a root cause that lived in 3 manifests breaking the project's own rule. Fixing the range removes the **class** of unwanted-major (not each instance after the fact) and lets `cap-major-bumps.mjs` be deleted — **gated** on the first real release with a core minor bump confirming no major surfaces. The fix is **load-bearing on `onlyUpdatePeerDependentsWhenOutOfRange: true`**: remove that option and changesets reverts to always-bumping peer-dependents, and the widened range no longer helps. `cap-major`'s `(no config to prevent this)` header comment is now stale — the config option exists; it is just useless for `workspace:^` on 0.x (always out-of-range on minor). 3 `patch` changesets ship the contract change to npm; until then the published peers stay `^0.62.x`.
+
+## Release-pipeline bash → isolated pure .mjs modules (changeset-check + changesets) (2026-06-30)
+
+### Problem
+
+The two release workflows carried load-bearing logic inline in bash:
+
+- `changeset-check.yml` `validate-changesets` (Check 1-4: PR-ref / multi-package / private / major) was a **bash re-implementation of the same rules `check-changeset.mjs` already enforces on pre-push** — two validators of one rule-set, free to drift (the bash one was already a strict *subset*, silently weaker).
+- `changesets.yml` Extract PR refs (`grep | sort -u | tr | xargs`) and Reconcile's `version_notes` / `version_has_own_changes` (awk/grep CHANGELOG section-parsing) were untested shell on the **release-critical** path.
+
+### Solution
+
+- **`check-changeset.mjs` → module + `--json`.** Exported `validateChangeset` / `loadPackages` / `validateAll`; added a `--json` mode emitting `[{ file, errors, warnings }]`; a `process.argv[1] === fileURLToPath(import.meta.url)` guard so `import` does no I/O. `changeset-check.yml` `validate-changesets` now runs `node check-changeset.mjs --json` and the `github-script` step builds a per-file PR comment from the JSON. One validator, two consumers (pre-push CLI + CI). Workflow diff: **−188/+34**.
+- **`extract-pr-refs.mjs`** (`#NN` → `" (#1 #2)"` suffix, lexical sort matching the old `sort -u`) and **`changelog-notes.mjs`** (`versionNotes` / `versionHasOwnChanges`). The latter is an exact port of the awk/grep — **byte-parity verified against the live awk on 21 package/version pairs**, not eyeballed.
+
+### Why
+
+DRY removes the silent-drift hazard (one changeset-rule validator, not a bash copy that can fall behind). The brittlest parsing (CHANGELOG sections, ref extraction) is isolated as pure functions out of the release-critical shell; awk-parity was demonstrated empirically at extraction time (21 package/version pairs).
+
+**Boundary — where this deliberately stops (vs the RFC's "all 8 blocks → ~30-50-line workflow"):** the `github-script` Comment/Remove steps are **context-bound** (need the GitHub API + `context.repo`) and stay in YAML — they only got *simpler* (per-file from JSON, not 4 hand-maintained per-type sections). `require-changeset`'s source-change detection (a `git diff` against the base ref) is not changeset-content validation and stays bash. And Reconcile's **gh/git orchestration** (`gh release create/list`, `gh api` tag backfill, `declare -A`, two-pass ordering) stays bash on purpose: it is release-critical, its real behaviour is **not locally verifiable** (needs GitHub + pushed tags + existing Releases), and `gh` is more natural in shell than `execSync` wrappers. Only the pure CHANGELOG-parsing came out. Net: the workflows got materially thinner and the extracted logic is tested, but "thin 30-50-line workflow" was an over-estimate — the irreducible remainder is API-bound or release-critical orchestration.
