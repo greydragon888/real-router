@@ -82,6 +82,7 @@ packages/**/.eslintcache
 .bundle-reports
 .changelog
 git-diff-report.md
+changeset-result.json
 jscpd-report/
 logs/*.log
 npm-debug.log

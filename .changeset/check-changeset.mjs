@@ -24,10 +24,22 @@
  * NOT checked here (semantic — not derivable from the file text): "one logical
  * change per file", "don't mix features/fixes", "right bump for the change type",
  * "descriptive title". Those need understanding of the diff, not the changeset.
+ *
+ * Two consumers, one validator (no drift):
+ *   - pre-push CLI: `node check-changeset.mjs` → human-readable, exit 1 on error.
+ *   - CI `changeset-check.yml`: `node check-changeset.mjs --json` → emits
+ *     `[{ file, errors, warnings }]` for the workflow's PR-comment step, exit 1
+ *     on any error. Replaces the hand-rolled bash re-implementation of these same
+ *     four checks (PR-ref / multi-package / private / major) that used to live in
+ *     the workflow and could silently drift from this script's rules.
+ *
+ * `validateChangeset` / `loadPackages` / `validateAll` are exported for reuse;
+ * `main()` only runs when invoked as a CLI.
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ROOT = process.cwd();
 const CHANGESET_DIR = join(ROOT, ".changeset");
@@ -39,7 +51,7 @@ const VALID_LEVELS = new Set(["major", "minor", "patch"]);
  * Source of truth for "unknown package" and "private package" checks.
  * @returns {Map<string, { private: boolean, version: string }>}
  */
-function loadPackages() {
+export function loadPackages() {
   const registry = new Map();
   for (const entry of readdirSync(PKG_DIR)) {
     const pkgJsonPath = join(PKG_DIR, entry, "package.json");
@@ -66,7 +78,7 @@ function loadPackages() {
  * @param {Map<string, { private: boolean, version: string }>} registry
  * @returns {{ errors: string[], warnings: string[] }}
  */
-function validateChangeset(name, content, registry) {
+export function validateChangeset(name, content, registry) {
   const errors = [];
   const warnings = [];
 
@@ -157,42 +169,61 @@ function validateChangeset(name, content, registry) {
   return { errors, warnings };
 }
 
-function main() {
-  if (!existsSync(CHANGESET_DIR)) {
-    return; // No .changeset dir at all — nothing to validate.
-  }
+/**
+ * Validate every pending changeset and return one result per file.
+ * Pure (no I/O side effects beyond reading): the CLI and the JSON consumer
+ * share this so the rules can never diverge.
+ * @returns {{ file: string, errors: string[], warnings: string[] }[]}
+ */
+export function validateAll() {
+  if (!existsSync(CHANGESET_DIR)) return [];
 
   const files = readdirSync(CHANGESET_DIR)
     .filter((f) => f.endsWith(".md") && f !== "README.md")
     .sort();
 
-  if (files.length === 0) {
-    // No pending changesets — a WIP/infra push. Pass silently.
+  if (files.length === 0) return [];
+
+  const registry = loadPackages();
+  return files.map((file) => {
+    const content = readFileSync(join(CHANGESET_DIR, file), "utf8");
+    const { errors, warnings } = validateChangeset(file, content, registry);
+    return { file: `.changeset/${file}`, errors, warnings };
+  });
+}
+
+function main() {
+  const jsonMode = process.argv.includes("--json");
+  const results = validateAll();
+  const invalid = results.filter((r) => r.errors.length > 0).length;
+
+  // CI consumer: machine-readable for changeset-check.yml's PR-comment step.
+  if (jsonMode) {
+    console.log(JSON.stringify(results));
+    if (invalid > 0) process.exit(1);
+    return;
+  }
+
+  // pre-push CLI: human-readable.
+  if (results.length === 0) {
     console.log("📝 No changesets to validate.");
     return;
   }
 
-  const registry = loadPackages();
-  let invalid = 0;
   let warned = 0;
-
-  for (const file of files) {
-    const content = readFileSync(join(CHANGESET_DIR, file), "utf8");
-    const { errors, warnings } = validateChangeset(file, content, registry);
-
+  for (const { file, errors, warnings } of results) {
     for (const w of warnings) {
-      console.warn(`⚠️  .changeset/${file}: ${w}`);
+      console.warn(`⚠️  ${file}: ${w}`);
       warned++;
     }
     for (const e of errors) {
-      console.error(`❌ .changeset/${file}: ${e}`);
+      console.error(`❌ ${file}: ${e}`);
     }
-    if (errors.length > 0) invalid++;
   }
 
   if (invalid > 0) {
     console.error(
-      `\n❌ ${invalid} of ${files.length} changeset file(s) invalid. ` +
+      `\n❌ ${invalid} of ${results.length} changeset file(s) invalid. ` +
         `Fix them before pushing.\n` +
         `   Rules: .changeset/README.md`,
     );
@@ -200,7 +231,10 @@ function main() {
   }
 
   const suffix = warned > 0 ? ` (${warned} warning(s))` : "";
-  console.log(`✅ ${files.length} changeset file(s) valid${suffix}.`);
+  console.log(`✅ ${results.length} changeset file(s) valid${suffix}.`);
 }
 
-main();
+// Run only as a CLI — `import` must not trigger validation.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}
