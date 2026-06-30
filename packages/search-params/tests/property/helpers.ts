@@ -22,11 +22,43 @@ export const NUM_RUNS = {
 // eslint-disable-next-line @typescript-eslint/no-misused-spread -- ASCII-only chars, no emoji risk
 const KEY_CHARS = [..."abcdefghijklmnopqrstuvwxyz0123456789"];
 
+// minLength 0 — the empty-string key `""` is a type-valid `SearchParams` key
+// (`Record<string, …>`), so the roundtrip suite must exercise it. It round-trips
+// in every config except `true`/`null` under `empty-true` (the bare-key token for
+// `""` is `""`, which build's empty-chunk filter drops — a documented loss,
+// #1051/#18); those combos are excluded in the roundtrip property and asserted
+// explicitly in formats.properties.ts.
 export const arbSafeKey: fc.Arbitrary<string> = fc.string({
   unit: fc.constantFrom(...KEY_CHARS),
-  minLength: 1,
+  minLength: 0,
   maxLength: 8,
 });
+
+/**
+ * Whether `build` erases the empty-string key `""` for this params/opts (#1051).
+ * The empty key is dropped whenever its value encodes to a BARE-KEY token (no
+ * `=`), because that token is `""` itself — which `build`'s empty-chunk filter
+ * removes (`searchParams.ts`, the same filter that erases `nullFormat:"hidden"`).
+ * The bare-key encoders: `true` under `booleanFormat:"empty-true"`, and `null`
+ * under `nullFormat:"default"`. Every other value encodes as `=value` (a
+ * non-empty chunk) and round-trips. Used to exclude this documented loss from the
+ * roundtrip / format properties — the loss is asserted explicitly instead.
+ */
+export function erasesEmptyKey(
+  params: Record<string, unknown>,
+  opts: { booleanFormat?: string; nullFormat?: string } = {},
+): boolean {
+  if (!("" in params)) {
+    return false;
+  }
+
+  const value = params[""];
+
+  return (
+    (value === true && opts.booleanFormat === "empty-true") ||
+    (value === null && (opts.nullFormat ?? "default") === "default")
+  );
+}
 
 const SAFE_CHARS = [
   // eslint-disable-next-line @typescript-eslint/no-misused-spread -- ASCII-only chars, no emoji risk

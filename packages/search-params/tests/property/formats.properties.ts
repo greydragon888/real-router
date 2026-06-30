@@ -7,6 +7,7 @@ import {
   arbSearchParamsEncodable,
   arbStringWithComma,
   arbNonCanonicalNumericString,
+  erasesEmptyKey,
   NUM_RUNS,
 } from "./helpers";
 import { build, parse } from "../../src";
@@ -168,6 +169,9 @@ describe("boolean format roundtrip", () => {
       );
 
       fc.pre(Object.keys(trueOnly).length > 0);
+      // "" + true under empty-true is a documented loss (#1051, erasesEmptyKey)
+      // — asserted in the dedicated test below, excluded from this round-trip.
+      fc.pre(!erasesEmptyKey(trueOnly, { booleanFormat: "empty-true" }));
 
       const opts = { booleanFormat: "empty-true" as BooleanFormat };
       const qs = build(trueOnly, opts);
@@ -185,6 +189,10 @@ describe("boolean format roundtrip", () => {
   )(
     "booleanFormat 'empty-true': both true and false roundtrip preserving boolean type",
     (params: Record<string, boolean>) => {
+      // "" + true under empty-true is a documented loss (#1051); "" + false
+      // round-trips (`=false`), so only the true case is excluded.
+      fc.pre(!erasesEmptyKey(params, { booleanFormat: "empty-true" }));
+
       const opts = { booleanFormat: "empty-true" as BooleanFormat };
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
@@ -201,6 +209,11 @@ describe("null format roundtrip", () => {
     "nullFormat 'default': parse(build(params, opts), opts) === params preserving null",
     (params: Record<string, null>, booleanFormat: BooleanFormat) => {
       const opts = { nullFormat: "default" as const, booleanFormat };
+
+      // "" + null under nullFormat default is a documented loss (#1051): the
+      // bare-key token is "", dropped by build. Asserted in the dedicated test.
+      fc.pre(!erasesEmptyKey(params, opts));
+
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
 
@@ -227,6 +240,12 @@ describe("null format roundtrip", () => {
   test.prop([arbSafeKey], { numRuns: NUM_RUNS.standard })(
     "nullFormat 'default' + empty-true: null is not representable — encodes to a bare key and decodes to true",
     (key: string) => {
+      // The collapse (null and true share the bare-key token, null decodes back
+      // as true) only applies to a NON-empty key. For "" the token is "" itself,
+      // which build drops entirely — an erasure, not a collapse (#1051, asserted
+      // in the dedicated test below).
+      fc.pre(key !== "");
+
       const opts = { booleanFormat: "empty-true" as BooleanFormat };
       const qs = build({ [key]: null }, opts);
 
@@ -234,6 +253,34 @@ describe("null format roundtrip", () => {
       expect(parse(qs, opts)).toStrictEqual({ [key]: true });
     },
   );
+
+  // #1051: the empty-string key "" is erased whenever its value encodes to a
+  // bare-key token (no `=`) — that token is "" itself, which build's empty-chunk
+  // filter drops, so there is no wire form to round-trip it. Documents the loss
+  // explicitly (the combos erasesEmptyKey excludes from the properties above),
+  // the empty-key sibling of the null+empty-true collapse (#18).
+  test("empty key carrying a bare-key value is erased (documented loss, #1051)", () => {
+    // true under empty-true → bare key → "" → dropped
+    expect(build({ "": true }, { booleanFormat: "empty-true" })).toBe("");
+    expect(parse("", { booleanFormat: "empty-true" })).toStrictEqual({});
+
+    // null under nullFormat default → bare key → "" → dropped
+    expect(build({ "": null }, { nullFormat: "default" })).toBe("");
+    expect(parse("", { nullFormat: "default" })).toStrictEqual({});
+
+    // contrast: the SAME values round-trip under a non-empty key, and the empty
+    // key round-trips for non-bare values (`=false` / `=x` keep the chunk).
+    expect(
+      parse(build({ k: true }, { booleanFormat: "empty-true" }), {
+        booleanFormat: "empty-true",
+      }),
+    ).toStrictEqual({ k: true });
+    expect(
+      parse(build({ "": false }, { booleanFormat: "empty-true" }), {
+        booleanFormat: "empty-true",
+      }),
+    ).toStrictEqual({ "": false });
+  });
 });
 
 describe("number format roundtrip", () => {
