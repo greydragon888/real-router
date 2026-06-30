@@ -46,9 +46,7 @@
     "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
-    "bundle": "tsdown --config-loader unrun",
-    "lint:package": "publint",
-    "lint:types": "attw --pack ."
+    "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false
 }

@@ -94,8 +94,6 @@
     "bench": "tsx tests/benchmarks/run.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "lint:package": "publint",
-    "lint:types": "attw --pack .",
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,

@@ -49,8 +49,6 @@
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
-    "lint:package": "publint",
-    "lint:types": "attw --pack .",
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
