@@ -1,5 +1,20 @@
 # @real-router/vue
 
+## 0.15.14
+
+### Patch Changes
+
+- [#1061](https://github.com/greydragon888/real-router/pull/1061) [`aeda6eb`](https://github.com/greydragon888/real-router/commit/aeda6eb4b7628f63696123f73ebfeebbadb66d8b) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix per-request router leak in the `v-link` directive stack under SSR ([#779](https://github.com/greydragon888/real-router/issues/779))
+
+  `RouterProvider` pushed its router onto the module-level `v-link` directive
+  stack unconditionally in `setup()`, but the release runs in `onScopeDispose`,
+  which never fires during `renderToString` (the canonical per-request SSR flow
+  never calls `app.unmount()`). The stack therefore grew by one entry per request
+  and strong-referenced every per-request router — a leak `router.dispose()`
+  cannot clear. The push is now guarded to the browser (`typeof document`), since
+  the directive only ever runs in mounted client DOM; the client and hydration
+  contract is unchanged.
+
 ## 0.15.13
 
 ### Patch Changes
