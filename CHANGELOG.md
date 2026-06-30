@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-06-30]
 
+### @real-router/rsc-server-plugin@0.2.10
+
+### Patch Changes
+
+- [`a12fbd9`](https://github.com/greydragon888/real-router/commit/a12fbd9c33daa401b48b0b10e8749c60c6ab6b40) Thanks [@greydragon888](https://github.com/greydragon888)! - Widen `@real-router/core` peer range to prevent unwanted major bumps (changesets/changesets#822)
+
+  The peer dependency was `workspace:^`, published as `^0.62.0` — patch-only on 0.x,
+  so any core minor bump went out of range and changesets escalated this package to a
+  major bump. Changed to `workspace:>=0.1.0` (publishes as `>=0.1.0`), keeping core
+  minor bumps in range. Backward-compatible range widening — no consumer breakage;
+  works in tandem with the existing `onlyUpdatePeerDependentsWhenOutOfRange: true`.
+
+### @real-router/ssr-data-plugin@0.4.10
+
+### Patch Changes
+
+- [`a12fbd9`](https://github.com/greydragon888/real-router/commit/a12fbd9c33daa401b48b0b10e8749c60c6ab6b40) Thanks [@greydragon888](https://github.com/greydragon888)! - Widen `@real-router/core` peer range to prevent unwanted major bumps (changesets/changesets#822)
+
+  The peer dependency was `workspace:^`, published as `^0.62.0` — patch-only on 0.x,
+  so any core minor bump went out of range and changesets escalated this package to a
+  major bump. Changed to `workspace:>=0.1.0` (publishes as `>=0.1.0`), keeping core
+  minor bumps in range. Backward-compatible range widening — no consumer breakage;
+  works in tandem with the existing `onlyUpdatePeerDependentsWhenOutOfRange: true`.
+
+### @real-router/validation-plugin@0.9.2
+
+### Patch Changes
+
+- [`a12fbd9`](https://github.com/greydragon888/real-router/commit/a12fbd9c33daa401b48b0b10e8749c60c6ab6b40) Thanks [@greydragon888](https://github.com/greydragon888)! - Widen `@real-router/core` peer range to prevent unwanted major bumps (changesets/changesets#822)
+
+  The peer dependency was `workspace:^`, published as `^0.62.2` — patch-only on 0.x,
+  so any core minor bump went out of range and changesets escalated this package to a
+  major bump. Changed to `workspace:>=0.1.0` (publishes as `>=0.1.0`), keeping core
+  minor bumps in range. Backward-compatible range widening — no consumer breakage;
+  works in tandem with the existing `onlyUpdatePeerDependentsWhenOutOfRange: true`.
+
+
 ### @real-router/vue@0.15.14
 
 ### Patch Changes
