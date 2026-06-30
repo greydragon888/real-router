@@ -19,12 +19,11 @@ pnpm changeset --since=develop
 
 ## Principles
 
-- **One changeset per package** — when a change affects multiple packages, create **separate changeset files** for each package (cleaner CHANGELOG)
+- **One package per file** — exactly one package in each changeset's frontmatter. A change spanning multiple packages becomes **separate changeset files**, one per package (cleaner CHANGELOG). Multi-package files are **rejected** by `pnpm lint:changeset` (pre-push).
 - **One file per logical change** — each changeset describes one feature, fix, or refactor
 - **Separate by type** — don't mix features, fixes, and performance improvements in one changeset
 - **Public packages only** — skip private packages (`"private": true` in package.json)
 - **Include PR/issue reference** — add `(#XX)` to title for traceability in release notes. Issue references like `#123` are auto-linked to GitHub in generated CHANGELOGs
-- Multi-package changeset (one file, multiple packages) = same text copied to ALL packages' CHANGELOGs (use only when truly identical change)
 
 ## File Naming Convention
 
@@ -51,24 +50,14 @@ Short title describing the change (#XX)
 Optional detailed description with context, examples, or migration notes.
 ```
 
-**Multiple packages (only when truly identical change):**
-
-```markdown
----
-"@real-router/core": minor
-"@real-router/types": minor
----
-
-Short title describing the change (#XX)
-
-This exact text will appear in BOTH packages' CHANGELOGs.
-```
+A change that touches several packages is **one file per package** — never one
+file listing many packages. See the separate-files example below.
 
 ### Frontmatter (YAML)
 
 - **Package names** must match exactly (with quotes)
-- **Version bump** must be one of: `major`, `minor`, `patch`
-- List all affected **public** packages
+- **Version bump** must be one of: `major`, `minor`, `patch` (pre-1.0 packages never take `major` — use `minor` for breaking changes)
+- Exactly **one public** package per file
 
 ### Description
 
@@ -144,34 +133,6 @@ Add `useNavigator()` hook and update React bindings (#37)
 - Each package gets its own CHANGELOG entry with relevant details
 - Breaking changes only appear in affected package's CHANGELOG
 - Easier to track which package introduced which feature
-
-### Feature (Multiple Packages - Single File)
-
-Use only when the change is **truly identical** across packages:
-
-**File:** `.changeset/novalidate-feature.md`
-
-```markdown
----
-"@real-router/core": minor
-"@real-router/types": minor
----
-
-Add `noValidate` option to disable validation in production (#XX)
-
-New configuration option for performance-critical environments:
-
-\`\`\`typescript
-const router = createRouter(routes, {
-noValidate: process.env.NODE_ENV === 'production'
-});
-\`\`\`
-
-When enabled, skips ~40 validation calls per navigation cycle.
-Constructor always validates options object itself.
-```
-
-**Note:** This exact text will appear in BOTH packages' CHANGELOGs.
 
 ### Bug Fix (Single Package)
 
@@ -294,20 +255,34 @@ Add new `noValidate` option
 5. **On merge to master**, changesets bot creates version PR
 6. **Merge version PR** to publish packages
 
-## CI Integration
+## Validation
 
-Our CI enforces changeset rules (all checks block merge):
+Changeset rules are enforced in two complementary places:
 
-```yaml
-# .github/workflows/changeset-check.yml
-- If source files changed → changeset REQUIRED
-- If changeset exists:
-    - Must include PR/issue reference (#XX)
-    - Must contain only one package per file
-    - Must not reference private packages
+**Pre-push — content validity** (`pnpm lint:changeset`, `.changeset/check-changeset.mjs`):
+runs first in the pre-push hook (fast fail-fast). Validates every pending
+`.changeset/*.md` that is present — **no files → no-op**, so a WIP or infra-only
+push is never blocked. What it checks:
+
+```
+- Frontmatter is present and well-formed (--- … ---)
+- Package names are quoted and match a real workspace package
+- Bump level is major | minor | patch (pre-1.0 packages reject major)
+- The package is public (not "private": true)
+- Exactly one package per file
+- A PR/issue reference (#NN) appears in the description
 ```
 
-**Escape hatch:** Add `#trivial` to PR title to skip changeset requirement.
+> Not machine-checked (semantic): "one logical change per file", "don't mix
+> features/fixes", "right bump for the change type". Those are on the author.
+
+**CI — changeset presence** (`.github/workflows/changeset-check.yml`, blocks PR merge):
+
+```yaml
+- If public-package source files changed → a changeset is REQUIRED
+```
+
+**Escape hatch:** Add `#trivial` to PR title to skip the requirement.
 
 ## Additional Resources
 

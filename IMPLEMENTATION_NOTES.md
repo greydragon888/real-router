@@ -255,6 +255,7 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 `.husky/pre-push` runs (artifact validation, NOT a superset of pre-commit):
 
+- `pnpm lint:changeset` (validates pending `.changeset/*.md` **content** — **runs first**, ~10 ms fail-fast; no changeset files → no-op — see "Changeset content validation" below)
 - `pnpm lint:duplicates` (jscpd — copy-paste detection across the full tree)
 - `pnpm turbo run build lint:package lint:types --filter='!./examples/**'` (full build + validate package.json exports via publint + validate `.d.ts` via arethetypeswrong)
 - `pnpm lint:unused` (knip — dead code detection across the full tree)
@@ -265,6 +266,22 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 **Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:package`/`lint:types`/`lint:unused` **also run in CI** now (#813 — see below); only `lint:duplicates`' hard threshold stays pre-push-only (CI keeps an informational jscpd SARIF channel). `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
 The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties`, AND `test:stress` — so pre-push exercises stress tests for every human push. Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
+
+#### Changeset content validation (pre-push fast-block)
+
+**Problem.** `.changeset/README.md` documented a contract for changeset files — quoted package names, a valid bump level, public packages only, a PR/issue reference, one package per file — and its "CI Integration" section *claimed* CI enforced the content rules. It did not: `.github/workflows/changeset-check.yml` only checks that a changeset **exists** when public-package `src/` changes. Nothing validated the **contents**. A malformed changeset (unknown package, typo'd bump level like `mihor`, a private package such as `route-tree`, a missing `#NN`, two packages in one file) sailed through every gate and only surfaced at `changeset version` on the release run — the slowest, most expensive place to find it.
+
+**Solution.** `.changeset/check-changeset.mjs` (`pnpm lint:changeset`), wired **first** in `.husky/pre-push` so it fails fast before the heavy build. It validates the machine-checkable subset of the README contract against every pending `.changeset/*.md`:
+
+- frontmatter present and terminated (`--- … ---`)
+- package names quoted **and** matching a real workspace package (registry read live from `packages/*/package.json` → "unknown package" / "private package" can't drift)
+- bump level ∈ `{major, minor, patch}`; `major` rejected for any package still on `0.x` (mirrors `cap-major-bumps.mjs`; auto-relaxes at 1.0 by reading the package's own version)
+- exactly one package per file
+- a `#NN` reference in the body
+
+**No changeset files present → exit 0, silently.** A WIP push or an infra-only push (which by repo convention carries no changeset) is never blocked — so there is no opt-out env flag: when changesets *are* present, they must be valid (the only blunt override is git's own `--no-verify`, which skips the whole hook).
+
+**Why pre-push, not CI.** The rules are author-facing policy — better heard before the push than after a red CI round-trip. It's a static `git`-free filesystem read (~10 ms), cheaper than every other pre-push gate, so it earns first place. **Not** machine-checked (semantic, left to the author): "one logical change per file", "don't mix features/fixes", "right bump for the change type". The same commit corrected `.changeset/README.md`, which contradicted itself — Principles + a "Multiple Packages — Single File" example permitted multi-package files while the CI-Integration section forbade them; the real practice (and now the linter) is **one package per file, always**.
 
 #### Local SAST: semgrep diff scan + eslint-plugin-security
 
