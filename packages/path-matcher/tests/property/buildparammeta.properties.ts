@@ -24,11 +24,7 @@ import { buildParamMeta } from "../../src/buildParamMeta";
  */
 
 type SegKind =
-  | "static"
-  | "param"
-  | "constrained"
-  | "constrainedLazy"
-  | "optional";
+  "static" | "param" | "constrained" | "constrainedLazy" | "optional";
 
 interface Spec {
   kinds: SegKind[];
