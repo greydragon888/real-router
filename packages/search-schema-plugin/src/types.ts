@@ -11,8 +11,7 @@ import type { Params } from "@real-router/core";
 export interface StandardSchemaV1Issue {
   readonly message: string;
   readonly path?:
-    | readonly (PropertyKey | { readonly key: PropertyKey })[]
-    | undefined;
+    readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
 }
 
 /** Validation result — either success or failure. */
@@ -33,8 +32,7 @@ export interface StandardSchemaV1<Input = unknown, Output = Input> {
     readonly validate: (
       value: unknown,
     ) =>
-      | StandardSchemaV1Result<Output>
-      | Promise<StandardSchemaV1Result<Output>>;
+      StandardSchemaV1Result<Output> | Promise<StandardSchemaV1Result<Output>>;
     readonly types?:
       | {
           readonly input: Input;

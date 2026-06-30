@@ -219,8 +219,7 @@ function buildActiveRouteSource(
           hash !== undefined &&
           ((
             next.route.context as
-              | { url?: { hashChanged?: boolean } }
-              | undefined
+              { url?: { hashChanged?: boolean } } | undefined
           )?.url?.hashChanged ??
             false);
 

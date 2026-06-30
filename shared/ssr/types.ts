@@ -32,9 +32,7 @@ export const ALL_SSR_MODES: readonly SsrMode[] = [
 export type SsrModeResolver<M extends SsrMode = SsrMode> = (state: State) => M;
 
 export type SsrModeConfig<M extends SsrMode = SsrMode> =
-  | M
-  | boolean
-  | SsrModeResolver<M>;
+  M | boolean | SsrModeResolver<M>;
 
 /**
  * Optional context object passed to the loader. The `signal` field is the
@@ -79,8 +77,7 @@ export type SsrRouteEntry<
   M extends SsrMode = SsrMode,
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > =
-  | SsrLoaderFnFactory<T, Dependencies>
-  | SsrRouteEntryObject<T, M, Dependencies>;
+  SsrLoaderFnFactory<T, Dependencies> | SsrRouteEntryObject<T, M, Dependencies>;
 
 export type SsrLoaderFactoryMap<
   T,

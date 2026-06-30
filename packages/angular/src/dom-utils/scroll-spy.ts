@@ -170,8 +170,7 @@ const createUrlPluginDetector = (
 
   const verify = (state: { context?: unknown }): void => {
     const context = state.context as
-      | (Record<string, unknown> & { url?: unknown })
-      | undefined;
+      (Record<string, unknown> & { url?: unknown }) | undefined;
 
     if (context && context.url === undefined) {
       console.warn(

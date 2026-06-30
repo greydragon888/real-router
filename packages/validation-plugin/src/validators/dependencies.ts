@@ -119,13 +119,11 @@ export function validateCloneArgs(dependencies: unknown): void {
     return;
   }
 
-  if (
-    !(
-      dependencies &&
-      typeof dependencies === "object" &&
-      dependencies.constructor === Object
-    )
-  ) {
+  if (!(
+    dependencies &&
+    typeof dependencies === "object" &&
+    dependencies.constructor === Object
+  )) {
     throw new TypeError(
       `[cloneRouter] Invalid dependencies: expected plain object or undefined, received ${typeof dependencies}`,
     );

@@ -28,8 +28,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   #warnedEvents: Set<string> | null = null;
   #limits: EventEmitterLimits = DEFAULT_LIMITS;
   readonly #onListenerError:
-    | ((eventName: string, error: unknown) => void)
-    | null;
+    ((eventName: string, error: unknown) => void) | null;
   readonly #onListenerWarn: ((eventName: string, count: number) => void) | null;
 
   constructor(options?: EventEmitterOptions) {

@@ -285,12 +285,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("decodeParams", () => {
     it("should add decodeParams", () => {
-      const decoder = vi.fn(
-        (params: Params): Params => ({
-          ...params,
-          id: Number(params.id),
-        }),
-      );
+      const decoder = vi.fn((params: Params): Params => ({
+        ...params,
+        id: Number(params.id),
+      }));
 
       routesApi.add({ name: "ur-items", path: "/ur-items/:id" });
       routesApi.update("ur-items", { decodeParams: decoder });
@@ -304,12 +302,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     it("should update existing decodeParams", () => {
       const decoder1 = vi.fn((params: Params): Params => params);
-      const decoder2 = vi.fn(
-        (params: Params): Params => ({
-          ...params,
-          id: Number(params.id),
-        }),
-      );
+      const decoder2 = vi.fn((params: Params): Params => ({
+        ...params,
+        id: Number(params.id),
+      }));
 
       routesApi.add({
         name: "ur-products",
@@ -326,12 +322,10 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should remove decodeParams when null", () => {
-      const decoder = vi.fn(
-        (params: Params): Params => ({
-          ...params,
-          decoded: true,
-        }),
-      );
+      const decoder = vi.fn((params: Params): Params => ({
+        ...params,
+        decoded: true,
+      }));
 
       routesApi.add({
         name: "ur-assets",
@@ -389,12 +383,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("encodeParams", () => {
     it("should add encodeParams", () => {
-      const encoder = vi.fn(
-        (params: Params): Params => ({
-          ...params,
-          id: String(params.id as string | number),
-        }),
-      );
+      const encoder = vi.fn((params: Params): Params => ({
+        ...params,
+        id: String(params.id as string | number),
+      }));
 
       routesApi.add({ name: "ur-goods", path: "/ur-goods/:id" });
       routesApi.update("ur-goods", { encodeParams: encoder });
@@ -407,12 +399,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     it("should update existing encodeParams", () => {
       const encoder1 = vi.fn((params: Params): Params => params);
-      const encoder2 = vi.fn(
-        (params: Params): Params => ({
-          ...params,
-          id: String(params.id as string | number),
-        }),
-      );
+      const encoder2 = vi.fn((params: Params): Params => ({
+        ...params,
+        id: String(params.id as string | number),
+      }));
 
       routesApi.add({
         name: "ur-things",

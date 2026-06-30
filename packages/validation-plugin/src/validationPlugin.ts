@@ -155,8 +155,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
 
         for (const segment of parent.split(".")) {
           const child = node.children.get(segment) as
-            | { children: Map<string, unknown> }
-            | undefined;
+            { children: Map<string, unknown> } | undefined;
 
           if (!child) {
             throw new ReferenceError(

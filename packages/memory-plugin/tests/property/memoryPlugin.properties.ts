@@ -17,8 +17,7 @@ import type { Router } from "@real-router/core";
 function getHistoryIndex(router: Router): number {
   const state = router.getState();
   const memory = state?.context.memory as
-    | { historyIndex: number; direction: string }
-    | undefined;
+    { historyIndex: number; direction: string } | undefined;
 
   return memory?.historyIndex ?? -1;
 }

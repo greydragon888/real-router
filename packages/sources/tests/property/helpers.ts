@@ -111,12 +111,10 @@ export const arbNavigationSeq: fc.Arbitrary<NavigationAction[]> = fc
     maxLength: 20,
   })
   .map((pairs) =>
-    pairs.map(
-      ([name, seed], index): NavigationAction => ({
-        name,
-        params: paramsForRoute(name, seed * 32 + index + 1),
-      }),
-    ),
+    pairs.map(([name, seed], index): NavigationAction => ({
+      name,
+      params: paramsForRoute(name, seed * 32 + index + 1),
+    })),
   );
 
 export const arbListenerCount = fc.integer({ min: 1, max: 10 });
@@ -224,8 +222,7 @@ export function expectedActive(
   }
 
   const ctx = router.getState()?.context as
-    | { url?: { hash?: string } }
-    | undefined;
+    { url?: { hash?: string } } | undefined;
   const contextHash = ctx?.url?.hash ?? "";
 
   return contextHash === hash;

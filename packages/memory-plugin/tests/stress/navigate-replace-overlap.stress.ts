@@ -123,8 +123,7 @@ describe("S12: navigate() in flight + replace navigate() overlap", () => {
       // Router must still be responsive — canGoBack must match the
       // live `#index > 0` invariant rather than just "returns a boolean".
       const memory = router.getState()?.context.memory as
-        | { historyIndex: number }
-        | undefined;
+        { historyIndex: number } | undefined;
 
       expect(memory).toBeDefined();
       expect(router.canGoBack()).toBe((memory?.historyIndex ?? -1) > 0);

@@ -331,8 +331,7 @@ describe("createActiveRouteSources", () => {
           opts: unknown,
         ) => {
           const optsAny = opts as
-            | { hash?: string; hashChange?: boolean }
-            | undefined;
+            { hash?: string; hashChange?: boolean } | undefined;
           const ctx = (toState as { context: Record<string, unknown> }).context;
           const prevUrl = ctx.url as { hash?: string } | undefined;
           const prevHash = prevUrl?.hash ?? initialHash;

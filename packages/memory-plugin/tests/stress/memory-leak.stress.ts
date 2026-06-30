@@ -101,8 +101,7 @@ describe("S13: memory leak detection across start/navigate/stop cycles", () => {
 
       // History cap is 100 — historyIndex must be exactly 99 after the last push.
       const memory = router.getState()?.context.memory as
-        | { historyIndex: number }
-        | undefined;
+        { historyIndex: number } | undefined;
 
       expect(memory?.historyIndex).toBe(99);
 

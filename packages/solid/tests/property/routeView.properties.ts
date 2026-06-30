@@ -214,18 +214,16 @@ const arbMatchMarker: fc.Arbitrary<RouteViewMarker> = fc
     segment: arbAlphaSegmentName,
     exact: fc.boolean(),
   })
-  .map(
-    ({ segment, exact }): RouteViewMarker => ({
-      $$type: MATCH_MARKER,
-      segment,
-      exact,
-      // The marker shape uses a getter for `children` in the production
-      // factory; the helper consumes it via `.children` so a plain field
-      // is structurally equivalent for the buildRenderList loop.
-      children: markerChild() as never,
-      fallback: undefined,
-    }),
-  );
+  .map(({ segment, exact }): RouteViewMarker => ({
+    $$type: MATCH_MARKER,
+    segment,
+    exact,
+    // The marker shape uses a getter for `children` in the production
+    // factory; the helper consumes it via `.children` so a plain field
+    // is structurally equivalent for the buildRenderList loop.
+    children: markerChild() as never,
+    fallback: undefined,
+  }));
 
 const arbSelfMarker: fc.Arbitrary<RouteViewMarker> = fc.constant({
   $$type: SELF_MARKER,
@@ -919,19 +917,15 @@ describe("collectElements — Property Tests (§6.4 №6, §6.5 №5)", () => {
         fc.array(
           fc.oneof(
             fc.constant(undefined).map((_) => sampleMatch("m")),
-            fc.constant(undefined).map(
-              (_): RouteViewMarker => ({
-                $$type: SELF_MARKER,
-                children: "S" as never,
-                fallback: undefined,
-              }),
-            ),
-            fc.constant(undefined).map(
-              (_): RouteViewMarker => ({
-                $$type: NOT_FOUND_MARKER,
-                children: "NF" as never,
-              }),
-            ),
+            fc.constant(undefined).map((_): RouteViewMarker => ({
+              $$type: SELF_MARKER,
+              children: "S" as never,
+              fallback: undefined,
+            })),
+            fc.constant(undefined).map((_): RouteViewMarker => ({
+              $$type: NOT_FOUND_MARKER,
+              children: "NF" as never,
+            })),
           ),
           { minLength: 1, maxLength: 6 },
         ),
@@ -1142,38 +1136,32 @@ describe("buildRenderList — Sprint G behavior equivalence (audit-8 §8b HIGH #
       exact: fc.boolean(),
       sentinel: fc.string({ minLength: 1, maxLength: 8 }),
     })
-    .map(
-      ({ segment, exact, sentinel }): RouteViewMarker => ({
-        $$type: MATCH_MARKER,
-        segment,
-        exact,
-        // Embed sentinel into children so we can compare result by
-        // value when render-list elements come back. The renderMatch
-        // helper passes children through unchanged for non-Suspense
-        // markers.
-        children: `M:${sentinel}` as never,
-        fallback: undefined,
-      }),
-    );
+    .map(({ segment, exact, sentinel }): RouteViewMarker => ({
+      $$type: MATCH_MARKER,
+      segment,
+      exact,
+      // Embed sentinel into children so we can compare result by
+      // value when render-list elements come back. The renderMatch
+      // helper passes children through unchanged for non-Suspense
+      // markers.
+      children: `M:${sentinel}` as never,
+      fallback: undefined,
+    }));
 
   const arbSelfMarkerForEq: fc.Arbitrary<RouteViewMarker> = fc
     .string({ minLength: 1, maxLength: 8 })
-    .map(
-      (sentinel): RouteViewMarker => ({
-        $$type: SELF_MARKER,
-        children: `S:${sentinel}` as never,
-        fallback: undefined,
-      }),
-    );
+    .map((sentinel): RouteViewMarker => ({
+      $$type: SELF_MARKER,
+      children: `S:${sentinel}` as never,
+      fallback: undefined,
+    }));
 
   const arbNotFoundMarkerForEq: fc.Arbitrary<RouteViewMarker> = fc
     .string({ minLength: 1, maxLength: 8 })
-    .map(
-      (sentinel): RouteViewMarker => ({
-        $$type: NOT_FOUND_MARKER,
-        children: `N:${sentinel}` as never,
-      }),
-    );
+    .map((sentinel): RouteViewMarker => ({
+      $$type: NOT_FOUND_MARKER,
+      children: `N:${sentinel}` as never,
+    }));
 
   const arbAnyMarkerForEq: fc.Arbitrary<RouteViewMarker> = fc.oneof(
     { weight: 4, arbitrary: arbMatchMarkerForEq },

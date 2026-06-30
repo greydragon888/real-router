@@ -162,8 +162,7 @@ describe("Link - Integration Tests", () => {
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
       const opts = navigateSpy.mock.calls[0][2] as
-        | { hash?: string }
-        | undefined;
+        { hash?: string } | undefined;
 
       // Critical: the `hash` key must be ABSENT (not `undefined`) so plugins
       // can distinguish "no hash intent" from "explicit clear".

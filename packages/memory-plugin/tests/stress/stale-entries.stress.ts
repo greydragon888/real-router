@@ -48,8 +48,7 @@ describe("S10: back() targeting an entry whose route was removed mid-session", (
       // context.memory.historyIndex is in range [0..1] (2-entry history, or
       // 1 if revalidation collapsed it).
       const memory = router.getState()?.context.memory as
-        | { historyIndex: number }
-        | undefined;
+        { historyIndex: number } | undefined;
 
       expect(memory).toBeDefined();
       expect(memory!.historyIndex).toBeGreaterThanOrEqual(0);

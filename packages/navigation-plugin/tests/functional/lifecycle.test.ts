@@ -242,8 +242,7 @@ describe("Navigation Plugin — Lifecycle", () => {
       // (scroll restoration, direction tracker, …) cannot distinguish a
       // genuine reload from a replace.
       const ctx = router.getState()?.context as
-        | { navigation?: { navigationType: string } }
-        | undefined;
+        { navigation?: { navigationType: string } } | undefined;
 
       expect(ctx?.navigation?.navigationType).toBe("reload");
     });

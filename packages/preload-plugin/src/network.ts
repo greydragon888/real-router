@@ -1,6 +1,5 @@
 type NetworkConnection =
-  | { saveData?: boolean; effectiveType?: string }
-  | undefined;
+  { saveData?: boolean; effectiveType?: string } | undefined;
 
 interface NavigatorWithConnection extends Navigator {
   connection?: NetworkConnection;
