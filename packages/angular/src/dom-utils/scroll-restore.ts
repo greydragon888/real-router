@@ -266,6 +266,15 @@ export function createScrollRestoration(
 
   let destroyed = false;
   let unserializableWarned = false;
+  // Capture/effect seam guard (#782). previousRoute's position is captured
+  // synchronously in `subscribe`, but the snap/restore effect runs a frame
+  // later in rAF. Across that window the viewport still shows the route BEFORE
+  // previousRoute, so a second navigation landing in the same frame would
+  // capture that foreign position under previousRoute's key. `scrollSettled` is
+  // false across the window — capture is skipped (previousRoute's own stored
+  // value survives the transit). A real user scroll in this <16ms window is
+  // physically impossible.
+  let scrollSettled = true;
 
   // `keyOf` defers to `canonicalJson` which calls `JSON.stringify`. Two
   // realistic inputs blow up the serializer and would otherwise crash the
@@ -296,8 +305,10 @@ export function createScrollRestoration(
 
     // Browsers dispatch reload as the initial navigation after refresh, so
     // previousRoute is undefined and capture is naturally skipped. The
-    // pre-refresh position was already persisted via pagehide.
-    if (previousRoute) {
+    // pre-refresh position was already persisted via pagehide. Capture is also
+    // skipped while the scroll is unsettled — a second navigation in the same
+    // frame, before the prior nav's rAF snap (see `scrollSettled`, #782).
+    if (previousRoute && scrollSettled) {
       const prevKey = safeKeyOf(previousRoute);
 
       if (prevKey !== null) {
@@ -305,10 +316,18 @@ export function createScrollRestoration(
       }
     }
 
+    // This navigation's scroll effect is now pending: the viewport position no
+    // longer belongs to `route` until the rAF below runs and settles it.
+    scrollSettled = false;
+
     requestAnimationFrame(() => {
       if (destroyed) {
         return;
       }
+
+      // Effect running — the position now belongs to `route`, so the next
+      // capture is honest again.
+      scrollSettled = true;
 
       if (mode === "top") {
         scrollToHashOrTop(route);

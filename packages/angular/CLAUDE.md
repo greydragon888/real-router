@@ -375,9 +375,11 @@ Despite the `subscribe` method name and `output()` source, the boundary's `onErr
 
 `createScrollRestoration` toggles `history.scrollRestoration = "manual"` inside a `try { ... } catch { /* ignore */ }`. Some embedded browsers (older Android WebView, certain JSDOM versions) declare the property non-writable; the setter throws `TypeError`. The catch keeps the rest of the scroll-restore wiring functional and falls back to native browser scroll restoration. Pinned by `tests/functional/scroll-restore.test.ts:794-844`.
 
-## Coverage Ceiling (~95%) — JIT Limitation, not Poor Testing
+## Coverage Ceiling (~97%) — JIT Limitation, not Poor Testing
 
-Coverage thresholds are **94%/84%/94%/94%** (statements/branches/functions/lines), not 100%. This is not a gap in test quality — it is a hard limitation of Angular 21 JIT mode used by TestBed without `@analogjs/vite-plugin-angular`. The dropped lines are concentrated in directive subscription callbacks, `RouteView` computed inner callbacks (`matchEntries`), and `updateDom` DOM-side effects that only run with non-empty `contentChildren` or with active-state transitions — both of which require AOT template compilation.
+Coverage thresholds are **97%/93%/98%/97%** (statements/branches/functions/lines), not 100%. This is not a gap in test quality — it is a hard limitation of Angular 21 JIT mode used by TestBed without `@analogjs/vite-plugin-angular`. The dropped lines are concentrated in directive subscription callbacks, `RouteView` computed inner callbacks (`matchEntries`), and `updateDom` DOM-side effects that only run with non-empty `contentChildren` or with active-state transitions — both of which require AOT template compilation.
+
+The floor sits at ~97% (ratcheted up from the earlier ~94% it held through 2026-06) because the git-tracked `src/dom-utils/` copies are pure logic with no JIT dependency: their suites reach 100% statements (route-announcer + view-transitions 100% branches too), pulling the package aggregate up. The JIT ceiling is now isolated to the directive/component template paths below — keep new directive code honest, but the dom-utils copies are held at 100% in their own config.
 
 **Root cause:** JIT compilation does not recognize signal-based `input()` as bindable template properties. Any attempt to bind `[routeName]="value"` to a directive with a signal input fails with `NG0303: Can't bind to 'routeName' since it isn't a known property`. Signal inputs only work with AOT compilation.
 
@@ -398,7 +400,7 @@ Coverage thresholds are **94%/84%/94%/94%** (statements/branches/functions/lines
 - All public `inject*` functions with positive and negative cases
 - `RouterErrorBoundary` 100% coverage via public API access (`boundary.errorContext()`, `boundary.onError.subscribe()`)
 - `buildHref`, `shouldNavigate`, `buildActiveClassName`, `applyLinkA11y` — 100%
-- `createRouteAnnouncer` — 100% lines, 92.59% branches
+- `createRouteAnnouncer` — 100% lines + branches (the `src/dom-utils/` copy)
 
 **Paths to 100% (all have trade-offs):**
 1. Install `@analogjs/vite-plugin-angular` + `@angular/build` → AOT compilation for tests. Adds ~30 packages, TypeScript version conflicts possible.

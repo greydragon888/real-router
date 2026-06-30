@@ -718,4 +718,79 @@ describe("createViewTransitions", () => {
       expect(startSpy).toHaveBeenCalledTimes(2);
     });
   });
+
+  // ===========================================================================
+  // #781 — a TRANSITION_SUCCESS resolver scheduled via setTimeout(0) must not
+  // clobber the *next* navigation's currentVT when it finally runs. If the next
+  // leave opens VT-2 inside the task-queue window after success, the stale
+  // setTimeout (which unconditionally set `currentVT = null`) reset the
+  // reference, so a subsequent cancellation skipped nothing and a stale
+  // animation leaked. The fix guards the null with an identity check.
+  // ===========================================================================
+  describe("#781 — stale success resolver must not clobber the next navigation's currentVT", () => {
+    it("control: when the success resolver runs BEFORE the next leave, cancellation skips VT-2", () => {
+      // Default beforeEach setTimeout stub fires synchronously, so b's success
+      // resolver runs (and clears currentVT) before c's leave opens VT-2.
+      const { instances } = stubStartViewTransitionSync();
+      const fake = makeFakeRouter();
+
+      track(createViewTransitions(fake.router));
+
+      void fake.emitLeave(makeState("home"), makeState("about")); // VT-1
+      fake.emitSuccess(makeState("about"), makeState("home")); // resolver runs now
+
+      const ctrl2 = new AbortController();
+
+      void fake.emitLeave(
+        makeState("about"),
+        makeState("contacts"),
+        ctrl2.signal,
+      ); // VT-2
+      ctrl2.abort(); // real cancellation (successFired reset by VT-2's leave)
+
+      expect(instances).toHaveLength(2);
+      expect(instances[1].skipTransition).toHaveBeenCalledTimes(1);
+    });
+
+    it("probe: a success resolver still queued when the next leave opens VT-2 must NOT null VT-2", () => {
+      // Defer the success resolver's setTimeout so it fires AFTER c's leave.
+      const scheduled: (() => void)[] = [];
+
+      vi.stubGlobal("setTimeout", (cb: () => void): number => {
+        scheduled.push(cb);
+
+        return 0;
+      });
+
+      const { instances } = stubStartViewTransitionSync();
+      const fake = makeFakeRouter();
+
+      track(createViewTransitions(fake.router));
+
+      void fake.emitLeave(makeState("home"), makeState("about")); // VT-1
+      fake.emitSuccess(makeState("about"), makeState("home")); // schedules (captured) resolver
+
+      const ctrl2 = new AbortController();
+
+      void fake.emitLeave(
+        makeState("about"),
+        makeState("contacts"),
+        ctrl2.signal,
+      ); // VT-2 → currentVT = VT-2
+
+      // The stale b-success setTimeout now fires. Before the fix it
+      // unconditionally did `currentVT = null`, clobbering VT-2.
+      expect(scheduled).toHaveLength(1);
+
+      scheduled[0]();
+
+      // Cancel VT-2. With the clobber, currentVT is null → skipTransition never
+      // runs → stale animation leaks. With the identity guard, currentVT is
+      // still VT-2 → it is skipped.
+      ctrl2.abort();
+
+      expect(instances).toHaveLength(2);
+      expect(instances[1].skipTransition).toHaveBeenCalledTimes(1);
+    });
+  });
 });

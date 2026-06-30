@@ -354,12 +354,12 @@ describe("createRouteAnnouncer — direct contract tests", () => {
       a2.destroy();
     });
 
-    it("known gotcha: first destroy() removes the shared element from the DOM", () => {
-      // Documented effect of the simple removeAnnouncer() impl: when two
-      // RouterProviders share the announcer, the FIRST destroy() removes it
-      // for both. Pin-test so a refactor that introduced refcount-based
-      // cleanup wouldn't silently change the contract. This is acceptable
-      // because the typical case is exactly ONE provider per app.
+    it("ref-counted: the shared element survives until the LAST provider is destroyed (#783)", () => {
+      // With two RouterProviders sharing the single announcer element, a
+      // module-scoped ref-count removes it only when the last holder is
+      // destroyed — the first provider's destroy() must NOT silence the second.
+      // (#783; previously `removeAnnouncer()` ran unconditionally, so the first
+      // teardown detached the node out from under the surviving provider.)
       const { router: r1 } = makeFakeRouter();
       const { router: r2 } = makeFakeRouter();
 
@@ -370,10 +370,13 @@ describe("createRouteAnnouncer — direct contract tests", () => {
 
       a1.destroy();
 
-      // Whoops — second provider's announcer is gone too.
-      expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(0);
+      // The shared element survives for the still-mounted second provider.
+      expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(1);
 
       a2.destroy();
+
+      // Last holder gone → removed.
+      expect(document.querySelectorAll(ANNOUNCER_SEL)).toHaveLength(0);
     });
   });
 

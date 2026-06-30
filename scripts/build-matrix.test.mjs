@@ -118,7 +118,12 @@ test("L1: '//' root, shared workspace and benchmarks are filtered out", () => {
       },
     },
   });
-  assert.deepEqual(deriveAffected(queryJson).affected, ["@real-router/core"]);
+  const { affected, dirOf } = deriveAffected(queryJson);
+
+  assert.deepEqual(affected, ["@real-router/core"]);
+  // `shared` is dropped from `affected` but RETAINED in dirOf — that is where
+  // buildPlan reads the shared-source fanout amplifier (touchesSharedSources).
+  assert.ok(dirOf.has("@real-router/shared-sources"));
 });
 
 test("L1: dirOf uses turbo's path verbatim (core-types quirk, not reconstructed)", () => {
@@ -325,6 +330,50 @@ test("routing: touchesAdapterShared overrides leaf even for a tiny affected set"
     buildPlan(["@real-router/route-utils"], realDirOf).mode,
     "sharded",
   );
+});
+
+test("routing: shared-source fanout forces sharded even for a tiny ≤ K set", () => {
+  // A shared-source edit fans out via symlinks to many heavy consumers, but the
+  // `shared` workspace is dropped from `affected` (only the consumers remain) —
+  // shared-sources stays in dirOf, so touchesSharedSources forces sharded, the
+  // same override as touchesCore / touchesAdapterShared. Run 28393785008: a
+  // shared/dom-utils PR (6 adapters + dom-utils = 7 ≤ K, no core) wrongly took
+  // the leaf monolith (~20m serialising the adapters); these lock the routing.
+  const dirOf = new Map([
+    ...realDirOf,
+    ["@real-router/shared-sources", "shared"],
+  ]);
+
+  // shared/dom-utils → the 6 adapters (+ the dom-utils test pkg) = 7 ≤ K.
+  const domUtilsAffected = [...ADAPTERS, "dom-utils"];
+  assert.ok(domUtilsAffected.length <= K);
+  const domUtils = buildPlan(domUtilsAffected, dirOf);
+  assert.equal(domUtils.mode, "sharded");
+  const domUtilsNames = domUtils.matrix.include.map((i) => i.name);
+  for (const a of ["react", "preact", "solid", "svelte", "vue", "angular"])
+    assert.ok(domUtilsNames.includes(a), a);
+
+  // shared/browser-env → the 3 url-plugins.
+  const browserEnv = buildPlan([...URL_PLUGINS], dirOf);
+  assert.equal(browserEnv.mode, "sharded");
+  assert.ok(
+    browserEnv.matrix.include.map((i) => i.name).includes("url-plugin"),
+  );
+
+  // shared/ssr → the 2 ssr-plugins.
+  const ssr = buildPlan([...SSR_PLUGINS], dirOf);
+  assert.equal(ssr.mode, "sharded");
+  assert.ok(ssr.matrix.include.map((i) => i.name).includes("ssr-plugin"));
+});
+
+test("routing: a multi-package edit WITHOUT a shared source stays leaf (≤ K)", () => {
+  // Distinguishes a shared-source fanout from an unrelated multi-package edit:
+  // two url-plugins edited directly (no shared/* touched) → shared-sources NOT
+  // in dirOf → the count path → leaf, exactly as the K-boundary set. Guards the
+  // touchesSharedSources override from over-firing on direct edits.
+  assert.ok(!realDirOf.has("@real-router/shared-sources"));
+  const twoUrlPlugins = [...LEAVES, ...URL_PLUGINS.slice(0, 2)]; // 10
+  assert.equal(buildPlan(twoUrlPlugins, realDirOf).mode, "leaf");
 });
 
 test("routing: sharded matrix — adapter shards + non-empty groups only, empties omitted", () => {

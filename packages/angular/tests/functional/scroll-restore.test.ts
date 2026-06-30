@@ -842,4 +842,556 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
       }
     }
   });
+
+  describe("unserializable params (#P0.2 audit)", () => {
+    it("BigInt params do NOT throw — capture is skipped, warning logged once", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 250,
+        configurable: true,
+      });
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      const bad = makeState("bad", { id: 9_007_199_254_740_993n });
+      const next = makeState("next", { id: "ok" });
+
+      expect(() => {
+        fake.emit(next, bad);
+      }).not.toThrow();
+
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      const stored =
+        raw === null ? {} : (JSON.parse(raw) as Record<string, number>);
+
+      expect(Object.keys(stored).some((k) => k.startsWith("bad:"))).toBe(false);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining("bad"));
+
+      // Second hit must NOT spam.
+      fake.emit(makeState("again"), makeState("bad", { id: 1n }));
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+
+      sr.destroy();
+      consoleError.mockRestore();
+    });
+
+    it("cyclic params do NOT throw — capture is skipped, warning logged once", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      const cyclic: Record<string, unknown> = { id: "x" };
+
+      cyclic.self = cyclic;
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      expect(() => {
+        fake.emit(makeState("home"), makeState("loop", cyclic));
+      }).not.toThrow();
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+
+      sr.destroy();
+      consoleError.mockRestore();
+    });
+
+    it("pagehide with unserializable current state does NOT throw", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      const fake = makeFakeRouter(makeState("bad", { id: 42n }));
+      const sr = track(createScrollRestoration(fake.router));
+
+      expect(() => {
+        globalThis.dispatchEvent(new Event("pagehide"));
+      }).not.toThrow();
+
+      expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+
+      sr.destroy();
+      consoleError.mockRestore();
+    });
+
+    it("restore (back/traverse) with unserializable params writes 0 instead of throwing", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const scrollSpy = vi.fn();
+
+      globalThis.scrollTo = scrollSpy;
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      const target = makeState(
+        "bad",
+        { id: 7n },
+        { navigation: { direction: "back", navigationType: "traverse" } },
+      );
+
+      expect(() => {
+        fake.emit(target, makeState("prev"));
+      }).not.toThrow();
+
+      expect(scrollSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+      consoleError.mockRestore();
+    });
+  });
+
+  describe("restore retry budget (late-mounting container)", () => {
+    it("late-mounted container resolved via bounded retry; window restored immediately", () => {
+      const element = document.createElement("div");
+
+      element.id = "late-restore-scroller";
+      Object.defineProperty(element, "scrollTop", {
+        value: 0,
+        writable: true,
+        configurable: true,
+      });
+      const elementScrollToSpy = vi.fn();
+
+      element.scrollTo = elementScrollToSpy;
+
+      let calls = 0;
+      const fake = makeFakeRouter(makeState("home"));
+      const windowScrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(
+        createScrollRestoration(fake.router, {
+          // #1 capture readPos, #2 restorePos fast-path probe, #3 first retry
+          // frame — stay null until the retry frame.
+          scrollContainer: () => {
+            calls += 1;
+
+            return calls >= 3 ? element : null;
+          },
+        }),
+      );
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 350 }));
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "back", navigationType: "traverse" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(windowScrollSpy).toHaveBeenCalledWith({
+        top: 350,
+        left: 0,
+        behavior: "auto",
+      });
+      expect(elementScrollToSpy).toHaveBeenCalledWith({
+        top: 350,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("container never mounts → window fallback after retry budget, no element scroll", () => {
+      const elementScrollToSpy = vi.fn();
+      const fake = makeFakeRouter(makeState("home"));
+      const windowScrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => null,
+        }),
+      );
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 420 }));
+
+      expect(() => {
+        fake.emit(
+          makeState(
+            "about",
+            {},
+            { navigation: { direction: "back", navigationType: "traverse" } },
+          ),
+          makeState("home"),
+        );
+      }).not.toThrow();
+
+      expect(windowScrollSpy).toHaveBeenCalledWith({
+        top: 420,
+        left: 0,
+        behavior: "auto",
+      });
+      expect(elementScrollToSpy).not.toHaveBeenCalled();
+
+      sr.destroy();
+    });
+
+    it("destroy() during container retry cancels the late scroll", () => {
+      vi.unstubAllGlobals();
+      const pending: FrameRequestCallback[] = [];
+
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        (cb: FrameRequestCallback): number => {
+          pending.push(cb);
+
+          return pending.length;
+        },
+      );
+
+      const element = document.createElement("div");
+
+      element.id = "destroy-during-retry-scroller";
+      const elementScrollToSpy = vi.fn();
+
+      element.scrollTo = elementScrollToSpy;
+
+      let mounted = false;
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = createScrollRestoration(fake.router, {
+        scrollContainer: () => (mounted ? element : null),
+      });
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 500 }));
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "back", navigationType: "traverse" } },
+        ),
+        makeState("home"),
+      );
+
+      // Fire the subscribe's outer rAF → restorePos runs, schedules the retry.
+      pending.shift()?.(0);
+
+      mounted = true;
+      sr.destroy();
+
+      // Fire the retry frame — the destroyed guard must bail before scrolling.
+      pending.shift()?.(0);
+
+      expect(elementScrollToSpy).not.toHaveBeenCalled();
+    });
+
+    it("instant container scroll stops re-applying once it sticks", () => {
+      const element = document.createElement("div");
+
+      element.id = "sticky-scroller";
+      let top = 0;
+
+      Object.defineProperty(element, "scrollTop", {
+        get: () => top,
+        set: (value: number) => {
+          top = value;
+        },
+        configurable: true,
+      });
+      const scrollToSpy = vi.fn((opts?: ScrollToOptions) => {
+        element.scrollTop = Math.min(opts?.top ?? 0, 5000 - 500);
+      });
+
+      element.scrollTo = scrollToSpy as unknown as typeof element.scrollTo;
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => element,
+        }),
+      );
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 1200 }));
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "back", navigationType: "traverse" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(element.scrollTop).toBe(1200);
+      // Stuck on the first apply → no wasted re-applies across the frame budget.
+      expect(scrollToSpy).toHaveBeenCalledTimes(1);
+
+      sr.destroy();
+    });
+  });
+
+  describe("additional edge coverage", () => {
+    it("navigationType 'reload' → restore from storage", () => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 200 }));
+
+      const fake = makeFakeRouter(makeState("home"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      // Reload is the initial navigation after a refresh → no previousRoute, so
+      // capture is skipped and the stored position is not overwritten before
+      // the restore reads it.
+      fake.emit(
+        makeState("home", {}, { navigation: { navigationType: "reload" } }),
+      );
+
+      expect(scrollSpy).toHaveBeenCalledWith({
+        top: 200,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("putPos skips the write when the position is unchanged (skip-same-value)", () => {
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 100,
+        configurable: true,
+      });
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // First capture: home at 100.
+      fake.emit(
+        makeState("a", {}, { navigation: { navigationType: "push" } }),
+        makeState("home"),
+      );
+
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+      // Second capture of home at the SAME 100 → cached value matches → putPos
+      // returns early without re-serializing/writing.
+      fake.emit(
+        makeState("b", {}, { navigation: { navigationType: "push" } }),
+        makeState("home"),
+      );
+
+      expect(setItemSpy).not.toHaveBeenCalled();
+
+      setItemSpy.mockRestore();
+      sr.destroy();
+    });
+
+    it("custom scrollContainer: push (no hash) snaps the container to top via element.scrollTo", () => {
+      const element = document.createElement("div");
+
+      Object.defineProperty(element, "scrollTop", {
+        value: 0,
+        writable: true,
+        configurable: true,
+      });
+      const elementScrollToSpy = vi.fn();
+
+      element.scrollTo = elementScrollToSpy;
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => element,
+        }),
+      );
+
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "forward", navigationType: "push" } },
+        ),
+        makeState("home"),
+      );
+
+      // push + no hash → scrollToHashOrTop → writePos(0) routes through the
+      // container's scrollTo, not window's.
+      expect(elementScrollToSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("canonicalizes function/symbol/nested param values without crashing the serializer", () => {
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 75,
+        configurable: true,
+      });
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // JSON.stringify would silently drop function/symbol values (collapsing
+      // distinct routes to one key); canonicalReplacer substitutes sentinels
+      // and sorts nested object keys for a deterministic cache key.
+      const prev = makeState("fnsym", {
+        fn: () => undefined,
+        sym: Symbol("s"),
+        nested: { b: 2, a: 1 },
+      });
+
+      expect(() => {
+        fake.emit(makeState("next"), prev);
+      }).not.toThrow();
+
+      const stored = JSON.parse(
+        sessionStorage.getItem(STORAGE_KEY) ?? "{}",
+      ) as Record<string, number>;
+
+      expect(Object.keys(stored).some((k) => k.startsWith("fnsym:"))).toBe(
+        true,
+      );
+
+      sr.destroy();
+    });
+
+    it("destroy() before the restore rAF fires cancels it (subscribe-rAF destroyed guard)", () => {
+      vi.unstubAllGlobals();
+      const pending: FrameRequestCallback[] = [];
+
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        (cb: FrameRequestCallback): number => {
+          pending.push(cb);
+
+          return pending.length;
+        },
+      );
+
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = createScrollRestoration(fake.router);
+
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "forward", navigationType: "push" } },
+        ),
+        makeState("home"),
+      );
+
+      // The subscribe scheduled an rAF but it has not fired. Tear down first.
+      sr.destroy();
+      scrollSpy.mockClear();
+
+      // Fire the pending rAF — the destroyed guard must bail before any scroll.
+      pending.shift()?.(0);
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+    });
+
+    it("keyOf caches the key per State reference (WeakMap cache hit on repeat)", () => {
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 50,
+        configurable: true,
+      });
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // Reuse ONE State object as previousRoute across two navigations → keyOf
+      // computes the key once, then returns it from the WeakMap on the second
+      // call (same reference).
+      const shared = makeState("shared", { id: "x" });
+
+      fake.emit(
+        makeState("a", {}, { navigation: { navigationType: "push" } }),
+        shared,
+      );
+      fake.emit(
+        makeState("b", {}, { navigation: { navigationType: "push" } }),
+        shared,
+      );
+
+      const stored = JSON.parse(
+        sessionStorage.getItem(STORAGE_KEY) ?? "{}",
+      ) as Record<string, number>;
+
+      expect(
+        Object.keys(stored).filter((k) => k.startsWith("shared:")),
+      ).toHaveLength(1);
+
+      sr.destroy();
+    });
+
+    it("pagehide with no current state (getState() undefined) is safe", () => {
+      const fake = makeFakeRouter(); // no initial → getState() returns undefined
+      const sr = track(createScrollRestoration(fake.router));
+
+      expect(() => {
+        globalThis.dispatchEvent(new Event("pagehide"));
+      }).not.toThrow();
+
+      expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+
+      sr.destroy();
+    });
+
+    it("back/traverse with no saved position restores to 0", () => {
+      const fake = makeFakeRouter(makeState("home"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      // No sessionStorage entry for "about" → loadStore()[key] is undefined → 0.
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "back", navigationType: "traverse" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(scrollSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("anchor scrolling via location.hash (no URL plugin) scrolls the matching element into view", () => {
+      const anchor = document.createElement("div");
+
+      anchor.id = "sec";
+      document.body.append(anchor);
+      const scrollIntoViewSpy = vi.fn();
+
+      anchor.scrollIntoView = scrollIntoViewSpy;
+      globalThis.history.replaceState(null, "", "/#sec");
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // context has no `url` slice → scrollToHashOrTop takes the location.hash
+      // fallback → getElementById("sec") → scrollIntoView.
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "forward", navigationType: "push" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: "auto" });
+
+      globalThis.history.replaceState(null, "", "/");
+      sr.destroy();
+    });
+  });
 });

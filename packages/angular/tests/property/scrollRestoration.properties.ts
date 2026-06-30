@@ -22,7 +22,7 @@
  */
 
 import { fc, test } from "@fast-check/vitest";
-import { afterEach, beforeEach, describe, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 import { NUM_RUNS } from "./helpers";
 import { createScrollRestoration } from "../../src/dom-utils";
@@ -72,6 +72,11 @@ function makeState(
     params,
     path: "/x",
     context: { navigation: { direction: "forward", navigationType: "push" } },
+    // `transition` is read by the rAF snap (`route.transition.reload/replace`).
+    // The previous async-rAF model let that access throw unobserved; firing rAF
+    // synchronously (to settle each frame, see beforeEach) surfaces it, so the
+    // mock must carry a real (empty) transition slice.
+    transition: {},
   } as unknown as State;
 }
 
@@ -84,11 +89,22 @@ describe("createScrollRestoration — canonicalJson key-order stability (audit �
     counter++;
     storageKey = `scrollProp-${counter}`;
     sessionStorage.clear();
+    // Fire rAF synchronously so the snap/restore effect settles between the
+    // two emits. The capture of `previousRoute` is gated on `scrollSettled`
+    // (#782) — two emits in the SAME frame are treated as a transit and the
+    // second capture is skipped. Settling each frame models two SEPARATE,
+    // committed navigations, which is what this key-stability property tests.
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0);
+
+      return 0;
+    });
     globalThis.scrollTo({ top: 0, left: 0 });
   });
 
   afterEach(() => {
     sessionStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   test.prop(

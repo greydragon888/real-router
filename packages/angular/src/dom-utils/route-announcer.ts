@@ -18,6 +18,15 @@ const NOOP_INSTANCE: { destroy: () => void } = Object.freeze({
   },
 });
 
+// Live (non-NOOP) instances sharing the single `[data-real-router-announcer]`
+// aria-live element. The element is created once by the first instance
+// (`getOrCreateAnnouncer`) and reused by the rest; it must be removed only when
+// the LAST holder is destroyed. Without this count the first provider's
+// destroy() would detach the shared node while sibling providers (micro-
+// frontends — the same multi-provider scenario `scroll-restore`'s `storageKey`
+// exists for) keep writing to the now-orphaned node → silent screen reader (#783).
+let announcerRefCount = 0;
+
 export function createRouteAnnouncer(
   router: Router,
   options?: RouteAnnouncerOptions,
@@ -46,6 +55,8 @@ export function createRouteAnnouncer(
   let clearTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const announcer = getOrCreateAnnouncer();
+
+  announcerRefCount += 1;
 
   const doAnnounce = (text: string, h1: HTMLElement | null): void => {
     lastAnnouncedText = text;
@@ -113,11 +124,25 @@ export function createRouteAnnouncer(
 
   return {
     destroy() {
+      // Idempotency guard — required so the ref-count is decremented EXACTLY
+      // once per instance. A double destroy() must not drop the count below the
+      // number of live holders (which would detach a sibling's element, or
+      // leave it attached forever).
+      if (isDestroyed) {
+        return;
+      }
+
       isDestroyed = true;
       unsubscribe();
       clearTimeout(clearTimeoutId);
       clearTimeout(safariTimeoutId);
-      removeAnnouncer();
+
+      announcerRefCount -= 1;
+
+      // Only the last holder tears down the shared element.
+      if (announcerRefCount === 0) {
+        removeAnnouncer();
+      }
     },
   };
 }
@@ -128,6 +153,14 @@ function getOrCreateAnnouncer(): HTMLElement {
   if (existing) {
     return existing;
   }
+
+  // Creating a FRESH element means no live instance is validly sharing one, so
+  // the ref-count restarts from zero (the caller increments immediately after).
+  // Without this, an element removed out from under live instances — a host
+  // wiping the subtree, or a consumer test whose teardown clears the DOM
+  // without calling every instance's destroy() — would leave a stale positive
+  // count that prevents the new element from ever being torn down (#783).
+  announcerRefCount = 0;
 
   const element = document.createElement("div");
 
