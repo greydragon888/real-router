@@ -159,6 +159,19 @@ const arbEmptyParamPath = fc
   )
   .map(([seg, marker, tail]) => `/${seg}/${marker}${tail}`);
 
+/**
+ * Param paths with a marker FUSED to a static prefix within a segment — `:`/`*`
+ * after ≥1 static char, no `/` between (`/a:b`, `/users/x:id`, `/a*b`). build/meta
+ * extract it as a param while the trie compiles the segment as a literal, so the
+ * route's build and match shapes drift; `validateRoute` must reject it at the gate
+ * (path-matcher backstops at `registerTree`), the sibling of the name-less
+ * rejection (#1050). Both prefix and name are non-empty so the marker is always
+ * mid-segment AND name-bearing.
+ */
+const arbFusedMarkerPath = fc
+  .tuple(arbSafeSegment, fc.constantFrom(":", "*"), arbSafeSegment)
+  .map(([prefix, marker, name]) => `/${prefix}${marker}${name}`);
+
 // =============================================================================
 // Route Name Validation
 // =============================================================================
@@ -309,6 +322,17 @@ describe("Route Path Validation", () => {
         expect(() => {
           validateRoutePath(path, "test", "add");
         }).toThrow(/parameter marker/);
+      },
+    );
+  });
+
+  describe("8: fused mid-segment marker rejection — ':'/'*' after a static prefix throws (high)", () => {
+    test.prop([arbFusedMarkerPath], { numRuns: NUM_RUNS.fast })(
+      "a marker fused to a static prefix throws (gate-level, consistent with path-matcher #1050)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/must begin a segment/u);
       },
     );
   });
