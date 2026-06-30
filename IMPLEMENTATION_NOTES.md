@@ -4687,3 +4687,21 @@ if (affected.length <= K && !touchesCore && !touchesAdapterShared) { /* leaf */ 
 `$FILTERS` is intentionally unquoted (bash word-splitting into separate `--filter=<pkg>` tokens — same pattern as the shards' `$SHARD_FILTER`). Verified locally: the closure now produces lcov for all 8 (`event-emitter` 1.8 KB, `path-matcher` 12 KB, …) where `--filter='@real-router/core...'` produced only `core`. `node --test scripts/build-matrix.test.mjs` → 19/19; `actionlint` clean.
 
 **Why not `dependsOn: ["^test"]` on the `test` task.** That would make every `test` run all upstream packages' tests first across the *entire* graph — a global change to the build/cache topology to fix one job's scoping. The filter is local to base-test and leaves the task graph untouched. **Why not hardcode the 8 names in ci.yml.** They already live in `CORE_LAYER`, which is also what excludes them from shards — two hand-maintained copies would drift the moment a 9th base-layer package appears, silently re-opening the same hole. Importing the one set keeps a single source of truth. **Misdiagnosis note:** the first attempt bumped the `vitest.config.common.mts` cache-bust marker (the #470 remedy for *stale* lcov-less cache entries). It did nothing here — the entries weren't stale; the tests simply never ran — and was reverted. The discriminator: the failure reproduced under `--force` (cache bypassed), and a healthy cache hit was shown to restore lcov correctly.
+
+## Cache layers & honest cold builds — clean scripts purge `.eslintcache` + `*.tsbuildinfo*` (2026-06-30)
+
+### Problem
+
+`turbo --force` invalidates the **turbo** cache but NOT the tool-level incremental caches that live outside turbo's output set. The `lint` task runs `eslint --cache` (→ per-package `.eslintcache`) and `type-check` is incremental tsc (→ `.tsbuildinfo`). Both tasks declare `outputs: []` in `turbo.json`, so turbo never captures or restores these files — they persist in the working tree across runs. Consequence: a `turbo run … --force` "cold" measurement is only **turbo-cold**; ESLint and tsc stay **warm** and re-check almost nothing. Measured gap for lint: **~72s warm vs ~1440s CPU truly cold (≈20x)** — enough that a profiling pass wrongly concluded lint was 9.3% of a no-cache rebuild when, cold, it is the dominant stage. On CI this matters because a fresh checkout has no `.eslintcache`/`.tsbuildinfo` at all: every turbo cache-miss is a true cold run.
+
+`scripts/clean-all.sh` and `clean-deep.sh` did not remove either tool cache, so even a "clean" then "rebuild" left them warm. Worse, the two scripts had **drifted**: clean-all used `find packages`, clean-deep used `find . -not node_modules`, and both omitted the two tool caches — a duplicated-and-diverged pair where adding a cache layer to one silently skipped the other.
+
+### Solution
+
+- **`clean-all.sh` is the single source of truth.** A `clean_artifacts()` function removes dist, `.turbo`, `node_modules/.cache`, coverage, `.vitest` + `node_modules/.vite`, **and now `.eslintcache` + `*.tsbuildinfo*`**. Its "main" block (banner + next-steps) runs only under a `[[ "${BASH_SOURCE[0]}" == "${0}" ]]` guard.
+- **`clean-deep.sh` SOURCES `clean-all.sh`** and calls `clean_artifacts()`, then adds `node_modules` + `pnpm-lock.yaml`. The artifact list can no longer drift between the two.
+- Both unified on `find . -not -path '*/node_modules/*'` (whole repo incl. `examples/`); bash 3.2-compatible (`BASH_SOURCE`, `[[ ]]`, `source` all ≥ bash 3.0).
+
+### Why
+
+A "clean" script that leaves tool caches warm is a silent correctness bug for any cold benchmark or bug reproduction — the build still succeeds, so nothing flags it; only the numbers lie (the 20x lint gap is the proof). Single-source-of-truth via `source` + `BASH_SOURCE` guard is the cheapest way to stop the two scripts re-diverging the next time a cache layer is added. To take a genuinely cold measurement: run `clean-all.sh` **then** `turbo run … --force` (the `--force` covers the turbo layer the script intentionally leaves to turbo's own invalidation; the script covers the tool layers turbo can't see).
