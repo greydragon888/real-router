@@ -49,6 +49,22 @@ updates:
     labels:
       - "dependencies"
       - "automated"
+    ignore:
+      # Transitive deps whose OSV/GHSA advisories are already resolved by a pnpm
+      # `overrides` entry in pnpm-workspace.yaml (verified clean by `lint:audit` /
+      # osv-scanner). Dependabot does NOT apply pnpm overrides during resolution,
+      # so it re-resolves these to their natural transitive ceiling (e.g. undici
+      # 7.27.2 < fixed 7.28.0), decides it "cannot update X to a non-vulnerable
+      # version", and ERRORS THE ENTIRE npm job — producing zero PRs. Repeated
+      # errors then auto-halt Dependabot for the whole repo. These are pure
+      # transitive deps (no direct import), fully managed via overrides, so
+      # Dependabot can never PR them anyway — ignore them here.
+      #
+      # PATTERN: whenever a transitive-dep advisory is fixed via a pnpm override
+      # in pnpm-workspace.yaml, add the dep here too, or Dependabot will re-halt.
+      - dependency-name: "undici" # override: undici '>=7.28.0 <8.0.0' (GHSA fixed 7.28.0)
+      - dependency-name: "piscina" # override: piscina '>=5.2.0 <6.0.0'
+      - dependency-name: "js-yaml" # override: read-yaml-file '>=2.1.0' (GHSA-h67p-54hq-rp68)
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"

@@ -75,13 +75,16 @@ function resolveHashOptions(
 
 export function createPopstateHandler(
   deps: PopstateHandlerDeps,
-): (evt: PopStateEvent) => void {
+): (evt: PopStateEvent | HashChangeEvent) => void {
   let isTransitioning = false;
   // Snapshot the route location alongside the event: a deferred popstate is
   // replayed only after the in-flight navigation's onTransitionSuccess →
   // replaceState has overwritten the live location, so re-reading it at
   // replay time would resolve the wrong target (#757).
-  let deferred: { evt: PopStateEvent; location: string } | null = null;
+  let deferred: {
+    evt: PopStateEvent | HashChangeEvent;
+    location: string;
+  } | null = null;
 
   function processDeferredEvent(): void {
     if (deferred) {
@@ -134,7 +137,7 @@ export function createPopstateHandler(
   }
 
   async function onPopState(
-    evt: PopStateEvent,
+    evt: PopStateEvent | HashChangeEvent,
     location: string,
   ): Promise<void> {
     if (isTransitioning) {
@@ -193,14 +196,14 @@ export function createPopstateHandler(
 
   // Snapshot the location the instant the event fires — before any in-flight
   // navigation can overwrite it via replaceState (#757).
-  return (evt: PopStateEvent) =>
+  return (evt: PopStateEvent | HashChangeEvent) =>
     void onPopState(evt, deps.browser.getLocation());
 }
 
 export interface PopstateLifecycleDeps {
   browser: Browser;
   shared: SharedFactoryState;
-  handler: (evt: PopStateEvent) => void;
+  handler: (evt: PopStateEvent | HashChangeEvent) => void;
   cleanup: () => void;
 }
 
@@ -231,6 +234,98 @@ export function createPopstateLifecycle(
         deps.shared.removePopStateListener = undefined;
       }
 
+      deps.cleanup();
+    },
+  };
+}
+
+/**
+ * Lifecycle for hash-plugin (#759): syncs the router with the URL fragment on
+ * BOTH `popstate` (back/forward) and `hashchange` (external fragment changes —
+ * native anchors, address-bar edits, `location.hash = ...`). browser-plugin
+ * keeps `createPopstateLifecycle` (popstate only) — for it a path change is a
+ * full navigation, and `hashchange` would be noise.
+ *
+ * Dedup: a hash-changing history traversal fires the `popstate`+`hashchange`
+ * pair synchronously (one browser task). Handling both double-navigates, so the
+ * second of the pair is dropped. The two `saw*` flags are **type-scoped** and
+ * **order-independent** — whichever of the pair arrives first is handled and
+ * blocks the other, no matter which the browser fires first. They reset on a
+ * microtask, so the guard spans only the synchronous pair: distinct user
+ * gestures land in separate tasks and are never coalesced, and same-type bursts
+ * (two rapid `popstate`s → the deferred-event path) are unaffected because a
+ * `popstate` only blocks a following `hashchange`, never another `popstate`.
+ *
+ * Both listeners are stored under the single `shared.removePopStateListener`
+ * slot as a combined remover, preserving the factory-pool last-wins cleanup
+ * (#758) unchanged.
+ */
+export function createHashSyncLifecycle(
+  deps: PopstateLifecycleDeps,
+): Pick<Plugin, "onStart" | "onStop" | "teardown"> {
+  let sawPopstate = false;
+  let sawHashchange = false;
+  let resetScheduled = false;
+
+  const scheduleReset = (): void => {
+    if (resetScheduled) {
+      return;
+    }
+
+    resetScheduled = true;
+    queueMicrotask(() => {
+      sawPopstate = false;
+      sawHashchange = false;
+      resetScheduled = false;
+    });
+  };
+
+  const onPopstate = (evt: PopStateEvent): void => {
+    // The paired hashchange already handled this traversal — drop the popstate.
+    if (sawHashchange) {
+      return;
+    }
+
+    sawPopstate = true;
+    scheduleReset();
+    deps.handler(evt);
+  };
+
+  const onHashchange = (evt: HashChangeEvent): void => {
+    // The paired popstate already handled this traversal — drop the hashchange.
+    if (sawPopstate) {
+      return;
+    }
+
+    sawHashchange = true;
+    scheduleReset();
+    deps.handler(evt);
+  };
+
+  const removeListeners = (): void => {
+    if (deps.shared.removePopStateListener) {
+      deps.shared.removePopStateListener();
+      deps.shared.removePopStateListener = undefined;
+    }
+  };
+
+  return {
+    onStart: () => {
+      removeListeners();
+
+      const removePopstate = deps.browser.addPopstateListener(onPopstate);
+      const removeHashchange = deps.browser.addHashChangeListener(onHashchange);
+
+      deps.shared.removePopStateListener = () => {
+        removePopstate();
+        removeHashchange();
+      };
+    },
+
+    onStop: removeListeners,
+
+    teardown: () => {
+      removeListeners();
       deps.cleanup();
     },
   };

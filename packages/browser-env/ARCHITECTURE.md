@@ -10,9 +10,9 @@
 ```
 shared/browser-env/
 ├── detect.ts               — isBrowserEnvironment()
-├── history-api.ts          — pushState, replaceState, addPopstateListener, getHash
+├── history-api.ts          — pushState, replaceState, addPopstateListener, addHashChangeListener, getHash
 ├── plugin-utils.ts         — createStartInterceptor, createReplaceHistoryState, shouldReplaceHistory
-├── popstate-handler.ts     — createPopstateHandler, createPopstateLifecycle
+├── popstate-handler.ts     — createPopstateHandler, createPopstateLifecycle, createHashSyncLifecycle
 ├── popstate-utils.ts       — getRouteFromEvent, updateBrowserState
 ├── safe-browser.ts         — createSafeBrowser
 ├── ssr-fallback.ts         — createWarnOnce, createHistoryFallbackBrowser
@@ -31,6 +31,7 @@ interface HistoryBrowser {
   pushState: (state: unknown, path: string) => void;
   replaceState: (state: unknown, path: string) => void;
   addPopstateListener: (fn: (evt: PopStateEvent) => void) => () => void;
+  addHashChangeListener: (fn: (evt: HashChangeEvent) => void) => () => void; // #759 — used by hash-plugin only
   getHash: () => string;
 }
 
@@ -53,10 +54,27 @@ live location — re-reading it at replay time would resolve the wrong target (#
 errors (anything that isn't a `RouterError`) trigger a `replaceState` recovery that rolls
 the URL back to the router's current state.
 
-`getRouteFromEvent(evt, api, location)` tries `isState(evt.state)` first; on failure it
-falls back to `api.matchPath(location)`, where `location` is the snapshot the handler
-captured at event time. `updateBrowserState(state, url, replace, browser)`
+`getRouteFromEvent(evt, api, location)` accepts `PopStateEvent | HashChangeEvent` (#759). It
+tries `"state" in evt && isState(evt.state)` first; on failure — always, for a `hashchange`,
+which carries no `state` — it falls back to `api.matchPath(location)`, where `location` is
+the snapshot the handler captured at event time. `updateBrowserState(state, url, replace, browser)`
 writes `{ name, params, path }` — nothing else — into `history.state`.
+
+### `createHashSyncLifecycle` — popstate + hashchange for hash-plugin (#759)
+
+hash-plugin uses `createHashSyncLifecycle` instead of `createPopstateLifecycle`: it registers
+**both** `popstate` and `hashchange` (via `addHashChangeListener`) through the *same* handler,
+so external fragment changes (native anchors, address-bar edits, `location.hash=`) — which fire
+`hashchange` only — reach the router. browser-plugin keeps `createPopstateLifecycle` (popstate
+only); it has no use for `hashchange`, so the split keeps that listener off its path entirely.
+
+A hash-changing back/forward fires **both** events synchronously. To avoid double-navigating,
+two type-scoped flags (`sawPopstate` / `sawHashchange`), reset on a `queueMicrotask`, drop
+whichever of the pair arrives **second** — order-independent, and never coalescing separate
+gestures (distinct tasks) or same-type bursts (a `popstate` blocks only a following
+`hashchange`, never another `popstate`, preserving the deferred-event path above). Both
+listeners share the single `SharedFactoryState.removePopStateListener` slot as a combined
+remover, keeping the factory-pool last-wins cleanup (#758) intact.
 
 ## Pure URL utilities
 

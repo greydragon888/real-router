@@ -3,6 +3,7 @@ import {
   pushState,
   replaceState,
   addPopstateListener,
+  addHashChangeListener,
   getHash,
 } from "./history-api.js";
 import {
@@ -21,6 +22,7 @@ export function createSafeBrowser(
       pushState,
       replaceState,
       addPopstateListener,
+      addHashChangeListener,
       getLocation,
       getHash,
     };

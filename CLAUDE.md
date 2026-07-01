@@ -41,7 +41,7 @@ shared/
 | TypeScript      | 6.0     | root `devDependencies` (pinned exact, `save-exact`)                         |
 | Vitest          | 4.1     | root `devDependencies`                                                      |
 | tsdown          | 0.22    | root `devDependencies`                                                      |
-| Turbo           | 2.9     | root `devDependencies`                                                      |
+| Turbo           | 2.10    | root `devDependencies`                                                      |
 | ESLint          | 10.5    | root `devDependencies` (flat config)                                        |
 | @changesets/cli | 2.31    | root `devDependencies`                                                      |
 | Prettier        | 3.8     | root `devDependencies`                                                      |

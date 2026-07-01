@@ -1,5 +1,13 @@
 # @real-router/browser-plugin
 
+## 0.18.0
+
+### Minor Changes
+
+- [#1064](https://github.com/greydragon888/real-router/pull/1064) [`ff1a29e`](https://github.com/greydragon888/real-router/commit/ff1a29e076a9c2f7af50ac736a9bcfb89db0a646) Thanks [@greydragon888](https://github.com/greydragon888)! - `Browser` interface now includes `addHashChangeListener` ([#759](https://github.com/greydragon888/real-router/issues/759))
+
+  The shared `Browser` type exported from browser-plugin gains an `addHashChangeListener` method, added so hash-plugin can track external URL fragment changes. browser-plugin's own runtime behavior is unchanged — it registers only a `popstate` listener, never `hashchange`. Code that supplies a hand-written `Browser` via the (test-only) `browser` factory argument must add this method.
+
 ## 0.17.14
 
 ### Patch Changes

@@ -1,5 +1,23 @@
 # @real-router/hash-plugin
 
+## 0.8.1
+
+### Patch Changes
+
+- [#1081](https://github.com/greydragon888/real-router/pull/1081) [`362f24d`](https://github.com/greydragon888/real-router/commit/362f24d1b57b88d5f01bc078e84e2b384b3811b1) Thanks [@greydragon888](https://github.com/greydragon888)! - Clarify the `getRouteFromEvent` matchPath-fallback JSDoc in shared `popstate-utils` — name hash-plugin's `buildHashLocation(location.hash, ...)` mechanism so the comment (read by both URL plugins' maintainers) correctly explains why the fallback resolves the hash route ([#760](https://github.com/greydragon888/real-router/issues/760))
+
+## 0.8.0
+
+### Minor Changes
+
+- [#1064](https://github.com/greydragon888/real-router/pull/1064) [`ff1a29e`](https://github.com/greydragon888/real-router/commit/ff1a29e076a9c2f7af50ac736a9bcfb89db0a646) Thanks [@greydragon888](https://github.com/greydragon888)! - Sync the router on external URL fragment changes ([#759](https://github.com/greydragon888/real-router/issues/759))
+
+  hash-plugin now listens to `hashchange` in addition to `popstate`, so external fragment changes — a native `<a href="#/x">`, a manual address-bar hash edit, or `location.hash = "..."` from app/third-party code — synchronize the router. Previously only programmatic navigation (`<Link>` / `router.navigate`) and back/forward (popstate) were tracked; an external hash mutation updated the URL while the router stayed on the old route.
+
+  A hash-changing back/forward fires both `popstate` and `hashchange`; the two are deduped (order-independent, microtask-scoped) so exactly one navigation runs — never a double-navigate.
+
+  **Type note:** the exported `Browser` interface now requires `addHashChangeListener`. Code that supplies a hand-written `Browser` via the (test-only) `browser` factory argument must add this method.
+
 ## 0.7.13
 
 ### Patch Changes

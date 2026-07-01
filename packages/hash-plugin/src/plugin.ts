@@ -1,6 +1,6 @@
 import {
   createPopstateHandler,
-  createPopstateLifecycle,
+  createHashSyncLifecycle,
   createStartInterceptor,
   createReplaceHistoryState,
   shouldReplaceHistory,
@@ -104,7 +104,7 @@ export class HashPlugin {
       buildUrl: pluginBuildUrl,
     });
 
-    this.#lifecycle = createPopstateLifecycle({
+    this.#lifecycle = createHashSyncLifecycle({
       browser,
       shared,
       handler,

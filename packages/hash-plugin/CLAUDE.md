@@ -22,7 +22,12 @@ Router Navigation:
 
 Browser Back/Forward:
   popstate → handler (browser-env) → router.navigate()/navigateToNotFound()/navigateToDefault() → pushState/replaceState
+
+External Fragment Change (native <a href="#/x">, address-bar edit, location.hash=):
+  hashchange → handler (browser-env) → router.navigate()/navigateToNotFound() → replaceState
 ```
+
+Both `popstate` and `hashchange` route through the **same** `createPopstateHandler`. A hash-changing history traversal fires **both** events; `createHashSyncLifecycle` dedups the pair (see [Gotchas](#hashchange-listener--popstatehashchange-dedup-759)) so exactly one navigation runs.
 
 ### Promise-Based API
 
@@ -43,6 +48,13 @@ Click back again → event DEFERRED (not lost)
 Transition completes → process deferred event
 ```
 Only the **last** deferred event is kept (intermediate states skipped).
+
+### Hashchange listener + popstate/hashchange dedup (#759)
+Unlike browser-plugin (which uses `createPopstateLifecycle`, popstate only), hash-plugin uses `createHashSyncLifecycle` from `browser-env` — it registers **both** `popstate` and `hashchange`. This is what makes external fragment changes reach the router: a native `<a href="#/x">`, a manual address-bar hash edit, or `location.hash = "..."` fire `hashchange` **only** (never `popstate`; `pushState`/`replaceState` — the plugin's own writes — never fire `hashchange` either), so a popstate-only listener would silently ignore them.
+
+A hash-changing **back/forward** traversal fires **both** events synchronously (one browser task). Handling both double-navigates, so the second of the pair is dropped. The dedup is **order-independent**: two type-scoped flags (`sawPopstate` / `sawHashchange`), reset on a microtask, drop whichever of the pair arrives second — regardless of which the browser fires first. The reset scopes the guard to a single synchronous pair, so distinct user gestures (separate tasks) are never coalesced, and same-type bursts (two rapid `popstate`s → the deferred-event path above) are unaffected because a `popstate` only ever blocks a following `hashchange`, never another `popstate`.
+
+Both listeners share the single `shared.removePopStateListener` slot as a combined remover, so the factory-pool last-wins cleanup (#758) is unchanged.
 
 ### Base Path Normalization
 ```typescript

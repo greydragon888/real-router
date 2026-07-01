@@ -16,6 +16,7 @@ function makeFakeBrowser(location = "/"): Browser {
     pushState: vi.fn(),
     replaceState: vi.fn(),
     addPopstateListener: vi.fn(() => () => {}),
+    addHashChangeListener: vi.fn(() => () => {}),
     getLocation: () => location,
     getHash: () => "",
   };
@@ -56,6 +57,16 @@ describe("getRouteFromEvent", () => {
     const evt = makePopStateEvent(undefined);
 
     expect(getRouteFromEvent(evt, api, "/nope")).toBeUndefined();
+  });
+
+  it("resolves a HashChangeEvent (no history.state) via api.matchPath(location) (#759)", () => {
+    // A hashchange event has no `state` property at all — the `"state" in evt`
+    // guard must skip the makeState branch and fall back to matchPath.
+    const evt = {} as HashChangeEvent;
+
+    const matched = getRouteFromEvent(evt, api, "/users");
+
+    expect(matched).toMatchObject({ name: "users" });
   });
 });
 

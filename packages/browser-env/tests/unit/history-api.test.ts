@@ -4,6 +4,7 @@ import {
   pushState,
   replaceState,
   addPopstateListener,
+  addHashChangeListener,
   getHash,
 } from "../../src/history-api";
 
@@ -41,6 +42,19 @@ describe("history-api", () => {
     cleanup();
 
     expect(removeSpy).toHaveBeenCalledWith("popstate", fn);
+  });
+
+  it("addHashChangeListener registers and returns cleanup (#759)", () => {
+    const addSpy = vi.spyOn(globalThis, "addEventListener");
+    const removeSpy = vi.spyOn(globalThis, "removeEventListener");
+    const fn = vi.fn();
+    const cleanup = addHashChangeListener(fn);
+
+    expect(addSpy).toHaveBeenCalledWith("hashchange", fn);
+
+    cleanup();
+
+    expect(removeSpy).toHaveBeenCalledWith("hashchange", fn);
   });
 
   it("getHash returns current location hash", () => {
