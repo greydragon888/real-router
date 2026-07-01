@@ -24,6 +24,7 @@ import {
   classify,
   CORE_LAYER,
   deriveAffected,
+  deriveMembership,
   K,
 } from "./build-matrix.mjs";
 
@@ -145,6 +146,32 @@ test("L1: docs/empty affected derives to []", () => {
     data: { affectedPackages: { items: [{ name: "//", path: "" }] } },
   });
   assert.deepEqual(deriveAffected(queryJson).affected, []);
+});
+
+test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo directory (#1067)", () => {
+  // Shape of `turbo run test test:properties bundle …[origin/master] --dry=json`:
+  // one task entry per (package, task), each with turbo's own `directory`.
+  const dryJson = JSON.stringify({
+    packages: ["@real-router/shared-sources"], // the changed seed — irrelevant to membership
+    tasks: [
+      { package: "@real-router/react", directory: "packages/react" },
+      { package: "@real-router/react", directory: "packages/react" }, // dup (bundle+test)
+      { package: "@real-router/types", directory: "packages/core-types" },
+      { package: "browser-env", directory: "packages/browser-env" },
+      { package: "@real-router/shared-sources", directory: "shared" }, // dropped (not packages/*)
+      { package: "router-benchmarks", directory: "benchmarks" }, // dropped
+      { package: "//", directory: "" }, // dropped
+    ],
+  });
+  const { members, dirOf } = deriveMembership(dryJson);
+  assert.deepEqual(
+    [...members].sort(),
+    ["@real-router/react", "@real-router/types", "browser-env"],
+    "membership = deduped packages/* target set",
+  );
+  // core-types quirk preserved from turbo's own directory (not reconstructed).
+  assert.equal(dirOf.get("@real-router/types"), "packages/core-types");
+  assert.ok(!dirOf.has("@real-router/shared-sources"));
 });
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
@@ -332,38 +359,54 @@ test("routing: touchesAdapterShared overrides leaf even for a tiny affected set"
   );
 });
 
-test("routing: shared-source fanout forces sharded even for a tiny ≤ K set", () => {
-  // A shared-source edit fans out via symlinks to many heavy consumers, but the
-  // `shared` workspace is dropped from `affected` (only the consumers remain) —
-  // shared-sources stays in dirOf, so touchesSharedSources forces sharded, the
-  // same override as touchesCore / touchesAdapterShared. Run 28393785008: a
-  // shared/dom-utils PR (6 adapters + dom-utils = 7 ≤ K, no core) wrongly took
-  // the leaf monolith (~20m serialising the adapters); these lock the routing.
+test("routing: shared-source fanout — routing shards via touchesSharedSources, membership (input-aware) supplies the consumer shards (#1067)", () => {
+  // GROUND TRUTH (turbo 2.10): `turbo query affected --packages` maps a shared/*
+  // edit to @real-router/shared-sources ONLY — the symlink + `../../shared/**`
+  // input-glob dep is invisible to the declared-dep graph, so the ROUTING set has
+  // zero consumers. shared-sources survives in dirOf, so touchesSharedSources
+  // forces sharded (run 28393785008: a shared/dom-utils PR would otherwise take
+  // the ~20m leaf monolith). But the shard CONTENTS come from the input-aware
+  // `...[origin/master]` MEMBERSHIP set — feeding the empty routing set to the
+  // shards was the #1067 bug (run 28489824878 shipped browser-plugin +
+  // navigation-plugin unbuilt).
   const dirOf = new Map([
     ...realDirOf,
     ["@real-router/shared-sources", "shared"],
   ]);
+  const routing = []; // packages/* from query-affected on a pure shared edit
 
-  // shared/dom-utils → the 6 adapters (+ the dom-utils test pkg) = 7 ≤ K.
-  const domUtilsAffected = [...ADAPTERS, "dom-utils"];
-  assert.ok(domUtilsAffected.length <= K);
-  const domUtils = buildPlan(domUtilsAffected, dirOf);
+  // shared/dom-utils → input-aware membership = the 6 adapters (+ dom-utils pkg).
+  const domUtils = buildPlan(routing, dirOf, [...ADAPTERS, "dom-utils"]);
   assert.equal(domUtils.mode, "sharded");
   const domUtilsNames = domUtils.matrix.include.map((i) => i.name);
   for (const a of ["react", "preact", "solid", "svelte", "vue", "angular"])
     assert.ok(domUtilsNames.includes(a), a);
 
   // shared/browser-env → the 3 url-plugins.
-  const browserEnv = buildPlan([...URL_PLUGINS], dirOf);
+  const browserEnv = buildPlan(routing, dirOf, [...URL_PLUGINS]);
   assert.equal(browserEnv.mode, "sharded");
   assert.ok(
     browserEnv.matrix.include.map((i) => i.name).includes("url-plugin"),
   );
 
   // shared/ssr → the 2 ssr-plugins.
-  const ssr = buildPlan([...SSR_PLUGINS], dirOf);
+  const ssr = buildPlan(routing, dirOf, [...SSR_PLUGINS]);
   assert.equal(ssr.mode, "sharded");
   assert.ok(ssr.matrix.include.map((i) => i.name).includes("ssr-plugin"));
+});
+
+test("routing: sharded with an empty membership set throws — empty matrix is a misdetection, not green (#1067)", () => {
+  const dirOf = new Map([
+    ...realDirOf,
+    ["@real-router/shared-sources", "shared"],
+  ]);
+  // touchesSharedSources forces sharded, but membership is empty → the pre-fix
+  // code emitted mode=sharded + {"include":[]} and passed CI green with ZERO
+  // shards (base-* jobs only, consumers unvalidated). The guard must fail loudly.
+  assert.throws(
+    () => buildPlan([], dirOf, []),
+    /empty|no.*shard|misdetection/i,
+  );
 });
 
 test("routing: a multi-package edit WITHOUT a shared source stays leaf (≤ K)", () => {

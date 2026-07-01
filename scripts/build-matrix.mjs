@@ -10,24 +10,31 @@
 // It is the SINGLE source of architectural truth for the matrix: a new package
 // is classified automatically from its deps/symlinks — zero `ci.yml` diff.
 //
-// Wiring into `.github/workflows/ci.yml` is intentionally NOT done here — this
-// is the standalone classifier component (PoC-2 step 2b). The compute-plan job
-// would call:  node scripts/build-matrix.mjs >> "$GITHUB_OUTPUT"
+// Wired into `.github/workflows/ci.yml`: the `check` job runs
+//   node scripts/build-matrix.mjs >> "$GITHUB_OUTPUT"
+// and the leaf / base / sharded jobs branch on `mode` + consume `matrix`.
 //
 // Design doc: .claude/ci-acceleration-poc-ru.md (§3-A) + companion empirical
 // measurements .claude/ci-acceleration-empirical-2026-06-20.md (A/B/C/D).
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 A5 (the load-bearing correctness invariant — do NOT regress):
-// affected packages come from the NATIVE `turbo query affected … --packages`
-// API, which returns the TARGET set (changed + dependents). We must NOT parse
-// `turbo run … --dry=json` and read `tasks[].package`: that is the EXECUTION
-// graph including each target's build *dependencies*, so `core` is pulled into
-// EVERY affected set as a dependency → `touchesCore` is always true → `mode=leaf`
-// never fires → the whole leaf-routing branch is dead. Proven empirically on an
-// rx-only commit (companion doc §D). The native API gives a clean target set,
-// and explicit `--base origin/master --head HEAD` also fixes the bare-`--affected`
-// footgun (its auto-detected base is `main`, but this repo is on `master`).
+// TWO package sets, two turbo calls — do NOT collapse them (A5 + #1067):
+//
+// 1. ROUTING (leaf vs sharded) — `deriveAffected(runAffectedQuery())`, the NATIVE
+//    `turbo query affected … --packages` TARGET set (changed + dependents). 🔴 A5:
+//    this MUST NOT carry the dependency-closure, or `touchesCore` is always true
+//    and `mode=leaf` never fires (proven on an rx-only commit, companion §D).
+//    Explicit `--base origin/master --head HEAD` also fixes the bare-`--affected`
+//    footgun (its auto-detected base is `main`, but this repo is on `master`).
+//
+// 2. MEMBERSHIP (which packages become shards) — `deriveMembership(runMembership
+//    Query())`, the INPUT-AWARE `turbo run … --filter='...[origin/master]'
+//    --dry=json` set. #1067: the query-affected TARGET set walks only the
+//    DECLARED-dep graph, so a `shared/*` edit reaching consumers via symlink +
+//    `../../shared/**` input-glob surfaces NONE of them → a shared PR sharded an
+//    empty matrix and skipped its consumers while CI stayed green. The dry-run
+//    graph is built from task INPUTS, so it DOES see them. The A5 closure caveat
+//    is why this set feeds MEMBERSHIP only, never ROUTING.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { execSync } from "node:child_process";
@@ -128,6 +135,37 @@ export function deriveAffected(queryJson) {
 }
 
 /**
+ * INPUT-AWARE shard-membership derivation (#1067). Takes the raw stdout of
+ * `turbo run test test:properties bundle --filter='...[origin/master]' --dry=json`
+ * and returns the deduped `packages/*` target set plus a name→directory map from
+ * turbo's own `tasks[].directory`.
+ *
+ * Unlike `turbo query affected --packages` (which walks the DECLARED-dep graph and
+ * so cannot see a `shared/*` edit reaching its symlink consumers), the `dry=json`
+ * run graph is built from task INPUTS — including the `../../shared/**` glob — so a
+ * shared-source change surfaces every consumer here. This is the set the shards are
+ * built from; `query affected` is kept only for the leaf/sharded routing decision.
+ *
+ * @param {string} dryRunJson raw JSON from `turbo run … --dry=json`
+ * @returns {{ members: string[], dirOf: Map<string,string> }}
+ */
+export function deriveMembership(dryRunJson) {
+  const { tasks } = JSON.parse(dryRunJson);
+  const dirOf = new Map();
+  const members = [];
+  for (const t of tasks ?? []) {
+    const dir = t.directory ?? "";
+    // Same filter as deriveAffected: real `packages/*` only — drops the `//` root,
+    // `shared` (@real-router/shared-sources) and `benchmarks` (router-benchmarks).
+    // Multiple tasks per package (test/test:properties/bundle) → dedupe by name.
+    if (!dir.startsWith("packages/") || dirOf.has(t.package)) continue;
+    dirOf.set(t.package, dir);
+    members.push(t.package);
+  }
+  return { members, dirOf };
+}
+
+/**
  * Classify one affected package into a layer bucket. Pure given its readers.
  * Throws on an unrecognised package so a new package with unusual deps fails the
  * compute-plan job loudly (R2.18 SPoF defence) rather than silently mis-sharding.
@@ -183,42 +221,66 @@ export function groupAffected(affected, dirOf, readers = defaultReaders) {
 /**
  * Decide leaf vs sharded and, if sharded, emit the matrix include[].
  *
- * Leaf: `affected.length <= K && !touchesCore && !touchesAdapterShared`. The
- * matrix is still a VALID but empty `{ include: [] }` — an empty string would
- * make `fromJson('')` crash the workflow parse even when the sharded job's `if:`
- * is false (companion C1). `touchesAdapterShared` (sources/route-utils) forces
- * sharded like `touchesCore`: both are fanout amplifiers over the heavy adapters.
+ * TWO package sets, because they answer two different questions (#1067):
+ *   • `affected` — the ROUTING set from `turbo query affected --packages` (the
+ *     declared-dep target set). It decides leaf vs sharded and must NOT carry the
+ *     dependency-closure (A5), or `touchesCore` is always true and leaf never
+ *     fires. It is blind to shared-source consumers (they depend on shared/* only
+ *     via symlink + input-glob, not a declared dep) — that is fine for routing
+ *     (touchesSharedSources still forces sharded), but WRONG for membership.
+ *   • `membership` — the MEMBERSHIP set (default: `affected`). In production it is
+ *     the INPUT-AWARE `...[origin/master]` set, which turbo derives from task
+ *     inputs (`../../shared/**`) and therefore DOES include shared-source
+ *     consumers. The shards are built from this set so a shared-source PR actually
+ *     validates the adapters / url-plugins / ssr-plugins it invalidates. Deriving
+ *     shards from `affected` instead is the #1067 bug: a shared PR shards nothing.
+ *
+ * Leaf: `affected.length <= K && !touchesCore && !touchesAdapterShared &&
+ * !touchesSharedSources`. The matrix is still a VALID but empty `{ include: [] }`
+ * — an empty string would make `fromJson('')` crash the workflow parse even when
+ * the sharded job's `if:` is false (companion C1).
  *
  * Sharded: each adapter is its own shard (1 adapter = 1 shard, R2.10); the other
  * non-empty groups become one shard each. `base` is handled by a separate job,
  * so it is never in `include`. Empty groups are omitted → GHA spawns no runner.
  *
+ * @param {string[]} affected routing set (query-affected, packages/* only)
+ * @param {Map<string,string>} dirOf name→directory (routing + membership merged)
+ * @param {string[]} [membership] input-aware shard-membership set (default: affected)
+ * @param {typeof defaultReaders} [readers] injectable fs accessors
  * @returns {{ mode: 'leaf'|'sharded', matrix: { include: Array<{name:string,filter:string}> } }}
  */
-export function buildPlan(affected, dirOf, readers = defaultReaders) {
-  const groups = groupAffected(affected, dirOf, readers);
-  const touchesCore = groups.base.length > 0;
+export function buildPlan(
+  affected,
+  dirOf,
+  membership = affected,
+  readers = defaultReaders,
+) {
+  // Routing signals are read from `affected` (the target set), NOT `membership`:
+  // membership carries the dependency-closure, which would make touchesCore always
+  // true (A5) and kill leaf-routing.
+  const routing = groupAffected(affected, dirOf, readers);
+  const touchesCore = routing.base.length > 0;
   // sources / route-utils are intermediate fanout amplifiers: a change to either
   // invalidates ALL 6 (heavy) adapters, so however few packages turbo reports
   // (sources alone fans out to 7, route-utils to 9 — both ≤ K), the monolithic
   // leaf path would serialize the entire adapter cohort (~15m observed on a
   // sources-only PR, #1017). Force the sharded path so the adapter shards run in
   // parallel — same rationale as touchesCore, just one layer down the graph.
-  const touchesAdapterShared = groups["adapter-shared"].length > 0;
+  const touchesAdapterShared = routing["adapter-shared"].length > 0;
   // A shared-source edit is the SAME class of fanout amplifier, one layer below
   // sources/route-utils. The `@real-router/shared-sources` workspace (dir
   // `shared/`) owns shared/dom-utils, shared/browser-env and shared/ssr; an edit
   // to any of them fans out to every consumer that symlinks it — dom-utils → the
   // 6 (heavy) adapters, browser-env → the 3 url-plugins, ssr → the 2 ssr-plugins.
-  // turbo reports those consumers but `deriveAffected` drops the `shared`
-  // workspace from `affected` (its path is `shared/`, not `packages/*`), so the
-  // consumer count alone can sit ≤ K and slip into the monolithic leaf path,
-  // which then rebuilds the heavy cohort serially (~20m on a shared/dom-utils PR,
-  // run 28393785008). `shared-sources` is still present in `dirOf` (the unfiltered
-  // name→dir map), so detect it there and force sharded — same as touchesCore /
-  // touchesAdapterShared. This keys on the shared WORKSPACE, so a direct
-  // multi-package edit that does NOT touch a shared source stays on the count
-  // path (the K-boundary leaf set with two url-plugins is unaffected).
+  // The declared-dep query set reports NONE of those consumers (the dep is a
+  // symlink, not a package.json edge), only the `shared` workspace — which
+  // `deriveAffected` drops from `affected` (path `shared/`, not `packages/*`). So
+  // `shared-sources` survives only in `dirOf`; detect it there and force sharded,
+  // same as touchesCore / touchesAdapterShared. The consumers themselves come from
+  // `membership` (input-aware), not from here. Keys on the shared WORKSPACE, so a
+  // direct multi-package edit that does NOT touch a shared source stays on the
+  // count path (the K-boundary leaf set with two url-plugins is unaffected).
   const touchesSharedSources = dirOf.has("@real-router/shared-sources");
 
   if (
@@ -230,6 +292,9 @@ export function buildPlan(affected, dirOf, readers = defaultReaders) {
     return { mode: "leaf", matrix: { include: [] } };
   }
 
+  // Shards come from `membership` (input-aware) — this is where shared-source
+  // consumers surface; `affected` (declared-dep) would omit them (#1067).
+  const groups = groupAffected(membership, dirOf, readers);
   const include = [];
   for (const a of groups.adapter) {
     include.push({
@@ -243,6 +308,22 @@ export function buildPlan(affected, dirOf, readers = defaultReaders) {
     if (pkgs.length === 0) continue;
     include.push({ name, filter: pkgs.map((p) => `--filter=${p}`).join(" ") });
   }
+
+  // Guard (#1067): a shared-source PR MUST surface its consumers as shards. An
+  // empty `include` here means `membership` lost them (the pre-fix bug: shards
+  // derived from the declared-dep `affected`, which omits shared consumers) — CI
+  // would then pass green with the base-* jobs only and ZERO consumer validation.
+  // Fail loudly instead. (A pure core-layer change legitimately yields empty
+  // shards — the base-* jobs cover it — so this only guards the shared trigger,
+  // where empty is always a misdetection.)
+  if (touchesSharedSources && include.length === 0) {
+    throw new Error(
+      "build-matrix: shared-source PR routed to sharded but produced no consumer " +
+        "shards — the membership set surfaced no shardable package (misdetection); " +
+        "refusing to emit a green-but-empty shard plan (#1067)",
+    );
+  }
+
   return { mode: "sharded", matrix: { include } };
 }
 
@@ -256,10 +337,35 @@ export function runAffectedQuery() {
   );
 }
 
-/** Entry point: query → plan → emit GITHUB_OUTPUT lines. */
+/**
+ * Run the input-aware membership query (#1067) — mirrors the shard command
+ * (`test test:properties bundle`) so membership = exactly the packages a shard
+ * would run for the affected filter. `--dry=json` plans without executing.
+ * `maxBuffer` is raised: on a full/shared rebuild the graph JSON (per-task input
+ * maps for ~32 packages × 3 tasks) exceeds the 1 MiB execSync default.
+ */
+export function runMembershipQuery() {
+  return execSync(
+    "pnpm exec turbo run test test:properties bundle " +
+      "--filter='...[origin/master]' --filter='!./examples/**' " +
+      "--filter='!./benchmarks' --dry=json",
+    {
+      encoding: "utf8",
+      maxBuffer: 256 * 1024 * 1024,
+    },
+  );
+}
+
+/** Entry point: query (routing) + dry-run (membership) → plan → GITHUB_OUTPUT. */
 export function main() {
   const { affected, dirOf } = deriveAffected(runAffectedQuery());
-  const { mode, matrix } = buildPlan(affected, dirOf);
+  const { members, dirOf: memberDirOf } =
+    deriveMembership(runMembershipQuery());
+  // Merge dirs so classify() can resolve every membership package; query's dirOf
+  // is applied last so the `shared-sources` workspace entry (which membership
+  // drops but touchesSharedSources keys on) is retained.
+  const mergedDirOf = new Map([...memberDirOf, ...dirOf]);
+  const { mode, matrix } = buildPlan(affected, mergedDirOf, members);
   process.stdout.write(`mode=${mode}\n`);
   process.stdout.write(`matrix=${JSON.stringify(matrix)}\n`);
 }

@@ -453,6 +453,14 @@ jobs:
       - name: Check for unused code
         run: pnpm lint:unused
 
+      # Unit-test the CI shard planner itself (scripts/build-matrix.*). Not a
+      # vitest workspace (stdlib node:test, zero install/turbo dependency), so it
+      # runs here rather than in the turbo graph. Gates the leaf/sharded routing
+      # + input-aware membership logic (#1067) so a regression fails loudly (R2.18)
+      # instead of silently mis-sharding a real PR.
+      - name: Test CI shard planner (build-matrix)
+        run: node --test scripts/*.test.mjs
+
   # ============================================
   # PIPELINE-SHARDED: one runner per affected class (mode=sharded). The matrix
   # comes from check (R2.19); empty groups never enter matrix.include → their
