@@ -34,6 +34,11 @@ export const createHistoryFallbackBrowser = (
 
       return NOOP;
     },
+    addHashChangeListener: () => {
+      warnOnce("addHashChangeListener");
+
+      return NOOP;
+    },
     getHash: () => {
       warnOnce("getHash");
 

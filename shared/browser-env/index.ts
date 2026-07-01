@@ -6,6 +6,7 @@ export {
   pushState,
   replaceState,
   addPopstateListener,
+  addHashChangeListener,
   getHash,
 } from "./history-api.js";
 
@@ -36,6 +37,7 @@ export { createSafeBrowser } from "./safe-browser.js";
 export {
   createPopstateHandler,
   createPopstateLifecycle,
+  createHashSyncLifecycle,
 } from "./popstate-handler.js";
 
 export type {

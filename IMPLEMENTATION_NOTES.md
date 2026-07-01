@@ -3267,6 +3267,22 @@ For hash, both URL plugins use a **lazy read** in `onTransitionSuccess`: on the 
 
 `#` is the route delimiter in hash-plugin → URL fragments are structurally incompatible. `pluginBuildUrl` accepts `hash` option for typing parity (TS interface merge needs identical signatures across all 3 URL plugins) but ignores it at runtime + emits one-time `console.warn`. Inline `let warned = false` pattern — existing `createWarnOnce` from `shared/browser-env/ssr-fallback.ts` has SSR-specific signature `(context) => (method) => void` and didn't fit.
 
+## `hashchange` listener for hash-plugin — external fragment changes (#759)
+
+**Problem.** `hash-plugin` synced the router only on `popstate`. But per [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event), `popstate` fires only on history **traversal** (back/forward). A same-document **fragment navigation** — a native `<a href="#/users">`, a manual address-bar hash edit, or `location.hash = "..."` from app/third-party code — fires `hashchange`, not `popstate`. So an external hash change updated the URL while the router stayed on the old route. (browser-plugin is unaffected: for it a path change is a full navigation / popstate.)
+
+**Solution.** A new `createHashSyncLifecycle` in `shared/browser-env/popstate-handler.ts` (hash-plugin's variant of `createPopstateLifecycle`) registers **both** `popstate` and `hashchange`, routing both through the *same* `createPopstateHandler`. A `hashchange` carries no `history.state`, so `getRouteFromEvent` resolves it via the `matchPath(location)` fallback — the URL is the source of truth for an external change, which is exactly right. Wiring:
+
+- `HistoryBrowser.addHashChangeListener` added symmetrically to `addPopstateListener` (`history-api.ts`, `safe-browser.ts`, no-op SSR fallback in `ssr-fallback.ts`).
+- `getRouteFromEvent` widened to `PopStateEvent | HashChangeEvent`; the `"state" in evt` guard skips the `makeState` branch for hashchange. Behaviour for `PopStateEvent` is byte-identical (it always has `state`), so browser-plugin is untouched.
+- Both listeners share the single `SharedFactoryState.removePopStateListener` slot as a **combined remover**, preserving the factory-pool last-wins cleanup (#758) with no new slot.
+
+**Dedup (order-independent).** A hash-changing back/forward fires the `popstate`+`hashchange` pair synchronously (one browser task). Handling both double-navigates. Two type-scoped flags (`sawPopstate` / `sawHashchange`), reset on a `queueMicrotask`, drop whichever of the pair arrives **second** — regardless of the browser's firing order (browsers have historically varied), so the fix does not depend on an unverified ordering fact. The microtask reset scopes the guard to a single synchronous pair: distinct gestures (separate tasks) are never coalesced, and same-type bursts (two rapid `popstate`s → the existing deferred-event path) are unaffected because a `popstate` only blocks a following `hashchange`, never another `popstate`.
+
+**Why this layer.** `hashchange` lives in `browser-env` (the History-API abstraction) symmetric to `popstate`, but is wired **only** by hash-plugin's lifecycle — browser-plugin keeps `createPopstateLifecycle` (popstate only), so it never grows a `hashchange` listener it doesn't want. Clean split, zero behaviour change for browser-plugin / navigation-plugin.
+
+**RED-test caveat (jsdom).** Not reproducible via a naive `location.hash =` in jsdom: jsdom fires a *spurious* `popstate` (`state=undefined`) **in addition to** `hashchange` on a `location.hash=` assignment, so the pre-fix popstate path masks the gap and the router *appears* to sync. Real browsers fire `hashchange` alone for a same-document fragment navigation. The RED test therefore dispatches `new HashChangeEvent("hashchange")` **directly** (URL pre-set via `replaceState`, which fires neither event) to isolate the missing channel. Because `shared/browser-env` is coverage-gated in the `packages/browser-env` test package (not in the symlink consumers, whose coverage `include` misses the real `shared/**` path), the dedup and listener wiring are unit-tested there against 100% thresholds; hash-plugin adds integration-level tests through the public plugin.
+
 ## `invalidate(router, namespace)` — CSR revalidation channel for SSR loader plugins (#605)
 
 ### Problem
@@ -4761,3 +4777,22 @@ Pilot on `core` proved parity + two non-obvious facts:
 `always` (not `ci-only`): keeps local coverage — pre-push `bundle` catches publint/attw errors before push, exactly as the old separate tasks did. Validation is now inseparable from the build (can't bundle without validating). publint `0.3.21` (already in devDeps, satisfies tsdown peer `^0.3.8`) + `@arethetypeswrong/cli 0.18.4` — no new deps.
 
 **Exceptions — NOT tsdown, deliberately keep separate validation:** `solid` (rollup) retains `lint:package`/`lint:types`; the turbo tasks stay **for it alone** (turbo run resolves to `@real-router/solid:lint:package` only — the 21 tsdown packages no longer have the scripts, turbo skips them). `angular` (ng-packagr) and `svelte` (svelte-package) never had publint/attw. The pre-push `pnpm turbo run build lint:package lint:types` line is unchanged: `build`→`bundle` validates the 21 tsdown packages inline; `lint:package`/`lint:types` cover solid. The turbo graph stays mixed — that asymmetry is the price of solid/angular/svelte not being tsdown-built, and is the reason the tasks aren't deleted outright.
+
+## Dependabot npm ecosystem auto-halted by pnpm-override-managed transitive advisories (2026-07-01)
+
+### Problem
+
+Dependabot stopped opening **any** npm PRs for ~2 weeks (only the `github-actions` ecosystem kept working — e.g. `actions/cache 5→6`), while `pnpm outdated` showed 30+ available bumps (angular, tanstack, preact, svelte, rollup, eslint plugins, …). The Dependabot update-log (`/network/updates`) showed every npm job **errored**, culminating in a repository-level auto-pause:
+
+> *Dependabot updates have stopped for your repository due to repeated errors.*
+> *Dependabot cannot update undici to a non-vulnerable version. The latest possible version of undici that can be installed is 7.27.2. The earliest fixed version is 7.28.0.*
+
+Root cause: three OSV/GHSA advisories on **transitive** deps were resolved by `overrides` in `pnpm-workspace.yaml` — `js-yaml` (2026-06-17, via `read-yaml-file '>=2.1.0'`), then `undici '>=7.28.0 <8.0.0'` + `piscina '>=5.2.0 <6.0.0'` (2026-06-18). The installed tree is genuinely clean (`undici@7.28.0`, `piscina@5.2.0`, `js-yaml@4.3.0`; `lint:audit`/osv-scanner: 1755 pkgs, no issues). **But Dependabot does not apply pnpm `overrides` during its own resolution** — it re-resolves each dep to its natural transitive ceiling (undici 7.27.2 < fixed 7.28.0), concludes it "cannot update to a non-vulnerable version", and **errors the entire npm job → zero PRs**. Successive errors (js-yaml → piscina → undici) tripped Dependabot's repo-wide auto-halt. **Not a pnpm-11 regression** — all three errors predate the 11.9 migration (2026-06-25); the overrides lived in `package.json#pnpm.overrides` at the time and Dependabot ignored them there too (it never honors pnpm overrides, in either location).
+
+### Solution
+
+Add the three transitive, override-pinned deps to the npm ecosystem's `ignore` list in `.github/dependabot.yml` (`ignore` filters a dep out of **both** version and security updates — GitHub docs). This removes the un-satisfiable advisory targets from Dependabot's resolution, so the weekly version job stops erroring and produces the backlog. After the config is on `master`, click **Check for updates** on the `package.json` ecosystem at `/network/updates` to lift the auto-halt (Dependabot reads config from the default branch; the halt only clears on a manual re-trigger). Coverage of these transitive advisories is unchanged — `lint:audit` (osv-scanner) remains the real gate; Dependabot could never PR an override-pinned transitive dep anyway.
+
+### Why this and not the alternatives
+
+**Not removing/loosening the overrides** — they are the actual fix that makes osv-scanner clean; dropping them re-opens the vulnerabilities. **Not disabling Dependabot security updates repo-wide** — that would blind us to advisories on *direct* deps (Dependabot's real job). **Not adding undici/piscina as direct devDeps** — pollutes manifests with transitive internals, and wouldn't help: Dependabot's resolver still can't reach 7.28.0 through the parent chain. The `ignore` list is surgical and codified. **Recurring-pattern note (in the config comment):** every future transitive-advisory-via-override adds another `ignore` entry, or Dependabot re-halts the whole npm ecosystem.

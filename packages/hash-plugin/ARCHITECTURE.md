@@ -52,7 +52,7 @@ External dependencies:
 | Dependency          | What it provides                                                        | Used in                                                     |
 | ------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)            | `factory.ts`, `plugin.ts`, `index.ts`                       |
-| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing helpers | `factory.ts`, `plugin.ts`, `validation.ts`, `hash-utils.ts` |
+| `browser-env`       | Browser abstraction, popstate + hashchange handling, validation, URL parsing helpers | `factory.ts`, `plugin.ts`, `validation.ts`, `hash-utils.ts` |
 | `type-guards`       | `isStateStrict` (`history.state` validation)                            | `index.ts` (re-exported as `isState`)                       |
 
 ## Factory + Class Pattern
@@ -82,7 +82,7 @@ hashPluginFactory(opts?, browser?)   ← factory.ts
                             │  - registers start interceptor (via browser-env)
                             │  - pre-computes urlPrefix = `${base}#${hashPrefix}`
                             │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
-                            │  - creates popstate handler and lifecycle (via browser-env)
+                            │  - creates popstate handler + hash-sync lifecycle (popstate & hashchange, via browser-env)
                             │
                             └── .getPlugin()  → Plugin { onStart, onStop, ... }
 ```
@@ -239,7 +239,7 @@ this.#lifecycle = createPopstateLifecycle({
 });
 ```
 
-`teardown` removes the popstate listener, then calls the `cleanup` callback which unregisters the start interceptor and router extensions.
+`teardown` removes the popstate **and** hashchange listeners (both stored under the single `removePopStateListener` slot as a combined remover, #759), then calls the `cleanup` callback which unregisters the start interceptor and router extensions.
 
 As a safety net, `router.dispose()` also cleans up any extensions that plugins failed to remove in their `teardown`.
 
@@ -275,16 +275,16 @@ interface SharedFactoryState {
 }
 ```
 
-The `shared` object is created once in `hashPluginFactory()` and passed to `createPopstateLifecycle` from `browser-env`.
+The `shared` object is created once in `hashPluginFactory()` and passed to `createHashSyncLifecycle` from `browser-env` (hash-plugin's variant of `createPopstateLifecycle` that also wires `hashchange`, #759).
 
 **Why is it needed?**
 
 The factory may be called again — for example, during hot module replacement (HMR) or when reusing the factory with different routers.
-Each new plugin instance registers its own popstate listener in `onStart`. Without `shared`, the previous listener would remain in memory.
+Each new plugin instance registers its own popstate + hashchange listeners in `onStart`. Without `shared`, the previous listeners would remain in memory.
 
 `shared` is intentionally mutable. It's the only shared state between instances of the same factory.
 
-**Factory pool — last-wins (concurrent-live caveat, #758).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listener before installing its own. The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate` — the earlier one silently desyncs from the URL. There is a single `popstate` stream and a single URL, so this mutual exclusivity is inherent. For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/plugin-lifecycle-churn.stress.ts`.
+**Factory pool — last-wins (concurrent-live caveat, #758).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listeners before installing its own. (For hash-plugin the slot holds a combined remover for **both** the popstate and hashchange listeners, #759.) The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate`/`hashchange` — the earlier one silently desyncs from the URL. There is a single event stream and a single URL, so this mutual exclusivity is inherent. For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/plugin-lifecycle-churn.stress.ts`.
 
 ## Data Flow: Navigation
 
@@ -311,15 +311,15 @@ router.navigate(name, params, opts)
 
 **Note:** Unlike browser-plugin, hash-plugin does NOT preserve hash fragments (the hash IS the route).
 
-## Data Flow: popstate (back/forward buttons)
+## Data Flow: popstate (back/forward buttons) + hashchange (external fragment changes)
 
-Popstate handling is fully delegated to `browser-env` via `createPopstateHandler` + `createPopstateLifecycle`. The flow is identical for browser-plugin and hash-plugin:
+Event handling is delegated to `browser-env` via `createPopstateHandler`. browser-plugin wires it with `createPopstateLifecycle` (popstate only); hash-plugin wires it with `createHashSyncLifecycle` (popstate **and** hashchange, #759). Both events reach the **same** handler; the flow below is shared:
 
 ```
-User clicks back or forward
-        │
+User clicks back/forward (popstate) OR changes the fragment externally (hashchange)
+        │  external = native <a href="#/x">, address-bar edit, location.hash=
         ▼
-  browser.addPopstateListener → handler(evt)  (from createPopstateHandler)
+  addPopstateListener / addHashChangeListener → handler(evt)  (from createPopstateHandler)
         │
         ├── location = browser.getLocation()   (snapshot at fire time, #757)
         │
@@ -331,8 +331,8 @@ User clicks back or forward
         │
         ├── getRouteFromEvent(evt, api, location)
         │     │
-        │     ├── isState(evt.state)?
-        │     │     YES: { name: evt.state.name, params: evt.state.params }
+        │     ├── "state" in evt && isState(evt.state)?   (popstate carries history.state;
+        │     │     YES: { name, params, path } from state    hashchange never does → fallback)
         │     │
         │     └── NO: api.matchPath(location)
         │               └── Hash URL matching as fallback
@@ -361,6 +361,15 @@ The `isTransitioning` flag blocks concurrent processing.
 New events are written to the single-slot `deferred = { evt, location }` queue — each one overwrites the previous (last-write-wins).
 The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live hash location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target (#757).
 After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location.
+
+### popstate/hashchange dedup (#759)
+
+`createHashSyncLifecycle` registers both listeners but must not act on both when a **hash-changing back/forward** fires the pair synchronously (one browser task) — that would double-navigate. Two type-scoped flags (`sawPopstate` / `sawHashchange`), reset on a microtask, drop whichever of the pair arrives **second**. The dedup is **order-independent** (works whether the browser fires popstate or hashchange first) and does not coalesce:
+
+- **Separate gestures** land in separate tasks → the microtask reset clears the flags between them, so each is handled.
+- **Same-type bursts** (two rapid `popstate`s → the deferred path above) are unaffected: a `popstate` only blocks a following `hashchange`, never another `popstate`.
+
+An **external** fragment change fires `hashchange` alone (no popstate), so it is never dropped — that is the gap #759 closed.
 
 See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for implementation details.
 
@@ -439,8 +448,8 @@ router.start()
         │
         ▼
   Plugin.onStart()
-        ├── Removes previous popstate listener (if any)
-        └── Registers new popstate listener
+        ├── Removes previous popstate + hashchange listeners (if any)
+        └── Registers new popstate + hashchange listeners (combined remover, #759)
 
 router.navigate() → success
         │
@@ -452,13 +461,13 @@ router.stop()
         │
         ▼
   Plugin.onStop()
-        └── Removes popstate listener
+        └── Removes popstate + hashchange listeners
 
 unsubscribe() or router.dispose()
         │
         ▼
   Plugin.teardown()
-        ├── Removes popstate listener
+        ├── Removes popstate + hashchange listeners
         ├── Unregisters start interceptor (#removeStartInterceptor)
         └── Removes router extensions (#removeExtensions)
 ```
@@ -513,6 +522,7 @@ buildUrl("users.profile", { id: "123" })
 | URL format         | `/app/users/123`                           | `#!/users/123`                                  |
 | Path extraction    | `String.startsWith` + `slice`              | Pre-computed RegExp via `createHashPrefixRegex` |
 | Hash preservation  | Preserves hash when paths match            | N/A — hash IS the route                         |
+| Event sources      | `popstate` only (`createPopstateLifecycle`) | `popstate` + `hashchange`, deduped (`createHashSyncLifecycle`, #759) |
 | Regex              | Not needed                                 | Pre-computed once at factory time               |
 | Server config      | Requires fallback (all paths → index.html) | No server config needed                         |
 | `buildUrl` formula | `base + path`                              | `urlPrefix + path` (pre-computed prefix)        |
