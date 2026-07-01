@@ -16,8 +16,10 @@ import type { PluginApi } from "@real-router/core/api";
  * - Otherwise (e.g. manually entered URL with no recorded state), fall back
  *   to `api.matchPath(location)`. `location` is the route location the caller
  *   captured when the popstate event fired — each plugin derives it from its
- *   own `browser.getLocation()` (URL pathname for browser-plugin, hash-derived
- *   path for hash-plugin), so the fallback works for both.
+ *   own `browser.getLocation()`, and both return a path the matcher understands
+ *   (browser-plugin: the History pathname; hash-plugin: the hash route via
+ *   `buildHashLocation(location.hash, ...)`), so the fallback works for both.
+ *   (#760)
  * - `undefined` when neither path produces a match.
  *
  * The caller passes the location it snapshotted at event time rather than
