@@ -338,6 +338,26 @@ describe("createScrollSpy (Angular dom-utils copy)", () => {
       router.stop();
     });
 
+    it("keeps the least-negative anchor when a more-negative one follows", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1, s2] = setupAnchors(["section-1", "section-2"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      // Both above the zone: s1 (-100) is closer than s2 (-300). s2 must NOT
+      // beat bestNegative → exercises the `distance > bestNegativeDist` false arm.
+      ioInstances[0].trigger([buildEntry(s1, -100), buildEntry(s2, -300)]);
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+        hash: "section-1",
+      });
+
+      router.stop();
+    });
+
     it("skips emit when no entries are intersecting", async () => {
       const router = await createTestRouter();
       const navigateSpy = vi.spyOn(router, "navigate");
