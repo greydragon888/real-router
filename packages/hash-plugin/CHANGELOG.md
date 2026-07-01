@@ -1,5 +1,11 @@
 # @real-router/hash-plugin
 
+## 0.8.1
+
+### Patch Changes
+
+- [#1081](https://github.com/greydragon888/real-router/pull/1081) [`362f24d`](https://github.com/greydragon888/real-router/commit/362f24d1b57b88d5f01bc078e84e2b384b3811b1) Thanks [@greydragon888](https://github.com/greydragon888)! - Clarify the `getRouteFromEvent` matchPath-fallback JSDoc in shared `popstate-utils` — name hash-plugin's `buildHashLocation(location.hash, ...)` mechanism so the comment (read by both URL plugins' maintainers) correctly explains why the fallback resolves the hash route ([#760](https://github.com/greydragon888/real-router/issues/760))
+
 ## 0.8.0
 
 ### Minor Changes
