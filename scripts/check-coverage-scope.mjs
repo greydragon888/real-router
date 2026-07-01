@@ -135,9 +135,15 @@ const sonarSources = [
   ...sharedDirs.map((d) => `shared/${d}`),
 ];
 const sonarTests = coverageProducing.map((p) => `packages/${p}/tests`);
-const lcovReports = packages
-  .map((p) => `packages/${p}/coverage/lcov.info`)
-  .filter((p) => existsSync(join(ROOT, p)));
+const lcovReports = [
+  ...packages.map((p) => `packages/${p}/coverage/lcov.info`),
+  // #1065: the shared/ test node (@real-router/shared-sources) owns the
+  // aggregated coverage of shared/{browser-env,dom-utils} and emits it to
+  // shared/coverage/lcov.info — NOT packages/*/coverage/. base-test uploads it
+  // (in sharded mode, the only mode a shared-source edit takes), so the merge
+  // must feed it to Codecov/Sonar or those shared lines score 0%.
+  "shared/coverage/lcov.info",
+].filter((p) => existsSync(join(ROOT, p)));
 
 // --- Check 1: codecov.yml components ⇔ coverage-producing packages ----------
 const codecov = read("codecov.yml");
@@ -316,7 +322,7 @@ if (emitMode) {
   // broken upload/download, not a valid scope; refuse to emit a blank argument.
   if (lcovReports.length === 0) {
     console.error(
-      "✖ --emit: no packages/*/coverage/lcov.info files found — coverage artifacts missing?",
+      "✖ --emit: no coverage lcov.info files found — coverage artifacts missing?",
     );
     process.exit(1);
   }

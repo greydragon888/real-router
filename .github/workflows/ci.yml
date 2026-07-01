@@ -255,7 +255,7 @@ jobs:
           # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
           # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
           # replaces an echo|sed subshell (SC2001).
-          find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
+          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
             while IFS= read -r -d '' lcov; do
               pkg_dir="${lcov%/coverage/lcov.info}"
               sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
@@ -381,12 +381,21 @@ jobs:
       # shard exclusion), so the two cannot drift. $FILTERS is intentionally
       # unquoted (bash word-splitting into separate --filter=<pkg> tokens) —
       # same pattern as the shards' $SHARD_FILTER.
-      - name: Test core layer
+      - name: Test core layer + shared test node
         run: |
           FILTERS=$(node -e 'import("./scripts/build-matrix.mjs").then((m) => process.stdout.write([...m.CORE_LAYER].map((p) => "--filter=" + p).join(" ")))')
           echo "Core-layer filters: $FILTERS"
+          # #1065: the shared/ test node (@real-router/shared-sources) owns the
+          # aggregated coverage of shared/{browser-env,dom-utils} (allowExternal +
+          # include, #809), but it is NEITHER a CORE_LAYER package NOR a dynamic
+          # shard member — so in sharded mode it would be tested NOWHERE (the exact
+          # base-layer failure described above), leaving shared/* changes with no
+          # lcov and a 0% SonarCloud score. A shared-source edit always routes
+          # sharded (touchesSharedSources), so it MUST run here. Turbo's
+          # `../../shared/**` input-glob makes it a cache hit when shared is
+          # untouched, so this is free on non-shared sharded PRs.
           # shellcheck disable=SC2086
-          pnpm turbo run test test:properties $FILTERS
+          pnpm turbo run test test:properties $FILTERS --filter=@real-router/shared-sources
 
       - name: Fix coverage paths
         run: |
@@ -395,7 +404,7 @@ jobs:
           # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
           # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
           # replaces an echo|sed subshell (SC2001).
-          find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
+          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
             while IFS= read -r -d '' lcov; do
               pkg_dir="${lcov%/coverage/lcov.info}"
               sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
@@ -410,7 +419,12 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-reports-base
-          path: packages/*/coverage/
+          # #1065: the shared/ test node's aggregated lcov (shared/browser-env +
+          # shared/dom-utils owner coverage) lands at shared/coverage/, not
+          # packages/*/coverage/ — upload it so the coverage/sonar merge sees it.
+          path: |
+            packages/*/coverage/
+            shared/coverage/
           retention-days: 1
 
   # ============================================
@@ -531,7 +545,7 @@ jobs:
           # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
           # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
           # replaces an echo|sed subshell (SC2001).
-          find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
+          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
             while IFS= read -r -d '' lcov; do
               pkg_dir="${lcov%/coverage/lcov.info}"
               sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
