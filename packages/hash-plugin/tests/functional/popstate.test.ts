@@ -517,4 +517,110 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       expect(router.getState()).toStrictEqual(stateBefore);
     });
   });
+
+  describe("Hashchange — external fragment changes (#759)", () => {
+    beforeEach(async () => {
+      router.usePlugin(hashPluginFactory({}, mockedBrowser));
+      await router.start();
+    });
+
+    it("syncs the router on an external hashchange with no popstate (native anchor / address-bar edit / location.hash=)", async () => {
+      // Router boots at "index" ("/"). An external fragment change — a native
+      // `<a href="#/users/list">`, a manual address-bar hash edit, or
+      // `location.hash = ...` from app/third-party code — updates location.hash
+      // and fires `hashchange` ONLY (popstate fires on traversal; pushState/
+      // replaceState never fire hashchange). Before #759 the plugin listened to
+      // popstate alone, so this external channel never reached the router.
+      expect(router.getState()?.name).toBe("index");
+
+      globalThis.history.replaceState({}, "", "/#/users/list");
+      globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("users.list");
+    });
+
+    it("does not double-navigate when a hash traversal fires popstate then hashchange", async () => {
+      // Back/forward over a hash entry fires BOTH events synchronously. The
+      // dedup drops the second of the pair, so exactly one navigation runs.
+      globalThis.history.replaceState({}, "", "/#/users/list");
+      const navSpy = vi.spyOn(getPluginApi(router), "navigateToState");
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("users.list");
+      expect(navSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not double-navigate when a hash traversal fires hashchange then popstate (reverse order)", async () => {
+      // Same traversal, opposite arrival order — the dedup is order-independent,
+      // so the popstate is the one dropped here. Still exactly one navigation.
+      globalThis.history.replaceState({}, "", "/#/users/list");
+      const navSpy = vi.spyOn(getPluginApi(router), "navigateToState");
+
+      globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("users.list");
+      expect(navSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("handles hashchanges from separate tasks independently (dedup guard resets per task)", async () => {
+      // Two distinct external changes in separate browser tasks must BOTH be
+      // handled — the guard resets on a microtask, so it never coalesces
+      // separate user gestures into one.
+      globalThis.history.replaceState({}, "", "/#/users/list");
+      globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("users.list");
+
+      globalThis.history.replaceState({}, "", "/#/home");
+      globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("home");
+    });
+
+    it("removes the hashchange listener on stop", async () => {
+      const removeEventSpy = vi.spyOn(globalThis, "removeEventListener");
+
+      router.stop();
+
+      expect(removeEventSpy).toHaveBeenCalledWith(
+        "hashchange",
+        expect.any(Function),
+      );
+
+      removeEventSpy.mockRestore();
+    });
+
+    it("registers a hashchange listener on start", async () => {
+      // Fresh router — the shared beforeEach already started one; assert the
+      // hashchange listener is wired alongside popstate on start.
+      router.stop();
+
+      const addEventSpy = vi.spyOn(globalThis, "addEventListener");
+      const freshRouter = createRouter(routerConfig, { defaultRoute: "home" });
+
+      freshRouter.usePlugin(hashPluginFactory({}, mockedBrowser));
+      await freshRouter.start();
+
+      expect(addEventSpy).toHaveBeenCalledWith(
+        "hashchange",
+        expect.any(Function),
+      );
+
+      freshRouter.stop();
+      addEventSpy.mockRestore();
+    });
+  });
 });

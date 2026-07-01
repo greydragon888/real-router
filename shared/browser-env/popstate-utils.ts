@@ -30,14 +30,21 @@ import type { PluginApi } from "@real-router/core/api";
  * the State directly to `router.navigateToState(state, opts)` and skip
  * the redundant `forwardState`/`buildPath` round-trip in
  * `buildNavigateState` (issue #525).
+ *
+ * Accepts `HashChangeEvent` too (#759): a `hashchange` carries no history
+ * `state`, so it always resolves via the `matchPath(location)` fallback — the
+ * correct source of truth for an external fragment change, where the URL, not
+ * a plugin-recorded entry, defines the target.
  */
 export function getRouteFromEvent(
-  evt: PopStateEvent,
+  evt: PopStateEvent | HashChangeEvent,
   api: PluginApi,
   location: string,
 ): State | undefined {
-  if (isState(evt.state)) {
-    return api.makeState(evt.state.name, evt.state.params, evt.state.path);
+  const state: unknown = "state" in evt ? evt.state : undefined;
+
+  if (isState(state)) {
+    return api.makeState(state.name, state.params, state.path);
   }
 
   return api.matchPath(location);

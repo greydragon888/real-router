@@ -2,6 +2,15 @@ export interface HistoryBrowser {
   pushState: (state: unknown, path: string) => void;
   replaceState: (state: unknown, path: string) => void;
   addPopstateListener: (fn: (evt: PopStateEvent) => void) => () => void;
+  /**
+   * Subscribe to `hashchange`. Fired for same-document fragment navigations
+   * that the plugin did NOT drive itself — native anchors (`<a href="#/x">`),
+   * manual address-bar hash edits, and `location.hash = ...` from app code.
+   * `pushState`/`replaceState` (the plugin's own writes) never fire it, so it
+   * is a clean external-change channel. Used only by hash-plugin, where `#`
+   * carries the route (browser-plugin leaves it unused). (#759)
+   */
+  addHashChangeListener: (fn: (evt: HashChangeEvent) => void) => () => void;
   getHash: () => string;
 }
 

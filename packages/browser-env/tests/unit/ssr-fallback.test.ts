@@ -76,6 +76,19 @@ describe("createHistoryFallbackBrowser", () => {
     }).not.toThrow();
   });
 
+  it("addHashChangeListener returns cleanup function and warns (#759)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const browser = createHistoryFallbackBrowser("ctx");
+    const cleanup = browser.addHashChangeListener(vi.fn());
+
+    expect(typeof cleanup).toBe("function");
+    expect(() => {
+      cleanup();
+    }).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain("addHashChangeListener");
+  });
+
   it("getHash returns empty string", () => {
     const browser = createHistoryFallbackBrowser("ctx");
 

@@ -2,7 +2,11 @@ import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createPopstateHandler, createPopstateLifecycle } from "../../src";
+import {
+  createPopstateHandler,
+  createPopstateLifecycle,
+  createHashSyncLifecycle,
+} from "../../src";
 
 import type {
   Browser,
@@ -28,6 +32,7 @@ function makeFakeBrowser(location = "/"): Browser {
     pushState: vi.fn(),
     replaceState: vi.fn(),
     addPopstateListener: vi.fn(() => () => {}),
+    addHashChangeListener: vi.fn(() => () => {}),
     getLocation: () => location,
     getHash: () => "",
   };
@@ -35,6 +40,12 @@ function makeFakeBrowser(location = "/"): Browser {
 
 function makePopStateEvent(state: unknown): PopStateEvent {
   return { state } as PopStateEvent;
+}
+
+// A hashchange event carries no history `state` — the handler resolves it via
+// the matchPath fallback. The synthetic object omits `state` on purpose.
+function makeHashChangeEvent(): HashChangeEvent {
+  return {} as HashChangeEvent;
 }
 
 async function flushAsync(): Promise<void> {
@@ -490,6 +501,191 @@ describe("popstate handler", () => {
 
       expect(removeSpy).not.toHaveBeenCalled();
       expect(cleanup).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("createHashSyncLifecycle (#759)", () => {
+    function makeHashSyncDeps(): {
+      shared: SharedFactoryState;
+      removePopSpy: ReturnType<typeof vi.fn>;
+      removeHashSpy: ReturnType<typeof vi.fn>;
+      addPopSpy: ReturnType<typeof vi.fn>;
+      addHashSpy: ReturnType<typeof vi.fn>;
+      handler: ReturnType<typeof vi.fn>;
+      cleanup: ReturnType<typeof vi.fn>;
+      lifecycle: ReturnType<typeof createHashSyncLifecycle>;
+      firePopstate: (state?: unknown) => void;
+      fireHashchange: () => void;
+    } {
+      const shared: SharedFactoryState = { removePopStateListener: undefined };
+      const removePopSpy = vi.fn();
+      const removeHashSpy = vi.fn();
+      let popstateListener: ((evt: PopStateEvent) => void) | undefined;
+      let hashchangeListener: ((evt: HashChangeEvent) => void) | undefined;
+      const addPopSpy = vi.fn((fn: (evt: PopStateEvent) => void) => {
+        popstateListener = fn;
+
+        return removePopSpy;
+      });
+      const addHashSpy = vi.fn((fn: (evt: HashChangeEvent) => void) => {
+        hashchangeListener = fn;
+
+        return removeHashSpy;
+      });
+      const browser: Browser = {
+        ...makeFakeBrowser(),
+        addPopstateListener: addPopSpy,
+        addHashChangeListener: addHashSpy,
+      };
+      const handler = vi.fn();
+      const cleanup = vi.fn();
+      const lifecycle = createHashSyncLifecycle({
+        browser,
+        shared,
+        handler,
+        cleanup,
+      });
+
+      return {
+        shared,
+        removePopSpy,
+        removeHashSpy,
+        addPopSpy,
+        addHashSpy,
+        handler,
+        cleanup,
+        lifecycle,
+        firePopstate: (state: unknown = null) => {
+          popstateListener?.(makePopStateEvent(state));
+        },
+        fireHashchange: () => {
+          hashchangeListener?.(makeHashChangeEvent());
+        },
+      };
+    }
+
+    it("onStart registers BOTH popstate and hashchange listeners", () => {
+      const { shared, addPopSpy, addHashSpy, lifecycle } = makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+
+      expect(addPopSpy).toHaveBeenCalledTimes(1);
+      expect(addHashSpy).toHaveBeenCalledTimes(1);
+      expect(shared.removePopStateListener).toBeTypeOf("function");
+    });
+
+    it("onStart removes a previous instance's listeners before re-registering", () => {
+      const { removePopSpy, removeHashSpy, addPopSpy, addHashSpy, lifecycle } =
+        makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      lifecycle.onStart?.();
+
+      expect(removePopSpy).toHaveBeenCalledTimes(1);
+      expect(removeHashSpy).toHaveBeenCalledTimes(1);
+      expect(addPopSpy).toHaveBeenCalledTimes(2);
+      expect(addHashSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("onStop removes both listeners and clears the shared slot", () => {
+      const { shared, removePopSpy, removeHashSpy, lifecycle } =
+        makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      lifecycle.onStop?.();
+
+      expect(removePopSpy).toHaveBeenCalledTimes(1);
+      expect(removeHashSpy).toHaveBeenCalledTimes(1);
+      expect(shared.removePopStateListener).toBeUndefined();
+    });
+
+    it("onStop is a no-op when no listeners are registered", () => {
+      const { removePopSpy, removeHashSpy, lifecycle } = makeHashSyncDeps();
+
+      lifecycle.onStop?.();
+
+      expect(removePopSpy).not.toHaveBeenCalled();
+      expect(removeHashSpy).not.toHaveBeenCalled();
+    });
+
+    it("teardown removes both listeners and runs cleanup", () => {
+      const { shared, removePopSpy, removeHashSpy, cleanup, lifecycle } =
+        makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      lifecycle.teardown?.();
+
+      expect(removePopSpy).toHaveBeenCalledTimes(1);
+      expect(removeHashSpy).toHaveBeenCalledTimes(1);
+      expect(shared.removePopStateListener).toBeUndefined();
+      expect(cleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it("teardown still runs cleanup when no listeners are registered", () => {
+      const { removePopSpy, cleanup, lifecycle } = makeHashSyncDeps();
+
+      lifecycle.teardown?.();
+
+      expect(removePopSpy).not.toHaveBeenCalled();
+      expect(cleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it("forwards a lone external hashchange to the handler (no popstate)", () => {
+      const { handler, lifecycle, fireHashchange } = makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      fireHashchange();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it("dedups a traversal pair — popstate first drops the paired hashchange", () => {
+      const { handler, lifecycle, firePopstate, fireHashchange } =
+        makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      firePopstate();
+      fireHashchange();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it("dedups a traversal pair — hashchange first drops the paired popstate (order-independent)", () => {
+      const { handler, lifecycle, firePopstate, fireHashchange } =
+        makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      fireHashchange();
+      firePopstate();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it("resets the dedup guard on a microtask so separate tasks are both handled", async () => {
+      const { handler, lifecycle, fireHashchange, firePopstate } =
+        makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      fireHashchange();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      // Flush the microtask that clears the guard, then a new task's popstate
+      // must NOT be treated as the pair of the earlier hashchange.
+      await Promise.resolve();
+      firePopstate();
+
+      expect(handler).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not coalesce same-type bursts — two popstates in one task both run", () => {
+      const { handler, lifecycle, firePopstate } = makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      firePopstate();
+      firePopstate();
+
+      expect(handler).toHaveBeenCalledTimes(2);
     });
   });
 });

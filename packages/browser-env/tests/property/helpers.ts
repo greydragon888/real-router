@@ -161,6 +161,7 @@ export function createSpyBrowser(): SpyBrowser {
       calls.push({ method: "replaceState", state, url });
     },
     addPopstateListener: () => () => {},
+    addHashChangeListener: () => () => {},
     getHash: () => "",
     getLocation: () => "/",
     getCalls: () => calls,

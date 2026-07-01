@@ -18,4 +18,14 @@ export const addPopstateListener: HistoryBrowser["addPopstateListener"] = (
   };
 };
 
+export const addHashChangeListener: HistoryBrowser["addHashChangeListener"] = (
+  fn,
+) => {
+  globalThis.addEventListener("hashchange", fn);
+
+  return () => {
+    globalThis.removeEventListener("hashchange", fn);
+  };
+};
+
 export const getHash = (): string => globalThis.location.hash;
