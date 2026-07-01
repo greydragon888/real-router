@@ -3,10 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
+  "description": "Shared source modules (browser-env, dom-utils, ssr) + aggregated tests and 100% coverage gate (#1065)",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts browser-env dom-utils tests --fix --max-warnings 0",
+    "test": "vitest run",
+    "test:properties": "vitest run --config vitest.config.properties.mts",
+    "test:stress": "vitest run --config vitest.config.stress.mts"
+  },
   "devDependencies": {
     "@real-router/core": "workspace:*",
     "@real-router/sources": "workspace:*",
     "@real-router/types": "workspace:*",
+    "jsdom": "29.1.1",
     "type-guards": "workspace:*"
   }
 }

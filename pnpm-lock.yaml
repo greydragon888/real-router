@@ -6084,19 +6084,6 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  packages/browser-env:
-    dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
-    devDependencies:
-      jsdom:
-        specifier: 29.1.1
-        version: 29.1.1(@noble/hashes@2.2.0)
-
   packages/browser-plugin:
     dependencies:
       '@real-router/core':
@@ -6136,19 +6123,6 @@ importers:
         version: link:../route-tree
 
   packages/core-types: {}
-
-  packages/dom-utils:
-    dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
-      '@real-router/sources':
-        specifier: workspace:^
-        version: link:../sources
-    devDependencies:
-      jsdom:
-        specifier: 29.1.1
-        version: 29.1.1(@noble/hashes@2.2.0)
 
   packages/event-emitter: {}
 
@@ -6561,6 +6535,9 @@ importers:
       '@real-router/types':
         specifier: workspace:*
         version: link:../packages/core-types
+      jsdom:
+        specifier: 29.1.1
+        version: 29.1.1(@noble/hashes@2.2.0)
       type-guards:
         specifier: workspace:*
         version: link:../packages/type-guards
