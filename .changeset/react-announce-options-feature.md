@@ -13,7 +13,9 @@ previous default behavior, so the change is fully backward compatible.
 ```tsx
 <RouterProvider
   router={router}
-  announceNavigation={{ getAnnouncementText: (route) => `Now on ${route.name}` }}
+  announceNavigation={{
+    getAnnouncementText: (route) => `Now on ${route.name}`,
+  }}
 >
   <App />
 </RouterProvider>

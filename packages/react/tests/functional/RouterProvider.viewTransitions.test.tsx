@@ -156,6 +156,7 @@ describe("RouterProvider — viewTransitions", () => {
     await act(async () => {
       const first = router.navigate("about");
       const second = router.navigate("users");
+
       await Promise.allSettled([first, second]);
     });
 

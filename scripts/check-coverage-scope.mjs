@@ -113,6 +113,12 @@ const sharedDirs = existsSync(SHARED_DIR)
         (n) =>
           !n.startsWith(".") &&
           n !== "node_modules" &&
+          // Generated / non-source dirs: `shared/tests` (#1065) holds the shared
+          // test node's specs, and `shared/coverage` is the transient lcov output
+          // (gitignored). Neither is a shipped source dir with a measuring owner
+          // or codecov component — exclude them from the shared-source checks.
+          n !== "tests" &&
+          n !== "coverage" &&
           isRealDir(join(SHARED_DIR, n)),
       )
       .sort()
@@ -147,7 +153,11 @@ for (const pkg of coverageProducing) {
   }
 }
 for (const comp of declaredComponents) {
-  if (!coverageProducing.includes(comp)) {
+  // A component is valid if it maps to a coverage-producing package OR to a
+  // shared source dir (#1065: browser-env/dom-utils are no longer wrapper
+  // packages — their coverage lands at shared/<dir>/… and codecov routes those
+  // components by `shared/<dir>/**` paths).
+  if (!coverageProducing.includes(comp) && !sharedDirs.includes(comp)) {
     errors.push(
       `codecov.yml: component "${comp}" has no coverage-producing package (stale — remove it)`,
     );
@@ -156,14 +166,15 @@ for (const comp of declaredComponents) {
 
 // --- Check 2: sonar.coverage.exclusions ⇔ no-test/phantom packages ----------
 const sonar = read("sonar-project.properties");
-const exclLine =
-  sonar.match(/^sonar\.coverage\.exclusions=(.*)$/m)?.[1] ?? "";
+const exclLine = sonar.match(/^sonar\.coverage\.exclusions=(.*)$/m)?.[1] ?? "";
 const exclusions = new Set(exclLine.split(",").map((s) => s.trim()));
 
 for (const pkg of mustCoverageExclude) {
   const glob = `packages/${pkg}/src/**`;
   if (!exclusions.has(glob)) {
-    const why = !hasTests(pkg) ? "no tests/ → no lcov" : "phantom code (lowered vitest threshold)";
+    const why = !hasTests(pkg)
+      ? "no tests/ → no lcov"
+      : "phantom code (lowered vitest threshold)";
     errors.push(
       `sonar-project.properties: "${glob}" missing from sonar.coverage.exclusions (${why}) — Sonar would score it as uncovered`,
     );
@@ -197,6 +208,17 @@ const ownerConfigs = packages
     pkg: p,
     text: readFileSync(join(PKG_DIR, p, "vitest.config.mts"), "utf8"),
   }));
+
+// #1065: the `shared/` test node owns the coverage of shared/{browser-env,
+// dom-utils} — its src is the symlink TARGET (not a package), so the owner
+// config lives at shared/vitest.config.mts, not under packages/*. Count it.
+const sharedOwnerCfg = join(SHARED_DIR, "vitest.config.mts");
+if (existsSync(sharedOwnerCfg)) {
+  ownerConfigs.push({
+    pkg: "shared",
+    text: readFileSync(sharedOwnerCfg, "utf8"),
+  });
+}
 
 for (const dir of sharedDirs) {
   // Match the include GLOB (`**/shared/<dir>/`), not a bare `shared/<dir>`

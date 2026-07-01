@@ -1,10 +1,8 @@
-import { act, render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { renderToString } from "react-dom/server";
-
 import { createRouter } from "@real-router/core";
 import { getTransitionSource } from "@real-router/sources";
+import { act, render } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RouterProvider } from "@real-router/react";
 
@@ -41,12 +39,12 @@ function installFakeIntersectionObserver(): void {
     public readonly scrollMargin: string = "";
     public readonly thresholds: readonly number[] = [];
 
-    readonly #callback: IntersectionObserverCallback;
-    readonly #observed = new Set<Element>();
-
     public disconnect = vi.fn((): void => {
       this.#observed.clear();
     });
+
+    readonly #callback: IntersectionObserverCallback;
+    readonly #observed = new Set<Element>();
 
     constructor(
       cb: IntersectionObserverCallback,
@@ -83,9 +81,9 @@ function installFakeMutationObserver(): void {
   moInstances.length = 0;
 
   const FakeMOClass = class implements MutationObserver {
-    readonly #callback: MutationCallback;
-
     public disconnect = vi.fn();
+
+    readonly #callback: MutationCallback;
 
     constructor(cb: MutationCallback) {
       this.#callback = cb;
@@ -130,7 +128,7 @@ function buildEntry(
     } as DOMRectReadOnly,
     rootBounds: null,
     time: 0,
-  } as IntersectionObserverEntry;
+  };
 }
 
 // Variant that pins `rootBounds.top` — exercises the rootMargin-aware
@@ -161,7 +159,7 @@ function buildEntryWithZone(
       height: 0,
     } as DOMRectReadOnly,
     time: 0,
-  } as IntersectionObserverEntry;
+  };
 }
 
 function setupAnchors(ids: readonly string[]): HTMLElement[] {
@@ -187,7 +185,7 @@ describe("RouterProvider — scrollSpy", () => {
     // window.location, which otherwise leaks across tests — a prior scroll-spy
     // emit of `#section-N` makes the next `router.start("/")` read a dirty hash
     // and the same-hash skip gate suppresses the emit under assertion.
-    window.history.replaceState(null, "", "/");
+    globalThis.history.replaceState(null, "", "/");
     installFakeIntersectionObserver();
     installFakeMutationObserver();
     router = createTestRouterWithADefaultRouter();
@@ -300,11 +298,13 @@ describe("RouterProvider — scrollSpy", () => {
     );
 
     act(() => {
-      ioInstances.at(-1)?.trigger([
-        buildEntry(s1, 200),
-        buildEntry(s2, 50),
-        buildEntry(s3, 400),
-      ]);
+      ioInstances
+        .at(-1)
+        ?.trigger([
+          buildEntry(s1, 200),
+          buildEntry(s2, 50),
+          buildEntry(s3, 400),
+        ]);
       vi.runAllTimers();
     });
 
@@ -327,10 +327,12 @@ describe("RouterProvider — scrollSpy", () => {
     // zoneTop = 500. s1 straddles from far above (dist −300); s2 sits at the
     // line (dist −10, least-negative → picked).
     act(() => {
-      ioInstances.at(-1)?.trigger([
-        buildEntryWithZone(s1, 200, 600, 500),
-        buildEntryWithZone(s2, 490, 20, 500),
-      ]);
+      ioInstances
+        .at(-1)
+        ?.trigger([
+          buildEntryWithZone(s1, 200, 600, 500),
+          buildEntryWithZone(s2, 490, 20, 500),
+        ]);
       vi.runAllTimers();
     });
 
@@ -353,10 +355,12 @@ describe("RouterProvider — scrollSpy", () => {
 
     // s1 above zone (dist −200); s2 just below (dist +20 → picked).
     act(() => {
-      ioInstances.at(-1)?.trigger([
-        buildEntryWithZone(s1, 300, 100, 500),
-        buildEntryWithZone(s2, 520, 100, 500),
-      ]);
+      ioInstances
+        .at(-1)
+        ?.trigger([
+          buildEntryWithZone(s1, 300, 100, 500),
+          buildEntryWithZone(s2, 520, 100, 500),
+        ]);
       vi.runAllTimers();
     });
 
@@ -423,11 +427,15 @@ describe("RouterProvider — scrollSpy", () => {
 
   it("skips emit when the resolved hash equals the current hash", async () => {
     await act(async () => {
-      await router.navigate("test", {}, {
-        hash: "section-1",
-        force: true,
-        hashChange: true,
-      } as never);
+      await router.navigate(
+        "test",
+        {},
+        {
+          hash: "section-1",
+          force: true,
+          hashChange: true,
+        },
+      );
     });
 
     const [s1] = setupAnchors(["section-1"]);
@@ -519,11 +527,15 @@ describe("RouterProvider — scrollSpy", () => {
     // A user-driven Link click updates the hash — the spy's subscribe callback
     // must set coolingDown so the ensuing scroll IO events don't fight it.
     await act(async () => {
-      await router.navigate("test", {}, {
-        hash: "section-2",
-        force: true,
-        hashChange: true,
-      } as never);
+      await router.navigate(
+        "test",
+        {},
+        {
+          hash: "section-2",
+          force: true,
+          hashChange: true,
+        },
+      );
     });
 
     const navigateSpy = vi.spyOn(router, "navigate");
@@ -546,11 +558,15 @@ describe("RouterProvider — scrollSpy", () => {
     );
 
     await act(async () => {
-      await router.navigate("test", {}, {
-        hash: "section-2",
-        force: true,
-        hashChange: true,
-      } as never);
+      await router.navigate(
+        "test",
+        {},
+        {
+          hash: "section-2",
+          force: true,
+          hashChange: true,
+        },
+      );
     });
 
     const navigateSpy = vi.spyOn(router, "navigate");
@@ -610,12 +626,15 @@ describe("RouterProvider — scrollSpy", () => {
 
     act(() => {
       for (let i = 0; i < 10; i++) {
-        ioInstances.at(-1)?.trigger([
-          buildEntry(s1, 50 + i),
-          buildEntry(s2, 200 + i),
-          buildEntry(s3, 400 + i),
-        ]);
+        ioInstances
+          .at(-1)
+          ?.trigger([
+            buildEntry(s1, 50 + i),
+            buildEntry(s2, 200 + i),
+            buildEntry(s3, 400 + i),
+          ]);
       }
+
       vi.runAllTimers();
     });
 
@@ -805,7 +824,7 @@ describe("RouterProvider — scrollSpy", () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(ioInstances.length).toBe(base + 1);
+    expect(ioInstances).toHaveLength(base + 1);
     expect(ioInstances.at(-1)?.options?.root).toBe(container);
     expect(ioInstances.at(-1)?.observed.has(anchor)).toBe(true);
   });
@@ -838,7 +857,7 @@ describe("RouterProvider — scrollSpy", () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(ioInstances.length).toBe(base + 1);
+    expect(ioInstances).toHaveLength(base + 1);
     expect(ioInstances.at(-1)?.options?.root).toBe(containerB);
   });
 
@@ -869,7 +888,7 @@ describe("RouterProvider — scrollSpy", () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(ioInstances.length).toBe(base + 1);
+    expect(ioInstances).toHaveLength(base + 1);
     expect(ioInstances.at(-1)?.options?.root).toBeNull();
   });
 
@@ -896,7 +915,7 @@ describe("RouterProvider — scrollSpy", () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(ioInstances.length).toBe(base);
+    expect(ioInstances).toHaveLength(base);
     expect(ioInstances.at(-1)?.options?.root).toBe(container);
   });
 
@@ -910,7 +929,9 @@ describe("RouterProvider — scrollSpy", () => {
 
     await plain.start("/docs");
 
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
     const navigateSpy = vi.spyOn(plain, "navigate");
     const [s1] = setupAnchors(["section-1"]);
 
@@ -926,7 +947,9 @@ describe("RouterProvider — scrollSpy", () => {
     });
 
     expect(warnSpy).toHaveBeenCalled();
-    expect(warnSpy.mock.calls[0]?.[0]).toContain("state.context.url is not claimed");
+    expect(warnSpy.mock.calls[0]?.[0]).toContain(
+      "state.context.url is not claimed",
+    );
     expect(navigateSpy).not.toHaveBeenCalled();
 
     plain.stop();
@@ -955,7 +978,9 @@ describe("RouterProvider — scrollSpy", () => {
   });
 
   it("warns once and stays silent on an invalid selector", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
     const navigateSpy = vi.spyOn(router, "navigate");
 
     render(
@@ -973,7 +998,9 @@ describe("RouterProvider — scrollSpy", () => {
   });
 
   it("warns when duplicate ids are observed", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
 
     const dup1 = document.createElement("section");
 
@@ -1093,7 +1120,9 @@ describe("RouterProvider — scrollSpy", () => {
   });
 
   it("does not re-warn on invalid selector across a reconcile (silenced)", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
 
     render(
       <RouterProvider
@@ -1113,7 +1142,7 @@ describe("RouterProvider — scrollSpy", () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(warnSpy.mock.calls.length).toBe(afterMount);
+    expect(warnSpy).toHaveBeenCalledTimes(afterMount);
   });
 
   it("defers URL-plugin detection when wired before the router has state", async () => {
@@ -1130,7 +1159,9 @@ describe("RouterProvider — scrollSpy", () => {
       </RouterProvider>,
     );
 
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
 
     // First navigation fires the deferred detector → verify() runs (no URL
     // plugin here → warns) and unsubscribes.
@@ -1144,13 +1175,13 @@ describe("RouterProvider — scrollSpy", () => {
   });
 
   it("SSR renderToString renders children but never wires scroll-spy (effect is client-only)", () => {
-    const markup = renderToString(
+    const view = renderToString(
       <RouterProvider router={router} scrollSpy={{ selector: "[id]" }}>
         <div>server content</div>
       </RouterProvider>,
     );
 
-    expect(markup).toContain("server content");
+    expect(view).toContain("server content");
     // useEffect does not run during renderToString → createScrollSpy is never
     // invoked server-side → no IntersectionObserver instantiated. Consequently
     // the utility's `typeof document === "undefined"` SSR guard is unreachable

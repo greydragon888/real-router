@@ -1,11 +1,10 @@
+import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { act, render } from "@testing-library/react";
 import { useState, type FC } from "react";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouterProvider } from "@real-router/react";
-
-import { createRouter } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
@@ -209,7 +208,11 @@ describe("RouterProvider — scrollRestoration", () => {
       await router.navigate("about");
     });
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
   });
 
   // ── capture / restore ─────────────────────────────────────────────────────
@@ -227,15 +230,17 @@ describe("RouterProvider — scrollRestoration", () => {
       await router.navigate("about");
     });
 
-    const saved = JSON.parse(
-      sessionStorage.getItem(STORAGE_KEY)!,
-    ) as Record<string, number>;
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY)!) as Record<
+      string,
+      number
+    >;
 
     expect(Object.values(saved)).toContain(250);
   });
 
   it("in-place replace navigation leaves scroll untouched (restore skipped)", async () => {
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
+
     setScrollY(120);
 
     render(
@@ -254,6 +259,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("restores the saved position on a reload navigation", async () => {
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
+
     setScrollY(0);
 
     render(
@@ -283,9 +289,11 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("scrolls to the hash anchor on a push navigation", async () => {
     const anchor = document.createElement("div");
+
     anchor.id = "section-2";
-    document.body.appendChild(anchor);
+    document.body.append(anchor);
     const scrollIntoView = vi.fn();
+
     anchor.scrollIntoView = scrollIntoView;
 
     render(
@@ -307,7 +315,8 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("captures and restores through a scroll container (instant early-stop)", async () => {
     const container = document.createElement("div");
-    document.body.appendChild(container);
+
+    document.body.append(container);
 
     let top = 0;
 
@@ -320,12 +329,17 @@ describe("RouterProvider — scrollRestoration", () => {
     const containerScrollTo = vi.fn((opts: { top: number }) => {
       top = opts.top;
     });
-    container.scrollTo = containerScrollTo as unknown as typeof container.scrollTo;
+
+    container.scrollTo =
+      containerScrollTo as unknown as typeof container.scrollTo;
 
     render(
       <RouterProvider
         router={router}
-        scrollRestoration={{ mode: "restore", scrollContainer: () => container }}
+        scrollRestoration={{
+          mode: "restore",
+          scrollContainer: () => container,
+        }}
       >
         <div />
       </RouterProvider>,
@@ -338,9 +352,10 @@ describe("RouterProvider — scrollRestoration", () => {
     });
 
     // readPos read the container's scrollTop (140), not window.scrollY.
-    const saved = JSON.parse(
-      sessionStorage.getItem(STORAGE_KEY)!,
-    ) as Record<string, number>;
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY)!) as Record<
+      string,
+      number
+    >;
 
     expect(Object.values(saved)).toContain(140);
 
@@ -371,7 +386,10 @@ describe("RouterProvider — scrollRestoration", () => {
     render(
       <RouterProvider
         router={router}
-        scrollRestoration={{ mode: "restore", scrollContainer: () => container }}
+        scrollRestoration={{
+          mode: "restore",
+          scrollContainer: () => container,
+        }}
       >
         <div />
       </RouterProvider>,
@@ -400,9 +418,11 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("anchorScrolling: false — hash navigation scrolls to top instead of the anchor", async () => {
     const anchor = document.createElement("div");
+
     anchor.id = "section-3";
-    document.body.appendChild(anchor);
+    document.body.append(anchor);
     const scrollIntoView = vi.fn();
+
     anchor.scrollIntoView = scrollIntoView;
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
 
@@ -420,7 +440,11 @@ describe("RouterProvider — scrollRestoration", () => {
     });
 
     expect(scrollIntoView).not.toHaveBeenCalled();
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     anchor.remove();
   });
@@ -452,12 +476,15 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("scrolls to the location.hash anchor when no URL plugin is installed", async () => {
     const plain = createPlainRouter();
+
     await plain.start("/");
 
     const anchor = document.createElement("div");
+
     anchor.id = "frag";
-    document.body.appendChild(anchor);
+    document.body.append(anchor);
     const scrollIntoView = vi.fn();
+
     anchor.scrollIntoView = scrollIntoView;
     globalThis.location.hash = "#frag";
 
@@ -480,14 +507,17 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("tolerates a malformed location.hash (decode throws → raw slice)", async () => {
     const plain = createPlainRouter();
+
     await plain.start("/");
 
     // "%E0%A4%A" is an incomplete escape — decodeURIComponent throws, so the
     // code falls back to the raw slice "%E0%A4%A" as the id.
     const anchor = document.createElement("div");
+
     anchor.id = "%E0%A4%A";
-    document.body.appendChild(anchor);
+    document.body.append(anchor);
     const scrollIntoView = vi.fn();
+
     anchor.scrollIntoView = scrollIntoView;
     globalThis.location.hash = "#%E0%A4%A";
 
@@ -510,8 +540,10 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("scrolls to top when the location.hash anchor is not found", async () => {
     const plain = createPlainRouter();
+
     await plain.start("/");
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
+
     globalThis.location.hash = "#missing";
 
     render(
@@ -525,7 +557,11 @@ describe("RouterProvider — scrollRestoration", () => {
     });
 
     // No matching element → writePos(0).
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     globalThis.location.hash = "";
     plain.stop();
@@ -553,6 +589,7 @@ describe("RouterProvider — scrollRestoration", () => {
     });
 
     const setItem = vi.spyOn(Storage.prototype, "setItem");
+
     setScrollY(75);
 
     // Leave "test" AGAIN at the same 75 → putPos sees cached[test] === 75 and
@@ -588,12 +625,17 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("restores the saved position on a back navigation", async () => {
     const navRouter = createNavRouter({ direction: "back" });
+
     await navRouter.start("/");
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
+
     setScrollY(200);
 
     render(
-      <RouterProvider router={navRouter} scrollRestoration={{ mode: "restore" }}>
+      <RouterProvider
+        router={navRouter}
+        scrollRestoration={{ mode: "restore" }}
+      >
         <div />
       </RouterProvider>,
     );
@@ -622,12 +664,17 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("restores the saved position on a traverse navigation", async () => {
     const navRouter = createNavRouter({ navigationType: "traverse" });
+
     await navRouter.start("/");
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
+
     setScrollY(310);
 
     render(
-      <RouterProvider router={navRouter} scrollRestoration={{ mode: "restore" }}>
+      <RouterProvider
+        router={navRouter}
+        scrollRestoration={{ mode: "restore" }}
+      >
         <div />
       </RouterProvider>,
     );
@@ -657,6 +704,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("canonicalizes function / nested-object params on capture", async () => {
     const plain = createPlainRouter();
+
     await plain.start("/");
     setScrollY(140);
 
@@ -679,6 +727,7 @@ describe("RouterProvider — scrollRestoration", () => {
     });
 
     const setItem = vi.spyOn(Storage.prototype, "setItem");
+
     setScrollY(140);
 
     // Leaving it captures the route → keyOf runs canonicalReplacer over the
@@ -697,6 +746,7 @@ describe("RouterProvider — scrollRestoration", () => {
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
     const plain = createPlainRouter();
+
     await plain.start("/");
     setScrollY(90);
 
@@ -741,7 +791,11 @@ describe("RouterProvider — scrollRestoration", () => {
       await router.navigate("about");
     });
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
   });
 
   it("loads an existing scroll store from sessionStorage and merges into it", async () => {
@@ -762,9 +816,10 @@ describe("RouterProvider — scrollRestoration", () => {
       await router.navigate("about");
     });
 
-    const saved = JSON.parse(
-      sessionStorage.getItem(STORAGE_KEY)!,
-    ) as Record<string, number>;
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY)!) as Record<
+      string,
+      number
+    >;
 
     expect(saved["preexisting:{}"]).toBe(300); // pre-existing entry preserved
     expect(Object.values(saved)).toContain(120); // new capture merged in
@@ -772,13 +827,15 @@ describe("RouterProvider — scrollRestoration", () => {
 
   it("smooth container restore runs the full retry budget (no early stop)", async () => {
     const container = document.createElement("div");
-    document.body.appendChild(container);
+
+    document.body.append(container);
     Object.defineProperty(container, "scrollTop", {
       get: () => 0,
       configurable: true,
     });
     const containerScrollTo = vi.fn();
-    container.scrollTo = containerScrollTo as unknown as typeof container.scrollTo;
+
+    container.scrollTo = containerScrollTo;
 
     render(
       <RouterProvider
@@ -811,6 +868,7 @@ describe("RouterProvider — scrollRestoration", () => {
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
     const plain = createPlainRouter();
+
     await plain.start("/");
 
     render(
@@ -841,6 +899,7 @@ describe("RouterProvider — scrollRestoration", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
     const plain = createPlainRouter();
+
     await plain.start("/");
 
     render(
@@ -864,13 +923,18 @@ describe("RouterProvider — scrollRestoration", () => {
       );
     });
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     plain.stop();
   });
 
   it("reload restores to 0 when the target has no stored position", async () => {
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
+
     setScrollY(50);
 
     render(
@@ -891,17 +955,25 @@ describe("RouterProvider — scrollRestoration", () => {
       await router.navigate("home", {}, { reload: true });
     });
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
   });
 
   it("back navigation to an unserializable route restores to 0 (key null)", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
     const navRouter = createNavRouter({ direction: "back" });
+
     await navRouter.start("/");
 
     render(
-      <RouterProvider router={navRouter} scrollRestoration={{ mode: "restore" }}>
+      <RouterProvider
+        router={navRouter}
+        scrollRestoration={{ mode: "restore" }}
+      >
         <div />
       </RouterProvider>,
     );
@@ -913,7 +985,11 @@ describe("RouterProvider — scrollRestoration", () => {
       await navRouter.navigate("about", { big: 1n as unknown as string });
     });
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     navRouter.stop();
   });
@@ -921,6 +997,7 @@ describe("RouterProvider — scrollRestoration", () => {
   it("pagehide skips capture for an unserializable route", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const plain = createPlainRouter();
+
     await plain.start("/");
 
     render(
@@ -934,6 +1011,7 @@ describe("RouterProvider — scrollRestoration", () => {
     });
 
     const setItem = vi.spyOn(Storage.prototype, "setItem");
+
     globalThis.dispatchEvent(new Event("pagehide"));
 
     // onPageHide → safeKeyOf(current) is null → capture skipped.
@@ -951,6 +1029,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     router.stop(); // getState() now returns undefined
     const setItem = vi.spyOn(Storage.prototype, "setItem");
+
     globalThis.dispatchEvent(new Event("pagehide"));
 
     expect(setItem).not.toHaveBeenCalled();
@@ -1049,24 +1128,30 @@ describe("RouterProvider — scrollRestoration (destroyed guard)", () => {
 
   it("restorePos retry bails when the provider is destroyed mid-budget", async () => {
     const navRouter = createNavRouter({ direction: "back" });
+
     await navRouter.start("/");
     // Pre-store a non-zero position for "about" that the fixed-at-0 container
     // can never reach → restorePos keeps retrying instead of early-stopping.
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 200 }));
 
     const container = document.createElement("div");
-    document.body.appendChild(container);
+
+    document.body.append(container);
     Object.defineProperty(container, "scrollTop", {
       get: () => 0,
       configurable: true,
     });
     const containerScrollTo = vi.fn();
-    container.scrollTo = containerScrollTo as unknown as typeof container.scrollTo;
+
+    container.scrollTo = containerScrollTo;
 
     const { unmount } = render(
       <RouterProvider
         router={navRouter}
-        scrollRestoration={{ mode: "restore", scrollContainer: () => container }}
+        scrollRestoration={{
+          mode: "restore",
+          scrollContainer: () => container,
+        }}
       >
         <div />
       </RouterProvider>,
@@ -1092,7 +1177,7 @@ describe("RouterProvider — scrollRestoration (destroyed guard)", () => {
       vi.advanceTimersToNextTimer();
     });
 
-    expect(containerScrollTo.mock.calls.length).toBe(callsBeforeDestroy);
+    expect(containerScrollTo).toHaveBeenCalledTimes(callsBeforeDestroy);
 
     container.remove();
     navRouter.stop();
