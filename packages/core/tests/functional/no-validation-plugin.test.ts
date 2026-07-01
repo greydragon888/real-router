@@ -609,4 +609,82 @@ describe("core/without validation plugin", () => {
       router.stop();
     });
   });
+
+  // #1047: always-on hardening was asymmetric — add() rejects dup-path (#955) and
+  // reserved @@ names (#954), but replace() lacked both (plugin-only) and
+  // remove()/update() lacked the reserved-name reject (plugin-only, #238
+  // regression). Bare core (no plugin) must reject all of these too.
+  describe("route-name hardening parity — replace/remove/update (#1047)", () => {
+    it("replace(): rejects in-batch duplicate paths (parity with add #955)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.replace([
+          { name: "a", path: "/dup" },
+          { name: "b", path: "/dup" },
+        ]);
+      }).toThrow('[router.addRoute] Path "/dup" is already defined');
+
+      router.stop();
+    });
+
+    it("replace(): rejects a reserved @@ route name (parity with add #954)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.replace([{ name: "@@router/UNKNOWN_ROUTE", path: "/x" }]);
+      }).toThrow(
+        '[router.addRoute] Route name "@@router/UNKNOWN_ROUTE" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.',
+      );
+
+      router.stop();
+    });
+
+    it("replace(): a rejected hardening batch leaves the existing tree intact (atomic)", () => {
+      const router = createRouter([{ name: "keep", path: "/keep" }]);
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.replace([
+          { name: "a", path: "/dup" },
+          { name: "b", path: "/dup" },
+        ]);
+      }).toThrow();
+
+      // The hardening guards run BEFORE buildReplaceArtifacts / the swap, so the
+      // old tree survives a rejected replace (#698 atomicity).
+      expect(api.has("keep")).toBe(true);
+      expect(api.has("a")).toBe(false);
+
+      router.stop();
+    });
+
+    it("remove(): rejects a reserved @@ route name (#238 regression)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.remove("@@router/UNKNOWN_ROUTE");
+      }).toThrow(
+        '[router.removeRoute] Route name "@@router/UNKNOWN_ROUTE" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.',
+      );
+
+      router.stop();
+    });
+
+    it("update(): rejects a reserved @@ route name (#238 regression)", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.update("@@router/UNKNOWN_ROUTE", { forwardTo: "x" });
+      }).toThrow(
+        '[router.updateRoute] Route name "@@router/UNKNOWN_ROUTE" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.',
+      );
+
+      router.stop();
+    });
+  });
 });

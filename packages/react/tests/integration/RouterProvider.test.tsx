@@ -175,8 +175,7 @@ describe("RouterProvider - Integration Tests", () => {
         const context = use(RouteContext);
 
         routeParams = context?.route?.params as
-          | Record<string, string>
-          | undefined;
+          Record<string, string> | undefined;
 
         return <div data-testid="id">{routeParams?.id ?? "no-id"}</div>;
       };
@@ -277,8 +276,7 @@ describe("RouterProvider - Integration Tests", () => {
       const ParamsDisplay: FC = () => {
         const context = use(RouteContext);
         const params = context?.route?.params as
-          | Record<string, string>
-          | undefined;
+          Record<string, string> | undefined;
 
         return <div data-testid="id">{params?.id ?? "no-id"}</div>;
       };

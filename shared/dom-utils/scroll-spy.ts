@@ -56,9 +56,13 @@ export interface ScrollSpyOptions {
   rootMargin?: string | undefined;
 
   /**
-   * Lazy getter for the scrollable container. Resolved on every event.
-   * `null` (or missing getter) falls back to the window viewport
-   * (`root: null` on the `IntersectionObserver`).
+   * Lazy getter for the scrollable container. Consulted at creation and
+   * re-consulted on every reconcile (DOM mutation), so a container that
+   * MOUNTS or CHANGES after the spy is created is honoured: the
+   * `IntersectionObserver` root and `MutationObserver` target — both immutable
+   * once constructed — are rebuilt to match (#780). `null` (or a missing
+   * getter) falls back to the window viewport (`root: null` on the
+   * `IntersectionObserver`).
    */
   scrollContainer?: (() => HTMLElement | null) | undefined;
 }
@@ -166,8 +170,7 @@ const createUrlPluginDetector = (
 
   const verify = (state: { context?: unknown }): void => {
     const context = state.context as
-      | (Record<string, unknown> & { url?: unknown })
-      | undefined;
+      (Record<string, unknown> & { url?: unknown }) | undefined;
 
     if (context && context.url === undefined) {
       console.warn(
@@ -379,11 +382,27 @@ const createObserverPair = (
     onIntersection();
   };
 
-  const io = new IntersectionObserver(handleIntersection, {
-    root: getContainer(),
-    rootMargin,
-    threshold: 0,
-  });
+  // Build (and rebuild) the IntersectionObserver for a given root. A root is
+  // immutable once its IO is constructed, so `reconcile` recreates the IO via
+  // this same factory when the resolved container changes (#780) — one
+  // definition, two call sites.
+  const makeIo = (container: HTMLElement | null): IntersectionObserver =>
+    new IntersectionObserver(handleIntersection, {
+      root: container,
+      rootMargin,
+      threshold: 0,
+    });
+
+  // Container the IntersectionObserver root + MutationObserver target are
+  // built with. Both are immutable once the observer is constructed (W3C), so
+  // a `scrollContainer` that resolves to a different element after creation —
+  // most importantly one that MOUNTS after the spy starts (Angular wires the
+  // spy at bootstrap, before any component renders; a docs route's container
+  // mounts on navigation) — is only honoured by rebuilding the pair in
+  // `reconcile`. Tracked here so `reconcile` can compare on every run (#780).
+  let observerContainer = getContainer();
+
+  let io = makeIo(observerContainer);
 
   const observeMatches = (): void => {
     const scope = getContainer() ?? document;
@@ -427,6 +446,24 @@ const createObserverPair = (
     }
   };
 
+  // MutationObserver init — reused when the observer is re-pointed at a new
+  // container in `reconcile`. `childList: true, subtree: true` catches
+  // structural changes; `attributes: true, attributeFilter: ["id"]` catches
+  // anchor id renames (typical for client-rendered docs). The MO targets the
+  // scroll container (or document.body for the window viewport).
+  const MUTATION_OBSERVE_INIT: MutationObserverInit = {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["id"],
+  };
+
+  // Null-then-assigned — the same forward-reference idiom as `flush` in the
+  // main scope. `reconcile` re-points it on a container change, so it must be
+  // in scope above its assignment; it is non-null by the time any async
+  // mutation callback (or `reconcile`) runs.
+  let mo: MutationObserver | null = null;
+
   const reconcile = (): void => {
     // Drop observed elements that left the DOM. Avoids observer holding
     // strong refs to detached nodes. Also drop their accumulated entry so
@@ -442,18 +479,34 @@ const createObserverPair = (
       pending.delete(element);
     }
 
+    // Honour a container that mounted (or changed) after construction (#780).
+    // The IntersectionObserver root and MutationObserver target cannot be
+    // mutated in place, so rebuild the pair under the new container. Clearing
+    // `observed` + `pending` makes the rebuild equivalent to constructing the
+    // spy with this container from the start: `observeMatches` below
+    // re-populates the tracked set from the new container's scope, and the
+    // stale merged snapshot (computed against the old root's geometry) is
+    // dropped — one empty debounce window, acceptable for a rare event.
+    const nextContainer = getContainer();
+
+    if (nextContainer !== observerContainer) {
+      observerContainer = nextContainer;
+
+      io.disconnect();
+      io = makeIo(nextContainer);
+      observed.clear();
+      pending.clear();
+
+      mo?.disconnect();
+      mo?.observe(nextContainer ?? document.body, MUTATION_OBSERVE_INIT);
+    }
+
     observeMatches();
   };
 
   observeMatches();
 
-  // MutationObserver targets the scroll container (or document.body for
-  // window viewport). `childList: true, subtree: true` catches structural
-  // changes; `attributes: true, attributeFilter: ["id"]` catches anchor
-  // id renames (typical for client-rendered docs).
-  const mutationTarget = getContainer() ?? document.body;
-
-  const mo = new MutationObserver(() => {
+  mo = new MutationObserver(() => {
     if (mutationTimer !== null) {
       clearTimeout(mutationTimer);
     }
@@ -464,12 +517,7 @@ const createObserverPair = (
     }, MUTATION_DEBOUNCE_MS);
   });
 
-  mo.observe(mutationTarget, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["id"],
-  });
+  mo.observe(observerContainer ?? document.body, MUTATION_OBSERVE_INIT);
 
   return {
     pending,

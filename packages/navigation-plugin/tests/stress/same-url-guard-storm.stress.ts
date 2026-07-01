@@ -169,8 +169,7 @@ describe("Same-URL guard + info-sentinel — stress (#580)", () => {
 
       const meta = (
         router.getState()?.context as
-          | { navigation?: { navigationType: string } }
-          | undefined
+          { navigation?: { navigationType: string } } | undefined
       )?.navigation;
 
       expect(updateSpy).toHaveBeenCalledTimes(expectedUpdate);

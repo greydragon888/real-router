@@ -411,8 +411,7 @@ export class RoutesNamespace<
     }
 
     const defaultParams = this.#store.config.defaultParams[name] as
-      | Params
-      | undefined;
+      Params | undefined;
 
     // Exact match case
     if (strictEquality || activeName === name) {

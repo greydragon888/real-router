@@ -710,6 +710,128 @@ describe("createScrollSpy (Angular dom-utils copy)", () => {
     });
   });
 
+  describe("#780 — late-mounted / changed scrollContainer", () => {
+    it("recreates the IO rooted at a container that mounts AFTER creation (reconcile)", async () => {
+      const router = await createTestRouter();
+      // Canonical Angular bootstrap flow: the getter resolves to null at
+      // creation (spy wired before any component renders), then the container
+      // mounts on a later render.
+      let container: HTMLElement | null = null;
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => container,
+        }),
+      );
+
+      expect(ioInstances).toHaveLength(1);
+      expect(ioInstances[0]?.options?.root).toBeNull();
+
+      container = document.createElement("div");
+      document.body.append(container);
+      const anchor = document.createElement("section");
+
+      anchor.id = "scoped";
+      container.append(anchor);
+
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+
+      // IO root + MO target are immutable post-construction, so honouring the
+      // late-mounted container requires a fresh IO rooted at it (was: root
+      // null/viewport forever).
+      expect(ioInstances).toHaveLength(2);
+      expect(ioInstances.at(-1)?.options?.root).toBe(container);
+      expect(ioInstances.at(-1)?.observed.has(anchor)).toBe(true);
+
+      router.stop();
+    });
+
+    it("recreates the IO when the resolved container identity changes", async () => {
+      const router = await createTestRouter();
+      const containerA = document.createElement("div");
+      const containerB = document.createElement("div");
+
+      document.body.append(containerA, containerB);
+
+      let current: HTMLElement = containerA;
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => current,
+        }),
+      );
+
+      expect(ioInstances[0]?.options?.root).toBe(containerA);
+
+      current = containerB;
+
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+
+      expect(ioInstances).toHaveLength(2);
+      expect(ioInstances.at(-1)?.options?.root).toBe(containerB);
+
+      router.stop();
+    });
+
+    it("rebuilds rooted at the viewport when the container unmounts (container → null)", async () => {
+      const router = await createTestRouter();
+      const container = document.createElement("div");
+
+      document.body.append(container);
+
+      let current: HTMLElement | null = container;
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => current,
+        }),
+      );
+
+      expect(ioInstances[0]?.options?.root).toBe(container);
+
+      current = null;
+
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+
+      expect(ioInstances).toHaveLength(2);
+      expect(ioInstances.at(-1)?.options?.root).toBeNull();
+
+      router.stop();
+    });
+
+    it("does NOT recreate the IO when the container is unchanged across reconciles", async () => {
+      const router = await createTestRouter();
+      const container = document.createElement("div");
+
+      document.body.append(container);
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => container,
+        }),
+      );
+
+      expect(ioInstances).toHaveLength(1);
+
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+
+      expect(ioInstances).toHaveLength(1);
+      expect(ioInstances[0]?.options?.root).toBe(container);
+
+      router.stop();
+    });
+  });
+
   describe("URL plugin detection", () => {
     it("warns once and disables when state.context.url is undefined (no URL plugin)", async () => {
       const router = createRouter([
@@ -843,6 +965,129 @@ describe("createScrollSpy (Angular dom-utils copy)", () => {
       expect(warnSpy.mock.calls[0]?.[0]).toContain("duplicate id");
 
       router.stop();
+    });
+  });
+
+  describe("edge coverage", () => {
+    it("SSR — returns NOOP when document is undefined", async () => {
+      const realDocument = globalThis.document;
+
+      vi.stubGlobal("document", undefined);
+
+      try {
+        const router = await createTestRouter();
+        const spy = createScrollSpy(router, { selector: "[id]" });
+
+        expect(ioInstances).toHaveLength(0);
+        expect(typeof spy.destroy).toBe("function");
+
+        spy.destroy();
+        router.stop();
+      } finally {
+        vi.stubGlobal("document", realDocument);
+      }
+    });
+
+    it("debounce destroy clears a pending trailing timeout", async () => {
+      const router = await createTestRouter();
+      const [s1] = setupAnchors(["section-1"]);
+      const spy = track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      // Fire only the rAF shim (0ms) so the trailing timeout is armed but not
+      // yet fired, then destroy → clears the live timeout.
+      vi.advanceTimersByTime(1);
+      spy.destroy();
+
+      expect(() => {
+        flushTimersAndRaf();
+      }).not.toThrow();
+
+      router.stop();
+    });
+
+    it("debounce reschedule clears the previous trailing timeout", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      vi.advanceTimersByTime(1); // rAF fires → trailing timeout armed
+      ioInstances[0].trigger([buildEntry(s1, 60)]);
+      vi.advanceTimersByTime(1); // second rAF fires → clears the first timeout
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+      router.stop();
+    });
+
+    it("MutationObserver destroy clears a pending reconcile timer", async () => {
+      const router = await createTestRouter();
+
+      setupAnchors(["section-1"]);
+      const spy = track(createScrollSpy(router, { selector: "[id]" }));
+
+      moInstances[0]?.trigger([]); // arms the mutation-debounce timer
+      spy.destroy();
+
+      expect(() => {
+        flushTimersAndRaf();
+      }).not.toThrow();
+
+      router.stop();
+    });
+
+    it("silences once on an invalid selector (second reconcile is a no-op)", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const router = await createTestRouter();
+
+      setupAnchors(["section-1"]);
+      track(createScrollSpy(router, { selector: "###" }));
+
+      // A second reconcile (MutationObserver) re-enters onInvalidSelector but
+      // `silenced` short-circuits it — still exactly one warning.
+      moInstances[0]?.trigger([]);
+      flushTimersAndRaf();
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain("invalid selector");
+
+      warnSpy.mockRestore();
+      router.stop();
+    });
+
+    it("no-op flush when there are no pending entries", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      setupAnchors(["section-1"]);
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([]); // empty batch → flush with empty pending map
+      flushTimersAndRaf();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+
+      router.stop();
+    });
+
+    it("skips the emit when the router has no active state", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      router.stop(); // getState() now returns undefined
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
   });
 });

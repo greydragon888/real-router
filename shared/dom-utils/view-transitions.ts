@@ -112,6 +112,14 @@ export function createViewTransitions(router: Router): ViewTransitions {
     if (resolver === null) {
       currentVT = null;
     } else {
+      // The VT this resolver belongs to. If the next navigation opens a new VT
+      // in the task-queue window before this setTimeout runs, the stale
+      // resolver must NOT null the new `currentVT` — otherwise a later
+      // cancellation reads `null` and skips nothing, leaking a stale animation
+      // (#781). Same identity-guard technique the navigation-plugin uses to
+      // heal its seams.
+      const scheduledVT = currentVT;
+
       // CRITICAL: CANNOT use requestAnimationFrame here. When the router
       // takes the async path (leave returned a Promise), subscribe fires
       // AFTER the browser has already transitioned VT into the
@@ -126,7 +134,10 @@ export function createViewTransitions(router: Router): ViewTransitions {
       // so the new DOM is committed by the time our callback runs.
       setTimeout(() => {
         resolver();
-        currentVT = null;
+
+        if (currentVT === scheduledVT) {
+          currentVT = null;
+        }
       }, 0);
     }
   });

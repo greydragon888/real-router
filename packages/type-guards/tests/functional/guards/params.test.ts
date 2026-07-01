@@ -505,6 +505,35 @@ describe("Params Type Guards", () => {
       });
     });
 
+    describe("Throwing accessor / Proxy — never throws (#1052)", () => {
+      // A throwing `[[Get]]` (a value getter that throws, or a Proxy get trap)
+      // must NOT crash isParams — the same never-throw contract as #786/#901, for
+      // a throwing accessor instead of deep nesting / cycles. A value that cannot
+      // even be read is not a valid params value → `false`.
+      it("returns false for an own value getter that throws (does not throw)", () => {
+        const evil = {
+          get k() {
+            throw new Error("BOOM");
+          },
+        };
+
+        expect(isParams(evil)).toBe(false);
+      });
+
+      it("returns false for a Proxy whose [[Get]] throws on a present key (does not throw)", () => {
+        const evil = new Proxy(
+          { k: 1 },
+          {
+            get() {
+              throw new Error("BOOM");
+            },
+          },
+        );
+
+        expect(isParams(evil)).toBe(false);
+      });
+    });
+
     describe("Unknown type handling", () => {
       it("rejects bigint values (line 74)", () => {
         // bigint is not JSON serializable
@@ -679,6 +708,31 @@ describe("Params Type Guards", () => {
   describe("isParamsStrict", () => {
     it("validates strict params", () => {
       expect(isParamsStrict({ id: "123", page: 1 })).toBe(true);
+    });
+
+    it("returns false for a throwing value getter / Proxy — never throws (#1052)", () => {
+      // Same never-throw contract as isParams: an unreadable value is not a valid
+      // strict-params value → `false`, not the caller's getter exception.
+      expect(
+        isParamsStrict({
+          get k() {
+            throw new Error("BOOM");
+          },
+        }),
+      ).toBe(false);
+
+      expect(
+        isParamsStrict(
+          new Proxy(
+            { k: 1 },
+            {
+              get() {
+                throw new Error("BOOM");
+              },
+            },
+          ),
+        ),
+      ).toBe(false);
     });
 
     it("skips prototype-polluted inherited keys", () => {

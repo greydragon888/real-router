@@ -1,6 +1,6 @@
 {
   "name": "@real-router/core",
-  "version": "0.62.0",
+  "version": "0.62.2",
   "type": "commonjs",
   "description": "A simple, powerful, view-agnostic, modular and extensible router",
   "main": "./dist/cjs/index.js",
@@ -94,8 +94,6 @@
     "bench": "tsx tests/benchmarks/run.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "lint:package": "publint",
-    "lint:types": "attw --pack .",
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,

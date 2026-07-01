@@ -1,6 +1,6 @@
 {
   "name": "@real-router/vue",
-  "version": "0.15.12",
+  "version": "0.15.14",
   "type": "commonjs",
   "description": "Vue 3 integration for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -50,8 +50,6 @@
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
-    "lint:package": "publint",
-    "lint:types": "attw --pack .",
     "bundle": "tsdown --config-loader unrun"
   },
   "keywords": [

@@ -11,6 +11,7 @@ import {
   arbSafeString,
   arbEncodableKey,
   arbUnicodeString,
+  erasesEmptyKey,
   normalizeForComparison,
   NUM_RUNS,
 } from "./helpers";
@@ -48,6 +49,13 @@ describe("parse/build roundtrip", () => {
           !Object.values(params).includes(null),
       );
 
+      // The empty-string key "" is erased when its value encodes to a bare-key
+      // token (true under empty-true, null under nullFormat default): that token
+      // is "" itself, dropped by build's empty-chunk filter (#1051). A documented
+      // loss, asserted explicitly in formats.properties.ts — exclude it here so
+      // the oracle stays an honest contract.
+      fc.pre(!erasesEmptyKey(params, opts));
+
       const qs = build(params, opts);
       const parsed = parse(qs, opts);
       const expected = normalizeForComparison(params, opts);
@@ -62,6 +70,11 @@ describe("parse/build roundtrip", () => {
   test.prop([arbSearchParams], { numRuns: NUM_RUNS.standard })(
     "no-options roundtrip: parse(build(params)) ≈ normalizeForComparison(params, {}) (auto defaults)",
     (params: SearchParams) => {
+      // No-options build uses auto defaults (nullFormat "default"), so the empty
+      // key carrying null is erased here too (#1051) — exclude it (the loss is
+      // asserted in formats.properties.ts).
+      fc.pre(!erasesEmptyKey(params, {}));
+
       const qs = build(params);
       const parsed = parse(qs);
       const expected = normalizeForComparison(params, {});

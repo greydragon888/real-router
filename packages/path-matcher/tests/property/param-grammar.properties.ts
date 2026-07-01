@@ -101,3 +101,42 @@ describe("Param-grammar properties (#738)", () => {
     );
   });
 });
+
+// #1050: the roundtrip properties above all place the marker at a segment
+// BOUNDARY (`/h/:name`, `/files/*name`) — the generator gap that let a marker
+// fused to a static prefix (`/h/abc:id`) drift between build/meta (which extract
+// it as a param) and the trie (which compiles the segment as a literal). Generate
+// that mid-segment shape and assert registerTree rejects it, so it can never
+// reach build/match to drift — with the boundary form as the round-tripping
+// control. This is the durable guard for the anchoring facet (#738 single-sourced
+// the param-name class; this covers marker anchoring).
+describe("Marker-anchoring properties (#1050)", () => {
+  const arbStaticPrefix = fc.stringMatching(/^[a-z]{1,8}$/);
+
+  test.prop([arbStaticPrefix, fc.constantFrom(":", "*"), arbParamName], {
+    numRuns: NUM_RUNS.thorough,
+  })(
+    "a `:`/`*` marker fused to a static prefix within a segment is rejected",
+    (prefix, marker, name) => {
+      expect(() => {
+        singleRouteMatcher(`/h/${prefix}${marker}${name}`);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    },
+  );
+
+  test.prop([arbStaticPrefix, arbParamName, arbValue], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "the boundary form of the same pieces round-trips (control)",
+    (prefix, name, value) => {
+      const matcher = singleRouteMatcher(`/h/${prefix}/:${name}`);
+
+      expect(matcher.match(`/h/${prefix}/${value}`)?.params).toStrictEqual({
+        [name]: value,
+      });
+      expect(matcher.buildPath("h", { [name]: value })).toBe(
+        `/h/${prefix}/${value}`,
+      );
+    },
+  );
+});

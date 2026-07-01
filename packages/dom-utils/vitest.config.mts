@@ -21,4 +21,16 @@ const config = mergeConfig(
 config.test.coverage.allowExternal = true;
 config.test.coverage.include = ["**/shared/dom-utils/**/*.ts"];
 
+// Pin the project's 100% standard explicitly on the shared/dom-utils sources.
+// The base unit config already sets 100/100/100/100, but these symlinked
+// sources are the canonical coverage of the six adapters' dom-utils (the
+// adapter suites only re-cover their own copies), so the floor is restated here
+// to keep it independent of any future base-config drift.
+config.test.coverage.thresholds = {
+  statements: 100,
+  branches: 100,
+  functions: 100,
+  lines: 100,
+};
+
 export default config;

@@ -144,7 +144,23 @@ export const RouterProvider = defineComponent({
     // Push this provider's router on the v-link directive stack so nested
     // RouterProviders behave like nested DI scopes (LIFO). Release on unmount
     // restores the outer router for any v-link still mounted in the parent.
-    const releaseDirective = pushDirectiveRouter(props.router);
+    //
+    // #779: only push in the browser. The v-link directive runs solely in
+    // mounted client DOM, so the server never reads the stack — while
+    // onScopeDispose (the release hook) never fires during renderToString, so a
+    // server-side push would strand every per-request router in this
+    // module-level array, a leak router.dispose() cannot clear. `typeof
+    // document` mirrors the SSR guard used across shared/dom-utils. The release
+    // gets its own onScopeDispose so the server path leaves no dead teardown
+    // branch (a combined callback would only ever run on the client).
+    const releaseDirective =
+      typeof document === "undefined"
+        ? undefined
+        : pushDirectiveRouter(props.router);
+
+    if (releaseDirective) {
+      onScopeDispose(releaseDirective);
+    }
 
     // #778 P2: eagerly create the per-router error source at Provider mount so a
     // navigation error that fires BEFORE a RouterErrorBoundary mounts (a lazy app
@@ -157,10 +173,7 @@ export const RouterProvider = defineComponent({
     const { navigator, route, previousRoute, unsubscribe } =
       setupRouteProvision(props.router);
 
-    onScopeDispose(() => {
-      releaseDirective();
-      unsubscribe();
-    });
+    onScopeDispose(unsubscribe);
 
     provide(RouterKey, props.router);
     provide(NavigatorKey, navigator);

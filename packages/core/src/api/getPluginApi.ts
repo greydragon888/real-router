@@ -39,8 +39,7 @@ export function getPluginApi<
         params,
         path,
         meta?.params as
-          | Record<string, Record<string, "url" | "query">>
-          | undefined,
+          Record<string, Record<string, "url" | "query">> | undefined,
       );
     },
     buildState: (routeName, routeParams) => {

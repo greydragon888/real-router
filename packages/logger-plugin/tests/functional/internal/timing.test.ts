@@ -383,8 +383,7 @@ describe("timing - module initialization", () => {
 
       // Mock perf_hooks with delayed loading
       let resolvePerfHooks:
-        | ((value: { performance: { now: () => number } }) => void)
-        | undefined;
+        ((value: { performance: { now: () => number } }) => void) | undefined;
       const perfHooksPromise = new Promise<{
         performance: { now: () => number };
       }>((resolve) => {

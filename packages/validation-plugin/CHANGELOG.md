@@ -1,5 +1,25 @@
 # @real-router/validation-plugin
 
+## 0.9.2
+
+### Patch Changes
+
+- [`a12fbd9`](https://github.com/greydragon888/real-router/commit/a12fbd9c33daa401b48b0b10e8749c60c6ab6b40) Thanks [@greydragon888](https://github.com/greydragon888)! - Widen `@real-router/core` peer range to prevent unwanted major bumps (changesets/changesets#822)
+
+  The peer dependency was `workspace:^`, published as `^0.62.2` — patch-only on 0.x,
+  so any core minor bump went out of range and changesets escalated this package to a
+  major bump. Changed to `workspace:>=0.1.0` (publishes as `>=0.1.0`), keeping core
+  minor bumps in range. Backward-compatible range widening — no consumer breakage;
+  works in tandem with the existing `onlyUpdatePeerDependentsWhenOutOfRange: true`.
+
+## 0.9.1
+
+### Patch Changes
+
+- [#1059](https://github.com/greydragon888/real-router/pull/1059) [`f651de1`](https://github.com/greydragon888/real-router/commit/f651de15eb97c671ad1520fa90bd3619ce96eadd) Thanks [@greydragon888](https://github.com/greydragon888)! - Never-crash on an adversarial throwing accessor in route/param validation ([#1052](https://github.com/greydragon888/real-router/issues/1052))
+
+  `getTypeDescription` and `isParams`/`isParamsStrict` read `constructor`/`.name`/property values without a `try/catch`, so an adversarial **throwing accessor** — a `constructor`/`.name` getter that throws, or a `Proxy` that throws on `[[Get]]` — made them throw the caller's exception instead of returning their documented fallback, breaking the [#787](https://github.com/greydragon888/real-router/issues/787)/[#903](https://github.com/greydragon888/real-router/issues/903)/[#786](https://github.com/greydragon888/real-router/issues/786) never-crash contract. These paths are reachable only through `@real-router/validation-plugin` (route-tree's `validateRoute` and the type-guards guards run in the plugin's always-on validators). The reads are now wrapped in `try/catch` (returning `"object"` / `false` — the same fallback as the non-function-value branch) in both `getTypeDescription` copies (type-guards + route-tree's twin) and the `isParams`/`isParamsStrict` walks, so the plugin surfaces a clean `[router.addRoute] … must be …` `TypeError` instead of leaking the getter's exception. Not reachable from untrusted input (URL params are strings; `history.state` is structured-clone and cannot carry getters/Proxies).
+
 ## 0.9.0
 
 ### Minor Changes

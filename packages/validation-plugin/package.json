@@ -1,6 +1,6 @@
 {
   "name": "@real-router/validation-plugin",
-  "version": "0.9.0",
+  "version": "0.9.2",
   "type": "commonjs",
   "description": "Route validation plugin with type guards and parameter validation",
   "main": "./dist/cjs/index.js",
@@ -45,8 +45,6 @@
     "test": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "lint:package": "publint",
-    "lint:types": "attw --pack .",
     "test:properties": "vitest run --config vitest.config.properties.mts",
     "bundle": "tsdown --config-loader unrun"
   },
@@ -56,7 +54,7 @@
     "@real-router/logger": "workspace:^"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:>=0.1.0"
   },
   "devDependencies": {
     "route-tree": "workspace:^",

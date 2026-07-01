@@ -49,8 +49,7 @@ describe("S4: concurrent back()/forward()", () => {
     expect(router.canGoBack() || router.canGoForward()).toBe(true);
 
     const memory = router.getState()?.context.memory as
-      | { historyIndex: number }
-      | undefined;
+      { historyIndex: number } | undefined;
 
     expect(memory?.historyIndex).toBeGreaterThanOrEqual(0);
     expect(memory?.historyIndex).toBeLessThanOrEqual(4);
@@ -77,8 +76,7 @@ describe("S4: concurrent back()/forward()", () => {
     await settle();
 
     const memory = router.getState()?.context.memory as
-      | { historyIndex: number }
-      | undefined;
+      { historyIndex: number } | undefined;
 
     expect(memory?.historyIndex).toBeGreaterThanOrEqual(0);
     expect(memory?.historyIndex).toBeLessThanOrEqual(10);

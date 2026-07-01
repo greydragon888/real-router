@@ -27,8 +27,7 @@ describe("S14: maxHistoryLength=1 — continuous trimming correctness", () => {
         expect(router.canGoForward()).toBe(false);
 
         const memory = router.getState()?.context.memory as
-          | { historyIndex: number }
-          | undefined;
+          { historyIndex: number } | undefined;
 
         expect(memory?.historyIndex).toBe(0);
       }

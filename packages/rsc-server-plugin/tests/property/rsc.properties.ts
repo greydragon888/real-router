@@ -781,11 +781,9 @@ describe("rscAction: getResult invoked exactly N times for N start() calls", () 
     const router = createRouter(ROUTES, { defaultRoute: "home" });
 
     router.usePlugin(
-      rscActionPluginFactory(
-        (): RscActionResult => ({
-          returnValue: { ok: true, data: { id, call: ++calls } },
-        }),
-      ),
+      rscActionPluginFactory((): RscActionResult => ({
+        returnValue: { ok: true, data: { id, call: ++calls } },
+      })),
     );
 
     for (let i = 0; i < n; i++) {

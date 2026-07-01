@@ -8,8 +8,7 @@ function getHistoryIndex(router: {
   getState: () => State | undefined;
 }): number | undefined {
   const memory = router.getState()?.context.memory as
-    | { historyIndex: number }
-    | undefined;
+    { historyIndex: number } | undefined;
 
   return memory?.historyIndex;
 }

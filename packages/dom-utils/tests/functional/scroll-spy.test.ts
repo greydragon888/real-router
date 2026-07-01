@@ -853,6 +853,139 @@ describe("createScrollSpy", () => {
     });
   });
 
+  describe("#780 — late-mounted / changed scrollContainer", () => {
+    it("recreates the IO rooted at a container that mounts AFTER creation (reconcile)", async () => {
+      const router = await createTestRouter();
+      // Canonical "scroll-spy on a separate route" / Angular bootstrap flow:
+      // the getter resolves to null at creation, then the container mounts on
+      // a later render.
+      let container: HTMLElement | null = null;
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => container,
+        }),
+      );
+
+      // At creation the getter returns null → IO root is the window viewport.
+      expect(ioInstances).toHaveLength(1);
+      expect(ioInstances[0]?.options?.root).toBeNull();
+
+      // Container (and its anchor) mount on a later route render.
+      container = document.createElement("div");
+      document.body.append(container);
+      const anchor = document.createElement("section");
+
+      anchor.id = "scoped";
+      container.append(anchor);
+
+      // MutationObserver reconcile fires (container appeared in the subtree).
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+
+      // The IO root + MO target are immutable post-construction, so honouring
+      // the late-mounted container requires a fresh IO rooted at it. Before
+      // the fix the spy never recreates the observer pair: root stays null
+      // (viewport) forever → wrong active-zone geometry → wrong hash.
+      expect(ioInstances).toHaveLength(2);
+      expect(ioInstances.at(-1)?.options?.root).toBe(container);
+      expect(ioInstances.at(-1)?.observed.has(anchor)).toBe(true);
+
+      router.stop();
+    });
+
+    it("recreates the IO when the resolved container identity changes", async () => {
+      const router = await createTestRouter();
+      const containerA = document.createElement("div");
+      const containerB = document.createElement("div");
+
+      document.body.append(containerA, containerB);
+
+      let current: HTMLElement = containerA;
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => current,
+        }),
+      );
+
+      expect(ioInstances).toHaveLength(1);
+      expect(ioInstances[0]?.options?.root).toBe(containerA);
+
+      // The container element is swapped for a different one (e.g. a re-keyed
+      // layout shell). The resolved identity changed → rebuild.
+      current = containerB;
+
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+
+      expect(ioInstances).toHaveLength(2);
+      expect(ioInstances.at(-1)?.options?.root).toBe(containerB);
+
+      router.stop();
+    });
+
+    it("rebuilds rooted at the viewport when the container unmounts (container → null)", async () => {
+      const router = await createTestRouter();
+      const container = document.createElement("div");
+
+      document.body.append(container);
+
+      let current: HTMLElement | null = container;
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => current,
+        }),
+      );
+
+      expect(ioInstances[0]?.options?.root).toBe(container);
+
+      // The container is torn down (route left) → getter resolves to null.
+      current = null;
+
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+
+      // Spy falls back to the window viewport (root: null) instead of holding
+      // a stale root pointing at a detached element.
+      expect(ioInstances).toHaveLength(2);
+      expect(ioInstances.at(-1)?.options?.root).toBeNull();
+
+      router.stop();
+    });
+
+    it("does NOT recreate the IO when the container is unchanged across reconciles", async () => {
+      const router = await createTestRouter();
+      const container = document.createElement("div");
+
+      document.body.append(container);
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => container,
+        }),
+      );
+
+      expect(ioInstances).toHaveLength(1);
+
+      // A reconcile with no container change must not churn the observer pair.
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+      moInstances[0]?.trigger([]);
+      vi.advanceTimersByTime(300);
+
+      expect(ioInstances).toHaveLength(1);
+      expect(ioInstances[0]?.options?.root).toBe(container);
+
+      router.stop();
+    });
+  });
+
   describe("URL plugin detection", () => {
     it("warns once and disables when state.context.url is undefined (no URL plugin)", async () => {
       const router = createRouter([

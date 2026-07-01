@@ -564,6 +564,104 @@ describe("createScrollRestoration", () => {
     sr.destroy();
   });
 
+  // ===========================================================================
+  // #782 — the previousRoute scroll position is captured synchronously inside
+  // router.subscribe, but the snap/restore effect runs in a requestAnimationFrame.
+  // When two navigations land in the same frame (await navigate(b); await
+  // navigate(c) — a programmatic redirect), the second capture runs before the
+  // first nav's rAF snap, so readPos() still returns the route BEFORE
+  // previousRoute and writes it under previousRoute's key. The fix skips the
+  // capture while the scroll is unsettled.
+  // ===========================================================================
+  describe("#782 — two navigations in one frame must not capture a foreign position", () => {
+    function makeRafQueue(): () => void {
+      const queue: FrameRequestCallback[] = [];
+
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        (cb: FrameRequestCallback): number => {
+          queue.push(cb);
+
+          return queue.length;
+        },
+      );
+
+      return () => {
+        const pending = queue.splice(0);
+
+        for (const cb of pending) {
+          cb(0);
+        }
+      };
+    }
+
+    function makeScroller(top: number): HTMLElement {
+      const element = document.createElement("div");
+
+      Object.defineProperty(element, "scrollTop", {
+        value: top,
+        writable: true,
+        configurable: true,
+      });
+      element.scrollTo = ((opts: ScrollToOptions) => {
+        element.scrollTop = opts.top ?? 0;
+      }) as typeof element.scrollTo;
+
+      return element;
+    }
+
+    it("control: navigations in SEPARATE frames capture honest positions", () => {
+      const flush = makeRafQueue();
+      const element = makeScroller(500);
+      const fake = makeFakeRouter(makeState("a"));
+
+      track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => element,
+        }),
+      );
+
+      // a → b: capture a at 500, snap-b deferred.
+      fake.emit(makeState("b"), makeState("a"));
+      flush(); // b's rAF snaps the container to top → scrollTop 0.
+      // b → c in a LATER frame: capture b at its honest 0.
+      fake.emit(makeState("c"), makeState("b"));
+      flush();
+
+      const store = JSON.parse(
+        sessionStorage.getItem(STORAGE_KEY) ?? "{}",
+      ) as Record<string, number>;
+
+      expect(store["a:{}"]).toBe(500);
+      expect(store["b:{}"]).toBe(0);
+    });
+
+    it("probe: navigations in the SAME frame must not write a's position under b's key", () => {
+      const flush = makeRafQueue();
+      const element = makeScroller(500);
+      const fake = makeFakeRouter(makeState("a"));
+
+      track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => element,
+        }),
+      );
+
+      // a → b then b → c with NO frame in between (programmatic redirect): b's
+      // snap-to-top rAF has not run, so readPos() still returns a's 500.
+      fake.emit(makeState("b"), makeState("a")); // capture a = 500
+      fake.emit(makeState("c"), makeState("b")); // capture b — must NOT read a's 500
+      flush(); // both deferred snaps run now
+
+      const store = JSON.parse(
+        sessionStorage.getItem(STORAGE_KEY) ?? "{}",
+      ) as Record<string, number>;
+
+      expect(store["a:{}"]).toBe(500); // a's honest position survives
+      expect(store["b:{}"]).toBeUndefined(); // b's foreign 500 must not be written
+    });
+  });
+
   it("initial navigation without previousRoute — nothing saved", () => {
     const fake = makeFakeRouter();
 

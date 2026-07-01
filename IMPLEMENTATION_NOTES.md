@@ -255,6 +255,7 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 `.husky/pre-push` runs (artifact validation, NOT a superset of pre-commit):
 
+- `pnpm lint:changeset` (validates pending `.changeset/*.md` **content** — **runs first**, ~10 ms fail-fast; no changeset files → no-op — see "Changeset content validation" below)
 - `pnpm lint:duplicates` (jscpd — copy-paste detection across the full tree)
 - `pnpm turbo run build lint:package lint:types --filter='!./examples/**'` (full build + validate package.json exports via publint + validate `.d.ts` via arethetypeswrong)
 - `pnpm lint:unused` (knip — dead code detection across the full tree)
@@ -265,6 +266,22 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 **Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:package`/`lint:types`/`lint:unused` **also run in CI** now (#813 — see below); only `lint:duplicates`' hard threshold stays pre-push-only (CI keeps an informational jscpd SARIF channel). `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
 The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties`, AND `test:stress` — so pre-push exercises stress tests for every human push. Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
+
+#### Changeset content validation (pre-push fast-block)
+
+**Problem.** `.changeset/README.md` documented a contract for changeset files — quoted package names, a valid bump level, public packages only, a PR/issue reference, one package per file — and its "CI Integration" section *claimed* CI enforced the content rules. It did not: `.github/workflows/changeset-check.yml` only checks that a changeset **exists** when public-package `src/` changes. Nothing validated the **contents**. A malformed changeset (unknown package, typo'd bump level like `mihor`, a private package such as `route-tree`, a missing `#NN`, two packages in one file) sailed through every gate and only surfaced at `changeset version` on the release run — the slowest, most expensive place to find it.
+
+**Solution.** `.changeset/check-changeset.mjs` (`pnpm lint:changeset`), wired **first** in `.husky/pre-push` so it fails fast before the heavy build. It validates the machine-checkable subset of the README contract against every pending `.changeset/*.md`:
+
+- frontmatter present and terminated (`--- … ---`)
+- package names quoted **and** matching a real workspace package (registry read live from `packages/*/package.json` → "unknown package" / "private package" can't drift)
+- bump level ∈ `{major, minor, patch}`; `major` rejected for any package still on `0.x` (mirrors `cap-major-bumps.mjs`; auto-relaxes at 1.0 by reading the package's own version)
+- exactly one package per file
+- a `#NN` reference in the body
+
+**No changeset files present → exit 0, silently.** A WIP push or an infra-only push (which by repo convention carries no changeset) is never blocked — so there is no opt-out env flag: when changesets *are* present, they must be valid (the only blunt override is git's own `--no-verify`, which skips the whole hook).
+
+**Why pre-push, not CI.** The rules are author-facing policy — better heard before the push than after a red CI round-trip. It's a static `git`-free filesystem read (~10 ms), cheaper than every other pre-push gate, so it earns first place. **Not** machine-checked (semantic, left to the author): "one logical change per file", "don't mix features/fixes", "right bump for the change type". The same commit corrected `.changeset/README.md`, which contradicted itself — Principles + a "Multiple Packages — Single File" example permitted multi-package files while the CI-Integration section forbade them; the real practice (and now the linter) is **one package per file, always**.
 
 #### Local SAST: semgrep diff scan + eslint-plugin-security
 
@@ -4670,3 +4687,77 @@ if (affected.length <= K && !touchesCore && !touchesAdapterShared) { /* leaf */ 
 `$FILTERS` is intentionally unquoted (bash word-splitting into separate `--filter=<pkg>` tokens — same pattern as the shards' `$SHARD_FILTER`). Verified locally: the closure now produces lcov for all 8 (`event-emitter` 1.8 KB, `path-matcher` 12 KB, …) where `--filter='@real-router/core...'` produced only `core`. `node --test scripts/build-matrix.test.mjs` → 19/19; `actionlint` clean.
 
 **Why not `dependsOn: ["^test"]` on the `test` task.** That would make every `test` run all upstream packages' tests first across the *entire* graph — a global change to the build/cache topology to fix one job's scoping. The filter is local to base-test and leaves the task graph untouched. **Why not hardcode the 8 names in ci.yml.** They already live in `CORE_LAYER`, which is also what excludes them from shards — two hand-maintained copies would drift the moment a 9th base-layer package appears, silently re-opening the same hole. Importing the one set keeps a single source of truth. **Misdiagnosis note:** the first attempt bumped the `vitest.config.common.mts` cache-bust marker (the #470 remedy for *stale* lcov-less cache entries). It did nothing here — the entries weren't stale; the tests simply never ran — and was reverted. The discriminator: the failure reproduced under `--force` (cache bypassed), and a healthy cache hit was shown to restore lcov correctly.
+
+## Cache layers & honest cold builds — clean scripts purge `.eslintcache` + `*.tsbuildinfo*` (2026-06-30)
+
+### Problem
+
+`turbo --force` invalidates the **turbo** cache but NOT the tool-level incremental caches that live outside turbo's output set. The `lint` task runs `eslint --cache` (→ per-package `.eslintcache`) and `type-check` is incremental tsc (→ `.tsbuildinfo`). Both tasks declare `outputs: []` in `turbo.json`, so turbo never captures or restores these files — they persist in the working tree across runs. Consequence: a `turbo run … --force` "cold" measurement is only **turbo-cold**; ESLint and tsc stay **warm** and re-check almost nothing. Measured gap for lint: **~72s warm vs ~1440s CPU truly cold (≈20x)** — enough that a profiling pass wrongly concluded lint was 9.3% of a no-cache rebuild when, cold, it is the dominant stage. On CI this matters because a fresh checkout has no `.eslintcache`/`.tsbuildinfo` at all: every turbo cache-miss is a true cold run.
+
+`scripts/clean-all.sh` and `clean-deep.sh` did not remove either tool cache, so even a "clean" then "rebuild" left them warm. Worse, the two scripts had **drifted**: clean-all used `find packages`, clean-deep used `find . -not node_modules`, and both omitted the two tool caches — a duplicated-and-diverged pair where adding a cache layer to one silently skipped the other.
+
+### Solution
+
+- **`clean-all.sh` is the single source of truth.** A `clean_artifacts()` function removes dist, `.turbo`, `node_modules/.cache`, coverage, `.vitest` + `node_modules/.vite`, **and now `.eslintcache` + `*.tsbuildinfo*`**. Its "main" block (banner + next-steps) runs only under a `[[ "${BASH_SOURCE[0]}" == "${0}" ]]` guard.
+- **`clean-deep.sh` SOURCES `clean-all.sh`** and calls `clean_artifacts()`, then adds `node_modules` + `pnpm-lock.yaml`. The artifact list can no longer drift between the two.
+- Both unified on `find . -not -path '*/node_modules/*'` (whole repo incl. `examples/`); bash 3.2-compatible (`BASH_SOURCE`, `[[ ]]`, `source` all ≥ bash 3.0).
+
+### Why
+
+A "clean" script that leaves tool caches warm is a silent correctness bug for any cold benchmark or bug reproduction — the build still succeeds, so nothing flags it; only the numbers lie (the 20x lint gap is the proof). Single-source-of-truth via `source` + `BASH_SOURCE` guard is the cheapest way to stop the two scripts re-diverging the next time a cache layer is added. To take a genuinely cold measurement: run `clean-all.sh` **then** `turbo run … --force` (the `--force` covers the turbo layer the script intentionally leaves to turbo's own invalidation; the script covers the tool layers turbo can't see).
+
+## peerDep range fix — `workspace:^` → `workspace:>=0.1.0` removes the #822 unwanted-major class (2026-06-30)
+
+### Problem
+
+Three plugins (`rsc-server-plugin`, `ssr-data-plugin`, `validation-plugin`) declared `@real-router/core` in **peerDependencies** as `workspace:^`, which pnpm publishes as `^0.62.0`. On a 0.x package `^0.x.y` is **patch-only** in semver, so any core *minor* bump (0.62 → 0.63) takes the peer out of range. With `onlyUpdatePeerDependentsWhenOutOfRange: true` (already set in `.changeset/config.json`), changesets then bumps these peer-dependents, and an out-of-range peer escalates to a **major** bump ([changesets/changesets#822](https://github.com/changesets/changesets/issues/822) — closed `completed` 2026-06-24 but with **no** code-fix; changesets 2.31 is latest and ships no option, so the workaround stays on the user). The 204-line `cap-major-bumps.mjs` post-version script existed solely to undo these unwanted majors. The 3 manifests also violated the project's own CLAUDE.md rule ("Never use `workspace:^` for peerDependencies on 0.x").
+
+### Solution
+
+- **3 manifests:** peer `workspace:^` → **`workspace:>=0.1.0`**. Keeps the local `link:../core` (workspace protocol preserved) and publishes as `>=0.1.0`, covering the whole 0.x line so core minor bumps stay in range. **NOT** a bare `>=0.1.0`: that makes pnpm resolve core from the registry (`version: 0.62.2`) instead of the workspace link — verified in lockfile, the bare form pulled published `@real-router/core` snapshots into `pnpm-lock.yaml`.
+- **`syncpack.config.mjs`:** added `dependencyTypes: ["prod", "dev"]` to the "Workspace packages use workspace:^ protocol" pinned versionGroup, excluding peer. Without this the pin forced `workspace:^` onto peer too (`DiffersToPin`), silently overriding the semverGroup that had **already** documented (in a comment, since inception) the intent "peer must NOT be forced to workspace:^ → fall through to >= ranges". The comment was intent; the pin was the override that defeated it.
+- Floor `0.1.0` (first published release), not the current `0.62.0`: for a pre-1.0 lockstep monorepo the floor is a soft bound (npm always installs latest core + latest plugin), so a "current version" floor would just read as a magic number. `syncpack lint` accepts `workspace:>=` under the `range: ">="` semverGroup (a compound `workspace:>=X <Y` would NOT pass — semverGroup `>=` is simple).
+
+### Why
+
+`cap-major` was a 204-line patch over a root cause that lived in 3 manifests breaking the project's own rule. Fixing the range removes the **class** of unwanted-major (not each instance after the fact) and lets `cap-major-bumps.mjs` be deleted — **gated** on the first real release with a core minor bump confirming no major surfaces. The fix is **load-bearing on `onlyUpdatePeerDependentsWhenOutOfRange: true`**: remove that option and changesets reverts to always-bumping peer-dependents, and the widened range no longer helps. `cap-major`'s `(no config to prevent this)` header comment is now stale — the config option exists; it is just useless for `workspace:^` on 0.x (always out-of-range on minor). 3 `patch` changesets ship the contract change to npm; until then the published peers stay `^0.62.x`.
+
+## Release-pipeline bash → isolated pure .mjs modules (changeset-check + changesets) (2026-06-30)
+
+### Problem
+
+The two release workflows carried load-bearing logic inline in bash:
+
+- `changeset-check.yml` `validate-changesets` (Check 1-4: PR-ref / multi-package / private / major) was a **bash re-implementation of the same rules `check-changeset.mjs` already enforces on pre-push** — two validators of one rule-set, free to drift (the bash one was already a strict *subset*, silently weaker).
+- `changesets.yml` Extract PR refs (`grep | sort -u | tr | xargs`) and Reconcile's `version_notes` / `version_has_own_changes` (awk/grep CHANGELOG section-parsing) were untested shell on the **release-critical** path.
+
+### Solution
+
+- **`check-changeset.mjs` → module + `--json`.** Exported `validateChangeset` / `loadPackages` / `validateAll`; added a `--json` mode emitting `[{ file, errors, warnings }]`; a `process.argv[1] === fileURLToPath(import.meta.url)` guard so `import` does no I/O. `changeset-check.yml` `validate-changesets` now runs `node check-changeset.mjs --json` and the `github-script` step builds a per-file PR comment from the JSON. One validator, two consumers (pre-push CLI + CI). Workflow diff: **−188/+34**.
+- **`extract-pr-refs.mjs`** (`#NN` → `" (#1 #2)"` suffix, lexical sort matching the old `sort -u`) and **`changelog-notes.mjs`** (`versionNotes` / `versionHasOwnChanges`). The latter is an exact port of the awk/grep — **byte-parity verified against the live awk on 21 package/version pairs**, not eyeballed.
+
+### Why
+
+DRY removes the silent-drift hazard (one changeset-rule validator, not a bash copy that can fall behind). The brittlest parsing (CHANGELOG sections, ref extraction) is isolated as pure functions out of the release-critical shell; awk-parity was demonstrated empirically at extraction time (21 package/version pairs).
+
+**Boundary — where this deliberately stops (vs the RFC's "all 8 blocks → ~30-50-line workflow"):** the `github-script` Comment/Remove steps are **context-bound** (need the GitHub API + `context.repo`) and stay in YAML — they only got *simpler* (per-file from JSON, not 4 hand-maintained per-type sections). `require-changeset`'s source-change detection (a `git diff` against the base ref) is not changeset-content validation and stays bash. And Reconcile's **gh/git orchestration** (`gh release create/list`, `gh api` tag backfill, `declare -A`, two-pass ordering) stays bash on purpose: it is release-critical, its real behaviour is **not locally verifiable** (needs GitHub + pushed tags + existing Releases), and `gh` is more natural in shell than `execSync` wrappers. Only the pure CHANGELOG-parsing came out. Net: the workflows got materially thinner and the extracted logic is tested, but "thin 30-50-line workflow" was an over-estimate — the irreducible remainder is API-bound or release-critical orchestration.
+
+## tsdown-consolidated publint/attw — validation inside `bundle`, not separate tasks (2026-06-30)
+
+### Problem
+
+Package-publishing validation was **two separate turbo tasks per public package**: `lint:package` (publint — validates `package.json` exports + file existence) and `lint:types` (`attw --pack .` — checks `.d.ts` resolution across node10 / node16-cjs / node16-esm / bundler). Both `dependsOn: ["bundle"]`, ran in pre-push + CI. ~22 packages × 2 tasks = a wide band of graph nodes that could drift from the build (you could `bundle` without validating).
+
+### Solution
+
+tsdown 0.22.3 runs publint + attw **built-in**. Added `publint: true` + `attw: true` to `commonConfig` in `tsdown.base.ts` — all **21 tsdown-built** public packages inherit it, so validation now runs as part of `bundle`. Removed the `lint:package`/`lint:types` scripts from those 21 `package.json`.
+
+Pilot on `core` proved parity + two non-obvious facts:
+- tsdown runs publint/attw **once** after the full dist (NOT per ESM/CJS config) even though the option lives in the shared `commonConfig` — so there was no need to inject it into only one format (the planned "decision A" turned out unnecessary).
+- `attw: true` (default) covers the **same 4 resolution modes** as `attw --pack .` — verdict identical ("No problems"). publint's `engines.node` suggestion is **info-level** (`ℹ`) and does NOT trip `failOnWarn: "ci-only"` — `CI=1 pnpm -F core bundle` exits 0.
+
+### Why
+
+`always` (not `ci-only`): keeps local coverage — pre-push `bundle` catches publint/attw errors before push, exactly as the old separate tasks did. Validation is now inseparable from the build (can't bundle without validating). publint `0.3.21` (already in devDeps, satisfies tsdown peer `^0.3.8`) + `@arethetypeswrong/cli 0.18.4` — no new deps.
+
+**Exceptions — NOT tsdown, deliberately keep separate validation:** `solid` (rollup) retains `lint:package`/`lint:types`; the turbo tasks stay **for it alone** (turbo run resolves to `@real-router/solid:lint:package` only — the 21 tsdown packages no longer have the scripts, turbo skips them). `angular` (ng-packagr) and `svelte` (svelte-package) never had publint/attw. The pre-push `pnpm turbo run build lint:package lint:types` line is unchanged: `build`→`bundle` validates the 21 tsdown packages inline; `lint:package`/`lint:types` cover solid. The turbo graph stays mixed — that asymmetry is the price of solid/angular/svelte not being tsdown-built, and is the reason the tasks aren't deleted outright.

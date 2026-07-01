@@ -944,6 +944,22 @@ export default tsEslint.config(
       "sonarjs/cognitive-complexity": ["warn", 15],
       "sonarjs/no-duplicate-string": ["warn", { threshold: 5 }],
 
+      // Perf: disable expensive SonarJS rules that either scan heuristically or
+      // duplicate cheaper/dedicated checks. Measured on core via TIMING; together
+      // these dominated lint rule-time.
+      //  - no-commented-code: NLP heuristic over every comment (~79s, 78-81%)
+      //  - deprecation: duplicate of @typescript-eslint/no-deprecated (already
+      //    on via strictTypeChecked, ~3.7x cheaper — same S1874 check)
+      //  - assertions-in-tests: duplicate of the (intentionally disabled)
+      //    vitest/expect-expect; chai/sinon-oriented, false-positives under vitest
+      //  - no-redundant-assignments: dataflow code-smell, partly covered by ts-eslint
+      //  - aws-restricted-ip-admin-access: irrelevant for a client-side router
+      "sonarjs/no-commented-code": "off",
+      "sonarjs/aws-restricted-ip-admin-access": "off",
+      "sonarjs/deprecation": "off",
+      "sonarjs/assertions-in-tests": "off",
+      "sonarjs/no-redundant-assignments": "off",
+
       // v4.0.0: New security rules — disable irrelevant for client-side router
       "sonarjs/review-blockchain-mnemonic": "off",
       "sonarjs/no-session-cookies-on-static-assets": "off",
@@ -1054,7 +1070,7 @@ export default tsEslint.config(
       "@typescript-eslint/no-shadow": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/unbound-method": "off", // Conflicts with expect.any() in Vitest
-      "sonarjs/no-commented-code": "warn",
+      "sonarjs/no-commented-code": "off",
       "sonarjs/no-duplicate-string": "off",
       "sonarjs/function-return-type": "off",
       "sonarjs/different-types-comparison": "off",

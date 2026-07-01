@@ -1,6 +1,6 @@
 {
   "name": "@real-router/ssr-data-plugin",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "type": "commonjs",
   "description": "SSR per-route data loading plugin for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -68,8 +68,6 @@
     "test:stress": "vitest --config vitest.config.stress.mts --run",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "lint:package": "publint",
-    "lint:types": "attw --pack .",
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
@@ -77,6 +75,6 @@
     "@real-router/types": "workspace:^"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:>=0.1.0"
   }
 }

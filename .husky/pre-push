@@ -2,6 +2,8 @@
 
 # Pre-push hook: artifact validation before pushing
 #
+# - lint:changeset: Validate pending changeset files (fast fail-fast, runs
+#                   first; no files → no-op)
 # - lint:duplicates: Copy-paste detection (jscpd)
 # - build: Final build to ensure compilation
 # - lint:types: Validate TypeScript types in dist (arethetypeswrong)
@@ -18,6 +20,12 @@
 set -e
 
 echo "🚀 Running pre-push checks..."
+
+# Validate pending changeset files first — cheap (~10ms) static check, so it
+# fails fast before the expensive build. No-op when .changeset/ holds no
+# changesets (WIP/infra push).
+echo "📝 Validating changesets..."
+pnpm lint:changeset
 
 # Check for code duplication
 echo "📋 Checking for code duplication..."

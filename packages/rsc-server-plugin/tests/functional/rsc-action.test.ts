@@ -149,11 +149,9 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
       let counter = 0;
 
       router.usePlugin(
-        rscActionPluginFactory(
-          (): RscActionResult => ({
-            returnValue: { ok: true, data: ++counter },
-          }),
-        ),
+        rscActionPluginFactory((): RscActionResult => ({
+          returnValue: { ok: true, data: ++counter },
+        })),
       );
 
       const first = await router.start("/");

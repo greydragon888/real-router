@@ -92,8 +92,7 @@ describe("S9: generation-guard under concurrent async-guard pressure", () => {
     expect(router.canGoBack() || router.canGoForward()).toBe(true);
 
     const memory = router.getState()?.context.memory as
-      | { historyIndex: number }
-      | undefined;
+      { historyIndex: number } | undefined;
 
     expect(memory?.historyIndex).toBeGreaterThanOrEqual(0);
     expect(memory?.historyIndex).toBeLessThanOrEqual(3);
@@ -151,8 +150,7 @@ describe("S9: generation-guard under concurrent async-guard pressure", () => {
     expect(["home", "a", "b"]).toContain(name);
 
     const memory = router.getState()?.context.memory as
-      | { historyIndex: number }
-      | undefined;
+      { historyIndex: number } | undefined;
 
     expect(memory?.historyIndex).toBeGreaterThanOrEqual(0);
     expect(memory?.historyIndex).toBeLessThanOrEqual(3);

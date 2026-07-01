@@ -289,11 +289,37 @@ function throwEmptyParamName(marker: ":" | "*"): never {
 }
 
 /**
+ * Rejects a `:`/`*` marker fused to a static prefix within a segment (`a:b`,
+ * `x:id`, `a*b`): the build/meta param regexes are unanchored and extract it as
+ * a param, but this trie honors a marker only at segment start and compiles the
+ * segment as a static literal — so `buildPath` emits an unmatchable URL while
+ * `match` rejects it (#1050). The sibling of {@link throwEmptyParamName} (#858):
+ * an ambiguous marker placement the three parsers cannot agree on. route-tree's
+ * validation gate catches this first with a route-contextual error; this is the
+ * standalone registration backstop.
+ */
+function throwFusedMarker(segment: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Fused parameter marker in segment "${segment}": ` +
+      `a ':'/'*' marker must begin a segment (e.g. 'a/:b', not 'a:b'). build extracts ` +
+      `it as a param while the trie treats the segment as a literal — the two disagree.`,
+  );
+}
+
+/**
  * The param name is the run of grammar chars right after the marker, up to a
  * `<…>` constraint or a trailing optional `?`. `PARAM_NAME_PATTERN` (`[^/?<]+`)
  * already excludes `/`, `?`, and `<`, so one positive match captures the name.
  */
 const PARAM_NAME_RGX = new RegExp(`^[:*](${PARAM_NAME_PATTERN})`);
+
+/**
+ * A `:`/`*` marker followed by a name. Detects a fused marker in a static-led
+ * segment (#1050 backstop): reuses `PARAM_NAME_PATTERN` so it matches exactly
+ * what the build/meta regexes would extract — a marker with NO name is left to
+ * the name-less path ({@link throwEmptyParamName}, #858).
+ */
+const FUSED_MARKER_RGX = new RegExp(`[:*]${PARAM_NAME_PATTERN}`);
 
 /**
  * Extracts the param name from a `:name` / `:name?` / `:name<…>` segment,
@@ -557,6 +583,15 @@ function processSegment(
     node.hasChildren = true;
 
     return child;
+  }
+
+  // The segment does not START with a marker, so it is compiled as a static
+  // literal below. A `:`/`*` (with a name) still lurking inside it is a marker
+  // fused to a static prefix (`a:b`, `x:id`, `a*b`): build/meta extract it as a
+  // param while this literal compilation ignores it, so the two drift (#1050).
+  // Reject it — the backstop for route-tree's route-contextual gate.
+  if (FUSED_MARKER_RGX.test(segment)) {
+    throwFusedMarker(segment);
   }
 
   const key = state.options.caseSensitive ? segment : segment.toLowerCase();

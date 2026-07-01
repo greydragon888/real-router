@@ -53,17 +53,14 @@ describe("RSC Action Stress", () => {
         // captures `i`. If the plugin's start interceptor smeared closures
         // across requests, we'd see ids out of order.
         clone.usePlugin(
-          rscActionPluginFactory(
-            (): RscActionResult => ({
-              returnValue: { ok: true, data: { reqId: i } },
-            }),
-          ),
+          rscActionPluginFactory((): RscActionResult => ({
+            returnValue: { ok: true, data: { reqId: i } },
+          })),
         );
 
         const state = await clone.start("/");
         const action = state.context.rscAction as
-          | { returnValue?: { data: { reqId: number } } }
-          | undefined;
+          { returnValue?: { data: { reqId: number } } } | undefined;
 
         clone.dispose();
 
@@ -89,18 +86,15 @@ describe("RSC Action Stress", () => {
 
         clone.usePlugin(
           rscServerPluginFactory(rscLoaders),
-          rscActionPluginFactory(
-            (): RscActionResult => ({
-              returnValue: { ok: true, data: { reqId: i } },
-            }),
-          ),
+          rscActionPluginFactory((): RscActionResult => ({
+            returnValue: { ok: true, data: { reqId: i } },
+          })),
         );
 
         const state = await clone.start(`/users/${i}`);
         const rsc = state.context.rsc;
         const action = state.context.rscAction as
-          | { returnValue?: { data: { reqId: number } } }
-          | undefined;
+          { returnValue?: { data: { reqId: number } } } | undefined;
 
         clone.dispose();
 
@@ -121,17 +115,14 @@ describe("RSC Action Stress", () => {
 
     for (let i = 0; i < 200; i++) {
       const unsub = router.usePlugin(
-        rscActionPluginFactory(
-          (): RscActionResult => ({
-            returnValue: { ok: true, data: i },
-          }),
-        ),
+        rscActionPluginFactory((): RscActionResult => ({
+          returnValue: { ok: true, data: i },
+        })),
       );
 
       const state = await router.start("/");
       const action = state.context.rscAction as
-        | { returnValue?: { data: number } }
-        | undefined;
+        { returnValue?: { data: number } } | undefined;
 
       expect(action?.returnValue?.data).toBe(i);
 
@@ -225,19 +216,16 @@ describe("RSC Action Stress", () => {
         clone.usePlugin(
           rscServerPluginFactory(rscLoaders),
           ssrDataPluginFactory(dataLoaders),
-          rscActionPluginFactory(
-            (): RscActionResult => ({
-              returnValue: { ok: true, data: { reqId: i } },
-            }),
-          ),
+          rscActionPluginFactory((): RscActionResult => ({
+            returnValue: { ok: true, data: { reqId: i } },
+          })),
         );
 
         const state = await clone.start(`/users/${i}`);
         const rsc = state.context.rsc;
         const data = state.context.data;
         const action = state.context.rscAction as
-          | { returnValue?: { data: { reqId: number } } }
-          | undefined;
+          { returnValue?: { data: { reqId: number } } } | undefined;
 
         clone.dispose();
 

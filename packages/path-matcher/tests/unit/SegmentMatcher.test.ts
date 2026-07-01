@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildParamMeta } from "../../src/buildParamMeta";
 import { createSegmentNode } from "../../src/SegmentMatcher";
+import { createMatcher } from "../helpers/buildTree";
 import { createTestMatcher } from "../helpers/createTestMatcher";
 
 import type { SegmentMatcher } from "../../src/SegmentMatcher";
@@ -627,6 +628,44 @@ describe("SegmentMatcher", () => {
     it("still accepts a named splat (control)", () => {
       expect(() => {
         createTestMatcher().registerTree(singleRoute("/files/*path"));
+      }).not.toThrow();
+    });
+  });
+
+  // A `:`/`*` marker fused to a static prefix WITHIN a segment (`/a:b`,
+  // `/users/x:id`, `/a*b`) is extracted as a param by build/meta (unanchored
+  // regex) but the trie compiles the whole segment as a static literal — so
+  // buildPath emits an unmatchable URL while match() rejects it (#1050). The
+  // sibling of the #858 name-less rejection: an ambiguous marker placement the
+  // three parsers cannot agree on, rejected loudly at registerTree.
+  describe("registerTree — fused mid-segment marker rejection (#1050)", () => {
+    it("throws on a param ':' fused to a static prefix (/a:b)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/a:b" }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("throws on a param fused mid-segment (/users/x:id)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/users/x:id" }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("throws on a splat '*' fused to a static prefix (/a*b)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/a*b" }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("still accepts a boundary marker (control, /a/:b)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/a/:b" }]);
+      }).not.toThrow();
+    });
+
+    it("still accepts a marker-led segment whose name contains ':' (control, /:a:b → param 'a:b')", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/:a:b" }]);
       }).not.toThrow();
     });
   });

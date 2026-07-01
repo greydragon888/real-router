@@ -103,6 +103,12 @@ export default {
         "browser-env",
         "dom-utils",
       ],
+      // prod/dev only — peer deps must NOT be pinned to workspace:^ (on 0.x,
+      // ^0.x.y is patch-only → minor bump → unwanted major via changesets #822;
+      // this is the root the cap-major-bumps.mjs workaround papered over). Peer
+      // ranges are governed by the ">= ranges" semverGroup instead. Without this
+      // exclusion the pin overrode that intent (DiffersToPin).
+      dependencyTypes: ["prod", "dev"],
       pinVersion: "workspace:^",
       policy: "pinned",
     },

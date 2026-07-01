@@ -13,5 +13,4 @@
  * persistentParamsPlugin({ lang: 'en', theme: 'light' })
  */
 export type PersistentParamsConfig =
-  | string[]
-  | Record<string, string | number | boolean>;
+  string[] | Record<string, string | number | boolean>;

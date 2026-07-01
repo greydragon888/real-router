@@ -9,8 +9,7 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
       let sourceSubscription: ReturnType<typeof source.subscribe> | undefined;
       // eslint-disable-next-line prefer-const -- assigned after usage in complete()
       let notifierSubscription:
-        | ReturnType<typeof notifier.subscribe>
-        | undefined;
+        ReturnType<typeof notifier.subscribe> | undefined;
       let completed = false;
 
       const complete = () => {

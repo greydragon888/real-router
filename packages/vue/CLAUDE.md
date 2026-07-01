@@ -562,6 +562,18 @@ stack regardless of position.
 </RouterProvider>
 ```
 
+**SSR: the push is client-only (#779).** `RouterProvider` pushes onto the stack
+only in the browser (`typeof document !== "undefined"`). During `renderToString`
+the directive never mounts (it runs solely in client DOM) and `onScopeDispose`
+— the release hook — never fires, so a server-side push would strand every
+per-request router (with its route tree, plugins, subscriptions) in the
+module-level array, a leak `router.dispose()` cannot clear. Skipping the push on
+the server keeps the stack empty across requests, so `getDirectiveRouter()`
+throws server-side exactly as it does before any provider mounts. On the client
+(and during hydration) the push/release contract is unchanged — the release is
+registered in its own `onScopeDispose` so the server path leaves no dead
+teardown branch.
+
 ### v-link Defensive Validation
 
 `v-link` validates `binding.value` on mount and update. Passing `null`/`undefined`/`{name: undefined}` logs `console.error` and skips handler attachment instead of throwing inside a click handler. Use this if your binding is computed and may be unset transiently.
@@ -591,7 +603,7 @@ setDirectiveRouter(router);
 
 ## SSR
 
-SSR-friendly without a separate entry. The same `RouterProvider`, `Link`, `RouteView`, and composables work under `vue/server-renderer` (`renderToString` / `renderToWebStream`) — no SSR-specific imports, no `if (typeof window !== "undefined")` shims, no platform branches in hot paths.
+SSR-friendly without a separate entry. The same `RouterProvider`, `Link`, `RouteView`, and composables work under `vue/server-renderer` (`renderToString` / `renderToWebStream`) — no SSR-specific imports and no platform branches in hot paths. The lone environment guard is in `RouterProvider`'s `setup()` (it runs once per mount, not a hot path): it skips the client-only `v-link` directive-stack push on the server (`typeof document !== "undefined"`), which otherwise leaks one router per request (#779).
 
 Verified end-to-end across three example apps:
 

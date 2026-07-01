@@ -217,6 +217,20 @@ function isPrimitiveValue(value: unknown): boolean {
  * isParams([]); // false (array, not object)
  */
 export function isParams(value: unknown): value is Params {
+  // Getter-safe boundary (#1052): a throwing `[[Get]]` (a value getter that
+  // throws, or a Proxy trap) during the structural walk below must not crash —
+  // an object whose structure cannot even be read is not valid params. Mirrors
+  // the never-throw contract of #786/#901 (deep nesting / cycles), for a throwing
+  // accessor. Wraps the whole walk (proto read, fast-path value reads, and the
+  // recursive isSerializable slow path) in one boundary.
+  try {
+    return isParamsUnsafe(value);
+  } catch {
+    return false;
+  }
+}
+
+function isParamsUnsafe(value: unknown): value is Params {
   // Reject null, undefined, and arrays (must be a plain object)
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
@@ -328,6 +342,17 @@ export function isValidParamValueStrict(value: unknown): boolean {
  * @returns true if value is a valid Params object
  */
 export function isParamsStrict(value: unknown): value is Params {
+  // Getter-safe boundary (#1052): same never-throw contract as isParams — a
+  // throwing `[[Get]]` / Proxy trap during the walk below → not valid params,
+  // not the caller's exception.
+  try {
+    return isParamsStrictUnsafe(value);
+  } catch {
+    return false;
+  }
+}
+
+function isParamsStrictUnsafe(value: unknown): value is Params {
   // Check if value is an object (null returns "object" but fails Array.isArray and other checks)
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;

@@ -92,8 +92,7 @@ export class SearchSchemaPlugin {
 
   #getSchema(routeName: string): StandardSchemaV1 | undefined {
     return this.#pluginApi.getRouteConfig(routeName)?.searchSchema as
-      | StandardSchemaV1
-      | undefined;
+      StandardSchemaV1 | undefined;
   }
 
   #validateState(result: { name: string; params: Params }): {

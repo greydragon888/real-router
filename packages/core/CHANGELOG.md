@@ -1,5 +1,25 @@
 # @real-router/core
 
+## 0.62.2
+
+### Patch Changes
+
+- [#1056](https://github.com/greydragon888/real-router/pull/1056) [`a98c390`](https://github.com/greydragon888/real-router/commit/a98c390acf70812f8e474914fab272b59b4467bd) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject a `:`/`*` marker fused to a static prefix within a segment ([#1050](https://github.com/greydragon888/real-router/issues/1050))
+
+  A marker glued to a static prefix inside one segment (`/a:b`, `/users/x:id`, `/a*b`) was parsed inconsistently: `buildPath`/`buildParamMeta` extracted it as a param (their marker regex is unanchored) while the trie honored a marker only at segment start and compiled the whole segment as a static literal. The two disagreed — `buildPath` emitted a URL its own `match` rejected, and the validation gate passed it through. `createRouter` / `addRoute` / `replaceRoutes` / `updateRoute` now reject such a path at registration (route-tree validation gate with a route-contextual error, path-matcher `registerTree` backstop), the sibling of the name-less marker rejection ([#858](https://github.com/greydragon888/real-router/issues/858)/[#863](https://github.com/greydragon888/real-router/issues/863)). Use a boundary marker (`/a/:b`) instead. A marker-led segment whose name itself contains `:`/`*` (`/:a:b` → param `a:b`) is unaffected.
+
+## 0.62.1
+
+### Patch Changes
+
+- [#1053](https://github.com/greydragon888/real-router/pull/1053) [`5fc3652`](https://github.com/greydragon888/real-router/commit/5fc3652ddb72fc1ce31fefdce5ab287a5a471177) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal refactor: extract `update()`'s field-patch commit into `commitRouteUpdate` ([#1049](https://github.com/greydragon888/real-router/issues/1049))
+
+  Co-locates `updateRoute`'s PREPARE/COMMIT logic in `routesStore.ts` beside the other three route-CRUD commit cores (`adoptRouteArtifacts`, `commitTreeChanges`, `resetStore`). `update` stays an O(1) field-patch (no tree rebuild), core reads each user `updates` getter exactly once, and all atomicity / guard-origin / custom-field semantics are unchanged. No public API or behavior change.
+
+- [#1053](https://github.com/greydragon888/real-router/pull/1053) [`5fc3652`](https://github.com/greydragon888/real-router/commit/5fc3652ddb72fc1ce31fefdce5ab287a5a471177) Thanks [@greydragon888](https://github.com/greydragon888)! - Pre-flight the lifecycle handler-limit check ([#961](https://github.com/greydragon888/real-router/issues/961)) into the route-CRUD PREPARE phase so `add`/`replace`/`update` stay atomic ([#1046](https://github.com/greydragon888/real-router/issues/1046)). Previously, with `@real-router/validation-plugin` installed and the per-type handler count at `maxLifecycleHandlers`, a CRUD op that registered a new guard slot threw the limit `RangeError` _after_ the tree/config swap — leaving a partial mutation (`update`'s `forwardTo` committed, `add`'s routes in the swapped tree, `replace`'s old tree destroyed). The limit is now projected per type before any store write (against surviving external guards for `replace`'s clear-then-register), so a limit-exceeding op aborts with the prior state fully intact.
+
+- [#1053](https://github.com/greydragon888/real-router/pull/1053) [`5fc3652`](https://github.com/greydragon888/real-router/commit/5fc3652ddb72fc1ce31fefdce5ab287a5a471177) Thanks [@greydragon888](https://github.com/greydragon888)! - Restore always-on (bare-core) route-name hardening parity across the mutating CRUD ops ([#1047](https://github.com/greydragon888/real-router/issues/1047)). `add` rejected reserved `@@`-prefixed names ([#954](https://github.com/greydragon888/real-router/issues/954)) and in-batch duplicate paths ([#955](https://github.com/greydragon888/real-router/issues/955)) without the validation-plugin, but `replace` only rejected duplicate names (reserved-name + dup-path were plugin-only) and `remove`/`update` accepted reserved `@@` names entirely (a regression of [#238](https://github.com/greydragon888/real-router/issues/238), which originally protected all four mutators before the validation-extraction demoted the checks to the opt-in plugin). Bare core now rejects these on `replace`/`remove`/`update` too — with the same error messages as the validation-plugin — closing silent-shadow (`replace` dup-path) and reserved-name-mutation gaps. The `replace` guards run before the build/swap, so a rejected batch leaves the existing tree intact.
+
 ## 0.62.0
 
 ### Minor Changes

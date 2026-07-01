@@ -94,20 +94,17 @@ jobs:
           echo "changesets_count=$CHANGESETS" >> $GITHUB_OUTPUT
           echo "Found $CHANGESETS changeset(s)"
 
-      # Extract PR/issue references from changeset files for Release PR title
+      # Extract PR/issue references from changeset files for Release PR title.
+      # Logic lives in .changeset/extract-pr-refs.mjs (was an inline
+      # grep|sort|tr|xargs here); it emits the " (#1 #2)" suffix directly (lexical
+      # sort, matching the historical title order), or "" when there are none.
       - name: Extract PR references
         if: steps.check.outputs.changesets_count != '0'
         id: refs
         run: |
-          # Find all #XX references in changeset files (excluding README)
-          REFS=$(grep -roh '#[0-9]\+' .changeset/*.md 2>/dev/null | sort -u | tr '\n' ' ' | xargs)
-          if [ -n "$REFS" ]; then
-            echo "refs= ($REFS)" >> $GITHUB_OUTPUT
-            echo "Found PR references: $REFS"
-          else
-            echo "refs=" >> $GITHUB_OUTPUT
-            echo "No PR references found in changesets"
-          fi
+          REFS=$(node .changeset/extract-pr-refs.mjs)
+          echo "refs=$REFS" >> "$GITHUB_OUTPUT"
+          echo "PR references suffix: '$REFS'"
 
       # If there are changesets, create/update the release PR
       - name: Create Release PR
@@ -341,13 +338,16 @@ jobs:
           echo "::endgroup::"
 
           # Notes = the '## <version>' section of a CHANGELOG (between two headers).
+          # Extraction + the "has own (non-dependency) changes" predicate live in
+          # .changeset/changelog-notes.mjs (unit-tested, byte-parity with the
+          # former inline awk/grep — see its tests). The gh/git orchestration
+          # below stays in bash.
           version_notes() {
-            [ -f "$1" ] || return 1
-            awk -v v="## $2" '$0==v{f=1;next} f&&/^## /{exit} f{print}' "$1"
+            node .changeset/changelog-notes.mjs "$1" "$2"
           }
-          # True when that version section has a non-dependency bullet.
+          # True (exit 0) when that version section has a non-dependency bullet.
           version_has_own_changes() {
-            version_notes "$1" "$2" | grep -E '^- ' | grep -qvF 'Updated dependencies'
+            node .changeset/changelog-notes.mjs "$1" "$2" --has-own-changes
           }
 
           RELEASES_CREATED=""

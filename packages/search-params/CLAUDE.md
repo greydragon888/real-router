@@ -65,6 +65,10 @@ Calling `parse()` or `build()` without options resolves to the cached `DEFAULT_O
 
 Under `booleanFormat: "empty-true"` the key-only form `?flag` means `true`. A `null` value with `nullFormat: "default"` encodes to the same bare key, so `build({ flag: null }, { booleanFormat: "empty-true" })` → `"flag"` → `parse` → `{ flag: true }`, **not** `null` — both collapse to one wire token and only `true` decodes back (INVARIANTS #18). Pair `empty-true` with `nullFormat: "hidden"`, or avoid null query values. The roundtrip property excludes this combo (asserted explicitly in `formats.properties.ts`) so the oracle stays an honest contract instead of mirroring the loss.
 
+### The empty-string key `""` is erased when its value encodes to a bare key
+
+`build` drops any chunk that encodes to the empty string (`searchParams.ts` `if (encoded)` — the same filter that erases `nullFormat: "hidden"`). For the **empty-string key** `""`, a value that encodes to a **bare key** (no `=`) yields the token `""` → dropped: `build({ "": true }, { booleanFormat: "empty-true" })` and `build({ "": null }, { nullFormat: "default" })` both return `""`, and `parse` recovers `{}` — a silent `parse(build(x)) != x`. Every other value (`string` / `number` / `false`) encodes `=value` and round-trips, and a non-empty key's bare token (`name`) survives. Pathological (router query keys come from route definitions, never empty) but type-valid (`SearchParams = Record<string, …>`); a documented loss (INVARIANTS #19), asserted in `formats.properties.ts`. `arbSafeKey` was widened to `minLength: 0` so the suite exercises the empty key, with the two erasing combos excluded via the `erasesEmptyKey` helper (#1051).
+
 ### Prototype-name keys are own properties
 
 The parse accumulator detects repeated keys with `Object.hasOwn`, not `params[name] !== undefined` — so a query key shadowing an `Object.prototype` member (`valueOf`, `constructor`, `toString`, …) is a plain param, not the inherited function. `__proto__` is assigned via `Object.defineProperty` so it becomes a real own entry instead of mutating the prototype. Without this, `?constructor=x` parsed to `{ constructor: [<fn>, "x"] }`.

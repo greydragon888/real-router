@@ -17,6 +17,15 @@
  *                                    `<html>` dataset attribute
  * - `createViewTransitions`        — subscribeLeave + subscribe + active VT
  *                                    skipTransition()
+ * - `createScrollSpy`              — IntersectionObserver + MutationObserver +
+ *                                    rAF + timers + getTransitionSource +
+ *                                    2 router subscriptions: the richest-
+ *                                    resource factory, so the one whose
+ *                                    teardown completeness most needs the
+ *                                    cross-factory lock (#784). Its active path
+ *                                    needs a real `createRouter` (it calls
+ *                                    `getTransitionSource` → `getPluginApi`,
+ *                                    which the minimal mock cannot satisfy).
  *
  * For each factory, two invariants are locked:
  *
@@ -36,12 +45,14 @@
  */
 
 import { fc, test } from "@fast-check/vitest";
+import { createRouter } from "@real-router/core";
 import { describe, expect, beforeEach, afterEach, vi } from "vitest";
 
 import {
   createDirectionTracker,
   createRouteAnnouncer,
   createScrollRestoration,
+  createScrollSpy,
   createViewTransitions,
 } from "../../src";
 
@@ -381,6 +392,119 @@ describe("Lifecycle factories — destroy idempotency PBT (audit-2026-05-17 §6 
   });
 
   // ===========================================================================
+  // createScrollSpy — the richest-resource factory. Its active path needs a
+  // real `createRouter` (it calls `getTransitionSource` → `getPluginApi`, which
+  // the minimal mock cannot satisfy) plus IntersectionObserver +
+  // MutationObserver, neither of which jsdom implements. Fake observers track
+  // `disconnect()` so the cross-factory teardown invariant can assert the pair
+  // is released; the router is left UNSTARTED so the URL-plugin detector defers
+  // (no warn) and the resources are just the observers + the deferred
+  // subscriptions, all of which destroy() must release (#784).
+  // ===========================================================================
+  describe("createScrollSpy", () => {
+    const ioRecords: { disconnected: boolean }[] = [];
+    const moRecords: { disconnected: boolean }[] = [];
+
+    beforeEach(() => {
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class {
+          private readonly record = { disconnected: false };
+
+          constructor() {
+            ioRecords.push(this.record);
+          }
+
+          observe(): void {
+            /* no-op */
+          }
+
+          unobserve(): void {
+            /* no-op */
+          }
+
+          disconnect(): void {
+            this.record.disconnected = true;
+          }
+
+          takeRecords(): never[] {
+            return [];
+          }
+        },
+      );
+
+      vi.stubGlobal(
+        "MutationObserver",
+        class {
+          private readonly record = { disconnected: false };
+
+          constructor() {
+            moRecords.push(this.record);
+          }
+
+          observe(): void {
+            /* no-op */
+          }
+
+          disconnect(): void {
+            this.record.disconnected = true;
+          }
+
+          takeRecords(): never[] {
+            return [];
+          }
+        },
+      );
+    });
+
+    test.prop([arbDestroyCount], { numRuns: NUM_RUNS.standard })(
+      "destroy() called N times never throws and disconnects the observer pair",
+      (n) => {
+        // Reset per property run — `test.prop` does not re-run `beforeEach`
+        // between runs, so the fake-observer records accumulate otherwise.
+        ioRecords.length = 0;
+        moRecords.length = 0;
+
+        const router = createRouter([{ name: "home", path: "/" }]);
+        const handle = createScrollSpy(router, { selector: "[id]" });
+
+        expect(ioRecords).toHaveLength(1);
+        expect(moRecords).toHaveLength(1);
+
+        for (let i = 0; i < n; i++) {
+          expect(() => {
+            handle.destroy();
+          }).not.toThrow();
+        }
+
+        expect(ioRecords[0]?.disconnected).toBe(true);
+        expect(moRecords[0]?.disconnected).toBe(true);
+      },
+    );
+
+    test.prop([arbCycleCount], { numRuns: NUM_RUNS.standard })(
+      "K create+destroy cycles disconnect every observer (no leak)",
+      (k) => {
+        ioRecords.length = 0;
+        moRecords.length = 0;
+
+        const router = createRouter([{ name: "home", path: "/" }]);
+
+        for (let i = 0; i < k; i++) {
+          const handle = createScrollSpy(router, { selector: "[id]" });
+
+          handle.destroy();
+        }
+
+        expect(ioRecords).toHaveLength(k);
+        expect(moRecords).toHaveLength(k);
+        expect(ioRecords.every((r) => r.disconnected)).toBe(true);
+        expect(moRecords.every((r) => r.disconnected)).toBe(true);
+      },
+    );
+  });
+
+  // ===========================================================================
   // Mini-sprint F.2 (audit-6 Stage-2 #20) — NOOP_INSTANCE SSR matrix.
   // Each of the 4 lifecycle factories has an SSR guard at the top:
   //   `if (typeof document === "undefined") return NOOP_INSTANCE;`
@@ -482,6 +606,35 @@ describe("Lifecycle factories — destroy idempotency PBT (audit-2026-05-17 §6 
       const { router } = createMockRouter();
       const a = createScrollRestoration(router, { mode: "native" });
       const b = createScrollRestoration(router, { mode: "native" });
+
+      expect(a).toBe(b);
+      expect(Object.isFrozen(a)).toBe(true);
+    });
+
+    test("createScrollSpy: SSR (no document) → frozen singleton", () => {
+      vi.stubGlobal("document", undefined);
+
+      const { router } = createMockRouter();
+      const a = createScrollSpy(router, { selector: "[id]" });
+      const b = createScrollSpy(router, { selector: "[id]" });
+
+      expect(a).toBe(b);
+      expect(Object.isFrozen(a)).toBe(true);
+      expect(() => {
+        a.destroy();
+      }).not.toThrow();
+    });
+
+    test("createScrollSpy: no IntersectionObserver → frozen singleton (same NOOP)", () => {
+      // document present, but the browser lacks IntersectionObserver (no
+      // polyfill ships). Locks the second NOOP exit to the same singleton —
+      // no observers / timers / subscriptions are created (the guard returns
+      // before `getTransitionSource`, so a minimal mock router is enough).
+      vi.stubGlobal("IntersectionObserver", undefined);
+
+      const { router } = createMockRouter();
+      const a = createScrollSpy(router, { selector: "[id]" });
+      const b = createScrollSpy(router, { selector: "[id]" });
 
       expect(a).toBe(b);
       expect(Object.isFrozen(a)).toBe(true);
