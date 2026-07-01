@@ -78,7 +78,7 @@ jobs:
       # stale/corrupt cache (checksum re-verify → re-download) and prunes zips
       # of other versions restored via restore-keys.
       - name: Cache Electron binary
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/electron-zip
           key: electron-zip-${{ runner.os }}-${{ hashFiles('examples/desktop/electron/*/package.json') }}
