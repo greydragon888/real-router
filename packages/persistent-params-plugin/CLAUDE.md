@@ -104,6 +104,25 @@ After updating the snapshot, `onTransitionSuccess` publishes it to `state.contex
 
 `usePlugin` is called once per router. Calling it twice with the same factory (without `unsubscribe()` in between) throws from core: the second instance's `claimContextNamespace("persistentParams")` hits the already-claimed namespace (`CONTEXT_NAMESPACE_ALREADY_CLAIMED`). The plugin itself adds no explicit guard — the core namespace-claim collision is the backstop. (With `@real-router/validation-plugin`, the duplicate **factory** is rejected even earlier, before the factory runs — #726.)
 
+### Composition order with `search-schema-plugin` decides whether persistent params are validated
+
+This plugin's `forwardState` interceptor **injects** persistent params into the target state (it wraps `next()` and merges the params on top). `@real-router/search-schema-plugin` also registers a `forwardState` interceptor, and it **validates** the result of its `next()`. Because core composes interceptors **LIFO** (last-registered = outermost), whichever plugin is registered **last** wraps the other — so registration order decides whether the injected persistent params pass through the schema:
+
+```typescript
+// RECOMMENDED — persistent-params first, search-schema second:
+router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
+router.usePlugin(searchSchemaPlugin());
+// search-schema is outermost → it validates the params this plugin injected
+// → an invalid persisted value is stripped by the schema
+
+// ALTERNATIVE — persistent-params second (this plugin outermost):
+router.usePlugin(searchSchemaPlugin());
+router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
+// this plugin injects AFTER the schema ran → persistent params bypass validation
+```
+
+Register this plugin **before** `search-schema-plugin` if you want persistent params validated by the schema (the safer default); register it after only when they must deliberately skip validation. This is a pure ordering choice — no code change, LIFO is working as documented. (`search-schema-plugin`'s CLAUDE.md and README carry the mirror note. #801)
+
 ## Module Structure
 
 ```

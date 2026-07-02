@@ -143,6 +143,80 @@ describe("Search schema plugin", () => {
 
       consoleSpy.mockRestore();
     });
+
+    // Composition-order lock (#801). A raw `forwardState` interceptor stands in
+    // for persistent-params-plugin (same "inject on top of next()" shape), so the
+    // lock stays inside this package with no cross-plugin dependency. It pins the
+    // strip-vs-leak asymmetry the CLAUDE.md / README "Composition order" sections
+    // describe: an INVALID value injected by an EARLIER interceptor (schema
+    // outermost → recommended order) is stripped; one injected by a LATER
+    // interceptor (schema innermost → alternative order) leaks past validation.
+    it("STRIPS an invalid value injected by an EARLIER interceptor (schema outermost — recommended)", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "search",
+            path: "/search?q&page",
+            searchSchema: searchSchema(),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      const pluginApi = getPluginApi(router);
+
+      // Injector registered FIRST → search-schema (registered second) is outermost.
+      pluginApi.addInterceptor("forwardState", (next, routeName, params) => {
+        const result = next(routeName, params);
+
+        return {
+          ...result,
+          params: { ...result.params, page: "INVALID-INJECTED" },
+        };
+      });
+      router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+      await router.start("/");
+
+      await router.navigate("search", { q: "hello" });
+
+      // schema (outermost) validated the injected page (a string, not a number) → stripped.
+      expect(router.getState()?.params.page).toBeUndefined();
+      expect(router.getState()?.params.q).toBe("hello");
+    });
+
+    it("LEAKS an invalid value injected by a LATER interceptor (schema innermost — alternative)", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "search",
+            path: "/search?q&page",
+            searchSchema: searchSchema(),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      const pluginApi = getPluginApi(router);
+
+      // search-schema registered FIRST → the injector (registered second) is outermost.
+      router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+      pluginApi.addInterceptor("forwardState", (next, routeName, params) => {
+        const result = next(routeName, params);
+
+        return {
+          ...result,
+          params: { ...result.params, page: "INVALID-INJECTED" },
+        };
+      });
+      await router.start("/");
+
+      await router.navigate("search", { q: "hello" });
+
+      // injector (outermost) added page AFTER the schema ran → invalid value leaks into state.
+      expect(router.getState()?.params.page).toBe("INVALID-INJECTED");
+    });
   });
 
   describe("buildPath with schema validation", () => {
