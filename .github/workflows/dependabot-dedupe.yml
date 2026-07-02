@@ -1,0 +1,86 @@
+name: Dependabot Lockfile Dedupe
+
+# Runs `pnpm dedupe` on a Dependabot PR branch and pushes the result back, so the
+# required `lint:dedupe` gate (`pnpm dedupe --check`) passes without the manual
+# `pnpm resolve:dependabot <PR#>`. Background: issue #1085.
+#
+# WHY it's needed: Dependabot does a minimal lockfile edit and never runs
+# `pnpm dedupe`, so a bump can split a shared transitive subtree into old+new
+# versions (e.g. `@vue/*@3.5.39` alongside `@vue/*@3.5.38`) → `pnpm dedupe --check`
+# fails → CI red on nearly every Dependabot PR. Human commits avoid this via the
+# pre-commit auto-dedupe hook, which Dependabot bypasses.
+#
+# WHY no PAT / stored secret: this is a `pull_request` run gated to Dependabot,
+# and GitHub honors a workflow's declared `permissions:` to grant GITHUB_TOKEN
+# write access for Dependabot runs (documented platform behavior). The push uses
+# the default GITHUB_TOKEN; nothing to configure. If elevation is ever refused,
+# the push fails loudly with a 403 — switch to a PAT then, not preemptively.
+# (`pull_request_target` would be the wrong tool here: for Dependabot it yields a
+# read-only token with no secrets, and it would run a privileged checkout of an
+# untrusted head. `pull_request` + declared write is both simpler and safer.)
+#
+# NOTE on re-runs: a GITHUB_TOKEN push does not itself re-trigger CI (GitHub
+# loop-prevention) — which also guarantees this workflow can't loop. Re-evaluation
+# of the pushed fix is handled at merge time.
+
+on:
+  pull_request:
+    # Every Dependabot dep bump edits the lockfile; nothing else runs us.
+    paths:
+      - "pnpm-lock.yaml"
+
+# Elevated for the push. Honored for Dependabot `pull_request` runs via this key.
+permissions:
+  contents: write
+
+concurrency:
+  group: dependabot-dedupe-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dedupe:
+    # Only Dependabot PRs — never touch a human PR branch.
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v7
+        with:
+          # Dependabot branches live in this repo (not a fork), so head_ref is
+          # pushable with the persisted GITHUB_TOKEN.
+          ref: ${{ github.head_ref }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Dedupe lockfile
+        id: dedupe
+        run: |
+          # `pnpm dedupe` does its own install+dedupe in one pass, so no separate
+          # `pnpm install` is needed (Dependabot's head already has a manifest and
+          # lockfile that agree — there's no rebase to reconcile). --ignore-scripts
+          # ensures no dependency lifecycle script runs with the write token.
+          pnpm dedupe --ignore-scripts
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Lockfile already deduped — nothing to push."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit & push deduped lockfile
+        if: steps.dedupe.outputs.changed == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "chore(deps): pnpm dedupe lockfile for #${PR_NUMBER}"
+          git push

@@ -499,7 +499,7 @@ All CI workflows use `pnpm/action-setup@v6` (`ci.yml`, `changesets.yml`, `danger
 | Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by Post-Merge Build success)                |
 | Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)                                   |
 | CodeQL               | `codeql.yml`               | Security scanning + dependency audit                                              |
-| Dependabot Automerge | `dependabot-automerge.yml` | Auto-merge patch/minor updates                                                    |
+| Dependabot Dedupe    | `dependabot-dedupe.yml`    | `pnpm dedupe` a Dependabot PR lockfile so `lint:dedupe` passes (#1085)             |
 | Danger               | `danger.yml`               | Automated PR review checks                                                        |
 | Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)                                  |
 
@@ -763,11 +763,18 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 - Groups: dev-dependencies, eslint, typescript, testing, turbo
 - GitHub Actions updates (separate config)
 
-`.github/workflows/dependabot-automerge.yml`:
+#### Dependabot automerge disabled (2026-07-02)
 
-- Auto-merges patch updates
-- Auto-merges minor dev dependency updates
-- Uses squash merge
+`dependabot-automerge.yml` (which squash-auto-merged patch updates and minor
+dev-dependency updates) was **removed**. **Why:** grouped and toolchain bumps can
+carry real breakage that the required-check set doesn't catch at merge time — e.g.
+an eslint-plugin bump that adds new rules (#1090: `route-tree#lint`, 2 errors) or a
+bump that breaks an adapter build (#1100: `@real-router/solid#bundle` babel
+SyntaxError). Auto-merging dependency changes without a human reviewing the diff is
+a supply-chain risk the maintainer chose not to take, so **every Dependabot PR now
+requires manual review + merge**. Recover the workflow from git history if a
+patch-only automerge is ever wanted back. (The `dependabot-dedupe.yml` below is
+unaffected — it only rewrites the lockfile, it never merges.)
 
 #### Squash-resolve for CONFLICTING Dependabot PRs
 
@@ -843,6 +850,44 @@ copy-paste hints in the stop-for-review path, with `$BRANCH` quoted inside the
 hint string too (a `dependabot/x;evil` branch can't reach that print — `git fetch
 origin "$BRANCH"` fails first under `set -e` unless the maintainer created such a
 ref — but the quoting removes the last theoretical paste vector).
+
+#### Auto-dedupe Dependabot PR lockfiles in CI (#1085)
+
+**Problem:** Nearly every Dependabot PR is red on CI's `lint:dedupe`
+(`pnpm dedupe --check` → `ERR_PNPM_DEDUPE_CHECK_ISSUES`). Dependabot does a minimal
+lockfile edit and never runs `pnpm dedupe`, so a bump splits a shared transitive
+subtree into old+new versions (e.g. `@vue/*@3.5.39` next to `@vue/*@3.5.38`). Human
+commits never hit this — the pre-commit hook auto-dedupes the staged lockfile — but
+Dependabot bypasses all local hooks. The manual remedy (`pnpm resolve:dependabot
+<PR#>`, above) fixes it but is a per-PR chore.
+
+**Solution:** `.github/workflows/dependabot-dedupe.yml` — a `pull_request` workflow
+gated to `github.actor == 'dependabot[bot]'` with `paths: [pnpm-lock.yaml]`. It checks
+out the PR head branch, runs `pnpm dedupe --ignore-scripts`, and — only if the lockfile
+changed — commits + pushes it back to the Dependabot branch. The push uses the
+**default `GITHUB_TOKEN`** with a workflow-declared `permissions: contents: write` —
+GitHub honors the `permissions:` key to elevate the token for Dependabot
+`pull_request` runs (documented platform behavior; a refused elevation fails the push
+loudly with a 403, never silently). No PAT, no GitHub App, no stored secret.
+
+**Why not `pull_request_target` + a PAT (the issue's original sketch):** a workflow
+*triggered by* Dependabot gets a **read-only** `GITHUB_TOKEN` and cannot see Actions
+secrets (only Dependabot secrets); for `pull_request_target` on a Dependabot PR even
+Dependabot secrets are unavailable, and it would run a privileged checkout of an
+untrusted head. A plain `pull_request` run whose declared `permissions:` elevate
+`GITHUB_TOKEN` sidesteps all of that — no long-lived write token (exactly the
+supply-chain surface this repo otherwise minimizes: OIDC publish, exact pins, no
+runtime deps), and the checkout runs the trusted base workflow. R1 is further
+contained by `--ignore-scripts` (no dependency lifecycle script runs with the write
+token) and by never invoking a repo npm script.
+
+**Why it can't loop, plus the CI-rerun caveat:** a `GITHUB_TOKEN` push does not
+re-trigger `pull_request` (GitHub loop-prevention), so this workflow cannot re-invoke
+itself, and it converges in one pass (dedupe is idempotent → a clean lockfile yields no
+diff → no push). The same rule means the pushed fix does not auto-re-run `lint:dedupe`
+on the new head SHA; re-evaluation is handled at merge time. `resolve:dependabot` stays
+the tool for **conflicting** PRs (rebase onto `master`) and if a token elevation is ever
+refused — this workflow only removes the dedupe-only chore.
 
 ### Danger JS
 
