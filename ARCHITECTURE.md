@@ -26,7 +26,7 @@ real-router/
 │   ├── solid/                     # Solid.js integration (hooks, components, directives)
 │   ├── vue/                       # Vue 3 integration (composables, components, directives)
 │   ├── svelte/                    # Svelte 5 integration (composables, components, actions)
-│   ├── angular/                   # Angular 21+ integration (signals, inject* functions, components, directives, zoneless)
+│   ├── angular/                   # Angular 22+ integration (signals, inject* functions, components, directives, zoneless)
 │   ├── sources/                   # Subscription layer for UI bindings: cached getTransitionSource / createDismissableError / createActiveNameSelector, canonicalJson params
 │   ├── rx/                        # Reactive Observable API (state$, events$, operators)
 │   ├── browser-plugin/            # Browser History API synchronization
@@ -62,7 +62,7 @@ real-router/
 │   │   ├── solid/      (24 vite apps)     # Solid.js (incl. animation-examples × 4 + ssr-examples × 4); 54 e2e specs
 │   │   ├── vue/        (24 vite apps)     # Vue 3 SFC (incl. animation-examples × 4 + ssr-examples × 4); 55 e2e specs
 │   │   ├── svelte/     (25 vite apps)     # Svelte 5 (incl. animation-examples × 4 + ssr-examples × 4); 54 e2e specs
-│   │   └── angular/    (16 vite apps)     # Angular 21+ (incl. animation-examples × 4 + ssr-examples × 4 using provideRealRouterFactory); 49 e2e specs
+│   │   └── angular/    (16 vite apps)     # Angular 22+ (incl. animation-examples × 4 + ssr-examples × 4 using provideRealRouterFactory); 49 e2e specs
 │   ├── console/
 │   │   └── react-ink/  (1 app)            # CLI demo via @real-router/react/ink + memory-plugin
 │   └── desktop/

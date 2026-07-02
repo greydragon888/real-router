@@ -1,6 +1,6 @@
 # Architecture
 
-> Angular 21 bindings for Real-Router with signal-based reactive state
+> Angular 22 bindings for Real-Router with signal-based reactive state
 
 ## Package Dependencies
 
@@ -19,7 +19,7 @@ depend on Angular SSR plumbing (`afterNextRender`, `TransferState`,
 `HttpStatusSink`).
 
 ```
-@real-router/angular        →  src/index.ts          →  Client API (Angular 21+)
+@real-router/angular        →  src/index.ts          →  Client API (Angular 22+)
 @real-router/angular/ssr    →  ssr/public_api.ts     →  SSR-feature surface
 ```
 
@@ -115,7 +115,7 @@ ssr/                            # SSR-feature entry — @real-router/angular/ssr
 | Route matching        | `RouteView.Match` (JSX children) | `RouteView.Match` (JSX children) | `RouteView.Match` (VNode type check)  | `ng-template[routeMatch]` (content children)                |
 | Build tool            | tsdown                           | rollup + babel-preset-solid      | tsdown                                | ng-packagr (partial compilation)                            |
 | Output format         | ESM + CJS                        | ESM + CJS                        | ESM + CJS                             | FESM2022 (ESM-only)                                         |
-| Peer dependency       | `react` >= 19.0.0                | `solid-js` >= 1.7.0              | `vue` >= 3.3.0                        | `@angular/core` >= 21.0.0                                   |
+| Peer dependency       | `react` >= 19.0.0                | `solid-js` >= 1.7.0              | `vue` >= 3.3.0                        | `@angular/core` >= 22.0.0                                   |
 | `keepAlive`           | React 19.2+ Activity             | Not available                    | Vue native `<KeepAlive>`              | Not available                                               |
 | RxJS                  | No                               | No                               | No                                    | No (signal-first)                                           |
 
@@ -266,7 +266,7 @@ Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSour
 
 **dom-utils prebuild copy:** The `src/dom-utils/` directory is a git-tracked copy of `shared/dom-utils/` — not a symlink (root `CLAUDE.md` calls this out explicitly for the Angular adapter). The `prebundle` script re-materializes the copy before every bundle to keep it in sync with `shared/dom-utils/`. ng-packagr does not follow symlinks the same way tsdown does, so the sources are copied into the package before compilation.
 
-**JIT mode limitation:** Angular 21 JIT mode (used in TestBed without `@analogjs/vite-plugin-angular`) does not support signal-based `input()` in template bindings. Full template compilation in tests requires the Analog Vite plugin.
+**JIT mode limitation:** Angular 22 JIT mode (used in TestBed without `@analogjs/vite-plugin-angular`) does not support signal-based `input()` in template bindings. Full template compilation in tests requires the Analog Vite plugin.
 
 ## Data Flow
 
@@ -301,7 +301,7 @@ tests/
 
 **Coverage thresholds:** 94% statements, 84% branches, 94% functions, 94% lines (enforced in `vitest.config.mts`). `src/dom-utils/direction-tracker.ts` is excluded from coverage — coverage for the shared source lives in `packages/dom-utils/`.
 
-**Why not 100%:** Angular 21 JIT mode (TestBed without `@analogjs/vite-plugin-angular`) does not compile signal-based `input()` template bindings. This makes ~15 lines across `RouteView`, `RealLink`, `RealLinkActive` unreachable from tests — specifically the subscription callbacks, DOM update branches, and `contentChildren`-driven template matching. These paths execute correctly at runtime with AOT compilation in real apps, but cannot be triggered in JIT-based unit tests without installing the AOT vite plugin (~30 packages of tooling) or refactoring directives to expose internals. See CLAUDE.md "Coverage Ceiling" section for the full analysis.
+**Why not 100%:** Angular 22 JIT mode (TestBed without `@analogjs/vite-plugin-angular`) does not compile signal-based `input()` template bindings. This makes ~15 lines across `RouteView`, `RealLink`, `RealLinkActive` unreachable from tests — specifically the subscription callbacks, DOM update branches, and `contentChildren`-driven template matching. These paths execute correctly at runtime with AOT compilation in real apps, but cannot be triggered in JIT-based unit tests without installing the AOT vite plugin (~30 packages of tooling) or refactoring directives to expose internals. See CLAUDE.md "Coverage Ceiling" section for the full analysis.
 
 ## See Also
 
