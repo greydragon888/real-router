@@ -36,17 +36,25 @@ router.usePlugin(browserPluginFactory());
 
 await router.start();
 
-// props NOT destructured — Solid props are getters (keeps k/name live).
+// F1 (#1094 research): materialize the lazy getter props ONCE. Each mounted
+// Level's k/name are static; reading `props.k`/`props.name` repeatedly AND
+// passing `props.k + 1` down built an O(depth²) getter + string-concat chain —
+// a Solid-specific bench-app artifact the react/vue deep apps don't pay (they
+// materialize prop values). Capturing here makes each level O(1) → the curve
+// reflects the router, not the app. (Navigation mounts a NEW Level per depth,
+// so a level's k/name never change in place — capturing loses no reactivity.)
 function Level(props: { k: number; name: string }): JSX.Element {
+  const k = props.k;
+  const name = props.name;
   return (
     <div class="lvl">
-      <RouteView nodeName={props.name}>
+      <RouteView nodeName={name}>
         <RouteView.Self>
-          <CatalogItem n={String(props.k)} />
+          <CatalogItem n={String(k)} />
         </RouteView.Self>
-        {props.k < DEEP_DEPTH ? (
-          <RouteView.Match segment={`l${props.k + 1}`}>
-            <Level k={props.k + 1} name={`${props.name}.l${props.k + 1}`} />
+        {k < DEEP_DEPTH ? (
+          <RouteView.Match segment={`l${k + 1}`}>
+            <Level k={k + 1} name={`${name}.l${k + 1}`} />
           </RouteView.Match>
         ) : null}
       </RouteView>
