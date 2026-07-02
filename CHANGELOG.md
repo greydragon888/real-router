@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-02]
+
+### @real-router/angular@0.12.0
+
+### Minor Changes
+
+- [#1093](https://github.com/greydragon888/real-router/pull/1093) [`42fb94a`](https://github.com/greydragon888/real-router/commit/42fb94a6edbb47c901cae3d2757fa80adf4c87cd) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate the Angular runtime from v21 to v22 ([#1078](https://github.com/greydragon888/real-router/issues/1078))
+
+  The adapter now targets Angular 22. Runtime `@angular/*` devDependencies,
+  `ng-packagr`, and `@analogjs/vitest-angular` are bumped to the v22 line, and the
+  `peerDependencies` range widens to `@angular/core` / `@angular/common`
+  `>=22.0.0`.
+
+  Angular 22 requires **TypeScript 6.0** (already the repo baseline) and
+  **Node.js 22+**. The adapter's public API is unchanged — it depends only on
+  stable Angular APIs (signals, `inject`/`DestroyRef`, `afterNextRender`,
+  `makeEnvironmentProviders`, `TransferState`), none of which are affected by the
+  v22 breaking changes (which land in `@angular/router`, `@angular/forms`,
+  `HttpClient` — none of which the adapter uses).
+
+  Consumers on Angular 21 should stay on the previous `@real-router/angular`
+  release and upgrade Angular to 22 before taking this version.
+
+
+### @real-router/core@0.62.3
+
+### Patch Changes
+
+- [#1087](https://github.com/greydragon888/real-router/pull/1087) [`9e64939`](https://github.com/greydragon888/real-router/commit/9e64939b063d128eacf05235ea7980397a98772d) Thanks [@greydragon888](https://github.com/greydragon888)! - Cut large route-table memory via shared empty per-route collections ([#1009](https://github.com/greydragon888/real-router/issues/1009))
+
+  For large route tables the segment matcher allocated a fresh empty `Set`/`Map`/array per route (query params, constraints, build slots) and added `cachedResult` after construction, making every `CompiledRoute` megamorphic. Both now reuse shared frozen sentinels and a single hidden class (extending the `EMPTY_CHILDREN_MAP` pattern already used for tree children). At 10 000 routes this is the bulk of a ~14.4 → ~9.0 MB drop (~1.2 → ~0.67 KB/route), with no change to the O(1) match (matcher CPU stays flat) or any observable behavior.
+
+- [#1087](https://github.com/greydragon888/real-router/pull/1087) [`9e64939`](https://github.com/greydragon888/real-router/commit/9e64939b063d128eacf05235ea7980397a98772d) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop redundant matcher indexes for large route tables ([#1010](https://github.com/greydragon888/real-router/issues/1010))
+
+  The segment matcher kept two per-route `Map`s (`segmentsByName` / `metaByName`) duplicating references already held in `routesByName`; the `getSegmentsByName` / `getMetaByName` getters now derive from `routesByName` and the two maps are removed. At 10 000 routes this trims retained heap a further ~0.4 MB on top of [#1009](https://github.com/greydragon888/real-router/issues/1009) (~9.0 → ~8.5 MB, ~0.63 KB/route), with no behavior or match-speed change.
+
+
+### @real-router/browser-plugin@0.18.1
+
+### Patch Changes
+
+- [#1088](https://github.com/greydragon888/real-router/pull/1088) [`98896fd`](https://github.com/greydragon888/real-router/commit/98896fd065ffd698a56fa08b1f4bd883ce34e804) Thanks [@greydragon888](https://github.com/greydragon888)! - Cache the URL fragment instead of reading `location.hash` on every navigation ([#1019](https://github.com/greydragon888/real-router/issues/1019))
+
+  `onTransitionSuccess` read `location.hash` (`getDecodedHash`) on every navigation to preserve the current fragment ([#532](https://github.com/greydragon888/real-router/issues/532)). Reading a `location.*` property in a navigation stream forces the browser to synchronously commit the pending `pushState`, costing ~0.04 ms/nav (~25% of a Vue per-navigation, and ~38% of the plugin's per-nav share, in the cross-router benchmark — see `benchmarks/cross-router/VUE_NAV_DECOMPOSITION.md`). The plugin now caches the fragment — seeded once on start, updated by its own navigations and by a `hashchange` listener for external changes (anchor clicks, manual `location.hash =`) — so the per-navigation hot path never reads `location.hash`. Framework-agnostic: the plugin is shared by every adapter cohort. Hash semantics ([#532](https://github.com/greydragon888/real-router/issues/532)) are unchanged — external fragment changes are still observed (now via `hashchange`), and the popstate path still samples `location.hash` (a rare event, not the hot path).
+
 ## [2026-07-01]
 
 ### @real-router/hash-plugin@0.8.1

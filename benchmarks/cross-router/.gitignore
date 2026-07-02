@@ -1,0 +1,4 @@
+# Raw machine output — curated REPORT.md is committed, raw JSON is not (design D3)
+results/
+# Per-app Vite build output
+**/dist/

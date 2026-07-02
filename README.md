@@ -196,7 +196,7 @@ Runs in **browser, terminal (Ink), and desktop (Electron, Tauri)** — same rout
 
 ### First-Class SSR · Streaming · SSG
 
-The only standalone router that ships the **same SSR contract** across React 19, Preact 10, Vue 3, Solid, Svelte 5, and Angular 21+ — without locking you into Next.js, Nuxt, SolidStart, or SvelteKit. ~300+ e2e scenarios covering classical SSR, streaming, SSG, and RSC pipelines.
+The only standalone router that ships the **same SSR contract** across React 19, Preact 10, Vue 3, Solid, Svelte 5, and Angular 22+ — without locking you into Next.js, Nuxt, SolidStart, or SvelteKit. ~300+ e2e scenarios covering classical SSR, streaming, SSG, and RSC pipelines.
 
 | Adapter   | SSR | Streaming SSR                          | SSG | e2e scenarios |
 | --------- | --- | -------------------------------------- | --- | ------------- |
@@ -275,7 +275,7 @@ The Segment Trie matcher traverses in O(segments), not O(routes).
 ### Key Features
 
 - **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, Angular, or vanilla JS
-- **First-class SSR / Streaming / SSG / RSC** — same primitives across React 19, Preact 10, Vue 3, Solid, Svelte 5, Angular 21+ — no meta-framework lock-in. [See above](#first-class-ssr--streaming--ssg)
+- **First-class SSR / Streaming / SSG / RSC** — same primitives across React 19, Preact 10, Vue 3, Solid, Svelte 5, Angular 22+ — no meta-framework lock-in. [See above](#first-class-ssr--streaming--ssg)
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
 - **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
 - **AbortController** — cancel navigations via standard `AbortSignal`
@@ -397,7 +397,7 @@ function App() {
 | [`@real-router/solid`](packages/solid)     | [![npm](https://img.shields.io/npm/v/@real-router/solid.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/solid)     | Solid.js (signals, `RouteView`, `Link`, store-based state)                                 |
 | [`@real-router/vue`](packages/vue)         | [![npm](https://img.shields.io/npm/v/@real-router/vue.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/vue)         | Vue 3 (composables, `RouteView`, `Link`, `KeepAlive`, `v-link`)                            |
 | [`@real-router/svelte`](packages/svelte)   | [![npm](https://img.shields.io/npm/v/@real-router/svelte.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/svelte)   | Svelte 5 (runes, `RouteView` with snippets, `Lazy`, `use:link`)                            |
-| [`@real-router/angular`](packages/angular) | [![npm](https://img.shields.io/npm/v/@real-router/angular.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/angular) | Angular 21+ (signals, `inject*` functions, `<route-view>`, `realLink` directive, zoneless) |
+| [`@real-router/angular`](packages/angular) | [![npm](https://img.shields.io/npm/v/@real-router/angular.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/angular) | Angular 22+ (signals, `inject*` functions, `<route-view>`, `realLink` directive, zoneless) |
 
 ### Plugins
 

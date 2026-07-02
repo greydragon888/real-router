@@ -219,7 +219,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/solid/CLAUDE.md](packages/solid/CLAUDE.md) — Solid.js integration architecture
 - [packages/vue/CLAUDE.md](packages/vue/CLAUDE.md) — Vue 3 integration architecture
 - [packages/svelte/CLAUDE.md](packages/svelte/CLAUDE.md) — Svelte 5 integration architecture
-- [packages/angular/CLAUDE.md](packages/angular/CLAUDE.md) — Angular 21+ integration architecture
+- [packages/angular/CLAUDE.md](packages/angular/CLAUDE.md) — Angular 22+ integration architecture
 - [packages/browser-plugin/CLAUDE.md](packages/browser-plugin/CLAUDE.md) — Browser plugin architecture
 - [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
 - [packages/hash-plugin/CLAUDE.md](packages/hash-plugin/CLAUDE.md) — Hash plugin architecture

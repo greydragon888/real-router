@@ -66,6 +66,7 @@ describe("type compilation", () => {
       buildStaticParts: ["/"],
       buildParamSlots: [],
       buildParamNamesSet: new Set(),
+      cachedResult: undefined,
     };
 
     expect(route.name).toBe("home");

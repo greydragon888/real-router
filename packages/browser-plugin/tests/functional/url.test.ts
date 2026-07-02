@@ -411,12 +411,15 @@ describe("Browser Plugin — URL", () => {
 
       const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
 
-      // Simulate hash being set on the current location
+      // Simulate an external fragment change (anchor click / location.hash =):
+      // it sets location.hash AND fires hashchange, which is how a real browser
+      // surfaces it — the plugin caches the hash from that event (#532).
       globalThis.history.replaceState(
         globalThis.history.state,
         "",
         "/home#section",
       );
+      globalThis.dispatchEvent(new Event("hashchange"));
 
       // Reload same route — path stays the same, hash should be preserved
       await router.navigate("home", {}, { reload: true });
@@ -438,12 +441,13 @@ describe("Browser Plugin — URL", () => {
 
       const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
 
-      // Simulate hash on current location
+      // External fragment change (anchor / location.hash =) fires hashchange.
       globalThis.history.replaceState(
         globalThis.history.state,
         "",
         "/home#section",
       );
+      globalThis.dispatchEvent(new Event("hashchange"));
 
       await router.navigate("users.list");
 
@@ -459,12 +463,13 @@ describe("Browser Plugin — URL", () => {
 
       const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
 
-      // Simulate hash on current location
+      // External fragment change (anchor / location.hash =) fires hashchange.
       globalThis.history.replaceState(
         globalThis.history.state,
         "",
         "/users/view/1#section",
       );
+      globalThis.dispatchEvent(new Event("hashchange"));
 
       await router.navigate("users.view", { id: "2" });
 
@@ -513,6 +518,7 @@ describe("Browser Plugin — URL", () => {
         "",
         "/home#anchor",
       );
+      globalThis.dispatchEvent(new Event("hashchange"));
 
       await router.navigate("users.list");
 
@@ -561,6 +567,21 @@ describe("Browser Plugin — URL", () => {
       const lastUrl = replaceStateSpy.mock.calls.at(-1)?.[1];
 
       expect(lastUrl).toContain("#section");
+    });
+
+    it("does not read location.hash on the per-navigation hot path (#532 perf)", async () => {
+      await router.start("/home");
+
+      // The fragment cache is seeded once in onStart; navigations must use it,
+      // not read location.hash — a per-nav location.* read forces a synchronous
+      // commit of the pending pushState (the cost this cache eliminates).
+      const getHashSpy = vi.spyOn(mockedBrowser, "getHash");
+
+      await router.navigate("users.list");
+      await router.navigate("home");
+      await router.navigate("users.view", { id: "1" });
+
+      expect(getHashSpy).not.toHaveBeenCalled();
     });
   });
 
