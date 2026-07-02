@@ -37,4 +37,16 @@ config.test.coverage.thresholds = {
   lines: 100,
 };
 
+// #1065 migration (direction-tracker vertical slice): the coverage of
+// shared/dom-utils/direction-tracker.ts moved to packages/react — no adapter wires
+// the tracker (it must be installed before `usePlugin`; see #545), so it cannot be
+// integration-tested and its white-box test now lives in the react suite, whose
+// coverage gates it. Exclude it here so this node no longer owns it. The cross-util
+// lifecycle property/stress tests still exercise it as one participant, but this
+// unit gate no longer counts it.
+config.test.coverage.exclude = [
+  ...config.test.coverage.exclude,
+  "**/shared/dom-utils/direction-tracker.ts",
+];
+
 export default config;

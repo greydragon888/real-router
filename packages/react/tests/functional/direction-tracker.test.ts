@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createDirectionTracker } from "../../../dom-utils";
+import { createDirectionTracker } from "../../src/dom-utils";
 
 import type { Router, State } from "@real-router/core";
 
