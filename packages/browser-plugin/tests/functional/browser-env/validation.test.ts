@@ -5,7 +5,7 @@ import {
   nonNegativeIntegerRule,
   safeBaseRule,
   safeHashPrefixRule,
-} from "../../../browser-env/validation";
+} from "../../../src/browser-env/validation";
 
 describe("createOptionsValidator", () => {
   const defaults = { base: "", max: 10 };

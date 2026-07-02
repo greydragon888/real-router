@@ -6,9 +6,9 @@ import {
   getRouteFromEvent,
   updateBrowserState,
   createUpdateBrowserState,
-} from "../../../browser-env";
+} from "../../../src/browser-env";
 
-import type { Browser } from "../../../browser-env";
+import type { Browser } from "../../../src/browser-env";
 import type { State } from "@real-router/core";
 
 function makeFakeBrowser(location = "/"): Browser {

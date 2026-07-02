@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 
 import { NUM_RUNS, arbNavigationOptions, arbState } from "./helpers";
-import { shouldReplaceHistory } from "../../../browser-env";
+import { shouldReplaceHistory } from "../../../src/browser-env";
 
 import type { NavigationOptions, State } from "@real-router/core";
 

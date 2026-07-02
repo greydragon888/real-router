@@ -6,7 +6,7 @@ import {
   addPopstateListener,
   addHashChangeListener,
   getHash,
-} from "../../../browser-env/history-api";
+} from "../../../src/browser-env/history-api";
 
 describe("history-api", () => {
   beforeEach(() => {

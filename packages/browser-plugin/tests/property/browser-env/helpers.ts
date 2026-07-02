@@ -2,7 +2,7 @@
 
 import { fc } from "@fast-check/vitest";
 
-import type { Browser } from "../../../browser-env";
+import type { Browser } from "../../../src/browser-env";
 import type { NavigationOptions, Params, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 

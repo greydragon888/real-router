@@ -4,5 +4,5 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vitest/globals", "node"]
   },
-  "include": ["browser-env", "dom-utils", "tests"]
+  "include": ["browser-env", "dom-utils"]
 }

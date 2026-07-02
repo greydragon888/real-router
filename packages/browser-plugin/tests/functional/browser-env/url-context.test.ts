@@ -5,7 +5,7 @@ import {
   decodeHashFragment,
   normalizeHashInput,
   getDecodedHash,
-} from "../../../browser-env";
+} from "../../../src/browser-env";
 
 describe("encodeHashFragment", () => {
   it("preserves RFC 3986 sub-delims that encodeURIComponent would escape", () => {

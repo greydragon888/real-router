@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createWarnOnce,
   createHistoryFallbackBrowser,
-} from "../../../browser-env/ssr-fallback";
+} from "../../../src/browser-env/ssr-fallback";
 
 describe("createWarnOnce", () => {
   beforeEach(() => {

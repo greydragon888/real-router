@@ -10,7 +10,7 @@ import {
   createOptionsValidator,
   nonNegativeIntegerRule,
   safeBaseRule,
-} from "../../../browser-env";
+} from "../../../src/browser-env";
 
 describe("createOptionsValidator Properties", () => {
   const validate = createOptionsValidator(testDefaults, "property-test");

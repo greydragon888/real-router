@@ -6,9 +6,9 @@ import {
   createStartInterceptor,
   createPluginBuildUrl,
   createReplaceHistoryState,
-} from "../../../browser-env";
+} from "../../../src/browser-env";
 
-import type { ReplaceStateBrowser } from "../../../browser-env";
+import type { ReplaceStateBrowser } from "../../../src/browser-env";
 import type { Router } from "@real-router/core";
 
 describe("plugin-utils factories", () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { shouldReplaceHistory } from "../../../browser-env";
+import { shouldReplaceHistory } from "../../../src/browser-env";
 
 import type { State } from "@real-router/core";
 

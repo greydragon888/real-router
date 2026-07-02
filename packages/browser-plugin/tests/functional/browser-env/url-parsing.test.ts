@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { safeParseUrl } from "../../../browser-env";
+import { safeParseUrl } from "../../../src/browser-env";
 
 describe("safeParseUrl", () => {
   it("parses an absolute URL with path, query and hash", () => {

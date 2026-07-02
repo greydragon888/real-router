@@ -6,13 +6,13 @@ import {
   createPopstateHandler,
   createPopstateLifecycle,
   createHashSyncLifecycle,
-} from "../../../browser-env";
+} from "../../../src/browser-env";
 
 import type {
   Browser,
   PopstateHandlerDeps,
   SharedFactoryState,
-} from "../../../browser-env";
+} from "../../../src/browser-env";
 import type { Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 import type { Mock } from "vitest";

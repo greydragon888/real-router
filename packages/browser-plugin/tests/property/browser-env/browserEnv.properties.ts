@@ -19,17 +19,17 @@ import {
   safelyEncodePath,
   pushState,
   replaceState,
-} from "../../../browser-env";
+} from "../../../src/browser-env";
 import {
   updateBrowserState,
   getRouteFromEvent,
-} from "../../../browser-env/popstate-utils";
-import { safeParseUrl } from "../../../browser-env/url-parsing";
+} from "../../../src/browser-env/popstate-utils";
+import { safeParseUrl } from "../../../src/browser-env/url-parsing";
 import {
   buildUrl,
   extractPath,
   urlToPath,
-} from "../../../browser-env/url-utils";
+} from "../../../src/browser-env/url-utils";
 
 import type { Params } from "@real-router/core";
 

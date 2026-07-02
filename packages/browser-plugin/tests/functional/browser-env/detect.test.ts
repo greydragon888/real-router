@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-import { isBrowserEnvironment } from "../../../browser-env/detect";
+import { isBrowserEnvironment } from "../../../src/browser-env/detect";
 
 describe("isBrowserEnvironment", () => {
   afterEach(() => {

@@ -6,7 +6,7 @@ import {
   extractPathFromAbsoluteUrl,
   urlToPath,
   urlToPathAndHash,
-} from "../../../browser-env/url-utils";
+} from "../../../src/browser-env/url-utils";
 
 describe("extractPath", () => {
   it("returns '/' for empty pathname", () => {

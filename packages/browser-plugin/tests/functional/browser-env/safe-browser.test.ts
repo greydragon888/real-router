@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-import { createSafeBrowser } from "../../../browser-env";
+import { createSafeBrowser } from "../../../src/browser-env";
 
 describe("createSafeBrowser", () => {
   afterEach(() => {

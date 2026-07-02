@@ -6595,9 +6595,6 @@ importers:
       '@real-router/types':
         specifier: workspace:*
         version: link:../packages/core-types
-      jsdom:
-        specifier: 29.1.1
-        version: 29.1.1(@noble/hashes@2.2.0)
       type-guards:
         specifier: workspace:*
         version: link:../packages/type-guards

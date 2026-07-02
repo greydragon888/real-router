@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { normalizeBase, safelyEncodePath } from "../../../browser-env/utils";
+import {
+  normalizeBase,
+  safelyEncodePath,
+} from "../../../src/browser-env/utils";
 
 describe("normalizeBase", () => {
   it("returns empty string unchanged", () => {

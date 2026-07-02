@@ -381,21 +381,16 @@ jobs:
       # shard exclusion), so the two cannot drift. $FILTERS is intentionally
       # unquoted (bash word-splitting into separate --filter=<pkg> tokens) —
       # same pattern as the shards' $SHARD_FILTER.
-      - name: Test core layer + shared test node
+      - name: Test core layer
         run: |
           FILTERS=$(node -e 'import("./scripts/build-matrix.mjs").then((m) => process.stdout.write([...m.CORE_LAYER].map((p) => "--filter=" + p).join(" ")))')
           echo "Core-layer filters: $FILTERS"
-          # #1065: the shared/ test node (@real-router/shared-sources) owns the
-          # aggregated coverage of shared/{browser-env,dom-utils} (allowExternal +
-          # include, #809), but it is NEITHER a CORE_LAYER package NOR a dynamic
-          # shard member — so in sharded mode it would be tested NOWHERE (the exact
-          # base-layer failure described above), leaving shared/* changes with no
-          # lcov and a 0% SonarCloud score. A shared-source edit always routes
-          # sharded (touchesSharedSources), so it MUST run here. Turbo's
-          # `../../shared/**` input-glob makes it a cache hit when shared is
-          # untouched, so this is free on non-shared sharded PRs.
+          # #1065: shared/{browser-env,dom-utils} coverage is now owned by the
+          # consumer packages (browser-plugin ← browser-env, react ← dom-utils) and
+          # rides along in their shard jobs; there is no separate shared test node to
+          # run here anymore.
           # shellcheck disable=SC2086
-          pnpm turbo run test test:properties $FILTERS --filter=@real-router/shared-sources
+          pnpm turbo run test test:properties $FILTERS
 
       - name: Fix coverage paths
         run: |
@@ -419,12 +414,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-reports-base
-          # #1065: the shared/ test node's aggregated lcov (shared/browser-env +
-          # shared/dom-utils owner coverage) lands at shared/coverage/, not
-          # packages/*/coverage/ — upload it so the coverage/sonar merge sees it.
           path: |
             packages/*/coverage/
-            shared/coverage/
           retention-days: 1
 
   # ============================================
