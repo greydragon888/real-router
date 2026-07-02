@@ -180,6 +180,8 @@ The flag is **preserved** until a successful, non-cancelled loader write. So a n
 
 Idempotent — multiple `invalidate()` calls between refreshes collapse to one re-run. Surgical for multi-namespace routes — only `"rsc"` re-runs; a side-by-side [`@real-router/ssr-data-plugin`](https://www.npmjs.com/package/@real-router/ssr-data-plugin) keeps its cached `state.context.data` unless its own `invalidate()` was also called.
 
+> **Failure semantics.** The refresh loader runs in the awaited LEAVE_APPROVE phase with no internal `try/catch`, so a rejecting loader **rejects the consuming `navigate()`** — one that would have succeeded *without* `invalidate`. The stale flag is cleared only after a successful write, so a rejection **keeps the flag set**: subsequent navigations to a loader-bearing route re-run the loader and fail again until it recovers (from "stale payload" to "cannot navigate"). Catch the `navigate()` rejection on the caller side, or make the loader infallible (`catch` → previous payload).
+
 ### Cancellation-aware loaders
 
 The leave handler passes the navigation's `AbortController.signal` as the second loader argument so loaders can abort their in-flight work (DB query, RSC stream, …) when a newer navigation supersedes:
@@ -309,7 +311,7 @@ Rules:
 
 - `getResult` is **validated at factory time** as a function — a TS-cast bypass that smuggles `null`/`async` through throws `TypeError` synchronously, **before** the `"rscAction"` namespace is claimed.
 - The return value is **validated per `start()`** — must be `undefined` (skip the write) or a plain object. Arrays, primitives, and `Promise`/thenables are rejected with a typed message pointing back at the call site. The most common consumer mistake is wiring an `async` getResult; the runtime guard surfaces that explicitly.
-- `state.context.rscAction` is **JSON-friendly** — `serializeRouterState(state)` works without `excludeContext`. Pass `excludeContext: ["rsc", "rscAction"]` only if the result carries server-only secrets you don't want to ship to the client.
+- `state.context.rscAction` is plain JSON (no `ReactNode`), so `serializeRouterState(state)` includes it without `excludeContext` — but that JSON copy is for **server-side inspection / logging**, not a client transport. `hydrateRouter` restores only namespaces written by a claim writer, and this plugin's client side never reads the hydration scratchpad, so a serialized `rscAction` **evaporates on the client** (`hydrated.context.rscAction === undefined`). The action result reaches the client via the **Flight payload** — `buildRscPayload(state)` folds `returnValue` / `formState` into the RSC stream, read there with React's `useActionState`. Pass `excludeContext: ["rsc", "rscAction"]` to keep it out of the JSON entirely (e.g. server-only secrets).
 - The two plugins coexist regardless of registration order; both namespaces are exclusive (double-registration throws `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`).
 - `buildRscPayload(state, rootOverride?)` reads `state.context.rsc` + `state.context.rscAction` and returns the canonical `RscPayload<TReturn, TFormState>` Flight shape. `returnValue` / `formState` are **omitted** (not set to `undefined`) when their source is missing — type-safe under `exactOptionalPropertyTypes: true`.
 

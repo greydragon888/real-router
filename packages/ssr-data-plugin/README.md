@@ -149,7 +149,9 @@ invalidate(router, "data");
 await router.navigate(state.name, state.params, { reload: true });
 ```
 
-The flag is **preserved** until a successful, non-cancelled loader write. So a navigation that lands on a route without a loader entry, a `client-only` route, a mode-only entry, or one that gets cancelled mid-loader (newer `navigate()` aborts the older controller) all leave the flag set for the next attempt. A loader rejection also leaves the flag set — retry re-runs the loader.
+The flag is **preserved** until a successful, non-cancelled loader write. So a navigation that lands on a route without a loader entry, a `client-only` route, a mode-only entry, or one that gets cancelled mid-loader (newer `navigate()` aborts the older controller) all leave the flag set for the next attempt.
+
+> **Failure semantics.** The refresh loader runs in the awaited LEAVE_APPROVE phase with no internal `try/catch`, so a rejecting loader **rejects the consuming `navigate()`** — one that would have succeeded *without* `invalidate`. The flag stays set (cleared only after a successful write), so **every** subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers — the degradation escalates from "stale data" to "cannot navigate." Catch the `navigate()` rejection on the caller side, or make the loader infallible (`catch` → previous payload).
 
 Idempotent — multiple `invalidate()` calls between refreshes collapse to one re-run. Survives `cloneRouter()` boundaries: each clone has its own flag set. Surgical for multi-namespace routes — only `"data"` re-runs; a side-by-side [`@real-router/rsc-server-plugin`](https://www.npmjs.com/package/@real-router/rsc-server-plugin) keeps its cached `state.context.rsc` unless its own `invalidate()` was also called.
 

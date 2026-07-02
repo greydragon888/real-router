@@ -76,10 +76,18 @@ function classifyRscActionResult(value: unknown): string | null {
  * write — `state.context.rscAction` stays `undefined`. Useful for
  * GET requests where there's no action to surface.
  *
- * The result is JSON-friendly (no ReactNode), so it serializes via
- * `serializeRouterState(state)` without needing `excludeContext`.
- * If you want to keep it server-side only (e.g. action result
- * contains secrets), pass `excludeContext: ["rsc", "rscAction"]`.
+ * `RscActionResult` is plain JSON (no ReactNode), so `serializeRouterState(state)`
+ * includes it without needing `excludeContext` — but that JSON copy is for
+ * **server-side inspection / logging**, not a client transport path.
+ * `hydrateRouter` restores only the `state.context` namespaces written by a
+ * claim writer, and this plugin's client side never reads the hydration
+ * scratchpad, so a serialized `rscAction` **evaporates on hydration**
+ * (`hydrated.context.rscAction === undefined`). The canonical way the action
+ * result reaches the client is the **Flight payload**: `buildRscPayload(state)`
+ * folds `rscAction.returnValue` / `formState` into the RSC stream, where the
+ * client reads them via React's `useActionState`. Pass
+ * `excludeContext: ["rsc", "rscAction"]` to keep it out of the JSON entirely
+ * (e.g. the result carries server-only secrets).
  */
 export function rscActionPluginFactory<
   TReturn = unknown,

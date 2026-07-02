@@ -362,7 +362,7 @@ Same as `ssr-data-plugin`: `Object.entries(loaders)` at compilation time only it
 
 ### Error-safe compilation (all-or-nothing claim rollback)
 
-The compilation loop in `shared-ssr/createSsrLoaderPlugin.ts:153-187` is wrapped in `try/catch` with an `acquired: ContextNamespaceClaim[]` array. Claims are pushed onto `acquired` as they're successfully obtained from `api.claimContextNamespace(...)` — `"rsc"` first, then `"ssrRscMode"` (and, in the `ssr-data-plugin` build of the same shared factory, additional `value`/`keys` claims under a configured `deferredNamespace`).
+The claim acquisitions and the `compile()` call (whose per-route loop lives at `shared-ssr/createSsrLoaderPlugin.ts:78-117`) run inside a shared `try/catch` (`createSsrLoaderPlugin.ts:230-252`) with an `acquired: ContextNamespaceClaim[]` array. Claims are pushed onto `acquired` as they're successfully obtained from `api.claimContextNamespace(...)` — `"rsc"` first, then `"ssrRscMode"` (and, in the `ssr-data-plugin` build of the same shared factory, additional `value`/`keys` claims under a configured `deferredNamespace`).
 
 If any factory throws or returns a non-function:
 
@@ -373,7 +373,7 @@ If any factory throws or returns a non-function:
 
 This prevents permanently blocking ANY of the plugin's namespaces when a factory has a bug. The change from "single-claim rollback" to "acquired-array rollback" was driven by adding the `ssrRscMode` claim — a single `claim.release()` would have leaked the partner namespace on factory failure.
 
-For `rsc-server-plugin` specifically, `acquired.length` is always 2 (no `deferredNamespace` configured). The `ssr-data-plugin` path can grow it to 4 — see `shared-ssr/createSsrLoaderPlugin.ts:165-180` for the deferred-namespace branch obligations.
+For `rsc-server-plugin` specifically, `acquired.length` is always 2 (no `deferredNamespace` configured). The `ssr-data-plugin` path can grow it to 4 — see the deferred-namespace claim branch at `shared-ssr/createSsrLoaderPlugin.ts:234-239` (the `value`/`keys` claims acquired when `deferredConfig !== null`).
 
 ### No bundler dependency
 

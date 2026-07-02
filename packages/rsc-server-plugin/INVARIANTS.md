@@ -79,7 +79,7 @@ The wire-format helper publishes a canonical Flight payload from `state.context.
 
 ## Server Action Plugin (`rscActionPluginFactory`)
 
-The plugin publishes a Server Action result to `state.context.rscAction`. The per-start runtime guard at `actionFactory.ts:110-119` rejects Promise/thenable, array, and `null` values to surface the most common consumer mistake (wiring an `async getResult`) eagerly.
+The plugin publishes a Server Action result to `state.context.rscAction`. The per-start runtime guard — `classifyRscActionResult` (`actionFactory.ts:28-43`), called at `:127-133` after the `undefined` short-circuit at `:115-117` — rejects Promise/thenable, array, and `null` values to surface the most common consumer mistake (wiring an `async getResult`) eagerly.
 
 | #   | Invariant                                                  | Description                                                                                                                                                                                  |
 | --- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
