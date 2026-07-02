@@ -6,34 +6,49 @@
 
 Six entry points via `package.json` `exports` — five named subpaths plus a `react-server` condition on the root and `/ssr` exports:
 
-| Entry Point | Import Path | React Version | Runtime | Description |
-|---|---|---|---|---|
-| Main | `@real-router/react` | React 19.2+ | DOM | Full client API including `RouteView` with `keepAlive` (React Activity). **No SSR-feature components** — those live at `/ssr` |
-| SSR | `@real-router/react/ssr` | React 19.2+ | DOM (SSR-aware) | `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink` — all components/hooks/utils that participate in the SSR pipeline |
-| Legacy | `@real-router/react/legacy` | React 18+ | DOM | Client API for React 18 (no `RouteView`, no SSR helpers) |
-| Legacy SSR | `@real-router/react/legacy/ssr` | React 18+ | DOM (SSR-aware) | SSR-feature subset for React 18 — same as `/ssr` minus `<Await>` (which depends on React 19's `use(promise)`); includes `<HttpStatusCode>` + `<HttpStatusProvider>` + `createHttpStatusSink` |
-| Ink | `@real-router/react/ink` | React 19.2+ & Ink 7+ | Terminal | Hooks + `InkRouterProvider` + `InkLink`; no `Link`, no `RouteView`, no `announceNavigation` |
-| RSC | `@real-router/react` (under `react-server` condition) | React 19+ | RSC bundler | **Type-only re-exports** — no client runtime in Server Component bundles. The `/ssr` subpath also resolves to a type-only entry under the same condition |
+| Entry Point | Import Path                                           | React Version        | Runtime         | Description                                                                                                                                                                                                  |
+| ----------- | ----------------------------------------------------- | -------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Main        | `@real-router/react`                                  | React 19.2+          | DOM             | Full client API including `RouteView` with `keepAlive` (React Activity). **No SSR-feature components** — those live at `/ssr`                                                                                |
+| SSR         | `@real-router/react/ssr`                              | React 19.2+          | DOM (SSR-aware) | `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink` — all components/hooks/utils that participate in the SSR pipeline |
+| Legacy      | `@real-router/react/legacy`                           | React 18+            | DOM             | Client API for React 18 (no `RouteView`, no SSR helpers)                                                                                                                                                     |
+| Legacy SSR  | `@real-router/react/legacy/ssr`                       | React 18+            | DOM (SSR-aware) | SSR-feature subset for React 18 — same as `/ssr` minus `<Await>` (which depends on React 19's `use(promise)`); includes `<HttpStatusCode>` + `<HttpStatusProvider>` + `createHttpStatusSink`                 |
+| Ink         | `@real-router/react/ink`                              | React 19.2+ & Ink 7+ | Terminal        | Hooks + `InkRouterProvider` + `InkLink`; no `Link`, no `RouteView`, no `announceNavigation`                                                                                                                  |
+| RSC         | `@real-router/react` (under `react-server` condition) | React 19+            | RSC bundler     | **Type-only re-exports** — no client runtime in Server Component bundles. The `/ssr` subpath also resolves to a type-only entry under the same condition                                                     |
 
 ```tsx
 // React 19.2+ (default — client API)
-import { RouterProvider, useRouteNode, Link } from '@real-router/react';
+import { RouterProvider, useRouteNode, Link } from "@real-router/react";
 
 // React 19.2+ — SSR-feature components/hooks
-import { ClientOnly, ServerOnly, Await, Streamed, useDeferred } from '@real-router/react/ssr';
+import {
+  ClientOnly,
+  ServerOnly,
+  Await,
+  Streamed,
+  useDeferred,
+} from "@real-router/react/ssr";
 
 // React 18+ — client API
-import { RouterProvider, useRouteNode, Link } from '@real-router/react/legacy';
+import { RouterProvider, useRouteNode, Link } from "@real-router/react/legacy";
 
 // React 18+ — SSR-feature subset (no <Await>)
-import { ClientOnly, ServerOnly, Streamed, useDeferred } from '@real-router/react/legacy/ssr';
+import {
+  ClientOnly,
+  ServerOnly,
+  Streamed,
+  useDeferred,
+} from "@real-router/react/legacy/ssr";
 
 // Terminal UIs via Ink v7+
-import { InkRouterProvider, useRouteNode, InkLink } from '@real-router/react/ink';
+import {
+  InkRouterProvider,
+  useRouteNode,
+  InkLink,
+} from "@real-router/react/ink";
 
 // Server Component (types only — same import path under `react-server` condition)
-import type { Navigator, LinkProps } from '@real-router/react';
-import type { AwaitProps, StreamedProps } from '@real-router/react/ssr';
+import type { Navigator, LinkProps } from "@real-router/react";
+import type { AwaitProps, StreamedProps } from "@real-router/react/ssr";
 ```
 
 ### Why split `/ssr`?
@@ -123,32 +138,32 @@ src/
 
 `RouteView.Match` accepts these props:
 
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `segment` | `string` | Yes | Route segment to match |
-| `exact` | `boolean` | No | Exact match only — no descendants. Defaults to `false`. |
-| `keepAlive` | `boolean` | No | Preserve state via React `<Activity>` |
-| `fallback` | `ReactNode` | No | Shown while children suspend. Wraps children in `<Suspense>` when provided. |
+| Prop        | Type        | Required | Description                                                                 |
+| ----------- | ----------- | -------- | --------------------------------------------------------------------------- |
+| `segment`   | `string`    | Yes      | Route segment to match                                                      |
+| `exact`     | `boolean`   | No       | Exact match only — no descendants. Defaults to `false`.                     |
+| `keepAlive` | `boolean`   | No       | Preserve state via React `<Activity>`                                       |
+| `fallback`  | `ReactNode` | No       | Shown while children suspend. Wraps children in `<Suspense>` when provided. |
 
 When `fallback` is set, `RouteView.Match` wraps its children in a `<Suspense>` boundary with that fallback. Use this with `React.lazy()` to code-split route components:
 
 ```tsx
-const LazyDashboard = lazy(() => import('./Dashboard'));
+const LazyDashboard = lazy(() => import("./Dashboard"));
 
 <RouteView.Match segment="dashboard" fallback={<Spinner />}>
   <LazyDashboard />
-</RouteView.Match>
+</RouteView.Match>;
 ```
 
 ### `RouteView.Self` and `RouteView.NotFound`
 
 Three fallback slots compose with `<RouteView.Match>` inside a `<RouteView nodeName="…">`:
 
-| Element                  | Fires when                                              | Props                                    | Render position                 |
-|--------------------------|---------------------------------------------------------|------------------------------------------|---------------------------------|
-| `<RouteView.Match>`      | Active route segment matches `segment` (or descendant if `exact={false}`) | `segment` / `exact` / `keepAlive` / `fallback` / `children` | Inline at source position       |
-| `<RouteView.Self>`       | Active route name **exactly equals** parent's `nodeName` | `fallback` / `children`                 | Appended after Match elements   |
-| `<RouteView.NotFound>`   | Active route name is `UNKNOWN_ROUTE` (`@@router/UNKNOWN_ROUTE`) AND no Match activated | `children`                              | Appended after Match elements   |
+| Element                | Fires when                                                                             | Props                                                       | Render position               |
+| ---------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------- |
+| `<RouteView.Match>`    | Active route segment matches `segment` (or descendant if `exact={false}`)              | `segment` / `exact` / `keepAlive` / `fallback` / `children` | Inline at source position     |
+| `<RouteView.Self>`     | Active route name **exactly equals** parent's `nodeName`                               | `fallback` / `children`                                     | Appended after Match elements |
+| `<RouteView.NotFound>` | Active route name is `UNKNOWN_ROUTE` (`@@router/UNKNOWN_ROUTE`) AND no Match activated | `children`                                                  | Appended after Match elements |
 
 **Precedence rules** (`buildRenderList` + `appendFallback`):
 
@@ -160,13 +175,13 @@ Three fallback slots compose with `<RouteView.Match>` inside a `<RouteView nodeN
 ```tsx
 <RouteView nodeName="users">
   <RouteView.Self>
-    <UsersIndex />             {/* route name === "users" → renders */}
+    <UsersIndex /> {/* route name === "users" → renders */}
   </RouteView.Self>
   <RouteView.Match segment="profile">
-    <UserProfile />            {/* "users.profile" and descendants → renders */}
+    <UserProfile /> {/* "users.profile" and descendants → renders */}
   </RouteView.Match>
   <RouteView.NotFound>
-    <NotFoundPage />           {/* UNKNOWN_ROUTE → renders */}
+    <NotFoundPage /> {/* UNKNOWN_ROUTE → renders */}
   </RouteView.NotFound>
 </RouteView>
 ```
@@ -205,27 +220,27 @@ dist/
 
 ## RouterProvider Props
 
-| Prop                  | Type      | Default | Description                                                                                    |
-| --------------------- | --------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `router`              | `Router`  | —       | Router instance (required)                                                                     |
-| `children`            | `ReactNode` | —     | Subtree that consumes router context (required — provider would be useless without descendants)                                       |
-| `announceNavigation`  | `boolean` | `false` | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region       |
-| `scrollRestoration`   | `ScrollRestorationOptions` | `undefined` | Opt into scroll capture + restoration. `undefined` = off. See [Scroll Restoration](../../real-router.wiki/Scroll-Restoration.md) |
-| `scrollSpy`           | `ScrollSpyOptions` | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Tracks the topmost visible anchor inside the configured scroll container and emits `router.navigate(name, params, { hash, replace: true, force: true, hashChange: true })`. Required: `{ selector: string }` (CSS selector for anchors). Optional `rootMargin`, `scrollContainer`. `undefined` / empty `selector` = off. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) |
-| `viewTransitions`     | `boolean` | `false` | Opt into View Transitions API integration via `createViewTransitions` utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements |
+| Prop                 | Type                               | Default     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------- | ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `router`             | `Router`                           | —           | Router instance (required)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `children`           | `ReactNode`                        | —           | Subtree that consumes router context (required — provider would be useless without descendants)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `announceNavigation` | `boolean \| RouteAnnouncerOptions` | `false`     | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region. `true` = defaults; pass `{ prefix?, getAnnouncementText? }` to customize the announced text (falls back to the default h1 → title → route-name chain when the callback returns empty or throws)                                                                                                                                                                                                                                                                                                       |
+| `scrollRestoration`  | `ScrollRestorationOptions`         | `undefined` | Opt into scroll capture + restoration. `undefined` = off. See [Scroll Restoration](../../real-router.wiki/Scroll-Restoration.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Tracks the topmost visible anchor inside the configured scroll container and emits `router.navigate(name, params, { hash, replace: true, force: true, hashChange: true })`. Required: `{ selector: string }` (CSS selector for anchors). Optional `rootMargin`, `scrollContainer`. `undefined` / empty `selector` = off. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) |
+| `viewTransitions`    | `boolean`                          | `false`     | Opt into View Transitions API integration via `createViewTransitions` utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## Hooks
 
-| Hook                    | Purpose                                                                    | Re-renders                     |
-| ----------------------- | -------------------------------------------------------------------------- | ------------------------------ |
-| `useRouter()`           | Get router instance                                                        | Never                          |
-| `useNavigator()`        | Get Navigator (stable ref) — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more | Never                          |
-| `useRoute()`            | Get route state                                                            | Every navigation               |
-| `useRouteNode(name)`    | Subscribe to specific node                                                 | Only when node active/inactive |
-| `useRouteUtils()`       | Get RouteUtils instance                                                    | Never                          |
-| `useRouterTransition()` | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end        |
-| `useRouteExit(handler, options?)`  | Wrap `router.subscribeLeave` with reentrant abort pre-check, same-route skip, latest-handler ref. Handler can return `Promise` — router blocks on it. Returns `void`. | Never |
-| `useRouteEnter(handler, options?)` | Fire `handler` once on nav-driven mount with `{ route, previousRoute }`. Skip-initial / skip-same-route / StrictMode-immune via `lastHandledRouteRef`. Returns `void`. | Never |
+| Hook                               | Purpose                                                                                                                                                                | Re-renders                     |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `useRouter()`                      | Get router instance                                                                                                                                                    | Never                          |
+| `useNavigator()`                   | Get Navigator (stable ref) — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more                                                                    | Never                          |
+| `useRoute()`                       | Get route state                                                                                                                                                        | Every navigation               |
+| `useRouteNode(name)`               | Subscribe to specific node                                                                                                                                             | Only when node active/inactive |
+| `useRouteUtils()`                  | Get RouteUtils instance                                                                                                                                                | Never                          |
+| `useRouterTransition()`            | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`                                                                                | On transition start/end        |
+| `useRouteExit(handler, options?)`  | Wrap `router.subscribeLeave` with reentrant abort pre-check, same-route skip, latest-handler ref. Handler can return `Promise` — router blocks on it. Returns `void`.  | Never                          |
+| `useRouteEnter(handler, options?)` | Fire `handler` once on nav-driven mount with `{ route, previousRoute }`. Skip-initial / skip-same-route / StrictMode-immune via `lastHandledRouteRef`. Returns `void`. | Never                          |
 
 > **`/legacy` entry exports 6 hooks** (omits `useRouteExit` and `useRouteEnter`) — those depend on React 19 concurrent-mode scheduling. Use `router.subscribeLeave()` / `useEffect` directly on React 18.
 
@@ -266,16 +281,16 @@ Shows fallback alongside children (Fragment). Auto-resets on `TRANSITION_SUCCESS
 
 All SSR-aware components and hooks live at the `/ssr` subpath. Eight exports total:
 
-| Export | Kind | Purpose |
-|---|---|---|
-| `<ClientOnly fallback={…}>` | component | Server emits `fallback` (default `null`); a single `useEffect` post-hydration swaps in `children`. For browser-API consumers (`window`/`document`), ad slots, dynamic widgets. |
-| `<ServerOnly fallback={…}>` | component | Symmetric inverse: server emits `children`; client swaps to `fallback` after mount. For SEO-only meta strips, zero-JS sections inside an otherwise-hydrated page. |
-| `<Streamed fallback={…}>` | component | Cross-adapter alias for `<Suspense fallback={…}>` — symmetric naming with SvelteKit `{#await}` / Solid `<Await/>` boundaries. |
-| `<Await<T> name="key">{(value) => …}</Await>` | component | Reads a deferred promise published by `defer({ deferred: { <name>: Promise } })` and hands the resolved value to the render-prop. Wraps `use(useDeferred(name))`. **Main entry only** — depends on React 19's `use(promise)`. |
-| `<HttpStatusCode code={N}/>` | component | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink during render and returns `null`. Last write wins. No-op without provider. |
-| `<HttpStatusProvider sink={...}>` | component | Provides an `HttpStatusSink` to any descendant `<HttpStatusCode />` via React context. |
-| `useDeferred<T>(key)` | hook | Reads `state.context.ssrDataDeferred[key]` published by `ssr-data-plugin`'s `defer()` API. Returns the deferred Promise; combine with `use(promise)` or `<Await>`. |
-| `createHttpStatusSink()` | utility | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`). Construct one per request on the server, pass to `<HttpStatusProvider>`, read `sink.code` after `renderToString`/`renderToReadableStream` to apply to the HTTP response. |
+| Export                                        | Kind      | Purpose                                                                                                                                                                                                                                      |
+| --------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<ClientOnly fallback={…}>`                   | component | Server emits `fallback` (default `null`); a single `useEffect` post-hydration swaps in `children`. For browser-API consumers (`window`/`document`), ad slots, dynamic widgets.                                                               |
+| `<ServerOnly fallback={…}>`                   | component | Symmetric inverse: server emits `children`; client swaps to `fallback` after mount. For SEO-only meta strips, zero-JS sections inside an otherwise-hydrated page.                                                                            |
+| `<Streamed fallback={…}>`                     | component | Cross-adapter alias for `<Suspense fallback={…}>` — symmetric naming with SvelteKit `{#await}` / Solid `<Await/>` boundaries.                                                                                                                |
+| `<Await<T> name="key">{(value) => …}</Await>` | component | Reads a deferred promise published by `defer({ deferred: { <name>: Promise } })` and hands the resolved value to the render-prop. Wraps `use(useDeferred(name))`. **Main entry only** — depends on React 19's `use(promise)`.                |
+| `<HttpStatusCode code={N}/>`                  | component | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink during render and returns `null`. Last write wins. No-op without provider.                                                                   |
+| `<HttpStatusProvider sink={...}>`             | component | Provides an `HttpStatusSink` to any descendant `<HttpStatusCode />` via React context.                                                                                                                                                       |
+| `useDeferred<T>(key)`                         | hook      | Reads `state.context.ssrDataDeferred[key]` published by `ssr-data-plugin`'s `defer()` API. Returns the deferred Promise; combine with `use(promise)` or `<Await>`.                                                                           |
+| `createHttpStatusSink()`                      | utility   | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`). Construct one per request on the server, pass to `<HttpStatusProvider>`, read `sink.code` after `renderToString`/`renderToReadableStream` to apply to the HTTP response. |
 
 ```tsx
 import {
@@ -364,7 +379,10 @@ useRouteExit(async ({ signal }) => {
 });
 
 useRouteEnter(({ route, previousRoute }) => {
-  analytics.track("page_enter", { route: route.name, from: previousRoute.name });
+  analytics.track("page_enter", {
+    route: route.name,
+    from: previousRoute.name,
+  });
 });
 ```
 
@@ -403,7 +421,7 @@ type SearchParams = { q: string; sort: string } & Params;
 
 const { route } = useRoute<SearchParams>();
 
-route.params.q;    // typed as string
+route.params.q; // typed as string
 route.params.sort; // typed as string
 ```
 
@@ -486,11 +504,11 @@ Active state is hash-aware: when `hash` is set, the Link is active iff route mat
 `fallback` and `keepAlive` can be combined. The `<Suspense>` boundary wraps the children; `<Activity>` wraps the whole match including the boundary:
 
 ```tsx
-const LazyUsers = lazy(() => import('./UsersPage'));
+const LazyUsers = lazy(() => import("./UsersPage"));
 
 <RouteView.Match segment="users" keepAlive fallback={<Spinner />}>
   <LazyUsers />
-</RouteView.Match>
+</RouteView.Match>;
 ```
 
 ### Keep `RouterProvider` above any `<Activity>` / keepAlive boundary
@@ -499,7 +517,7 @@ const LazyUsers = lazy(() => import('./UsersPage'));
 (subscribe-on-first-listener, unsubscribe-on-last). React 19's `<Activity>` —
 the same API behind `RouteView`'s `keepAlive` — **detaches the effects of a
 hidden subtree**, which drops that subscription. If the Provider itself sits
-*under* an `<Activity>` (or keepAlive) boundary, a `hide → router.navigate(...)
+_under_ an `<Activity>` (or keepAlive) boundary, a `hide → router.navigate(...)
 → show` sequence renders the **stale** previous route: the navigation lands
 while the source is disconnected, and on re-show `createRouteSource` replays its
 last snapshot until the next navigation. `useMemo(() => createRouteSource(router),

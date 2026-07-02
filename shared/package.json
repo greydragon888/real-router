@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
+  "description": "Shared source modules (browser-env, dom-utils, ssr) — symlinked into consumer packages; tests + 100% coverage owned by the consumers (react ← dom-utils, browser-plugin ← browser-env) (#1065)",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts browser-env dom-utils --fix --max-warnings 0"
+  },
   "devDependencies": {
     "@real-router/core": "workspace:*",
     "@real-router/sources": "workspace:*",

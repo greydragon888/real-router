@@ -257,11 +257,23 @@ describe("createScrollSpy (Angular dom-utils copy)", () => {
       router.stop();
     });
 
-    it("returns NOOP when selector is empty string", async () => {
+    it("returns NOOP when selector is empty string — silent disable, no invalid-selector warning", async () => {
       const router = await createTestRouter();
+      const warnSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+
       const spy = track(createScrollSpy(router, { selector: "" }));
 
       expect(ioInstances).toHaveLength(0);
+      // "" is the documented DISABLE signal (RFC §5.4 `selector: enable ? "[id]" : ""`),
+      // NOT an invalid selector: the `if (!selector) return NOOP` guard short-circuits
+      // BEFORE the constructor's querySelectorAll("") — which the try/catch would
+      // otherwise treat as invalid and console.warn about (see the "invalid selector"
+      // case). Delete the guard → createScrollSpy("") runs querySelectorAll("") →
+      // SyntaxError → this warning fires. This assertion is what makes the guard
+      // mutation-discriminating; the `ioInstances` check alone passes without it.
+      expect(warnSpy).not.toHaveBeenCalled();
 
       spy.destroy();
       router.stop();
@@ -333,6 +345,26 @@ describe("createScrollSpy (Angular dom-utils copy)", () => {
 
       expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
         hash: "section-2",
+      });
+
+      router.stop();
+    });
+
+    it("keeps the least-negative anchor when a more-negative one follows", async () => {
+      const router = await createTestRouter();
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1, s2] = setupAnchors(["section-1", "section-2"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+
+      // Both above the zone: s1 (-100) is closer than s2 (-300). s2 must NOT
+      // beat bestNegative → exercises the `distance > bestNegativeDist` false arm.
+      ioInstances[0].trigger([buildEntry(s1, -100), buildEntry(s2, -300)]);
+
+      flushTimersAndRaf();
+
+      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+        hash: "section-1",
       });
 
       router.stop();

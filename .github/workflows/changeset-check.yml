@@ -39,7 +39,7 @@ jobs:
           # glob: shared docs (CLAUDE.md, .claude/), shared/package.json, and
           # __test-helpers/ (test-only, never bundled) must not trip this
           # REQUIRED gate — a bare `^shared/` did, on docs-only PRs.
-          SOURCE_CHANGED=$(echo "$CHANGED" | grep -E "^packages/($PUBLIC_PACKAGES)/src/|^shared/[^/]+/.*\.ts$" | grep -v '/__test-helpers/' || true)
+          SOURCE_CHANGED=$(echo "$CHANGED" | grep -E "^packages/($PUBLIC_PACKAGES)/src/|^shared/[^/]+/.*\.ts$" | grep -v '/__test-helpers/' | grep -v '^shared/tests/' || true)
 
           if [ -z "$SOURCE_CHANGED" ]; then
             echo "No source files changed in public packages"

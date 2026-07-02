@@ -26,6 +26,7 @@
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",
         "../../shared/**/*.ts",
+        "!../../shared/tests/**/*.ts",
         "tsdown.config.*",
         "tsconfig.json",
         "package.json"
@@ -90,6 +91,7 @@
       "inputs": [
         "src/**/*.{ts,tsx}",
         "../../shared/**/*.ts",
+        "!../../shared/tests/**/*.ts",
         "tests/**/*.{ts,tsx}",
         "vitest.config.*",
         "**/*.test.{ts,tsx}",
@@ -107,6 +109,7 @@
       "inputs": [
         "**/*.{ts,tsx,js,jsx}",
         "../../shared/**/*.ts",
+        "!../../shared/tests/**/*.ts",
         "!dist/**",
         "!coverage/**",
         "!**/node_modules/**",
@@ -121,6 +124,7 @@
       "inputs": [
         "**/*.{ts,tsx,vue,svelte}",
         "../../shared/**/*.ts",
+        "!../../shared/tests/**/*.ts",
         "!dist/**",
         "!**/node_modules/**",
         "tsconfig.json",

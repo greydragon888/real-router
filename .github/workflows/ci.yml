@@ -255,7 +255,7 @@ jobs:
           # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
           # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
           # replaces an echo|sed subshell (SC2001).
-          find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
+          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
             while IFS= read -r -d '' lcov; do
               pkg_dir="${lcov%/coverage/lcov.info}"
               sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
@@ -385,6 +385,10 @@ jobs:
         run: |
           FILTERS=$(node -e 'import("./scripts/build-matrix.mjs").then((m) => process.stdout.write([...m.CORE_LAYER].map((p) => "--filter=" + p).join(" ")))')
           echo "Core-layer filters: $FILTERS"
+          # #1065: shared/{browser-env,dom-utils} coverage is now owned by the
+          # consumer packages (browser-plugin ← browser-env, react ← dom-utils) and
+          # rides along in their shard jobs; there is no separate shared test node to
+          # run here anymore.
           # shellcheck disable=SC2086
           pnpm turbo run test test:properties $FILTERS
 
@@ -395,7 +399,7 @@ jobs:
           # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
           # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
           # replaces an echo|sed subshell (SC2001).
-          find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
+          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
             while IFS= read -r -d '' lcov; do
               pkg_dir="${lcov%/coverage/lcov.info}"
               sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
@@ -410,7 +414,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-reports-base
-          path: packages/*/coverage/
+          path: |
+            packages/*/coverage/
           retention-days: 1
 
   # ============================================
@@ -531,7 +536,7 @@ jobs:
           # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
           # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
           # replaces an echo|sed subshell (SC2001).
-          find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
+          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
             while IFS= read -r -d '' lcov; do
               pkg_dir="${lcov%/coverage/lcov.info}"
               sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"

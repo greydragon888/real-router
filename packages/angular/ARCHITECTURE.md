@@ -299,7 +299,7 @@ tests/
 └── setup.ts              # Angular TestBed + JSDOM environment setup
 ```
 
-**Coverage thresholds:** 94% statements, 84% branches, 94% functions, 94% lines (enforced in `vitest.config.mts`). `src/dom-utils/direction-tracker.ts` is excluded from coverage — coverage for the shared source lives in `packages/dom-utils/`.
+**Coverage thresholds:** 94% statements, 84% branches, 94% functions, 94% lines (enforced in `vitest.config.mts`). `src/dom-utils/direction-tracker.ts` is excluded from coverage — coverage for the canonical shared source (`shared/dom-utils/direction-tracker.ts`) lives in `packages/react/` (react is its measuring owner after the node→consumer migration, #1065).
 
 **Why not 100%:** Angular 22 JIT mode (TestBed without `@analogjs/vite-plugin-angular`) does not compile signal-based `input()` template bindings. This makes ~15 lines across `RouteView`, `RealLink`, `RealLinkActive` unreachable from tests — specifically the subscription callbacks, DOM update branches, and `contentChildren`-driven template matching. These paths execute correctly at runtime with AOT compilation in real apps, but cannot be triggered in JIT-based unit tests without installing the AOT vite plugin (~30 packages of tooling) or refactoring directives to expose internals. See CLAUDE.md "Coverage Ceiling" section for the full analysis.
 

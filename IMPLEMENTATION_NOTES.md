@@ -660,15 +660,25 @@ realpath, which the base vitest `coverage.include` (`packages/*/src/**`) drops a
 *exclude* files from the global threshold ("Vitest counts all files … into the global coverage
 thresholds"), so a consumer can't include shared code in its lcov without it gating the consumer's
 own 100%. Instead, each shared dir gets exactly one **measuring owner** whose vitest config sets
-`coverage.allowExternal = true` and **replaces** (not concatenates — keeping the base
-`packages/*/src/**` alongside `allowExternal` drags the whole aliased workspace graph into the
-report) `coverage.include` with the shared glob:
+`coverage.allowExternal = true` and a **dual** `coverage.include` — the owner's **own narrowed
+src** plus the shared glob. It must NOT keep the base `packages/*/src/**` wildcard alongside
+`allowExternal` (that drags the whole aliased workspace graph — core/sources — into the report and
+fails the owner's own gate):
 
 | Shared dir           | Measuring owner                       | Include                                                          |
 | -------------------- | ------------------------------------- | ---------------------------------------------------------------- |
-| `shared/browser-env` | `packages/browser-env` (owner pkg)    | `["**/shared/browser-env/**/*.ts"]`                              |
-| `shared/dom-utils`   | `packages/dom-utils` (owner pkg)      | `["**/shared/dom-utils/**/*.ts"]`                                |
+| `shared/browser-env` | `packages/browser-plugin` (consumer)  | `["packages/browser-plugin/src/**/*.ts", "**/shared/browser-env/**/*.ts"]` |
+| `shared/dom-utils`   | `packages/react` (consumer)           | `["packages/react/src/**/*.{ts,tsx}", "**/shared/dom-utils/**/*.ts"]` |
 | `shared/ssr`         | `packages/ssr-data-plugin` (consumer) | `["**/packages/ssr-data-plugin/src/**/*.ts", "**/shared/ssr/**/*.ts"]` |
+
+**Owner evolution.** browser-env/dom-utils began in tests-only wrapper packages
+(`packages/{browser-env,dom-utils}`, #809), moved to a single `shared/` test node
+(`@real-router/shared-sources`, #1065), and finally to their natural consumers — **react ←
+dom-utils, browser-plugin ← browser-env** (2026-07, the test node retired). Each dir's white-box
+tests now live in the consumer's `tests/{functional,property,stress}/<tree>/` (namespaced to dodge
+`helpers.ts` collisions) and gate via the dual include above; `shared/ssr` rode on
+`ssr-data-plugin` throughout. Property files that need a DOM carry a per-file
+`// @vitest-environment jsdom` (react's property config is `node`).
 
 `shared/ssr` has no dedicated owner package (both consumers carry their own `src`), so the
 measurement rides on `ssr-data-plugin` with a dual include — the *specific* own-src path doesn't
@@ -963,7 +973,7 @@ ko_fi: greydragon888
 }
 ```
 
-Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`, `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**` (last two are symlinks to `shared/dom-utils/` — see #437 section; without the ignore jscpd would report 6 false-positive duplicates).
+Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`, `packages/*/src/dom-utils/**` (the `shared/dom-utils/` symlink/copy across consumers — see #437 section; without the ignore jscpd would report false-positive duplicates).
 
 **`svelte` format (jscpd 4.2+).** Adds Svelte SFC tokenization — jscpd parses each `<script>`/`<template>`/`<style>` block with its native format and cross-detects clones across formats (e.g., duplicated logic between a `.svelte` script block and a `.ts` helper). Currently exercised by `packages/svelte/src/RouterProvider.svelte`. No false positives on the current source tree (clones: 4 / 0.15%, well under the 2% threshold).
 
@@ -1818,6 +1828,17 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 
 ## Shared Sources via Symlinks: `shared/dom-utils/` and `shared/browser-env/` (#437)
 
+> **Superseded in part (#1065, 2026-07).** This section records the original #437
+> migration (workspace packages → `shared/` symlinks). The symlink infrastructure and
+> the `shared/package.json` rationale below still hold. But the two **tests-only
+> wrapper packages** (`packages/{dom-utils,browser-env}`) it introduced are **gone**,
+> and the "deferred test migration" is **done**: the shared tests + 100% coverage were
+> collapsed into a `shared/` test node (`@real-router/shared-sources`, #1065) and then
+> moved into the natural consumers — **react ← `shared/dom-utils`, browser-plugin ←
+> `shared/browser-env`** (see the measuring-owner table in the #809 owner-only coverage
+> section above). The "tests-only wrappers" subsection and the vitest-coverage
+> "deferred" note below are historical.
+
 ### Problem
 
 Two groups of code were shared across multiple packages via full workspace packages:
@@ -1865,12 +1886,11 @@ packages/preact/src/dom-utils              → ../../../shared/dom-utils      (s
 packages/vue/src/dom-utils                 → ../../../shared/dom-utils      (symlink)
 packages/solid/src/dom-utils               → ../../../shared/dom-utils      (symlink)
 packages/svelte/src/dom-utils              → ../../../shared/dom-utils      (symlink)
-packages/dom-utils/src                     → ../../shared/dom-utils         (tests-only wrapper)
+packages/angular/src/dom-utils             → (git-tracked COPY, re-materialized by prebundle — not a symlink)
 
 packages/browser-plugin/src/browser-env    → ../../../shared/browser-env    (symlink, git-tracked)
 packages/hash-plugin/src/browser-env       → ../../../shared/browser-env    (symlink)
 packages/navigation-plugin/src/browser-env → ../../../shared/browser-env    (symlink)
-packages/browser-env/src                   → ../../shared/browser-env       (tests-only wrapper)
 ```
 
 All tooling follows symlinks transparently and sees shared files as if they live locally inside each consumer's `src/`:
@@ -1926,6 +1946,11 @@ This asymmetry is why `dom-utils` **appears** to work without workspace deps on 
 
 ### `packages/dom-utils/` and `packages/browser-env/` as tests-only wrappers
 
+> **Retired (#1065).** Both wrapper packages were deleted; the "deferred follow-up"
+> below actually happened — the shared tests moved into a `shared/` test node and then
+> into the consumers (react ← dom-utils, browser-plugin ← browser-env). The rest of this
+> subsection is historical.
+
 Both packages are retained as minimal wrappers to host existing tests. Each has:
 
 - `package.json` — minimal: name (kept for backward compat), test scripts, deps on `@real-router/core` and (for browser-env) `type-guards` to satisfy the test runner
@@ -1938,19 +1963,18 @@ Full test migration to a dedicated location (e.g., `tests/shared/`) is a **defer
 
 ### Windows symlink requirement
 
-Git-tracked symlinks work on Unix/macOS/Linux out of the box. Windows contributors need `git config --global core.symlinks true` plus Developer Mode (or elevated shell). This was already required for Svelte's pre-#437 symlink. #437 scales it from 1 symlink to 10 (5 dom-utils consumers + 3 browser-env consumers + 2 tests-only wrappers). See README "Development" section.
+Git-tracked symlinks work on Unix/macOS/Linux out of the box. Windows contributors need `git config --global core.symlinks true` plus Developer Mode (or elevated shell). This was already required for Svelte's pre-#437 symlink. #437 scaled it from 1 symlink to 8 (5 dom-utils consumers + 3 browser-env consumers; the 2 tests-only wrapper symlinks it also added were retired with #1065). See README "Development" section.
 
 ### Tooling configuration
 
 **knip** (`knip.json`):
 
 - Each consumer workspace (8 entries: react, preact, vue, solid, svelte, browser-plugin, hash-plugin, navigation-plugin) lists `"ignore": ["src/dom-utils/**"]` or `"src/browser-env/**"` to skip symlinked directories from dead-code analysis
-- `packages/dom-utils` and `packages/browser-env` use tests-only project patterns
-- `packages/browser-env` and `packages/navigation-plugin` add `type-guards` to `ignoreDependencies` — knip doesn't see the transitive import through the symlinked `shared/browser-env/popstate-utils.ts` and would otherwise flag it as unused
+- `packages/navigation-plugin` adds `type-guards` to `ignoreDependencies` — knip doesn't see the transitive import through the symlinked `shared/browser-env/popstate-utils.ts` and would otherwise flag it as unused. (The `packages/{dom-utils,browser-env}` tests-only-wrapper entries were removed with #1065 — those packages no longer exist.)
 
-**jscpd** (`.jscpd.json`): ignores `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**`, `packages/*/src/browser-env/**`, `packages/browser-env/src/**` — without these, jscpd follows symlinks and reports the same shared files as duplicates across every symlinked location.
+**jscpd** (`.jscpd.json`): ignores `packages/*/src/dom-utils/**`, `packages/*/src/browser-env/**`, `packages/*/src/shared-ssr/**` — without these, jscpd follows symlinks and reports the same shared files as duplicates across every symlinked location. (The wrapper-specific `packages/{dom-utils,browser-env}/src/**` ignores were dropped with #1065 — those packages no longer exist.)
 
-**vitest coverage**: shared code is tracked by the file's real path (`shared/**/*.ts`), not the symlinked virtual path. The global include pattern `packages/*/src/**/*.ts` does not match `shared/**`, so shared code is currently excluded from per-package 100% coverage enforcement. This is accepted as a trade-off — test migration for shared code is the deferred follow-up.
+**vitest coverage**: shared code is tracked by the file's real path (`shared/**/*.ts`), not the symlinked virtual path. The global include pattern `packages/*/src/**/*.ts` does not match `shared/**`. Coverage is now enforced by the consumer owners (#1065): react gates `shared/dom-utils`, browser-plugin gates `shared/browser-env`, each via `allowExternal` + a dual `coverage.include` — see the #809 measuring-owner table above.
 
 ### History
 

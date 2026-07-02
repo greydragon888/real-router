@@ -113,6 +113,12 @@ const sharedDirs = existsSync(SHARED_DIR)
         (n) =>
           !n.startsWith(".") &&
           n !== "node_modules" &&
+          // Generated / non-source dirs: `shared/tests` (#1065) holds the shared
+          // test node's specs, and `shared/coverage` is the transient lcov output
+          // (gitignored). Neither is a shipped source dir with a measuring owner
+          // or codecov component — exclude them from the shared-source checks.
+          n !== "tests" &&
+          n !== "coverage" &&
           isRealDir(join(SHARED_DIR, n)),
       )
       .sort()
@@ -129,9 +135,15 @@ const sonarSources = [
   ...sharedDirs.map((d) => `shared/${d}`),
 ];
 const sonarTests = coverageProducing.map((p) => `packages/${p}/tests`);
-const lcovReports = packages
-  .map((p) => `packages/${p}/coverage/lcov.info`)
-  .filter((p) => existsSync(join(ROOT, p)));
+const lcovReports = [
+  ...packages.map((p) => `packages/${p}/coverage/lcov.info`),
+  // #1065: the shared/ test node (@real-router/shared-sources) owns the
+  // aggregated coverage of shared/{browser-env,dom-utils} and emits it to
+  // shared/coverage/lcov.info — NOT packages/*/coverage/. base-test uploads it
+  // (in sharded mode, the only mode a shared-source edit takes), so the merge
+  // must feed it to Codecov/Sonar or those shared lines score 0%.
+  "shared/coverage/lcov.info",
+].filter((p) => existsSync(join(ROOT, p)));
 
 // --- Check 1: codecov.yml components ⇔ coverage-producing packages ----------
 const codecov = read("codecov.yml");
@@ -147,7 +159,11 @@ for (const pkg of coverageProducing) {
   }
 }
 for (const comp of declaredComponents) {
-  if (!coverageProducing.includes(comp)) {
+  // A component is valid if it maps to a coverage-producing package OR to a
+  // shared source dir (#1065: browser-env/dom-utils are no longer wrapper
+  // packages — their coverage lands at shared/<dir>/… and codecov routes those
+  // components by `shared/<dir>/**` paths).
+  if (!coverageProducing.includes(comp) && !sharedDirs.includes(comp)) {
     errors.push(
       `codecov.yml: component "${comp}" has no coverage-producing package (stale — remove it)`,
     );
@@ -156,14 +172,15 @@ for (const comp of declaredComponents) {
 
 // --- Check 2: sonar.coverage.exclusions ⇔ no-test/phantom packages ----------
 const sonar = read("sonar-project.properties");
-const exclLine =
-  sonar.match(/^sonar\.coverage\.exclusions=(.*)$/m)?.[1] ?? "";
+const exclLine = sonar.match(/^sonar\.coverage\.exclusions=(.*)$/m)?.[1] ?? "";
 const exclusions = new Set(exclLine.split(",").map((s) => s.trim()));
 
 for (const pkg of mustCoverageExclude) {
   const glob = `packages/${pkg}/src/**`;
   if (!exclusions.has(glob)) {
-    const why = !hasTests(pkg) ? "no tests/ → no lcov" : "phantom code (lowered vitest threshold)";
+    const why = !hasTests(pkg)
+      ? "no tests/ → no lcov"
+      : "phantom code (lowered vitest threshold)";
     errors.push(
       `sonar-project.properties: "${glob}" missing from sonar.coverage.exclusions (${why}) — Sonar would score it as uncovered`,
     );
@@ -197,6 +214,17 @@ const ownerConfigs = packages
     pkg: p,
     text: readFileSync(join(PKG_DIR, p, "vitest.config.mts"), "utf8"),
   }));
+
+// #1065: the `shared/` test node owns the coverage of shared/{browser-env,
+// dom-utils} — its src is the symlink TARGET (not a package), so the owner
+// config lives at shared/vitest.config.mts, not under packages/*. Count it.
+const sharedOwnerCfg = join(SHARED_DIR, "vitest.config.mts");
+if (existsSync(sharedOwnerCfg)) {
+  ownerConfigs.push({
+    pkg: "shared",
+    text: readFileSync(sharedOwnerCfg, "utf8"),
+  });
+}
 
 for (const dir of sharedDirs) {
   // Match the include GLOB (`**/shared/<dir>/`), not a bare `shared/<dir>`
@@ -294,7 +322,7 @@ if (emitMode) {
   // broken upload/download, not a valid scope; refuse to emit a blank argument.
   if (lcovReports.length === 0) {
     console.error(
-      "✖ --emit: no packages/*/coverage/lcov.info files found — coverage artifacts missing?",
+      "✖ --emit: no coverage lcov.info files found — coverage artifacts missing?",
     );
     process.exit(1);
   }

@@ -63,16 +63,16 @@ All composables must be called during component initialization (not inside `$eff
 
 `useRoute()` returns a **non-nullable** `route.current` (typed as `State<P>`) and throws when the router has no active state (unstarted, stopped, disposed). `useRouteNode(name)` keeps its nullable `current` — node inactivity is a legitimate business state, not a lifecycle error.
 
-| Composable              | Returns                                                         | Reactive?                                  |
-| ----------------------- | --------------------------------------------------------------- | ------------------------------------------ |
-| `useRouter()`           | `Router`                                                        | Never                                      |
-| `useNavigator()`        | `Navigator`                                                     | Never (stable ref, safe to use directly)   |
-| `useRoute()`            | `{ navigator, route: { current: State<P> }, previousRoute: { current } }` — throws if no active state | `.current` on every navigation             |
-| `useRouteNode(name)`    | `{ navigator, route: { current }, previousRoute: { current } }` | `.current` when node activates/deactivates |
-| `useRouteUtils()`       | `RouteUtils`                                                    | Never                                      |
-| `useRouterTransition()` | `{ current: RouterTransitionSnapshot }`                         | `.current` on transition start/end         |
-| `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured at init)           |
-| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `$effect` + `transition.from` | Never (handler captured at init)           |
+| Composable                         | Returns                                                                                               | Reactive?                                  |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `useRouter()`                      | `Router`                                                                                              | Never                                      |
+| `useNavigator()`                   | `Navigator`                                                                                           | Never (stable ref, safe to use directly)   |
+| `useRoute()`                       | `{ navigator, route: { current: State<P> }, previousRoute: { current } }` — throws if no active state | `.current` on every navigation             |
+| `useRouteNode(name)`               | `{ navigator, route: { current }, previousRoute: { current } }`                                       | `.current` when node activates/deactivates |
+| `useRouteUtils()`                  | `RouteUtils`                                                                                          | Never                                      |
+| `useRouterTransition()`            | `{ current: RouterTransitionSnapshot }`                                                               | `.current` on transition start/end         |
+| `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards                                        | Never (handler captured at init)           |
+| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `$effect` + `transition.from`                             | Never (handler captured at init)           |
 
 ```svelte
 <!-- useRouteNode — updates only when "users.*" changes -->
@@ -178,17 +178,17 @@ Navigation link with automatic active state detection. Uses `$derived` for href 
 
 **Props:**
 
-| Prop                | Type                | Default     | Description                             |
-| ------------------- | ------------------- | ----------- | --------------------------------------- |
-| `routeName`         | `string`            | required    | Target route name                       |
-| `routeParams`       | `Params`            | `undefined` | Route parameters (omitted → `undefined`, shares one active-route source with `useIsActiveRoute(name)`, #776) |
-| `routeOptions`      | `NavigationOptions` | `{}`        | Navigation options (replace, etc.)      |
-| `class`             | `string`            | `undefined` | CSS class                               |
-| `activeClassName`   | `string`            | `"active"`  | Class added when route is active        |
-| `activeStrict`      | `boolean`           | `false`     | Exact match only (no ancestor matching) |
-| `ignoreQueryParams` | `boolean`           | `true`      | Query params don't affect active state  |
-| `hash`              | `string`            | `undefined` | URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532) |
-| `target`            | `string`            | `undefined` | Link target (`_blank`, etc.)            |
+| Prop                | Type                        | Default     | Description                                                                                                      |
+| ------------------- | --------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| `routeName`         | `string`                    | required    | Target route name                                                                                                |
+| `routeParams`       | `Params`                    | `undefined` | Route parameters (omitted → `undefined`, shares one active-route source with `useIsActiveRoute(name)`, #776)     |
+| `routeOptions`      | `NavigationOptions`         | `{}`        | Navigation options (replace, etc.)                                                                               |
+| `class`             | `string`                    | `undefined` | CSS class                                                                                                        |
+| `activeClassName`   | `string`                    | `"active"`  | Class added when route is active                                                                                 |
+| `activeStrict`      | `boolean`                   | `false`     | Exact match only (no ancestor matching)                                                                          |
+| `ignoreQueryParams` | `boolean`                   | `true`      | Query params don't affect active state                                                                           |
+| `hash`              | `string`                    | `undefined` | URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532)                          |
+| `target`            | `string`                    | `undefined` | Link target (`_blank`, etc.)                                                                                     |
 | `onclick`           | `(evt: MouseEvent) => void` | `undefined` | Custom click handler. Runs **before** the navigation logic — call `evt.preventDefault()` to suppress navigation. |
 
 All other props are spread onto the `<a>` element.
@@ -243,12 +243,12 @@ Declarative route matching. Renders the snippet whose name matches the active ro
 
 **Props:**
 
-| Prop        | Type      | Description                                                                                  |
-| ----------- | --------- | -------------------------------------------------------------------------------------------- |
-| `nodeName`  | `string`  | Route node to match against. `""` for root.                                                  |
-| `self`      | `Snippet` | Rendered when the active route is exactly `nodeName` (no descendant segments)                |
-| `notFound`  | `Snippet` | Rendered when route is `UNKNOWN_ROUTE`                                                       |
-| `[segment]` | `Snippet` | Named snippet matching a route segment                                                       |
+| Prop        | Type      | Description                                                                   |
+| ----------- | --------- | ----------------------------------------------------------------------------- |
+| `nodeName`  | `string`  | Route node to match against. `""` for root.                                   |
+| `self`      | `Snippet` | Rendered when the active route is exactly `nodeName` (no descendant segments) |
+| `notFound`  | `Snippet` | Rendered when route is `UNKNOWN_ROUTE`                                        |
+| `[segment]` | `Snippet` | Named snippet matching a route segment                                        |
 
 Snippet names must be valid JavaScript identifiers and match the first segment of the active route after `nodeName`. For a route `users.profile` with `nodeName=""`, the snippet named `users` matches.
 
@@ -462,6 +462,22 @@ Enable screen reader announcements for route changes:
 ```
 
 When enabled, a visually hidden `aria-live` region announces each navigation. Focus moves to the first `<h1>` on the new page. See [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
+
+`announceNavigation` also accepts a `RouteAnnouncerOptions` object to customize the announced text:
+
+| Option                | Type                | Description                                                                                         |
+| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `prefix`              | `string`            | Prefix prepended to the resolved text (default `"Navigated to "`)                                   |
+| `getAnnouncementText` | `(route) => string` | Full custom text; overrides the default `h1 → title → route-name` chain (falls back on empty/throw) |
+
+```svelte
+<RouterProvider
+  {router}
+  announceNavigation={{ getAnnouncementText: (route) => `Now on ${route.name}` }}
+>
+  {/* Your app */}
+</RouterProvider>
+```
 
 ## Scroll Restoration
 

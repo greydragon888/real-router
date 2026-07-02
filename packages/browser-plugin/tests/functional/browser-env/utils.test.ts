@@ -1,0 +1,89 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+import {
+  normalizeBase,
+  safelyEncodePath,
+} from "../../../src/browser-env/utils";
+
+describe("normalizeBase", () => {
+  it("returns empty string unchanged", () => {
+    expect(normalizeBase("")).toBe("");
+  });
+
+  it("prepends leading slash if missing", () => {
+    expect(normalizeBase("app")).toBe("/app");
+  });
+
+  it("removes trailing slash", () => {
+    expect(normalizeBase("/app/")).toBe("/app");
+  });
+
+  it("prepends slash and removes trailing slash", () => {
+    expect(normalizeBase("app/")).toBe("/app");
+  });
+
+  it("returns already-normalized base unchanged", () => {
+    expect(normalizeBase("/app")).toBe("/app");
+  });
+
+  it("collapses consecutive slashes to one", () => {
+    expect(normalizeBase("//app//")).toBe("/app");
+  });
+
+  it("collapses interior runs of slashes", () => {
+    expect(normalizeBase("/a///b////c")).toBe("/a/b/c");
+  });
+
+  it("collapses a lone '/' to empty string", () => {
+    expect(normalizeBase("/")).toBe("");
+  });
+
+  it("collapses repeated slashes down to empty string", () => {
+    expect(normalizeBase("//")).toBe("");
+    expect(normalizeBase("///")).toBe("");
+  });
+
+  it("is idempotent", () => {
+    const cases = ["/app", "//app//", "app", "", "/", "//a//b//"];
+
+    for (const c of cases) {
+      const once = normalizeBase(c);
+
+      expect(normalizeBase(once)).toBe(once);
+    }
+  });
+});
+
+describe("safelyEncodePath", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns unchanged ASCII path", () => {
+    expect(safelyEncodePath("/path/to/page")).toBe("/path/to/page");
+  });
+
+  it("normalizes percent-encoded path", () => {
+    expect(safelyEncodePath("/path%20to")).toBe("/path%20to");
+  });
+
+  it("encodes non-ASCII characters", () => {
+    expect(safelyEncodePath("/über")).toBe("/%C3%BCber");
+  });
+
+  it("returns original path and warns on malformed URI", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const malformed = "%invalid";
+    const result = safelyEncodePath(malformed);
+
+    expect(result).toBe(malformed);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain(malformed);
+  });
+
+  it("preserves query string and hash fragment", () => {
+    expect(safelyEncodePath("/users?q=hello&page=1#section")).toBe(
+      "/users?q=hello&page=1#section",
+    );
+  });
+});

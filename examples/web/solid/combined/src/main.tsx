@@ -13,7 +13,15 @@ const rootElement = document.querySelector("#root");
 if (rootElement) {
   render(
     () => (
-      <RouterProvider router={router} announceNavigation>
+      <RouterProvider
+        router={router}
+        announceNavigation={{
+          // announceNavigation accepts RouteAnnouncerOptions — a custom
+          // getAnnouncementText overrides the default "Navigated to
+          // <route.name>"; `prefix` is the other option.
+          getAnnouncementText: (route) => `Now on the ${route.name} page`,
+        }}
+      >
         <App />
       </RouterProvider>
     ),

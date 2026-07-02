@@ -17,14 +17,14 @@ npm install @real-router/react @real-router/core @real-router/browser-plugin
 
 ## Entry Points
 
-| Import Path                        | React Version | Runtime                                | Includes                                                                                                                                                |
-| ---------------------------------- | ------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@real-router/react`               | 19.2+         | DOM                                    | Full client API (hooks, `Link`, `RouteView` with `keepAlive`, `RouterErrorBoundary`). **No SSR-feature components** — those live at `/ssr`.             |
-| `@real-router/react/ssr`           | 19.2+         | DOM (SSR-aware)                        | `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink` |
-| `@real-router/react/legacy`        | 18+           | DOM                                    | Client API for React 18 (no `RouteView`, no SSR helpers)                                                                                                |
-| `@real-router/react/legacy/ssr`    | 18+           | DOM (SSR-aware)                        | SSR-feature subset for React 18 — same as `/ssr` minus `<Await>` (which depends on React 19's `use(promise)`)                                           |
-| `@real-router/react/ink`           | 19.2+         | Terminal (Ink 7+)                      | Hooks, `InkRouterProvider`, `InkLink` — no `Link`, no `RouteView`, no `announceNavigation`                                                              |
-| `@real-router/react` (`react-server` condition) | 19+ | RSC bundler                            | **Type-only** re-exports for Server Components — no client runtime. Same condition applies to `/ssr` for prop types.                                    |
+| Import Path                                     | React Version | Runtime           | Includes                                                                                                                                    |
+| ----------------------------------------------- | ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@real-router/react`                            | 19.2+         | DOM               | Full client API (hooks, `Link`, `RouteView` with `keepAlive`, `RouterErrorBoundary`). **No SSR-feature components** — those live at `/ssr`. |
+| `@real-router/react/ssr`                        | 19.2+         | DOM (SSR-aware)   | `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink`  |
+| `@real-router/react/legacy`                     | 18+           | DOM               | Client API for React 18 (no `RouteView`, no SSR helpers)                                                                                    |
+| `@real-router/react/legacy/ssr`                 | 18+           | DOM (SSR-aware)   | SSR-feature subset for React 18 — same as `/ssr` minus `<Await>` (which depends on React 19's `use(promise)`)                               |
+| `@real-router/react/ink`                        | 19.2+         | Terminal (Ink 7+) | Hooks, `InkRouterProvider`, `InkLink` — no `Link`, no `RouteView`, no `announceNavigation`                                                  |
+| `@real-router/react` (`react-server` condition) | 19+           | RSC bundler       | **Type-only** re-exports for Server Components — no client runtime. Same condition applies to `/ssr` for prop types.                        |
 
 All client entries share the same underlying hook code. `/legacy` excludes React 19.2 `<Activity>`; `/ink` excludes DOM-bound primitives (`<a>`-based `Link`, `announceNavigation`) and replaces them with keyboard-driven terminal equivalents. The `/ssr` split keeps server-only prop types out of the client TypeScript context for apps that don't touch SSR (bundle cost is ≈ 0 thanks to `"sideEffects": false`).
 
@@ -74,16 +74,16 @@ function App() {
 
 ## Hooks
 
-| Hook                    | Returns                                                    | Re-renders                              |
-| ----------------------- | ---------------------------------------------------------- | --------------------------------------- |
-| `useRouter()`           | `Router`                                                   | Never                                   |
-| `useNavigator()`        | `Navigator`                                                | Never (stable ref, safe to destructure) |
-| `useRoute()`            | `{ navigator, route, previousRoute }`                      | Every navigation                        |
-| `useRouteNode(name)`    | `{ navigator, route, previousRoute }`                      | Only when node activates/deactivates    |
-| `useRouteUtils()`       | `RouteUtils`                                               | Never                                   |
-| `useRouterTransition()` | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end                 |
-| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards | Never (stable subscription)        |
-| `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Never (handler stays current)      |
+| Hook                               | Returns                                                               | Re-renders                              |
+| ---------------------------------- | --------------------------------------------------------------------- | --------------------------------------- |
+| `useRouter()`                      | `Router`                                                              | Never                                   |
+| `useNavigator()`                   | `Navigator`                                                           | Never (stable ref, safe to destructure) |
+| `useRoute()`                       | `{ navigator, route, previousRoute }`                                 | Every navigation                        |
+| `useRouteNode(name)`               | `{ navigator, route, previousRoute }`                                 | Only when node activates/deactivates    |
+| `useRouteUtils()`                  | `RouteUtils`                                                          | Never                                   |
+| `useRouterTransition()`            | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`            | On transition start/end                 |
+| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards | Never (stable subscription)             |
+| `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Never (handler stays current)           |
 
 ```tsx
 // useRouteNode — re-renders only when "users.*" changes
@@ -125,7 +125,10 @@ function FormPage() {
 // useRouteEnter — page-enter analytics, focus management, entry animations
 function AboutPage() {
   useRouteEnter(({ route, previousRoute }) => {
-    analytics.track("page_enter", { route: route.name, from: previousRoute.name });
+    analytics.track("page_enter", {
+      route: route.name,
+      from: previousRoute.name,
+    });
   });
   return <About />;
 }
@@ -154,9 +157,15 @@ Navigation link with automatic active state detection. Re-renders only when its 
 
 ```tsx
 <nav>
-  <Link routeName="settings" hash="profile">Profile</Link>
-  <Link routeName="settings" hash="account">Account</Link>
-  <Link routeName="settings" hash="billing">Billing</Link>
+  <Link routeName="settings" hash="profile">
+    Profile
+  </Link>
+  <Link routeName="settings" hash="account">
+    Account
+  </Link>
+  <Link routeName="settings" hash="billing">
+    Billing
+  </Link>
 </nav>
 ```
 
@@ -225,10 +234,10 @@ Renders when the active route name **exactly equals** the parent `<RouteView>`'s
 </RouteView>
 ```
 
-| Prop       | Type        | Description                                                                                  |
-| ---------- | ----------- | -------------------------------------------------------------------------------------------- |
-| `fallback` | `ReactNode` | Symmetric with `RouteView.Match` — wraps `children` in `<Suspense>` when defined.            |
-| `children` | `ReactNode` | Content to render when the active route name equals the parent `<RouteView>`'s `nodeName`.   |
+| Prop       | Type        | Description                                                                                |
+| ---------- | ----------- | ------------------------------------------------------------------------------------------ |
+| `fallback` | `ReactNode` | Symmetric with `RouteView.Match` — wraps `children` in `<Suspense>` when defined.          |
+| `children` | `ReactNode` | Content to render when the active route name equals the parent `<RouteView>`'s `nodeName`. |
 
 First-wins: if multiple `<RouteView.Self>` elements appear, only the first contributes to the rendered output (same precedence semantics as `<RouteView.NotFound>`). An activating `<RouteView.Match>` suppresses both `Self` and `NotFound`.
 
@@ -331,11 +340,11 @@ const html = renderToString(
 response.status(sink.code ?? 200).send(html);
 ```
 
-| Export                           | Kind      | Purpose                                                                                                                                                  |
-| -------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<HttpStatusCode code={N}/>`     | component | Writes `code` to the optional context sink during render. Last write wins across multiple instances. No-op without a provider.                            |
-| `<HttpStatusProvider sink={…}>`  | component | Supplies an `HttpStatusSink` to descendant `<HttpStatusCode />` via React context.                                                                       |
-| `createHttpStatusSink()`         | utility   | Returns a fresh `{ code: number \| undefined }` sink — construct one per request on the server, read `sink.code` after rendering.                         |
+| Export                          | Kind      | Purpose                                                                                                                           |
+| ------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `<HttpStatusCode code={N}/>`    | component | Writes `code` to the optional context sink during render. Last write wins across multiple instances. No-op without a provider.    |
+| `<HttpStatusProvider sink={…}>` | component | Supplies an `HttpStatusSink` to descendant `<HttpStatusCode />` via React context.                                                |
+| `createHttpStatusSink()`        | utility   | Returns a fresh `{ code: number \| undefined }` sink — construct one per request on the server, read `sink.code` after rendering. |
 
 Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only. **Streaming SSR caveat**: mount `<HttpStatusCode>` in the shell (above every `<Suspense>` that could delay it), or `await stream.allReady` before reading `sink.code` — once the response status flushes, later writes are lost.
 
@@ -369,7 +378,11 @@ Ships three entry-specific pieces alongside the shared hooks:
 ```tsx
 import { createRouter } from "@real-router/core";
 import { memoryPluginFactory } from "@real-router/memory-plugin";
-import { InkLink, InkRouterProvider, useRouteNode } from "@real-router/react/ink";
+import {
+  InkLink,
+  InkRouterProvider,
+  useRouteNode,
+} from "@real-router/react/ink";
 import { Box, Text, render } from "ink";
 
 const router = createRouter([
@@ -386,7 +399,12 @@ const App = () => {
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box columnGap={2}>
-        <InkLink routeName="home" focusColor="cyan" activeColor="green" autoFocus>
+        <InkLink
+          routeName="home"
+          focusColor="cyan"
+          activeColor="green"
+          autoFocus
+        >
           [ Home ]
         </InkLink>
         <InkLink routeName="users" focusColor="cyan" activeColor="green">
@@ -439,6 +457,24 @@ Enable screen reader announcements for route changes:
 
 When enabled, a visually hidden `aria-live` region announces each navigation. Focus moves to the first `<h1>` on the new page. See [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
 
+`announceNavigation` also accepts a `RouteAnnouncerOptions` object to customize the announced text:
+
+| Option                | Type                | Description                                                                                         |
+| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `prefix`              | `string`            | Prefix prepended to the resolved text (default `"Navigated to "`)                                   |
+| `getAnnouncementText` | `(route) => string` | Full custom text; overrides the default `h1 → title → route-name` chain (falls back on empty/throw) |
+
+```tsx
+<RouterProvider
+  router={router}
+  announceNavigation={{
+    getAnnouncementText: (route) => `Now on ${route.name}`,
+  }}
+>
+  {/* Your app */}
+</RouterProvider>
+```
+
 ## Scroll Restoration
 
 Opt-in preservation of scroll position across navigations:
@@ -456,10 +492,7 @@ Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three mode
 Opt-in router-coordinated `IntersectionObserver` scroll spy — the URL hash tracks the topmost visible anchor as the user scrolls, syncing `state.context.url.hash` so sibling `<Link hash>` highlights stay current:
 
 ```tsx
-<RouterProvider
-  router={router}
-  scrollSpy={{ selector: "[id]:is(h2,h3)" }}
->
+<RouterProvider router={router} scrollSpy={{ selector: "[id]:is(h2,h3)" }}>
   {/* Your app */}
 </RouterProvider>
 ```

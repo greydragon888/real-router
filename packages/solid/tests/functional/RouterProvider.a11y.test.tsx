@@ -339,43 +339,111 @@ describe("RouterProvider — announceNavigation", () => {
     expect(announcer!.textContent).toBe("");
   });
 
-  it("§5.7 — custom getAnnouncementText throw is swallowed; falls back to default resolution", async () => {
-    // The Solid RouterProvider does not pass `getAnnouncementText` through,
-    // so we exercise the fallback path by directly invoking the shared
-    // announcer factory. This locks the shared/dom-utils contract that a
-    // throwing custom resolver is caught and logged — it does NOT tear
-    // down the announcer subscription.
-    const { createRouteAnnouncer } =
-      await import("../../src/dom-utils/route-announcer.js");
+  // ── announceNavigation options (getAnnouncementText / prefix) ─────────────
+  // Exercise the RouterProvider `announceNavigation` prop wiring through the
+  // PUBLIC contract (not a direct createRouteAnnouncer call) now that the Solid
+  // adapter forwards `RouteAnnouncerOptions`. The first navigation after mount
+  // is the initial transition and is skipped, so each case navigates twice and
+  // asserts on the second route ("home").
+
+  it("uses a custom getAnnouncementText", async () => {
+    render(() => (
+      <RouterProvider
+        router={router}
+        announceNavigation={{
+          getAnnouncementText: (route) => `You are on ${route.name}`,
+        }}
+      >
+        <div />
+      </RouterProvider>
+    ));
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    await router.navigate("home");
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "You are on home",
+    );
+  });
+
+  it("falls back to default resolution when getAnnouncementText returns empty", async () => {
+    render(() => (
+      <RouterProvider
+        router={router}
+        announceNavigation={{ getAnnouncementText: () => "" }}
+      >
+        <div />
+      </RouterProvider>
+    ));
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    await router.navigate("home");
+
+    // Empty custom result → fall through to the default chain → route name.
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to home",
+    );
+  });
+
+  it("uses a custom prefix", async () => {
+    render(() => (
+      <RouterProvider router={router} announceNavigation={{ prefix: "Page: " }}>
+        <div />
+      </RouterProvider>
+    ));
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    await router.navigate("home");
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Page: home",
+    );
+  });
+
+  it("swallows a throwing getAnnouncementText and falls back (via the prop)", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
+    // Fallback chain is h1 → document.title → route.name. Pin the title branch
+    // (h1 absent, title present) so the throw-fallback still exercises it now
+    // that it runs through the public announceNavigation prop, not a direct
+    // createRouteAnnouncer call.
     document.title = "ServerTitle";
     document.querySelectorAll("h1").forEach((h1) => {
       h1.remove();
     });
 
-    const handle = createRouteAnnouncer(router, {
-      getAnnouncementText: () => {
-        throw new Error("boom");
-      },
-    });
+    render(() => (
+      <RouterProvider
+        router={router}
+        announceNavigation={{
+          getAnnouncementText: () => {
+            throw new Error("boom");
+          },
+        }}
+      >
+        <div />
+      </RouterProvider>
+    ));
 
     vi.advanceTimersByTime(100);
-    // Warm up the announcer past the initial-skip.
-    await router.navigate("home").catch(() => {});
 
     await router.navigate("about");
+    await router.navigate("home");
 
-    const announcer = document.querySelector(ANNOUNCER_SEL);
-
-    // Fallback chain: h1 absent, document.title="ServerTitle" → use it.
-    expect(announcer?.textContent).toBe("Navigated to ServerTitle");
     expect(errSpy).toHaveBeenCalledWith(
       expect.stringContaining("getAnnouncementText threw"),
       expect.any(Error),
     );
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to ServerTitle",
+    );
 
-    handle.destroy();
     errSpy.mockRestore();
     document.title = "";
   });

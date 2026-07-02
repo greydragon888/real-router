@@ -190,6 +190,116 @@ describe("RouterProvider — announceNavigation", () => {
 
     expect(document.querySelector(ANNOUNCER_SEL)).toBeNull();
   });
+
+  // ── announceNavigation options (getAnnouncementText / prefix) ─────────────
+  // First navigation after mount is skipped (initial-navigation flag), so each
+  // case navigates twice and asserts on the second route ("home").
+
+  it("uses a custom getAnnouncementText", async () => {
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            {
+              router,
+              announceNavigation: {
+                getAnnouncementText: (route) => `You are on ${route.name}`,
+              },
+            },
+            { default: () => h("div") },
+          ),
+      }),
+    );
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    await router.navigate("home");
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "You are on home",
+    );
+  });
+
+  it("falls back to default resolution when getAnnouncementText returns empty", async () => {
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            { router, announceNavigation: { getAnnouncementText: () => "" } },
+            { default: () => h("div") },
+          ),
+      }),
+    );
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    await router.navigate("home");
+
+    // Empty custom result → fall through to the default chain.
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to home",
+    );
+  });
+
+  it("falls back to default resolution when getAnnouncementText throws", async () => {
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            {
+              router,
+              announceNavigation: {
+                getAnnouncementText: () => {
+                  throw new Error("boom");
+                },
+              },
+            },
+            { default: () => h("div") },
+          ),
+      }),
+    );
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    await router.navigate("home");
+
+    expect(errorSpy).toHaveBeenCalled();
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to home",
+    );
+  });
+
+  it("uses a custom prefix", async () => {
+    mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            RouterProvider,
+            { router, announceNavigation: { prefix: "Page: " } },
+            { default: () => h("div") },
+          ),
+      }),
+    );
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    await router.navigate("home");
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Page: home",
+    );
+  });
 });
 
 // Review §5.7 — announcer edge cases. The shared `createRouteAnnouncer`

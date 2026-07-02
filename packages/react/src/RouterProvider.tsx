@@ -10,14 +10,18 @@ import {
   createViewTransitions,
 } from "./dom-utils";
 
-import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
+import type {
+  RouteAnnouncerOptions,
+  ScrollRestorationOptions,
+  ScrollSpyOptions,
+} from "./dom-utils";
 import type { Router } from "@real-router/core";
 import type { FC, ReactNode } from "react";
 
 export interface RouteProviderProps {
   router: Router;
   children: ReactNode;
-  announceNavigation?: boolean;
+  announceNavigation?: boolean | RouteAnnouncerOptions;
   scrollRestoration?: ScrollRestorationOptions;
   scrollSpy?: ScrollSpyOptions;
   viewTransitions?: boolean;
@@ -31,17 +35,30 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   scrollSpy,
   viewTransitions,
 }) => {
+  // `announceNavigation` accepts `true` (default announcer) or a
+  // `RouteAnnouncerOptions` object (`{ prefix, getAnnouncementText }`) for
+  // custom announcement text. `false` / `undefined` disables it.
+  const announceEnabled =
+    announceNavigation !== undefined && announceNavigation !== false;
+  const announceOptions =
+    typeof announceNavigation === "object" ? announceNavigation : undefined;
+  const announcePrefix = announceOptions?.prefix;
+
   useEffect(() => {
-    if (!announceNavigation) {
+    if (!announceEnabled) {
       return;
     }
 
-    const announcer = createRouteAnnouncer(router);
+    const announcer = createRouteAnnouncer(router, announceOptions);
 
     return () => {
       announcer.destroy();
     };
-  }, [announceNavigation, router]);
+    // announceOptions (for getAnnouncementText) omitted — inline-object identity
+    // churn shouldn't re-create the announcer; the callback is captured once by
+    // the utility (same rationale as scrollContainer below).
+    // eslint-disable-next-line @eslint-react/exhaustive-deps
+  }, [router, announceEnabled, announcePrefix]);
 
   // Primitive deps so inline `{ mode: "restore" }` doesn't thrash on every
   // render. scrollContainer is a getter invoked lazily on every event inside

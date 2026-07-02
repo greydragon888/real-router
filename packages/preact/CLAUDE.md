@@ -6,17 +6,28 @@
 
 Two entry points via `package.json` `exports` — main + SSR subpath:
 
-| Entry Point | Import Path | Description |
-|---|---|---|
-| Main | `@real-router/preact` | Full client API: hooks, `RouterProvider`, `RouteView`, `Link`, `RouterErrorBoundary` |
-| SSR | `@real-router/preact/ssr` | `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink` — mirrors `@real-router/react/ssr` |
+| Entry Point | Import Path               | Description                                                                                                                                                                   |
+| ----------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Main        | `@real-router/preact`     | Full client API: hooks, `RouterProvider`, `RouteView`, `Link`, `RouterErrorBoundary`                                                                                          |
+| SSR         | `@real-router/preact/ssr` | `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink` — mirrors `@real-router/react/ssr` |
 
 ```tsx
 // Client API
-import { RouterProvider, useRouteNode, Link, RouteView } from '@real-router/preact';
+import {
+  RouterProvider,
+  useRouteNode,
+  Link,
+  RouteView,
+} from "@real-router/preact";
 
 // SSR-feature components/hooks
-import { ClientOnly, ServerOnly, Await, Streamed, useDeferred } from '@real-router/preact/ssr';
+import {
+  ClientOnly,
+  ServerOnly,
+  Await,
+  Streamed,
+  useDeferred,
+} from "@real-router/preact/ssr";
 ```
 
 **Peer dependency:** `preact` ">=10.28.0 || ^11.0.0-0" — compatible with Preact 10.28+ and Preact 11 (beta and stable). Floor sits at 10.28 because the adapter pulls `HTMLAttributes` / `TargetedMouseEvent` from the top-level `preact` namespace (introduced in 10.28; `dom.d.ts`), which is the only import shape that survives Preact 11's JSX-namespace restructure.
@@ -25,13 +36,13 @@ import { ClientOnly, ServerOnly, Await, Streamed, useDeferred } from '@real-rout
 
 **RouterProvider Props:**
 
-| Prop                  | Type      | Default | Description                                                                                    |
-| --------------------- | --------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `router`              | `Router`  | —       | Router instance (required)                                                                     |
-| `announceNavigation`  | `boolean` | `false` | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region       |
-| `scrollRestoration`   | `ScrollRestorationOptions` | `undefined` | Opt into scroll capture + restoration. Keyed by `(name, canonicalJson(params))` — duplicate history entries share one bucket. |
-| `scrollSpy`           | `ScrollSpyOptions` | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). `{ selector, rootMargin?, scrollContainer? }`. Empty `selector` / `undefined` = off. Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP. |
-| `viewTransitions`     | `boolean` | `false` | Opt into View Transitions API integration via `createViewTransitions` utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements |
+| Prop                 | Type                               | Default     | Description                                                                                                                                                                                                                                                                               |
+| -------------------- | ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `router`             | `Router`                           | —           | Router instance (required)                                                                                                                                                                                                                                                                |
+| `announceNavigation` | `boolean \| RouteAnnouncerOptions` | `false`     | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region. Pass `{ prefix?, getAnnouncementText? }` to customize the announcement text — the callback falls back to the default `h1 → title → route-name` chain when it returns an empty string or throws. |
+| `scrollRestoration`  | `ScrollRestorationOptions`         | `undefined` | Opt into scroll capture + restoration. Keyed by `(name, canonicalJson(params))` — duplicate history entries share one bucket.                                                                                                                                                             |
+| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). `{ selector, rootMargin?, scrollContainer? }`. Empty `selector` / `undefined` = off. Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP.               |
+| `viewTransitions`    | `boolean`                          | `false`     | Opt into View Transitions API integration via `createViewTransitions` utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements                                                                              |
 
 ### Source Structure
 
@@ -86,11 +97,11 @@ src/
 
 `RouteView.Match` accepts these props:
 
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `segment` | `string` | Yes | Route segment to match |
-| `exact` | `boolean` | No | When `true`, matches only the exact route (not descendants). Default: `false` |
-| `fallback` | `ComponentChildren` | No | Shown while children suspend. Wraps children in `<Suspense>` when provided. **Experimental** — requires `lazy` and `Suspense` from `preact/compat`. |
+| Prop       | Type                | Required | Description                                                                                                                                         |
+| ---------- | ------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `segment`  | `string`            | Yes      | Route segment to match                                                                                                                              |
+| `exact`    | `boolean`           | No       | When `true`, matches only the exact route (not descendants). Default: `false`                                                                       |
+| `fallback` | `ComponentChildren` | No       | Shown while children suspend. Wraps children in `<Suspense>` when provided. **Experimental** — requires `lazy` and `Suspense` from `preact/compat`. |
 
 ### Build (tsdown)
 
@@ -123,28 +134,28 @@ dist/
 
 ## Hooks
 
-| Hook                    | Purpose                                                                    | Re-renders                     |
-| ----------------------- | -------------------------------------------------------------------------- | ------------------------------ |
-| `useRouter()`           | Get router instance                                                        | Never                          |
-| `useNavigator()`        | Get Navigator (stable ref) — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more | Never                          |
-| `useRoute()`            | Get `RouteContext` (`navigator` + non-nullable `route` + optional `previousRoute`), not raw `RouteState` | Every navigation               |
-| `useRouteNode(name)`    | Subscribe to specific node                                                 | Only when node active/inactive |
-| `useRouteUtils()`       | Get RouteUtils instance                                                    | Never                          |
-| `useRouterTransition()` | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end        |
-| `useRouteExit(handler, options?)`  | Subscribe to `router.subscribeLeave` with `signal.aborted` pre-check, same-route skip and stable handler-ref. Returns `void`.   | Never (subscription stable across renders) |
+| Hook                               | Purpose                                                                                                                                                         | Re-renders                                                                                                 |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `useRouter()`                      | Get router instance                                                                                                                                             | Never                                                                                                      |
+| `useNavigator()`                   | Get Navigator (stable ref) — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more                                                             | Never                                                                                                      |
+| `useRoute()`                       | Get `RouteContext` (`navigator` + non-nullable `route` + optional `previousRoute`), not raw `RouteState`                                                        | Every navigation                                                                                           |
+| `useRouteNode(name)`               | Subscribe to specific node                                                                                                                                      | Only when node active/inactive                                                                             |
+| `useRouteUtils()`                  | Get RouteUtils instance                                                                                                                                         | Never                                                                                                      |
+| `useRouterTransition()`            | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`                                                                         | On transition start/end                                                                                    |
+| `useRouteExit(handler, options?)`  | Subscribe to `router.subscribeLeave` with `signal.aborted` pre-check, same-route skip and stable handler-ref. Returns `void`.                                   | Never (subscription stable across renders)                                                                 |
 | `useRouteEnter(handler, options?)` | Fire `handler` once when component mounts as a result of a navigation; uses `useRoute()` snapshot + `route.transition.from` for skip-initial / skip-same-route. | Every navigation (host component reads `useRoute()`); handler ref + subscription are stable across renders |
 
 ## Differences from React Adapter
 
-| Aspect | React | Preact |
-|--------|-------|--------|
-| `useSyncExternalStore` | Native (React 18+) | Custom polyfill (`useState` + `useEffect`) |
-| Context provider | `<Context value={...}>` (React 19) | `<Context.Provider value={...}>` |
-| `memo()` | `react` | `preact/compat` |
-| `Children.toArray` | `react` | `toChildArray` from `preact` |
-| `keepAlive` / Activity | React 19.2+ | Not available |
-| `fallback` / `Suspense` | `react` | `preact/compat` (experimental) |
-| Entry points | Main + Legacy + `/ssr` + `/legacy/ssr` + `/ink` + RSC | Main + `/ssr` |
+| Aspect                  | React                                                 | Preact                                     |
+| ----------------------- | ----------------------------------------------------- | ------------------------------------------ |
+| `useSyncExternalStore`  | Native (React 18+)                                    | Custom polyfill (`useState` + `useEffect`) |
+| Context provider        | `<Context value={...}>` (React 19)                    | `<Context.Provider value={...}>`           |
+| `memo()`                | `react`                                               | `preact/compat`                            |
+| `Children.toArray`      | `react`                                               | `toChildArray` from `preact`               |
+| `keepAlive` / Activity  | React 19.2+                                           | Not available                              |
+| `fallback` / `Suspense` | `react`                                               | `preact/compat` (experimental)             |
+| Entry points            | Main + Legacy + `/ssr` + `/legacy/ssr` + `/ink` + RSC | Main + `/ssr`                              |
 
 ## Promise-Based Navigation
 
@@ -152,7 +163,9 @@ Link uses fire-and-forget navigation via `navigateWithHash` (from `dom-utils/lin
 which adds same-route different-hash detection on top of `router.navigate`:
 
 ```typescript
-navigateWithHash(router, routeName, stableParams, hash, stableOptions).catch(() => {});
+navigateWithHash(router, routeName, stableParams, hash, stableOptions).catch(
+  () => {},
+);
 ```
 
 The `.catch(() => {})` swallows rejected transitions (guards returning false, redirects,
@@ -166,16 +179,16 @@ navigation bypasses core's `SAME_STATES` short-circuit (see "`<Link hash>` Prop"
 
 All SSR-aware components/hooks live at the `/ssr` subpath. Eight exports total — symmetric with `@real-router/react/ssr`:
 
-| Export | Kind | Purpose |
-|---|---|---|
-| `<ClientOnly fallback={…}>` | component | Server emits `fallback` (default `null`); a single `useEffect` post-hydration swaps in `children`. |
-| `<ServerOnly fallback={…}>` | component | Symmetric inverse: server emits `children`; client swaps to `fallback` after mount. |
-| `<Streamed fallback={…}>` | component | Cross-adapter alias for Preact `Suspense` boundaries. |
-| `<Await<T> name="key">{(value) => …}</Await>` | component | Reads a deferred promise published by `defer({ deferred: { <name>: Promise } })`. Throws-then-renders pattern via Preact `Suspense`. |
-| `<HttpStatusCode code={N}/>` | component | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink during render and returns `null`. Last write wins. No-op without provider. |
-| `<HttpStatusProvider sink={...}>` | component | Provides an `HttpStatusSink` to descendant `<HttpStatusCode />` instances via Preact context. |
-| `useDeferred<T>(key)` | hook | Reads `state.context.ssrDataDeferred[key]`. |
-| `createHttpStatusSink()` | utility | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after `renderToString` to apply to the response. |
+| Export                                        | Kind      | Purpose                                                                                                                                                                    |
+| --------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<ClientOnly fallback={…}>`                   | component | Server emits `fallback` (default `null`); a single `useEffect` post-hydration swaps in `children`.                                                                         |
+| `<ServerOnly fallback={…}>`                   | component | Symmetric inverse: server emits `children`; client swaps to `fallback` after mount.                                                                                        |
+| `<Streamed fallback={…}>`                     | component | Cross-adapter alias for Preact `Suspense` boundaries.                                                                                                                      |
+| `<Await<T> name="key">{(value) => …}</Await>` | component | Reads a deferred promise published by `defer({ deferred: { <name>: Promise } })`. Throws-then-renders pattern via Preact `Suspense`.                                       |
+| `<HttpStatusCode code={N}/>`                  | component | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink during render and returns `null`. Last write wins. No-op without provider. |
+| `<HttpStatusProvider sink={...}>`             | component | Provides an `HttpStatusSink` to descendant `<HttpStatusCode />` instances via Preact context.                                                                              |
+| `useDeferred<T>(key)`                         | hook      | Reads `state.context.ssrDataDeferred[key]`.                                                                                                                                |
+| `createHttpStatusSink()`                      | utility   | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after `renderToString` to apply to the response.          |
 
 Implementation: `useState(false)` + `useEffect(() => setMounted(true), [])` from `preact/hooks` for boundary components. `<HttpStatusCode>` reads `useContext` and writes during render — no DOM, no hydration mismatch. Same SSR/hydration contract as the React adapter.
 
@@ -301,13 +314,13 @@ RouteView renders only the active match. On navigation, the previous component u
 `fallback` wraps children in `<Suspense>` from `preact/compat`. Preact's lazy loading support is experimental — test thoroughly before shipping:
 
 ```tsx
-import { lazy, Suspense } from 'preact/compat';
+import { lazy, Suspense } from "preact/compat";
 
-const LazyDashboard = lazy(() => import('./Dashboard'));
+const LazyDashboard = lazy(() => import("./Dashboard"));
 
 <RouteView.Match segment="dashboard" fallback={<Spinner />}>
   <LazyDashboard />
-</RouteView.Match>
+</RouteView.Match>;
 ```
 
 ### activeStrict Meaning
@@ -341,10 +354,12 @@ import { memo } from "preact/compat";
 // WRONG — MemoMatch.type !== Match, invisible to collectElements
 const MemoMatch = memo(RouteView.Match);
 <RouteView nodeName="">
-  <MemoMatch segment="users">       {/* silently skipped */}
+  <MemoMatch segment="users">
+    {" "}
+    {/* silently skipped */}
     <UsersPage />
   </MemoMatch>
-</RouteView>
+</RouteView>;
 
 // WRONG — wrapper function changes type identity (same footgun)
 function MyMatch({ segment, children }: Props) {
@@ -354,8 +369,11 @@ function MyMatch({ segment, children }: Props) {
 // OK — const alias preserves identity (Alias === RouteView.Match)
 const Alias = RouteView.Match;
 <RouteView nodeName="">
-  <Alias segment="users"><UsersPage /></Alias>   {/* detected */}
-</RouteView>
+  <Alias segment="users">
+    <UsersPage />
+  </Alias>{" "}
+  {/* detected */}
+</RouteView>;
 ```
 
 Lock: `RouteView.test.tsx` "consumer footgun: RouteView.Match wrapped in memo()"
@@ -373,11 +391,13 @@ RouteView; declare it at the bottom for readability.
 ```tsx
 <RouteView nodeName="">
   <RouteView.NotFound>
-    <div data-testid="first-nf">First</div>   {/* not rendered */}
+    <div data-testid="first-nf">First</div> {/* not rendered */}
   </RouteView.NotFound>
-  <RouteView.Match segment="users"><UsersPage /></RouteView.Match>
+  <RouteView.Match segment="users">
+    <UsersPage />
+  </RouteView.Match>
   <RouteView.NotFound>
-    <div data-testid="last-nf">Last</div>     {/* renders on UNKNOWN_ROUTE */}
+    <div data-testid="last-nf">Last</div> {/* renders on UNKNOWN_ROUTE */}
   </RouteView.NotFound>
 </RouteView>
 ```
@@ -421,11 +441,11 @@ unwanted `<Link>` re-renders when a consumer toggles a controlled/uncontrolled
 optional field.
 
 ```tsx
-shallowEqual({ a: 1, b: undefined }, { a: 1 });  // false
-shallowEqual({ a: 1 }, { a: 1, b: undefined });  // false (symmetric)
+shallowEqual({ a: 1, b: undefined }, { a: 1 }); // false
+shallowEqual({ a: 1 }, { a: 1, b: undefined }); // false (symmetric)
 
 // Practical example — these two routeParams break Link memo bail-out:
-<Link routeParams={controlled ? { id, draft } : { id }} />
+<Link routeParams={controlled ? { id, draft } : { id }} />;
 //                                ↑ first render: { id, draft: undefined }
 //                                  second render: { id }
 //                                  → shallowEqual = false → Link re-renders

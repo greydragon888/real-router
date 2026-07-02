@@ -1,0 +1,64 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+import {
+  pushState,
+  replaceState,
+  addPopstateListener,
+  addHashChangeListener,
+  getHash,
+} from "../../../src/browser-env/history-api";
+
+describe("history-api", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("pushState delegates to globalThis.history.pushState", () => {
+    const spy = vi.spyOn(globalThis.history, "pushState");
+    const state = { name: "home", params: {}, path: "/", context: {} };
+
+    pushState(state, "/");
+
+    expect(spy).toHaveBeenCalledWith(state, "", "/");
+  });
+
+  it("replaceState delegates to globalThis.history.replaceState", () => {
+    const spy = vi.spyOn(globalThis.history, "replaceState");
+    const state = { name: "home", params: {}, path: "/", context: {} };
+
+    replaceState(state, "/");
+
+    expect(spy).toHaveBeenCalledWith(state, "", "/");
+  });
+
+  it("addPopstateListener registers and returns cleanup", () => {
+    const addSpy = vi.spyOn(globalThis, "addEventListener");
+    const removeSpy = vi.spyOn(globalThis, "removeEventListener");
+    const fn = vi.fn();
+    const cleanup = addPopstateListener(fn);
+
+    expect(addSpy).toHaveBeenCalledWith("popstate", fn);
+
+    cleanup();
+
+    expect(removeSpy).toHaveBeenCalledWith("popstate", fn);
+  });
+
+  it("addHashChangeListener registers and returns cleanup (#759)", () => {
+    const addSpy = vi.spyOn(globalThis, "addEventListener");
+    const removeSpy = vi.spyOn(globalThis, "removeEventListener");
+    const fn = vi.fn();
+    const cleanup = addHashChangeListener(fn);
+
+    expect(addSpy).toHaveBeenCalledWith("hashchange", fn);
+
+    cleanup();
+
+    expect(removeSpy).toHaveBeenCalledWith("hashchange", fn);
+  });
+
+  it("getHash returns current location hash", () => {
+    // jsdom location.hash is "" by default
+    expect(getHash()).toBe("");
+  });
+});

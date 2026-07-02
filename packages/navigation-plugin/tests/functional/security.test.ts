@@ -1,7 +1,6 @@
 import { createRouter } from "@real-router/core";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { urlToPath } from "../../src/browser-env";
 import { navigationPluginFactory } from "../../src/factory";
 import { MockNavigation } from "../helpers/mockNavigation";
 import {
@@ -33,35 +32,44 @@ describe("Cross-Origin Filtering", () => {
 });
 
 describe("Protocol Handling", () => {
-  // Post-desktop-support: urlToPath is scheme-agnostic. Security against
-  // malicious URLs comes from route matching (unknown paths return undefined
-  // state), not from scheme filtering. See issue #496.
+  // urlToPath is scheme-agnostic (issue #496 — desktop `tauri://` / `app://` URL
+  // support). Security against malicious URLs comes from route matching (unknown
+  // paths resolve to `undefined` state), NOT from scheme filtering. Exercised
+  // through the plugin's public `router.matchUrl()` rather than calling the pure
+  // `urlToPath` helper directly (that is owned + unit-tested by the shared node).
+  let router: ReturnType<typeof createRouter>;
 
-  it("urlToPath extracts path from ftp:// URLs (routing will match or miss)", () => {
-    expect(urlToPath("ftp://files.example.com/doc", "")).toBe("/doc");
+  beforeEach(async () => {
+    const mock = new MockNavigation("http://localhost/home");
+    const browser = createMockNavigationBrowser(mock);
+
+    router = createRouter(routerConfig);
+    router.usePlugin(navigationPluginFactory({ base: "" }, browser));
+    await router.start("/home");
   });
 
-  it("urlToPath treats javascript: as literal pathname (no route will match)", () => {
-    expect(urlToPath("javascript:alert(1)", "")).toBe("/javascript:alert(1)");
-  });
-
-  it("urlToPath treats data: as literal pathname (no route will match)", () => {
-    expect(urlToPath("data:text/html,<h1>hi</h1>", "")).toBe(
-      "/data:text/html,<h1>hi</h1>",
+  it("accepts desktop tauri:// scheme — path extracted and matched", () => {
+    expect(router.matchUrl("tauri://localhost/users/list")?.name).toBe(
+      "users.list",
     );
   });
 
-  it("urlToPath accepts http:// protocol", () => {
-    expect(urlToPath("http://localhost/users", "")).toBe("/users");
+  it("accepts desktop app:// scheme — path extracted and matched", () => {
+    expect(router.matchUrl("app://myapp/home")?.name).toBe("home");
   });
 
-  it("urlToPath accepts https:// protocol", () => {
-    expect(urlToPath("https://example.com/users", "")).toBe("/users");
+  it("accepts https:// scheme — path extracted and matched", () => {
+    expect(router.matchUrl("https://example.com/users/list")?.name).toBe(
+      "users.list",
+    );
   });
 
-  it("urlToPath accepts Tauri/Electron custom schemes", () => {
-    expect(urlToPath("tauri://localhost/users", "")).toBe("/users");
-    expect(urlToPath("app://myapp/home", "")).toBe("/home");
+  it("javascript: URL yields a non-matching path → undefined (route matching is the filter)", () => {
+    expect(router.matchUrl("javascript:alert(1)")).toBeUndefined();
+  });
+
+  it("data: URL yields a non-matching path → undefined (route matching is the filter)", () => {
+    expect(router.matchUrl("data:text/html,<h1>hi</h1>")).toBeUndefined();
   });
 });
 

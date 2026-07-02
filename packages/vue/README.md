@@ -114,16 +114,16 @@ All composables (`useRouter`, `useRoute`, etc.) and the `v-link` directive work 
 
 Route state composables return `Readonly<Ref>` values — `useRoute` mirrors a `shallowRef`, `useRouteNode` derives a `computed`, and `useRouterTransition` returns a `ShallowRef` directly. Consumers only need `.value` read access; in templates Vue auto-unwraps refs.
 
-| Composable              | Returns                                                                      | Reactive?                                |
-| ----------------------- | ---------------------------------------------------------------------------- | ---------------------------------------- |
-| `useRouter()`           | `Router`                                                                     | Never                                    |
-| `useNavigator()`        | `Navigator`                                                                  | Never (stable ref, safe to use directly) |
-| `useRoute()`            | `{ navigator, route: Readonly<Ref<State>>, previousRoute: Readonly<Ref<State \| undefined>> }` | route/previousRoute on every navigation  |
-| `useRouteNode(name)`    | `{ navigator, route: Readonly<Ref<State \| undefined>>, previousRoute: Readonly<Ref<State \| undefined>> }` (computed under the hood) | Only when node activates/deactivates     |
-| `useRouteUtils()`       | `RouteUtils`                                                                 | Never                                    |
-| `useRouterTransition()` | `ShallowRef<RouterTransitionSnapshot>`                                       | On transition start/end                  |
-| `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured in `setup()`)    |
-| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `watch(route)` + `transition.from` | Never (handler captured in `setup()`) |
+| Composable                         | Returns                                                                                                                               | Reactive?                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `useRouter()`                      | `Router`                                                                                                                              | Never                                    |
+| `useNavigator()`                   | `Navigator`                                                                                                                           | Never (stable ref, safe to use directly) |
+| `useRoute()`                       | `{ navigator, route: Readonly<Ref<State>>, previousRoute: Readonly<Ref<State \| undefined>> }`                                        | route/previousRoute on every navigation  |
+| `useRouteNode(name)`               | `{ navigator, route: Readonly<Ref<State \| undefined>>, previousRoute: Readonly<Ref<State \| undefined>> }` (computed under the hood) | Only when node activates/deactivates     |
+| `useRouteUtils()`                  | `RouteUtils`                                                                                                                          | Never                                    |
+| `useRouterTransition()`            | `ShallowRef<RouterTransitionSnapshot>`                                                                                                | On transition start/end                  |
+| `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards                                                                        | Never (handler captured in `setup()`)    |
+| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `watch(route)` + `transition.from`                                                        | Never (handler captured in `setup()`)    |
 
 ```typescript
 // useRouteNode — updates only when "users.*" changes
@@ -329,8 +329,16 @@ h(
   {
     default: () => [
       // Only UsersPage is kept alive; SettingsPage always remounts
-      h(RouteView.Match, { segment: "users", keepAlive: true }, { default: () => h(UsersPage) }),
-      h(RouteView.Match, { segment: "settings" }, { default: () => h(SettingsPage) }),
+      h(
+        RouteView.Match,
+        { segment: "users", keepAlive: true },
+        { default: () => h(UsersPage) },
+      ),
+      h(
+        RouteView.Match,
+        { segment: "settings" },
+        { default: () => h(SettingsPage) },
+      ),
     ],
   },
 );
@@ -480,10 +488,9 @@ import { vLink } from "@real-router/vue";
 
 const Profile = defineComponent({
   setup: () => () =>
-    withDirectives(
-      h("a", null, "User Profile"),
-      [[vLink, { name: "users.profile", params: { id: "123" } }]],
-    ),
+    withDirectives(h("a", null, "User Profile"), [
+      [vLink, { name: "users.profile", params: { id: "123" } }],
+    ]),
 });
 ```
 
@@ -570,9 +577,7 @@ h(
   RouterProvider,
   { router, announceNavigation: true },
   {
-    default: () => [
-      /* Your app */
-    ],
+    default: () => [/* Your app */],
   },
 );
 ```
@@ -586,6 +591,22 @@ Or in a template:
 ```
 
 When enabled, a visually hidden `aria-live` region announces each navigation. Focus moves to the first `<h1>` on the new page. See [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
+
+`announceNavigation` also accepts a `RouteAnnouncerOptions` object to customize the announced text:
+
+| Option                | Type                | Description                                                                                         |
+| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `prefix`              | `string`            | Prefix prepended to the resolved text (default `"Navigated to "`)                                   |
+| `getAnnouncementText` | `(route) => string` | Full custom text; overrides the default `h1 → title → route-name` chain (falls back on empty/throw) |
+
+```typescript
+h(RouterProvider, {
+  router,
+  announceNavigation: {
+    getAnnouncementText: (route) => `Now on ${route.name}`,
+  },
+});
+```
 
 ## Scroll Restoration
 

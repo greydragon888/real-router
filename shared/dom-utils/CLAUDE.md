@@ -83,7 +83,7 @@ pnpm -F @real-router/svelte test:properties -- --run # property-тесты (ду
 
 - API утилиты — **unstable** в текущем релиз-цикле (минор-изменения возможны).
 - Использование требует осознанной установки до `usePlugin(browserPlugin)` (см. комментарий о listener-ordering в `direction-tracker.ts`).
-- Coverage этого файла обеспечен в `packages/dom-utils/`; angular vitest исключает его из threshold (`vitest.config.mts` exclude list).
+- Coverage этого файла обеспечен в `packages/react/` (react — measuring owner для shared/dom-utils после миграции node→consumer, #1065; white-box в `tests/functional/dom-utils/direction-tracker.test.ts`); angular vitest исключает его из threshold (`vitest.config.mts` exclude list).
 
 Опытные потребители могут импортировать функцию из публичного пути ng-packagr-собранного пакета: `import { createDirectionTracker } from "@real-router/angular/dist/esm2022/dom-utils/direction-tracker"` — но эта точка входа **не покрыта SemVer гарантиями**. После стабилизации API утилита будет реэкспортирована из `src/index.ts` отдельным минорным релизом.
 

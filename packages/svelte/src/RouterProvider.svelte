@@ -13,7 +13,11 @@
   import { createRouteContext } from "./createRouteContext.svelte";
   import { NAVIGATOR_KEY, ROUTE_KEY, ROUTER_KEY } from "./context";
 
-  import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
+  import type {
+    RouteAnnouncerOptions,
+    ScrollRestorationOptions,
+    ScrollSpyOptions,
+  } from "./dom-utils";
   import type { Router } from "@real-router/core";
   import type { Snippet } from "svelte";
 
@@ -27,15 +31,35 @@
   }: {
     router: Router;
     children: Snippet;
-    announceNavigation?: boolean | undefined;
+    announceNavigation?: boolean | RouteAnnouncerOptions | undefined;
     scrollRestoration?: ScrollRestorationOptions | undefined;
     scrollSpy?: ScrollSpyOptions | undefined;
     viewTransitions?: boolean | undefined;
   } = $props();
 
+  // `announceNavigation` accepts `true` (default announcer) or a
+  // `RouteAnnouncerOptions` object (`{ prefix, getAnnouncementText }`) for
+  // custom announcement text. Derive primitives (enabled + prefix) so inline
+  // `{ getAnnouncementText }` identity churn (new object ref, same prefix)
+  // doesn't re-create the announcer — mirrors the scrollRestoration pattern
+  // below. getAnnouncementText is read once via `untrack`, captured by the
+  // utility (same rationale as scrollContainer).
+  const anEnabled = $derived(
+    announceNavigation !== false && announceNavigation !== undefined,
+  );
+  const anPrefix = $derived(
+    typeof announceNavigation === "object"
+      ? announceNavigation.prefix
+      : undefined,
+  );
+
   $effect(() => {
-    if (!announceNavigation) return;
-    const announcer = createRouteAnnouncer(router);
+    if (!anEnabled) return;
+    void anPrefix;
+    const options = untrack(() =>
+      typeof announceNavigation === "object" ? announceNavigation : undefined,
+    );
+    const announcer = createRouteAnnouncer(router, options);
     return () => announcer.destroy();
   });
 
