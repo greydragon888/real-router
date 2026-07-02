@@ -560,6 +560,7 @@ snapshot live even with zero subscribers.
 - **No `announceNavigation`** — `InkRouterProvider` is a thin wrapper that **does not** forward this prop; `createRouteAnnouncer` is unreachable from `/ink`. The DOM announcer uses `document.querySelector`/`requestAnimationFrame` and cannot run in Ink.
 - **`ink` is an optional peer** (`peerDependenciesMeta.ink.optional = true`) — DOM consumers won't be prompted to install it.
 - **Navigation contract:** Tab moves focus across `InkLink`s (Ink's focus ring), Enter triggers `router.navigate(...)`. `ignoreQueryParams` defaults to `true` like DOM `Link`; `activeClassName` is replaced by `activeColor`/`activeInverse`, `onClick` by `onSelect`.
+- **`onSelect` is throw-isolated:** a throwing `onSelect` is caught + logged via `console.error`, then navigation proceeds. An uncaught throw inside `useInput` would otherwise escape into ink's stdin handler as an `uncaughtException` (no browser event-listener safety net) **and** swallow the navigation — mirrors `route-announcer`'s consumer-callback isolation (#799).
 - **Tests:** Ink tests live alongside other functional tests and use `ink-testing-library`. Forces colors via `FORCE_COLOR=3` in `tests/setup.ts` so ANSI assertions on `lastFrame()` work in the non-TTY vitest stdout.
 
 ## SSR
