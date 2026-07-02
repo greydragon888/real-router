@@ -10,6 +10,15 @@
 // it (#863) so the validation layer cannot drift from the matcher's own grammar.
 export { buildParamMeta, PARAM_NAME_PATTERN } from "./buildParamMeta";
 
+// `CONSTRAINT_BODY_PATTERN` + `isConstraintBalanced` are the constraint-`<...>`
+// axis counterpart of `PARAM_NAME_PATTERN` (#804): the one atom every
+// match/strip/build regex derives from, and the one balance predicate route-tree's
+// gate consumes — replacing route-tree's former local `hasBalancedConstraints`.
+export {
+  CONSTRAINT_BODY_PATTERN,
+  isConstraintBalanced,
+} from "./constraint-grammar";
+
 export { SegmentMatcher } from "./SegmentMatcher";
 
 export type {
