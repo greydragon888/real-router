@@ -16,20 +16,20 @@ const config = mergeConfig(
   }),
 );
 
-// #1065 migration (direction-tracker vertical slice): react owns the coverage of
-// shared/dom-utils/direction-tracker.ts. No adapter wires the tracker — it must be
-// installed before `usePlugin(browserPlugin)` (see direction-tracker.ts listener-
-// ordering note + #545), so it cannot be integration-tested; its white-box test
-// lives in this suite (tests/functional/direction-tracker.test.ts). `allowExternal`
-// + the explicit include let react's coverage gate the symlinked shared file.
-// Include is narrowed to react's OWN src: the inherited base `packages/*/src/**`
-// would, under `allowExternal`, also measure core/sources src that react's tests
-// execute (via the internal-source condition) but do not fully cover.
+// #1065 migration (node -> consumer host): react owns the aggregated 100% coverage
+// of the whole shared/dom-utils tree. The white-box unit tests that used to live in
+// the shared test node now live under tests/{functional,property,stress}/dom-utils/;
+// react's coverage gates the symlinked shared files. `allowExternal` admits the
+// external symlink target; the include is narrowed to react's OWN src — the inherited
+// base `packages/*/src/**` would, under `allowExternal`, also measure core/sources
+// src that react's tests execute (via the internal-source condition) but do not fully
+// cover. The literal `**/shared/dom-utils/**` form is grepped by
+// scripts/check-coverage-scope.mjs to identify react as the dom-utils owner.
 config.test.coverage.allowExternal = true;
 config.test.coverage.include = [
   "packages/react/src/**/*.ts",
   "packages/react/src/**/*.tsx",
-  "**/shared/dom-utils/direction-tracker.ts",
+  "**/shared/dom-utils/**/*.ts",
 ];
 
 export default config;

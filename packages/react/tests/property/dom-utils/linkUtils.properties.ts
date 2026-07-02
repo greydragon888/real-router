@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
@@ -14,7 +16,7 @@ import {
   buildHref,
   buildActiveClassName,
   applyLinkA11y,
-} from "../../../dom-utils";
+} from "../../../src/dom-utils";
 
 import type { Router } from "@real-router/core";
 

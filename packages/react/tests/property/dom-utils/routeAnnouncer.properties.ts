@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, beforeAll, afterAll, vi } from "vitest";
 
@@ -8,7 +10,7 @@ import {
   arbInstanceCount,
   createMockRouter,
 } from "./helpers";
-import { createRouteAnnouncer } from "../../../dom-utils";
+import { createRouteAnnouncer } from "../../../src/dom-utils";
 
 const ANNOUNCER_ATTR = "[data-real-router-announcer]";
 

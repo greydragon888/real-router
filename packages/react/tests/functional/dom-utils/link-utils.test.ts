@@ -7,7 +7,7 @@ import {
   buildActiveClassName,
   shallowEqual,
   applyLinkA11y,
-} from "../../../dom-utils";
+} from "../../../src/dom-utils";
 
 import type { Router, State } from "@real-router/core";
 

@@ -3,9 +3,9 @@ import { getPluginApi } from "@real-router/core/api";
 import { getTransitionSource } from "@real-router/sources";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createScrollSpy } from "../../../dom-utils";
+import { createScrollSpy } from "../../../src/dom-utils";
 
-import type { ScrollSpy } from "../../../dom-utils";
+import type { ScrollSpy } from "../../../src/dom-utils";
 import type { Plugin, PluginFactory, Router } from "@real-router/core";
 
 interface FakeIntersectionObserver {
@@ -513,11 +513,15 @@ describe("createScrollSpy", () => {
       const router = await createTestRouter();
 
       // Initialize URL context with a matching hash via a prior emit.
-      await router.navigate("docs", {}, {
-        hash: "section-1",
-        force: true,
-        hashChange: true,
-      } as never);
+      await router.navigate(
+        "docs",
+        {},
+        {
+          hash: "section-1",
+          force: true,
+          hashChange: true,
+        },
+      );
 
       const navigateSpy = vi.spyOn(router, "navigate");
       const [s1] = setupAnchors(["section-1"]);
@@ -601,11 +605,15 @@ describe("createScrollSpy", () => {
 
       // Simulate a user-driven Link click that updates the hash via the URL
       // plugin. The spy's subscribe callback should set coolingDown=true.
-      await router.navigate("docs", {}, {
-        hash: "section-2",
-        force: true,
-        hashChange: true,
-      } as never);
+      await router.navigate(
+        "docs",
+        {},
+        {
+          hash: "section-2",
+          force: true,
+          hashChange: true,
+        },
+      );
 
       const navigateSpy = vi.spyOn(router, "navigate");
 
@@ -624,11 +632,15 @@ describe("createScrollSpy", () => {
 
       track(createScrollSpy(router, { selector: "[id]" }));
 
-      await router.navigate("docs", {}, {
-        hash: "section-2",
-        force: true,
-        hashChange: true,
-      } as never);
+      await router.navigate(
+        "docs",
+        {},
+        {
+          hash: "section-2",
+          force: true,
+          hashChange: true,
+        },
+      );
 
       const navigateSpy = vi.spyOn(router, "navigate");
 

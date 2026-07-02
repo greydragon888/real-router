@@ -31,7 +31,7 @@ import {
   createScrollRestoration,
   createScrollSpy,
   createViewTransitions,
-} from "../../../dom-utils";
+} from "../../../src/dom-utils";
 
 import type { PluginFactory, Router } from "@real-router/core";
 

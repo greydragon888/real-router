@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 // packages/dom-utils/tests/property/lifecycle.properties.ts
 
 /**
@@ -54,7 +56,7 @@ import {
   createScrollRestoration,
   createScrollSpy,
   createViewTransitions,
-} from "../../../dom-utils";
+} from "../../../src/dom-utils";
 
 import type { Router, State } from "@real-router/core";
 

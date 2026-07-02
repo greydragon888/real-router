@@ -1,9 +1,9 @@
 import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createRouteAnnouncer } from "../../../dom-utils";
+import { createRouteAnnouncer } from "../../../src/dom-utils";
 
-import type { RouteAnnouncerOptions } from "../../../dom-utils";
+import type { RouteAnnouncerOptions } from "../../../src/dom-utils";
 import type { Router } from "@real-router/core";
 
 const ROUTES = [

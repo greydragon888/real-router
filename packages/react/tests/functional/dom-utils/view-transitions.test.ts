@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createViewTransitions } from "../../../dom-utils";
+import { createViewTransitions } from "../../../src/dom-utils";
 
 import type { Router, State } from "@real-router/core";
 

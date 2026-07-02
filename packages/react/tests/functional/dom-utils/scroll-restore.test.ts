@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createScrollRestoration } from "../../../dom-utils";
+import { createScrollRestoration } from "../../../src/dom-utils";
 
 import type { Router, State } from "@real-router/core";
 
