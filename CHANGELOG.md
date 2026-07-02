@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/search-schema-plugin@0.4.4
+
+### Patch Changes
+
+- [#1120](https://github.com/greydragon888/real-router/pull/1120) [`d94ee79`](https://github.com/greydragon888/real-router/commit/d94ee79f3ef8de43f4ceadbe3b7d2e85191644b5) Thanks [@greydragon888](https://github.com/greydragon888)! - Document the `defaultParams` runtime contract and sharpen the dev warning ([#802](https://github.com/greydragon888/real-router/issues/802))
+
+  The plugin's runtime guarantee ("invalid params never reach `state`") is scoped to
+  user **input**. `defaultParams` are trusted developer config injected by the router
+  core _below_ the interceptor seam the plugin hooks, so a `defaultParams` value that
+  violates its own `searchSchema` still reaches `state` and the URL at runtime — in every
+  `mode`, including `production`. This is now documented as a contract in the README and
+  wiki, and the dev-time warning states the consequence (the value still reaches state)
+  plus the fix (make `defaultParams` satisfy `searchSchema`). No behavior change.
+
+
 ### @real-router/lifecycle-plugin@0.6.4
 
 ### Patch Changes
