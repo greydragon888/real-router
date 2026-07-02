@@ -125,8 +125,8 @@ importers:
         specifier: 10.1.8
         version: 10.1.8(eslint@10.6.0(jiti@2.7.0))
       eslint-config-turbo:
-        specifier: 2.10.1
-        version: 2.10.1(eslint@10.6.0(jiti@2.7.0))(turbo@2.10.2)
+        specifier: 2.10.2
+        version: 2.10.2(eslint@10.6.0(jiti@2.7.0))(turbo@2.10.2)
       eslint-import-resolver-typescript:
         specifier: 4.4.5
         version: 4.4.5(eslint-plugin-import-x@4.17.0(@typescript-eslint/utils@8.62.0(eslint@10.6.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.6.0(jiti@2.7.0)))(eslint@10.6.0(jiti@2.7.0))
@@ -266,14 +266,14 @@ importers:
         specifier: 0.16.1
         version: 0.16.1(solid-js@1.9.13)
       '@tanstack/react-router':
-        specifier: 1.170.15
-        version: 1.170.15(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: 1.170.17
+        version: 1.170.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/solid-router':
         specifier: 1.170.17
         version: 1.170.17(solid-js@1.9.13)
       '@tanstack/vue-router':
-        specifier: 1.170.15
-        version: 1.170.15(vue@3.5.38(typescript@6.0.3))
+        specifier: 1.170.16
+        version: 1.170.16(vue@3.5.38(typescript@6.0.3))
       mitata:
         specifier: 1.0.34
         version: 1.0.34
@@ -9378,8 +9378,8 @@ packages:
     resolution: {integrity: sha512-79pf/RkhteYZTRgcR4F9kbk84P2N8rugQJswxfIqovlbRiT3yI7eBE+5QorIrZaOKktsgzRlXh1l/du/xpl4iA==}
     engines: {node: '>=20.19'}
 
-  '@tanstack/react-router@1.170.15':
-    resolution: {integrity: sha512-GawYz7HEjj8rTUUDoT/SemDEVm63pZUO+2mOcXHY9Jl3EwMS5gFBnPu/2UvcrwRm1jN1k79fokc0d4aFmrLatg==}
+  '@tanstack/react-router@1.170.17':
+    resolution: {integrity: sha512-ppLkjCfSMaeug9rmFRYzOd4TIqWV+yTE7tzIny7alJsSnM7w4lzEZm6eqCehG0SPetpZ0R3K+UnanSmBgOAVcQ==}
     engines: {node: '>=20.19'}
     peerDependencies:
       react: '>=18.0.0 || >=19.0.0'
@@ -9408,8 +9408,8 @@ packages:
   '@tanstack/store@0.9.3':
     resolution: {integrity: sha512-8reSzl/qGWGGVKhBoxXPMWzATSbZLZFWhwBAFO9NAyp0TxzfBP0mIrGb8CP8KrQTmvzXlR/vFPPUrHTLBGyFyw==}
 
-  '@tanstack/vue-router@1.170.15':
-    resolution: {integrity: sha512-+V/zoRXx8s6Do/wGw15tIrobMQZeQKWtyIAbfHBsliu5Jeg9OpxyPs0xiJwwemLf995FSnee/i2DmZzfW4RSpA==}
+  '@tanstack/vue-router@1.170.16':
+    resolution: {integrity: sha512-XEvPTNueSMP87c6lgcwO0btohH3nkad3P+WxtJ3BYV3OLcfLc0DpA4psw7yP82MElkMLliyotXBqFj52GjvktA==}
     engines: {node: '>=20.19'}
     peerDependencies:
       vue: ^3.3.0
@@ -11137,8 +11137,8 @@ packages:
     peerDependencies:
       eslint: '>=7.0.0'
 
-  eslint-config-turbo@2.10.1:
-    resolution: {integrity: sha512-6pvDvMKXUIvEaPfPLo9M38JIzrQi8g9LV0oL0l6KfstOihzRU9Mz7noPteWmmsUTNr+uxwDfqo/4b7KXsEcqjQ==}
+  eslint-config-turbo@2.10.2:
+    resolution: {integrity: sha512-xEUibnZdtFiGcHBbxhSZrvnaXSQfiYQOF556i3tYt6zKlixevzxl9T2J9Ske+4G292wlUQGxvyYi5vjfWiAn0Q==}
     peerDependencies:
       eslint: '>6.6.0'
       turbo: '>2.0.0'
@@ -11269,8 +11269,8 @@ packages:
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
 
-  eslint-plugin-turbo@2.10.1:
-    resolution: {integrity: sha512-GpuWF6OMoK7cTyZzreB78dmjcXXk7nFrYDQp1pQV2yqEi2jIQiN6YBHekF/gRHfyFqEaZ+sYwjzH15oFKU7iIw==}
+  eslint-plugin-turbo@2.10.2:
+    resolution: {integrity: sha512-ERkDlzfk4AMZv3lijeuDSQrYRArUXvOVYex96EN0c2jLUPtkQkucSzwRVgnwQKC4yj0PoWpCk5iork2bFQ2WPQ==}
     peerDependencies:
       eslint: '>6.6.0'
       turbo: '>2.0.0'
@@ -17491,11 +17491,11 @@ snapshots:
 
   '@tanstack/history@1.162.0': {}
 
-  '@tanstack/react-router@1.170.15(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@tanstack/react-router@1.170.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@tanstack/history': 1.162.0
       '@tanstack/react-store': 0.9.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/router-core': 1.171.13
+      '@tanstack/router-core': 1.171.14
       isbot: 5.1.44
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
@@ -17532,10 +17532,10 @@ snapshots:
 
   '@tanstack/store@0.9.3': {}
 
-  '@tanstack/vue-router@1.170.15(vue@3.5.38(typescript@6.0.3))':
+  '@tanstack/vue-router@1.170.16(vue@3.5.38(typescript@6.0.3))':
     dependencies:
       '@tanstack/history': 1.162.0
-      '@tanstack/router-core': 1.171.13
+      '@tanstack/router-core': 1.171.14
       '@tanstack/vue-store': 0.9.3(vue@3.5.38(typescript@6.0.3))
       '@vue/runtime-dom': 3.5.38
       isbot: 5.1.44
@@ -19414,10 +19414,10 @@ snapshots:
     dependencies:
       eslint: 10.6.0(jiti@2.7.0)
 
-  eslint-config-turbo@2.10.1(eslint@10.6.0(jiti@2.7.0))(turbo@2.10.2):
+  eslint-config-turbo@2.10.2(eslint@10.6.0(jiti@2.7.0))(turbo@2.10.2):
     dependencies:
       eslint: 10.6.0(jiti@2.7.0)
-      eslint-plugin-turbo: 2.10.1(eslint@10.6.0(jiti@2.7.0))(turbo@2.10.2)
+      eslint-plugin-turbo: 2.10.2(eslint@10.6.0(jiti@2.7.0))(turbo@2.10.2)
       turbo: 2.10.2
 
   eslint-import-context@0.1.9(unrs-resolver@1.12.2):
@@ -19632,7 +19632,7 @@ snapshots:
       - supports-color
       - typescript
 
-  eslint-plugin-turbo@2.10.1(eslint@10.6.0(jiti@2.7.0))(turbo@2.10.2):
+  eslint-plugin-turbo@2.10.2(eslint@10.6.0(jiti@2.7.0))(turbo@2.10.2):
     dependencies:
       dotenv: 16.0.3
       eslint: 10.6.0(jiti@2.7.0)
