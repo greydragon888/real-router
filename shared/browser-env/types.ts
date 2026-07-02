@@ -7,8 +7,10 @@ export interface HistoryBrowser {
    * that the plugin did NOT drive itself — native anchors (`<a href="#/x">`),
    * manual address-bar hash edits, and `location.hash = ...` from app code.
    * `pushState`/`replaceState` (the plugin's own writes) never fire it, so it
-   * is a clean external-change channel. Used only by hash-plugin, where `#`
-   * carries the route (browser-plugin leaves it unused). (#759)
+   * is a clean external-change channel. Used by hash-plugin (`#` carries the
+   * route) and by browser-plugin to keep its cached fragment fresh without a
+   * per-navigation `location.hash` read (#532 forces a sync pushState commit).
+   * (#759, #1019)
    */
   addHashChangeListener: (fn: (evt: HashChangeEvent) => void) => () => void;
   getHash: () => string;
@@ -34,4 +36,9 @@ export interface Browser extends HistoryBrowser {
  */
 export interface SharedFactoryState {
   removePopStateListener: (() => void) | undefined;
+  /**
+   * Remover for the `hashchange` listener (see `addHashChangeListener`).
+   * Same factory-pool last-wins semantics as `removePopStateListener`.
+   */
+  removeHashChangeListener?: (() => void) | undefined;
 }

@@ -67,7 +67,10 @@ export function browserPluginFactory(
     replace: true as const,
   };
 
-  const shared: SharedFactoryState = { removePopStateListener: undefined };
+  const shared: SharedFactoryState = {
+    removePopStateListener: undefined,
+    removeHashChangeListener: undefined,
+  };
 
   return function browserPlugin(routerBase) {
     return createBrowserPlugin(
@@ -128,6 +131,18 @@ function createBrowserPlugin(
   const updateState = createUpdateBrowserState();
   const removeStartInterceptor = createStartInterceptor(api, browser);
 
+  // Cache the current URL fragment instead of reading location.hash on every
+  // navigation (#532). A per-nav `location.*` read forces the browser to commit
+  // the pending pushState synchronously (~0.04 ms/nav — see
+  // benchmarks/cross-router/VUE_NAV_DECOMPOSITION.md). The cache stays fresh via
+  // (a) the plugin's own navigations (set in onTransitionSuccess) and (b) a
+  // hashchange listener for *external* fragment changes (anchor clicks,
+  // `location.hash = …`) — exactly what the per-nav read used to detect.
+  let currentHash = "";
+  const syncHashFromBrowser = (): void => {
+    currentHash = getDecodedHash(browser);
+  };
+
   const pluginBuildUrl = createPluginBuildUrl(router, options.base);
 
   const removeExtensions = api.extendRouter({
@@ -171,7 +186,27 @@ function createBrowserPlugin(
   });
 
   return {
-    ...lifecycle,
+    onStart: () => {
+      lifecycle.onStart?.();
+      // Read location.hash once per (re)start — not per navigation — so the
+      // cache is fresh after stop/re-start, then track external changes.
+      syncHashFromBrowser();
+      shared.removeHashChangeListener?.();
+      shared.removeHashChangeListener =
+        browser.addHashChangeListener(syncHashFromBrowser);
+    },
+
+    onStop: () => {
+      lifecycle.onStop?.();
+      shared.removeHashChangeListener?.();
+      shared.removeHashChangeListener = undefined;
+    },
+
+    teardown: () => {
+      shared.removeHashChangeListener?.();
+      shared.removeHashChangeListener = undefined;
+      lifecycle.teardown?.();
+    },
 
     onTransitionSuccess: (
       toState: State,
@@ -185,16 +220,17 @@ function createBrowserPlugin(
       );
 
       // Tri-state hash resolution (#532).
-      //   navOptions.hash === undefined → preserve current browser hash
+      //   navOptions.hash === undefined → preserve current fragment
       //   navOptions.hash === ""        → explicitly clear
       //   navOptions.hash === "value"   → explicitly set
       //
-      // The "preserve" branch reads location.hash from the browser, not
-      // fromState.context.url.hash — captures dynamic fragment changes
-      // (anchor clicks, manual location.hash assignment) made outside the
-      // plugin. hashChanged compares the chosen hash against the published
-      // previous hash so subscribers see a true signal.
-      const browserHash = getDecodedHash(browser);
+      // The "preserve" branch uses the cached `currentHash` (kept fresh by the
+      // hashchange listener) instead of reading location.hash here — a per-nav
+      // location.* read forces a synchronous pushState commit. The cache still
+      // captures external fragment changes (anchor clicks, manual location.hash)
+      // via hashchange. hashChanged compares the chosen hash against the
+      // published previous hash so subscribers see a true signal.
+      const browserHash = currentHash;
       const publishedPrevHash =
         (fromState?.context as { url?: { hash?: string } } | undefined)?.url
           ?.hash ?? "";
@@ -203,6 +239,11 @@ function createBrowserPlugin(
         navOptions.hash === undefined
           ? browserHash
           : normalizeHashInput(navOptions.hash);
+
+      // Keep the cache in sync with the fragment we are about to commit —
+      // pushState/replaceState do not fire hashchange, so the listener never
+      // observes the plugin's own navigations.
+      currentHash = hash;
 
       urlClaim.write(
         toState,
