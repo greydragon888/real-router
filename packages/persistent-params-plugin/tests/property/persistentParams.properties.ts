@@ -1,4 +1,5 @@
 import { test } from "@fast-check/vitest";
+import { getLifecycleApi } from "@real-router/core/api";
 import { describe, expect } from "vitest";
 
 import {
@@ -286,6 +287,33 @@ describe("removal: passing undefined permanently removes a param from persistenc
       await router.navigate("routeA", { id: idD });
 
       expect(router.getState()?.params).not.toHaveProperty(paramName);
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbParamName, arbParamValue], { numRuns: NUM_RUNS.async })(
+    "a removal rejected by a guard does not drop the param (#803)",
+    async (paramName, paramValue) => {
+      const router = await createStartedRouter([paramName]);
+
+      const idA = nextId();
+      const idB = nextId();
+      const idC = nextId();
+
+      // persist the param
+      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+
+      // block routeB so the removal navigation is rejected by the guard
+      getLifecycleApi(router).addActivateGuard("routeB", () => () => false);
+      await router
+        .navigate("routeB", { id: idB, [paramName]: undefined })
+        .catch(() => {});
+
+      // the rejected removal never committed — the param must still persist
+      await router.navigate("routeC", { id: idC });
+
+      expect(router.getState()?.params[paramName]).toBe(paramValue);
 
       router.stop();
     },
