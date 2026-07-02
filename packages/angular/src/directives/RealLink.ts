@@ -7,11 +7,10 @@ import {
   input,
   signal,
 } from "@angular/core";
-import { createActiveRouteSource } from "@real-router/sources";
 
 import { buildHref, navigateWithHash, shouldNavigate } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
-import { buildActiveRouteOptions } from "../internal/buildActiveRouteOptions";
+import { createActiveSource } from "../internal/createActiveSource";
 import { createStableParams } from "../internal/createStableParams";
 import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
@@ -90,15 +89,15 @@ export class RealLink {
     // source whenever any input changes; `onCleanup` tears the previous
     // subscription down.
     effect((onCleanup) => {
-      const source = createActiveRouteSource(
+      // Fast path (#1103) for default-options links — shared name selector
+      // instead of a per-link source; see `createActiveSource`.
+      const source = createActiveSource(
         this.router,
         this.routeName(),
         this.stableParams(),
-        buildActiveRouteOptions(
-          this.activeStrict(),
-          this.ignoreQueryParams(),
-          this.hash(),
-        ),
+        this.activeStrict(),
+        this.ignoreQueryParams(),
+        this.hash(),
       );
 
       onCleanup(
