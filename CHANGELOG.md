@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/lifecycle-plugin@0.6.4
+
+### Patch Changes
+
+- [#1118](https://github.com/greydragon888/real-router/pull/1118) [`8953cd7`](https://github.com/greydragon888/real-router/commit/8953cd7fd476fe3f8c527ad201904c1ea3d7bd91) Thanks [@greydragon888](https://github.com/greydragon888)! - Isolate lifecycle hook exceptions so a throwing `onEnter`/`onStay` no longer swallows `onNavigate` of the same transition ([#798](https://github.com/greydragon888/real-router/issues/798))
+
+  Each lifecycle hook is now invoked with per-hook exception isolation. Previously a throwing `onEnter`/`onStay` aborted the plugin's `onTransitionSuccess` handler before `onNavigate` ran, silently breaking the documented `onNavigate` orthogonality invariant ("if both are defined, both fire"). The navigation itself always survived (core isolates the plugin handler), but `onNavigate` of that transition was swallowed.
+
+  Hook errors are now re-thrown asynchronously via `queueMicrotask` — mirroring `BaseSource`/`createActiveNameSelector` in `@real-router/sources` — so the developer signal still surfaces to global error handlers while every other hook of the transition still runs. Note the observable change: a throwing hook now surfaces as an asynchronous uncaught error rather than synchronously through the router's event-emitter "Error in listener" sink.
+
+
 ### @real-router/react@0.28.1
 
 ### Patch Changes
