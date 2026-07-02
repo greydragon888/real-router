@@ -35,6 +35,18 @@ benchmarks/
 │   ├── run.mjs                    # runner: <scenario> <engine> <framework> <mode>
 │   ├── tsconfig.json · tsconfig.solid.json (solid aggregate) · vitest.config.ts
 │   └── .bench-results/            # Text logs from bench-compare-vs-tanstack.sh (gitignored)
+├── cross-router/                  # REAL browser (Playwright + CDP): ALL competitors, per-cohort (no cross-framework rank)
+│   ├── apps/<framework>/<engine>/ # per-cohort shells (engine-agnostic, only routing differs): base + {wide,deep,nested,links,params,tableheap,linkbuild} variants + feature demos {data,search,guard}
+│   │   #  react cohort: real-router · react-router (v8 Data mode) · tanstack — wouter EXCLUDED (minimalist, different class; REPORT.md Scope) · _baseline = bare React floor
+│   │   #  preact cohort REMOVED (2026-06-29) — no full-router competitor (preact-iso = minimalist/recommended, preact-router = deprecated); no honest competitive perf comparison. apps/preact/ deleted (git-recoverable); @real-router/preact adapter still ships + is tested
+│   │   #  vue cohort: real-router · vue-router@4 (Vue 3 official; v5 pulls pinia — excluded) · @tanstack/vue-router — three FULL routers, like-for-like (REPORT-vue.md); Vue JSX apps (@vitejs/plugin-vue-jsx, all dedupe ['vue']) · _baseline = bare Vue floor
+│   ├── scenarios/*.mjs            # 8 engine-agnostic drivers: cold-start · nav-latency · param-nav · wide-config ·
+│   │   #  deep-config · nav-churn · active-links · nested-switch  (sweeps emit per-size @N/@D keys)
+│   ├── harness/                   # cdp.mjs (CDPSession: Performance.getMetrics + HeapProfiler) · stats.mjs (median/p95/RME) · measure.mjs · report.mjs
+│   ├── run.mjs · run-all.mjs      # one run / full matrix → results/<fw>/<scenario>/<engine>.json; VARIANT map routes big-table scenarios to <engine>/<variant>/
+│   ├── results/ (gitignored) · REPORT.md (react) + REPORT-vue.md (committed, curated)
+│   └── tsconfig.json (react-jsx; excludes apps/vue) · apps/vue/tsconfig.json (jsx preserve + jsxImportSource vue) · .gitignore
+│      #  type-check (ungated, manual/IDE): tsc -p cross-router/tsconfig.json (react) · -p cross-router/apps/vue/tsconfig.json (vue)
 ├── bench-compare.sh               # Core comparison script (sudo, thermal monitoring)
 ├── bench-compare-vs-tanstack.sh   # TanStack comparison script (sudo, thermal monitoring)
 ├── compare.mjs                    # Analyze and compare core/.bench/ results
@@ -101,6 +113,24 @@ pnpm bench:vs-tanstack -- client-nav real-router react memory
 # Full comparison (requires sudo)
 sudo ./bench-compare-vs-tanstack.sh
 ```
+
+### Cross-router (real browser, all competitors)
+
+`node cross-router/run.mjs <scenario> <engine> [framework=react] [runs=30]` — engine ∈ `real-router`|`tanstack`|`react-router` (react) · `real-router`|`vue-router`|`tanstack` (vue); scenario ∈ `cold-start`|`nav-latency`|`param-nav`|`wide-config`|`deep-config`|`param-scaling`|`table-heap`|`link-build`|`nav-churn`|`active-links`|`nested-switch` (11). Big-table scenarios resolve to `apps/<fw>/<engine>/<variant>/` via the `VARIANT` map (`wide-config`→`wide`, `deep-config`→`deep`, `param-scaling`→`params`, `table-heap`→`tableheap`, `link-build`→`linkbuild`, `nested-switch`→`nested`, `active-links`→`links`); base scenarios use `apps/<fw>/<engine>/`. `_baseline` (bare React, no router) is a reference engine run for cold-start/nav-latency/link-build → REPORT.md "Router overhead over bare React".
+
+```bash
+pnpm bench:cross-router -- nav-latency real-router react 30   # one (scenario × engine)
+node cross-router/run-all.mjs 15                              # FULL matrix — both cohorts (react+vue, per-cohort engines) → results/
+node cross-router/run-all.mjs 15 vue                          # one cohort (react|vue) with its own engine roster
+node cross-router/harness/verify-features.mjs                 # functional capability demos → results/features.json
+node cross-router/harness/report.mjs [react|vue]             # results/<fw>/ → REPORT.md (react) / REPORT-vue.md — perf tables + capability matrix
+node cross-router/harness/status-tables.mjs [react|vue]       # committed REPORT*.md → flat status view: `сценарий | metric | engines | rr status` (🟡 parity <10%, else 🟢/🔴 delta from winner or, if rr first, nearest competitor). Reads the committed REPORTs (no results/ needed); `> view.md` to snapshot
+node cross-router/harness/rme-gate.mjs [stable=15] [noisy=40] [cohort] # RME-gate: scans results/ and exits non-zero (1) if any metric's RME exceeds its family threshold — `stable` for reliable signals (total/script/heap/throughput), looser `noisy` for inherently-jittery blink/latency/fcp. Cross-router analogue of check-rme.sh; run AFTER run-all (exit 2 = no results). Env: RME_STABLE/RME_NOISY
+```
+
+Capability matrix (`✓ⁱ` = verified in-harness via a functional demo app under `apps/react/<engine>/{data,search,guard}/`) shows feature gaps a perf table can't — among the full routers, `react-router` lacks first-class validated search. `wouter` is excluded from the roster (minimalist location-matcher, different class + no cross-framework analog — see REPORT.md **Scope**). Per-cohort, never cross-framework.
+
+**Per-cohort only — no cross-framework ranking** (a cross-framework number is mostly a framework comparison). CPU (`script`) + heap are the stable signals; latency is paint-noisy; `nav-churn.navsPerSec` is frame-capped (read CPU/nav + heap). Driven via the `playwright` package (programmatic Chromium + `CDPSession`), not `@playwright/test`. Results: `cross-router/REPORT.md`; design: [`.claude/cross-router-benchmarks-design.md`](../.claude/cross-router-benchmarks-design.md).
 
 ### Utilities
 

@@ -207,6 +207,21 @@ Same workload, same framework render — the delta is router work. On React/Soli
 
 Measured 2026-06-27 (Apple M3 Pro, jsdom). Speed: `vitest bench` (warmup 100, 10 s). Memory: 5 rounds × N navigations with double `forceGC`.
 
+## Cross-Router — real browser, all competitors
+
+A separate layer from the jsdom `vs-tanstack` benches above: **real Chromium via Playwright + CDP**, comparing **every competitor in a cohort** (not just TanStack), with metrics read straight from the DevTools Protocol (`Performance.getMetrics`, `HeapProfiler.collectGarbage`). React cohort (full routers): `@real-router/react` · `react-router@8` (Data mode) · `@tanstack/react-router`. (`wouter` is excluded — a minimalist location-matcher in a different class, with no cross-framework analog; see [`REPORT.md`](cross-router/REPORT.md) **Scope**.)
+
+**Per-cohort only — routers are compared within one framework; we do NOT rank across frameworks** (a cross-framework number is mostly a framework comparison, not a router one). The same engine-agnostic Playwright drivers (interacting by `data-testid`) run against every engine — only the routing layer differs, which is what keeps it fair and the harness small (N drivers + M apps, not N×M scripts).
+
+8 scenarios: `cold-start` · `nav-latency` · `param-nav` · `wide-config` (matcher breadth sweep N∈{10,100,1000}) · `deep-config` (nesting depth sweep D∈{3,10,20}) · `nav-churn` (stress: CPU/nav + retained heap) · `active-links` (100 active-aware links) · `nested-switch` (sibling reuse).
+
+```bash
+node cross-router/run-all.mjs 15            # full matrix → results/
+node cross-router/harness/report.mjs        # → cross-router/REPORT.md
+```
+
+**Headline (measured, 15 runs):** `wide-config` shows real-router's matcher scaling **flat — `script@1000 ≈ script@10` (O(1) segment trie)** — and tanstack flat too, while **react-router rises ~2×** with route count (linear scan). real-router leads `nav-latency` and `active-links` (cached active-source) and is competitive across the board; **tanstack** is flat on the matcher but heaviest on cold-start/heap; **react-router** is generally heaviest on navigation. **`table-heap` is the one scenario real-router *loses*** — its precomputed trie costs ~1.85× react-router's memory at 10k routes (the RAM price of O(1) match — an honest space-for-time trade); **`link-build`** (mount 1000 `<Link>`) real-router wins (trie reverse-build); and a **`_baseline`** (bare React, no router) shows real-router adds the least over the floor per navigation (the lightest router pipeline, well under react-router's). CPU (`script`) + heap are the **only** reported signals (all RME < 5%); **felt latency was dropped** (RME 9–44%, dominated by React render + display-frame cadence, not router work — see REPORT.md *Why no latency*), and `nav-churn` throughput is frame-capped. **Full measured tables + caveats: [`cross-router/REPORT.md`](cross-router/REPORT.md).** Design: [`.claude/cross-router-benchmarks-design.md`](../.claude/cross-router-benchmarks-design.md).
+
 ## Bundle Size — vs TanStack Router
 
 Competitive client-JS size: `@real-router/*` vs `@tanstack/*-router`, across React / Vue / Solid in `minimal` and `full` app fixtures (built as full client apps via Vite — production, esbuild-minified, es2022).

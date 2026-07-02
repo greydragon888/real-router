@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "tsBuildInfoFile": "./.tsbuildinfo",
+    "incremental": false
+  },
+  "include": ["apps/**/*.ts", "apps/**/*.tsx"],
+  "exclude": ["apps/vue/**"]
+}
