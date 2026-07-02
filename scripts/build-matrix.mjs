@@ -12,7 +12,8 @@
 //
 // Wired into `.github/workflows/ci.yml`: the `check` job runs
 //   node scripts/build-matrix.mjs >> "$GITHUB_OUTPUT"
-// and the leaf / base / sharded jobs branch on `mode` + consume `matrix`.
+// and the leaf / base / sharded jobs branch on `mode` + consume `matrix` /
+// `leaf_filter` (the explicit leaf execution filter — see buildPlan).
 //
 // Design doc: .claude/ci-acceleration-poc-ru.md (§3-A) + companion empirical
 // measurements .claude/ci-acceleration-empirical-2026-06-20.md (A/B/C/D).
@@ -244,11 +245,22 @@ export function groupAffected(affected, dirOf, readers = defaultReaders) {
  * non-empty groups become one shard each. `base` is handled by a separate job,
  * so it is never in `include`. Empty groups are omitted → GHA spawns no runner.
  *
+ * `leafFilter` (leaf only, else "") is the explicit `--filter=<pkg>` set the
+ * pipeline-leaf job runs INSTEAD of `--filter='...[origin/master]'`. The git-ref
+ * filter treats a root-file change (pnpm-lock.yaml, root tsconfig) as touching
+ * EVERY workspace, so a Dependabot lockfile bump — routed here as a 1-package
+ * leaf — would still execute the whole-repo graph; with Remote Cache off in the
+ * Dependabot context (repo secrets are withheld) that graph runs COLD (~8m vs
+ * ~2m). `query affected --packages` (this set) attributes the root lockfile to
+ * the actually-affected package, so leaf EXECUTION scope matches the ROUTING
+ * decision. Empty only on a root-config PR touching zero packages; pipeline-leaf
+ * falls back to the git-ref filter there (which yields zero tasks on such a PR).
+ *
  * @param {string[]} affected routing set (query-affected, packages/* only)
  * @param {Map<string,string>} dirOf name→directory (routing + membership merged)
  * @param {string[]} [membership] input-aware shard-membership set (default: affected)
  * @param {typeof defaultReaders} [readers] injectable fs accessors
- * @returns {{ mode: 'leaf'|'sharded', matrix: { include: Array<{name:string,filter:string}> } }}
+ * @returns {{ mode: 'leaf'|'sharded', matrix: { include: Array<{name:string,filter:string}> }, leafFilter: string }}
  */
 export function buildPlan(
   affected,
@@ -289,7 +301,15 @@ export function buildPlan(
     !touchesAdapterShared &&
     !touchesSharedSources
   ) {
-    return { mode: "leaf", matrix: { include: [] } };
+    // Explicit per-package filter from the routing set, so leaf EXECUTION scope
+    // equals the ROUTING decision (see the leafFilter note above): a root
+    // pnpm-lock.yaml bump stays scoped to its real package instead of the
+    // whole-repo balloon `--filter='...[origin/master]'` produces.
+    return {
+      mode: "leaf",
+      matrix: { include: [] },
+      leafFilter: affected.map((p) => `--filter=${p}`).join(" "),
+    };
   }
 
   // Shards come from `membership` (input-aware) — this is where shared-source
@@ -324,7 +344,8 @@ export function buildPlan(
     );
   }
 
-  return { mode: "sharded", matrix: { include } };
+  // leafFilter is leaf-only; sharded scopes each shard via its matrix filter.
+  return { mode: "sharded", matrix: { include }, leafFilter: "" };
 }
 
 /** Run the native turbo affected query (separated so tests never spawn turbo). */
@@ -365,9 +386,14 @@ export function main() {
   // is applied last so the `shared-sources` workspace entry (which membership
   // drops but touchesSharedSources keys on) is retained.
   const mergedDirOf = new Map([...memberDirOf, ...dirOf]);
-  const { mode, matrix } = buildPlan(affected, mergedDirOf, members);
+  const { mode, matrix, leafFilter } = buildPlan(
+    affected,
+    mergedDirOf,
+    members,
+  );
   process.stdout.write(`mode=${mode}\n`);
   process.stdout.write(`matrix=${JSON.stringify(matrix)}\n`);
+  process.stdout.write(`leaf_filter=${leafFilter}\n`);
 }
 
 // Run main() only when invoked directly (`node scripts/build-matrix.mjs`),

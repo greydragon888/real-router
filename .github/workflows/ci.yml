@@ -34,6 +34,7 @@ jobs:
       turbo_base: ${{ steps.turbo.outputs.base }}
       mode: ${{ steps.plan.outputs.mode }} # 'leaf' | 'sharded'; empty for docs/CI-only PRs
       matrix: ${{ steps.plan.outputs.matrix }} # always-valid JSON; {"include":[]} for leaf
+      leaf_filter: ${{ steps.plan.outputs.leaf_filter }} # explicit --filter set for pipeline-leaf; empty on a zero-package leaf
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -162,6 +163,23 @@ jobs:
             exit 1
           fi
 
+      # Leaf EXECUTION scope = the ROUTING decision. build-matrix.mjs emits
+      # leaf_filter as explicit `--filter=<pkg>` tokens from `turbo query affected
+      # --packages`, which attributes a ROOT-file change (pnpm-lock.yaml, root
+      # tsconfig) to its real package. The git-ref filter `--filter='...[ref]'`
+      # instead treats ANY root-file change as touching every workspace, so a
+      # Dependabot lockfile bump — routed here as a 1-package leaf — used to
+      # execute the whole-repo graph; with Remote Cache off in the Dependabot
+      # context (repo secrets withheld) that ran COLD (~8m vs ~2m). Fall back to
+      # the git-ref filter only when leaf_filter is empty (a root-config PR
+      # touching zero packages — yields zero tasks there, as before). Resolved
+      # once into $GITHUB_ENV and reused (word-split, unquoted) by the steps below.
+      - name: Resolve leaf filter
+        env:
+          LEAF_FILTER: ${{ needs.check.outputs.leaf_filter }}
+          TURBO_BASE: ${{ needs.check.outputs.turbo_base || 'origin/master' }}
+        run: echo "LEAF_FILTER=${LEAF_FILTER:-"--filter=...[$TURBO_BASE]"}" >> "$GITHUB_ENV"
+
       # Full validation: type-check → lint → test → test:properties.
       # ^bundle for upstream packages runs bundle (tsdown) as a dependency.
       #
@@ -188,7 +206,7 @@ jobs:
       - name: Test with coverage
         run: >-
           pnpm turbo run test test:properties
-          --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
+          $LEAF_FILTER
           --filter='!./examples/**'
           --filter='!./benchmarks'
 
@@ -198,7 +216,7 @@ jobs:
       - name: Bundle
         run: >-
           pnpm turbo run bundle
-          --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
+          $LEAF_FILTER
           --filter='!./examples/**'
           --filter='!./benchmarks'
 
@@ -244,7 +262,7 @@ jobs:
         if: steps.artifacts.outputs.built == 'true'
         run: >-
           pnpm turbo run lint:package lint:types
-          --filter='...[${{ needs.check.outputs.turbo_base || 'origin/master' }}]'
+          $LEAF_FILTER
           --filter='!./examples/**'
           --filter='!./benchmarks'
 

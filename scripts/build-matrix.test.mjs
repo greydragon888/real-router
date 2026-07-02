@@ -290,13 +290,18 @@ test("L2 edge: missing turbo directory throws loudly (R2.18 SPoF, not silent ski
 
 test("routing: small non-core PR → leaf with a VALID empty matrix (C1)", () => {
   const plan = buildPlan(["@real-router/rx"], realDirOf);
-  assert.deepEqual(plan, { mode: "leaf", matrix: { include: [] } });
+  assert.deepEqual(plan, {
+    mode: "leaf",
+    matrix: { include: [] },
+    leafFilter: "--filter=@real-router/rx",
+  });
 });
 
 test("routing: empty affected → leaf with empty matrix", () => {
   assert.deepEqual(buildPlan([], realDirOf), {
     mode: "leaf",
     matrix: { include: [] },
+    leafFilter: "",
   });
 });
 
@@ -460,4 +465,122 @@ test("routing: full rebuild (all 30) → base excluded, 11 shards", () => {
     assert.ok(names.includes(g), g);
   }
   assert.equal(matrix.include.length, 11);
+});
+
+// ─── leafFilter — leaf EXECUTION scope == ROUTING decision (root-lockfile fix) ─
+
+test("leafFilter: single-package leaf → one explicit --filter", () => {
+  // The regression shape: a Dependabot bump edits packages/preact/package.json +
+  // the ROOT pnpm-lock.yaml. `query affected --packages` attributes it to preact
+  // alone, so pipeline-leaf runs `--filter=@real-router/preact` — NOT the
+  // whole-repo graph that `--filter='...[origin/master]'` produces the moment a
+  // root file changes (turbo treats the root lockfile as touching every
+  // workspace). With Remote Cache off in the Dependabot context that whole graph
+  // ran cold (~8m); scoping leaf execution to the routing set keeps it ~2m.
+  const { mode, leafFilter } = buildPlan(["@real-router/preact"], realDirOf);
+  assert.equal(mode, "leaf");
+  assert.equal(leafFilter, "--filter=@real-router/preact");
+});
+
+test("leafFilter: multi-package leaf → space-joined tokens (ci.yml word-splits)", () => {
+  const affected = ["@real-router/rx", "@real-router/memory-plugin"];
+  const { mode, leafFilter } = buildPlan(affected, realDirOf);
+  assert.equal(mode, "leaf");
+  assert.equal(
+    leafFilter,
+    "--filter=@real-router/rx --filter=@real-router/memory-plugin",
+  );
+});
+
+test("leafFilter: empty on a zero-package leaf (ci.yml falls back to git-ref)", () => {
+  // Root-config PR touching no packages → leaf with no explicit filter; the
+  // workflow substitutes `--filter='...[origin/master]'`, which yields zero
+  // tasks on such a PR (git diff = config files, not packages).
+  assert.equal(buildPlan([], realDirOf).leafFilter, "");
+});
+
+test("leafFilter: sharded emits empty leafFilter (shards use their matrix filter)", () => {
+  assert.equal(buildPlan(allPackages, realDirOf).leafFilter, "");
+});
+
+test("leafFilter: END-TO-END #1112 — root-lockfile query JSON → narrow leaf filter", () => {
+  // The exact turbo shape a Dependabot lockfile bump produces: the root `//`
+  // workspace surfaces (GlobalDepsChanged = the root pnpm-lock.yaml moved) next
+  // to the one real package and its examples. deriveAffected drops `//` + the
+  // examples, buildPlan routes leaf, and leafFilter stays scoped to preact — NOT
+  // the whole-repo balloon `--filter='...[origin/master]'` would emit here.
+  const queryJson = JSON.stringify({
+    data: {
+      affectedPackages: {
+        items: [
+          { name: "//", path: "", reason: { __typename: "GlobalDepsChanged" } },
+          {
+            name: "@real-router/preact",
+            path: "packages/preact",
+            reason: { __typename: "FileChanged" },
+          },
+          {
+            name: "preact-basic-example",
+            path: "examples/web/preact/basic",
+            reason: { __typename: "DependencyChanged" },
+          },
+        ],
+      },
+    },
+  });
+  const { affected, dirOf } = deriveAffected(queryJson);
+  assert.deepEqual(affected, ["@real-router/preact"]);
+  const { mode, leafFilter } = buildPlan(affected, dirOf);
+  assert.equal(mode, "leaf");
+  assert.equal(leafFilter, "--filter=@real-router/preact");
+});
+
+test("leafFilter: carries the routing set verbatim — NO dependency-closure", () => {
+  // rx depends on core/types/logger, but leaf runs `--filter=@real-router/rx`
+  // ONLY — turbo pulls the deps' ^bundle in via the task graph; they are NOT in
+  // the execution filter. This is precisely what `--filter='...[ref]'` failed to
+  // keep narrow on a root-file change (it added every workspace). Round-trips
+  // back to the affected set exactly.
+  const affected = ["@real-router/rx"];
+  const { leafFilter } = buildPlan(affected, realDirOf);
+  assert.deepEqual(
+    leafFilter.split(" ").map((t) => t.replace(/^--filter=/, "")),
+    affected,
+  );
+  for (const core of CORE_LAYER)
+    assert.ok(!leafFilter.includes(core), `closure leaked ${core}`);
+});
+
+test("leafFilter: invariant — leaf ⇒ tokens == affected, sharded ⇒ empty", () => {
+  const decode = (f) => f.split(" ").map((t) => t.replace(/^--filter=/, ""));
+  for (const affected of [
+    ["@real-router/rx"],
+    ["@real-router/preact"],
+    [...LEAVES], // 8 ≤ K, all non-core → leaf
+  ]) {
+    const { mode, leafFilter } = buildPlan(affected, realDirOf);
+    assert.equal(mode, "leaf", affected.join(","));
+    assert.deepEqual(decode(leafFilter), affected);
+  }
+  for (const affected of [
+    allPackages, // > K
+    ["@real-router/core"], // touchesCore
+    ["@real-router/sources"], // touchesAdapterShared
+  ]) {
+    const { mode, leafFilter } = buildPlan(affected, realDirOf);
+    assert.equal(mode, "sharded", affected.join(","));
+    assert.equal(leafFilter, "");
+  }
+});
+
+test("leafFilter: K-boundary leaf (10 packages) emits all 10 tokens in order", () => {
+  const tenNonCore = [...LEAVES, ...URL_PLUGINS.slice(0, 2)]; // 8 + 2 = 10 (== K)
+  const { mode, leafFilter } = buildPlan(tenNonCore, realDirOf);
+  assert.equal(mode, "leaf");
+  const tokens = leafFilter.split(" ");
+  assert.equal(tokens.length, 10);
+  assert.deepEqual(
+    tokens.map((t) => t.replace(/^--filter=/, "")),
+    tenNonCore,
+  );
 });
