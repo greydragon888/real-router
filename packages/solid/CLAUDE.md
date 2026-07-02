@@ -6,10 +6,20 @@
 
 ```tsx
 // Main entry — client API (router, components, hooks, directive)
-import { RouterProvider, useRouteNode, Link, RouteView } from '@real-router/solid';
+import {
+  RouterProvider,
+  useRouteNode,
+  Link,
+  RouteView,
+} from "@real-router/solid";
 
 // SSR-feature subpath — server/boundary components, deferred-data hooks, HTTP status sink
-import { ClientOnly, ServerOnly, HttpStatusCode, useDeferred } from '@real-router/solid/ssr';
+import {
+  ClientOnly,
+  ServerOnly,
+  HttpStatusCode,
+  useDeferred,
+} from "@real-router/solid/ssr";
 ```
 
 **Peer dependency:** `solid-js` >= 1.7.0
@@ -18,15 +28,15 @@ import { ClientOnly, ServerOnly, HttpStatusCode, useDeferred } from '@real-route
 
 **RouterProvider Props:**
 
-| Prop                  | Type      | Default | Description                                                                                    |
-| --------------------- | --------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `router`              | `Router`  | —       | Router instance (required)                                                                     |
-| `announceNavigation`  | `boolean` | `false` | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region       |
-| `scrollRestoration`   | `ScrollRestorationOptions` | `undefined` | Opt into scroll capture + restoration. Keyed by `(name, canonicalJson(params))`. |
-| `scrollSpy`           | `ScrollSpyOptions` | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). `{ selector, rootMargin?, scrollContainer? }`. Empty `selector` / `undefined` = off. Wired through a dedicated `onMount` block (not `mountFeature` helper) so the `selector === ""` opt-out branches before the spy factory runs. Read once on mount (Solid `onMount` is non-reactive). Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP. |
-| `viewTransitions`     | `boolean` | `false` | Opt into View Transitions API integration via `createViewTransitions` utility. Read once on `onMount` — non-reactive. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements |
+| Prop                 | Type                               | Default     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ---------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `router`             | `Router`                           | —           | Router instance (required)                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `announceNavigation` | `boolean \| RouteAnnouncerOptions` | `false`     | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region. Pass `{ prefix?, getAnnouncementText? }` to customize the announcement text — the callback falls back to the default `h1 → title → route-name` chain when it returns an empty string or throws.                                                                                                                                                                                      |
+| `scrollRestoration`  | `ScrollRestorationOptions`         | `undefined` | Opt into scroll capture + restoration. Keyed by `(name, canonicalJson(params))`.                                                                                                                                                                                                                                                                                                                                                                                               |
+| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). `{ selector, rootMargin?, scrollContainer? }`. Empty `selector` / `undefined` = off. Wired through a dedicated `onMount` block (not `mountFeature` helper) so the `selector === ""` opt-out branches before the spy factory runs. Read once on mount (Solid `onMount` is non-reactive). Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP. |
+| `viewTransitions`    | `boolean`                          | `false`     | Opt into View Transitions API integration via `createViewTransitions` utility. Read once on `onMount` — non-reactive. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements                                                                                                                                                                                                                            |
 
-**Announcer internals:** `announceNavigation` enables the shared `createRouteAnnouncer` helper from `shared/dom-utils/route-announcer.ts`. The helper supports `prefix` (default `"Navigated to "`) and `getAnnouncementText(route)` customization options, but the Solid adapter currently invokes it with the defaults only — there is no `RouterProvider` prop to override them. The announcer always speaks `"Navigated to <route.name>"`. A Safari-ready window of `100ms` queues early announcements (regression test: `RouterProvider.a11y.test.tsx` — `"rapid navigation before Safari-ready delay..."`); announcements are cleared after `7000ms`.
+**Announcer internals:** `announceNavigation` enables the shared `createRouteAnnouncer` helper from `shared/dom-utils/route-announcer.ts`. The helper supports `prefix` (default `"Navigated to "`) and `getAnnouncementText(route)` customization options; pass a `RouteAnnouncerOptions` object as `announceNavigation` (`announceNavigation={{ getAnnouncementText }}`) to override them — `mountFeature` forwards the object to `createRouteAnnouncer`. With `announceNavigation` set to `true` the announcer speaks the default `"Navigated to <route.name>"`. A Safari-ready window of `100ms` queues early announcements (regression test: `RouterProvider.a11y.test.tsx` — `"rapid navigation before Safari-ready delay..."`); announcements are cleared after `7000ms`.
 
 ### Source Structure
 
@@ -111,59 +121,59 @@ dist/
 
 ## Hooks
 
-| Hook                    | Returns                              | Reactive?                      |
-| ----------------------- | ------------------------------------ | ------------------------------ |
-| `useRouter()`           | `Router`                             | Never                          |
-| `useNavigator()`        | `Navigator` — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more | Never                          |
-| `useRoute()`            | `Accessor<RouteState>`               | Every navigation               |
-| `useRouteNode(name)`    | `Accessor<RouteState>`               | Only when node active/inactive |
-| `useRouteUtils()`       | `RouteUtils`                         | Never                          |
-| `useRouterTransition()` | `Accessor<RouterTransitionSnapshot>` — includes `isLeaveApproved` field | On transition start/end        |
-| `useRouteStore()`       | `RouteState` (store)                 | Granular — per-property        |
-| `useRouteNodeStore(name)` | `RouteState` (store)               | Granular — per-property, node-scoped |
-| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured at hook call) | Never (subscription is stable) |
-| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` accessor + `route.transition.from` (handler captured at hook call) | Never (effect is fine-grained) |
+| Hook                               | Returns                                                                                                                     | Reactive?                            |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `useRouter()`                      | `Router`                                                                                                                    | Never                                |
+| `useNavigator()`                   | `Navigator` — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more                                        | Never                                |
+| `useRoute()`                       | `Accessor<RouteState>`                                                                                                      | Every navigation                     |
+| `useRouteNode(name)`               | `Accessor<RouteState>`                                                                                                      | Only when node active/inactive       |
+| `useRouteUtils()`                  | `RouteUtils`                                                                                                                | Never                                |
+| `useRouterTransition()`            | `Accessor<RouterTransitionSnapshot>` — includes `isLeaveApproved` field                                                     | On transition start/end              |
+| `useRouteStore()`                  | `RouteState` (store)                                                                                                        | Granular — per-property              |
+| `useRouteNodeStore(name)`          | `RouteState` (store)                                                                                                        | Granular — per-property, node-scoped |
+| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured at hook call)                       | Never (subscription is stable)       |
+| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` accessor + `route.transition.from` (handler captured at hook call) | Never (effect is fine-grained)       |
 
 ## Exports
 
-| Export                  | Type      | Description                                    |
-| ----------------------- | --------- | ---------------------------------------------- |
-| `RouterProvider`        | Component | Context provider for router instance           |
-| `Link`                  | Component | Navigation link with active state detection    |
-| `RouteView`             | Component | Declarative route matching                     |
-| `RouterErrorBoundary`   | Component | Declarative navigation error UI (auto-resets on next successful navigation) |
-| `useRouter()`           | Hook      | Get router instance                            |
-| `useNavigator()`        | Hook      | Get navigator instance                         |
-| `useRoute()`            | Hook      | Subscribe to all route changes                 |
-| `useRouteNode(name)`    | Hook      | Subscribe to specific node changes             |
-| `useRouteUtils()`       | Hook      | Get route tree utilities                       |
-| `useRouterTransition()` | Hook      | Subscribe to transition state                  |
-| `useRouteStore()`       | Hook      | Store-based granular route state               |
-| `useRouteNodeStore(name)` | Hook    | Store-based granular node-scoped state         |
-| `useRouteEnter(handler, options?)` | Hook | Fires once on nav-driven mount via `createEffect` + `transition.from` |
-| `useRouteExit(handler, options?)`  | Hook | Wraps `router.subscribeLeave` with abort + same-route guards |
-| `createSignalFromSource` | Primitive | Bridge `RouterSource<T>` → Solid accessor     |
-| `createStoreFromSource` | Primitive | Bridge `RouterSource<T>` → Solid store         |
-| `link`                  | Directive | Low-level navigation directive (`use:link`)    |
-| `RouterContext`         | Context   | Solid context carrying `RouterContextValue` (`{ router, navigator, routeSelector }`). Prefer `useRouter` / `useNavigator` for read-only access — consume `RouterContext` directly only for advanced composition (custom hook bridges, testing, multi-provider wrappers). |
-| `RouteContext`          | Context   | Solid context carrying `Accessor<RouteState>` — the reactive route snapshot. Prefer `useRoute` for normal use; consume directly when building custom hooks that need to layer effects on the existing accessor. |
-| `RouterContextValue`    | Type      | Shape of `RouterContext` — `{ router, navigator, routeSelector }`. Re-exported for type-only consumers writing their own provider wrappers. |
+| Export                             | Type      | Description                                                                                                                                                                                                                                                              |
+| ---------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `RouterProvider`                   | Component | Context provider for router instance                                                                                                                                                                                                                                     |
+| `Link`                             | Component | Navigation link with active state detection                                                                                                                                                                                                                              |
+| `RouteView`                        | Component | Declarative route matching                                                                                                                                                                                                                                               |
+| `RouterErrorBoundary`              | Component | Declarative navigation error UI (auto-resets on next successful navigation)                                                                                                                                                                                              |
+| `useRouter()`                      | Hook      | Get router instance                                                                                                                                                                                                                                                      |
+| `useNavigator()`                   | Hook      | Get navigator instance                                                                                                                                                                                                                                                   |
+| `useRoute()`                       | Hook      | Subscribe to all route changes                                                                                                                                                                                                                                           |
+| `useRouteNode(name)`               | Hook      | Subscribe to specific node changes                                                                                                                                                                                                                                       |
+| `useRouteUtils()`                  | Hook      | Get route tree utilities                                                                                                                                                                                                                                                 |
+| `useRouterTransition()`            | Hook      | Subscribe to transition state                                                                                                                                                                                                                                            |
+| `useRouteStore()`                  | Hook      | Store-based granular route state                                                                                                                                                                                                                                         |
+| `useRouteNodeStore(name)`          | Hook      | Store-based granular node-scoped state                                                                                                                                                                                                                                   |
+| `useRouteEnter(handler, options?)` | Hook      | Fires once on nav-driven mount via `createEffect` + `transition.from`                                                                                                                                                                                                    |
+| `useRouteExit(handler, options?)`  | Hook      | Wraps `router.subscribeLeave` with abort + same-route guards                                                                                                                                                                                                             |
+| `createSignalFromSource`           | Primitive | Bridge `RouterSource<T>` → Solid accessor                                                                                                                                                                                                                                |
+| `createStoreFromSource`            | Primitive | Bridge `RouterSource<T>` → Solid store                                                                                                                                                                                                                                   |
+| `link`                             | Directive | Low-level navigation directive (`use:link`)                                                                                                                                                                                                                              |
+| `RouterContext`                    | Context   | Solid context carrying `RouterContextValue` (`{ router, navigator, routeSelector }`). Prefer `useRouter` / `useNavigator` for read-only access — consume `RouterContext` directly only for advanced composition (custom hook bridges, testing, multi-provider wrappers). |
+| `RouteContext`                     | Context   | Solid context carrying `Accessor<RouteState>` — the reactive route snapshot. Prefer `useRoute` for normal use; consume directly when building custom hooks that need to layer effects on the existing accessor.                                                          |
+| `RouterContextValue`               | Type      | Shape of `RouterContext` — `{ router, navigator, routeSelector }`. Re-exported for type-only consumers writing their own provider wrappers.                                                                                                                              |
 
 ## Differences from React and Preact Adapters
 
-| Aspect | React/Preact | Solid |
-|--------|--------------|-------|
-| Hook return types | Values | Accessors (`Accessor<T>`) |
-| `useSyncExternalStore` | Native or polyfill | `createSignalFromSource` |
-| `memo()` | Required | Not needed — components run once |
-| `useCallback` | Required for stable refs | Not needed |
-| Params stabilization | `canonicalJson` in sources | `canonicalJson` in sources |
-| Active class on Link | `className` string concat | `classList` object |
-| Context count | 3 (Router, Navigator, Route) | 2 (Router+Navigator, Route) |
-| `keepAlive` / Activity | React 19.2+ only | Not available |
-| Entry points | Main + Legacy (React) / Single (Preact) | Single |
-| Build tool | tsdown | rollup + babel-preset-solid |
-| RouteView child detection | Element type checking | Symbol-based `$$type` markers |
+| Aspect                    | React/Preact                            | Solid                            |
+| ------------------------- | --------------------------------------- | -------------------------------- |
+| Hook return types         | Values                                  | Accessors (`Accessor<T>`)        |
+| `useSyncExternalStore`    | Native or polyfill                      | `createSignalFromSource`         |
+| `memo()`                  | Required                                | Not needed — components run once |
+| `useCallback`             | Required for stable refs                | Not needed                       |
+| Params stabilization      | `canonicalJson` in sources              | `canonicalJson` in sources       |
+| Active class on Link      | `className` string concat               | `classList` object               |
+| Context count             | 3 (Router, Navigator, Route)            | 2 (Router+Navigator, Route)      |
+| `keepAlive` / Activity    | React 19.2+ only                        | Not available                    |
+| Entry points              | Main + Legacy (React) / Single (Preact) | Single                           |
+| Build tool                | tsdown                                  | rollup + babel-preset-solid      |
+| RouteView child detection | Element type checking                   | Symbol-based `$$type` markers    |
 
 ## Promise-Based Navigation
 
@@ -177,16 +187,16 @@ router.navigate(routeName, routeParams, routeOptions).catch(() => {});
 
 All SSR-aware components/hooks live at the `/ssr` subpath. Eight exports total — symmetric with `@real-router/react/ssr`:
 
-| Export | Kind | Purpose |
-|---|---|---|
-| `<ClientOnly fallback={…}>` | component | `createSignal(false)` + `onMount` + `<Show>` — SSR emits `fallback`, post-mount swap reveals `children`. |
-| `<ServerOnly fallback={…}>` | component | Symmetric inverse. |
-| `<Streamed fallback={…}>` | component | Cross-adapter alias for Solid `<Suspense fallback={…}>`. |
+| Export                                        | Kind      | Purpose                                                                                                                                                                                                                                                         |
+| --------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<ClientOnly fallback={…}>`                   | component | `createSignal(false)` + `onMount` + `<Show>` — SSR emits `fallback`, post-mount swap reveals `children`.                                                                                                                                                        |
+| `<ServerOnly fallback={…}>`                   | component | Symmetric inverse.                                                                                                                                                                                                                                              |
+| `<Streamed fallback={…}>`                     | component | Cross-adapter alias for Solid `<Suspense fallback={…}>`.                                                                                                                                                                                                        |
 | `<Await<T> name="key">{(value) => …}</Await>` | component | Reads a deferred promise via `createResource` — pairs with `defer()` from `ssr-data-plugin`. **Falsy values reach the render-prop:** the gate is `resource.state === "ready"` (not truthiness), so `0`, `false`, `null`, and `""` still call `children(value)`. |
-| `<HttpStatusCode code={N}/>` | component | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink during render and returns `null`. Last write wins. No-op without provider. |
-| `<HttpStatusProvider sink={...}>` | component | Provides an `HttpStatusSink` to descendant `<HttpStatusCode />` instances via Solid context. |
-| `useDeferred<T>(key)` | hook | Returns the deferred Promise accessor. **Missing key → forever-pending promise** (`NEVER_PROMISE` sentinel): surfaces loader/consumer key drift as a visible `<Suspense>` fallback rather than a silent runtime error. Use a key the loader actually declared. |
-| `createHttpStatusSink()` | utility | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after `renderToString`/`renderToStream` to apply to the response. |
+| `<HttpStatusCode code={N}/>`                  | component | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink during render and returns `null`. Last write wins. No-op without provider.                                                                                      |
+| `<HttpStatusProvider sink={...}>`             | component | Provides an `HttpStatusSink` to descendant `<HttpStatusCode />` instances via Solid context.                                                                                                                                                                    |
+| `useDeferred<T>(key)`                         | hook      | Returns the deferred Promise accessor. **Missing key → forever-pending promise** (`NEVER_PROMISE` sentinel): surfaces loader/consumer key drift as a visible `<Suspense>` fallback rather than a silent runtime error. Use a key the loader actually declared.  |
+| `createHttpStatusSink()`                      | utility   | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after `renderToString`/`renderToStream` to apply to the response.                                                                              |
 
 Built on `onMount` + `<Show>` for the boundary components (Solid runtime guarantees `onMount` never fires during `renderToString`/`renderToStream`, so the initial render emits the SSR-side branch). `<HttpStatusCode>` reads `useContext` and writes during render — no DOM, no hydration mismatch.
 
@@ -230,7 +240,7 @@ body:
 const [draft, setDraft] = createSignal<Draft | null>(null);
 
 useRouteExit(async ({ signal }) => {
-  const current = draft();          // read signal inside handler
+  const current = draft(); // read signal inside handler
   if (current) await api.save(current, { signal });
 });
 ```
@@ -241,11 +251,11 @@ Same applies to `useRouteEnter`. This contrasts with React/Preact, where
 ### Hooks Return Accessors, Not Values
 
 ```typescript
-const routeState = useRoute();   // Accessor<RouteState>
-const { route } = routeState();  // Call it to read the value
+const routeState = useRoute(); // Accessor<RouteState>
+const { route } = routeState(); // Call it to read the value
 
 const nodeState = useRouteNode("users");
-const { route } = nodeState();   // Same pattern
+const { route } = nodeState(); // Same pattern
 ```
 
 ### Never Destructure Props
@@ -265,9 +275,9 @@ function MyComponent(props) {
 ### useRouter vs useRoute
 
 ```typescript
-const router = useRouter();       // Stable — never reactive
-const routeState = useRoute();    // Accessor — call to read, reactive
-const { route } = routeState();   // Read inside reactive context
+const router = useRouter(); // Stable — never reactive
+const routeState = useRoute(); // Accessor — call to read, reactive
+const { route } = routeState(); // Read inside reactive context
 ```
 
 ### useRoute throws when route is undefined
@@ -302,7 +312,7 @@ const q = routeState().route.params.q; // typed as string
 ### useRouteNode Semantics
 
 ```typescript
-useRouteNode("");       // Root — ALL route changes
+useRouteNode(""); // Root — ALL route changes
 useRouteNode("users"); // Only "users" and "users.*" routes
 ```
 
@@ -323,13 +333,19 @@ useRouteNode("users")().previousRoute; // = items (not users.list!)
 
 ```tsx
 // WRONG — Match is not a real component in the JSX sense
-const el = <RouteView.Match segment="users"><UsersPage /></RouteView.Match>;
+const el = (
+  <RouteView.Match segment="users">
+    <UsersPage />
+  </RouteView.Match>
+);
 el.type === RouteView.Match; // false — this is a marker object
 
 // CORRECT — use inside RouteView only
 <RouteView nodeName="">
-  <RouteView.Match segment="users"><UsersPage /></RouteView.Match>
-</RouteView>
+  <RouteView.Match segment="users">
+    <UsersPage />
+  </RouteView.Match>
+</RouteView>;
 ```
 
 ### `RouteView.Self` — render parent node exactly
@@ -339,10 +355,10 @@ el.type === RouteView.Match; // false — this is a marker object
 ```tsx
 <RouteView nodeName="users">
   <RouteView.Self>
-    <UsersIndex />               {/* active route name === "users" exactly */}
+    <UsersIndex /> {/* active route name === "users" exactly */}
   </RouteView.Self>
   <RouteView.Match segment="profile">
-    <UserProfile />              {/* "users.profile" or any descendant */}
+    <UserProfile /> {/* "users.profile" or any descendant */}
   </RouteView.Match>
   <RouteView.NotFound>
     <NotFoundPage />
@@ -363,15 +379,15 @@ Accepts an optional `fallback` prop (`JSX.Element`) — symmetric with `<Match f
 `Match` accepts an optional `fallback` prop (`JSX.Element`). When provided, the matched content is wrapped in Solid's `<Suspense>` with that element as the fallback. Use this with `lazy()` to show a loading state while the component chunk loads.
 
 ```tsx
-import { lazy } from 'solid-js';
+import { lazy } from "solid-js";
 
-const LazyDashboard = lazy(() => import('./Dashboard'));
+const LazyDashboard = lazy(() => import("./Dashboard"));
 
 <RouteView nodeName="">
   <RouteView.Match segment="dashboard" fallback={<Spinner />}>
     <LazyDashboard />
   </RouteView.Match>
-</RouteView>
+</RouteView>;
 ```
 
 Without `fallback`, no `<Suspense>` boundary is added — the prop is entirely optional.
@@ -534,15 +550,15 @@ reactive route switching, use the `<Link>` component instead.
 
 All source caches live inside `@real-router/sources` — no local WeakMaps in this adapter. N components calling `useRouteNode("users")` against the same router share ONE source — one router subscription, one `shouldUpdate` call per navigation, not N.
 
-| Hook / Component                  | Source factory                                        |
-| --------------------------------- | ----------------------------------------------------- |
-| `useRoute()`                      | **non-cached** `createRouteSource(router)` — `RouterProvider` builds ONE instance and shares it via `RouteContext`; every `useRoute()` reads that same signal (shared per-Provider through context, **not** via the sources cache) |
-| `useRouteStore()`                 | **non-cached** `createRouteSource(router)` — a **fresh** source per call: each consumer gets its own router subscription + reconcile pass (NOT shared — see the note below) |
-| `useRouteNode(name)`              | cached `createRouteNodeSource(router, nodeName)`      |
-| `useRouteNodeStore(name)`         | cached `createRouteNodeSource(router, nodeName)`      |
-| `useRouterTransition()`           | cached `getTransitionSource(router)`                  |
-| `RouterErrorBoundary`             | cached `createDismissableError(router)` — shared error source with integrated dismissal state |
-| Link (slow path)                  | cached `createActiveRouteSource(router, name, params, opts)` — params hashed via `canonicalJson` (key-order-insensitive) |
+| Hook / Component          | Source factory                                                                                                                                                                                                                     |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useRoute()`              | **non-cached** `createRouteSource(router)` — `RouterProvider` builds ONE instance and shares it via `RouteContext`; every `useRoute()` reads that same signal (shared per-Provider through context, **not** via the sources cache) |
+| `useRouteStore()`         | **non-cached** `createRouteSource(router)` — a **fresh** source per call: each consumer gets its own router subscription + reconcile pass (NOT shared — see the note below)                                                        |
+| `useRouteNode(name)`      | cached `createRouteNodeSource(router, nodeName)`                                                                                                                                                                                   |
+| `useRouteNodeStore(name)` | cached `createRouteNodeSource(router, nodeName)`                                                                                                                                                                                   |
+| `useRouterTransition()`   | cached `getTransitionSource(router)`                                                                                                                                                                                               |
+| `RouterErrorBoundary`     | cached `createDismissableError(router)` — shared error source with integrated dismissal state                                                                                                                                      |
+| Link (slow path)          | cached `createActiveRouteSource(router, name, params, opts)` — params hashed via `canonicalJson` (key-order-insensitive)                                                                                                           |
 
 > **`useRoute()` vs `useRouteStore()` sharing.** `useRoute()` is shared
 > per-`RouterProvider`: the Provider builds one `createRouteSource` and hands the
