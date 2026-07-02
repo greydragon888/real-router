@@ -95,6 +95,7 @@ gh label list --repo greydragon888/real-router --limit 100
 - core/react/plugins/tests/build/npm/benchmarks/ci-cd → префикс `area: ` (`area: core`, `area: react`, `area: ci/cd`, …)
 - **solid → `area:solid`** (без пробела!)
 - **vue → `vue`**, **svelte → `svelte`**, **angular → `angular`** (вообще без префикса `area:`)
+- **dependencies → `dependencies`** (bare; для dep-bump / dep-migration задач)
 - тип: `bug` / `enhancement` / `performance` / `documentation` / `good first issue`
 - priority: `priority: critical|high|medium|low`
 

@@ -65,6 +65,13 @@ updates:
       - dependency-name: "undici" # override: undici '>=7.28.0 <8.0.0' (GHSA fixed 7.28.0)
       - dependency-name: "piscina" # override: piscina '>=5.2.0 <6.0.0'
       - dependency-name: "js-yaml" # override: read-yaml-file '>=2.1.0' (GHSA-h67p-54hq-rp68)
+      # @types/node is pinned to the Node.js runtime major (Node 24 — see the
+      # CLAUDE.md toolchain table + CI `node-version: 24`). Block semver-major:
+      # type defs ahead of the runtime let TS resolve Node APIs that don't exist
+      # at runtime (compiles, then fails on Node 24). 24.x patch/minor still flow.
+      # Lift this when the project moves to a newer Node major.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
