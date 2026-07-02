@@ -107,6 +107,26 @@ When schema validation fails, the plugin strips only the keys with validation is
 
 In `mode: "development"`, a `console.error` is emitted with the route name and validation issues before the recovery happens.
 
+### `defaultParams` must satisfy the schema (contract)
+
+The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming_ param (from the URL or a `navigate()` call) never reaches `state`. It does **not** validate `defaultParams` at runtime — those are **trusted developer config**, injected by the router core _below_ the layer this plugin intercepts. So a `defaultParams` value that violates its own `searchSchema` **will reach `state.params` and the URL** (`state.path`), on every navigation, in **every** `mode` — including `mode: "production"`:
+
+```typescript
+{
+  name: "products",
+  path: "/products?page",
+  defaultParams: { page: -5 },              // ← violates the schema below
+  searchSchema: z.object({ page: z.number().positive() }),
+}
+await router.navigate("products");          // no input supplied by the caller
+router.getState().params;                   // { page: -5 }  ← invalid default reaches state
+router.getState().path;                     // "/products?page=-5"  ← and the URL
+```
+
+In `mode: "development"` the plugin **warns** about a schema-violating `defaultParams` at authoring time (at `usePlugin()`, and when routes are added / replaced / updated) — a config lint, not a runtime block. `mode: "production"` skips that warning. Either way the value is **not** blocked at runtime, and `onError` does not change this (core injects the default independently of the callback).
+
+**Fix:** keep each route's `defaultParams` consistent with its `searchSchema`. Treat the dev warning as a config error to resolve, not a recoverable runtime condition. To _fill_ absent params from within the schema instead, use the schema's own `.default()` (e.g. Zod `z.number().default(1)`) — those values are validated by construction.
+
 ### Strict mode
 
 ```typescript

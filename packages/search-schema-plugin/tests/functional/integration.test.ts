@@ -356,4 +356,78 @@ describe("Search schema plugin", () => {
       consoleSpy.mockRestore();
     });
   });
+
+  // Documented contract boundary for #802. The plugin gates invalid user INPUT
+  // (see the stripping tests above); `defaultParams` are trusted config injected
+  // by core BELOW the interceptor seam the plugin hooks, so an invalid default
+  // reaches state and the URL at runtime. These tests PIN that documented
+  // limitation deliberately — a tripwire: if core ever starts stripping invalid
+  // defaults (e.g. a single-merge-point refactor), they fail and flag that the
+  // README / wiki / CLAUDE contract must be revisited.
+  describe("Documented limitation: invalid defaultParams reach state (#802)", () => {
+    /** `page` must be a positive number when present; no defaults, no coercion. */
+    function positivePageSchema() {
+      return createMockSchema({
+        validate: (value) => {
+          const params = value as Record<string, unknown>;
+
+          if (
+            "page" in params &&
+            !(typeof params.page === "number" && params.page > 0)
+          ) {
+            return {
+              issues: [{ message: "page must be positive", path: ["page"] }],
+            };
+          }
+
+          return { value: params };
+        },
+      });
+    }
+
+    it("guarantee HOLDS for user input: invalid input is stripped, nothing revives it", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "clean",
+            path: "/clean?page",
+            searchSchema: positivePageSchema(),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+      await router.start("/");
+
+      await router.navigate("clean", { page: -3 });
+
+      expect(router.getState()?.params).toStrictEqual({});
+    });
+
+    it("limitation: an invalid defaultParams value reaches state.params AND state.path (mode: production)", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "bad",
+            path: "/bad?page",
+            defaultParams: { page: -5 },
+            searchSchema: positivePageSchema(),
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+      await router.start("/");
+
+      // No input supplied by the caller — the invalid default is injected by core.
+      await router.navigate("bad");
+
+      const state = router.getState();
+
+      expect(state?.params).toStrictEqual({ page: -5 });
+      expect(state?.path).toBe("/bad?page=-5");
+    });
+  });
 });
