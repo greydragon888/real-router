@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const CR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const RESULTS = join(CR, "results");
-const FW = ["react", "vue", "solid"];
+const FW = ["react", "vue", "solid", "svelte"];
 
 // Inherently-noisy metric families — CDP Blink trace (history.pushState), wall-clock
 // latency, and FCP all have a fat RME tail by nature (small absolute / paint cadence).
