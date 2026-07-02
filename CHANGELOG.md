@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/persistent-params-plugin@0.2.16
+
+### Patch Changes
+
+- [#1113](https://github.com/greydragon888/real-router/pull/1113) [`28ea6e9`](https://github.com/greydragon888/real-router/commit/28ea6e991a3a526ca08c7f873ba45618e7e1be79) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix persistent param removal committing before guards on a rejected/cancelled navigation ([#803](https://github.com/greydragon888/real-router/issues/803))
+
+  Removing a persistent param via `navigate(name, { key: undefined })` no longer drops the param permanently when the navigation is rejected by a guard or superseded by a concurrent navigate. The removal is now committed in `onTransitionSuccess`, against the state that actually committed, so a transition that never commits leaves the param intact.
+
+  - `forwardState` records removals transiently instead of mutating the tracked set/snapshot before guards run; the paired `buildPath` consumes the record so the built URL still drops the removed param for the current transition.
+  - Permanent removal (from both the snapshot and the tracked param set) happens in `onTransitionSuccess`, keyed on the committed state — a successful removal stays permanent (unchanged), while a rejected/cancelled one rolls back.
+
+
 ### @real-router/angular@0.13.0
 
 ### Minor Changes
