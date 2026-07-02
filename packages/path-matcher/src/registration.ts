@@ -16,6 +16,15 @@ import type {
   URLParamsEncodingType,
 } from "./types";
 
+// Shared frozen sentinels for the no-params/-constraints common case — avoid a
+// fresh empty Set/Map/array per route (#1009). All are ReadonlySet/Map/[] and
+// read-only on the match/build hot paths.
+const EMPTY_STRINGS: readonly string[] = Object.freeze([]);
+const EMPTY_STRING_SET: ReadonlySet<string> = new Set();
+const EMPTY_CONSTRAINTS: ReadonlyMap<string, ConstraintPattern> = new Map();
+const EMPTY_PARAM_SLOTS: readonly BuildParamSlot[] = Object.freeze([]);
+const EMPTY_PARAMS: Readonly<Record<string, unknown>> = Object.freeze({});
+
 // =============================================================================
 // Registration State
 // =============================================================================
@@ -24,11 +33,6 @@ export interface RegistrationState {
   readonly root: SegmentNode;
   readonly options: ResolvedMatcherOptions;
   readonly routesByName: Map<string, CompiledRoute>;
-  readonly segmentsByName: Map<string, readonly MatcherInputNode[]>;
-  readonly metaByName: Map<
-    string,
-    Readonly<Record<string, Record<string, "url" | "query">>>
-  >;
   readonly staticCache: Map<string, CompiledRoute>;
   readonly rootQueryParams: readonly string[];
 }
@@ -137,27 +141,34 @@ function compileAndRegisterRoute(
     matchSegments: frozenSegments,
     meta: frozenMeta,
     declaredQueryParams,
-    declaredQueryParamsSet: new Set(declaredQueryParams),
+    declaredQueryParamsSet:
+      declaredQueryParams.length === 0
+        ? EMPTY_STRING_SET
+        : new Set(declaredQueryParams),
     hasTrailingSlash: matchPath.length > 1 && matchPath.endsWith("/"),
     constraintPatterns,
     hasConstraints: constraintPatterns.size > 0,
     buildStaticParts,
     buildParamSlots,
-    buildParamNamesSet: new Set(buildParamSlots.map((slot) => slot.paramName)),
+    buildParamNamesSet:
+      buildParamSlots.length === 0
+        ? EMPTY_STRING_SET
+        : new Set(buildParamSlots.map((slot) => slot.paramName)),
+    // Initialized here (not added conditionally below) so static and param
+    // routes share one hidden class — avoids a megamorphic CompiledRoute (#1009).
+    cachedResult: undefined,
   };
 
   // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — cachedResult is a pure match() optimization; #buildResult recomputes the same value on a miss (proven: disabling the whole static cache keeps the unit+property suite green)
   if (node.paramMeta.urlParams.length === 0) {
     compiled.cachedResult = Object.freeze({
       segments: compiled.matchSegments,
-      params: Object.freeze({}),
+      params: EMPTY_PARAMS,
       meta: compiled.meta,
     });
   }
 
   state.routesByName.set(node.fullName, compiled);
-  state.segmentsByName.set(node.fullName, frozenSegments);
-  state.metaByName.set(node.fullName, frozenMeta);
 
   if (slashChild) {
     registerSlashChild(state, compiled, parentPath);
@@ -631,7 +642,10 @@ function compileBuildParts(
 
   // Stryker disable next-line BlockStatement: equivalent — fast path; the param-compile loop below yields [normalizedPath]/[] when allUrlParams is empty — identical output. Proven by injection.
   if (allUrlParams.size === 0) {
-    return { buildStaticParts: [normalizedPath], buildParamSlots: [] };
+    return {
+      buildStaticParts: [normalizedPath],
+      buildParamSlots: EMPTY_PARAM_SLOTS,
+    };
   }
 
   const parts: string[] = [];
@@ -693,7 +707,7 @@ function collectDeclaredQueryParams(
     }
   }
 
-  return queryParams;
+  return queryParams.length === 0 ? EMPTY_STRINGS : queryParams;
 }
 
 function collectConstraintPatterns(
@@ -707,5 +721,5 @@ function collectConstraintPatterns(
     }
   }
 
-  return patterns;
+  return patterns.size === 0 ? EMPTY_CONSTRAINTS : patterns;
 }

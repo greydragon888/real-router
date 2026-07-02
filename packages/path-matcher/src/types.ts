@@ -139,7 +139,11 @@ export interface CompiledRoute {
   readonly buildParamSlots: readonly BuildParamSlot[];
   readonly buildParamNamesSet: ReadonlySet<string>;
 
-  cachedResult?: MatchResult;
+  // Required (not optional) so every CompiledRoute literal initializes it — a
+  // static route sets the cached result, a param route leaves it `undefined`,
+  // but both share ONE hidden class (an optional added post-construction made
+  // the two megamorphic). #1009
+  cachedResult: MatchResult | undefined;
 }
 
 export interface BuildParamSlot {
