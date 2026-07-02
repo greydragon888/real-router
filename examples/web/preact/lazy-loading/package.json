@@ -13,7 +13,7 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@real-router/preact": "workspace:^",
-    "preact": "10.29.2"
+    "preact": "10.29.3"
   },
   "devDependencies": {
     "@preact/preset-vite": "2.10.5",
