@@ -20,6 +20,15 @@ export class PersistentParamsPlugin {
 
   #persistentParams: Readonly<Params>;
 
+  // Per-navigation removal record, valid ONLY within the synchronous
+  // forwardState → buildPath window of core's `buildNavigateState`. forwardState
+  // (which sees the raw `{ key: undefined }` removal marker) records the removed
+  // keys here; the paired buildPath (which receives the already-forwarded params,
+  // where the `undefined` marker is gone) consumes it to drop the same keys from
+  // the built URL, then clears it. Never a source of permanent state — the
+  // permanent removal happens in #onTransitionSuccess against the committed state.
+  readonly #pendingRemovals = new Set<string>();
+
   constructor(
     api: PluginApi,
     persistentParams: Readonly<Params>,
@@ -41,7 +50,7 @@ export class PersistentParamsPlugin {
       removeBuildPath = api.addInterceptor(
         "buildPath",
         (next, route, navParams) =>
-          next(route, this.#withPersistentParams(navParams ?? {})),
+          next(route, this.#buildPathParams(navParams ?? {})),
       );
 
       removeForwardState = api.addInterceptor(
@@ -51,7 +60,7 @@ export class PersistentParamsPlugin {
 
           return {
             ...result,
-            params: this.#withPersistentParams(result.params),
+            params: this.#forwardStateParams(result.params),
           };
         },
       );
@@ -81,25 +90,59 @@ export class PersistentParamsPlugin {
     };
   }
 
-  #withPersistentParams(additionalParams: Params): Params {
+  // forwardState phase (runs first in buildNavigateState). Injects persistent
+  // params into the target state and RECORDS — but does not commit — any removal
+  // requests (`{ key: undefined }`). The removal is NOT applied to the tracked
+  // set/snapshot here: this runs before the deactivation/activation guards, so a
+  // rejected or cancelled transition must leave the param intact (#803). The
+  // permanent removal is committed in #onTransitionSuccess against the state that
+  // actually committed. `mergeParams` honors `undefined` as a delete for the
+  // current transition's params.
+  #forwardStateParams(additionalParams: Params): Params {
     const safeParams = extractOwnParams(additionalParams);
-    let newParams: Params | undefined;
+
+    // Reset the per-navigation record: forwardState opens the synchronous
+    // forwardState → buildPath window that buildPath consumes.
+    this.#pendingRemovals.clear();
 
     for (const [key, value] of Object.entries(safeParams)) {
       if (value === undefined && this.#paramNamesSet.has(key)) {
-        this.#paramNamesSet.delete(key);
-        newParams ??= { ...this.#persistentParams };
-        delete newParams[key];
+        this.#pendingRemovals.add(key);
       } else {
         validateParamValue(key, value);
       }
     }
 
-    if (newParams) {
-      this.#persistentParams = Object.freeze(newParams);
+    return mergeParams(this.#persistentParams, safeParams);
+  }
+
+  // buildPath phase (runs second in buildNavigateState, and standalone for
+  // `router.buildPath()`). Injects persistent params into the URL, then drops the
+  // keys the paired forwardState just removed — otherwise the freshly-removed
+  // param would be re-injected into the built path from the still-unchanged
+  // snapshot (the `undefined` marker is gone by the time params reach buildPath).
+  // Consume-once: a standalone buildPath sees an empty set and injects normally.
+  #buildPathParams(additionalParams: Params): Params {
+    const safeParams = extractOwnParams(additionalParams);
+
+    // A removal marker (`undefined`) is a valid param value, so validating it is
+    // harmless — mergeParams treats it as a delete for the built path. No need to
+    // special-case removal here (unlike forwardState, which must record it).
+    for (const [key, value] of Object.entries(safeParams)) {
+      validateParamValue(key, value);
     }
 
-    return mergeParams(this.#persistentParams, safeParams);
+    const merged = mergeParams(this.#persistentParams, safeParams);
+
+    if (this.#pendingRemovals.size > 0) {
+      for (const key of this.#pendingRemovals) {
+        delete merged[key];
+      }
+
+      this.#pendingRemovals.clear();
+    }
+
+    return merged;
   }
 
   #onTransitionSuccess(toState: State): void {
@@ -109,13 +152,19 @@ export class PersistentParamsPlugin {
       const value = toState.params[key];
 
       if (!Object.hasOwn(toState.params, key) || value === undefined) {
-        // Drop a persisted key absent from a state committed via navigateToState
-        // (which bypasses the forwardState injection) — covered by the "drops a
-        // persisted param when navigateToState bypasses forwardState" test.
+        // A tracked param is absent from the committed state — either an explicit
+        // removal (`navigate({ key: undefined })`, applied as a delete by
+        // mergeParams for this transition) or a state committed via navigateToState
+        // (which bypasses the forwardState injection). The permanent removal is
+        // committed HERE, against the state that actually committed, so a
+        // rejected/cancelled transition never drops the param (#803). Only a param
+        // that was really persisted (present with a defined value) is removed;
+        // a still-empty tracked key stays tracked so it can persist later.
         if (
           Object.hasOwn(this.#persistentParams, key) &&
           this.#persistentParams[key] !== undefined
         ) {
+          this.#paramNamesSet.delete(key);
           newParams ??= { ...this.#persistentParams };
           delete newParams[key];
         }

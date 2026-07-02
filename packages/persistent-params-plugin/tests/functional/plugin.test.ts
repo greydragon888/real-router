@@ -388,6 +388,84 @@ describe("Persistent params plugin", () => {
       });
     });
 
+    describe("Removal on rejected/cancelled transition (#803)", () => {
+      beforeEach(async () => {
+        router.usePlugin(persistentParamsPlugin({ lang: "en" }));
+        await router.start("/");
+      });
+
+      it("should keep the persistent param when a removal navigation is rejected by a guard", async () => {
+        // route2 activation is always blocked
+        getLifecycleApi(router).addActivateGuard("route2", () => () => false);
+
+        // attempt to remove `lang` on a transition the guard rejects
+        await router
+          .navigate("route2", { id: "2", lang: undefined })
+          .catch(() => {});
+
+        // the transition never committed — the removal must be rolled back
+        const state = await router.navigate("route1", { id: "1" });
+
+        expect(state.params.lang).toBe("en");
+        expect(state.path).toBe("/route1/1?lang=en");
+      });
+
+      it("should keep the persistent param when a removal navigation is cancelled mid-flight", async () => {
+        // route2 activation suspends in an async guard, so the removal navigation
+        // to route2 stays in-flight and can be superseded by another navigate
+        let releaseGuard: (allow: boolean) => void = () => {};
+        let enterGuard: () => void = () => {};
+        const guardEntered = new Promise<void>((resolve) => {
+          enterGuard = resolve;
+        });
+
+        getLifecycleApi(router).addActivateGuard("route2", () => () => {
+          enterGuard();
+
+          return new Promise<boolean>((resolve) => {
+            releaseGuard = resolve;
+          });
+        });
+
+        // removal navigation to route2 suspends inside the async guard
+        const removal = router.navigate("route2", { id: "2", lang: undefined });
+
+        await guardEntered;
+
+        // supersede it with a navigation to route3 → cancels the removal
+        const winner = await router.navigate("route3", { id: "3" });
+
+        // the superseding navigation still carries the (not-yet-removed) param
+        expect(winner.params.lang).toBe("en");
+
+        // release the now-cancelled guard; the removal rejects as cancelled
+        releaseGuard(true);
+        await removal.catch(() => {});
+
+        // the cancelled removal must not have dropped `lang` permanently
+        const state = await router.navigate("route1", { id: "9" });
+
+        expect(state.params.lang).toBe("en");
+      });
+
+      it("should still remove the param permanently once a removal navigation actually commits", async () => {
+        // removal on a committed transition stays permanent (unchanged semantics)
+        await router.navigate("route1", { id: "1", lang: undefined });
+        const reAttempt = await router.navigate("route2", {
+          id: "2",
+          lang: "fr",
+        });
+
+        // `lang` was removed from tracking on the successful removal, so an
+        // explicit re-pass is not re-persisted on the following navigation
+        const state = await router.navigate("route3", { id: "3" });
+
+        expect(reAttempt.path).toBe("/route2/2?lang=fr");
+        expect(state.params.lang).toBeUndefined();
+        expect(state.path).toBe("/route3/3");
+      });
+    });
+
     describe("Parameter Synchronization", () => {
       beforeEach(async () => {
         router.usePlugin(persistentParamsPlugin(["mode", "lang"]));
