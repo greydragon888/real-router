@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/core@0.62.3
+
+### Patch Changes
+
+- [#1087](https://github.com/greydragon888/real-router/pull/1087) [`9e64939`](https://github.com/greydragon888/real-router/commit/9e64939b063d128eacf05235ea7980397a98772d) Thanks [@greydragon888](https://github.com/greydragon888)! - Cut large route-table memory via shared empty per-route collections ([#1009](https://github.com/greydragon888/real-router/issues/1009))
+
+  For large route tables the segment matcher allocated a fresh empty `Set`/`Map`/array per route (query params, constraints, build slots) and added `cachedResult` after construction, making every `CompiledRoute` megamorphic. Both now reuse shared frozen sentinels and a single hidden class (extending the `EMPTY_CHILDREN_MAP` pattern already used for tree children). At 10 000 routes this is the bulk of a ~14.4 → ~9.0 MB drop (~1.2 → ~0.67 KB/route), with no change to the O(1) match (matcher CPU stays flat) or any observable behavior.
+
+- [#1087](https://github.com/greydragon888/real-router/pull/1087) [`9e64939`](https://github.com/greydragon888/real-router/commit/9e64939b063d128eacf05235ea7980397a98772d) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop redundant matcher indexes for large route tables ([#1010](https://github.com/greydragon888/real-router/issues/1010))
+
+  The segment matcher kept two per-route `Map`s (`segmentsByName` / `metaByName`) duplicating references already held in `routesByName`; the `getSegmentsByName` / `getMetaByName` getters now derive from `routesByName` and the two maps are removed. At 10 000 routes this trims retained heap a further ~0.4 MB on top of [#1009](https://github.com/greydragon888/real-router/issues/1009) (~9.0 → ~8.5 MB, ~0.63 KB/route), with no behavior or match-speed change.
+
+
 ### @real-router/browser-plugin@0.18.1
 
 ### Patch Changes
