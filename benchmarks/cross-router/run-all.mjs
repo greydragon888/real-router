@@ -19,6 +19,7 @@ const COHORT_ENGINES = {
   vue: ["real-router", "vue-router", "tanstack"],
   solid: ["real-router", "solid-router", "tanstack"],
   svelte: ["real-router", "sv-router", "mateo-router"],
+  angular: ["real-router", "angular-router"],
 };
 const SCENARIOS = [
   "cold-start",
