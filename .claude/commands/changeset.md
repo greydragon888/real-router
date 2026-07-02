@@ -25,8 +25,9 @@
 
 3. **Определи затронутые публичные пакеты по полю `private` в их `package.json`, а не по статическому списку** — список пакетов дрейфует (адаптеры `vue`/`solid`/`svelte`/`preact`/`angular`, новые плагины), и хардкод устаревает:
    - Для каждого затронутого пакета: `node -p "require('./packages/<pkg>/package.json').private || 'PUBLIC'"`. `PUBLIC` → changeset нужен; `true` → пропусти (для private-пакета changeset делается на его публичного consumer'а, чьё поведение изменилось).
-   - Все `packages/*` без `"private": true` — публичные (на текущий момент: `core`, `core-types`/`types`, `helpers`, `logger`, все адаптеры `react`/`preact`/`solid`/`vue`/`svelte`/`angular`, все `*-plugin`, `sources`, `path-matcher`).
-   - НЕ включай private: `route-tree`, `search-params`, `type-guards`, `router-benchmarks` (и любой другой с `"private": true`).
+   - Все `packages/*` без `"private": true` — публичные (сверка 2026-07-03: `core`, `core-types`/`types`, `fsm`, `logger`, `route-utils`, `rx`, `sources`, все адаптеры `react`/`preact`/`solid`/`vue`/`svelte`/`angular`, все `*-plugin`).
+   - НЕ включай private (сверка 2026-07-03): `event-emitter`, `path-matcher`, `route-tree`, `search-params`, `type-guards` (и любой другой с `"private": true`).
+   - ⚠ Эти списки — ориентир, НЕ источник: они уже дрейфовали (`path-matcher` числился «публичным», будучи `private: true` — чуть не породил неверный changeset-план в RFC #804; `helpers` вовсе не существует). Проверка `node -p` из первого пункта обязательна для каждого затронутого пакета.
 
 4. **Определи тип изменения** (следуй таблице bump в [.changeset/README.md](../../.changeset/README.md); pre-1.0: breaking → `minor`):
    - `major` — breaking changes
