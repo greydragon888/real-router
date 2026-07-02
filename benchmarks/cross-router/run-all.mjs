@@ -2,7 +2,7 @@
 // Run the full matrix (every scenario × engine, per cohort) to populate results/,
 // then `node harness/report.mjs <fw>` turns results/ into REPORT[-<fw>].md.
 //   node cross-router/run-all.mjs [runs=15] [framework]
-// No framework arg → both cohorts (react + vue) = the full matrix. (preact cohort removed — see COHORT_ENGINES.)
+// No framework arg → all cohorts (react + vue + solid) = the full matrix. (preact cohort removed — see COHORT_ENGINES.)
 // A framework arg restricts to that cohort, using its OWN engine roster (the
 // engines differ per cohort — that is why a single hardcoded list was wrong).
 import { spawnSync } from "node:child_process";
@@ -17,6 +17,7 @@ const COHORT_ENGINES = {
   react: ["real-router", "tanstack", "react-router"],
   // preact cohort REMOVED — no full-router competitor: preact-iso is a minimalist (recommended) location-matcher, preact-router is deprecated. No honest competitive perf benchmark possible. (real-router/preact adapter still ships + is tested; just not benchmarked here.)
   vue: ["real-router", "vue-router", "tanstack"],
+  solid: ["real-router", "solid-router", "tanstack"],
 };
 const SCENARIOS = [
   "cold-start",
