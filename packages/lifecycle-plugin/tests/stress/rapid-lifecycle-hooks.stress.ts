@@ -173,9 +173,7 @@ describe("Rapid Lifecycle Hook Invocation", () => {
     }
   });
 
-  it("100 navigations with throwing hooks: errors logged, transitions complete", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
-
+  it("100 navigations with throwing hooks: errors surface asynchronously, transitions complete", async () => {
     let enterCount = 0;
     const throwingEnter: LifecycleHook = () => {
       enterCount++;
@@ -192,16 +190,42 @@ describe("Rapid Lifecycle Hook Invocation", () => {
     );
     router.usePlugin(lifecyclePluginFactory());
 
-    await router.start("/");
+    // A throwing onEnter is isolated and re-thrown asynchronously (#798) —
+    // capture the queueMicrotask re-throws so they don't fail the run as
+    // unhandled errors, then restore the previous listeners.
+    const rethrown: unknown[] = [];
+    const previousListeners = [...process.listeners("uncaughtException")];
 
-    for (let i = 0; i < 100; i++) {
-      await router.navigate("about");
-      await router.navigate("home");
+    process.removeAllListeners("uncaughtException");
+    const captureHandler = (error: unknown): void => {
+      rethrown.push(error);
+    };
+
+    process.on("uncaughtException", captureHandler);
+
+    try {
+      await router.start("/");
+
+      for (let i = 0; i < 100; i++) {
+        await router.navigate("about");
+        await router.navigate("home");
+      }
+
+      // Drain queueMicrotask-scheduled re-throws.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Every throwing onEnter fired and surfaced its error asynchronously —
+      // isolation neither swallowed the error nor aborted the transition.
+      expect(enterCount).toBe(100);
+      expect(rethrown).toHaveLength(100);
+      expect(router.getState()?.name).toBe("home");
+    } finally {
+      process.removeListener("uncaughtException", captureHandler);
+      for (const listener of previousListeners) {
+        process.on("uncaughtException", listener);
+      }
     }
-
-    expect(enterCount).toBe(100);
-    expect(errorSpy).toHaveBeenCalled();
-    expect(router.getState()?.name).toBe("home");
   });
 
   it("100 navigations with throwing hook factory: factory retried each time", async () => {

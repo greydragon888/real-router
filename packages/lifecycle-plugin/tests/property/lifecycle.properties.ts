@@ -498,6 +498,75 @@ describe("onNavigate orthogonality: fires alongside specific hooks", () => {
 });
 
 // =============================================================================
+// onNavigate Orthogonality under throwing hooks (#798)
+// =============================================================================
+
+describe("onNavigate orthogonality survives a throwing onEnter (#798)", () => {
+  test.prop([arbDistinctRouteNamePair], { numRuns: NUM_RUNS.standard })(
+    "a throwing onEnter does not swallow onNavigate on the target route",
+    async ([fromRoute, toRoute]) => {
+      const onNavigate = vi.fn();
+      const boom = new Error("onEnter boom");
+      const routes: Route[] = ["home", "about", "contact"].map((name) => ({
+        name,
+        path: name === "home" ? "/" : `/${name}`,
+        onEnter: () => () => {
+          throw boom;
+        },
+        onNavigate: () => onNavigate,
+      }));
+      const router = createRouter(routes, { defaultRoute: "home" });
+
+      router.usePlugin(lifecyclePluginFactory());
+
+      // The isolated hook error is re-thrown asynchronously (queueMicrotask);
+      // capture it so it does not fail the run, then restore listeners.
+      const rethrown: unknown[] = [];
+      const previousListeners = [...process.listeners("uncaughtException")];
+
+      process.removeAllListeners("uncaughtException");
+      const captureHandler = (error: unknown): void => {
+        rethrown.push(error);
+      };
+
+      process.on("uncaughtException", captureHandler);
+
+      try {
+        await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
+        // Drain the start transition's re-throw, then isolate the navigation.
+        await Promise.resolve();
+        await Promise.resolve();
+        onNavigate.mockClear();
+        rethrown.length = 0;
+
+        await router.navigate(toRoute);
+
+        // Drain the navigation's queueMicrotask-scheduled re-throw.
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // onEnter threw, yet onNavigate still fired for the target route —
+        // the orthogonality invariant holds under a throwing sibling hook.
+        const callsForTarget = onNavigate.mock.calls.filter(
+          ([toState]) => toState.name === toRoute,
+        );
+
+        expect(callsForTarget).toHaveLength(1);
+        // The developer signal survived, surfaced asynchronously.
+        expect(rethrown).toStrictEqual([boom]);
+      } finally {
+        process.removeListener("uncaughtException", captureHandler);
+        for (const listener of previousListeners) {
+          process.on("uncaughtException", listener);
+        }
+
+        router.stop();
+      }
+    },
+  );
+});
+
+// =============================================================================
 // Compilation Referential Stability
 // =============================================================================
 

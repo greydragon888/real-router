@@ -83,24 +83,46 @@ function createPlugin(
     return hook;
   }
 
+  // Invoke a compiled hook with per-hook exception isolation. A throwing hook
+  // must not abort the handler before a *later* hook of the same transition
+  // runs — otherwise a throwing onEnter/onStay silently swallows onNavigate,
+  // breaking the onNavigate orthogonality invariant (#798). Mirrors the
+  // per-listener isolation in `BaseSource` / `createActiveNameSelector`
+  // (@real-router/sources): re-throw asynchronously via `queueMicrotask` so the
+  // developer signal still surfaces to global error handlers / test harnesses
+  // without aborting the synchronous hook dispatch.
+  function runHook(
+    hook: LifecycleHook | undefined,
+    toState: State,
+    fromState: State | undefined,
+  ): void {
+    try {
+      hook?.(toState, fromState);
+    } catch (error) {
+      queueMicrotask(() => {
+        throw error;
+      });
+    }
+  }
+
   return {
     onTransitionLeaveApprove: (
       toState: State,
       fromState: State | undefined,
     ) => {
       if (fromState && toState.name !== fromState.name) {
-        compileHook("onLeave", fromState.name)?.(toState, fromState);
+        runHook(compileHook("onLeave", fromState.name), toState, fromState);
       }
     },
 
     onTransitionSuccess: (toState: State, fromState: State | undefined) => {
       if (toState.name === fromState?.name) {
-        compileHook("onStay", toState.name)?.(toState, fromState);
+        runHook(compileHook("onStay", toState.name), toState, fromState);
       } else {
-        compileHook("onEnter", toState.name)?.(toState, fromState);
+        runHook(compileHook("onEnter", toState.name), toState, fromState);
       }
 
-      compileHook("onNavigate", toState.name)?.(toState, fromState);
+      runHook(compileHook("onNavigate", toState.name), toState, fromState);
     },
 
     teardown: () => {

@@ -133,9 +133,11 @@ The only failure mode of orthogonal dispatch is the user declaring the same func
 
 The plugin is stateless and has no options. The hooks themselves (defined on routes) are the configuration. Adding options like "fire for parent segments" would complicate both API and implementation for marginal benefit.
 
-### Why no try/catch
+### Why per-hook try/catch (isolation)
 
-Errors from user-defined hooks propagate to the EventEmitter, which logs them to stderr. Swallowing errors with `console.warn` would hide bugs from developers. The router continues operating regardless — the EventEmitter's error handling is robust.
+Each hook invocation is wrapped in a per-hook `try/catch` that re-throws asynchronously via `queueMicrotask` (#798). This exists for one reason: a throwing `onEnter` / `onStay` must not abort the `onTransitionSuccess` handler before `onNavigate` of the same transition runs — otherwise the throw silently swallows `onNavigate`, breaking the orthogonality invariant. Re-throwing on a microtask (rather than swallowing with `console.warn`) keeps the developer signal visible to global error handlers while every other hook of the transition still fires; the router continues operating regardless. This mirrors the per-listener isolation in `BaseSource` / `createActiveNameSelector` (`@real-router/sources`).
+
+The trade-off vs. the earlier "let it propagate to the EventEmitter" design: a throwing hook now surfaces **asynchronously** (uncaught, via the microtask) instead of synchronously through the EventEmitter's "Error in listener" sink. The isolation is applied uniformly to all four hooks via a single local `runHook` helper — a per-site fix, not a shared cross-package `invokeSafely` primitive (deliberately rejected in #1039: a shared helper can't enforce adoption and per-context policies differ; the structural preventer of the forgotten-isolation class is a lint rule, not a primitive).
 
 ## See Also
 
