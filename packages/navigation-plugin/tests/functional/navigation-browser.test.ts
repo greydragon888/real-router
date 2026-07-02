@@ -63,6 +63,30 @@ describe("createNavigationBrowser", () => {
 
       expect(browser.getLocation()).toBe("/");
     });
+
+    // Base-stripping precision — re-expresses the former direct `extractPath`
+    // unit tests (removed from url.test.ts as browser-env white-box) through the
+    // real browser wrapper, which calls `extractPath(location.pathname, base)`.
+    it("returns the original pathname when base is set but does not match", () => {
+      globalThis.history.pushState({}, "", "/users");
+      browser = createNavigationBrowser("/app");
+
+      expect(browser.getLocation()).toBe("/users");
+    });
+
+    it("does not strip a base that is only a partial segment match", () => {
+      globalThis.history.pushState({}, "", "/application/users");
+      browser = createNavigationBrowser("/app");
+
+      expect(browser.getLocation()).toBe("/application/users");
+    });
+
+    it("does not strip when base is a prefix of the first segment", () => {
+      globalThis.history.pushState({}, "", "/app-v2/users");
+      browser = createNavigationBrowser("/app");
+
+      expect(browser.getLocation()).toBe("/app-v2/users");
+    });
   });
 
   describe("getHash", () => {
