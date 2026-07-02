@@ -45,5 +45,5 @@ export function isNavigationOptions(
   // Validate signal field
   const signalValue = obj.signal;
 
-  return !(signalValue !== undefined && !(signalValue instanceof AbortSignal));
+  return signalValue === undefined || signalValue instanceof AbortSignal;
 }

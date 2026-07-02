@@ -70,10 +70,10 @@ describe("New API - createRouteTree", () => {
     ]);
 
     expect(tree.children.get("home")).toBe(
-      [...tree.children.values()].find((c) => c.name === "home"),
+      tree.children.values().find((c) => c.name === "home"),
     );
     expect(tree.children.get("about")).toBe(
-      [...tree.children.values()].find((c) => c.name === "about"),
+      tree.children.values().find((c) => c.name === "about"),
     );
   });
 
