@@ -27,14 +27,32 @@ import {
   SELF_MARKER,
 } from "../../src/components/RouteView/components";
 import {
-  buildRenderList,
   collectElements,
   isSegmentMatch,
+  materializeWinner,
+  pickWinner,
 } from "../../src/components/RouteView/helpers";
 import { isRouteActive } from "../../src/RouterProvider";
 
 import type { RouteViewMarker } from "../../src/components/RouteView/components";
 import type { JSX } from "solid-js";
+
+// `buildRenderList` was the pre-#1094 production API: it returned the rendered
+// child list (length ≤ 1) that `RouteView` mounted. After #1094 the component
+// consumes the winner-keyed pipeline (`pickWinner` + `materializeWinner`)
+// directly, so this thin wrapper reproduces the exact `JSX.Element[]` shape
+// these invariants pin — over the SAME winner-selection logic the component
+// now uses. Keeping it here (not in `src/`) keeps the observable contract
+// under test without exporting a component-unused function from production.
+function buildRenderList(
+  elements: RouteViewMarker[],
+  routeName: string,
+  nodeName: string,
+): JSX.Element[] {
+  const winner = pickWinner(elements, routeName, nodeName);
+
+  return winner === null ? [] : [materializeWinner(winner)];
+}
 
 // Alpha-only segment name to keep `parent + suffix` constructions free of
 // hyphens/underscores that would alter the dot-boundary semantics being
@@ -1043,10 +1061,9 @@ describe("collectElements — Property Tests (§6.4 №6, §6.5 №5)", () => {
 // linear-walk implementation that uses isSegmentMatch unchanged. If the
 // optimization ever diverges from the reference (e.g. a refactor that
 // caches incorrectly, or breaks first-Match-wins under specific marker
-// combinations), this PBT catches it. The pre-pass cache key is
-// `${routeName} ${nodeName}` — collision-free for any real route name
-// (route names cannot contain spaces per @real-router/core's segment
-// validation).
+// combinations), this PBT catches it. The pre-pass cache is keyed by
+// `routeName` alone (#1094) — the candidate set is a pure function of the
+// active route name.
 // =============================================================================
 
 /**
