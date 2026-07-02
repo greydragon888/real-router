@@ -200,4 +200,57 @@ describe("useIsActiveRoute", () => {
 
     expect(strictResult.current).toBe(false);
   });
+
+  describe("fast path (#1099 — default options, no params)", () => {
+    // A no-params call with defaults (strict=false, ignoreQueryParams=true, no
+    // hash) takes the `createActiveNameSelector` fast path — one shared router
+    // subscription for all links — instead of a per-link
+    // `createActiveRouteSource`. These lock the fast path's observable
+    // behaviour: exact + descendant matches, inactive names, and reactive
+    // updates on navigation. (beforeEach started the router at /users/123 →
+    // current route "users.view".)
+    it("exact name match is active", () => {
+      let result!: { readonly current: boolean };
+
+      renderWithRouter(router, ActiveRouteCapture, {
+        routeName: "users.view",
+        onCapture: (r: { readonly current: boolean }) => {
+          result = r;
+        },
+      });
+
+      expect(result.current).toBe(true);
+    });
+
+    it("ancestor name is active (non-strict descendant match)", () => {
+      let result!: { readonly current: boolean };
+
+      renderWithRouter(router, ActiveRouteCapture, {
+        routeName: "users",
+        onCapture: (r: { readonly current: boolean }) => {
+          result = r;
+        },
+      });
+
+      expect(result.current).toBe(true);
+    });
+
+    it("unrelated name is inactive, then turns active after navigating to it", async () => {
+      let result!: { readonly current: boolean };
+
+      renderWithRouter(router, ActiveRouteCapture, {
+        routeName: "home",
+        onCapture: (r: { readonly current: boolean }) => {
+          result = r;
+        },
+      });
+
+      expect(result.current).toBe(false);
+
+      await router.navigate("home");
+      flushSync();
+
+      expect(result.current).toBe(true);
+    });
+  });
 });

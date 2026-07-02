@@ -265,23 +265,50 @@ describe("Link component", () => {
     consoleError.mockRestore();
   });
 
-  describe("no-params active-route source dedup (#776)", () => {
-    it("a no-params <Link> shares the canonical undefined-params source (cache key '', not '{}')", () => {
-      // A no-params `<Link routeName="users">` and a manual `useIsActiveRoute("users")`
-      // (params === undefined) ask ONE logical question and must resolve the SAME
-      // cached active-route source — one router subscription, not two (#766).
-      // `createActiveRouteSource` keys params as
-      // `params === undefined ? "" : canonicalJson(params)`, so defaulting routeParams
-      // to EMPTY_PARAMS ({}) before the call keys "{}" and splits the source.
+  describe("no-params active state — fast path (#1099) vs slow-path dedup (#776)", () => {
+    it("a default no-params <Link> uses the shared name-selector fast path, NOT a per-link createActiveRouteSource (#1099)", () => {
+      // #1099 — a default-options no-params `<Link routeName="users">` resolves
+      // active state through the per-router `createActiveNameSelector` (ONE
+      // shared `router.subscribe` for any number of distinct-name links), NOT a
+      // per-link `createActiveRouteSource` (a `BaseSource` + its own router
+      // subscription EACH). That per-link source was the bulk of the Svelte
+      // `<Link>`'s excess link-build cost over the Solid adapter.
       //
-      // Discriminator: a cache HIT returns the shared source without re-running
-      // `router.isActiveRoute`; a cache MISS constructs a fresh source and calls it once.
+      // Discriminator: the canonical undefined-params slow-path source is
+      // therefore still UNBUILT after the Link mounts. Building it now is a cache
+      // MISS — `buildActiveRouteSource` computes its initial value via
+      // `router.isActiveRoute`. (Pre-#1099 the Link built this exact source, so
+      // the same call was a cache HIT and `isActiveRoute` was NOT re-run.)
       renderWithRouter(router, Link, { routeName: "users" });
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
       createActiveRouteSource(router, "users", undefined, {
         strict: false,
+        ignoreQueryParams: true,
+      });
+
+      expect(isActiveRouteSpy).toHaveBeenCalled();
+    });
+
+    it("a slow-path no-params <Link> (activeStrict) still shares the canonical undefined-params source (#776)", () => {
+      // When a no-params Link falls to the slow path (here via `activeStrict`,
+      // which the fast path excludes), it must still pass `routeParams` straight
+      // through as `undefined` — keying the source "" (not "{}") — so a manual
+      // `useIsActiveRoute` / a matching Link shares the SAME cached source (one
+      // router subscription, not two). Discriminator: after the Link mounts +
+      // subscribes (building the source, calling `isActiveRoute` before the spy),
+      // asking for the identical source is a cache HIT → `isActiveRoute` is NOT
+      // re-run.
+      renderWithRouter(router, Link, {
+        routeName: "users",
+        activeStrict: true,
+      });
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      createActiveRouteSource(router, "users", undefined, {
+        strict: true,
         ignoreQueryParams: true,
       });
 
