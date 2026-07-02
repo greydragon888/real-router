@@ -6,11 +6,10 @@ import {
   input,
   signal,
 } from "@angular/core";
-import { createActiveRouteSource } from "@real-router/sources";
 
 import { applyLinkA11y } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
-import { buildActiveRouteOptions } from "../internal/buildActiveRouteOptions";
+import { createActiveSource } from "../internal/createActiveSource";
 import { createStableParams } from "../internal/createStableParams";
 import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
@@ -50,15 +49,16 @@ export class RealLinkActive {
     // Reactive source-creation effect (#630 fix) — see
     // `packages/angular/CLAUDE.md` → "Directives use constructor + effect()".
     effect((onCleanup) => {
-      const source = createActiveRouteSource(
+      // Fast path (#1103) for default-options links — shared name selector
+      // instead of a per-link source; see `createActiveSource`. RealLinkActive
+      // has no `hash` input, so it is always passed `undefined`.
+      const source = createActiveSource(
         this.router,
         this.routeName(),
         this.stableParams(),
-        buildActiveRouteOptions(
-          this.activeStrict(),
-          this.ignoreQueryParams(),
-          undefined,
-        ),
+        this.activeStrict(),
+        this.ignoreQueryParams(),
+        undefined,
       );
 
       onCleanup(
