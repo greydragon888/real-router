@@ -334,6 +334,7 @@ describe("buildParamMeta", () => {
       // with strip/build. (This produces a never-matching `^()$` pattern, which
       // is exactly why the gate/backstop reject `<>` — see #804 §3.3.)
       expect(meta.constraintPatterns.has("id")).toBe(true);
+
       const entry = meta.constraintPatterns.get("id")!;
 
       expect(entry.constraint).toBe("<>");
@@ -360,7 +361,9 @@ describe("buildParamMeta", () => {
 
       expect(meta.queryParams).toStrictEqual([]);
       expect(meta.urlParams).toStrictEqual(["id"]);
-      expect(meta.constraintPatterns.get("id")?.constraint).toBe(String.raw`<\d+>`);
+      expect(meta.constraintPatterns.get("id")?.constraint).toBe(
+        String.raw`<\d+>`,
+      );
     });
   });
 });

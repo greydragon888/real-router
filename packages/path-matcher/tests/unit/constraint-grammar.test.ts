@@ -14,7 +14,7 @@ describe("constraint-grammar (#804)", () => {
     it("derives a regex that matches a `<...>` delimiter pair (incl. empty)", () => {
       const rgx = new RegExp(`<${CONSTRAINT_BODY_PATTERN}>`);
 
-      expect(rgx.test("<\\d+>")).toBe(true);
+      expect(rgx.test(String.raw`<\d+>`)).toBe(true);
       expect(rgx.test("<[a-z]+>")).toBe(true);
       // canonical `*` admits the empty body at the grammar level (rejected
       // later at the gate/backstop, not here).
@@ -30,8 +30,8 @@ describe("constraint-grammar (#804)", () => {
     });
 
     it("returns true for a well-formed constraint", () => {
-      expect(isConstraintBalanced("/users/:id<\\d+>")).toBe(true);
-      expect(isConstraintBalanced("/q/:id<\\d?>")).toBe(true);
+      expect(isConstraintBalanced(String.raw`/users/:id<\d+>`)).toBe(true);
+      expect(isConstraintBalanced(String.raw`/q/:id<\d?>`)).toBe(true);
     });
 
     it("allows a `<` inside the constraint body (first `>` closes)", () => {
@@ -43,7 +43,7 @@ describe("constraint-grammar (#804)", () => {
     });
 
     it("returns false for an unclosed `<`", () => {
-      expect(isConstraintBalanced("/:id<\\d+")).toBe(false);
+      expect(isConstraintBalanced(String.raw`/:id<\d+`)).toBe(false);
       expect(isConstraintBalanced("/:id<")).toBe(false);
       expect(isConstraintBalanced("<a><b")).toBe(false);
       expect(isConstraintBalanced("a<b>c<")).toBe(false);

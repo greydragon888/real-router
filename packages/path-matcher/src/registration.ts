@@ -47,7 +47,7 @@ export interface RegistrationState {
 
 // Constraint delimiter grammar derives from the single `CONSTRAINT_BODY_PATTERN`
 // atom (#804) so the strip side cannot desync from match/build.
-// eslint-disable-next-line sonarjs/super-linear-regex -- Constraint pattern regex - bounded input from route definitions, not user input
+
 const CONSTRAINT_PATTERN_RGX = new RegExp(`<${CONSTRAINT_BODY_PATTERN}>`, "g");
 
 // =============================================================================
@@ -359,7 +359,7 @@ function throwUnbalancedConstraint(path: string): never {
 function throwEmptyConstraint(path: string): never {
   throw new Error(
     `[SegmentMatcher.registerTree] Empty constraint '<>' in path "${path}": ` +
-      `a constraint body must be non-empty (e.g. '<\\d+>'). An empty '<>' ` +
+      `a constraint body must be non-empty (e.g. '<[0-9]+>'). An empty '<>' ` +
       `compiles to a never-matching pattern.`,
   );
 }

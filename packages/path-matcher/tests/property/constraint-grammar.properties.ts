@@ -22,7 +22,9 @@ import {
 // STAR-strip oracle: remove every well-formed `<...>` pair (grammar = the atom),
 // then the path is "balanced" iff no stray `<` or `>` remains.
 const strippedBalanced = (path: string): boolean =>
-  !/[<>]/.test(path.replaceAll(new RegExp(`<${CONSTRAINT_BODY_PATTERN}>`, "g"), ""));
+  !/[<>]/.test(
+    path.replaceAll(new RegExp(`<${CONSTRAINT_BODY_PATTERN}>`, "g"), ""),
+  );
 
 // Delimiter-heavy generator: strings biased toward `<`/`>` so the balance logic
 // is actually exercised (a plain fc.string almost never produces a delimiter).
@@ -54,6 +56,7 @@ describe("constraint-grammar property-lock (#804)", () => {
   // stays true, and the property above starts failing.
   it("the oracle grammar is the STAR atom, not PLUS (empty <> is the discriminator)", () => {
     const plusStripped = (path: string): boolean =>
+      // eslint-disable-next-line sonarjs/super-linear-regex -- test oracle, bounded literal input
       !/[<>]/.test(path.replaceAll(/<[^>]+>/g, ""));
 
     // scan and STAR-strip agree that `<>` is balanced; PLUS-strip disagrees.

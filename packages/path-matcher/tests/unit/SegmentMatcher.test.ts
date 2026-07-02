@@ -677,7 +677,7 @@ describe("SegmentMatcher", () => {
   // a garbage URL (`/x/1<\d+`). registerTree is the bare-core backstop that
   // rejects them for every consumer, not only under validation-plugin (#804).
   describe("registerTree — unbalanced/empty constraint rejection (#804)", () => {
-    it("throws on an unclosed constraint '<' (/x/:id<\\d+)", () => {
+    it("throws on an unclosed constraint '<' (/x/:id<[0-9]+)", () => {
       expect(() => {
         createMatcher([{ name: "r", path: String.raw`/x/:id<\d+` }]);
       }).toThrow(/\[SegmentMatcher\.registerTree\].*[Uu]nbalanced/);
@@ -707,13 +707,13 @@ describe("SegmentMatcher", () => {
       }).toThrow(/\[SegmentMatcher\.registerTree\].*[Ee]mpty/);
     });
 
-    it("still accepts a well-formed constraint (control, /x/:id<\\d+>)", () => {
+    it("still accepts a well-formed constraint (control, /x/:id<[0-9]+>)", () => {
       expect(() => {
         createMatcher([{ name: "r", path: String.raw`/x/:id<\d+>` }]);
       }).not.toThrow();
     });
 
-    it("still accepts a well-formed constrained-optional (control, /x/:id<\\d+>?)", () => {
+    it("still accepts a well-formed constrained-optional (control, /x/:id<[0-9]+>?)", () => {
       expect(() => {
         createMatcher([{ name: "r", path: String.raw`/x/:id<\d+>?` }]);
       }).not.toThrow();
