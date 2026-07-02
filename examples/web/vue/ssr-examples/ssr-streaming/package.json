@@ -15,7 +15,7 @@
     "@real-router/ssr-data-plugin": "workspace:^",
     "@real-router/vue": "workspace:^",
     "express": "5.1.0",
-    "vue": "3.5.38"
+    "vue": "3.5.39"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
