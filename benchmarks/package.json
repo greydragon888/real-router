@@ -39,7 +39,7 @@
     "@real-router/types": "workspace:^",
     "@real-router/vue": "workspace:^",
     "@solidjs/router": "0.16.1",
-    "@tanstack/react-router": "1.170.15",
+    "@tanstack/react-router": "1.170.17",
     "@tanstack/solid-router": "1.170.17",
     "@tanstack/vue-router": "1.170.15",
     "mitata": "1.0.34",
