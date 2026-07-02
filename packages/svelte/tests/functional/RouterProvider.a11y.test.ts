@@ -5,7 +5,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 import RouterProviderAnnounceTest from "../helpers/RouterProviderAnnounceTest.svelte";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 
 const ANNOUNCER_SEL = "[data-real-router-announcer]";
 
@@ -104,5 +104,103 @@ describe("RouterProvider — announceNavigation", () => {
     unmount();
 
     expect(document.querySelector(ANNOUNCER_SEL)).toBeNull();
+  });
+
+  // ── announceNavigation options (getAnnouncementText / prefix) ─────────────
+  // Exercise the RouterProvider `announceNavigation` prop wiring through the
+  // PUBLIC contract now that the Svelte adapter forwards RouteAnnouncerOptions.
+  // The first navigation after mount is the initial transition (skipped), so
+  // each case navigates twice and asserts on the second route ("home").
+
+  it("uses a custom getAnnouncementText", async () => {
+    render(RouterProviderAnnounceTest, {
+      props: {
+        router,
+        announceNavigation: {
+          getAnnouncementText: (route: State) => `You are on ${route.name}`,
+        },
+      },
+    });
+    flushSync();
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    flushSync();
+    await router.navigate("home");
+    flushSync();
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "You are on home",
+    );
+  });
+
+  it("falls back to default resolution when getAnnouncementText returns empty", async () => {
+    render(RouterProviderAnnounceTest, {
+      props: { router, announceNavigation: { getAnnouncementText: () => "" } },
+    });
+    flushSync();
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    flushSync();
+    await router.navigate("home");
+    flushSync();
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to home",
+    );
+  });
+
+  it("uses a custom prefix", async () => {
+    render(RouterProviderAnnounceTest, {
+      props: { router, announceNavigation: { prefix: "Page: " } },
+    });
+    flushSync();
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    flushSync();
+    await router.navigate("home");
+    flushSync();
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Page: home",
+    );
+  });
+
+  it("swallows a throwing getAnnouncementText and falls back (via the prop)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(RouterProviderAnnounceTest, {
+      props: {
+        router,
+        announceNavigation: {
+          getAnnouncementText: () => {
+            throw new Error("boom");
+          },
+        },
+      },
+    });
+    flushSync();
+
+    vi.advanceTimersByTime(100);
+
+    await router.navigate("about");
+    flushSync();
+    await router.navigate("home");
+    flushSync();
+
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("getAnnouncementText threw"),
+      expect.any(Error),
+    );
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Navigated to home",
+    );
+
+    errSpy.mockRestore();
   });
 });

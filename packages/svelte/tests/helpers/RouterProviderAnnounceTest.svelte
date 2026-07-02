@@ -1,12 +1,16 @@
 <script lang="ts">
   import RouterProvider from "../../src/RouterProvider.svelte";
 
+  import type { RouteAnnouncerOptions } from "../../src/dom-utils";
   import type { Router } from "@real-router/core";
 
   let {
     router,
     announceNavigation = false,
-  }: { router: Router; announceNavigation?: boolean } = $props();
+  }: {
+    router: Router;
+    announceNavigation?: boolean | RouteAnnouncerOptions;
+  } = $props();
 </script>
 
 <RouterProvider {router} {announceNavigation}>
