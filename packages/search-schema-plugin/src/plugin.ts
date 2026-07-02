@@ -205,8 +205,14 @@ export class SearchSchemaPlugin {
     }
 
     if ("issues" in validation) {
+      // The plugin gates invalid user *input*, not developer *config*: core
+      // injects `defaultParams` into `state.params` / `state.path` below the
+      // interceptor seam this plugin hooks, so an invalid default reaches state
+      // and the URL at runtime regardless of this warning (documented contract,
+      // #802). Hence the message states the consequence + the fix, rather than
+      // implying the value was blocked.
       console.warn(
-        `${ERROR_PREFIX} Route "${routeName}": defaultParams do not pass searchSchema`,
+        `${ERROR_PREFIX} Route "${routeName}": defaultParams do not pass searchSchema — they are trusted config and will still reach state and the URL at runtime (the plugin validates user input, not config). Fix the route's defaultParams to satisfy its searchSchema.`,
         validation.issues,
       );
     }
