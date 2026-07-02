@@ -407,7 +407,10 @@ describe("Browser Plugin — Lifecycle", () => {
         unsubscribe();
         unsubscribe();
 
-        expect(removeListenerSpy).toHaveBeenCalledTimes(1);
+        // Two listeners now — popstate + the #532 cached-hash `hashchange`
+        // listener — each removed exactly once (not twice) despite the double
+        // unsubscribe.
+        expect(removeListenerSpy).toHaveBeenCalledTimes(2);
       });
     });
   });
