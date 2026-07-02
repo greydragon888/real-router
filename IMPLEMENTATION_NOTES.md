@@ -1828,6 +1828,17 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 
 ## Shared Sources via Symlinks: `shared/dom-utils/` and `shared/browser-env/` (#437)
 
+> **Superseded in part (#1065, 2026-07).** This section records the original #437
+> migration (workspace packages → `shared/` symlinks). The symlink infrastructure and
+> the `shared/package.json` rationale below still hold. But the two **tests-only
+> wrapper packages** (`packages/{dom-utils,browser-env}`) it introduced are **gone**,
+> and the "deferred test migration" is **done**: the shared tests + 100% coverage were
+> collapsed into a `shared/` test node (`@real-router/shared-sources`, #1065) and then
+> moved into the natural consumers — **react ← `shared/dom-utils`, browser-plugin ←
+> `shared/browser-env`** (see the measuring-owner table in the #809 owner-only coverage
+> section above). The "tests-only wrappers" subsection and the vitest-coverage
+> "deferred" note below are historical.
+
 ### Problem
 
 Two groups of code were shared across multiple packages via full workspace packages:
@@ -1875,12 +1886,11 @@ packages/preact/src/dom-utils              → ../../../shared/dom-utils      (s
 packages/vue/src/dom-utils                 → ../../../shared/dom-utils      (symlink)
 packages/solid/src/dom-utils               → ../../../shared/dom-utils      (symlink)
 packages/svelte/src/dom-utils              → ../../../shared/dom-utils      (symlink)
-packages/dom-utils/src                     → ../../shared/dom-utils         (tests-only wrapper)
+packages/angular/src/dom-utils             → (git-tracked COPY, re-materialized by prebundle — not a symlink)
 
 packages/browser-plugin/src/browser-env    → ../../../shared/browser-env    (symlink, git-tracked)
 packages/hash-plugin/src/browser-env       → ../../../shared/browser-env    (symlink)
 packages/navigation-plugin/src/browser-env → ../../../shared/browser-env    (symlink)
-packages/browser-env/src                   → ../../shared/browser-env       (tests-only wrapper)
 ```
 
 All tooling follows symlinks transparently and sees shared files as if they live locally inside each consumer's `src/`:
@@ -1936,6 +1946,11 @@ This asymmetry is why `dom-utils` **appears** to work without workspace deps on 
 
 ### `packages/dom-utils/` and `packages/browser-env/` as tests-only wrappers
 
+> **Retired (#1065).** Both wrapper packages were deleted; the "deferred follow-up"
+> below actually happened — the shared tests moved into a `shared/` test node and then
+> into the consumers (react ← dom-utils, browser-plugin ← browser-env). The rest of this
+> subsection is historical.
+
 Both packages are retained as minimal wrappers to host existing tests. Each has:
 
 - `package.json` — minimal: name (kept for backward compat), test scripts, deps on `@real-router/core` and (for browser-env) `type-guards` to satisfy the test runner
@@ -1948,7 +1963,7 @@ Full test migration to a dedicated location (e.g., `tests/shared/`) is a **defer
 
 ### Windows symlink requirement
 
-Git-tracked symlinks work on Unix/macOS/Linux out of the box. Windows contributors need `git config --global core.symlinks true` plus Developer Mode (or elevated shell). This was already required for Svelte's pre-#437 symlink. #437 scales it from 1 symlink to 10 (5 dom-utils consumers + 3 browser-env consumers + 2 tests-only wrappers). See README "Development" section.
+Git-tracked symlinks work on Unix/macOS/Linux out of the box. Windows contributors need `git config --global core.symlinks true` plus Developer Mode (or elevated shell). This was already required for Svelte's pre-#437 symlink. #437 scaled it from 1 symlink to 8 (5 dom-utils consumers + 3 browser-env consumers; the 2 tests-only wrapper symlinks it also added were retired with #1065). See README "Development" section.
 
 ### Tooling configuration
 
@@ -1960,7 +1975,7 @@ Git-tracked symlinks work on Unix/macOS/Linux out of the box. Windows contributo
 
 **jscpd** (`.jscpd.json`): ignores `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**`, `packages/*/src/browser-env/**`, `packages/browser-env/src/**` — without these, jscpd follows symlinks and reports the same shared files as duplicates across every symlinked location.
 
-**vitest coverage**: shared code is tracked by the file's real path (`shared/**/*.ts`), not the symlinked virtual path. The global include pattern `packages/*/src/**/*.ts` does not match `shared/**`, so shared code is currently excluded from per-package 100% coverage enforcement. This is accepted as a trade-off — test migration for shared code is the deferred follow-up.
+**vitest coverage**: shared code is tracked by the file's real path (`shared/**/*.ts`), not the symlinked virtual path. The global include pattern `packages/*/src/**/*.ts` does not match `shared/**`. Coverage is now enforced by the consumer owners (#1065): react gates `shared/dom-utils`, browser-plugin gates `shared/browser-env`, each via `allowExternal` + a dual `coverage.include` — see the #809 measuring-owner table above.
 
 ### History
 
