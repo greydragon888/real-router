@@ -671,6 +671,61 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
+  // empty `<>` desyncs match vs build the same way name-less (#858) / fused
+  // (#1050) markers do: bare core built these silently and buildPath then emitted
+  // a garbage URL (`/x/1<\d+`). registerTree is the bare-core backstop that
+  // rejects them for every consumer, not only under validation-plugin (#804).
+  describe("registerTree — unbalanced/empty constraint rejection (#804)", () => {
+    it("throws on an unclosed constraint '<' (/x/:id<[0-9]+)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: String.raw`/x/:id<\d+` }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\].*[Uu]nbalanced/);
+    });
+
+    it("throws on a lone opening '<' (/x/:id<)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/x/:id<" }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("throws on a stray closing '>' (/x/a>b)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/x/a>b" }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("throws on the empty constraint '<>' (/x/:id<>)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/x/:id<>" }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\].*[Ee]mpty/);
+    });
+
+    it("throws on the empty constraint before an optional marker (/x/:id<>?/y)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/x/:id<>?/y" }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\].*[Ee]mpty/);
+    });
+
+    it("still accepts a well-formed constraint (control, /x/:id<[0-9]+>)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: String.raw`/x/:id<\d+>` }]);
+      }).not.toThrow();
+    });
+
+    it("still accepts a well-formed constrained-optional (control, /x/:id<[0-9]+>?)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: String.raw`/x/:id<\d+>?` }]);
+      }).not.toThrow();
+    });
+
+    it("still accepts a '<' inside the constraint body (control, /:id<[a<b]>)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/:id<[a<b]>" }]);
+      }).not.toThrow();
+    });
+  });
+
   // ===========================================================================
   // build↔match grammar agreement (#738)
   // ===========================================================================

@@ -320,6 +320,22 @@ describe("validateRoutePath", () => {
           }).toThrow(/constraint/);
         });
       });
+
+      // An empty `<>` is balanced but compiles to a never-matching `^()$`
+      // pattern — a dead required param. The gate rejects it route-contextually
+      // (#804); path-matcher backstops it at registerTree.
+      it("should throw for an empty constraint '<>' (#804)", () => {
+        const paths = [
+          "/u/:id<>", // empty constraint
+          "/x/:id<>?/y", // empty constraint before an optional marker
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/empty constraint/);
+        });
+      });
     });
 
     describe("Name-less parameter markers (#863)", () => {

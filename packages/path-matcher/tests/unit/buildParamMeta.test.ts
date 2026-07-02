@@ -320,4 +320,50 @@ describe("buildParamMeta", () => {
       expect(meta.urlParams).toStrictEqual(["deep-path"]);
     });
   });
+
+  describe("constraint delimiter grammar reconcile (#804)", () => {
+    // Before #804 the match side used `<[^>]+>` (PLUS) while strip/build used
+    // `<[^>]*>` (STAR); they disagreed only on the empty `<>`. Now every regex
+    // derives from CONSTRAINT_BODY_PATTERN (`*`), so all phases agree.
+
+    it("recognizes the empty `<>` as a constraint on the match side (was dropped under PLUS)", () => {
+      const meta = buildParamMeta("/x/:id<>");
+
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      // The empty body now compiles to a constraint — grammatically consistent
+      // with strip/build. (This produces a never-matching `^()$` pattern, which
+      // is exactly why the gate/backstop reject `<>` — see #804 §3.3.)
+      expect(meta.constraintPatterns.has("id")).toBe(true);
+
+      const entry = meta.constraintPatterns.get("id")!;
+
+      expect(entry.constraint).toBe("<>");
+      expect(entry.pattern.source).toBe("^()$");
+      // `^()$` matches only the empty string — a never-matching required param.
+      expect(entry.pattern.test("")).toBe(true);
+      expect(entry.pattern.test("5")).toBe(false);
+    });
+
+    it("no longer mis-splits `/x/:id<>?/y` into a bogus query param (P3 divergence gone)", () => {
+      const meta = buildParamMeta("/x/:id<>?/y");
+
+      // Under the old PLUS match/mask, `<>` was invisible to the optional-marker
+      // mask, so the `?` was mistaken for the query separator → queryParams:["/y"]
+      // and a truncated pathPattern. With the `*` atom the mask sees `<>`, the
+      // `?` is the optional marker, and no bogus query is produced.
+      expect(meta.queryParams).toStrictEqual([]);
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.pathPattern).toBe("/x/:id<>?/y");
+    });
+
+    it("keeps non-empty constrained-optional `/x/:id<\\d+>?/y` correct (control)", () => {
+      const meta = buildParamMeta(String.raw`/x/:id<\d+>?/y`);
+
+      expect(meta.queryParams).toStrictEqual([]);
+      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.constraintPatterns.get("id")?.constraint).toBe(
+        String.raw`<\d+>`,
+      );
+    });
+  });
 });
