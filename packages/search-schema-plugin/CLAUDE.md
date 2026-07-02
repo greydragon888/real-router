@@ -81,6 +81,14 @@ Zod strip mode (default) removes unknown keys from output. With `strict: true`, 
 
 At `usePlugin()` time, validates all existing routes' `defaultParams` against their `searchSchema`. Runtime tree mutations are then re-validated via the `TREE_CHANGED` subscription: `add`/`replace` validate the whole added subtree (flat, full dotted names), and `update` re-validates the route when its `defaultParams` change. `remove`/`clear` are no-ops (routes gone). Production mode skips all of this (no subscription registered).
 
+### Invalid `defaultParams` reach state at runtime — core-injected, plugin cannot gate (#802)
+
+The runtime guarantee ("invalid params never reach `state`") holds for **user input** only. `defaultParams` are **developer config** merged in by **core**, at layers _below_ the `forwardState` interceptor this plugin hooks — so an invalid default reaches `state.params`, `state.path`, `router.buildPath()`, and `isActiveRoute()` comparisons, on every navigation, in every `mode`. The plugin **cannot** strip it from `forwardState`: whatever it returns, core re-merges `{ ...defaultParams, ...params }` afterwards in three uninterceptable spots — `StateNamespace.makeState`, `RoutesNamespace.buildPath`, `RoutesNamespace.isActiveRoute` (`InterceptableMethodMap` = `start` / `buildPath` / `forwardState`; only `forwardState` is hooked). The `{ ...defaults, ...params }` merges always put `params` on top, so an interceptor can add or replace a key but cannot **remove** one core will re-fill from config.
+
+Consequence: the restore branch `{ ...defaults, ...stripped }` in `#validateState` is **redundant with `makeState`'s merge** on the navigate/start paths — but it still matters for `PluginApi.buildState` / `forwardState` consumers (which skip `makeState`), so **do not delete it**. The dev-time check above is a **config lint**, not a runtime gate. Documented limitation, not a plugin bug — a runtime fix would require core changes (single-merge-point refactor; see the #802 analysis). Priority-low, no user report; the plugin's honest contract is "invalid _input_ never reaches state".
+
+Known gap (#802 side-finding): swapping `searchSchema` via `getRoutesApi(router).update(name, { searchSchema })` emits **no** `TREE_CHANGED` (custom fields aren't in `buildStructuralPatch` — only `forwardTo` / `defaultParams` / `encodeParams` / `decodeParams`), so the dev check does **not** re-validate existing `defaultParams` against a newly-swapped schema.
+
 ## See Also
 
 - [RFC](../core/.claude/rfc/rfc-search-schema-validation.md) — Full design document
