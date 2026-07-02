@@ -10,5 +10,5 @@
     "incremental": false
   },
   "include": ["apps/**/*.ts", "apps/**/*.tsx"],
-  "exclude": ["apps/vue/**"]
+  "exclude": ["apps/vue/**", "apps/solid/**"]
 }
