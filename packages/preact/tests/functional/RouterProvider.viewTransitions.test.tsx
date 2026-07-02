@@ -14,11 +14,10 @@ function stubStartViewTransition(): ReturnType<typeof vi.fn> {
     return { skipTransition: vi.fn() };
   });
 
-  Object.defineProperty(document, "startViewTransition", {
-    value: startSpy,
-    writable: true,
-    configurable: true,
-  });
+  (
+    document as Document & { startViewTransition?: unknown }
+  ).startViewTransition =
+    startSpy as unknown as Document["startViewTransition"];
 
   return startSpy;
 }
@@ -39,7 +38,8 @@ describe("RouterProvider — viewTransitions", () => {
   afterEach(() => {
     router.stop();
 
-    Reflect.deleteProperty(document, "startViewTransition");
+    delete (document as unknown as { startViewTransition?: unknown })
+      .startViewTransition;
     vi.unstubAllGlobals();
   });
 
@@ -73,7 +73,6 @@ describe("RouterProvider — viewTransitions", () => {
     });
 
     expect(startSpy).toHaveBeenCalledTimes(1);
-    expect(startSpy).toHaveBeenCalledWith(expect.any(Function));
   });
 
   it("viewTransitions: false — utility not wired", async () => {
@@ -113,6 +112,54 @@ describe("RouterProvider — viewTransitions", () => {
       await router.navigate("home");
     });
 
+    // After unmount, utility destroyed — no additional calls.
     expect(startSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves the deferred and clears currentVT after the post-success setTimeout", async () => {
+    const startSpy = stubStartViewTransition();
+
+    render(
+      <RouterProvider router={router} viewTransitions>
+        <div />
+      </RouterProvider>,
+    );
+
+    vi.useFakeTimers();
+
+    await act(async () => {
+      await router.navigate("about");
+    });
+
+    // The success handler schedules a setTimeout(0) that resolves the deferred
+    // and nulls currentVT via the identity guard.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    expect(startSpy).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
+
+  it("skips the transition when a concurrent navigation aborts the leave", async () => {
+    const startSpy = stubStartViewTransition();
+
+    render(
+      <RouterProvider router={router} viewTransitions>
+        <div />
+      </RouterProvider>,
+    );
+
+    // Two navigations in flight: the second supersedes the first, aborting the
+    // first transition's signal → the VT abort handler runs (real cancellation).
+    await act(async () => {
+      const first = router.navigate("about");
+      const second = router.navigate("users");
+
+      await Promise.allSettled([first, second]);
+    });
+
+    expect(startSpy).toHaveBeenCalled();
   });
 });

@@ -63,15 +63,15 @@ function App() {
 
 ## Hooks
 
-| Hook                    | Returns                                                    | Re-renders                              |
-| ----------------------- | ---------------------------------------------------------- | --------------------------------------- |
-| `useRouter()`           | `Router`                                                   | Never                                   |
-| `useNavigator()`        | `Navigator`                                                | Never (stable ref, safe to destructure) |
-| `useRoute()`            | `{ navigator, route, previousRoute }`                      | Every navigation                        |
-| `useRouteNode(name)`    | `{ navigator, route, previousRoute }`                      | Only when node activates/deactivates    |
-| `useRouteUtils()`       | `RouteUtils`                                               | Never                                   |
-| `useRouterTransition()` | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }` | On transition start/end                 |
-| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards | Never (stable subscription) |
+| Hook                               | Returns                                                               | Re-renders                                                                                                 |
+| ---------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `useRouter()`                      | `Router`                                                              | Never                                                                                                      |
+| `useNavigator()`                   | `Navigator`                                                           | Never (stable ref, safe to destructure)                                                                    |
+| `useRoute()`                       | `{ navigator, route, previousRoute }`                                 | Every navigation                                                                                           |
+| `useRouteNode(name)`               | `{ navigator, route, previousRoute }`                                 | Only when node activates/deactivates                                                                       |
+| `useRouteUtils()`                  | `RouteUtils`                                                          | Never                                                                                                      |
+| `useRouterTransition()`            | `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`            | On transition start/end                                                                                    |
+| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards | Never (stable subscription)                                                                                |
 | `useRouteEnter(handler, options?)` | `void` — fires on nav-driven mount via `useRoute()` snapshot          | Every navigation (host component reads `useRoute()`); handler ref + subscription are stable across renders |
 
 ```tsx
@@ -192,30 +192,30 @@ Declarative route matching. Renders the first matching `<RouteView.Match>` child
 
 Three fallback slots compose inside a `<RouteView nodeName="…">`:
 
-| Element                  | Fires when                                              | Props                              | Render position                 |
-|--------------------------|---------------------------------------------------------|------------------------------------|---------------------------------|
-| `<RouteView.Match>`      | Active route segment matches `segment` (or descendant when `exact={false}`) | `segment` / `exact` / `fallback` / `children` | Inline at source position       |
-| `<RouteView.Self>`       | Active route name **exactly equals** parent's `nodeName` | `fallback` / `children`           | Appended after Match elements   |
-| `<RouteView.NotFound>`   | Active route name is `UNKNOWN_ROUTE` AND no Match activated | `children`                       | Appended after Match elements   |
+| Element                | Fires when                                                                  | Props                                         | Render position               |
+| ---------------------- | --------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------- |
+| `<RouteView.Match>`    | Active route segment matches `segment` (or descendant when `exact={false}`) | `segment` / `exact` / `fallback` / `children` | Inline at source position     |
+| `<RouteView.Self>`     | Active route name **exactly equals** parent's `nodeName`                    | `fallback` / `children`                       | Appended after Match elements |
+| `<RouteView.NotFound>` | Active route name is `UNKNOWN_ROUTE` AND no Match activated                 | `children`                                    | Appended after Match elements |
 
 Precedence:
 
 1. `<Match>` first-wins — duplicate segments short-circuit; subsequent `<Match>` with the same segment are not rendered.
 2. `<Self>` first-wins — only the first `<RouteView.Self>` contributes; subsequent ones are ignored.
-3. `<NotFound>` **last-wins** — when multiple `<RouteView.NotFound>` siblings are declared (unusual but legal), only the *last* one renders. Asymmetric with the other two slots; prefer a single `<NotFound>` per RouteView.
+3. `<NotFound>` **last-wins** — when multiple `<RouteView.NotFound>` siblings are declared (unusual but legal), only the _last_ one renders. Asymmetric with the other two slots; prefer a single `<NotFound>` per RouteView.
 4. An activating `<Match>` suppresses both `<Self>` and `<NotFound>`.
 5. When no `<Match>` activates: `<Self>` wins over `<NotFound>` if both would fire (occurs only when `nodeName === UNKNOWN_ROUTE`, narrow edge case).
 
 ```tsx
 <RouteView nodeName="users">
   <RouteView.Self>
-    <UsersIndex />            {/* route name === "users" → renders */}
+    <UsersIndex /> {/* route name === "users" → renders */}
   </RouteView.Self>
   <RouteView.Match segment="profile">
-    <UserProfile />           {/* "users.profile" and descendants → renders */}
+    <UserProfile /> {/* "users.profile" and descendants → renders */}
   </RouteView.Match>
   <RouteView.NotFound>
-    <NotFoundPage />          {/* UNKNOWN_ROUTE → renders */}
+    <NotFoundPage /> {/* UNKNOWN_ROUTE → renders */}
   </RouteView.NotFound>
 </RouteView>
 ```
@@ -355,11 +355,11 @@ const html = renderToString(
 response.status(sink.code ?? 200).send(html);
 ```
 
-| Export                          | Kind      | Purpose                                                                                                                                                  |
-| ------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<HttpStatusCode code={N}/>`    | component | Writes `code` to the optional context sink during render. Last write wins across multiple instances. No-op without a provider.                            |
-| `<HttpStatusProvider sink={…}>` | component | Supplies an `HttpStatusSink` to descendant `<HttpStatusCode />` via Preact context.                                                                       |
-| `createHttpStatusSink()`        | utility   | Returns a fresh `{ code: number \| undefined }` sink — construct one per request on the server, read `sink.code` after rendering.                         |
+| Export                          | Kind      | Purpose                                                                                                                           |
+| ------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `<HttpStatusCode code={N}/>`    | component | Writes `code` to the optional context sink during render. Last write wins across multiple instances. No-op without a provider.    |
+| `<HttpStatusProvider sink={…}>` | component | Supplies an `HttpStatusSink` to descendant `<HttpStatusCode />` via Preact context.                                               |
+| `createHttpStatusSink()`        | utility   | Returns a fresh `{ code: number \| undefined }` sink — construct one per request on the server, read `sink.code` after rendering. |
 
 Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only.
 
@@ -374,6 +374,24 @@ Enable screen reader announcements for route changes:
 ```
 
 When enabled, a visually hidden `aria-live` region announces each navigation. Focus moves to the first `<h1>` on the new page. See [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
+
+`announceNavigation` also accepts a `RouteAnnouncerOptions` object to customize the announced text:
+
+| Option                | Type                | Description                                                                                         |
+| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `prefix`              | `string`            | Prefix prepended to the resolved text (default `"Navigated to "`)                                   |
+| `getAnnouncementText` | `(route) => string` | Full custom text; overrides the default `h1 → title → route-name` chain (falls back on empty/throw) |
+
+```tsx
+<RouterProvider
+  router={router}
+  announceNavigation={{
+    getAnnouncementText: (route) => `Now on ${route.name}`,
+  }}
+>
+  {/* Your app */}
+</RouterProvider>
+```
 
 ## Scroll Restoration
 
@@ -392,10 +410,7 @@ Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three mode
 Opt-in router-coordinated `IntersectionObserver` scroll spy — the URL hash tracks the topmost visible anchor as the user scrolls, syncing `state.context.url.hash` so sibling `<Link hash>` highlights stay current:
 
 ```tsx
-<RouterProvider
-  router={router}
-  scrollSpy={{ selector: "[id]:is(h2,h3)" }}
->
+<RouterProvider router={router} scrollSpy={{ selector: "[id]:is(h2,h3)" }}>
   {/* Your app */}
 </RouterProvider>
 ```

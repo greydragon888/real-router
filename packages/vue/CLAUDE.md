@@ -5,7 +5,12 @@
 ## Single Entry Point
 
 ```typescript
-import { RouterProvider, useRouteNode, Link, RouteView } from '@real-router/vue';
+import {
+  RouterProvider,
+  useRouteNode,
+  Link,
+  RouteView,
+} from "@real-router/vue";
 ```
 
 **Peer dependency:** `vue` >= 3.3.0
@@ -14,13 +19,13 @@ import { RouterProvider, useRouteNode, Link, RouteView } from '@real-router/vue'
 
 **RouterProvider Props:**
 
-| Prop                  | Type      | Default | Description                                                                                    |
-| --------------------- | --------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `router`              | `Router`  | —       | Router instance (required)                                                                     |
-| `announceNavigation`  | `boolean` | `false` | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region       |
-| `scrollRestoration`   | `ScrollRestorationOptions` | `undefined` | Opt into scroll capture + restoration. Reactive — toggling via ref creates/destroys the utility. Shape: `{ mode?: "restore"\|"top"\|"native", anchorScrolling?: boolean, behavior?: ScrollBehavior, storageKey?: string, scrollContainer?: () => HTMLElement\|null }` |
-| `scrollSpy`           | `ScrollSpyOptions` | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Shape: `{ selector: string, rootMargin?: string, scrollContainer?: () => HTMLElement\|null }`. Reactive — toggling via ref creates/destroys the utility (watched by primitive fields, so inline objects with the same `selector`/`rootMargin` don't thrash). Empty `selector` / `undefined` = off. Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP. |
-| `viewTransitions`     | `boolean` | `false` | Opt into View Transitions API integration via `createViewTransitions` utility. Reactive — toggling creates/destroys the utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements |
+| Prop                 | Type                               | Default     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------- | ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `router`             | `Router`                           | —           | Router instance (required)                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `announceNavigation` | `boolean \| RouteAnnouncerOptions` | `false`     | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region. Pass `{ prefix?, getAnnouncementText? }` to customize the announcement text — the callback falls back to the default `h1 → title → route-name` chain when it returns an empty string or throws.                                                                                                                                                                                                 |
+| `scrollRestoration`  | `ScrollRestorationOptions`         | `undefined` | Opt into scroll capture + restoration. Reactive — toggling via ref creates/destroys the utility. Shape: `{ mode?: "restore"\|"top"\|"native", anchorScrolling?: boolean, behavior?: ScrollBehavior, storageKey?: string, scrollContainer?: () => HTMLElement\|null }`                                                                                                                                                                                                                     |
+| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Shape: `{ selector: string, rootMargin?: string, scrollContainer?: () => HTMLElement\|null }`. Reactive — toggling via ref creates/destroys the utility (watched by primitive fields, so inline objects with the same `selector`/`rootMargin` don't thrash). Empty `selector` / `undefined` = off. Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP. |
+| `viewTransitions`    | `boolean`                          | `false`     | Opt into View Transitions API integration via `createViewTransitions` utility. Reactive — toggling creates/destroys the utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements                                                                                                                                                                                                                            |
 
 ### Source Structure
 
@@ -102,56 +107,56 @@ A fourth `@internal` key — `HTTP_STATUS_KEY` (provider/inject pair behind `<Ht
 
 ## Composables
 
-| Composable              | Returns                                                              | Reactive?                      |
-| ----------------------- | -------------------------------------------------------------------- | ------------------------------ |
-| `useRouter()`           | `Router`                                                             | Never                          |
-| `useNavigator()`        | `Navigator` — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more | Never                          |
-| `useRoute()`            | `{ navigator, route: Readonly<Ref<State>>, previousRoute: Readonly<Ref<State \| undefined>> }` — backed by `shallowRef` | route/previousRoute on every navigation |
-| `useRouteNode(name)`    | `{ navigator, route: Readonly<Ref<State \| undefined>>, previousRoute: Readonly<Ref<State \| undefined>> }` — backed by `computed` over a shared `shallowRef` snapshot | Only when node active/inactive |
-| `useRouteUtils()`       | `RouteUtils`                                                         | Never                          |
-| `useRouterTransition()` | `ShallowRef<RouterTransitionSnapshot>` — includes `isLeaveApproved` field | On transition start/end        |
-| `useIsActiveRoute()`    | `ShallowRef<boolean>`                                                | **INTERNAL ONLY**              |
-| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured in `setup()`) | Never (subscription is stable) |
-| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `watch(route)` (handler captured in `setup()`) | Never (watcher is owned by setup scope) |
+| Composable                         | Returns                                                                                                                                                                | Reactive?                               |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `useRouter()`                      | `Router`                                                                                                                                                               | Never                                   |
+| `useNavigator()`                   | `Navigator` — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more                                                                                   | Never                                   |
+| `useRoute()`                       | `{ navigator, route: Readonly<Ref<State>>, previousRoute: Readonly<Ref<State \| undefined>> }` — backed by `shallowRef`                                                | route/previousRoute on every navigation |
+| `useRouteNode(name)`               | `{ navigator, route: Readonly<Ref<State \| undefined>>, previousRoute: Readonly<Ref<State \| undefined>> }` — backed by `computed` over a shared `shallowRef` snapshot | Only when node active/inactive          |
+| `useRouteUtils()`                  | `RouteUtils`                                                                                                                                                           | Never                                   |
+| `useRouterTransition()`            | `ShallowRef<RouterTransitionSnapshot>` — includes `isLeaveApproved` field                                                                                              | On transition start/end                 |
+| `useIsActiveRoute()`               | `ShallowRef<boolean>`                                                                                                                                                  | **INTERNAL ONLY**                       |
+| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured in `setup()`)                                                                  | Never (subscription is stable)          |
+| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `watch(route)` (handler captured in `setup()`)                                                              | Never (watcher is owned by setup scope) |
 
 ## Exports
 
-| Export                       | Type      | Description                                                       |
-| ---------------------------- | --------- | ----------------------------------------------------------------- |
-| `RouterProvider`             | Component | Context provider for router instance                              |
-| `Link`                       | Component | Navigation link with active state detection                       |
-| `RouteView`                  | Component | Declarative route matching                                        |
-| `RouterErrorBoundary`        | Component | Declarative navigation error handling                             |
-| `useRouter()`                | Composable| Get router instance                                               |
-| `useNavigator()`             | Composable| Get navigator instance                                            |
-| `useRoute()`                 | Composable| Subscribe to all route changes                                    |
-| `useRouteNode(name)`         | Composable| Subscribe to specific node changes                                |
-| `useRouteUtils()`            | Composable| Get route tree utilities                                          |
-| `useRouterTransition()`      | Composable| Subscribe to transition state                                     |
-| `vLink`                      | Directive | Low-level navigation directive (`v-link`)                         |
-| `createRouterPlugin`         | Factory   | Vue Plugin for `app.use()` installation                           |
-| `RouterKey`/`NavigatorKey`/`RouteKey` | InjectionKey | Vue `provide`/`inject` keys for advanced integration  |
-| `LinkProps`                  | Type      | Props for `<Link>`                                                |
-| `LinkDirectiveValue`         | Type      | Value type for `v-link` directive                                 |
-| `RouteViewProps` / `RouteViewMatchProps` / `RouteViewSelfProps` / `RouteViewNotFoundProps` | Type | RouteView component props |
-| `RouteContext<P>`            | Type      | Shape of `RouteKey` inject value — `{ navigator, route, previousRoute }` |
-| `RouterErrorBoundaryProps`   | Type      | Props for `<RouterErrorBoundary>`                                 |
+| Export                                                                                     | Type         | Description                                                              |
+| ------------------------------------------------------------------------------------------ | ------------ | ------------------------------------------------------------------------ |
+| `RouterProvider`                                                                           | Component    | Context provider for router instance                                     |
+| `Link`                                                                                     | Component    | Navigation link with active state detection                              |
+| `RouteView`                                                                                | Component    | Declarative route matching                                               |
+| `RouterErrorBoundary`                                                                      | Component    | Declarative navigation error handling                                    |
+| `useRouter()`                                                                              | Composable   | Get router instance                                                      |
+| `useNavigator()`                                                                           | Composable   | Get navigator instance                                                   |
+| `useRoute()`                                                                               | Composable   | Subscribe to all route changes                                           |
+| `useRouteNode(name)`                                                                       | Composable   | Subscribe to specific node changes                                       |
+| `useRouteUtils()`                                                                          | Composable   | Get route tree utilities                                                 |
+| `useRouterTransition()`                                                                    | Composable   | Subscribe to transition state                                            |
+| `vLink`                                                                                    | Directive    | Low-level navigation directive (`v-link`)                                |
+| `createRouterPlugin`                                                                       | Factory      | Vue Plugin for `app.use()` installation                                  |
+| `RouterKey`/`NavigatorKey`/`RouteKey`                                                      | InjectionKey | Vue `provide`/`inject` keys for advanced integration                     |
+| `LinkProps`                                                                                | Type         | Props for `<Link>`                                                       |
+| `LinkDirectiveValue`                                                                       | Type         | Value type for `v-link` directive                                        |
+| `RouteViewProps` / `RouteViewMatchProps` / `RouteViewSelfProps` / `RouteViewNotFoundProps` | Type         | RouteView component props                                                |
+| `RouteContext<P>`                                                                          | Type         | Shape of `RouteKey` inject value — `{ navigator, route, previousRoute }` |
+| `RouterErrorBoundaryProps`                                                                 | Type         | Props for `<RouterErrorBoundary>`                                        |
 
 ## Differences from React, Preact, and Solid Adapters
 
-| Aspect | React/Preact | Solid | Vue |
-|--------|--------------|-------|-----|
-| Composable return types | Values | Accessors (`Accessor<T>`) | `Readonly<Ref<T>>` (shallowRef / computed under the hood; `useRouterTransition` exposes `ShallowRef` directly) |
-| External store bridge | `useSyncExternalStore` / polyfill | `createSignalFromSource` | `useRefFromSource` |
-| `memo()` | Required | Not needed | Not needed |
-| Params stabilization | `canonicalJson` in `@real-router/sources` | Same | Same |
-| Active class on Link | `className` string concat | `classList` object | `class` string concat |
-| Context count | 3 (Preact) / 2 (React) | 2 | 3 |
-| `keepAlive` / Activity | React 19.2+ only | Not available | Vue native `<KeepAlive>` |
-| Entry points | Main + Legacy (React) / Single (Preact) | Single | Single |
-| Build tool | tsdown | rollup + babel-preset-solid | tsdown |
-| Components | JSX (.tsx) | JSX (.tsx) | `defineComponent` + `h()` (.ts) |
-| RouteView child detection | Element type checking | Symbol-based `$$type` markers | `vnode.type === Match` |
+| Aspect                    | React/Preact                              | Solid                         | Vue                                                                                                            |
+| ------------------------- | ----------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Composable return types   | Values                                    | Accessors (`Accessor<T>`)     | `Readonly<Ref<T>>` (shallowRef / computed under the hood; `useRouterTransition` exposes `ShallowRef` directly) |
+| External store bridge     | `useSyncExternalStore` / polyfill         | `createSignalFromSource`      | `useRefFromSource`                                                                                             |
+| `memo()`                  | Required                                  | Not needed                    | Not needed                                                                                                     |
+| Params stabilization      | `canonicalJson` in `@real-router/sources` | Same                          | Same                                                                                                           |
+| Active class on Link      | `className` string concat                 | `classList` object            | `class` string concat                                                                                          |
+| Context count             | 3 (Preact) / 2 (React)                    | 2                             | 3                                                                                                              |
+| `keepAlive` / Activity    | React 19.2+ only                          | Not available                 | Vue native `<KeepAlive>`                                                                                       |
+| Entry points              | Main + Legacy (React) / Single (Preact)   | Single                        | Single                                                                                                         |
+| Build tool                | tsdown                                    | rollup + babel-preset-solid   | tsdown                                                                                                         |
+| Components                | JSX (.tsx)                                | JSX (.tsx)                    | `defineComponent` + `h()` (.ts)                                                                                |
+| RouteView child detection | Element type checking                     | Symbol-based `$$type` markers | `vnode.type === Match`                                                                                         |
 
 ## Promise-Based Navigation
 
@@ -165,16 +170,16 @@ router.navigate(routeName, routeParams, routeOptions).catch(() => {});
 
 All SSR-aware components/composables live at the `/ssr` subpath. Eight exports total — symmetric with `@real-router/react/ssr`:
 
-| Export | Kind | Purpose |
-|---|---|---|
-| `<ClientOnly>` | component | `ref(false)` + `onMounted` + slots `default`/`fallback` — server emits fallback, post-mount swap reveals children. |
-| `<ServerOnly>` | component | Symmetric inverse. |
-| `<Streamed>` | component | Cross-adapter alias for Vue's native `<Suspense>` boundary. |
-| `<Await name="key">` | component | `async setup()` — awaits the deferred promise, hands the resolved value to the `default` scoped slot. |
-| `<HttpStatusCode :code="N"/>` | component | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink in `setup()`. Last write wins. No-op without provider. |
-| `<HttpStatusProvider :sink="...">` | component | Provides an `HttpStatusSink` to descendants via `provide()` + `InjectionKey`. |
-| `useDeferred<T>(key)` | composable | Returns the deferred Promise from `state.context.ssrDataDeferred[key]`. |
-| `createHttpStatusSink()` | utility | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after `renderToString`/`renderToWebStream` to apply to the response. |
+| Export                             | Kind       | Purpose                                                                                                                                                                               |
+| ---------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<ClientOnly>`                     | component  | `ref(false)` + `onMounted` + slots `default`/`fallback` — server emits fallback, post-mount swap reveals children.                                                                    |
+| `<ServerOnly>`                     | component  | Symmetric inverse.                                                                                                                                                                    |
+| `<Streamed>`                       | component  | Cross-adapter alias for Vue's native `<Suspense>` boundary.                                                                                                                           |
+| `<Await name="key">`               | component  | `async setup()` — awaits the deferred promise, hands the resolved value to the `default` scoped slot.                                                                                 |
+| `<HttpStatusCode :code="N"/>`      | component  | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink in `setup()`. Last write wins. No-op without provider.                                |
+| `<HttpStatusProvider :sink="...">` | component  | Provides an `HttpStatusSink` to descendants via `provide()` + `InjectionKey`.                                                                                                         |
+| `useDeferred<T>(key)`              | composable | Returns the deferred Promise from `state.context.ssrDataDeferred[key]`.                                                                                                               |
+| `createHttpStatusSink()`           | utility    | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after `renderToString`/`renderToWebStream` to apply to the response. |
 
 ```vue-html
 <HttpStatusProvider :sink="sink">
@@ -199,9 +204,13 @@ import {
 } from "@real-router/vue/ssr";
 
 const sink = createHttpStatusSink();
-h(HttpStatusProvider, { sink }, {
-  default: () => h(HttpStatusCode, { code: 404 }),
-});
+h(
+  HttpStatusProvider,
+  { sink },
+  {
+    default: () => h(HttpStatusCode, { code: 404 }),
+  },
+);
 ```
 
 Server flow:
@@ -271,7 +280,7 @@ Don't swap `shallowRef` for `ref` in `useRefFromSource` — the deep proxy would
 Core identifies a router by **object identity** in an internal `WeakMap`
 (`getInternals` / `getPluginApi`). Putting the router into a Vue `reactive()`
 store — **including Pinia state** — wraps it in a reactive `Proxy`, and that
-proxy is a *different* object than the WeakMap key. Any code that goes through
+proxy is a _different_ object than the WeakMap key. Any code that goes through
 the WeakMap API (`RouterErrorBoundary`, `useRouteUtils`, `useRouterTransition`,
 plugin internals) then throws:
 
@@ -297,7 +306,7 @@ const store = reactive({ router: markRaw(router) });
 
 `markRaw` is the Vue canon for non-proxyable instances. Passing the router as a
 plain `<RouterProvider :router="router">` prop is safe (Vue does not deep-proxy
-prop *values*) — the breakage is specifically about making the instance itself
+prop _values_) — the breakage is specifically about making the instance itself
 reactive. A defensive `toRaw(props.router)` inside `RouterProvider` /
 `createRouterPlugin` would also harden the rare case where a parent has already
 wrapped it.
@@ -309,9 +318,9 @@ wrapped it.
 ### useRouter vs useRoute
 
 ```typescript
-const router = useRouter();           // Stable — never reactive
-const { route } = useRoute();         // Readonly<Ref<State>> (shallowRef under the hood) — reactive, read .value
-const routeName = route.value?.name;  // Read in script
+const router = useRouter(); // Stable — never reactive
+const { route } = useRoute(); // Readonly<Ref<State>> (shallowRef under the hood) — reactive, read .value
+const routeName = route.value?.name; // Read in script
 ```
 
 ### useRoute throws when route is undefined
@@ -348,7 +357,7 @@ const q = route.value.params.q; // typed as string
 ### useRouteNode Semantics
 
 ```typescript
-useRouteNode("");       // Root — ALL route changes
+useRouteNode(""); // Root — ALL route changes
 useRouteNode("users"); // Only "users" and "users.*" routes
 ```
 
@@ -366,11 +375,15 @@ previousRoute.value; // = items (not users.list!)
 
 ```typescript
 // nodeName = "" + segment = ""  →  fullSegmentName = "" → never active
-h(RouteView, { nodeName: "" }, {
-  default: () => [
-    h(RouteView.Match, { segment: "" }, { default: () => h(Home) }),
-  ],
-});
+h(
+  RouteView,
+  { nodeName: "" },
+  {
+    default: () => [
+      h(RouteView.Match, { segment: "" }, { default: () => h(Home) }),
+    ],
+  },
+);
 ```
 
 Use `<RouteView.Self>` (the dedicated marker for "this exact node") or set `segment` to the actual route name. The `Match` element with `segment=""` silently never renders — there is no warning at runtime.
@@ -391,11 +404,15 @@ const el = h(RouteView.Match, { segment: "users" }, () => h(UsersPage));
 // el renders nothing — it's a marker
 
 // CORRECT — use inside RouteView only
-h(RouteView, { nodeName: "" }, {
-  default: () => [
-    h(RouteView.Match, { segment: "users" }, { default: () => h(UsersPage) }),
-  ],
-})
+h(
+  RouteView,
+  { nodeName: "" },
+  {
+    default: () => [
+      h(RouteView.Match, { segment: "users" }, { default: () => h(UsersPage) }),
+    ],
+  },
+);
 ```
 
 ### keepAlive Wrapper Components
@@ -432,7 +449,7 @@ When `keepAlive` is enabled (on `<RouteView>` or on an individual `<RouteView.Ma
 
 ### `<KeepAlive>` deactivated subtrees stay fresh — immune to #765
 
-Vue is the **only** adapter where a sleeping (deactivated) subtree is *outside*
+Vue is the **only** adapter where a sleeping (deactivated) subtree is _outside_
 the reconnect-staleness window. `useRefFromSource` bridges via `shallowRef` +
 `onScopeDispose`; under native `<KeepAlive>` a deactivated component keeps its
 **effect scope alive** (Vue disposes scopes on `unmount`, not on deactivate). The
@@ -441,7 +458,7 @@ sleeps — a navigation during deactivation is applied to the `shallowRef` as
 usual, and re-activating shows the **fresh** state with no dependence on source
 reconcile.
 
-Contrast: React `<Activity>` detaches effects on hide and so *opens* the stale
+Contrast: React `<Activity>` detaches effects on hide and so _opens_ the stale
 window ([#765](https://github.com/greydragon888/real-router/issues/765)); Solid
 and Svelte have no keepAlive analogue. This is a real, guaranteed advantage of
 the Vue adapter — with one cost worth knowing: subscriptions of sleeping subtrees
@@ -453,27 +470,31 @@ components are not "paused" with respect to router updates.
 `RouteView.Match` accepts an optional `fallback` prop (`VNode | (() => VNode)`). When provided, the matched content is wrapped in Vue's `<Suspense>` with that node as the fallback. Use this with `defineAsyncComponent` to show a loading state while the component chunk loads.
 
 ```typescript
-import { defineAsyncComponent, h } from 'vue';
+import { defineAsyncComponent, h } from "vue";
 
-const LazyDashboard = defineAsyncComponent(() => import('./Dashboard.vue'));
+const LazyDashboard = defineAsyncComponent(() => import("./Dashboard.vue"));
 
-h(RouteView, { nodeName: "" }, {
-  default: () => [
-    h(
-      RouteView.Match,
-      { segment: "dashboard", fallback: h(Spinner) },
-      { default: () => h(LazyDashboard) },
-    ),
-  ],
-});
+h(
+  RouteView,
+  { nodeName: "" },
+  {
+    default: () => [
+      h(
+        RouteView.Match,
+        { segment: "dashboard", fallback: h(Spinner) },
+        { default: () => h(LazyDashboard) },
+      ),
+    ],
+  },
+);
 ```
 
 In a template:
 
 ```vue
 <script setup>
-import { defineAsyncComponent } from 'vue';
-const LazyDashboard = defineAsyncComponent(() => import('./Dashboard.vue'));
+import { defineAsyncComponent } from "vue";
+const LazyDashboard = defineAsyncComponent(() => import("./Dashboard.vue"));
 </script>
 
 <RouteView nodeName="">
@@ -615,8 +636,8 @@ Verified end-to-end across three example apps:
 
 - **Per-request `createSSRApp(...)`** — never reuse a Vue app across requests. `RouterProvider`'s `provide()` is scoped to the app instance, and the router clone is per-request anyway. Pair with `cloneRouter(baseRouter, deps)` for full request isolation; `dispose()` the router after the response is sent.
 - **Refs read with `.value` on the server too** — composables return `Readonly<Ref<…>>` (a shallowRef or computed) under SSR identical to the client. Read `route.value.context.data`, not `route.context.data`. Vue's template auto-unwrapping also works server-side, so `{{ route.name }}` in a template stays valid in either environment.
-- **`<Suspense>` is blocking in SSR** — Vue 3 (stable) emits no out-of-order placeholders. Render of content placed *after* a `<Suspense>` boundary waits for every `async setup()` inside it before more HTML is emitted. `renderToWebStream` still helps TTFB on the shell that precedes the boundary, but you don't get React's "fallback now, real content later" model. Use `onErrorCaptured` (returning `false` to halt propagation) as the SSR-safe error boundary — it triggers symmetrically on the server-rendered tree and on hydration-time async failures.
-- **SSG dual-mode mount** — when the same client entry serves both pre-rendered SSG output and dev mode (no SSR content), branch the factory: `rootElement.firstElementChild ? createSSRApp(...) : createApp(...)`. Both share the exact same `RouterProvider` setup. In either case, `await hydrateRouter(router, ssrState)` must complete *before* `mount("#root")` — otherwise the first render reads an unstarted router and Vue logs hydration mismatches.
+- **`<Suspense>` is blocking in SSR** — Vue 3 (stable) emits no out-of-order placeholders. Render of content placed _after_ a `<Suspense>` boundary waits for every `async setup()` inside it before more HTML is emitted. `renderToWebStream` still helps TTFB on the shell that precedes the boundary, but you don't get React's "fallback now, real content later" model. Use `onErrorCaptured` (returning `false` to halt propagation) as the SSR-safe error boundary — it triggers symmetrically on the server-rendered tree and on hydration-time async failures.
+- **SSG dual-mode mount** — when the same client entry serves both pre-rendered SSG output and dev mode (no SSR content), branch the factory: `rootElement.firstElementChild ? createSSRApp(...) : createApp(...)`. Both share the exact same `RouterProvider` setup. In either case, `await hydrateRouter(router, ssrState)` must complete _before_ `mount("#root")` — otherwise the first render reads an unstarted router and Vue logs hydration mismatches.
 - **`previousRoute` is `undefined` on the server** — first render has no prior navigation, so `useRoute().previousRoute.value === undefined` server-side; design SSR-rendered components accordingly.
 - **No `browser-plugin` on the server** — register it only in `entry-client.ts`. The server uses bare `cloneRouter(...).start(url)` with the explicit URL string; `browser-plugin` exists for client-side `popstate` + `pushState` and would touch `globalThis.history`/`window.location` during SSR.
 

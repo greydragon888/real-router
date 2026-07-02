@@ -11,13 +11,17 @@ import {
   createViewTransitions,
 } from "./dom-utils";
 
-import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
+import type {
+  RouteAnnouncerOptions,
+  ScrollRestorationOptions,
+  ScrollSpyOptions,
+} from "./dom-utils";
 import type { Router } from "@real-router/core";
 import type { ParentProps, JSX } from "solid-js";
 
 export interface RouteProviderProps {
   router: Router;
-  announceNavigation?: boolean;
+  announceNavigation?: boolean | RouteAnnouncerOptions;
   scrollRestoration?: ScrollRestorationOptions;
   scrollSpy?: ScrollSpyOptions;
   viewTransitions?: boolean;
@@ -86,7 +90,12 @@ export function RouterProvider(
 
   // Opt-in features wired through the shared mountFeature helper.
   mountFeature(props.announceNavigation, () =>
-    createRouteAnnouncer(props.router),
+    createRouteAnnouncer(
+      props.router,
+      typeof props.announceNavigation === "object"
+        ? props.announceNavigation
+        : undefined,
+    ),
   );
   mountFeature(props.scrollRestoration, () =>
     createScrollRestoration(props.router, props.scrollRestoration),

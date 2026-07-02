@@ -50,21 +50,6 @@
         "config": ["vitest.config.mts"]
       }
     },
-    "packages/dom-utils": {
-      "entry": ["tests/**/*.{ts,tsx}"],
-      "project": ["tests/**/*.ts"],
-      "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
-      }
-    },
-    "packages/browser-env": {
-      "entry": ["tests/**/*.{ts,tsx}"],
-      "project": ["tests/**/*.ts"],
-      "ignoreDependencies": ["type-guards"],
-      "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
-      }
-    },
     "packages/browser-plugin": {
       "project": ["src/**/*.ts"],
       "ignore": ["src/browser-env/**"],

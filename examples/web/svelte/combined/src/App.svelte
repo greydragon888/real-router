@@ -68,7 +68,16 @@
   };
 </script>
 
-<RouterProvider {router} announceNavigation>
+<!-- announceNavigation accepts RouteAnnouncerOptions to customize the
+     screen-reader announcement text — here a custom getAnnouncementText
+     overrides the default "Navigated to <route.name>". `prefix` is the other
+     option. See the @real-router/svelte README (announceNavigation prop). -->
+<RouterProvider
+  {router}
+  announceNavigation={{
+    getAnnouncementText: (route) => `Now on the ${route.name} page`,
+  }}
+>
   <Layout title="Real-Router — Combined" {links}>
     <ProgressBar />
     <RouteView nodeName="">

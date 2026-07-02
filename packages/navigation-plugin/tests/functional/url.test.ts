@@ -1,7 +1,6 @@
 import { createRouter } from "@real-router/core";
 import { describe, expect, it } from "vitest";
 
-import { buildUrl, extractPath, urlToPath } from "../../src/browser-env";
 import { navigationPluginFactory } from "../../src/factory";
 import { createNavigationFallbackBrowser } from "../../src/ssr-fallback";
 import { MockNavigation } from "../helpers/mockNavigation";
@@ -10,123 +9,16 @@ import {
   routerConfig,
 } from "../helpers/testUtils";
 
-describe("extractPath", () => {
-  it("returns path without base when base matches", () => {
-    expect(extractPath("/app/users", "/app")).toBe("/users");
-  });
-
-  it("ensures leading slash when base stripped", () => {
-    expect(extractPath("/app", "/app")).toBe("/");
-  });
-
-  it("returns original path when no base match", () => {
-    expect(extractPath("/users", "/app")).toBe("/users");
-  });
-
-  it("returns original path when base is empty", () => {
-    expect(extractPath("/users/list", "")).toBe("/users/list");
-  });
-
-  // Edge cases: empty pathname — the fallback branch `if (!pathname)`
-  // returns "/" so callers never see an empty string. Pin both base
-  // variants so a regression that returns "" or `base` stands out.
-  it("returns / for empty pathname with empty base", () => {
-    expect(extractPath("", "")).toBe("/");
-  });
-
-  it("returns / for empty pathname with non-empty base", () => {
-    expect(extractPath("", "/app")).toBe("/");
-  });
-
-  it("does not strip partial segment match", () => {
-    expect(extractPath("/application/users", "/app")).toBe(
-      "/application/users",
-    );
-  });
-
-  it("does not strip when base is prefix of segment", () => {
-    expect(extractPath("/app-v2/users", "/app")).toBe("/app-v2/users");
-  });
-
-  it("strips exact segment match", () => {
-    expect(extractPath("/app/users", "/app")).toBe("/users");
-  });
-
-  it("returns / for exact base match", () => {
-    expect(extractPath("/app", "/app")).toBe("/");
-  });
-
-  // Baseline behavior doc: with a canonical base, extractPath preserves any
-  // runs of '/' inside the tail unchanged. Callers that want collapsed paths
-  // must normalize downstream (router.matchPath tolerates '//foo' as no-match).
-  it("preserves double slashes after stripping base (extractPath is not a normalizer)", () => {
-    expect(extractPath("/app//users", "/app")).toBe("//users");
-  });
-
-  it("preserves double slashes when base is empty", () => {
-    expect(extractPath("//foo", "")).toBe("//foo");
-  });
-});
-
-describe("buildUrl", () => {
-  it("prepends base to path", () => {
-    expect(buildUrl("/users", "/app")).toBe("/app/users");
-  });
-
-  it("returns path unchanged when base is empty", () => {
-    expect(buildUrl("/users", "")).toBe("/users");
-  });
-
-  // Edge cases: empty path and index-with-base.
-  it("returns empty string for empty path with empty base", () => {
-    expect(buildUrl("", "")).toBe("");
-  });
-
-  it("returns base unchanged for empty path with non-empty base", () => {
-    expect(buildUrl("", "/app")).toBe("/app");
-  });
-
-  it("returns canonical base (no trailing slash) for path=/ with non-empty base", () => {
-    // Historically this produced "/app/" — the collapse to bare base keeps
-    // index URLs symmetric with `normalizeBase("/app/") === "/app"`. Roundtrip
-    // holds: extractPath("/app", "/app") === "/".
-    expect(buildUrl("/", "/app")).toBe("/app");
-  });
-
-  it("returns / for path=/ with empty base", () => {
-    expect(buildUrl("/", "")).toBe("/");
-  });
-});
-
-describe("urlToPath", () => {
-  it("parses absolute URL and extracts path with search", () => {
-    expect(urlToPath("http://localhost/users?page=1", "")).toBe(
-      "/users?page=1",
-    );
-  });
-
-  it("returns '/' for scheme-only URL with no path (authority stripped)", () => {
-    expect(urlToPath("not-a-valid-url-at-all://broken", "")).toBe("/");
-  });
-
-  it("returns '/' for empty URL input (parser is total)", () => {
-    expect(urlToPath("", "")).toBe("/");
-  });
-
-  it("extracts path from ftp:// URL (scheme-agnostic)", () => {
-    expect(urlToPath("ftp://files.example.com/doc", "")).toBe("/doc");
-  });
-
-  it("treats javascript: as literal pathname (no route will match)", () => {
-    expect(urlToPath("javascript:alert(1)", "")).toBe("/javascript:alert(1)");
-  });
-
-  it("handles URL with base path correctly", () => {
-    expect(urlToPath("http://localhost/app/users?tab=active", "/app")).toBe(
-      "/users?tab=active",
-    );
-  });
-});
+// `extractPath` / `buildUrl` / `urlToPath` are generic browser-env URL helpers,
+// owned and unit-tested to 100% by the shared test node. This file drives the
+// navigation-plugin's URL *wiring* through its public surface rather than
+// calling those functions directly:
+//   - extractPath → the real browser's getLocation (navigation-browser.test.ts,
+//     base-stripping precision).
+//   - buildUrl    → router.buildUrl(...) below.
+//   - urlToPath   → router.matchUrl(...) below.
+// Pure-function edge cases (empty pathname, "//"-preservation) stay in the
+// shared node — they are not distinct plugin behaviours.
 
 describe("buildUrl extension (via plugin)", () => {
   it("builds URL with base path via router.buildUrl()", async () => {
@@ -149,6 +41,19 @@ describe("buildUrl extension (via plugin)", () => {
     await router.start("/home");
 
     expect(router.buildUrl("users.list")).toBe("/users/list");
+  });
+
+  // Index route (path "/") with a base collapses to the bare base — the
+  // integration form of the former `buildUrl("/", "/app") === "/app"` unit test.
+  it("builds the canonical base URL for the index route (path='/')", async () => {
+    const mock = new MockNavigation("http://localhost/app/home");
+    const browser = createMockNavigationBrowser(mock);
+    const router = createRouter(routerConfig);
+
+    router.usePlugin(navigationPluginFactory({ base: "/app" }, browser));
+    await router.start("/home");
+
+    expect(router.buildUrl("index")).toBe("/app");
   });
 });
 
@@ -206,6 +111,36 @@ describe("matchUrl extension (via plugin)", () => {
 
     expect(state).toBeDefined();
     expect(state!.name).toBe("users.list");
+  });
+
+  // Empty URL parses to "/" → resolves to the index route. Integration form of
+  // the former `urlToPath("", "") === "/"` unit test.
+  it("resolves an empty URL to the index route", async () => {
+    const mock = new MockNavigation("http://localhost/home");
+    const browser = createMockNavigationBrowser(mock);
+    const router = createRouter(routerConfig);
+
+    router.usePlugin(navigationPluginFactory({ base: "" }, browser));
+    await router.start("/home");
+
+    const state = router.matchUrl("");
+
+    expect(state).toBeDefined();
+    expect(state!.name).toBe("index");
+  });
+
+  // urlToPath is scheme-agnostic: "ftp://host/doc" → "/doc" (authority
+  // stripped), which matches no route here → undefined. Integration form of the
+  // former `urlToPath("ftp://…") === "/doc"` unit test.
+  it("extracts the path from a non-http scheme and returns undefined when unmatched", async () => {
+    const mock = new MockNavigation("http://localhost/home");
+    const browser = createMockNavigationBrowser(mock);
+    const router = createRouter(routerConfig);
+
+    router.usePlugin(navigationPluginFactory({ base: "" }, browser));
+    await router.start("/home");
+
+    expect(router.matchUrl("ftp://files.example.com/doc")).toBeUndefined();
   });
 });
 

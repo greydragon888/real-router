@@ -93,9 +93,14 @@ type HashAwareNavigationOptions = NavigationOptions & {
   hashChange?: boolean;
 };
 
+// The `url` namespace contract is owned by browser-env: both URL plugins
+// (browser-plugin, navigation-plugin) write `{ hash: string; hashChanged }` on
+// every transition. This is a local mirror (keeps dom-utils independent of
+// browser-env) and must match that canonical shape — `hash` is always present,
+// never a partial slice.
 interface UrlContextSlice {
-  hash?: string;
-  hashChanged?: boolean;
+  hash: string;
+  hashChanged: boolean;
 }
 
 const getUrlContext = (state: {
@@ -635,9 +640,14 @@ export function createScrollSpy(
       return;
     }
 
-    if (observers.pending.size === 0) {
-      return;
-    }
+    // No `if (pending.size === 0) return` fast-path: `pending` is never empty
+    // here via any real path (a real IntersectionObserver always delivers ≥1
+    // entry, so `handleIntersection` populates `pending` before scheduling; the
+    // mutation reconcile that could drop entries runs at MUTATION_DEBOUNCE_MS
+    // 250 > RAF_DEBOUNCE_MS 150, i.e. always AFTER the flush). And an empty map
+    // is already handled identically below — `pickTopmost(∅)` is `null` → the
+    // `if (!picked) return` guard — so the fast-path was both unreachable and
+    // redundant.
 
     // Successful flush consumes the merged snapshot. We clear so that the
     // next debounce window starts fresh; an anchor that is still
@@ -666,7 +676,11 @@ export function createScrollSpy(
       return;
     }
 
-    const currentHash = getUrlContext(state)?.hash ?? "";
+    // `getUrlContext` is guaranteed present here (the URL-plugin detector
+    // silences the spy otherwise), so `?.` only satisfies the `| undefined`
+    // slice type. `newHash` is a non-empty id (guarded above), so it can never
+    // equal an absent hash — no `?? ""` normalization needed for the compare.
+    const currentHash = getUrlContext(state)?.hash;
 
     if (newHash === currentHash) {
       return;
@@ -716,10 +730,12 @@ export function createScrollSpy(
 
   return {
     destroy(): void {
-      if (destroyed) {
-        return;
-      }
-
+      // No `if (destroyed) return` idempotency guard: every subsystem teardown
+      // below is itself idempotent (null-guarded timers, `set.delete` on the
+      // router unsubscribe, spec-idempotent `IntersectionObserver.disconnect`),
+      // and `destroy()` is not a hot path — so a redundant guard would only add
+      // an unreachable branch. `destroyed = true` is still set to gate any
+      // late-arriving IO/router callback via `isStopped()`.
       destroyed = true;
 
       // Unsubscribe FIRST to prevent late-arriving router transition

@@ -8,7 +8,7 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets (8/6/3/2/2/8/3 = 32), plus synthetic
+//     reproduce the companion §C buckets (8/6/3/2/2/8/1 = 30), plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
 // Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.
@@ -73,7 +73,7 @@ const LEAVES = [
   "logger-plugin",
   "persistent-params-plugin",
 ].map((p) => `@real-router/${p}`);
-const INTERNAL = ["browser-env", "dom-utils", "type-guards"];
+const INTERNAL = ["type-guards"];
 
 // ─── Level 1 — affected derivation (A5, the load-bearing invariant) ──────────
 
@@ -157,7 +157,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
       { package: "@real-router/react", directory: "packages/react" },
       { package: "@real-router/react", directory: "packages/react" }, // dup (bundle+test)
       { package: "@real-router/types", directory: "packages/core-types" },
-      { package: "browser-env", directory: "packages/browser-env" },
+      { package: "event-emitter", directory: "packages/event-emitter" },
       { package: "@real-router/shared-sources", directory: "shared" }, // dropped (not packages/*)
       { package: "router-benchmarks", directory: "benchmarks" }, // dropped
       { package: "//", directory: "" }, // dropped
@@ -166,7 +166,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
   const { members, dirOf } = deriveMembership(dryJson);
   assert.deepEqual(
     [...members].sort(),
-    ["@real-router/react", "@real-router/types", "browser-env"],
+    ["@real-router/react", "@real-router/types", "event-emitter"],
     "membership = deduped packages/* target set",
   );
   // core-types quirk preserved from turbo's own directory (not reconstructed).
@@ -176,13 +176,13 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 8/6/3/2/2/8/3 = 32", () => {
+test("L2: classify() buckets all real packages/* exactly 8/6/3/2/2/8/1 = 30", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 32, "expected 32 packages/* workspaces");
+  assert.equal(allPackages.length, 30, "expected 30 packages/* workspaces");
   assert.deepEqual(counts, {
     base: 8,
     adapter: 6,
@@ -190,7 +190,7 @@ test("L2: classify() buckets all real packages/* exactly 8/6/3/2/2/8/3 = 32", ()
     "ssr-plugin": 2,
     "adapter-shared": 2,
     leaf: 8,
-    internal: 3,
+    internal: 1,
   });
 });
 
@@ -315,8 +315,8 @@ test("routing: touchesCore overrides leaf even for a tiny affected set", () => {
 
 test("routing: route-utils fanout (intermediate amplifier) → sharded despite ≤ K", () => {
   // Empirically measured (isolated route-utils source edit, turbo 2.10.0):
-  // affected = route-utils + sources + dom-utils + 6 adapters = 9, no core layer.
-  // 9 ≤ K(10), so the COUNT alone would route to leaf — but route-utils/sources
+  // affected = route-utils + sources + 6 adapters = 8, no core layer.
+  // 8 ≤ K(10), so the COUNT alone would route to leaf — but route-utils/sources
   // are intermediate fanout amplifiers (every change invalidates all 6 HEAVY
   // adapters), so the monolith would serialize the whole adapter cohort (~15m
   // observed on a sources-only PR, #1017). `touchesAdapterShared` forces the
@@ -327,9 +327,8 @@ test("routing: route-utils fanout (intermediate amplifier) → sharded despite �
     ...ADAPTERS,
     "@real-router/route-utils",
     "@real-router/sources",
-    "dom-utils",
   ];
-  assert.equal(routeUtilsFanout.length, 9);
+  assert.equal(routeUtilsFanout.length, 8);
   assert.equal(buildPlan(routeUtilsFanout, realDirOf).mode, "sharded");
 });
 
@@ -375,8 +374,8 @@ test("routing: shared-source fanout — routing shards via touchesSharedSources,
   ]);
   const routing = []; // packages/* from query-affected on a pure shared edit
 
-  // shared/dom-utils → input-aware membership = the 6 adapters (+ dom-utils pkg).
-  const domUtils = buildPlan(routing, dirOf, [...ADAPTERS, "dom-utils"]);
+  // shared/dom-utils → input-aware membership = the 6 adapters.
+  const domUtils = buildPlan(routing, dirOf, [...ADAPTERS]);
   assert.equal(domUtils.mode, "sharded");
   const domUtilsNames = domUtils.matrix.include.map((i) => i.name);
   for (const a of ["react", "preact", "solid", "svelte", "vue", "angular"])
@@ -445,7 +444,7 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   );
 });
 
-test("routing: full rebuild (all 32) → base excluded, 11 shards", () => {
+test("routing: full rebuild (all 30) → base excluded, 11 shards", () => {
   const { mode, matrix } = buildPlan(allPackages, realDirOf);
   assert.equal(mode, "sharded");
   const names = matrix.include.map((i) => i.name);

@@ -1,12 +1,19 @@
 import { mount } from "@vue/test-utils";
-import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
-import { defineComponent, h, ref } from "vue";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { defineComponent, h } from "vue";
 
 import { RouterProvider } from "../../src/RouterProvider";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
 
+// Mock document.startViewTransition — jsdom has no View Transitions API. The
+// stub invokes the update callback synchronously (mirroring the spec's "capture
+// old DOM → run updateCallback" order closely enough for the router's
+// subscribeLeave choreography) and returns a { skipTransition } handle so the
+// abort path has something to call. Parity with the react adapter's suite,
+// driven here via `<RouterProvider viewTransitions>` mounted through
+// @vue/test-utils.
 function stubStartViewTransition(): ReturnType<typeof vi.fn> {
   const startSpy = vi.fn((cb: () => void | Promise<void>) => {
     void cb();
@@ -24,6 +31,22 @@ function stubStartViewTransition(): ReturnType<typeof vi.fn> {
 
 describe("RouterProvider — viewTransitions", () => {
   let router: Router;
+
+  // Mount `<RouterProvider viewTransitions>` through a render-function component
+  // — the vue analogue of react's `render(<RouterProvider …/>)`. No `act`
+  // wrapper: `createViewTransitions` wires via `subscribeLeave`/`subscribe`, the
+  // reactive utility is created synchronously in `setup()` (immediate watch),
+  // and the startViewTransition stub runs its callback synchronously — so the
+  // whole path resolves on the navigation's own microtasks, with no vue
+  // reactivity to flush before asserting.
+  function mountVT(props: Record<string, unknown> = {}) {
+    return mount(
+      defineComponent({
+        setup: () => () =>
+          h(RouterProvider, { router, ...props }, { default: () => h("div") }),
+      }),
+    );
+  }
 
   beforeEach(async () => {
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -45,31 +68,17 @@ describe("RouterProvider — viewTransitions", () => {
   it("no viewTransitions prop — utility not wired", async () => {
     const startSpy = stubStartViewTransition();
 
-    mount(
-      defineComponent({
-        setup: () => () =>
-          h(RouterProvider, { router }, { default: () => h("div") }),
-      }),
-    );
+    mountVT();
 
     await router.navigate("about");
 
     expect(startSpy).not.toHaveBeenCalled();
   });
 
-  it("viewTransitions: true — utility wired, startViewTransition called on navigate", async () => {
+  it("viewTransitions: true — startViewTransition called on navigate", async () => {
     const startSpy = stubStartViewTransition();
 
-    mount(
-      defineComponent({
-        setup: () => () =>
-          h(
-            RouterProvider,
-            { router, viewTransitions: true },
-            { default: () => h("div") },
-          ),
-      }),
-    );
+    mountVT({ viewTransitions: true });
 
     await router.navigate("about");
 
@@ -79,16 +88,7 @@ describe("RouterProvider — viewTransitions", () => {
   it("viewTransitions: false — utility not wired", async () => {
     const startSpy = stubStartViewTransition();
 
-    mount(
-      defineComponent({
-        setup: () => () =>
-          h(
-            RouterProvider,
-            { router, viewTransitions: false },
-            { default: () => h("div") },
-          ),
-      }),
-    );
+    mountVT({ viewTransitions: false });
 
     await router.navigate("about");
 
@@ -98,16 +98,7 @@ describe("RouterProvider — viewTransitions", () => {
   it("unmount tears down the utility", async () => {
     const startSpy = stubStartViewTransition();
 
-    const wrapper = mount(
-      defineComponent({
-        setup: () => () =>
-          h(
-            RouterProvider,
-            { router, viewTransitions: true },
-            { default: () => h("div") },
-          ),
-      }),
-    );
+    const wrapper = mountVT({ viewTransitions: true });
 
     await router.navigate("about");
 
@@ -121,32 +112,36 @@ describe("RouterProvider — viewTransitions", () => {
     expect(startSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("toggling viewTransitions from false → true creates the utility", async () => {
+  it("resolves the deferred and clears currentVT after the post-success setTimeout", async () => {
     const startSpy = stubStartViewTransition();
-    const enabled = ref(false);
 
-    const wrapper = mount(
-      defineComponent({
-        setup: () => () =>
-          h(
-            RouterProvider,
-            { router, viewTransitions: enabled.value },
-            { default: () => h("div") },
-          ),
-      }),
-    );
+    mountVT({ viewTransitions: true });
+
+    vi.useFakeTimers();
 
     await router.navigate("about");
 
-    expect(startSpy).not.toHaveBeenCalled();
-
-    enabled.value = true;
-    await wrapper.vm.$nextTick();
-
-    await router.navigate("home");
+    // The success handler schedules a setTimeout(0) that resolves the deferred
+    // and nulls currentVT via the identity guard.
+    await vi.advanceTimersByTimeAsync(1);
 
     expect(startSpy).toHaveBeenCalledTimes(1);
 
-    wrapper.unmount();
+    vi.useRealTimers();
+  });
+
+  it("skips the transition when a concurrent navigation aborts the leave", async () => {
+    const startSpy = stubStartViewTransition();
+
+    mountVT({ viewTransitions: true });
+
+    // Two navigations in flight: the second supersedes the first, aborting the
+    // first transition's signal → the VT abort handler runs (real cancellation).
+    const first = router.navigate("about");
+    const second = router.navigate("users");
+
+    await Promise.allSettled([first, second]);
+
+    expect(startSpy).toHaveBeenCalled();
   });
 });

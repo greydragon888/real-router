@@ -392,10 +392,12 @@ export function createScrollRestoration(
 
   return {
     destroy: () => {
-      if (destroyed) {
-        return;
-      }
-
+      // No `if (destroyed) return` guard: every teardown below is idempotent —
+      // `unsubscribe()` is a `set.delete` in the core EventEmitter, DOM
+      // `removeEventListener` is spec-idempotent, and the history assignment is
+      // a plain re-set. There is no ref-count to protect (unlike
+      // route-announcer's shared announcer element), so a double `destroy()` is
+      // harmless. `destroyed = true` still gates any pending restore rAF / retry.
       destroyed = true;
       unsubscribe();
       globalThis.removeEventListener("pagehide", onPageHide);

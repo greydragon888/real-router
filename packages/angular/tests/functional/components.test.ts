@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-extraneous-class -- Angular test host components use empty classes with @Component decorators */
-import { Component } from "@angular/core";
+import { Component, Injector, runInInjectionContext } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { createRouter } from "@real-router/core";
 import { createErrorSource } from "@real-router/sources";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { NavigationAnnouncer } from "../../src/components/NavigationAnnouncer";
 import { RouterErrorBoundary } from "../../src/components/RouterErrorBoundary";
@@ -13,6 +13,8 @@ import { RouteMatch } from "../../src/directives/RouteMatch";
 import { RouteNotFound } from "../../src/directives/RouteNotFound";
 import { RouteSelf } from "../../src/directives/RouteSelf";
 import { provideRealRouter } from "../../src/providers";
+
+import type { State } from "@real-router/core";
 
 const routes = [
   { name: "home", path: "/" },
@@ -794,6 +796,83 @@ describe("NavigationAnnouncer component", () => {
     const element = fixture.nativeElement.querySelector("navigation-announcer");
 
     expect(element.textContent.trim()).toBe("");
+  });
+});
+
+describe("NavigationAnnouncer — announcer options", () => {
+  const ANNOUNCER_SEL = "[data-real-router-announcer]";
+  let router: ReturnType<typeof createRouter>;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0);
+
+      return 0;
+    });
+    router = createRouter(routes);
+    await router.start("/");
+  });
+
+  afterEach(() => {
+    router.stop();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    document.querySelector(ANNOUNCER_SEL)?.remove();
+    document.querySelectorAll("h1").forEach((element) => {
+      element.remove();
+    });
+  });
+
+  // Signal inputs can't be bound via a template in JIT TestBed (NG0303), so the
+  // component is instantiated through the test injector, its input getters are
+  // patched, and `ngOnInit` is invoked directly — the same pattern the SSR
+  // `<http-status-code>` test uses. This exercises the public
+  // input → ngOnInit → createRouteAnnouncer forwarding path the AOT runtime hits
+  // when the template binding fires. The announcer skips its first navigation
+  // (initial transition), so each case navigates twice and asserts on the
+  // second route ("home").
+
+  it("forwards a custom getAnnouncementText to the announcer", async () => {
+    TestBed.configureTestingModule({ providers: [provideRealRouter(router)] });
+
+    const cmp = runInInjectionContext(
+      TestBed.inject(Injector),
+      () => new NavigationAnnouncer(),
+    );
+
+    Object.defineProperty(cmp, "getAnnouncementText", {
+      value: () => (route: State) => `You are on ${route.name}`,
+    });
+    cmp.ngOnInit();
+
+    vi.advanceTimersByTime(100);
+    await router.navigate("users");
+    await router.navigate("home");
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "You are on home",
+    );
+  });
+
+  it("forwards a custom prefix to the announcer", async () => {
+    TestBed.configureTestingModule({ providers: [provideRealRouter(router)] });
+
+    const cmp = runInInjectionContext(
+      TestBed.inject(Injector),
+      () => new NavigationAnnouncer(),
+    );
+
+    Object.defineProperty(cmp, "prefix", { value: () => "Page: " });
+    cmp.ngOnInit();
+
+    vi.advanceTimersByTime(100);
+    await router.navigate("users");
+    await router.navigate("home");
+
+    expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
+      "Page: home",
+    );
   });
 });
 

@@ -5,7 +5,12 @@
 ## Single Entry Point
 
 ```typescript
-import { RouterProvider, useRouteNode, Link, RouteView } from '@real-router/svelte';
+import {
+  RouterProvider,
+  useRouteNode,
+  Link,
+  RouteView,
+} from "@real-router/svelte";
 ```
 
 **Peer dependency:** `svelte` >= 5.7.0
@@ -14,13 +19,13 @@ import { RouterProvider, useRouteNode, Link, RouteView } from '@real-router/svel
 
 **RouterProvider Props:**
 
-| Prop                  | Type      | Default | Description                                                                                    |
-| --------------------- | --------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `router`              | `Router`  | —       | Router instance (required)                                                                     |
-| `announceNavigation`  | `boolean` | `false` | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region       |
-| `scrollRestoration`   | `ScrollRestorationOptions` | `undefined` | Opt into scroll capture + restoration. Keyed by `(name, canonicalJson(params))`. |
-| `scrollSpy`           | `ScrollSpyOptions` | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Shape: `{ selector, rootMargin?, scrollContainer? }`. Reactive via `$effect` — primitives wrapped in `$derived`, `scrollContainer` getter pulled via `untrack`. Empty `selector` / `undefined` = off. Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP. |
-| `viewTransitions`     | `boolean` | `false` | Opt into View Transitions API integration via `createViewTransitions` utility. Reactive via `$effect` — toggling creates/destroys the utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements |
+| Prop                 | Type                               | Default     | Description                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------- | ---------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `router`             | `Router`                           | —           | Router instance (required)                                                                                                                                                                                                                                                                                                                                                                   |
+| `announceNavigation` | `boolean \| RouteAnnouncerOptions` | `false`     | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region. Pass `{ prefix?, getAnnouncementText? }` to customize the announcement text — the callback falls back to the default `h1 → title → route-name` chain when it returns an empty string or throws. Derived by primitives (enabled + prefix) so inline-object churn doesn't re-create the announcer.   |
+| `scrollRestoration`  | `ScrollRestorationOptions`         | `undefined` | Opt into scroll capture + restoration. Keyed by `(name, canonicalJson(params))`.                                                                                                                                                                                                                                                                                                             |
+| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Shape: `{ selector, rootMargin?, scrollContainer? }`. Reactive via `$effect` — primitives wrapped in `$derived`, `scrollContainer` getter pulled via `untrack`. Empty `selector` / `undefined` = off. Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP. |
+| `viewTransitions`    | `boolean`                          | `false`     | Opt into View Transitions API integration via `createViewTransitions` utility. Reactive via `$effect` — toggling creates/destroys the utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements                                                                                                                 |
 
 ### Source Structure
 
@@ -107,59 +112,59 @@ dist/
 
 ## Composables
 
-| Composable | Returns | Reactive? |
-| --- | --- | --- |
-| `useRouter()` | `Router` | Never |
-| `useNavigator()` | `Navigator` — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more | Never |
-| `useRoute()` | `{ navigator, route: { current }, previousRoute: { current } }` | `.current` changes on every navigation |
-| `useRouteNode(name)` | `{ navigator, route: { current }, previousRoute: { current } }` | `.current` changes when node active/inactive |
-| `useRouteUtils()` | `RouteUtils` | Never |
-| `useRouterTransition()` | `{ current: RouterTransitionSnapshot }` — includes `isLeaveApproved` field | `.current` changes on transition start/end |
-| `useIsActiveRoute()` | `{ current: boolean }` | **INTERNAL ONLY** |
-| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured at init) | Never (subscription is stable) |
-| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `$effect` (handler captured at init) | Never (effect runs on `route.current` changes) |
+| Composable                         | Returns                                                                                          | Reactive?                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| `useRouter()`                      | `Router`                                                                                         | Never                                          |
+| `useNavigator()`                   | `Navigator` — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more             | Never                                          |
+| `useRoute()`                       | `{ navigator, route: { current }, previousRoute: { current } }`                                  | `.current` changes on every navigation         |
+| `useRouteNode(name)`               | `{ navigator, route: { current }, previousRoute: { current } }`                                  | `.current` changes when node active/inactive   |
+| `useRouteUtils()`                  | `RouteUtils`                                                                                     | Never                                          |
+| `useRouterTransition()`            | `{ current: RouterTransitionSnapshot }` — includes `isLeaveApproved` field                       | `.current` changes on transition start/end     |
+| `useIsActiveRoute()`               | `{ current: boolean }`                                                                           | **INTERNAL ONLY**                              |
+| `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured at init) | Never (subscription is stable)                 |
+| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `$effect` (handler captured at init)  | Never (effect runs on `route.current` changes) |
 
 ## Exports
 
-| Export                  | Type      | Description                                    |
-| ----------------------- | --------- | ---------------------------------------------- |
-| `RouterProvider`        | Component | Context provider for router instance           |
-| `Link`                  | Component | Navigation link with active state detection    |
-| `RouteView`             | Component | Declarative route matching                     |
-| `Lazy`                  | Component | Lazy-load route content with fallback          |
-| `RouterErrorBoundary`   | Component | Declarative navigation error handling          |
-| `useRouter()`           | Composable| Get router instance                            |
-| `useNavigator()`        | Composable| Get navigator (stable ref, never reactive)     |
-| `useRoute()`            | Composable| Subscribe to all route changes (throws if no active state) |
-| `useRouteNode(name)`    | Composable| Subscribe to specific node changes             |
-| `useRouteUtils()`       | Composable| Get route tree utilities                       |
-| `useRouterTransition()` | Composable| Subscribe to transition state                  |
-| `useRouteExit(handler, options?)` | Composable | Subscribe to `subscribeLeave` with abort + same-route guards |
-| `useRouteEnter(handler, options?)` | Composable | Fire once on nav-driven mount via `$effect` |
-| `createLinkAction`      | Factory   | Create navigation action (`use:link`)           |
-| `createReactiveSource`  | Primitive | Bridge `RouterSource<T>` → reactive `{ current: T }` |
-| `ROUTER_KEY`, `NAVIGATOR_KEY`, `ROUTE_KEY` | Constants | Svelte context keys (re-exported for advanced patterns) |
-| `LinkProps`, `RouteContext`, `LinkActionParams` | Types | Adapter-specific public types |
-| `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions` | Types | `useRouteExit` API surface |
-| `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions` | Types | `useRouteEnter` API surface |
-| `Navigator`, `RouterTransitionSnapshot`, `RouterErrorSnapshot` | Types | Re-exported from core/sources for convenience |
+| Export                                                           | Type       | Description                                                  |
+| ---------------------------------------------------------------- | ---------- | ------------------------------------------------------------ |
+| `RouterProvider`                                                 | Component  | Context provider for router instance                         |
+| `Link`                                                           | Component  | Navigation link with active state detection                  |
+| `RouteView`                                                      | Component  | Declarative route matching                                   |
+| `Lazy`                                                           | Component  | Lazy-load route content with fallback                        |
+| `RouterErrorBoundary`                                            | Component  | Declarative navigation error handling                        |
+| `useRouter()`                                                    | Composable | Get router instance                                          |
+| `useNavigator()`                                                 | Composable | Get navigator (stable ref, never reactive)                   |
+| `useRoute()`                                                     | Composable | Subscribe to all route changes (throws if no active state)   |
+| `useRouteNode(name)`                                             | Composable | Subscribe to specific node changes                           |
+| `useRouteUtils()`                                                | Composable | Get route tree utilities                                     |
+| `useRouterTransition()`                                          | Composable | Subscribe to transition state                                |
+| `useRouteExit(handler, options?)`                                | Composable | Subscribe to `subscribeLeave` with abort + same-route guards |
+| `useRouteEnter(handler, options?)`                               | Composable | Fire once on nav-driven mount via `$effect`                  |
+| `createLinkAction`                                               | Factory    | Create navigation action (`use:link`)                        |
+| `createReactiveSource`                                           | Primitive  | Bridge `RouterSource<T>` → reactive `{ current: T }`         |
+| `ROUTER_KEY`, `NAVIGATOR_KEY`, `ROUTE_KEY`                       | Constants  | Svelte context keys (re-exported for advanced patterns)      |
+| `LinkProps`, `RouteContext`, `LinkActionParams`                  | Types      | Adapter-specific public types                                |
+| `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`    | Types      | `useRouteExit` API surface                                   |
+| `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions` | Types      | `useRouteEnter` API surface                                  |
+| `Navigator`, `RouterTransitionSnapshot`, `RouterErrorSnapshot`   | Types      | Re-exported from core/sources for convenience                |
 
 ## Differences from React, Preact, Vue, and Solid Adapters
 
-| Aspect | React/Preact | Vue | Solid | Svelte |
-|--------|--------------|-----|-------|--------|
-| Composable return types | Values | Values with ShallowRefs | Accessors (`Accessor<T>`) | `{ current: T }` getter objects |
-| External store bridge | `useSyncExternalStore` / polyfill | `useRefFromSource` | `createSignalFromSource` | `createReactiveSource` |
-| `memo()` | Required | Not needed | Not needed | Not needed |
-| Params stabilization | `canonicalJson` in sources | Same | Same | Same |
-| Active class on Link | `className` string concat | `class` string concat | `classList` object | `class` string concat |
-| Context count | 3 (Preact) / 2 (React) | 3 | 2 | 3 |
-| `keepAlive` / Activity | React 19.2+ only | Vue native `<KeepAlive>` | Not available | Not available |
-| Entry points | Main + Legacy (React) / Single (Preact) | Single | Single | Single |
-| Build tool | tsdown | tsdown | rollup + babel-preset-solid | svelte-package |
-| Components | JSX (.tsx) | `defineComponent` + `h()` (.ts) | JSX (.tsx) | `.svelte` SFC |
-| Composable files | .tsx | .ts | .tsx | `.svelte.ts` |
-| RouteView child detection | Element type markers | `vnode.type === Match` | Symbol `$$type` markers | Named snippets (rest `$props()`) |
+| Aspect                    | React/Preact                            | Vue                             | Solid                       | Svelte                           |
+| ------------------------- | --------------------------------------- | ------------------------------- | --------------------------- | -------------------------------- |
+| Composable return types   | Values                                  | Values with ShallowRefs         | Accessors (`Accessor<T>`)   | `{ current: T }` getter objects  |
+| External store bridge     | `useSyncExternalStore` / polyfill       | `useRefFromSource`              | `createSignalFromSource`    | `createReactiveSource`           |
+| `memo()`                  | Required                                | Not needed                      | Not needed                  | Not needed                       |
+| Params stabilization      | `canonicalJson` in sources              | Same                            | Same                        | Same                             |
+| Active class on Link      | `className` string concat               | `class` string concat           | `classList` object          | `class` string concat            |
+| Context count             | 3 (Preact) / 2 (React)                  | 3                               | 2                           | 3                                |
+| `keepAlive` / Activity    | React 19.2+ only                        | Vue native `<KeepAlive>`        | Not available               | Not available                    |
+| Entry points              | Main + Legacy (React) / Single (Preact) | Single                          | Single                      | Single                           |
+| Build tool                | tsdown                                  | tsdown                          | rollup + babel-preset-solid | svelte-package                   |
+| Components                | JSX (.tsx)                              | `defineComponent` + `h()` (.ts) | JSX (.tsx)                  | `.svelte` SFC                    |
+| Composable files          | .tsx                                    | .ts                             | .tsx                        | `.svelte.ts`                     |
+| RouteView child detection | Element type markers                    | `vnode.type === Match`          | Symbol `$$type` markers     | Named snippets (rest `$props()`) |
 
 ## Promise-Based Navigation
 
@@ -173,16 +178,16 @@ router.navigate(routeName, routeParams, routeOptions).catch(() => {});
 
 All SSR-aware components/composables live at the `/ssr` subpath. Nine exports total — 8 runtime + 1 type re-export (`HttpStatusSink`) — symmetric with `@real-router/react/ssr`:
 
-| Export | Kind | Purpose |
-|---|---|---|
-| `<ClientOnly>` | component | `$state(false)` + `$effect` + named snippets (`children`, `fallback`). `$effect` is browser-only — server emits fallback. |
-| `<ServerOnly>` | component | Symmetric inverse. |
-| `<Streamed>` | component | Cross-adapter alias for Svelte's native `{#await}` block. |
-| `<Await name="key">` | component | Reads `useDeferred(name)` and renders the resolved value through `{#await}`. |
-| `<HttpStatusCode code={N}/>` | component | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink at component init via `getContext`. Last write wins. No-op without provider. |
-| `<HttpStatusProvider {sink}>` | component | Provides an `HttpStatusSink` via `setContext(HTTP_STATUS_KEY, sink)`. |
-| `useDeferred<T>(key)` | composable | Returns the deferred Promise from `state.context.ssrDataDeferred[key]`. |
-| `createHttpStatusSink()` | utility | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after `await render()` from `svelte/server` to apply to the response. |
+| Export                        | Kind       | Purpose                                                                                                                                                                                |
+| ----------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<ClientOnly>`                | component  | `$state(false)` + `$effect` + named snippets (`children`, `fallback`). `$effect` is browser-only — server emits fallback.                                                              |
+| `<ServerOnly>`                | component  | Symmetric inverse.                                                                                                                                                                     |
+| `<Streamed>`                  | component  | Cross-adapter alias for Svelte's native `{#await}` block.                                                                                                                              |
+| `<Await name="key">`          | component  | Reads `useDeferred(name)` and renders the resolved value through `{#await}`.                                                                                                           |
+| `<HttpStatusCode code={N}/>`  | component  | Render-time HTTP status declaration. Writes `code` to the nearest `<HttpStatusProvider>`'s sink at component init via `getContext`. Last write wins. No-op without provider.           |
+| `<HttpStatusProvider {sink}>` | component  | Provides an `HttpStatusSink` via `setContext(HTTP_STATUS_KEY, sink)`.                                                                                                                  |
+| `useDeferred<T>(key)`         | composable | Returns the deferred Promise from `state.context.ssrDataDeferred[key]`.                                                                                                                |
+| `createHttpStatusSink()`      | utility    | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after `await render()` from `svelte/server` to apply to the response. |
 
 ```svelte
 <script lang="ts">
@@ -285,7 +290,7 @@ Files with the `.svelte.ts` extension use Runes (`$state`, `$derived`, `$effect`
 The laziness cuts both ways. When **every** `.current` reader disappears at once
 — e.g. the whole app sits behind a plain `{#if loggedIn}` login-gate — the last
 subscriber unwinds and the underlying `createRouteSource` disconnects from the
-router. A navigation that happens *while hidden* (a post-login deep-link
+router. A navigation that happens _while hidden_ (a post-login deep-link
 redirect, a restored route) is missed; when the gate re-opens, the first
 `.current` read replays the **stale** pre-navigation snapshot until the next
 navigation. Unlike React (needs `<Activity>`) or Solid (needs a lifted-source
@@ -348,8 +353,8 @@ Svelte 5 snippets replace slots. Use `{@render children?.()}` to render children
 ### useRouter vs useRoute
 
 ```typescript
-const router = useRouter();           // Stable — never reactive
-const { route } = useRoute();         // { current } getter — reactive, read .current
+const router = useRouter(); // Stable — never reactive
+const { route } = useRoute(); // { current } getter — reactive, read .current
 const routeName = route.current?.name; // Read .current in reactive context
 ```
 
@@ -385,7 +390,7 @@ const q = route.current.params.q; // typed as string
 ### useRouteNode Semantics
 
 ```typescript
-useRouteNode("");       // Root — ALL route changes
+useRouteNode(""); // Root — ALL route changes
 useRouteNode("users"); // Only "users" and "users.*" routes
 ```
 
@@ -546,7 +551,7 @@ Verified end-to-end across three example apps:
 ### Verified Patterns
 
 - **`hydrate` and `mount` are different functions in Svelte 5.** `hydrate(App, { target, props })` claims existing DOM, `mount(App, { target, props })` mounts fresh. There is **no** `mount({ hydrate: true })` option in Svelte 5 — that's the deprecated Svelte 4 compat surface via `asClassComponent`. SSG dual-mode mount must branch explicitly: `if (rootElement.firstElementChild) hydrate(...) else mount(...)`
-- **Do not override `resolve.conditions` in vite config.** Setting `resolve: { conditions: ["development"] }` *replaces* the Vite default condition list, which means the client build loses the implicit `"browser"` condition. svelte's `package.json` maps the `"."` export to `index-server.js` under the `default` condition — that's the SSR runtime, where `hydrate()`/`mount()` throw `lifecycle_function_unavailable`. Letting Vite supply "browser" for the client build and "node" for the SSR build is what routes `import { hydrate } from "svelte"` to the correct runtime per target. Use only `dedupe: ["svelte"]`
+- **Do not override `resolve.conditions` in vite config.** Setting `resolve: { conditions: ["development"] }` _replaces_ the Vite default condition list, which means the client build loses the implicit `"browser"` condition. svelte's `package.json` maps the `"."` export to `index-server.js` under the `default` condition — that's the SSR runtime, where `hydrate()`/`mount()` throw `lifecycle_function_unavailable`. Letting Vite supply "browser" for the client build and "node" for the SSR build is what routes `import { hydrate } from "svelte"` to the correct runtime per target. Use only `dedupe: ["svelte"]`
 - **`render()` is `PromiseLike` even for sync components** — `RenderOutput = SyncRenderOutput & PromiseLike<SyncRenderOutput>`. `await render(App, { props })` covers both sync and async paths uniformly (top-level `await`, `<svelte:boundary pending>`, `{#await}` blocks)
 - **`{#await}` blocks ship pending UI on the server, real content lands on the client.** Svelte 5 stable does NOT block the SSR response on `{#await}` resolution. The server emits the `{#await}` template's pending branch and returns immediately; the deferred resolution happens after hydration. This is RSC-like (server shell + client data), not React 19/Solid streaming (chunked HTTP + OOO placeholders)
 - **`<svelte:head>` content lands in `RenderOutput.head`.** Components contribute declaratively to `<head>`; `render()` collects everything into the `head` field so the server splices it via `<!--ssr-head-->`. This is the alternative to manual `meta.ts` injection

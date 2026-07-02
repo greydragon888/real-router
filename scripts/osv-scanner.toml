@@ -76,3 +76,17 @@ reason = "Transitive via Tauri 2.x, desktop examples only."
 [[IgnoredVulns]]
 id = "RUSTSEC-2025-0100"  # unic-ucd-ident unmaintained
 reason = "Transitive via Tauri 2.x, desktop examples only."
+
+# quick-xml DoS advisories — real CVEs with CVSS scores (unlike the
+# unmaintained-crate entries above). RUSTSEC-only (no GHSA alias), so NOT
+# mirrored in codeql.yml: GitHub Dependency Review only flags GHSA advisories,
+# and quick-xml is unchanged by any PR diff anyway. Drop these when an upstream
+# Tauri/plist bump moves quick-xml to >= 0.41.0.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0194"  # quick-xml quadratic duplicate-attribute DoS
+reason = "quick-xml < 0.41.0 uses an O(N^2) duplicate-attribute check → CPU-exhaustion DoS. Transitive via Tauri 2.x (tauri 2.11.2 -> plist 1.9.0 -> quick-xml ^0.39.2), examples/desktop/tauri/* only — not in any published @real-router/* package. The DoS needs attacker-controlled XML; the examples parse only trusted app config through plist, so the vector is unreachable. Bump-blocked: plist 1.9.0 pins quick-xml ^0.39.2, so 0.41.0 can only arrive via an upstream Tauri/plist bump."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0195"  # quick-xml unbounded namespace-declaration memory DoS
+reason = "quick-xml < 0.41.0 NsReader allocates unbounded memory for namespace declarations → memory-exhaustion DoS. Same chain and rationale as RUSTSEC-2026-0194 (Tauri 2.x -> plist -> quick-xml ^0.39.2, desktop examples only, unreachable vector, bump-blocked by plist ^0.39.2)."

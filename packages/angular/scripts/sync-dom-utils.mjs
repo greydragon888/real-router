@@ -25,11 +25,13 @@ const sourceDir = join(angularRoot, "..", "..", "shared", "dom-utils");
 const targetDir = join(angularRoot, "src", "dom-utils");
 
 rmSync(targetDir, { recursive: true, force: true });
-// Skip test-helper directories (prefixed with `__`) — Angular doesn't use them
-// and ng-packagr would otherwise try to bundle the helper into the lib output.
+// Skip test-helper directories (prefixed with `__`) and Markdown docs (e.g.
+// CLAUDE.md) — Angular uses neither: ng-packagr would try to bundle a helper into
+// the lib output, and a copied CLAUDE.md turns every `shared/dom-utils/*.md` doc
+// edit into a spurious "copy out of sync" CI failure (the copy only needs source).
 cpSync(sourceDir, targetDir, {
   recursive: true,
-  filter: (src) => !src.includes("/__"),
+  filter: (src) => !src.includes("/__") && !src.endsWith(".md"),
 });
 
 const stripJsExtension = /\.js"/g;

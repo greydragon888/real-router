@@ -11,7 +11,11 @@ import {
 } from "./dom-utils";
 import { setupRouteProvision } from "./setupRouteProvision";
 
-import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
+import type {
+  RouteAnnouncerOptions,
+  ScrollRestorationOptions,
+  ScrollSpyOptions,
+} from "./dom-utils";
 import type { Router } from "@real-router/core";
 import type { PropType } from "vue";
 
@@ -58,7 +62,7 @@ export const RouterProvider = defineComponent({
       required: true,
     },
     announceNavigation: {
-      type: Boolean,
+      type: [Boolean, Object] as PropType<boolean | RouteAnnouncerOptions>,
       default: false,
     },
     scrollRestoration: {
@@ -76,10 +80,26 @@ export const RouterProvider = defineComponent({
     // Reactive announceNavigation: setting prop true/false at runtime
     // creates/destroys the announcer accordingly. Prior implementation read
     // the prop only inside onMounted, so toggling it post-mount silently no-op'd.
+    // `announceNavigation` accepts `true` (default announcer) or a
+    // `RouteAnnouncerOptions` object (`{ prefix, getAnnouncementText }`) for
+    // custom announcement text. `false` / `undefined` disables it. Watched by
+    // primitives (enabled + prefix) so inline-object identity churn doesn't
+    // re-create the announcer; getAnnouncementText is captured once by the
+    // utility (same rationale as scrollContainer below).
     watchToggleableUtility(
-      () => [props.router, props.announceNavigation] as const,
-      ([router, enabled]) =>
-        enabled ? createRouteAnnouncer(router) : undefined,
+      () => {
+        const nav = props.announceNavigation;
+        const enabled = nav !== false;
+        const prefix = typeof nav === "object" ? nav.prefix : undefined;
+
+        return [props.router, enabled, prefix] as const;
+      },
+      ([router, enabled]) => {
+        const nav = props.announceNavigation;
+        const options = typeof nav === "object" ? nav : undefined;
+
+        return enabled ? createRouteAnnouncer(router, options) : undefined;
+      },
     );
 
     // Watch by primitives so inline `{ mode: "restore" }` doesn't thrash.
