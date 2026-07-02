@@ -1,6 +1,10 @@
 // packages/route-node/modules/validation/routes.ts
 
-import { buildParamMeta, PARAM_NAME_PATTERN } from "path-matcher";
+import {
+  buildParamMeta,
+  isConstraintBalanced,
+  PARAM_NAME_PATTERN,
+} from "path-matcher";
 
 import type { RouteTree } from "../types";
 
@@ -27,37 +31,6 @@ function createRouterError(methodName: string, message: string): TypeError {
 const EMPTY_PARAM_MARKER_RGX = new RegExp(`[:*](?!${PARAM_NAME_PATTERN})`);
 
 /**
- * Reports whether a path's `<...>` constraint delimiters are balanced.
- *
- * Single linear scan: a `<` opens a constraint and the first following `>`
- * closes it; a `<` inside the body is allowed (mirrors path-matcher's `<[^>]*>`
- * grammar, e.g. `<[a<b]>`). A `>` seen outside a constraint, or a `<` left
- * unclosed at the end, is a stray/unbalanced delimiter.
- *
- * Implemented as a scan rather than a `replaceAll(/<[^>]*>/, "")` strip so the
- * intent — delimiter *balance*, not HTML *sanitization* — is unambiguous to both
- * readers and static analysis (the regex strip is the classic incomplete-tag
- * sanitizer pattern, which it is not).
- */
-function hasBalancedConstraints(path: string): boolean {
-  let insideConstraint = false;
-
-  for (const char of path) {
-    if (char === "<") {
-      insideConstraint = true;
-    } else if (char === ">") {
-      if (!insideConstraint) {
-        return false; // stray `>` with no open `<`
-      }
-
-      insideConstraint = false;
-    }
-  }
-
-  return !insideConstraint; // a still-open `<` is an unclosed constraint
-}
-
-/**
  * Reports whether a path fuses a `:`/`*` marker to a static prefix WITHIN a
  * segment (`/a:b`, `/users/x:id`, `/a*b`). build/meta's unanchored param regex
  * extracts such a marker as a param, but the trie honors a marker only at
@@ -67,7 +40,7 @@ function hasBalancedConstraints(path: string): boolean {
  * an ambiguous marker placement the three parsers cannot agree on.
  *
  * A single linear scan, NOT a regex on a `<...>`-stripped string (the strip is
- * the incomplete-tag-sanitizer pattern CodeQL flags — see hasBalancedConstraints
+ * the incomplete-tag-sanitizer pattern CodeQL flags — see `isConstraintBalanced`
  * for the same reasoning). A marker counts as fused only when its segment did
  * NOT start with a marker: a marker-led segment's name and `<...>` constraint may
  * themselves contain `:`/`*` (`/:a:b` is the param `a:b`; `/:id<\d*>` a valid
@@ -187,11 +160,24 @@ export function validateRoutePath(
   // truncated at the stray `<`, the unclosed constraint survives as a literal in
   // the trie node path, and `buildPath` then throws `Missing required param`.
   // Reject it here, at the gatekeeper (#749 — the residual gap left by #738,
-  // which only unified the *balanced* grammar).
-  if (!hasBalancedConstraints(path)) {
+  // which only unified the *balanced* grammar). `isConstraintBalanced` is the
+  // single balance predicate exported by path-matcher (#804), replacing the
+  // former local scan; path-matcher backstops it at `registerTree`.
+  if (!isConstraintBalanced(path)) {
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": unbalanced constraint delimiter ('<' or '>') in "${path}"`,
+    );
+  }
+
+  // Empty constraint `<>`. It is balanced, but compiles to a never-matching
+  // `^()$` pattern — a dead required param. Reject it route-contextually here
+  // (#804 §3.3); path-matcher backstops it at `registerTree` too. Sibling of the
+  // name-less rejection below (#863): a valid-shape-but-meaningless marker.
+  if (path.includes("<>")) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": empty constraint '<>' in "${path}" (a constraint body must be non-empty, e.g. '<\\d+>')`,
     );
   }
 
