@@ -58,18 +58,18 @@ function App() {
 
 All hooks that subscribe to route state return `Accessor<T>` — call the accessor inside a reactive context to read the current value.
 
-| Hook                      | Returns                              | Reactive?                            |
-| ------------------------- | ------------------------------------ | ------------------------------------ |
-| `useRouter()`             | `Router`                             | Never                                |
-| `useNavigator()`          | `Navigator` — `{ navigate, subscribe, subscribeLeave, isLeaveApproved, … }` | Never                                |
-| `useRoute()`              | `Accessor<RouteState>`               | Every navigation                     |
-| `useRouteNode(name)`      | `Accessor<RouteState>`               | When the node's slice of state changes (activation, deactivation, params change inside the subtree) |
-| `useRouteUtils()`         | `RouteUtils`                         | Never                                |
-| `useRouterTransition()`   | `Accessor<RouterTransitionSnapshot>` | On transition start/end              |
-| `useRouteStore()`         | `RouteState` (store)                 | Granular — per-property              |
-| `useRouteNodeStore(name)` | `RouteState` (store)                 | Granular — per-property, node-scoped |
-| `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured at hook call) |
-| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `transition.from` | Never (handler captured at hook call) |
+| Hook                               | Returns                                                                      | Reactive?                                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `useRouter()`                      | `Router`                                                                     | Never                                                                                               |
+| `useNavigator()`                   | `Navigator` — `{ navigate, subscribe, subscribeLeave, isLeaveApproved, … }`  | Never                                                                                               |
+| `useRoute()`                       | `Accessor<RouteState>`                                                       | Every navigation                                                                                    |
+| `useRouteNode(name)`               | `Accessor<RouteState>`                                                       | When the node's slice of state changes (activation, deactivation, params change inside the subtree) |
+| `useRouteUtils()`                  | `RouteUtils`                                                                 | Never                                                                                               |
+| `useRouterTransition()`            | `Accessor<RouterTransitionSnapshot>`                                         | On transition start/end                                                                             |
+| `useRouteStore()`                  | `RouteState` (store)                                                         | Granular — per-property                                                                             |
+| `useRouteNodeStore(name)`          | `RouteState` (store)                                                         | Granular — per-property, node-scoped                                                                |
+| `useRouteExit(handler, options?)`  | `void` — wraps `subscribeLeave` with abort + same-route guards               | Never (handler captured at hook call)                                                               |
+| `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `transition.from` | Never (handler captured at hook call)                                                               |
 
 ### Typed Route Params (`useRoute<P>`)
 
@@ -118,10 +118,10 @@ Signal-based hooks (`useRoute`, `useRouteNode`) remain available for simpler use
 
 Two low-level bridges convert `@real-router/sources` `RouterSource<T>` instances into Solid reactive primitives. Use them when you build custom hooks on top of `@real-router/sources`:
 
-| Primitive                | Returns            | Description                                                   |
-| ------------------------ | ------------------ | ------------------------------------------------------------- |
-| `createSignalFromSource` | `Accessor<T>`      | Bridges a source to a Solid signal. Calls `onCleanup`.        |
-| `createStoreFromSource`  | `T` (Solid store)  | Bridges a source to a Solid store via `createStore + reconcile`. |
+| Primitive                | Returns           | Description                                                      |
+| ------------------------ | ----------------- | ---------------------------------------------------------------- |
+| `createSignalFromSource` | `Accessor<T>`     | Bridges a source to a Solid signal. Calls `onCleanup`.           |
+| `createStoreFromSource`  | `T` (Solid store) | Bridges a source to a Solid store via `createStore + reconcile`. |
 
 Both must be called inside a reactive owner (component body or `createRoot`).
 
@@ -129,10 +129,10 @@ Both must be called inside a reactive owner (component body or `createRoot`).
 
 Two Solid contexts are exported for building custom hooks or deeply nested integrations that need direct access to router internals without prop drilling:
 
-| Context        | Value type                                                       | Description                                                              |
-| -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Context         | Value type                                                            | Description                                                                                                 |
+| --------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `RouterContext` | `RouterContextValue \| null` — `{ router, navigator, routeSelector }` | Stable references. `routeSelector(name)` is the O(1) `createSelector`-backed active check used by `<Link>`. |
-| `RouteContext`  | `Accessor<RouteState> \| null`                                   | Reactive signal. Updates on every navigation. Consumed by `useRoute()`. |
+| `RouteContext`  | `Accessor<RouteState> \| null`                                        | Reactive signal. Updates on every navigation. Consumed by `useRoute()`.                                     |
 
 ```tsx
 import { RouterContext, RouteContext } from "@real-router/solid";
@@ -313,11 +313,11 @@ Without `fallback`, no `<Suspense>` boundary is added. The prop is optional.
 2. `<Self>` first-wins — only the first `<RouteView.Self>` contributes; later instances are ignored.
 3. `<Self>` wins over `<NotFound>` if no `<Match>` activates (rare — applies only when `nodeName === UNKNOWN_ROUTE`).
 
-| Element | Fires when | Render position |
-|---|---|---|
-| `<RouteView.Match>` | Active route segment matches `segment` (or descendant if `exact={false}`) | Inline at source position |
-| `<RouteView.Self>` | Active route name **exactly equals** parent's `nodeName` | Appended after Match elements |
-| `<RouteView.NotFound>` | Active route is `UNKNOWN_ROUTE` AND no Match activated | Appended after Match elements |
+| Element                | Fires when                                                                | Render position               |
+| ---------------------- | ------------------------------------------------------------------------- | ----------------------------- |
+| `<RouteView.Match>`    | Active route segment matches `segment` (or descendant if `exact={false}`) | Inline at source position     |
+| `<RouteView.Self>`     | Active route name **exactly equals** parent's `nodeName`                  | Appended after Match elements |
+| `<RouteView.NotFound>` | Active route is `UNKNOWN_ROUTE` AND no Match activated                    | Appended after Match elements |
 
 > **Note:** `keepAlive` is not supported. Solid has no equivalent of React's `<Activity>` API. Components dispose completely when navigating away.
 
@@ -448,9 +448,9 @@ import { link } from "@real-router/solid";
 
 The directive automatically sets `href` on `<a>` elements and adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility.
 
-> **Must be used inside `<RouterProvider>`.** The directive calls `useRouter()` internally and will throw if the host element is mounted outside the provider tree. See CLAUDE.md gotcha *"use:link Requires useRouter Context"* for the failure mode and the canonical wrapping pattern.
+> **Must be used inside `<RouterProvider>`.** The directive calls `useRouter()` internally and will throw if the host element is mounted outside the provider tree. See CLAUDE.md gotcha _"use:link Requires useRouter Context"_ for the failure mode and the canonical wrapping pattern.
 
-**Pass the options object directly — not an accessor (#976).** Solid's compiler wraps a directive value into an accessor at compile time (`use:link={X}` → `link(el, () => X)`), so the value you write *is* the options object:
+**Pass the options object directly — not an accessor (#976).** Solid's compiler wraps a directive value into an accessor at compile time (`use:link={X}` → `link(el, () => X)`), so the value you write _is_ the options object:
 
 ```tsx
 // CORRECT — object form (canonical)
@@ -516,6 +516,24 @@ Enable screen reader announcements for route changes:
 
 When enabled, a visually hidden `aria-live` region announces each navigation. Focus moves to the first `<h1>` on the new page. See [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
 
+`announceNavigation` also accepts a `RouteAnnouncerOptions` object to customize the announced text:
+
+| Option                | Type                | Description                                                                                         |
+| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `prefix`              | `string`            | Prefix prepended to the resolved text (default `"Navigated to "`)                                   |
+| `getAnnouncementText` | `(route) => string` | Full custom text; overrides the default `h1 → title → route-name` chain (falls back on empty/throw) |
+
+```tsx
+<RouterProvider
+  router={router}
+  announceNavigation={{
+    getAnnouncementText: (route) => `Now on ${route.name}`,
+  }}
+>
+  {/* Your app */}
+</RouterProvider>
+```
+
 ## Scroll Restoration
 
 Opt-in preservation of scroll position across navigations:
@@ -533,10 +551,7 @@ Restores scroll on back/forward, scrolls to top (or `#hash`) on push. Three mode
 Opt-in router-coordinated `IntersectionObserver` scroll spy — the URL hash tracks the topmost visible anchor as the user scrolls, syncing `state.context.url.hash` so sibling `<Link hash>` highlights stay current:
 
 ```tsx
-<RouterProvider
-  router={router}
-  scrollSpy={{ selector: "[id]:is(h2,h3)" }}
->
+<RouterProvider router={router} scrollSpy={{ selector: "[id]:is(h2,h3)" }}>
   {/* Your app */}
 </RouterProvider>
 ```

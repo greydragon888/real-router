@@ -103,17 +103,17 @@ export class UsersLayoutComponent {}
 
 All inject functions must be called within an injection context (constructor, field initializer, or `runInInjectionContext`). Route state functions return `RouteSignals` — an object with a `routeState` signal and a stable `navigator` reference.
 
-| Function                                    | Returns                            | Reactive?                            |
-| ------------------------------------------- | ---------------------------------- | ------------------------------------ |
-| `injectRouter()`                            | `Router`                           | Never                                |
-| `injectNavigator()`                         | `Navigator`                        | Never                                |
-| `injectRoute()`                             | `RouteSignals`                     | `routeState` on every navigation     |
-| `injectRouteNode(name)`                     | `RouteSignals`                     | When the node subtree is entered, left, or changes between descendants (uses `shouldUpdateNode` — sibling-leaf transitions within the same subtree still fire) |
-| `injectRouteUtils()`                        | `RouteUtils`                       | Never                                |
-| `injectRouterTransition()`                  | `Signal<RouterTransitionSnapshot>` | On transition start/end              |
-| `injectIsActiveRoute(name, params?, opts?)` | `Signal<boolean>`                  | On active state change               |
-| `injectRouteExit(handler, options?)`        | `void` — wraps `subscribeLeave` with abort + same-route guards            | Never (handler captured at injection time) |
-| `injectRouteEnter(handler, options?)`       | `void` — fires once on nav-driven mount via `effect()` + `transition.from` | Never (handler captured at injection time) |
+| Function                                    | Returns                                                                    | Reactive?                                                                                                                                                      |
+| ------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `injectRouter()`                            | `Router`                                                                   | Never                                                                                                                                                          |
+| `injectNavigator()`                         | `Navigator`                                                                | Never                                                                                                                                                          |
+| `injectRoute()`                             | `RouteSignals`                                                             | `routeState` on every navigation                                                                                                                               |
+| `injectRouteNode(name)`                     | `RouteSignals`                                                             | When the node subtree is entered, left, or changes between descendants (uses `shouldUpdateNode` — sibling-leaf transitions within the same subtree still fire) |
+| `injectRouteUtils()`                        | `RouteUtils`                                                               | Never                                                                                                                                                          |
+| `injectRouterTransition()`                  | `Signal<RouterTransitionSnapshot>`                                         | On transition start/end                                                                                                                                        |
+| `injectIsActiveRoute(name, params?, opts?)` | `Signal<boolean>`                                                          | On active state change                                                                                                                                         |
+| `injectRouteExit(handler, options?)`        | `void` — wraps `subscribeLeave` with abort + same-route guards             | Never (handler captured at injection time)                                                                                                                     |
+| `injectRouteEnter(handler, options?)`       | `void` — fires once on nav-driven mount via `effect()` + `transition.from` | Never (handler captured at injection time)                                                                                                                     |
 
 `RouteSignals` shape:
 
@@ -374,7 +374,9 @@ import { injectDeferred } from "@real-router/angular/ssr";
 @Component({
   template: `
     @if (reviews(); as r) {
-      @for (review of r; track review.id) { <li>{{ review.author }}</li> }
+      @for (review of r; track review.id) {
+        <li>{{ review.author }}</li>
+      }
     } @else {
       <p>Loading reviews…</p>
     }
@@ -411,15 +413,15 @@ Navigation directive for `<a>` elements. Handles click events, sets `href`, and 
 </a>
 ```
 
-| Input               | Type                | Default    | Description                            |
-| ------------------- | ------------------- | ---------- | -------------------------------------- |
-| `routeName`         | `string`            | `""`       | Target route name                      |
-| `routeParams`       | `Params`            | `undefined`| Route parameters (omitted → `undefined`, shares one active-route source with `injectIsActiveRoute(name)`, #776) |
-| `routeOptions`      | `NavigationOptions` | `{}`       | Navigation options (replace, etc.)     |
-| `activeClassName`   | `string`            | `"active"` | CSS class applied when route is active |
-| `activeStrict`      | `boolean`           | `false`    | Exact match only (no ancestor match)   |
-| `ignoreQueryParams` | `boolean`           | `true`     | Query params don't affect active state |
-| `hash`              | `string`            | `undefined`| URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532) |
+| Input               | Type                | Default     | Description                                                                                                     |
+| ------------------- | ------------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| `routeName`         | `string`            | `""`        | Target route name                                                                                               |
+| `routeParams`       | `Params`            | `undefined` | Route parameters (omitted → `undefined`, shares one active-route source with `injectIsActiveRoute(name)`, #776) |
+| `routeOptions`      | `NavigationOptions` | `{}`        | Navigation options (replace, etc.)                                                                              |
+| `activeClassName`   | `string`            | `"active"`  | CSS class applied when route is active                                                                          |
+| `activeStrict`      | `boolean`           | `false`     | Exact match only (no ancestor match)                                                                            |
+| `ignoreQueryParams` | `boolean`           | `true`      | Query params don't affect active state                                                                          |
+| `hash`              | `string`            | `undefined` | URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532)                         |
 
 #### `hash` input — URL fragment / tab-style UIs
 
@@ -454,13 +456,13 @@ Applies an active CSS class to any element when a route is active. Use this when
 </li>
 ```
 
-| Input               | Type      | Default | Description                            |
-| ------------------- | --------- | ------- | -------------------------------------- |
-| `realLinkActive`    | `string`  | `""`    | CSS class to apply when active         |
-| `routeName`         | `string`  | `""`    | Route to watch                         |
+| Input               | Type      | Default     | Description                                    |
+| ------------------- | --------- | ----------- | ---------------------------------------------- |
+| `realLinkActive`    | `string`  | `""`        | CSS class to apply when active                 |
+| `routeName`         | `string`  | `""`        | Route to watch                                 |
 | `routeParams`       | `Params`  | `undefined` | Route parameters (omitted → `undefined`, #776) |
-| `activeStrict`      | `boolean` | `false` | Exact match only                       |
-| `ignoreQueryParams` | `boolean` | `true`  | Query params don't affect active state |
+| `activeStrict`      | `boolean` | `false`     | Exact match only                               |
+| `ignoreQueryParams` | `boolean` | `true`      | Query params don't affect active state         |
 
 ### `routeMatch`
 
@@ -520,6 +522,23 @@ export class AppComponent {}
 ```
 
 The announcer creates a visually hidden `aria-live` region and announces each navigation to screen readers. See the [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
+
+`<navigation-announcer>` accepts optional `[prefix]` and `[getAnnouncementText]` signal inputs to customize the announced text:
+
+| Input                   | Type                       | Description                                                                                         |
+| ----------------------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
+| `[prefix]`              | `string`                   | Prefix prepended to the resolved text (default `"Navigated to "`)                                   |
+| `[getAnnouncementText]` | `(route: State) => string` | Full custom text; overrides the default `h1 → title → route-name` chain (falls back on empty/throw) |
+
+```typescript
+@Component({
+  imports: [NavigationAnnouncer],
+  template: `<navigation-announcer [getAnnouncementText]="announce" />`,
+})
+export class AppComponent {
+  announce = (route: State): string => `Now on ${route.name}`;
+}
+```
 
 ## Scroll Restoration
 
@@ -604,25 +623,25 @@ Existing `provideRealRouter(router)` is unchanged — keep using it for SPA / po
 
 **SPA examples** — `provideRealRouter(router)` after `await router.start()`:
 
-| Example | Demonstrates |
-|---------|--------------|
-| [`examples/web/angular/basic/`](../../examples/web/angular/basic) | Minimal setup with `RouteView` + `RealLink` + `injectRoute` |
-| [`examples/web/angular/combined/`](../../examples/web/angular/combined) | All features combined: nested routes, dynamic params, lazy loading, persistent params |
-| [`examples/web/angular/dynamic-routes/`](../../examples/web/angular/dynamic-routes) | `:id` params, programmatic navigation |
-| [`examples/web/angular/hash-routing/`](../../examples/web/angular/hash-routing) | `hash-plugin` with `<a realLink hash="…">` tab-style UIs (#532) |
-| [`examples/web/angular/lazy-loading/`](../../examples/web/angular/lazy-loading) | Route-level code-splitting via `import()` |
-| [`examples/web/angular/nested-routes/`](../../examples/web/angular/nested-routes) | Multi-level `<route-view>` composition |
-| [`examples/web/angular/persistent-params/`](../../examples/web/angular/persistent-params) | `persistent-params-plugin` integration |
-| [`examples/web/angular/animation-examples/`](../../examples/web/angular/animation-examples) | View Transitions API + scroll restoration + direction-tracker patterns |
+| Example                                                                                     | Demonstrates                                                                          |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [`examples/web/angular/basic/`](../../examples/web/angular/basic)                           | Minimal setup with `RouteView` + `RealLink` + `injectRoute`                           |
+| [`examples/web/angular/combined/`](../../examples/web/angular/combined)                     | All features combined: nested routes, dynamic params, lazy loading, persistent params |
+| [`examples/web/angular/dynamic-routes/`](../../examples/web/angular/dynamic-routes)         | `:id` params, programmatic navigation                                                 |
+| [`examples/web/angular/hash-routing/`](../../examples/web/angular/hash-routing)             | `hash-plugin` with `<a realLink hash="…">` tab-style UIs (#532)                       |
+| [`examples/web/angular/lazy-loading/`](../../examples/web/angular/lazy-loading)             | Route-level code-splitting via `import()`                                             |
+| [`examples/web/angular/nested-routes/`](../../examples/web/angular/nested-routes)           | Multi-level `<route-view>` composition                                                |
+| [`examples/web/angular/persistent-params/`](../../examples/web/angular/persistent-params)   | `persistent-params-plugin` integration                                                |
+| [`examples/web/angular/animation-examples/`](../../examples/web/angular/animation-examples) | View Transitions API + scroll restoration + direction-tracker patterns                |
 
 **SSR / SSG examples** — `provideRealRouterFactory({ baseRouter, plugins, deps })`:
 
-| Example | Demonstrates |
-|---------|--------------|
-| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr) | Classical SSR with cookie-based DI, auth guards, nested loaders |
-| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed) | Mixed SSR/CSR routes — some routes server-rendered, others CSR-only |
+| Example                                                                                                     | Demonstrates                                                                                   |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr)                     | Classical SSR with cookie-based DI, auth guards, nested loaders                                |
+| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed)         | Mixed SSR/CSR routes — some routes server-rendered, others CSR-only                            |
 | [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR with `@defer (on viewport)` + `@defer (on hover)` + `withIncrementalHydration()` |
-| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg) | Static site generation via in-process AngularNodeAppEngine + `getStaticPaths()` |
+| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg)                     | Static site generation via in-process AngularNodeAppEngine + `getStaticPaths()`                |
 
 **Post-hydration loader skip (#599)** — `provideRealRouterFactory` automatically bridges Angular's `TransferState` to the cross-adapter hydration scratchpad. On the server pass, the resolved router state is written to `TransferState`; on the client, the bootstrap consumes the seed via `hydrateRouter(...)` and `ssr-data-plugin` reuses the server-resolved `state.context.data` without re-invoking the loader on first paint. Requires `provideServerRendering()` (server) + `provideClientHydration()` (client) — both standard for Angular SSR apps. Verified end-to-end in `ssr/` and `ssr-streaming/` examples via `window.__LOADER_CALLS__` counter assertion.
 
@@ -636,9 +655,7 @@ Opt-in animated route transitions via the browser's [View Transitions API](https
 import { provideRealRouter } from "@real-router/angular";
 
 bootstrapApplication(AppComponent, {
-  providers: [
-    provideRealRouter(router, { viewTransitions: true }),
-  ],
+  providers: [provideRealRouter(router, { viewTransitions: true })],
 });
 ```
 
