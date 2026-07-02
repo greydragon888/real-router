@@ -100,7 +100,19 @@ const InkLinkImpl: FC<InkLinkProps> = ({
   useInput(
     (_input, key) => {
       if (key.return) {
-        onSelect?.();
+        // Isolate a throwing `onSelect`: unlike the DOM `<Link>` (where the
+        // browser contains event-listener exceptions), an uncaught throw here
+        // escapes into ink's stdin handler → `uncaughtException` crashes a real
+        // CLI, and it also swallows the navigation below. Log and still
+        // navigate — mirrors `route-announcer`'s consumer-callback isolation.
+        try {
+          onSelect?.();
+        } catch (error) {
+          console.error(
+            "[real-router] InkLink onSelect threw; proceeding with navigation.",
+            error,
+          );
+        }
         router.navigate(routeName, paramsForNav, routeOptions).catch(() => {});
       }
     },

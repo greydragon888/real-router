@@ -68,7 +68,7 @@ router.navigate("page3", { lang: "fr" });      // URL: /page3?lang=fr, saved: la
 router.navigate("page4", { lang: undefined }); // lang removed permanently
 ```
 
-> **Note:** Removal is permanent for the plugin lifetime. Once `undefined` is passed, the param is no longer tracked — even if passed again in a later navigation.
+> **Note:** Removal is permanent for the plugin lifetime — but only once the removal navigation actually commits. Once `undefined` is passed and the navigation succeeds, the param is no longer tracked, even if passed again later. If that navigation is rejected by a guard or superseded by a concurrent navigate, the param stays persisted (the removal rolls back).
 
 ## Use Cases
 

@@ -142,6 +142,38 @@ describe("InkLink", () => {
     expect(navigateSpy).toHaveBeenCalledWith("about", {}, {});
   });
 
+  it("isolates a throwing onSelect: navigation still fires and the error is logged, not propagated to ink's stdin handler", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error");
+    const onSelect = vi.fn(() => {
+      throw new Error("onSelect boom");
+    });
+    const navigateSpy = vi.spyOn(router, "navigate");
+
+    const { stdin } = render(
+      <InkRouterProvider router={router}>
+        <InkLink routeName="about" onSelect={onSelect} autoFocus>
+          About
+        </InkLink>
+      </InkRouterProvider>,
+    );
+
+    await flushInk();
+    // A throwing onSelect must neither swallow the navigation nor escape into
+    // ink's stdin handler — an uncaughtException there would crash a real CLI
+    // (Node has no browser-style event-listener isolation).
+    stdin.write(ENTER);
+
+    await vi.waitFor(() => {
+      expect(navigateSpy).toHaveBeenCalledWith("about", {}, {});
+    }, WAIT_OPTS);
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[real-router] InkLink onSelect threw; proceeding with navigation.",
+      expect.any(Error),
+    );
+  });
+
   it("does not navigate when not focused", async () => {
     const navigateSpy = vi.spyOn(router, "navigate");
 
