@@ -1,5 +1,25 @@
 # @real-router/angular
 
+## 0.13.0
+
+### Minor Changes
+
+- [#1086](https://github.com/greydragon888/real-router/pull/1086) [`f0d9c7a`](https://github.com/greydragon888/real-router/commit/f0d9c7a23a30a8a6e0f4f080b7901c735a4a9072) Thanks [@greydragon888](https://github.com/greydragon888)! - Expose announcer options on the `<navigation-announcer>` component ([#1065](https://github.com/greydragon888/real-router/issues/1065))
+
+  `<navigation-announcer>` now accepts optional `prefix` and `getAnnouncementText`
+  signal inputs — `[prefix]="'Page: '"` and `[getAnnouncementText]="fn"` — to
+  customize the screen-reader announcement text, matching the `announceNavigation`
+  options on the react/preact/vue/solid/svelte adapters. `getAnnouncementText`
+  falls back to the default `h1 → title → route-name` chain when it returns an
+  empty string or throws. Without either input the announcer keeps speaking the
+  default `"Navigated to <route.name>"`, so the change is fully backward
+  compatible. Options are read once in `ngOnInit` (after the input bindings fire),
+  mirroring the SSR `<http-status-code>` component.
+
+  ```html
+  <navigation-announcer [prefix]="'Page: '" [getAnnouncementText]="announce" />
+  ```
+
 ## 0.12.1
 
 ### Patch Changes
