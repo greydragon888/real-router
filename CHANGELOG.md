@@ -7,6 +7,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/angular@0.13.0
+
+### Minor Changes
+
+- [#1086](https://github.com/greydragon888/real-router/pull/1086) [`f0d9c7a`](https://github.com/greydragon888/real-router/commit/f0d9c7a23a30a8a6e0f4f080b7901c735a4a9072) Thanks [@greydragon888](https://github.com/greydragon888)! - Expose announcer options on the `<navigation-announcer>` component ([#1065](https://github.com/greydragon888/real-router/issues/1065))
+
+  `<navigation-announcer>` now accepts optional `prefix` and `getAnnouncementText`
+  signal inputs — `[prefix]="'Page: '"` and `[getAnnouncementText]="fn"` — to
+  customize the screen-reader announcement text, matching the `announceNavigation`
+  options on the react/preact/vue/solid/svelte adapters. `getAnnouncementText`
+  falls back to the default `h1 → title → route-name` chain when it returns an
+  empty string or throws. Without either input the announcer keeps speaking the
+  default `"Navigated to <route.name>"`, so the change is fully backward
+  compatible. Options are read once in `ngOnInit` (after the input bindings fire),
+  mirroring the SSR `<http-status-code>` component.
+
+  ```html
+  <navigation-announcer [prefix]="'Page: '" [getAnnouncementText]="announce" />
+  ```
+
+### @real-router/preact@0.16.0
+
+### Minor Changes
+
+- [#1086](https://github.com/greydragon888/real-router/pull/1086) [`f0d9c7a`](https://github.com/greydragon888/real-router/commit/f0d9c7a23a30a8a6e0f4f080b7901c735a4a9072) Thanks [@greydragon888](https://github.com/greydragon888)! - Expose announcer options on `RouterProvider`'s `announceNavigation` prop ([#1065](https://github.com/greydragon888/real-router/issues/1065))
+
+  `announceNavigation` now accepts `boolean | RouteAnnouncerOptions`. Pass an
+  object — `{ prefix?, getAnnouncementText? }` — to customize the screen-reader
+  announcement text; the callback falls back to the default `h1 → title →
+route-name` chain when it returns an empty string or throws. `true` keeps the
+  previous default behavior, so the change is fully backward compatible. Mirrors
+  the same addition on `@real-router/react`.
+
+  ```tsx
+  <RouterProvider
+    router={router}
+    announceNavigation={{
+      getAnnouncementText: (route) => `Now on ${route.name}`,
+    }}
+  >
+    <App />
+  </RouterProvider>
+  ```
+
+### @real-router/react@0.28.0
+
+### Minor Changes
+
+- [#1086](https://github.com/greydragon888/real-router/pull/1086) [`f0d9c7a`](https://github.com/greydragon888/real-router/commit/f0d9c7a23a30a8a6e0f4f080b7901c735a4a9072) Thanks [@greydragon888](https://github.com/greydragon888)! - Expose announcer options on `RouterProvider`'s `announceNavigation` prop ([#1065](https://github.com/greydragon888/real-router/issues/1065))
+
+  `announceNavigation` now accepts `boolean | RouteAnnouncerOptions`. Pass an
+  object — `{ prefix?, getAnnouncementText? }` — to customize the screen-reader
+  announcement text; the callback falls back to the default `h1 → title →
+route-name` chain when it returns an empty string or throws. `true` keeps the
+  previous default behavior, so the change is fully backward compatible.
+
+  ```tsx
+  <RouterProvider
+    router={router}
+    announceNavigation={{
+      getAnnouncementText: (route) => `Now on ${route.name}`,
+    }}
+  >
+    <App />
+  </RouterProvider>
+  ```
+
+### @real-router/solid@0.16.0
+
+### Minor Changes
+
+- [#1086](https://github.com/greydragon888/real-router/pull/1086) [`f0d9c7a`](https://github.com/greydragon888/real-router/commit/f0d9c7a23a30a8a6e0f4f080b7901c735a4a9072) Thanks [@greydragon888](https://github.com/greydragon888)! - Expose announcer options on `RouterProvider`'s `announceNavigation` prop ([#1065](https://github.com/greydragon888/real-router/issues/1065))
+
+  `announceNavigation` now accepts `boolean | RouteAnnouncerOptions`. Pass an
+  object — `{ prefix?, getAnnouncementText? }` — to customize the screen-reader
+  announcement text; the callback falls back to the default `h1 → title →
+route-name` chain when it returns an empty string or throws. `true` keeps the
+  previous default behavior, so the change is fully backward compatible. Mirrors
+  the same addition on `@real-router/react`, `@real-router/preact`, and
+  `@real-router/vue`.
+
+  ```tsx
+  <RouterProvider
+    router={router}
+    announceNavigation={{
+      getAnnouncementText: (route) => `Now on ${route.name}`,
+    }}
+  >
+    <App />
+  </RouterProvider>
+  ```
+
+### @real-router/svelte@0.14.0
+
+### Minor Changes
+
+- [#1086](https://github.com/greydragon888/real-router/pull/1086) [`f0d9c7a`](https://github.com/greydragon888/real-router/commit/f0d9c7a23a30a8a6e0f4f080b7901c735a4a9072) Thanks [@greydragon888](https://github.com/greydragon888)! - Expose announcer options on `RouterProvider`'s `announceNavigation` prop ([#1065](https://github.com/greydragon888/real-router/issues/1065))
+
+  `announceNavigation` now accepts `boolean | RouteAnnouncerOptions`. Pass an
+  object — `{ prefix?, getAnnouncementText? }` — to customize the screen-reader
+  announcement text; the callback falls back to the default `h1 → title →
+route-name` chain when it returns an empty string or throws. `true` keeps the
+  previous default behavior, so the change is fully backward compatible. Mirrors
+  the same addition on `@real-router/react`, `@real-router/preact`, and
+  `@real-router/vue`.
+
+  ```svelte
+  <RouterProvider
+    {router}
+    announceNavigation={{
+      getAnnouncementText: (route) => `Now on ${route.name}`,
+    }}
+  >
+    <App />
+  </RouterProvider>
+  ```
+
+### @real-router/vue@0.16.0
+
+### Minor Changes
+
+- [#1086](https://github.com/greydragon888/real-router/pull/1086) [`f0d9c7a`](https://github.com/greydragon888/real-router/commit/f0d9c7a23a30a8a6e0f4f080b7901c735a4a9072) Thanks [@greydragon888](https://github.com/greydragon888)! - Expose announcer options on `RouterProvider`'s `announceNavigation` prop ([#1065](https://github.com/greydragon888/real-router/issues/1065))
+
+  `announceNavigation` now accepts `boolean | RouteAnnouncerOptions`. Pass an
+  object — `{ prefix?, getAnnouncementText? }` — to customize the screen-reader
+  announcement text; the callback falls back to the default `h1 → title →
+route-name` chain when it returns an empty string or throws. `true` keeps the
+  previous default behavior, so the change is fully backward compatible. Mirrors
+  the same addition on `@real-router/react` and `@real-router/preact`.
+
+  ```ts
+  h(
+    RouterProvider,
+    {
+      router,
+      announceNavigation: {
+        getAnnouncementText: (route) => `Now on ${route.name}`,
+      },
+    },
+    { default: () => h(App) },
+  );
+  ```
+
+
 ### @real-router/angular@0.12.1
 
 ### Patch Changes
