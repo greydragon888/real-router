@@ -1307,7 +1307,7 @@ describe("createScrollSpy", () => {
 
         return {
           onTransitionSuccess: (toState) => {
-            claim.write(toState, { hash: "section-1" });
+            claim.write(toState, { hash: "section-1", hashChanged: false });
           },
         };
       });

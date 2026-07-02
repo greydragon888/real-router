@@ -49,7 +49,7 @@ const urlContextPlugin: PluginFactory = (router) => {
 
   return {
     onTransitionSuccess: (toState) => {
-      claim.write(toState, { hash: "" });
+      claim.write(toState, { hash: "", hashChanged: false });
     },
   };
 };
