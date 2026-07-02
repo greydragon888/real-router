@@ -205,6 +205,21 @@ importers:
 
   benchmarks:
     dependencies:
+      '@angular/common':
+        specifier: 22.0.5
+        version: 22.0.5(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@angular/core':
+        specifier: 22.0.5
+        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+      '@angular/platform-browser':
+        specifier: 22.0.5
+        version: 22.0.5(@angular/common@22.0.5(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2))
+      '@angular/router':
+        specifier: 22.0.5
+        version: 22.0.5(@angular/common@22.0.5(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2))(@angular/platform-browser@22.0.5(@angular/common@22.0.5(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)))(rxjs@7.8.2)
+      '@mateothegreat/svelte5-router':
+        specifier: 2.16.19
+        version: 2.16.19(svelte@5.56.4(@typescript-eslint/types@8.62.0))
       '@nanostores/react':
         specifier: 0.8.4
         version: 0.8.4(nanostores@0.11.4)(react@19.2.7)
@@ -214,6 +229,9 @@ importers:
       '@nanostores/vue':
         specifier: 1.1.0
         version: 1.1.0(nanostores@0.11.4)(vue@3.5.38(typescript@6.0.3))
+      '@real-router/angular':
+        specifier: workspace:^
+        version: link:../packages/angular
       '@real-router/browser-plugin':
         specifier: workspace:^
         version: link:../packages/browser-plugin
@@ -235,6 +253,9 @@ importers:
       '@real-router/solid':
         specifier: workspace:^
         version: link:../packages/solid
+      '@real-router/svelte':
+        specifier: workspace:^
+        version: link:../packages/svelte
       '@real-router/types':
         specifier: workspace:^
         version: link:../packages/core-types
@@ -277,6 +298,12 @@ importers:
       solid-js:
         specifier: 1.9.13
         version: 1.9.13
+      sv-router:
+        specifier: 0.17.0
+        version: 0.17.0(svelte@5.56.4(@typescript-eslint/types@8.62.0))
+      svelte:
+        specifier: 5.56.4
+        version: 5.56.4(@typescript-eslint/types@8.62.0)
       vue:
         specifier: 3.5.38
         version: 3.5.38(typescript@6.0.3)
@@ -290,6 +317,21 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
     devDependencies:
+      '@analogjs/vite-plugin-angular':
+        specifier: 2.6.2
+        version: 2.6.2(@angular/build@22.0.5(72ef9b0dd0700c1a00ffbfb6bbde33f0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
+      '@angular/build':
+        specifier: 22.0.5
+        version: 22.0.5(72ef9b0dd0700c1a00ffbfb6bbde33f0)
+      '@angular/compiler':
+        specifier: 22.0.5
+        version: 22.0.5
+      '@angular/compiler-cli':
+        specifier: 22.0.5
+        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: 6.2.4
+        version: 6.2.4(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
       '@tanstack/router-core':
         specifier: 1.171.13
         version: 1.171.13
@@ -301,13 +343,13 @@ importers:
         version: 19.2.3(@types/react@19.2.17)
       '@vitejs/plugin-react':
         specifier: 5.2.0
-        version: 5.2.0(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))
+        version: 5.2.0(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
       '@vitejs/plugin-vue':
         specifier: 6.0.7
-        version: 6.0.7(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))(vue@3.5.38(typescript@6.0.3))
+        version: 6.0.7(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))(vue@3.5.38(typescript@6.0.3))
       '@vitejs/plugin-vue-jsx':
         specifier: 5.1.5
-        version: 5.1.5(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))(vue@3.5.38(typescript@6.0.3))
+        version: 5.1.5(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))(vue@3.5.38(typescript@6.0.3))
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
@@ -316,13 +358,13 @@ importers:
         version: 1.61.1
       vite:
         specifier: '>=7.3.5 <8'
-        version: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)
+        version: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
       vite-plugin-solid:
         specifier: 2.11.12
-        version: 2.11.12(@testing-library/jest-dom@6.9.1)(solid-js@1.9.13)(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))
+        version: 2.11.12(@testing-library/jest-dom@6.9.1)(solid-js@1.9.13)(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
       vitest:
         specifier: 4.1.9
-        version: 4.1.9(@types/node@25.9.3)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))
+        version: 4.1.9(@types/node@25.9.3)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
 
   examples/console/react-ink:
     dependencies:
@@ -7923,6 +7965,11 @@ packages:
   '@manypkg/get-packages@1.1.3':
     resolution: {integrity: sha512-fo+QhuU3qE/2TQMQmbVMqaQ6EWbMhi4ABWP+O4AM1NqPBuy0OrApV5LO6BrrgnhtAHS2NH6RrVk9OL181tTi8A==}
 
+  '@mateothegreat/svelte5-router@2.16.19':
+    resolution: {integrity: sha512-SNkR15x3b0HLNM33BORKF9U6elHHWZxg42yikNUKW1YNjkYRBLBgDkVSJTqRIC6aE8Wt4vqmKKmHzQTK2EKiqA==}
+    peerDependencies:
+      svelte: ^5.0.0
+
   '@modelcontextprotocol/sdk@1.29.0':
     resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
     engines: {node: '>=18'}
@@ -13834,6 +13881,12 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
+  sv-router@0.17.0:
+    resolution: {integrity: sha512-vny+g+yVhb2fUi9+hD3JwrzCM45iXXK3BAYwxRr0Uqw1gGcPXuUjkpeoisdZt9/D/lwiJ6UaKSGhKMeIy5a1QA==}
+    hasBin: true
+    peerDependencies:
+      svelte: ^5
+
   svelte-check@4.6.0:
     resolution: {integrity: sha512-KhVnDFDSid57mmZtHz8gfW8AAGylOZ0vPnOIzVmAL+urzwK8sBYXRss953gD8T0OdgAQ11mdWhE6uadmtOz8TQ==}
     engines: {node: '>= 18.0.0'}
@@ -14727,6 +14780,20 @@ snapshots:
     optionalDependencies:
       '@angular/build': 22.0.5(72ef9b0dd0700c1a00ffbfb6bbde33f0)
       vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)
+    transitivePeerDependencies:
+      - '@emnapi/core'
+      - '@emnapi/runtime'
+
+  '@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.5(72ef9b0dd0700c1a00ffbfb6bbde33f0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))':
+    dependencies:
+      magic-string: 0.30.21
+      obug: 2.1.3
+      oxc-parser: 0.121.0(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+      tinyglobby: 0.2.17
+      ts-morph: 21.0.1
+    optionalDependencies:
+      '@angular/build': 22.0.5(72ef9b0dd0700c1a00ffbfb6bbde33f0)
+      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -16267,6 +16334,10 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 2.1.0
 
+  '@mateothegreat/svelte5-router@2.16.19(svelte@5.56.4(@typescript-eslint/types@8.62.0))':
+    dependencies:
+      svelte: 5.56.4(@typescript-eslint/types@8.62.0)
+
   '@modelcontextprotocol/sdk@1.29.0(zod@4.4.2)':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.25)
@@ -17386,6 +17457,13 @@ snapshots:
       svelte: 5.56.4(@typescript-eslint/types@8.62.0)
       vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)
 
+  '@sveltejs/vite-plugin-svelte-inspector@5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)))(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))':
+    dependencies:
+      '@sveltejs/vite-plugin-svelte': 6.2.4(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
+      obug: 2.1.3
+      svelte: 5.56.4(@typescript-eslint/types@8.62.0)
+      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
+
   '@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))':
     dependencies:
       '@sveltejs/vite-plugin-svelte-inspector': 5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)))(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))
@@ -17395,6 +17473,16 @@ snapshots:
       svelte: 5.56.4(@typescript-eslint/types@8.62.0)
       vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)
       vitefu: 1.1.3(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))
+
+  '@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))':
+    dependencies:
+      '@sveltejs/vite-plugin-svelte-inspector': 5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)))(svelte@5.56.4(@typescript-eslint/types@8.62.0))(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
+      deepmerge: 4.3.1
+      magic-string: 0.30.21
+      obug: 2.1.3
+      svelte: 5.56.4(@typescript-eslint/types@8.62.0)
+      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
+      vitefu: 1.1.3(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
 
   '@szmarczak/http-timer@4.0.6':
     dependencies:
@@ -17922,6 +18010,18 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@vitejs/plugin-react@5.2.0(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))':
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.29.7)
+      '@babel/plugin-transform-react-jsx-source': 7.27.1(@babel/core@7.29.7)
+      '@rolldown/pluginutils': 1.0.0-rc.3
+      '@types/babel__core': 7.20.5
+      react-refresh: 0.18.0
+      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
+    transitivePeerDependencies:
+      - supports-color
+
   '@vitejs/plugin-rsc@0.5.27(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
@@ -17936,14 +18036,14 @@ snapshots:
       vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)
       vitefu: 1.1.3(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))
 
-  '@vitejs/plugin-vue-jsx@5.1.5(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3))(vue@3.5.38(typescript@6.0.3))':
+  '@vitejs/plugin-vue-jsx@5.1.5(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))(vue@3.5.38(typescript@6.0.3))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-syntax-typescript': 7.29.7(@babel/core@7.29.7)
       '@babel/plugin-transform-typescript': 7.29.7(@babel/core@7.29.7)
       '@rolldown/pluginutils': 1.0.1
       '@vue/babel-plugin-jsx': 2.0.1(@babel/core@7.29.7)
-      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)
+      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
       vue: 3.5.38(typescript@6.0.3)
     transitivePeerDependencies:
       - supports-color
@@ -17952,6 +18052,12 @@ snapshots:
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@vitejs/plugin-vue@6.0.7(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      '@rolldown/pluginutils': 1.0.1
+      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
       vue: 3.5.38(typescript@6.0.3)
 
   '@vitest/coverage-v8@4.1.9(vitest@4.1.9)':
@@ -18004,7 +18110,6 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
-    optional: true
 
   '@vitest/pretty-format@4.1.9':
     dependencies:
@@ -22384,6 +22489,11 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
+  sv-router@0.17.0(svelte@5.56.4(@typescript-eslint/types@8.62.0)):
+    dependencies:
+      esm-env: 1.2.2
+      svelte: 5.56.4(@typescript-eslint/types@8.62.0)
+
   svelte-check@4.6.0(picomatch@4.0.4)(svelte@5.56.4(@typescript-eslint/types@8.62.0))(typescript@6.0.3):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
@@ -22824,6 +22934,21 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  vite-plugin-solid@2.11.12(@testing-library/jest-dom@6.9.1)(solid-js@1.9.13)(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)):
+    dependencies:
+      '@babel/core': 7.29.7
+      '@types/babel__core': 7.20.5
+      babel-preset-solid: 1.9.12(@babel/core@7.29.7)(solid-js@1.9.13)
+      merge-anything: 5.1.7
+      solid-js: 1.9.13
+      solid-refresh: 0.6.3(solid-js@1.9.13)
+      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
+      vitefu: 1.1.3(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3))
+    optionalDependencies:
+      '@testing-library/jest-dom': 6.9.1
+    transitivePeerDependencies:
+      - supports-color
+
   vite-prerender-plugin@0.5.13(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)):
     dependencies:
       kolorist: 1.8.0
@@ -22881,6 +23006,10 @@ snapshots:
   vitefu@1.1.3(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)):
     optionalDependencies:
       vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.22.4)(yaml@2.8.3)
+
+  vitefu@1.1.3(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)):
+    optionalDependencies:
+      vite: 7.3.5(@types/node@25.9.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.22.4)(yaml@2.8.3)
 
   vitest-react-profiler@1.12.0(react@19.2.7)(vitest@4.1.9):
     dependencies:
@@ -22946,7 +23075,6 @@ snapshots:
       jsdom: 29.1.1(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw
-    optional: true
 
   vscode-uri@3.1.0: {}
 

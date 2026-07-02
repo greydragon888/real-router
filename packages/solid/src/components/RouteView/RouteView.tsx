@@ -1,10 +1,16 @@
-import { children as resolveChildren, createMemo, For, Show } from "solid-js";
+import { children as resolveChildren, createMemo } from "solid-js";
 
 import { Match, NotFound, Self } from "./components";
-import { buildRenderList, collectElements } from "./helpers";
+import {
+  collectElements,
+  materializeWinner,
+  pickWinner,
+  winnersEqual,
+} from "./helpers";
 import { useRouteNode } from "../../hooks/useRouteNode";
 
 import type { RouteViewMarker } from "./components";
+import type { RouteViewWinner } from "./helpers";
 import type { RouteViewProps } from "./types";
 import type { JSX } from "solid-js";
 
@@ -21,26 +27,36 @@ function RouteViewRoot(props: Readonly<RouteViewProps>): JSX.Element {
     return arr;
   });
 
-  // Idiomatic Solid: `<Show>` gates on the route presence, `<For>` iterates
-  // the build-render-list output. `<Show when={...} keyed>` re-runs the
-  // child callback only when route identity changes; `<For>` adds/removes
-  // exactly the changed elements without re-running the rest.
-  // (§8a Q4 audit fix — replaced an IIFE-in-JSX with idiomatic primitives.)
-  const renderList = createMemo<JSX.Element[]>(() => {
-    const state = routeState();
+  // FIX C (research #1094) — winner-keyed pipeline.
+  // `winner` re-computes on every node-signal fire, but its custom equality
+  // (kind + marker identity) stops propagation when the same marker stays
+  // active. `rendered` therefore materializes marker.children exactly once
+  // per winner CHANGE — the active subtree is preserved across in-winner
+  // navigations (React/Vue adapter parity) instead of dispose+recreate.
+  // This also replaces the previous <Show>+<For> pair (2 extra components +
+  // mapArray machinery per RouteView) with a single memo returned as a
+  // reactive JSX expression.
+  const winner = createMemo<RouteViewWinner | null>(
+    () => {
+      const state = routeState();
 
-    if (!state.route) {
-      return [];
-    }
+      if (!state.route) {
+        return null;
+      }
 
-    return buildRenderList(elements(), state.route.name, props.nodeName);
+      return pickWinner(elements(), state.route.name, props.nodeName);
+    },
+    null,
+    { equals: winnersEqual },
+  );
+
+  const rendered = createMemo<JSX.Element>(() => {
+    const current = winner();
+
+    return current === null ? null : materializeWinner(current);
   });
 
-  return (
-    <Show when={renderList().length > 0}>
-      <For each={renderList()}>{(node) => node}</For>
-    </Show>
-  );
+  return rendered as unknown as JSX.Element;
 }
 
 RouteViewRoot.displayName = "RouteView";

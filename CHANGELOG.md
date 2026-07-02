@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/svelte@0.13.14
+
+### Patch Changes
+
+- [#1101](https://github.com/greydragon888/real-router/pull/1101) [`31286b8`](https://github.com/greydragon888/real-router/commit/31286b89bc3751f743ef00d78cc46a67c5ec058a) Thanks [@greydragon888](https://github.com/greydragon888)! - Speed up `<Link>` mount via a shared active-name selector fast path ([#1099](https://github.com/greydragon888/real-router/issues/1099))
+
+  A default-options `<Link>` (non-strict, query params ignored, no custom
+  `routeParams`, no `hash`) now resolves its active state through the per-router
+  `createActiveNameSelector` — a single shared `router.subscribe` handle for any
+  number of distinct-`routeName` links — instead of allocating a per-link
+  `createActiveRouteSource` (a `BaseSource` plus its own router subscription for
+  every link).
+
+  This mirrors the Solid adapter's `routeSelector` fast path. On the `link-build`
+  benchmark (mount 1000 `<Link>`s) it removes the per-link source setup that was
+  the bulk of the Svelte `<Link>`'s excess cost — ~14.5 → ~12.6 ms / 1000 links —
+  and collapses 1000 router subscriptions down to one. Active-class behaviour is
+  unchanged (non-strict, query-ignoring, name-only matching is exactly what the
+  default `createActiveRouteSource` did); links needing custom params, strict
+  matching, `ignoreQueryParams: false`, or hash-aware ([#532](https://github.com/greydragon888/real-router/issues/532)) matching keep the
+  full-fidelity slow path.
+
+
+### @real-router/solid@0.15.6
+
+### Patch Changes
+
+- [#1097](https://github.com/greydragon888/real-router/pull/1097) [`02c81c3`](https://github.com/greydragon888/real-router/commit/02c81c358b5b9d348832e34293c2d01e028a1803) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `RouteView` deep-nesting composition cost and per-navigation subtree remount ([#1094](https://github.com/greydragon888/real-router/issues/1094))
+
+  `RouteView` now selects the winning marker with a winner-keyed `createMemo`
+  (`pickWinner` + `winnersEqual`) and materializes its children only when the
+  winner actually changes. Two problems are fixed:
+
+  - **Correctness:** the active subtree is preserved across navigations that keep
+    the same `<Match>` winner (e.g. `users.list` → `users.view`). Previously every
+    navigation re-materialized the winning subtree, disposing and recreating the
+    child components and silently losing their local state — divergent from the
+    React and Vue adapters, which preserve it.
+  - **Performance:** the `CandidateLookup` cache is now keyed by `routeName` alone
+    (its content never depended on `nodeName`), so a deeply nested `RouteView`
+    chain no longer rebuilds an identical candidate set at every level — removing
+    the O(depth²) substring work that made deep-nesting navigation cost grow
+    super-linearly with depth.
+
+  No public API change. Marker precedence (Match > Self > NotFound) is unchanged
+  and remains locked by the RouteView property-based suite.
+
+
 ### @real-router/angular@0.12.0
 
 ### Minor Changes
