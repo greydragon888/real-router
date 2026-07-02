@@ -46,9 +46,9 @@ src/
 
 ## Gotchas
 
-### Hooks are fire-and-forget
+### Hooks are fire-and-forget, with per-hook error isolation
 
-Return values are ignored. Errors propagate to the EventEmitter (logged to stderr) but do not block or cancel the transition.
+Return values are ignored. Each hook is invoked with **per-hook exception isolation** (#798): a throwing hook is caught and re-thrown **asynchronously** via `queueMicrotask`, so it never aborts the handler before a later hook of the same transition runs (the `onNavigate` orthogonality invariant), and never blocks or cancels the transition. The error still surfaces to global error handlers as an async uncaught error — mirroring `BaseSource` / `createActiveNameSelector` in `@real-router/sources`. Note the observable change from the pre-#798 design: a throwing hook surfaces **asynchronously (uncaught)**, not synchronously through the router's EventEmitter "Error in listener" sink.
 
 ### onLeave fires at leave-approve, not success
 

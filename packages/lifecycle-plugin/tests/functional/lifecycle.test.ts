@@ -485,12 +485,140 @@ describe("@real-router/lifecycle-plugin", () => {
     });
   });
 
-  describe("error handling", () => {
-    it("should let errors from hooks propagate to the event emitter", async () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  describe("intra-plugin hook isolation (#798)", () => {
+    // A throwing hook is re-thrown asynchronously via queueMicrotask (mirrors
+    // BaseSource / createActiveNameSelector in @real-router/sources). Capture the
+    // async re-throw before vitest's default uncaughtException handler fails the
+    // test, then restore the previous listeners.
+    async function withUncaughtCapture(
+      run: () => Promise<void>,
+    ): Promise<unknown[]> {
+      const rethrown: unknown[] = [];
+      const previousListeners = [...process.listeners("uncaughtException")];
 
+      process.removeAllListeners("uncaughtException");
+      const captureHandler = (error: unknown): void => {
+        rethrown.push(error);
+      };
+
+      process.on("uncaughtException", captureHandler);
+
+      try {
+        await run();
+        // Drain the microtask queue so the queueMicrotask(throw) lands.
+        await Promise.resolve();
+        await Promise.resolve();
+      } finally {
+        process.removeListener("uncaughtException", captureHandler);
+        for (const listener of previousListeners) {
+          process.on("uncaughtException", listener);
+        }
+      }
+
+      return rethrown;
+    }
+
+    it("still fires onNavigate when onEnter throws (orthogonality preserved)", async () => {
+      const boom = new Error("boomE");
       const throwingEnter: LifecycleHook = () => {
-        throw new Error("hook error");
+        throw boom;
+      };
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "about",
+            path: "/about",
+            onEnter: () => throwingEnter,
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+
+      const rethrown = await withUncaughtCapture(async () => {
+        await router.navigate("about");
+      });
+
+      // onNavigate is NOT swallowed by the throwing onEnter (the #798 bug).
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      // The developer signal still surfaces — re-thrown asynchronously.
+      expect(rethrown).toStrictEqual([boom]);
+    });
+
+    it("still fires onNavigate when onStay throws (orthogonality preserved)", async () => {
+      const boom = new Error("boomS");
+      const throwingStay: LifecycleHook = () => {
+        throw boom;
+      };
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users.view",
+            path: "/users/:id",
+            onStay: () => throwingStay,
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: "1" });
+      onNavigate.mockClear();
+
+      const rethrown = await withUncaughtCapture(async () => {
+        await router.navigate("users.view", { id: "2" });
+      });
+
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      expect(rethrown).toStrictEqual([boom]);
+    });
+
+    it("isolates a throwing onNavigate without aborting the transition", async () => {
+      const boom = new Error("boomN");
+      const throwingNavigate: LifecycleHook = () => {
+        throw boom;
+      };
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "about",
+            path: "/about",
+            onNavigate: () => throwingNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+
+      const rethrown = await withUncaughtCapture(async () => {
+        await router.navigate("about");
+      });
+
+      // Transition still commits; the error surfaces asynchronously.
+      expect(router.getState()?.name).toBe("about");
+      expect(rethrown).toStrictEqual([boom]);
+    });
+
+    it("re-throws hook errors asynchronously instead of through the event emitter", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const boom = new Error("hook error");
+      const throwingEnter: LifecycleHook = () => {
+        throw boom;
       };
 
       router = createRouter(
@@ -503,9 +631,17 @@ describe("@real-router/lifecycle-plugin", () => {
       router.usePlugin(lifecyclePluginFactory());
 
       await router.start("/");
-      await router.navigate("about");
 
-      expect(errorSpy).toHaveBeenCalledWith(
+      const rethrown = await withUncaughtCapture(async () => {
+        await router.navigate("about");
+      });
+
+      // Isolation does not cancel the navigation.
+      expect(router.getState()?.name).toBe("about");
+      // The error surfaces via async re-throw, NOT the core "Error in listener"
+      // sink — the plugin now catches the throw before it reaches EventEmitter.
+      expect(rethrown).toStrictEqual([boom]);
+      expect(errorSpy).not.toHaveBeenCalledWith(
         expect.stringContaining("Error in listener"),
         expect.any(Error),
       );

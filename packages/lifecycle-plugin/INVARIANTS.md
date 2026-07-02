@@ -33,6 +33,7 @@
 | 2   | `onNavigate` fires on param-change regardless of `onStay`       | Navigating to the same route with different params calls `onNavigate` exactly once. Fires alongside `onStay` when both are defined — hooks are orthogonal.                                   |
 | 3   | `onEnter` and `onNavigate` both fire on entry when both defined | Each hook fires based on its own condition — declaring `onEnter` does not silence `onNavigate`. Enables hybrid declarations (entry-specific setup + shared navigation logic).               |
 | 4   | `onStay` and `onNavigate` both fire on param-change when both defined | Each hook fires based on its own condition — declaring `onStay` does not silence `onNavigate`. Enables hybrid declarations (stay-specific update + shared navigation logic).             |
+| 5   | Orthogonality survives a throwing sibling hook (#798)          | A throwing `onEnter`/`onStay` does not swallow `onNavigate` of the same transition — each hook is invoked with per-hook exception isolation, and the error is re-thrown asynchronously. Closes the invariant-generator gap: prior generators never threw, so intra-plugin swallowing went undetected. |
 
 ## Hook Ordering
 
@@ -63,4 +64,4 @@
 
 | File                                          | Invariants | Category                                                     |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| `tests/property/lifecycle.properties.ts`      | 17         | onEnter dispatch, onLeave dispatch, onStay dispatch, onNavigate dispatch + orthogonality, ordering, teardown, mutual exclusion, compilation |
+| `tests/property/lifecycle.properties.ts`      | 18         | onEnter dispatch, onLeave dispatch, onStay dispatch, onNavigate dispatch + orthogonality (incl. throwing-hook isolation, #798), ordering, teardown, mutual exclusion, compilation |
