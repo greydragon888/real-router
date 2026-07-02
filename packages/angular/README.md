@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-> Angular 21 integration for [Real-Router](https://github.com/greydragon888/real-router) — inject functions, components, and directives.
+> Angular 22 integration for [Real-Router](https://github.com/greydragon888/real-router) — inject functions, components, and directives.
 
 ## Installation
 
@@ -10,7 +10,7 @@
 npm install @real-router/angular @real-router/core @real-router/browser-plugin
 ```
 
-**Peer dependencies:** `@angular/core` >= 21.0.0, `@angular/common` >= 21.0.0
+**Peer dependencies:** `@angular/core` >= 22.0.0, `@angular/common` >= 22.0.0
 
 ## Quick Start
 

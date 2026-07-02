@@ -1,6 +1,6 @@
 # @real-router/angular
 
-> Angular 21 bindings with signal-based reactive state
+> Angular 22 bindings with signal-based reactive state
 
 ## Two Entry Points
 
@@ -12,7 +12,7 @@ import { provideRealRouter, injectRoute, RouteView, RealLink } from '@real-route
 import { ClientOnly, HttpStatusCode, createHttpStatusSink } from '@real-router/angular/ssr';
 ```
 
-**Peer dependency:** `@angular/core` >= 21.0.0, `@angular/common` >= 21.0.0
+**Peer dependency:** `@angular/core` >= 22.0.0, `@angular/common` >= 22.0.0
 
 **Architecture:** Flat structure with two entry points (main + `/ssr` ng-packagr secondary entry). All code lives in `src/` and `ssr/`. Built with ng-packagr (partial compilation mode). Signal-first, zoneless-compatible.
 
@@ -280,7 +280,7 @@ The `nodeName` property collides with `HTMLElement.nodeName` (read-only). Angula
 
 ### JIT mode limitations
 
-Angular 21 JIT mode (used in TestBed without the Angular Vite plugin) does not support signal-based `input()` in template bindings. This affects component/directive testing. The `@analogjs/vite-plugin-angular` is needed for full template compilation support in tests.
+Angular 22 JIT mode (used in TestBed without the Angular Vite plugin) does not support signal-based `input()` in template bindings. This affects component/directive testing. The `@analogjs/vite-plugin-angular` is needed for full template compilation support in tests.
 
 ### sourceToSignal requires injection context
 
@@ -377,7 +377,7 @@ Despite the `subscribe` method name and `output()` source, the boundary's `onErr
 
 ## Coverage Ceiling (~97%) — JIT Limitation, not Poor Testing
 
-Coverage thresholds are **97%/93%/98%/97%** (statements/branches/functions/lines), not 100%. This is not a gap in test quality — it is a hard limitation of Angular 21 JIT mode used by TestBed without `@analogjs/vite-plugin-angular`. The dropped lines are concentrated in directive subscription callbacks, `RouteView` computed inner callbacks (`matchEntries`), and `updateDom` DOM-side effects that only run with non-empty `contentChildren` or with active-state transitions — both of which require AOT template compilation.
+Coverage thresholds are **97%/93%/98%/97%** (statements/branches/functions/lines), not 100%. This is not a gap in test quality — it is a hard limitation of Angular 22 JIT mode used by TestBed without `@analogjs/vite-plugin-angular`. The dropped lines are concentrated in directive subscription callbacks, `RouteView` computed inner callbacks (`matchEntries`), and `updateDom` DOM-side effects that only run with non-empty `contentChildren` or with active-state transitions — both of which require AOT template compilation.
 
 The floor sits at ~97% (ratcheted up from the earlier ~94% it held through 2026-06) because the git-tracked `src/dom-utils/` copies are pure logic with no JIT dependency: their suites reach 100% statements (route-announcer + view-transitions 100% branches too), pulling the package aggregate up. The JIT ceiling is now isolated to the directive/component template paths below — keep new directive code honest, but the dom-utils copies are held at 100% in their own config.
 
@@ -490,7 +490,7 @@ All four examples use `provideRealRouterFactory` (not `provideRealRouter`); exis
 ### Known constraints (documented in example READMEs)
 
 1. **`@angular/router` peer dep with stub wildcard route** is required to satisfy `@angular/ssr`'s URL matching pipeline. Real-Router does the actual app routing via `<route-view>`; `@angular/router` is purely a placeholder. See `ssr/README.md` "Why provideRealRouterFactory" for the architectural rationale.
-2. **`security.allowedHosts: ["localhost"]`** required in `angular.json` — Angular 21 SSR rejects unrecognized hosts by default (SSRF prevention).
+2. **`security.allowedHosts: ["localhost"]`** required in `angular.json` — Angular 22 SSR rejects unrecognized hosts by default (SSRF prevention).
 3. **`server-runner.mjs` Node wrapper** for `ssr/` and `ssr-streaming/` — `outputMode: "server"` produces a `server.mjs` whose `isMainModule` check is fragile across @angular/ssr versions; the wrapper imports `app` from the compiled bundle and explicitly calls `listen()`.
 4. **SSG `renderApplication` direct fails with NG0201** in @angular/ssr 21.2 (`platformProviders` REQUEST does not propagate cleanly into the application Injector when `provideRealRouterFactory` calls `inject(REQUEST, { optional: true })`). The `ssg/` example works around this by booting `server.mjs` in-process during build and `fetch`-ing each URL.
 5. **`/admin` without auth returns 302** (custom middleware in `server.ts` catches `CANNOT_ACTIVATE` from `bootstrapApplication` rejection and issues `res.redirect(302, "/")`); **`/nonexistent` returns 200** with NotFound content (Real-Router's `allowNotFound: true` resolves `UNKNOWN_ROUTE` without throwing). See `ssr/README.md` "Known limitations".
