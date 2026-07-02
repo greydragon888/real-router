@@ -1,4 +1,5 @@
 import { PARAM_NAME_PATTERN } from "./buildParamMeta";
+import { CONSTRAINT_BODY_PATTERN } from "./constraint-grammar";
 import { encodeParam, ENCODING_METHODS } from "./encoding";
 import {
   buildFullPath,
@@ -41,8 +42,10 @@ export interface RegistrationState {
 // Constants
 // =============================================================================
 
+// Constraint delimiter grammar derives from the single `CONSTRAINT_BODY_PATTERN`
+// atom (#804) so the strip side cannot desync from match/build.
 // eslint-disable-next-line sonarjs/super-linear-regex -- Constraint pattern regex - bounded input from route definitions, not user input
-const CONSTRAINT_PATTERN_RGX = /<[^>]*>/g;
+const CONSTRAINT_PATTERN_RGX = new RegExp(`<${CONSTRAINT_BODY_PATTERN}>`, "g");
 
 // =============================================================================
 // Registration Functions
@@ -655,7 +658,7 @@ function compileBuildParts(
   // build-path grammar matches the match-path grammar exactly (#738) — e.g.
   // `:my-param` builds under the same name it matched under.
   const paramRgx = new RegExp(
-    String.raw`[:*](${PARAM_NAME_PATTERN})(?:<[^>]*>)?(\?)?`,
+    String.raw`[:*](${PARAM_NAME_PATTERN})(?:<${CONSTRAINT_BODY_PATTERN}>)?(\?)?`,
     "gu",
   );
   let lastIndex = 0;
