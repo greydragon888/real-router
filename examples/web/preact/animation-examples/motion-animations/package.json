@@ -15,7 +15,7 @@
     "@real-router/core": "workspace:^",
     "@real-router/preact": "workspace:^",
     "motion": "12.40.0",
-    "preact": "10.29.2"
+    "preact": "10.29.3"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",

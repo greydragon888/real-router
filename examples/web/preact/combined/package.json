@@ -20,7 +20,7 @@
     "@real-router/preact": "workspace:^",
     "@real-router/preload-plugin": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
-    "preact": "10.29.2",
+    "preact": "10.29.3",
     "zod": "4.4.3"
   },
   "devDependencies": {
