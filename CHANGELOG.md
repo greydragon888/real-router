@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/solid@0.15.6
+
+### Patch Changes
+
+- [#1097](https://github.com/greydragon888/real-router/pull/1097) [`02c81c3`](https://github.com/greydragon888/real-router/commit/02c81c358b5b9d348832e34293c2d01e028a1803) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `RouteView` deep-nesting composition cost and per-navigation subtree remount ([#1094](https://github.com/greydragon888/real-router/issues/1094))
+
+  `RouteView` now selects the winning marker with a winner-keyed `createMemo`
+  (`pickWinner` + `winnersEqual`) and materializes its children only when the
+  winner actually changes. Two problems are fixed:
+
+  - **Correctness:** the active subtree is preserved across navigations that keep
+    the same `<Match>` winner (e.g. `users.list` → `users.view`). Previously every
+    navigation re-materialized the winning subtree, disposing and recreating the
+    child components and silently losing their local state — divergent from the
+    React and Vue adapters, which preserve it.
+  - **Performance:** the `CandidateLookup` cache is now keyed by `routeName` alone
+    (its content never depended on `nodeName`), so a deeply nested `RouteView`
+    chain no longer rebuilds an identical candidate set at every level — removing
+    the O(depth²) substring work that made deep-nesting navigation cost grow
+    super-linearly with depth.
+
+  No public API change. Marker precedence (Match > Self > NotFound) is unchanged
+  and remains locked by the RouteView property-based suite.
+
+
 ### @real-router/angular@0.12.0
 
 ### Minor Changes
