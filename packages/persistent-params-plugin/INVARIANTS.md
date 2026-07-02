@@ -41,8 +41,9 @@
 
 | #   | Invariant                                           | Description                                                                                                                                                                                               |
 | --- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Param set to undefined is absent on next navigation | Passing `undefined` for a tracked param removes it from `#paramNamesSet` and `#persistentParams`. Subsequent navigations do not inject the removed param.                                                 |
+| 1   | Param set to undefined is absent on next navigation | Passing `undefined` for a tracked param removes it from `#paramNamesSet` and `#persistentParams` **once the removal navigation commits** (in `onTransitionSuccess`). Subsequent navigations do not inject the removed param. |
 | 2   | Removal is permanent                                | After removal via `undefined`, re-passing the same param name in a later navigation does NOT restore persistence. The key was deleted from `#paramNamesSet`, so `onTransitionSuccess` never re-tracks it. |
+| 3   | Removal on a rejected/cancelled transition rolls back | The removal is committed only in `onTransitionSuccess`, so a `navigate({ key: undefined })` rejected by a guard or superseded by a concurrent navigate leaves the param persisted — the never-committed transition does not drop it (#803). |
 
 ## Default Values
 
@@ -94,6 +95,6 @@
 
 | File                                            | Invariants | Category                                                                                    |
 | ----------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------- |
-| `tests/property/persistentParams.properties.ts` | 16         | Persistence, Override, No-Clobber, Scope, Idempotency, Removal, Default Values, Multi-Param |
+| `tests/property/persistentParams.properties.ts` | 17         | Persistence, Override, No-Clobber, Scope, Idempotency, Removal, Default Values, Multi-Param |
 | `tests/property/paramUtils.properties.ts`       | 6          | Merge Semantics, Own-Property Extraction                                                    |
 | `tests/property/validation.properties.ts`       | 4          | Validation                                                                                  |

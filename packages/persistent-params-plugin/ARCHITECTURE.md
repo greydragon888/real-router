@@ -171,16 +171,13 @@ router.buildPath(routeName, navParams)
         ├── extractOwnParams(navParams ?? {})
         │     └── strips inherited properties (prototype pollution guard)
         │
-        ├── #withPersistentParams(safeParams)
-        │     ├── for each key in safeParams:
-        │     │     value === undefined && paramNamesSet.has(key)?
-        │     │       YES: paramNamesSet.delete(key)
-        │     │            delete from #persistentParams copy
-        │     │       NO:  validateParamValue(key, value)
-        │     │
-        │     └── mergeParams(#persistentParams, safeParams)
-        │           ├── copy all persistent keys with defined values
-        │           └── overlay safeParams (undefined → delete, else overwrite)
+        ├── #buildPathParams(safeParams)
+        │     ├── validateParamValue(key, value) for each key
+        │     ├── mergeParams(#persistentParams, safeParams)
+        │     │     ├── copy all persistent keys with defined values
+        │     │     └── overlay safeParams (undefined → delete, else overwrite)
+        │     └── drop #pendingRemovals keys (recorded by the paired
+        │           forwardState this transition), then clear #pendingRemovals
         │
         └── next(route, mergedParams)  → core builds path
 ```
@@ -196,13 +193,18 @@ router.navigate(name, params, opts)
         ├── result = next(routeName, routeParams)
         │     └── core builds State object
         │
-        ├── #withPersistentParams(result.params)
-        │     └── same merge logic as buildPath interceptor
+        ├── #forwardStateParams(result.params)  ← runs BEFORE buildPath, same tick
+        │     ├── clear #pendingRemovals
+        │     ├── for each key in safeParams:
+        │     │     value === undefined && paramNamesSet.has(key)?
+        │     │       YES: #pendingRemovals.add(key)  ← RECORD only, no mutation (#803)
+        │     │       NO:  validateParamValue(key, value)
+        │     └── mergeParams(#persistentParams, safeParams)  (undefined → delete)
         │
         └── return { ...result, params: mergedParams }
 ```
 
-Both interceptors call `#withPersistentParams`, which is the single merge point. The `undefined`-removal side effect (deleting from `paramNamesSet` and `#persistentParams`) happens here, before the state is committed.
+The two interceptors are two phases of core's synchronous `buildNavigateState` (forwardState, then buildPath). `#forwardStateParams` **records** removals into the transient `#pendingRemovals` set but does **not** mutate `paramNamesSet` / `#persistentParams` — that would drop the param before the deactivation/activation guards run, so a rejected or cancelled transition would lose it (#803). `#buildPathParams` consumes the record to keep the built URL consistent. The permanent removal is committed in `onTransitionSuccess`, against the state that actually committed.
 
 ### onTransitionSuccess: updating stored params and publishing to state context
 
@@ -213,8 +215,10 @@ Transition committed → onTransitionSuccess(toState)
         │     value = toState.params[key]
         │
         │     !hasOwn(toState.params, key) || value === undefined?
-        │       YES: defensive removal — if stored value was defined, delete it
-        │            (guards against navigateToState bypassing forwardState)
+        │       YES: PRIMARY removal (#803) — if stored value was defined,
+        │            delete it from #persistentParams AND paramNamesSet.
+        │            Covers explicit navigate({key: undefined}) removals and
+        │            navigateToState bypassing forwardState with one branch.
         │
         │     validateParamValue(key, value)
         │
@@ -304,11 +308,11 @@ Throws `TypeError` with a descriptive message on any violation. The factory neve
 
 ### Runtime param value validation (per navigation)
 
-`validateParamValue(key, value)` is called inside `#withPersistentParams` and `#onTransitionSuccess` for every persistent param encountered during navigation:
+`validateParamValue(key, value)` is called inside `#forwardStateParams` / `#buildPathParams` and `#onTransitionSuccess` for every persistent param encountered during navigation:
 
 | Value                         | Result                                                      |
 | ----------------------------- | ----------------------------------------------------------- |
-| `undefined`                   | Allowed — triggers permanent removal from tracking          |
+| `undefined`                   | Allowed — flags removal (committed on success)              |
 | `string`, `number`, `boolean` | Allowed                                                     |
 | `null`                        | Throws `TypeError` with "cannot be null" message            |
 | object, array                 | Throws `TypeError` with "must be a primitive value" message |
@@ -317,20 +321,31 @@ Throws `TypeError` with a descriptive message on any violation. The factory neve
 
 ## Parameter Removal Semantics
 
-Setting a persistent param to `undefined` is a permanent deletion, not a temporary omission:
+Setting a persistent param to `undefined` is a permanent deletion, not a temporary omission — **but the deletion is committed only when the navigation succeeds** (#803):
 
 ```
 navigate("route", { mode: undefined })
         │
         ▼
-  #withPersistentParams({ mode: undefined })
-        ├── paramNamesSet.delete("mode")   ← removed from tracking
+  #forwardStateParams({ mode: undefined })
+        └── #pendingRemovals.add("mode")   ← RECORD only; no mutation yet
+        │                                     (runs before guards — a rejected/
+        │                                      cancelled nav must not drop "mode")
+        ▼
+  #buildPathParams(...)  → drops "mode" from the built URL, clears #pendingRemovals
+        │
+        ▼
+  guards pass, transition commits → onTransitionSuccess(toState)
+        ├── paramNamesSet.delete("mode")      ← removed from tracking
         └── delete #persistentParams["mode"]  ← removed from stored values
         │
         ▼
   All subsequent navigations: "mode" is not injected
   Even if "mode" is passed explicitly, it won't be re-persisted
   (paramNamesSet no longer contains "mode")
+
+  If instead a guard rejects or a concurrent navigate supersedes the removal,
+  onTransitionSuccess never runs → "mode" stays persisted (rolled back).
 ```
 
 This is intentional. Once removed, the param behaves as if it was never in the config. Re-initialization (unsubscribe + usePlugin again) is the only way to restore tracking.

@@ -25,26 +25,26 @@ Validation runs at factory call time (param names) and again at navigation time 
 ## Navigation Flow
 
 ```
-navigate(name, params)
-  → buildPath interceptor
-      → #withPersistentParams(navParams)   ← merges persistent into nav params
-      → next(route, mergedParams)
-
-navigate(name, params)
+navigate(name, params)  →  core buildNavigateState (synchronous):
   → forwardState interceptor
       → next(routeName, routeParams)       ← get base state
-      → #withPersistentParams(result.params) ← inject persistent into state params
+      → #forwardStateParams(result.params) ← inject persistent; RECORD removals (#pendingRemovals)
+  → buildPath interceptor
+      → #buildPathParams(forwardedParams)  ← inject persistent; DROP #pendingRemovals from URL; clear
+      → next(route, mergedParams)
 
-onTransitionSuccess(toState)
+onTransitionSuccess(toState)   ← only fires if the transition actually committed
   → reads toState.params for each tracked key
-  → updates #persistentParams snapshot
+  → updates #persistentParams snapshot; COMMITS removals (deletes from snapshot + #paramNamesSet)
   → claim.write(toState, #persistentParams)   ← publishes to state.context.persistentParams
 ```
 
-Both interceptors call `#withPersistentParams`, which:
-1. Runs `extractOwnParams` on incoming params (prototype pollution guard)
-2. Handles `undefined` values (removal)
-3. Calls `mergeParams(persistentParams, safeParams)`
+The two interceptors are **two phases of one synchronous window** (core's `buildNavigateState` runs `forwardState` then `buildPath` back-to-back):
+
+- **`#forwardStateParams`** (forwardState phase, runs first) — `extractOwnParams` → for a tracked param passed as `undefined`, RECORD it in the transient `#pendingRemovals` set (does **not** mutate the tracked set/snapshot — that would drop the param before guards run, #803) → `mergeParams` (honors `undefined` as a delete for this transition).
+- **`#buildPathParams`** (buildPath phase, runs second) — `extractOwnParams` → validate → `mergeParams` → drop the `#pendingRemovals` keys so the built URL matches the forwarded params (the `undefined` marker is gone by now, so a plain re-merge would re-inject the removed param) → clear `#pendingRemovals`. A standalone `router.buildPath()` sees an empty set and injects normally.
+
+**Permanent removal happens in `onTransitionSuccess`, not in the interceptors** — keyed on the committed state, so a rejected/cancelled navigation never drops the param (#803).
 
 ## State Context
 
@@ -59,16 +59,18 @@ Components can use `state.context.persistentParams` to distinguish persistent pa
 
 ## Gotchas
 
-### Parameter removal is permanent
+### Parameter removal is permanent — but only once the removal commits
 
 Passing `undefined` for a tracked param deletes it from `paramNamesSet` and from `#persistentParams`. It won't be re-persisted even if you pass it again later:
 
 ```typescript
-router.navigate("page", { lang: undefined }); // lang removed from Set
+router.navigate("page", { lang: undefined }); // lang removed once this navigation commits
 router.navigate("page", { lang: "en" });       // lang NOT re-added — Set no longer tracks it
 ```
 
 Once removed, the param is gone for the lifetime of the plugin instance.
+
+**The removal is committed in `onTransitionSuccess`, not in the interceptor (#803).** If the removal navigation is rejected by a guard or superseded by a concurrent navigate, it never reaches `onTransitionSuccess`, so the param stays persisted — the drop is not permanent until the transition actually commits. Within the current transition the param is still absent from both `state.params` and `state.path` (the `buildPath` phase honors the pending removal); it is only re-persisted for **later** navigations when the removal did not commit.
 
 ### `setRootPath` throws during `router.dispose()`
 
@@ -90,11 +92,11 @@ The factory creates one `paramNamesSet` from the config. Each `PluginFactory` in
 
 ### `mergeParams` does NOT self-sanitize
 
-`mergeParams(persistent, current)` assumes `current` is already sanitized. The caller (`#withPersistentParams`) must call `extractOwnParams` first. If you call `mergeParams` directly with an unsanitized object, inherited properties will leak through.
+`mergeParams(persistent, current)` assumes `current` is already sanitized. The callers (`#forwardStateParams` / `#buildPathParams`) must call `extractOwnParams` first. If you call `mergeParams` directly with an unsanitized object, inherited properties will leak through.
 
-### `onTransitionSuccess` is a secondary sync, not the primary source
+### `onTransitionSuccess` — secondary sync for injection, PRIMARY for removal
 
-The primary param injection happens in the interceptors. `onTransitionSuccess` only updates `#persistentParams` to reflect what actually committed. It also handles the defensive case where a state was committed via `navigateToState` (bypassing `forwardState`) — if a tracked key is missing or `undefined` in `toState.params`, it removes that key from `#persistentParams`.
+The primary param **injection** happens in the interceptors. `onTransitionSuccess` updates `#persistentParams` to reflect what actually committed. For **removal**, though, it is the primary site (#803): a tracked key that is missing or `undefined` in the committed `toState.params` is deleted from **both** `#persistentParams` and `#paramNamesSet` here — covering the explicit `navigate({ key: undefined })` removal (mergeParams dropped it for this transition) and the defensive `navigateToState` bypass (which skips the `forwardState` injection) with the same branch. Only a key that was really persisted (present with a defined value) is removed; a still-empty tracked key stays tracked so it can persist later.
 
 After updating the snapshot, `onTransitionSuccess` publishes it to `state.context.persistentParams` via `claim.write(toState, #persistentParams)`. This happens before subscriber callbacks fire, so `router.subscribe()` listeners always see the current persistent params snapshot on `state.context.persistentParams`.
 
