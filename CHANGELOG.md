@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/react@0.28.1
+
+### Patch Changes
+
+- [#1114](https://github.com/greydragon888/real-router/pull/1114) [`98884f0`](https://github.com/greydragon888/real-router/commit/98884f0ab25fdca87e33ea1ac006bbb04949b704) Thanks [@greydragon888](https://github.com/greydragon888)! - Isolate a throwing `onSelect` in `InkLink` ([#799](https://github.com/greydragon888/real-router/issues/799))
+
+  A throwing `onSelect` on `<InkLink>` no longer swallows the navigation nor escapes into ink's `useInput` stdin handler — an `uncaughtException` there would crash a real CLI, since Node has no browser-style event-listener isolation. The callback is now wrapped in try/catch: the error is logged via `console.error` and navigation still proceeds, mirroring `route-announcer`'s consumer-callback isolation.
+
+
 ### @real-router/persistent-params-plugin@0.2.16
 
 ### Patch Changes
