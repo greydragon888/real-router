@@ -660,15 +660,25 @@ realpath, which the base vitest `coverage.include` (`packages/*/src/**`) drops a
 *exclude* files from the global threshold ("Vitest counts all files … into the global coverage
 thresholds"), so a consumer can't include shared code in its lcov without it gating the consumer's
 own 100%. Instead, each shared dir gets exactly one **measuring owner** whose vitest config sets
-`coverage.allowExternal = true` and **replaces** (not concatenates — keeping the base
-`packages/*/src/**` alongside `allowExternal` drags the whole aliased workspace graph into the
-report) `coverage.include` with the shared glob:
+`coverage.allowExternal = true` and a **dual** `coverage.include` — the owner's **own narrowed
+src** plus the shared glob. It must NOT keep the base `packages/*/src/**` wildcard alongside
+`allowExternal` (that drags the whole aliased workspace graph — core/sources — into the report and
+fails the owner's own gate):
 
 | Shared dir           | Measuring owner                       | Include                                                          |
 | -------------------- | ------------------------------------- | ---------------------------------------------------------------- |
-| `shared/browser-env` | `packages/browser-env` (owner pkg)    | `["**/shared/browser-env/**/*.ts"]`                              |
-| `shared/dom-utils`   | `packages/dom-utils` (owner pkg)      | `["**/shared/dom-utils/**/*.ts"]`                                |
+| `shared/browser-env` | `packages/browser-plugin` (consumer)  | `["packages/browser-plugin/src/**/*.ts", "**/shared/browser-env/**/*.ts"]` |
+| `shared/dom-utils`   | `packages/react` (consumer)           | `["packages/react/src/**/*.{ts,tsx}", "**/shared/dom-utils/**/*.ts"]` |
 | `shared/ssr`         | `packages/ssr-data-plugin` (consumer) | `["**/packages/ssr-data-plugin/src/**/*.ts", "**/shared/ssr/**/*.ts"]` |
+
+**Owner evolution.** browser-env/dom-utils began in tests-only wrapper packages
+(`packages/{browser-env,dom-utils}`, #809), moved to a single `shared/` test node
+(`@real-router/shared-sources`, #1065), and finally to their natural consumers — **react ←
+dom-utils, browser-plugin ← browser-env** (2026-07, the test node retired). Each dir's white-box
+tests now live in the consumer's `tests/{functional,property,stress}/<tree>/` (namespaced to dodge
+`helpers.ts` collisions) and gate via the dual include above; `shared/ssr` rode on
+`ssr-data-plugin` throughout. Property files that need a DOM carry a per-file
+`// @vitest-environment jsdom` (react's property config is `node`).
 
 `shared/ssr` has no dedicated owner package (both consumers carry their own `src`), so the
 measurement rides on `ssr-data-plugin` with a dual include — the *specific* own-src path doesn't
