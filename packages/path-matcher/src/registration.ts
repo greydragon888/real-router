@@ -1,5 +1,8 @@
 import { PARAM_NAME_PATTERN } from "./buildParamMeta";
-import { CONSTRAINT_BODY_PATTERN } from "./constraint-grammar";
+import {
+  CONSTRAINT_BODY_PATTERN,
+  isConstraintBalanced,
+} from "./constraint-grammar";
 import { encodeParam, ENCODING_METHODS } from "./encoding";
 import {
   buildFullPath,
@@ -71,6 +74,19 @@ export function registerNode(
       ? pathPattern.slice(1)
       : pathPattern;
   const rawNodePath = isAbsolute ? strippedPattern : pathPattern;
+
+  // Bare-core backstop for constraint-delimiter grammar (#804): reject an
+  // unbalanced `<`/`>` or a semantically-empty `<>` before trie insertion — the
+  // same producing-layer defense name-less (#858) and fused (#1050) markers get.
+  // Without it, `createRouter([{ path: "/x/:id<\\d+" }])` built silently and
+  // buildPath then emitted a garbage URL. Uses the single balance predicate.
+  if (!isConstraintBalanced(rawNodePath)) {
+    throwUnbalancedConstraint(rawNodePath);
+  }
+
+  if (rawNodePath.includes("<>")) {
+    throwEmptyConstraint(rawNodePath);
+  }
 
   // Strip constraint patterns (e.g., <\d+>, <[^/]+>) from path before trie insertion.
   // Constraints like <[^/]+> contain "/" which breaks segment splitting in indexOf("/", start).
@@ -317,6 +333,34 @@ function throwFusedMarker(segment: string): never {
     `[SegmentMatcher.registerTree] Fused parameter marker in segment "${segment}": ` +
       `a ':'/'*' marker must begin a segment (e.g. 'a/:b', not 'a:b'). build extracts ` +
       `it as a param while the trie treats the segment as a literal — the two disagree.`,
+  );
+}
+
+/**
+ * An unbalanced `<`/`>` desyncs match vs build: the name is truncated at the
+ * stray `<`, the unclosed constraint survives as a literal in the trie path, and
+ * `buildPath` emits a URL its own `match` rejects (#804 — the residual gap #749
+ * only closed on the plugin path; this is the bare-core backstop). Sibling of
+ * {@link throwEmptyParamName} (#858) / {@link throwFusedMarker} (#1050).
+ */
+function throwUnbalancedConstraint(path: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Unbalanced constraint delimiter ('<' or '>') ` +
+      `in path "${path}": every '<' must be closed by a '>'. A stray delimiter ` +
+      `desyncs match vs build (buildPath would emit a URL match rejects).`,
+  );
+}
+
+/**
+ * An empty constraint `<>` compiles to `^()$`, which matches only the empty
+ * string — a never-matching required param. Rejected loudly instead of silently
+ * producing a dead route (#804 §3.3). Sibling of the name-less rejection (#858).
+ */
+function throwEmptyConstraint(path: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Empty constraint '<>' in path "${path}": ` +
+      `a constraint body must be non-empty (e.g. '<\\d+>'). An empty '<>' ` +
+      `compiles to a never-matching pattern.`,
   );
 }
 
