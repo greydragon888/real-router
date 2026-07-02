@@ -973,7 +973,7 @@ ko_fi: greydragon888
 }
 ```
 
-Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`, `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**` (last two are symlinks to `shared/dom-utils/` — see #437 section; without the ignore jscpd would report 6 false-positive duplicates).
+Ignores: `*.d.ts`, `*.test.ts`, `*.test.tsx`, `*.bench.ts`, `*.spec.ts`, `*.properties.ts`, `benchmarks/**`, `packages/preact/src/**`, `packages/hash-plugin/src/**`, `packages/*/src/dom-utils/**` (the `shared/dom-utils/` symlink/copy across consumers — see #437 section; without the ignore jscpd would report false-positive duplicates).
 
 **`svelte` format (jscpd 4.2+).** Adds Svelte SFC tokenization — jscpd parses each `<script>`/`<template>`/`<style>` block with its native format and cross-detects clones across formats (e.g., duplicated logic between a `.svelte` script block and a `.ts` helper). Currently exercised by `packages/svelte/src/RouterProvider.svelte`. No false positives on the current source tree (clones: 4 / 0.15%, well under the 2% threshold).
 
@@ -1970,10 +1970,9 @@ Git-tracked symlinks work on Unix/macOS/Linux out of the box. Windows contributo
 **knip** (`knip.json`):
 
 - Each consumer workspace (8 entries: react, preact, vue, solid, svelte, browser-plugin, hash-plugin, navigation-plugin) lists `"ignore": ["src/dom-utils/**"]` or `"src/browser-env/**"` to skip symlinked directories from dead-code analysis
-- `packages/dom-utils` and `packages/browser-env` use tests-only project patterns
-- `packages/browser-env` and `packages/navigation-plugin` add `type-guards` to `ignoreDependencies` — knip doesn't see the transitive import through the symlinked `shared/browser-env/popstate-utils.ts` and would otherwise flag it as unused
+- `packages/navigation-plugin` adds `type-guards` to `ignoreDependencies` — knip doesn't see the transitive import through the symlinked `shared/browser-env/popstate-utils.ts` and would otherwise flag it as unused. (The `packages/{dom-utils,browser-env}` tests-only-wrapper entries were removed with #1065 — those packages no longer exist.)
 
-**jscpd** (`.jscpd.json`): ignores `packages/*/src/dom-utils/**`, `packages/dom-utils/src/**`, `packages/*/src/browser-env/**`, `packages/browser-env/src/**` — without these, jscpd follows symlinks and reports the same shared files as duplicates across every symlinked location.
+**jscpd** (`.jscpd.json`): ignores `packages/*/src/dom-utils/**`, `packages/*/src/browser-env/**`, `packages/*/src/shared-ssr/**` — without these, jscpd follows symlinks and reports the same shared files as duplicates across every symlinked location. (The wrapper-specific `packages/{dom-utils,browser-env}/src/**` ignores were dropped with #1065 — those packages no longer exist.)
 
 **vitest coverage**: shared code is tracked by the file's real path (`shared/**/*.ts`), not the symlinked virtual path. The global include pattern `packages/*/src/**/*.ts` does not match `shared/**`. Coverage is now enforced by the consumer owners (#1065): react gates `shared/dom-utils`, browser-plugin gates `shared/browser-env`, each via `allowExternal` + a dual `coverage.include` — see the #809 measuring-owner table above.
 
