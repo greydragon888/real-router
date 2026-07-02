@@ -6,10 +6,19 @@
 
 ```typescript
 // Client API (main entry)
-import { provideRealRouter, injectRoute, RouteView, RealLink } from '@real-router/angular';
+import {
+  provideRealRouter,
+  injectRoute,
+  RouteView,
+  RealLink,
+} from "@real-router/angular";
 
 // SSR-feature surface (subpath)
-import { ClientOnly, HttpStatusCode, createHttpStatusSink } from '@real-router/angular/ssr';
+import {
+  ClientOnly,
+  HttpStatusCode,
+  createHttpStatusSink,
+} from "@real-router/angular/ssr";
 ```
 
 **Peer dependency:** `@angular/core` >= 21.0.0, `@angular/common` >= 21.0.0
@@ -79,72 +88,72 @@ ssr/                            # /ssr subpath — SSR-feature surface
 
 ## Exports
 
-| Export | Type | Description |
-|--------|------|-------------|
-| `provideRealRouter(router, options?)` | Provider | Environment providers for DI. `options.scrollRestoration` enables scroll capture + restoration via `createScrollRestoration`; `options.scrollSpy` enables router-coordinated `IntersectionObserver` URL hash spy via `createScrollSpy` (#575); `options.viewTransitions: true` enables View Transitions API integration via `createViewTransitions`; teardown of all three utilities wired through `DestroyRef`. |
-| `RealRouterOptions` | Type | `{ scrollRestoration?: ScrollRestorationOptions; scrollSpy?: ScrollSpyOptions; viewTransitions?: boolean }` — second arg to `provideRealRouter` |
-| `provideRealRouterFactory(options)` | Provider | SSR/SSG environment providers. `useFactory` for per-request router clones via Angular's `REQUEST` token, `provideAppInitializer` async start, `DestroyRef.onDestroy` per-request `router.dispose()`. See "SSR Support" section. |
-| `RealRouterFactoryOptions<TDeps>` | Type | `{ baseRouter, plugins?, deps?, scrollRestoration?, scrollSpy?, viewTransitions? }` — second arg to `provideRealRouterFactory` |
-| `RequestDepsFactory<TDeps>` | Type | `(request: Request \| null) => TDeps \| undefined` — derive per-request deps from REQUEST |
-| `RequestPluginsFactory<TDeps>` | Type | `(request: Request \| null) => readonly PluginFactory<TDeps>[]` — conditional plugin list |
-| `ROUTER` | InjectionToken | Router instance token |
-| `NAVIGATOR` | InjectionToken | Navigator instance token |
-| `ROUTE` | InjectionToken | Route signals token |
-| `injectRouter()` | Function | Get router instance |
-| `injectNavigator()` | Function | Get navigator instance |
-| `injectRoute()` | Function | Subscribe to all route changes |
-| `injectRouteNode(name)` | Function | Subscribe to specific node changes |
-| `injectRouteUtils()` | Function | Get route tree utilities |
-| `injectRouterTransition()` | Function | Subscribe to transition state |
-| `injectIsActiveRoute(name, params?, opts?)` | Function | Subscribe to active route state |
-| `injectRouteExit(handler, options?)`  | Function | Subscribe to leave window (handler captured at injection time) |
-| `injectRouteEnter(handler, options?)` | Function | Fire on nav-driven mount (handler captured at injection time) |
-| `RouteView` | Component | Declarative route matching |
-| `RouterErrorBoundary` | Component | Navigation error handling |
-| `NavigationAnnouncer` | Component | WCAG announcer |
-| `RouteMatch` | Directive | Route segment marker (`<ng-template routeMatch="segment">`) |
-| `RouteSelf` | Directive | Exact-match slot for the parent `<route-view>`'s node (`<ng-template routeSelf>`). Renders only when the active route name equals the `routeNode` input — useful for "index" content on a node that also has children |
-| `RouteNotFound` | Directive | Not-found marker — renders when `state.name === UNKNOWN_ROUTE` |
-| `RealLink` | Directive | Navigation link directive for `<a>` elements (hash-aware via `[hash]`) |
-| `RealLinkActive` | Directive | Active route class directive for any element. **Note**: does NOT accept a `hash` input — hash-aware active state is `RealLink`-only |
-| `sourceToSignal` | Function | RouterSource to Signal bridge |
-| `RouteSignals<P>` | Type | `{ routeState: Signal<RouteSnapshot<P>>; navigator }` — return shape of `injectRouteNode` (nullable `route`) |
-| `ErrorContext` | Type | `{ $implicit: RouterError; resetError: () => void }` — `RouterErrorBoundary` template context |
-| `RouteSnapshot<P>` re-export | Type | From `@real-router/sources` — emitted by `RouteSignals.routeState()` |
-| `RouterTransitionSnapshot` re-export | Type | From `@real-router/sources` — emitted by `injectRouterTransition()` |
-| `RouterErrorSnapshot` re-export | Type | From `@real-router/sources` — error source snapshot |
-| `Navigator` re-export | Type | From `@real-router/core` — read-only navigation surface |
-| `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions` | Types | Types associated with `injectRouteExit` |
-| `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions` | Types | Types associated with `injectRouteEnter` |
+| Export                                                           | Type           | Description                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provideRealRouter(router, options?)`                            | Provider       | Environment providers for DI. `options.scrollRestoration` enables scroll capture + restoration via `createScrollRestoration`; `options.scrollSpy` enables router-coordinated `IntersectionObserver` URL hash spy via `createScrollSpy` (#575); `options.viewTransitions: true` enables View Transitions API integration via `createViewTransitions`; teardown of all three utilities wired through `DestroyRef`. |
+| `RealRouterOptions`                                              | Type           | `{ scrollRestoration?: ScrollRestorationOptions; scrollSpy?: ScrollSpyOptions; viewTransitions?: boolean }` — second arg to `provideRealRouter`                                                                                                                                                                                                                                                                  |
+| `provideRealRouterFactory(options)`                              | Provider       | SSR/SSG environment providers. `useFactory` for per-request router clones via Angular's `REQUEST` token, `provideAppInitializer` async start, `DestroyRef.onDestroy` per-request `router.dispose()`. See "SSR Support" section.                                                                                                                                                                                  |
+| `RealRouterFactoryOptions<TDeps>`                                | Type           | `{ baseRouter, plugins?, deps?, scrollRestoration?, scrollSpy?, viewTransitions? }` — second arg to `provideRealRouterFactory`                                                                                                                                                                                                                                                                                   |
+| `RequestDepsFactory<TDeps>`                                      | Type           | `(request: Request \| null) => TDeps \| undefined` — derive per-request deps from REQUEST                                                                                                                                                                                                                                                                                                                        |
+| `RequestPluginsFactory<TDeps>`                                   | Type           | `(request: Request \| null) => readonly PluginFactory<TDeps>[]` — conditional plugin list                                                                                                                                                                                                                                                                                                                        |
+| `ROUTER`                                                         | InjectionToken | Router instance token                                                                                                                                                                                                                                                                                                                                                                                            |
+| `NAVIGATOR`                                                      | InjectionToken | Navigator instance token                                                                                                                                                                                                                                                                                                                                                                                         |
+| `ROUTE`                                                          | InjectionToken | Route signals token                                                                                                                                                                                                                                                                                                                                                                                              |
+| `injectRouter()`                                                 | Function       | Get router instance                                                                                                                                                                                                                                                                                                                                                                                              |
+| `injectNavigator()`                                              | Function       | Get navigator instance                                                                                                                                                                                                                                                                                                                                                                                           |
+| `injectRoute()`                                                  | Function       | Subscribe to all route changes                                                                                                                                                                                                                                                                                                                                                                                   |
+| `injectRouteNode(name)`                                          | Function       | Subscribe to specific node changes                                                                                                                                                                                                                                                                                                                                                                               |
+| `injectRouteUtils()`                                             | Function       | Get route tree utilities                                                                                                                                                                                                                                                                                                                                                                                         |
+| `injectRouterTransition()`                                       | Function       | Subscribe to transition state                                                                                                                                                                                                                                                                                                                                                                                    |
+| `injectIsActiveRoute(name, params?, opts?)`                      | Function       | Subscribe to active route state                                                                                                                                                                                                                                                                                                                                                                                  |
+| `injectRouteExit(handler, options?)`                             | Function       | Subscribe to leave window (handler captured at injection time)                                                                                                                                                                                                                                                                                                                                                   |
+| `injectRouteEnter(handler, options?)`                            | Function       | Fire on nav-driven mount (handler captured at injection time)                                                                                                                                                                                                                                                                                                                                                    |
+| `RouteView`                                                      | Component      | Declarative route matching                                                                                                                                                                                                                                                                                                                                                                                       |
+| `RouterErrorBoundary`                                            | Component      | Navigation error handling                                                                                                                                                                                                                                                                                                                                                                                        |
+| `NavigationAnnouncer`                                            | Component      | WCAG announcer. Optional `[prefix]` / `[getAnnouncementText]` signal inputs customize the announcement text (parity with `announceNavigation` options on the other adapters); read once in `ngOnInit`. Falls back to the default `h1 → title → route-name` chain on empty/throw.                                                                                                                                 |
+| `RouteMatch`                                                     | Directive      | Route segment marker (`<ng-template routeMatch="segment">`)                                                                                                                                                                                                                                                                                                                                                      |
+| `RouteSelf`                                                      | Directive      | Exact-match slot for the parent `<route-view>`'s node (`<ng-template routeSelf>`). Renders only when the active route name equals the `routeNode` input — useful for "index" content on a node that also has children                                                                                                                                                                                            |
+| `RouteNotFound`                                                  | Directive      | Not-found marker — renders when `state.name === UNKNOWN_ROUTE`                                                                                                                                                                                                                                                                                                                                                   |
+| `RealLink`                                                       | Directive      | Navigation link directive for `<a>` elements (hash-aware via `[hash]`)                                                                                                                                                                                                                                                                                                                                           |
+| `RealLinkActive`                                                 | Directive      | Active route class directive for any element. **Note**: does NOT accept a `hash` input — hash-aware active state is `RealLink`-only                                                                                                                                                                                                                                                                              |
+| `sourceToSignal`                                                 | Function       | RouterSource to Signal bridge                                                                                                                                                                                                                                                                                                                                                                                    |
+| `RouteSignals<P>`                                                | Type           | `{ routeState: Signal<RouteSnapshot<P>>; navigator }` — return shape of `injectRouteNode` (nullable `route`)                                                                                                                                                                                                                                                                                                     |
+| `ErrorContext`                                                   | Type           | `{ $implicit: RouterError; resetError: () => void }` — `RouterErrorBoundary` template context                                                                                                                                                                                                                                                                                                                    |
+| `RouteSnapshot<P>` re-export                                     | Type           | From `@real-router/sources` — emitted by `RouteSignals.routeState()`                                                                                                                                                                                                                                                                                                                                             |
+| `RouterTransitionSnapshot` re-export                             | Type           | From `@real-router/sources` — emitted by `injectRouterTransition()`                                                                                                                                                                                                                                                                                                                                              |
+| `RouterErrorSnapshot` re-export                                  | Type           | From `@real-router/sources` — error source snapshot                                                                                                                                                                                                                                                                                                                                                              |
+| `Navigator` re-export                                            | Type           | From `@real-router/core` — read-only navigation surface                                                                                                                                                                                                                                                                                                                                                          |
+| `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`    | Types          | Types associated with `injectRouteExit`                                                                                                                                                                                                                                                                                                                                                                          |
+| `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions` | Types          | Types associated with `injectRouteEnter`                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## Functions
 
-| Function | Returns | Reactive? |
-|----------|---------|-----------|
-| `injectRouter()` | `Router` | Never |
-| `injectNavigator()` | `Navigator` | Never |
-| `injectRoute()` | `RouteSignals` | routeState on every navigation |
-| `injectRouteNode(name)` | `RouteSignals` | Only when node activates/deactivates |
-| `injectRouteUtils()` | `RouteUtils` | Never |
-| `injectRouterTransition()` | `Signal<RouterTransitionSnapshot>` | On transition start/end |
-| `injectIsActiveRoute(name, params?, opts?)` | `Signal<boolean>` | On active state change |
-| `injectRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured at injection time, cleanup via `DestroyRef`) | Never |
-| `injectRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `injectRoute()` + `effect()` (handler captured at injection time, cleanup via injection-context `DestroyRef`) | Never |
+| Function                                    | Returns                                                                                                                                                   | Reactive?                            |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `injectRouter()`                            | `Router`                                                                                                                                                  | Never                                |
+| `injectNavigator()`                         | `Navigator`                                                                                                                                               | Never                                |
+| `injectRoute()`                             | `RouteSignals`                                                                                                                                            | routeState on every navigation       |
+| `injectRouteNode(name)`                     | `RouteSignals`                                                                                                                                            | Only when node activates/deactivates |
+| `injectRouteUtils()`                        | `RouteUtils`                                                                                                                                              | Never                                |
+| `injectRouterTransition()`                  | `Signal<RouterTransitionSnapshot>`                                                                                                                        | On transition start/end              |
+| `injectIsActiveRoute(name, params?, opts?)` | `Signal<boolean>`                                                                                                                                         | On active state change               |
+| `injectRouteExit(handler, options?)`        | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured at injection time, cleanup via `DestroyRef`)                      | Never                                |
+| `injectRouteEnter(handler, options?)`       | `void` — fires once on nav-driven mount via `injectRoute()` + `effect()` (handler captured at injection time, cleanup via injection-context `DestroyRef`) | Never                                |
 
 ## SSR-feature surface — `@real-router/angular/ssr`
 
 All SSR-aware components and SSR functions live at the `/ssr` subpath
 (ng-packagr secondary entry-point). Seven exports:
 
-| Export | Kind | Purpose |
-|---|---|---|
-| `<client-only>` | component | Server emits `[fallback]` TemplateRef; client swaps to projected children after `afterNextRender`. For browser-API consumers (`window`/`document`), ad slots, dynamic widgets. |
-| `<server-only>` | component | Symmetric inverse: server emits projected children; client swaps to `[fallback]` after the first browser render. For SEO-only meta strips, zero-JS sections inside an otherwise-hydrated page. |
-| `<http-status-code [code]="N"/>` | component | Render-time HTTP status declaration. Writes `code` to the optionally injected `HTTP_STATUS_SINK` in `ngOnInit` (after the input binding fires) and renders nothing. Last write wins. No-op when no provider is registered. |
-| `injectDeferred<T>(key)` | function | Reads `state.context.ssrDataDeferred[key]` (published by `defer()` in `@real-router/ssr-data-plugin`). Returns `Signal<T \| undefined>` that updates when the promise settles. |
-| `provideHttpStatusSink(sink)` | function | Environment providers helper that wires `HTTP_STATUS_SINK` for the request-scoped sink. Equivalent to `{ provide: HTTP_STATUS_SINK, useValue: sink }`. |
-| `HTTP_STATUS_SINK` | InjectionToken | DI token for the request-scoped `HttpStatusSink`. Inject with `{ optional: true }` on the client side. |
-| `createHttpStatusSink()` | utility | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after the SSR render pass to apply to the response. |
+| Export                           | Kind           | Purpose                                                                                                                                                                                                                    |
+| -------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<client-only>`                  | component      | Server emits `[fallback]` TemplateRef; client swaps to projected children after `afterNextRender`. For browser-API consumers (`window`/`document`), ad slots, dynamic widgets.                                             |
+| `<server-only>`                  | component      | Symmetric inverse: server emits projected children; client swaps to `[fallback]` after the first browser render. For SEO-only meta strips, zero-JS sections inside an otherwise-hydrated page.                             |
+| `<http-status-code [code]="N"/>` | component      | Render-time HTTP status declaration. Writes `code` to the optionally injected `HTTP_STATUS_SINK` in `ngOnInit` (after the input binding fires) and renders nothing. Last write wins. No-op when no provider is registered. |
+| `injectDeferred<T>(key)`         | function       | Reads `state.context.ssrDataDeferred[key]` (published by `defer()` in `@real-router/ssr-data-plugin`). Returns `Signal<T \| undefined>` that updates when the promise settles.                                             |
+| `provideHttpStatusSink(sink)`    | function       | Environment providers helper that wires `HTTP_STATUS_SINK` for the request-scoped sink. Equivalent to `{ provide: HTTP_STATUS_SINK, useValue: sink }`.                                                                     |
+| `HTTP_STATUS_SINK`               | InjectionToken | DI token for the request-scoped `HttpStatusSink`. Inject with `{ optional: true }` on the client side.                                                                                                                     |
+| `createHttpStatusSink()`         | utility        | Returns a fresh `HttpStatusSink` (`{ code: number \| undefined }`) — construct one per request, read `sink.code` after the SSR render pass to apply to the response.                                                       |
 
 ```html
 <ng-template #loadingTpl>
@@ -205,6 +214,7 @@ export class Reviews {
 ```
 
 **Implementation notes:**
+
 - `<client-only>`/`<server-only>`: `signal(false)` + `afterNextRender(() => mounted.set(true))`. `afterNextRender` is a no-op on the server (Angular runtime guarantees), so SSR emits the SSR-side branch — projected children for `<server-only>`, the bound `[fallback]` `TemplateRef` for `<client-only>`. After the first browser render the signal flips and the `@if` branch swaps.
 - `<http-status-code>`: writes to `inject(HTTP_STATUS_SINK, { optional: true })` in `ngOnInit` (after the input binding has fired). `code` is declared as optional `input<number>()` rather than `input.required<number>()` to keep the JIT/TestBed test path safe (`NG0950` would fire under JIT signal-input limitations) — the body skips the write when the value is `undefined`. Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only.
 - **Asymmetric Angular**: no `<Await>` / `<Streamed>` adapter components. Angular has no native `<Suspense>` / `use(promise)` analogue, so `injectDeferred()` returns a `Signal<T | undefined>` (starts undefined, updates on settle) instead. Compose with `@if (signal()) { … } @else { … }`, the `async` pipe (`from(deferredPromise)`), or native `@defer` blocks for chunk-level lazy hydration.
@@ -302,11 +312,11 @@ This pattern replaces the legacy `ngOnInit`-based setup that captured input valu
 
 Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef` — no explicit `inject(DestroyRef).onDestroy(...)` wiring is required (effects self-register).
 
-**`routeParams` is content-stabilized before the effect reads it (#988).** Angular re-allocates an inline `[routeParams]="{ id: 1 }"` literal on every change detection, so reading the raw input signal inside the effect would re-create the cached active-route source (`canonicalJson` cache-key churn + sub/unsub) and re-run `buildHref` on every navigation even when the param content is unchanged. `RealLink` / `RealLinkActive` route their `routeParams` through the internal `createStableParams` helper (`computed` + `shallowEqual`), which re-emits a reference-stable value until the param content actually changes — so the source-creation effect and the `href` computed bail on same-content navigations. Binding a stable reference (a component field or signal) already produced zero churn; this closes the gap for inline-literal binds. Mirrors the Vue `<Link>` fix. Behavior is unchanged — the stabilized params are always content-equal to the input. Nested-object param *values* fall back to per-render recompute (`shallowEqual` compares them by reference) — bind a stable `signal`/`computed` if it matters.
+**`routeParams` is content-stabilized before the effect reads it (#988).** Angular re-allocates an inline `[routeParams]="{ id: 1 }"` literal on every change detection, so reading the raw input signal inside the effect would re-create the cached active-route source (`canonicalJson` cache-key churn + sub/unsub) and re-run `buildHref` on every navigation even when the param content is unchanged. `RealLink` / `RealLinkActive` route their `routeParams` through the internal `createStableParams` helper (`computed` + `shallowEqual`), which re-emits a reference-stable value until the param content actually changes — so the source-creation effect and the `href` computed bail on same-content navigations. Binding a stable reference (a component field or signal) already produced zero churn; this closes the gap for inline-literal binds. Mirrors the Vue `<Link>` fix. Behavior is unchanged — the stabilized params are always content-equal to the input. Nested-object param _values_ fall back to per-render recompute (`shallowEqual` compares them by reference) — bind a stable `signal`/`computed` if it matters.
 
 **Consequence for tests**: full reactive-input verification (e.g., changing `[realLink]="signal()"` and asserting `.active` class re-binds) requires AOT compilation — JIT mode rejects signal-input template bindings with `NG0303`. Use `@analogjs/vite-plugin-angular` or e2e via Playwright against a production-mode example app. The content-stabilization is unit-tested via the JIT-safe toy pattern (`tests/functional/createStableParams.test.ts`) — a plain `signal<Params>()` drives the same `createStableParams` helper the directives feed their input signal into (the effect-re-run mechanism is identical for `input()` and `signal()`).
 
-**Caveat — distinct `[routeParams]` / `[realLink]` keys on a reused node accumulate eternal sources (#766).** Each effect rebuild creates a `createActiveRouteSource` for the new `(name | params | hash)` key, and those sources are **cached eagerly and never released** in `@real-router/sources` (their `destroy()` is a no-op; `onCleanup` only tears down the *bridge subscription*, not the cached source). Content-stabilization (#988, above) already collapses inline-literal churn when the param *content* is unchanged — but a node that genuinely cycles through many **distinct** keys still leaves one permanent router listener per unique key. The textbook trigger is a long virtual list / `@for` with **track-identity** reuse, where a single `<a realLink [routeParams]="item().params">` is re-bound to thousands of different param values as the user scrolls: it walks monotonically toward the `EventEmitter` `Listener limit (10000)` crash. This is the **lowest-threshold path to #766 in the adapter series** — no thousands of `RealLink` instances (React/Preact/Vue) and no remount workaround (Svelte `{#key}`) are needed; one reused directive suffices.
+**Caveat — distinct `[routeParams]` / `[realLink]` keys on a reused node accumulate eternal sources (#766).** Each effect rebuild creates a `createActiveRouteSource` for the new `(name | params | hash)` key, and those sources are **cached eagerly and never released** in `@real-router/sources` (their `destroy()` is a no-op; `onCleanup` only tears down the _bridge subscription_, not the cached source). Content-stabilization (#988, above) already collapses inline-literal churn when the param _content_ is unchanged — but a node that genuinely cycles through many **distinct** keys still leaves one permanent router listener per unique key. The textbook trigger is a long virtual list / `@for` with **track-identity** reuse, where a single `<a realLink [routeParams]="item().params">` is re-bound to thousands of different param values as the user scrolls: it walks monotonically toward the `EventEmitter` `Listener limit (10000)` crash. This is the **lowest-threshold path to #766 in the adapter series** — no thousands of `RealLink` instances (React/Preact/Vue) and no remount workaround (Svelte `{#key}`) are needed; one reused directive suffices.
 
 Until the sources fix lands ([#766](https://github.com/greydragon888/real-router/issues/766) — lazy / bounded active-route source), prefer **value reuse** over re-binding one node across an unbounded key space: bind a bounded set of param objects, or `track` by a value whose distinct count stays small. A short-lived router (a per-page clone disposed on teardown) also sidesteps the accumulation — its whole sources cache is released when the router is GC'd.
 
@@ -323,11 +333,13 @@ Signal-first approach. No `rxjs` or `@angular/core/rxjs-interop` dependencies.
 `RealLink.updateDom()` calls `this.anchor.setAttribute("href", href)` and `this.anchor.classList.toggle(activeClass, this.isActive())` **directly on the native element** from inside the `createActiveRouteSource` subscribe callback. This bypasses Angular's change detection — there is no template binding for `href` or `class` to invalidate.
 
 **Why this is intentional**:
+
 - The directive owns its host element, so direct DOM writes are scope-safe.
 - The `subscribe` callback fires synchronously from `source.updateSnapshot` (see [packages/sources/CLAUDE.md → "Notification flow"](../sources/CLAUDE.md)) — at that point the router state has already updated but Angular has not scheduled a CD pass yet. Writing the attribute synchronously commits the new `href` immediately, with no intermediate "stale" frame.
 - Zoneless apps benefit doubly: no microtask roundtrip through Angular's scheduler for a one-attribute write.
 
 **Consequences**:
+
 - `ngOnChanges` / template `[href]` bindings on the same element would conflict — do not double-bind.
 - Tests that watch `host.attributes` via Angular's `ComponentRef.changeDetectorRef` will NOT see the update via `fixture.detectChanges()` alone — they must read the DOM attribute directly.
 - `prevHref` / `prevActiveClass` instance fields cache the last-written values to skip redundant `setAttribute` / `classList.remove` calls (added per audit §8.2 hot-path optimization).
@@ -385,16 +397,17 @@ The floor sits at ~97% (ratcheted up from the earlier ~94% it held through 2026-
 
 **Concrete consequences:**
 
-| File:Lines | Why unreachable without AOT |
-|---|---|
+| File:Lines              | Why unreachable without AOT                                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `RouteView.ts:56-60,69` | `contentChildren(RouteMatch/RouteNotFound)` returns empty — structural directives on `ng-template` with signal inputs aren't registered in JIT. Verified: `view.matches().length === 0` |
-| `RealLink.ts:99-102` | Subscription callback fires only when `isActive` changes. With `routeName=""` (JIT default), `isActiveRoute("")` always returns `false` — no state transitions |
-| `RealLink.ts:133` | `setAttribute("href", href)` skipped because `buildHref(router, "", {})` always returns `undefined` for empty routeName |
-| `RealLink.ts:143` | `classList.remove(prevActiveClass)` requires class transition. `activeClassName` input stays at default `"active"` — `prevActiveClass` never changes |
-| `RealLinkActive.ts:62` | Same subscription callback pattern as RealLink |
-| `RealLinkActive.ts:80` | `classList.toggle` early-returns at line 77 because `realLinkActive=""` (JIT default) |
+| `RealLink.ts:99-102`    | Subscription callback fires only when `isActive` changes. With `routeName=""` (JIT default), `isActiveRoute("")` always returns `false` — no state transitions                          |
+| `RealLink.ts:133`       | `setAttribute("href", href)` skipped because `buildHref(router, "", {})` always returns `undefined` for empty routeName                                                                 |
+| `RealLink.ts:143`       | `classList.remove(prevActiveClass)` requires class transition. `activeClassName` input stays at default `"active"` — `prevActiveClass` never changes                                    |
+| `RealLinkActive.ts:62`  | Same subscription callback pattern as RealLink                                                                                                                                          |
+| `RealLinkActive.ts:80`  | `classList.toggle` early-returns at line 77 because `realLinkActive=""` (JIT default)                                                                                                   |
 
 **What IS covered:**
+
 - Full `provideRealRouter` / DI wiring
 - `sourceToSignal` bridge including rapid emissions and destroy-during-emission
 - All public `inject*` functions with positive and negative cases
@@ -403,6 +416,7 @@ The floor sits at ~97% (ratcheted up from the earlier ~94% it held through 2026-
 - `createRouteAnnouncer` — 100% lines + branches (the `src/dom-utils/` copy)
 
 **Paths to 100% (all have trade-offs):**
+
 1. Install `@analogjs/vite-plugin-angular` + `@angular/build` → AOT compilation for tests. Adds ~30 packages, TypeScript version conflicts possible.
 2. Refactor directives to extract logic into pure functions. Breaks component architecture.
 3. Access private fields via `(directive as any).isActive.set(...)`. Violates "test only public API" principle.
@@ -413,9 +427,9 @@ The floor sits at ~97% (ratcheted up from the earlier ~94% it held through 2026-
 
 Two complementary APIs for application bootstrap:
 
-| API | Use case |
-|-----|----------|
-| `provideRealRouter(router)` | SPA, SSG client (post-hydrate), single-instance routing |
+| API                                                       | Use case                                                                                                                                  |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `provideRealRouter(router)`                               | SPA, SSG client (post-hydrate), single-instance routing                                                                                   |
 | `provideRealRouterFactory({ baseRouter, plugins, deps })` | Angular SSR (`@angular/ssr` + `outputMode: "server"`), SSG build-time render via `renderApplication`, multi-tenant request-scoped routing |
 
 ### When to choose `provideRealRouterFactory`
@@ -431,9 +445,10 @@ For SPA / SSG-client-after-hydrate keep using `provideRealRouter(router)` — it
 ```ts
 provideRealRouterFactory({
   baseRouter: createBaseRouter(),
-  plugins: (request) => request
-    ? [ssrDataPluginFactory(loaders)]
-    : [browserPluginFactory(), ssrDataPluginFactory(loaders)],
+  plugins: (request) =>
+    request
+      ? [ssrDataPluginFactory(loaders)]
+      : [browserPluginFactory(), ssrDataPluginFactory(loaders)],
   deps: (request) => ({
     currentUser: request
       ? parseCookieHeader(request.headers.get("cookie"))
@@ -478,12 +493,12 @@ Parity with the other 5 adapters that consume `<script>window.__SSR_STATE__</scr
 
 ### Examples
 
-| Example | Demonstrates | E2e count |
-|---------|--------------|-----------|
-| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr) | Classical SSR — Express + AngularNodeAppEngine, per-request `provideRealRouterFactory`, cookie-based DI, auth guards (CANNOT_ACTIVATE → 302 middleware redirect), nested loaders | 50 |
-| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed) | Mixed SSR/CSR — some routes server-rendered, others CSR-only | 8 |
-| [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR — `@defer (on viewport)` for Reviews, `@defer (on hover)` for RelatedItems, `withIncrementalHydration()` per-block lazy hydration | 28 |
-| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg) | Static site generation — `getStaticPaths()` + in-process `AngularNodeAppEngine` on build-only port, per-page `<title>` + `<meta>`, `404.html`, `sitemap.xml` | 24 |
+| Example                                                                                                     | Demonstrates                                                                                                                                                                     | E2e count |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr)                     | Classical SSR — Express + AngularNodeAppEngine, per-request `provideRealRouterFactory`, cookie-based DI, auth guards (CANNOT_ACTIVATE → 302 middleware redirect), nested loaders | 50        |
+| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed)         | Mixed SSR/CSR — some routes server-rendered, others CSR-only                                                                                                                     | 8         |
+| [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR — `@defer (on viewport)` for Reviews, `@defer (on hover)` for RelatedItems, `withIncrementalHydration()` per-block lazy hydration                                  | 28        |
+| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg)                     | Static site generation — `getStaticPaths()` + in-process `AngularNodeAppEngine` on build-only port, per-page `<title>` + `<meta>`, `404.html`, `sitemap.xml`                     | 24        |
 
 All four examples use `provideRealRouterFactory` (not `provideRealRouter`); existing 8 examples (`basic`, `combined`, `dynamic-routes`, `hash-routing`, `lazy-loading`, `nested-routes`, `persistent-params`, `animation-examples/*`) continue to use `provideRealRouter` for SPA scenarios — both APIs ship in parallel.
 
