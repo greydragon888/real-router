@@ -7,6 +7,161 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-02]
 
+### @real-router/core@0.63.0
+
+### Minor Changes
+
+- [#1122](https://github.com/greydragon888/real-router/pull/1122) [`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject unbalanced and empty `<>` constraint delimiters at route registration ([#804](https://github.com/greydragon888/real-router/issues/804))
+
+  `createRouter` / `addRoute` now throw for a route path whose `<...>` constraint
+  delimiters are unbalanced (`/x/:id<\d+`, a stray `>`, `/x/:id<`) or empty
+  (`/x/:id<>`). Previously bare core built such routes silently and `buildPath`
+  later emitted a garbage URL (`/x/1<\d+`), while an empty `<>` compiled to a
+  never-matching `^()$` param — the "silent at registration, cryptic later" flow.
+  The rejection now happens loudly at `registerTree`, mirroring the existing
+  name-less ([#858](https://github.com/greydragon888/real-router/issues/858)) and fused-marker ([#1050](https://github.com/greydragon888/real-router/issues/1050)) guards, so it covers the
+  `createRouter`-first flow for every consumer, not only under
+  `@real-router/validation-plugin`.
+
+  Internally this lands the constraint-`<...>` grammar single source of truth: a
+  single `CONSTRAINT_BODY_PATTERN` atom now backs every match/strip/build regex
+  (reconciling a latent `+`/`*` desync), and a single `isConstraintBalanced`
+  predicate backs both the route-tree gate and the path-matcher backstop —
+  completing the [#738](https://github.com/greydragon888/real-router/issues/738) single-sourcing on the constraint axis.
+
+### @real-router/angular@0.13.1
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+  - @real-router/sources@0.10.2
+
+### @real-router/browser-plugin@0.18.2
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/hash-plugin@0.8.2
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/lifecycle-plugin@0.6.5
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/logger-plugin@0.5.17
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/memory-plugin@0.4.13
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/navigation-plugin@0.7.14
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/persistent-params-plugin@0.2.17
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/preact@0.16.1
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+  - @real-router/sources@0.10.2
+
+### @real-router/preload-plugin@0.6.7
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/react@0.28.2
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+  - @real-router/sources@0.10.2
+
+### @real-router/rx@0.3.18
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/search-schema-plugin@0.4.5
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/solid@0.16.1
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+  - @real-router/sources@0.10.2
+
+### @real-router/sources@0.10.2
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/svelte@0.14.1
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+  - @real-router/sources@0.10.2
+
+### @real-router/validation-plugin@0.9.3
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+
+### @real-router/vue@0.16.1
+
+### Patch Changes
+
+- Updated dependencies [[`25d6fd8`](https://github.com/greydragon888/real-router/commit/25d6fd856c68d8d75cecd14815972415480a7677)]:
+  - @real-router/core@0.63.0
+  - @real-router/sources@0.10.2
+
+
 ### @real-router/search-schema-plugin@0.4.4
 
 ### Patch Changes
