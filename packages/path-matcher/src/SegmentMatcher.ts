@@ -46,11 +46,6 @@ export class SegmentMatcher {
 
   readonly #root: SegmentNode = createSegmentNode();
   readonly #routesByName = new Map<string, CompiledRoute>();
-  readonly #segmentsByName = new Map<string, readonly MatcherInputNode[]>();
-  readonly #metaByName = new Map<
-    string,
-    Readonly<Record<string, Record<string, "url" | "query">>>
-  >();
   readonly #staticCache = new Map<string, CompiledRoute>();
 
   // H1: Reusable object eliminates tuple allocation per match() call
@@ -94,8 +89,6 @@ export class SegmentMatcher {
         root: this.#root,
         options: this.#options,
         routesByName: this.#routesByName,
-        segmentsByName: this.#segmentsByName,
-        metaByName: this.#metaByName,
         staticCache: this.#staticCache,
         rootQueryParams: this.#rootQueryParams,
       },
@@ -194,13 +187,16 @@ export class SegmentMatcher {
   }
 
   getSegmentsByName(name: string): readonly MatcherInputNode[] | undefined {
-    return this.#segmentsByName.get(name);
+    // Derived from #routesByName — `compiled.matchSegments` is the same frozen
+    // array a dedicated #segmentsByName index would store, so the index was
+    // pure duplication (#1010).
+    return this.#routesByName.get(name)?.matchSegments;
   }
 
   getMetaByName(
     name: string,
   ): Readonly<Record<string, Record<string, "url" | "query">>> | undefined {
-    return this.#metaByName.get(name);
+    return this.#routesByName.get(name)?.meta;
   }
 
   hasRoute(name: string): boolean {
