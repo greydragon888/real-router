@@ -317,11 +317,25 @@ describe("Immutability Opt-Out Properties", () => {
 
         for (const node of [tree, ...collectAllNodes(tree)]) {
           expect(Object.isFrozen(node)).toBe(false);
-          expect(Object.isFrozen(node.paramTypeMap)).toBe(false);
           expect(Object.isFrozen(node.paramMeta)).toBe(false);
-          expect(Object.isFrozen(node.paramMeta.urlParams)).toBe(false);
-          expect(Object.isFrozen(node.paramMeta.queryParams)).toBe(false);
-          expect(Object.isFrozen(node.paramMeta.spatParams)).toBe(false);
+
+          // Empty param collections reuse shared FROZEN sentinels
+          // (EMPTY_PARAM_TYPE_MAP / EMPTY_PARAM_NAMES, #1009) regardless of
+          // skipFreeze — same rationale as the EMPTY_CHILDREN sentinels below:
+          // they are never mutated in place (node mutability is what matters),
+          // so only the computed (non-empty) collections reflect the flag.
+          if (Object.keys(node.paramTypeMap).length > 0) {
+            expect(Object.isFrozen(node.paramTypeMap)).toBe(false);
+          }
+          if (node.paramMeta.urlParams.length > 0) {
+            expect(Object.isFrozen(node.paramMeta.urlParams)).toBe(false);
+          }
+          if (node.paramMeta.queryParams.length > 0) {
+            expect(Object.isFrozen(node.paramMeta.queryParams)).toBe(false);
+          }
+          if (node.paramMeta.spatParams.length > 0) {
+            expect(Object.isFrozen(node.paramMeta.spatParams)).toBe(false);
+          }
 
           // Leaf nodes reuse the shared FROZEN empty sentinels
           // (EMPTY_CHILDREN_MAP / EMPTY_CHILDREN_ARRAY) regardless of skipFreeze,
