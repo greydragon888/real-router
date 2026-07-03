@@ -72,6 +72,18 @@ updates:
       # Lift this when the project moves to a newer Node major.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # nanostores state-lib set — benchmark-only (benchmarks/package.json), used to
+      # compare state libraries. The @nanostores/* adapters are version-COUPLED to
+      # `nanostores` via strict peer ranges (@nanostores/react@0.8.x peers nanostores
+      # ^0.9||^0.10||^0.11; @1.x peers ^1.2). Dependabot bumps each dep INDIVIDUALLY,
+      # which breaks the other's peer range → with `strictPeerDependencies: true`
+      # (pnpm-workspace.yaml) the `pnpm install --lockfile-only` re-resolve fails
+      # (ERR_PNPM_PEER_DEP_ISSUES) and ERRORS THE ENTIRE npm job (observed: run
+      # 28643677860, "3 error(s)"), risking a repo-wide Dependabot halt — same class
+      # as the transitive block above. Pinned to the libs' recommended pairing; bump
+      # the set manually + together if a benchmark refresh needs it.
+      - dependency-name: "nanostores"
+      - dependency-name: "@nanostores/*"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
