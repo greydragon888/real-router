@@ -279,22 +279,7 @@ jobs:
           --filter='!./benchmarks'
 
       - name: Fix coverage paths
-        run: |
-          # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
-          # Both Codecov and SonarCloud need project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
-          # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
-          # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
-          # replaces an echo|sed subshell (SC2001).
-          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
-            while IFS= read -r -d '' lcov; do
-              pkg_dir="${lcov%/coverage/lcov.info}"
-              sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
-              # Shared-source owners (#809) emit SF:../../shared/<dir>/x.ts — the
-              # prefix above turns those into packages/<owner>/../../shared/…;
-              # collapse the parent-dir hops to repo-root-relative shared/<dir>/x.ts
-              # so Codecov components and Sonar score them at their real location.
-              sed -i -E 's|^SF:packages/[^/]+/\.\./\.\./|SF:|' "$lcov"
-            done
+        run: bash scripts/fix-lcov-paths.sh
 
       - name: Upload coverage artifacts
         if: steps.artifacts.outputs.built == 'true'
@@ -423,22 +408,7 @@ jobs:
           pnpm turbo run test test:properties $FILTERS
 
       - name: Fix coverage paths
-        run: |
-          # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
-          # Both Codecov and SonarCloud need project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
-          # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
-          # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
-          # replaces an echo|sed subshell (SC2001).
-          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
-            while IFS= read -r -d '' lcov; do
-              pkg_dir="${lcov%/coverage/lcov.info}"
-              sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
-              # Shared-source owners (#809) emit SF:../../shared/<dir>/x.ts — the
-              # prefix above turns those into packages/<owner>/../../shared/…;
-              # collapse the parent-dir hops to repo-root-relative shared/<dir>/x.ts
-              # so Codecov components and Sonar score them at their real location.
-              sed -i -E 's|^SF:packages/[^/]+/\.\./\.\./|SF:|' "$lcov"
-            done
+        run: bash scripts/fix-lcov-paths.sh
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v7
@@ -560,22 +530,7 @@ jobs:
         run: pnpm turbo run lint:package lint:types $SHARD_FILTER --filter='!./examples/**'
 
       - name: Fix coverage paths
-        run: |
-          # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
-          # Both Codecov and SonarCloud need project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
-          # NUL-delimited find | while-read (not `for … in $(find)`) — robust to
-          # whitespace and avoids shellcheck SC2044; ${lcov%…} parameter expansion
-          # replaces an echo|sed subshell (SC2001).
-          find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
-            while IFS= read -r -d '' lcov; do
-              pkg_dir="${lcov%/coverage/lcov.info}"
-              sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
-              # Shared-source owners (#809) emit SF:../../shared/<dir>/x.ts — the
-              # prefix above turns those into packages/<owner>/../../shared/…;
-              # collapse the parent-dir hops to repo-root-relative shared/<dir>/x.ts
-              # so Codecov components and Sonar score them at their real location.
-              sed -i -E 's|^SF:packages/[^/]+/\.\./\.\./|SF:|' "$lcov"
-            done
+        run: bash scripts/fix-lcov-paths.sh
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v7
