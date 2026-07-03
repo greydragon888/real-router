@@ -113,10 +113,10 @@ const sharedDirs = existsSync(SHARED_DIR)
         (n) =>
           !n.startsWith(".") &&
           n !== "node_modules" &&
-          // Generated / non-source dirs: `shared/tests` (#1065) holds the shared
-          // test node's specs, and `shared/coverage` is the transient lcov output
-          // (gitignored). Neither is a shipped source dir with a measuring owner
-          // or codecov component — exclude them from the shared-source checks.
+          // Generated / non-source dirs excluded defensively: `shared/coverage`
+          // is transient lcov output (gitignored); `shared/tests` was the shared
+          // test node's spec dir, removed in #1065/#1086. Neither is a shipped
+          // source dir with a measuring owner or codecov component.
           n !== "tests" &&
           n !== "coverage" &&
           isRealDir(join(SHARED_DIR, n)),
@@ -135,15 +135,13 @@ const sonarSources = [
   ...sharedDirs.map((d) => `shared/${d}`),
 ];
 const sonarTests = coverageProducing.map((p) => `packages/${p}/tests`);
-const lcovReports = [
-  ...packages.map((p) => `packages/${p}/coverage/lcov.info`),
-  // #1065: the shared/ test node (@real-router/shared-sources) owns the
-  // aggregated coverage of shared/{browser-env,dom-utils} and emits it to
-  // shared/coverage/lcov.info — NOT packages/*/coverage/. base-test uploads it
-  // (in sharded mode, the only mode a shared-source edit takes), so the merge
-  // must feed it to Codecov/Sonar or those shared lines score 0%.
-  "shared/coverage/lcov.info",
-].filter((p) => existsSync(join(ROOT, p)));
+// #1065/#1086: shared/{browser-env,dom-utils} coverage is now owned by the
+// consumer packages (react ← dom-utils, browser-plugin ← browser-env) and rides
+// in their packages/*/coverage/lcov.info (paths normalized to shared/… in CI) —
+// there is no separate shared/coverage/lcov.info anymore.
+const lcovReports = packages
+  .map((p) => `packages/${p}/coverage/lcov.info`)
+  .filter((p) => existsSync(join(ROOT, p)));
 
 // --- Check 1: codecov.yml components ⇔ coverage-producing packages ----------
 const codecov = read("codecov.yml");
@@ -215,17 +213,10 @@ const ownerConfigs = packages
     text: readFileSync(join(PKG_DIR, p, "vitest.config.mts"), "utf8"),
   }));
 
-// #1065: the `shared/` test node owns the coverage of shared/{browser-env,
-// dom-utils} — its src is the symlink TARGET (not a package), so the owner
-// config lives at shared/vitest.config.mts, not under packages/*. Count it.
-const sharedOwnerCfg = join(SHARED_DIR, "vitest.config.mts");
-if (existsSync(sharedOwnerCfg)) {
-  ownerConfigs.push({
-    pkg: "shared",
-    text: readFileSync(sharedOwnerCfg, "utf8"),
-  });
-}
-
+// #1065/#1086: shared sources have no test node of their own — each shared dir
+// is measured by a CONSUMER package's vitest.config.mts (allowExternal + a
+// "**/shared/<dir>/**" include), so its measuring owner is found among the
+// ownerConfigs (package configs) collected above.
 for (const dir of sharedDirs) {
   // Match the include GLOB (`**/shared/<dir>/`), not a bare `shared/<dir>`
   // substring — config comments mention sibling shared dirs in prose and a
