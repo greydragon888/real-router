@@ -511,6 +511,45 @@ describe("segmentTesters", () => {
     });
   });
 
+  // Regression: the single-argument (curried) form promises a tester
+  // FUNCTION via its overload signature, even for an empty or non-string
+  // route name. Previously the name checks short-circuited to `false`
+  // BEFORE the currying branch, so the single-arg form returned a boolean
+  // and blew up with an unrelated TypeError at the eventual call site.
+  describe("#769: curried tester from empty/non-string route name", () => {
+    const testers = [
+      ["startsWithSegment", startsWithSegment],
+      ["endsWithSegment", endsWithSegment],
+      ["includesSegment", includesSegment],
+    ] as const;
+
+    it.each(testers)(
+      "%s: single-arg call on empty name returns a function that yields false",
+      (_name, tester) => {
+        const curried = tester("");
+
+        expect(typeof curried).toBe("function");
+        expect(curried("users")).toBe(false);
+      },
+    );
+
+    it.each(testers)(
+      "%s: single-arg call on non-string name returns a function that yields false",
+      (_name, tester) => {
+        const curried = tester({ name: 42 } as unknown as State);
+
+        expect(typeof curried).toBe("function");
+        expect(curried("users")).toBe(false);
+      },
+    );
+
+    it("preserves the direct-form 'all false' semantics for an empty name", () => {
+      expect(startsWithSegment("", "users")).toBe(false);
+      expect(endsWithSegment("", "users")).toBe(false);
+      expect(includesSegment("", "users")).toBe(false);
+    });
+  });
+
   describe("RouteUtils static facade", () => {
     it("should expose startsWithSegment as static method", () => {
       expect(RouteUtils.startsWithSegment("a.b.c", "a")).toBe(true);

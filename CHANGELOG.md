@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-03]
 
+### @real-router/route-utils@0.2.6
+
+### Patch Changes
+
+- [#1136](https://github.com/greydragon888/real-router/pull/1136) [`db88fdd`](https://github.com/greydragon888/real-router/commit/db88fdd70418f70deb7c8bbc76d0103ce07550e9) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix curried segment testers returning a boolean for an empty/non-string route name ([#769](https://github.com/greydragon888/real-router/issues/769))
+
+  `startsWithSegment` / `endsWithSegment` / `includesSegment` promise a tester function for the single-argument (curried) form, but the route-name validation short-circuited to `false` before the currying branch. A single-arg call on an empty or non-string route name returned a boolean typed as a function, crashing with an unrelated `TypeError` at the eventual call site.
+
+  - Defer the route-name check (computed once as `invalidName`) into each return path so the single-arg form always yields a `(segment: string) => boolean` tester, and that tester returns `false` for any segment.
+  - Direct-form output is unchanged: an empty/non-string name still returns `false` (the check runs before the segment-type guard, so no new `TypeError`).
+
+
 ### @real-router/rsc-server-plugin@0.2.11
 
 ### Patch Changes
