@@ -37,10 +37,18 @@ cpSync(sourceDir, targetDir, {
 const stripJsExtension = /\.js"/g;
 let stripped = 0;
 
-for (const entry of readdirSync(targetDir, { withFileTypes: true })) {
+// Recursive: cpSync above copies subdirectories too, so the `.js`→bare rewrite
+// must descend into them — a non-recursive readdir would leave NodeNext `./x.js`
+// suffixes in the first subdir added under shared/dom-utils/, which ng-packagr
+// then fails to resolve (the tree is flat today, so this is latent). Node 24's
+// recursive readdirSync with withFileTypes exposes `entry.parentPath` (#1132).
+for (const entry of readdirSync(targetDir, {
+  recursive: true,
+  withFileTypes: true,
+})) {
   if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
 
-  const filePath = join(targetDir, entry.name);
+  const filePath = join(entry.parentPath, entry.name);
   const original = readFileSync(filePath, "utf8");
   const updated = original.replace(stripJsExtension, '"');
 
