@@ -35,8 +35,8 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
-  packages: write
-  id-token: write # Required for OIDC Trusted Publishing
+  id-token: write # Required for OIDC Trusted Publishing (npm registry; GitHub
+  # Packages is not used, so no `packages: write` — Releases ride on contents:write)
 
 # Turbo Remote Cache
 # Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490)

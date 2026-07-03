@@ -203,7 +203,9 @@ export function classify(pkg, dirOf, readers = defaultReaders) {
   // route-utils/sources fan out to all 6 adapters — their own shard.
   if (pkg === "@real-router/sources" || pkg === "@real-router/route-utils")
     return "adapter-shared";
-  // browser-env / dom-utils / type-guards — the unscoped internal packages.
+  // type-guards — the sole remaining unscoped internal package (bare name; the
+  // former bare browser-env / dom-utils were retired with the shared test node,
+  // #1065/#1086).
   if (!pkg.startsWith("@real-router/")) return "internal";
   // depends only on core/types/logger.
   return "leaf";
