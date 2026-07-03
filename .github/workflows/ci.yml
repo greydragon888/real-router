@@ -1060,7 +1060,7 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, sonarcloud, actionlint]
+    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, coverage, sonarcloud, actionlint]
     if: always()
     steps:
       - name: Determine result
@@ -1099,9 +1099,10 @@ jobs:
           BASE_TEST="${{ needs.base-test.result }}"
           SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
+          COVERAGE="${{ needs.coverage.result }}"
           SONAR="${{ needs.sonarcloud.result }}"
           LINTS="${{ needs.repo-lints.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE sonar=$SONAR lints=$LINTS"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE sonar=$SONAR lints=$LINTS"
 
           # Defensive belt-and-suspenders on the shard-plan output (R2.19): the
           # check-result guard at the top of this step already exits on any check
@@ -1111,10 +1112,12 @@ jobs:
             exit 1
           fi
 
-          # ok(): success OR skipped. Used ONLY for smoke/sonar (sonar skips on
-          # dependabot / built==false) and an empty-include pipeline-sharded —
-          # NEVER for the job that DEFINES the active path (pipeline-leaf / base-bundle + base-test),
-          # so a real failure there cannot be masked as a skip.
+          # ok(): success OR skipped. Used ONLY for smoke/coverage/sonar (coverage
+          # & sonar legitimately skip on a built==false leaf; sonar also skips on
+          # dependabot — codecov runs tokenless there and stays gated) and an
+          # empty-include pipeline-sharded — NEVER for the job that DEFINES the
+          # active path (pipeline-leaf / base-bundle + base-test), so a real
+          # failure there cannot be masked as a skip.
           ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
 
           case "$MODE" in
@@ -1130,7 +1133,7 @@ jobs:
           # repo-lints runs on every should_run PR in BOTH modes — past the
           # should_run short-circuit above it must have run AND passed (hard
           # requirement, not ok()-skippable like smoke/sonar).
-          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$SONAR"; then
+          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$SONAR"; then
             echo "✅ All checks passed"
             exit 0
           fi
