@@ -101,7 +101,11 @@ const makeSegmentTester = (start: string, end: string) => {
     // Currying: if no segment provided, return a tester function
     if (segment === undefined) {
       return (localSegment: string) => {
-        // Type check for runtime safety (consistent with direct call)
+        // Type check for runtime safety. NOT consistent with the direct call for
+        // `null`: the direct form has a `segment === null → false` guard above,
+        // but this curried `(segment: string) => boolean` form has no null branch,
+        // so a non-string (incl. null) throws here. Curried/direct equivalence
+        // holds for string segments only (INVARIANTS Inv 5).
         if (typeof localSegment !== "string") {
           throw new TypeError(
             `Segment must be a string, got ${typeof localSegment}`,

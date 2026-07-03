@@ -69,6 +69,20 @@ Core `forwardState` fills undefined params from `defaultParams` via `next()` BEF
 
 When `onError` is set, the plugin does NOT call `console.error` or strip params. The callback receives raw issues and must return clean params. No re-validation of returned params (avoids infinite loops).
 
+### Path-less validation issues (cross-field `refine`) can't be stripped by key
+
+The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts:17`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the invalid combination passes into `state` untouched. In `mode: "development"` a `console.error` is still logged; `mode: "production"` is **silent**.
+
+```typescript
+const schema = z
+  .object({ min: z.number(), max: z.number() })
+  .refine((v) => v.min < v.max, { message: "min must be < max" }); // no `path`
+await router.navigate("range", { min: 10, max: 5 });
+router.getState().params; // { min: 10, max: 5 } — NOT stripped
+```
+
+So the "schema validate → strip invalid → merge defaults" contract holds **per key**; it cannot recover a rule class for which strip-by-key is structurally impossible. To recover from a cross-field failure, give the refine a `path` (`{ message, path: ["max"] }`) so the offending key is stripped and its default restored, or handle it in `onError` (which sees the raw issues). A whole-object reset on a path-less failure is not built in — add it via `onError` if you need it.
+
 ### Async schemas throw immediately
 
 If `~standard.validate()` returns a Promise, the plugin throws `TypeError`. This is by design — `forwardState` is synchronous.
@@ -76,6 +90,26 @@ If `~standard.validate()` returns a Promise, the plugin throws `TypeError`. This
 ### `strict: true` interaction with Zod
 
 Zod strip mode (default) removes unknown keys from output. With `strict: true`, the plugin uses `validation.value` directly (unknowns gone). With `strict: false`, it merges `{ ...original, ...validation.value }` (unknowns preserved from original).
+
+### Composition order with `persistent-params-plugin` decides whether persistent params are validated
+
+Both this plugin and `@real-router/persistent-params-plugin` register a `forwardState` interceptor, and core runs interceptors **LIFO** (last-registered = outermost, wraps the rest — the documented `addInterceptor` contract). This plugin's interceptor validates the result of `next()`, so it only sees what the **inner** (earlier-registered) layers produced. Registration order therefore decides whether persistent params go through the schema:
+
+```typescript
+// RECOMMENDED — persistent-params first, search-schema second (schema outermost):
+router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
+router.usePlugin(searchSchemaPlugin());
+// schema wraps persistent-params → it validates the INJECTED persistent params too
+// → an invalid persisted value is stripped and its default restored
+
+// ALTERNATIVE — search-schema first, persistent-params second (persistent outermost):
+router.usePlugin(searchSchemaPlugin());
+router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
+// persistent-params injects AFTER the schema already validated
+// → persistent params BYPASS the schema and reach state unvalidated
+```
+
+Prefer the recommended order (schema outermost) so `state` is validated as a whole, persistent params included — it is the last line of defense. Use the alternative only when persistent/infra params must deliberately skip schema validation ("schema doesn't touch infra params"). Both are defensible, but the two are **not** interchangeable: swapping the `usePlugin` lines silently flips whether persistent params are validated. Verified live — an invalid persisted value reaches `state` under the alternative order and is stripped under the recommended one. (`persistent-params-plugin`'s CLAUDE.md carries the mirror note.)
 
 ### Dev-time defaultParams check
 

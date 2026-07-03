@@ -276,7 +276,7 @@ Mechanics: `invalidate()` flips a per-router `Set<namespace>` flag (`WeakMap` ke
 - **No-entry navigation** (route not in loaders map) — listener no-ops, flag preserved for the next attempt.
 - **Client-only / no-loader entry** — mode marker written, loader skipped, flag preserved.
 - **Cancelled navigation** (newer `navigate()` aborts the older controller) — late-resolving loader sees `signal.aborted`, skips the write, flag preserved for the new navigation to consume.
-- **Loader rejection** — navigation rejects with the loader error; flag preserved; user retry re-runs the loader.
+- **Loader rejection** — the leave handler awaits the refresh loader with **no `try/catch`**, so the rejection **rejects the whole `navigate()`** — a navigation that would have succeeded *without* `invalidate`. The flag is preserved (cleared only after a successful write), so **every** subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers — the degradation escalates from "stale data" to "cannot navigate." Intended (ARCHITECTURE lists it among the flag-preserving outcomes; a test pins the propagation), but mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
 
 Idempotent — multiple `invalidate()` calls before the next refresh collapse to a single re-run (Set-deduplicated). Cheap when not stale: a single `WeakMap.get` + `Set.has` check per navigation. Survives `cloneRouter()` boundaries — the `WeakMap` is keyed by router instance, each clone has its own flag set.
 

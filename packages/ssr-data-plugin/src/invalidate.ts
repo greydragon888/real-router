@@ -32,6 +32,15 @@ import type { Router } from "@real-router/types";
  * 2. Surgical: only the `"data"` namespace re-runs. Companion plugins (e.g.
  *    `rsc-server-plugin`) keep their cached `state.context.rsc` on this same
  *    transition unless their own `invalidate()` was also called.
+ *
+ * **Failure semantics.** The refresh loader runs in the awaited LEAVE_APPROVE
+ * phase with no internal `try/catch`, so a rejecting loader **rejects the
+ * consuming `navigate()`** — a navigation that would have succeeded *without*
+ * `invalidate`. Peek-then-clear-after-write means a rejection **keeps the flag
+ * set**: every following navigation to a loader-bearing route re-runs the loader
+ * and fails again until it recovers (degradation escalates from "stale data" to
+ * "cannot navigate"). Catch on the caller side, or make the loader infallible
+ * (`catch` → previous payload).
  */
 export function invalidate(router: Router, namespace: "data"): void {
   markStale(router, namespace);

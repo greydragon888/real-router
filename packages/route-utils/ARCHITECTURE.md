@@ -106,6 +106,8 @@ Each tester supports three overloads (+ implementation signature) via conditiona
 
 The curried form is useful for creating reusable predicates (e.g., in `filter()` callbacks).
 
+> **`null` is a direct-form-only overload.** `f(route, null) → false` applies to the **direct** call. The **curried** form's parameter is typed `(segment: string) => boolean` and has **no null branch**, so `f(route)(null)` throws `TypeError` (curried/direct equivalence holds for string segments only — see INVARIANTS Inv 5).
+
 ### Validation Pipeline
 
 ```

@@ -129,6 +129,23 @@ router.subscribe(({ route, previousRoute }) => {
 
 **Type:** Importing `@real-router/persistent-params-plugin` augments `StateContext` with `persistentParams?: Params`, providing full type safety.
 
+## Composition with `@real-router/search-schema-plugin`
+
+This plugin **injects** persistent params via a `forwardState` interceptor; `search-schema-plugin` **validates** params via its own `forwardState` interceptor. Core composes interceptors **LIFO** (last-registered = outermost), so registration order decides whether persistent params are validated:
+
+```typescript
+// RECOMMENDED — register persistent-params FIRST, search-schema SECOND:
+router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
+router.usePlugin(searchSchemaPlugin());
+// search-schema is outermost → validates the injected persistent params (invalid ones stripped)
+
+// ALTERNATIVE — persistent-params outermost → persistent params bypass the schema:
+router.usePlugin(searchSchemaPlugin());
+router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
+```
+
+Register this plugin **before** `search-schema-plugin` to have persistent params validated (the safer default); after it only when they must deliberately skip validation.
+
 ## Documentation
 
 Full documentation: [Wiki — persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin)

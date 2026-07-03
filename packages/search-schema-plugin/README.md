@@ -107,6 +107,8 @@ When schema validation fails, the plugin strips only the keys with validation is
 
 In `mode: "development"`, a `console.error` is emitted with the route name and validation issues before the recovery happens.
 
+> **Strip is per-key — cross-field `refine` issues aren't stripped.** Recovery removes only the keys a validation issue names in its `path`. A cross-field `.refine()` / `.superRefine()` that reports a **path-less** issue (it concerns the whole object, not one key) strips **nothing** — the invalid combination reaches `state` (dev still logs `console.error`; production is silent). To recover, give the refine a `path` (`{ message, path: ["max"] }`) so the offending key is stripped, or handle it in `onError`. Example: `z.object({ min: z.number(), max: z.number() }).refine((v) => v.min < v.max)` navigated with `{ min: 10, max: 5 }` leaves `{ min: 10, max: 5 }` in `state`.
+
 ### `defaultParams` must satisfy the schema (contract)
 
 The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming_ param (from the URL or a `navigate()` call) never reaches `state`. It does **not** validate `defaultParams` at runtime — those are **trusted developer config**, injected by the router core _below_ the layer this plugin intercepts. So a `defaultParams` value that violates its own `searchSchema` **will reach `state.params` and the URL** (`state.path`), on every navigation, in **every** `mode` — including `mode: "production"`:
@@ -135,6 +137,25 @@ router.usePlugin(searchSchemaPlugin({ strict: true }));
 ```
 
 Per-route schema configuration (e.g., Zod's `.passthrough()` or `.strip()`) controls which keys appear in the schema output and effectively overrides the `strict` option for that route.
+
+### Composition with `@real-router/persistent-params-plugin`
+
+Both plugins register a `forwardState` interceptor, and core runs interceptors **LIFO** (last-registered wraps the rest). The schema validates the result of the inner (earlier-registered) layers, so **registration order decides whether persistent params are validated**:
+
+```typescript
+// RECOMMENDED — persistent-params first, search-schema second:
+router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
+router.usePlugin(searchSchemaPlugin());
+// schema is outermost → it validates the injected persistent params too
+// → an invalid persisted value is stripped and its default restored
+
+// ALTERNATIVE — search-schema first, persistent-params second:
+router.usePlugin(searchSchemaPlugin());
+router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
+// persistent-params injects after the schema ran → persistent params bypass validation
+```
+
+Prefer the recommended order (schema outermost) so `state` is validated as a whole. Reach for the alternative only when persistent/infra params must deliberately skip the schema. Swapping the two `usePlugin` lines silently flips the guarantee.
 
 ## Use Cases
 

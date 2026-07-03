@@ -30,6 +30,15 @@ import type { Router } from "@real-router/types";
  * namespace routes: only the `"rsc"` namespace re-runs; a side-by-side
  * `ssr-data-plugin` keeps its cached `state.context.data` on this transition
  * unless its own `invalidate()` was also called.
+ *
+ * **Failure semantics.** The refresh loader runs in the awaited LEAVE_APPROVE
+ * phase with no internal `try/catch`, so a rejecting loader **rejects the
+ * consuming `navigate()`** — a navigation that would have succeeded *without*
+ * `invalidate`. The stale flag is cleared only *after* a successful write, so a
+ * rejection **keeps the flag set**: every following navigation to a loader-bearing
+ * route re-runs the loader and fails again until it recovers (degradation
+ * escalates from "stale payload" to "cannot navigate"). Catch on the caller side,
+ * or make the loader infallible (`catch` → previous payload).
  */
 export function invalidate(router: Router, namespace: "rsc"): void {
   markStale(router, namespace);

@@ -96,9 +96,20 @@ Validation at factory time: rejects `null`, non-objects, non-function values, un
 
 | `ssr` config                 | mode marker       | server/client loader behaviour |
 | ---------------------------- | ----------------- | ------------------------------ |
-| omitted / `true` / `"full"`  | `"full"`          | runs (composes with #596)       |
+| omitted / `true` / `"full"`  | `"full"`          | runs (composes with #596*)      |
 | `false` / `"client-only"`    | `"client-only"`   | **skipped** unconditionally     |
 | `(state) => RscSsrMode`      | resolver result   | resolved per-navigation         |
+
+> **\*#596 composition caveat.** The #596 hydration-scratchpad skip (reuse the
+> server value instead of re-running the loader on the client) fires **only** when
+> `"rsc"` is present in the hydrated `state.context` — an **in-memory / object
+> handoff**. Under the package's own recommended `excludeContext: ["rsc"]`
+> serialization (a `ReactNode` can't survive JSON), the namespace is cut from the
+> payload → the scratchpad `in`-check is false → the loader **re-runs** on the
+> client (validated: `clientLoaderCalls === 1`). So with the recommended
+> `excludeContext`, do **not** register this plugin on the client — there is no
+> server value to reuse and the loader would run again. The skip is real only for
+> Variant-B in-memory handoff. See "Post-hydration loader skip" in the README.
 
 Mode is published to `state.context.ssrRscMode`. Read it via `getSsrRscMode(state)`:
 
@@ -203,6 +214,8 @@ Mechanics: `invalidate()` flips a per-router `Set<namespace>` flag (`WeakMap` ke
 Behaviour during an in-flight transition is **deferred**: the current transition completes unchanged; the *following* navigation consumes the flag. This preserves the invariant "one transition = one `state.context` snapshot".
 
 Idempotent — multiple `invalidate()` calls before the next navigation collapse to a single re-run. Cheap when not stale: a single `WeakMap` lookup + `Set.has` check per navigation. Surgical for multi-namespace routes — only `"rsc"` re-runs; a side-by-side `ssr-data-plugin` keeps its cached `state.context.data` unless its own `invalidate()` was also called.
+
+**Failure semantics (intended, but sharp).** The refresh loader runs in the awaited LEAVE_APPROVE phase with **no internal `try/catch`** (`shared/ssr/createSsrLoaderPlugin.ts`, the `subscribeLeave` handler), so a rejecting loader **rejects the consuming `navigate()`** — a navigation that would have succeeded *without* `invalidate`. And because the stale flag is cleared only *after* a successful write, a rejection **keeps the flag set**: every subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers. The degradation escalates from "stale payload" to "cannot navigate." This is intended (ARCHITECTURE lists loader rejections among the flag-preserving outcomes, and a test pins the propagation) — mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
 
 ### Loader errors propagate
 
