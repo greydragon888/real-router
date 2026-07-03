@@ -348,12 +348,13 @@ function computeTransitionPath(
     // result order-INSENSITIVELY, so the from-chain is returned as-is
     // (root→leaf, no reverse needed):
     //   • `shouldUpdateNode` reads `toDeactivate` by MEMBERSHIP (`.includes`).
-    //   • `canNavigateTo` reaches it too — its `toState` is built without meta
-    //     (`Router.canNavigateTo` → `makeState` 2-arg) and the committed
-    //     `getState()` carries no meta either, so both sides are meta-less — and
-    //     it only AND-folds the guard booleans, where order is irrelevant. That
-    //     same meta-absence is why canNavigateTo (de)activates the WHOLE chain
-    //     incl. shared ancestors: over-broad vs navigate, tracked as #970.
+    //   • States committed via `navigateToState` (start() and every popstate
+    //     under a URL plugin) and via `replace()` revalidation are meta-less
+    //     today (the writable-shell copy drops the WeakMap binding) — two such
+    //     states in a row land here and (de)activate the WHOLE chain incl.
+    //     shared ancestors: over-broad vs navigate, tracked as #1170.
+    // (`canNavigateTo` no longer reaches this path — since #970 it builds its
+    // toState WITH meta, mirroring buildNavigateState.)
     // The navigate pipeline always carries meta (buildNavigateState) → STANDARD
     // PATH below, which trims the shared ancestor and reverses correctly.
     return {

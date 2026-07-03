@@ -382,6 +382,46 @@ describe("dispose", () => {
     });
   });
 
+  // dispose() is NOT a route-CRUD op, so the #1032 REENTRANT_TREE_MUTATION ban
+  // does not apply to it — a subscribeChanges handler may dispose the router
+  // mid-dispatch. The tree is torn down inside the emit, so the REMAINING
+  // handlers of that same emit observe the post-dispose (empty) tree while the
+  // event still describes the mutation (e.g. `op: "add"`). This is the
+  // documented carve-out of INVARIANTS.md subscribeChanges #3 (dispose stays
+  // unconditional by design; dispose audit wave 2, 2026-07-03, finding N1).
+  describe("dispose() from a subscribeChanges handler (INVARIANTS subscribeChanges #3 carve-out)", () => {
+    it("does not throw, later handlers of the same emit still run and observe the torn-down tree", async () => {
+      await router.start("/home");
+
+      let disposeThrew = false;
+      let secondHandlerRan = false;
+      let secondHandlerSawAddedRoute: boolean | null = null;
+
+      routesApi.subscribeChanges(() => {
+        try {
+          router.dispose(); // not a CRUD op → no REENTRANT_TREE_MUTATION
+        } catch {
+          disposeThrew = true;
+        }
+      });
+      routesApi.subscribeChanges((event) => {
+        secondHandlerRan = true;
+        // The event says op:"add", but the tree is already torn down.
+        secondHandlerSawAddedRoute =
+          event.op === "add" && routesApi.has("reentrant-dispose-probe");
+      });
+
+      expect(() => {
+        routesApi.add({ name: "reentrant-dispose-probe", path: "/rdp" });
+      }).not.toThrow();
+
+      expect(disposeThrew).toBe(false);
+      expect(secondHandlerRan).toBe(true); // snapshot delivery survives the dispose
+      expect(secondHandlerSawAddedRoute).toBe(false); // torn-down tree observed
+      expect(router.isActive()).toBe(false);
+    });
+  });
+
   // A subscription reference captured BEFORE dispose() — e.g.
   // `const s = router.subscribe.bind(router)` — bypasses the facade's
   // #markDisposed swap (which replaces only `router.subscribe`, not a copy

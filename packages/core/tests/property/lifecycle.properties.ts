@@ -212,6 +212,7 @@ describe("start / stop / dispose Lifecycle Properties", () => {
       () => router.stop(),
       () => router.usePlugin(() => ({})),
       () => router.subscribe(() => {}),
+      () => router.subscribeLeave(() => {}),
       () => router.canNavigateTo("home"),
     ] as const;
 
