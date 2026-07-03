@@ -59,6 +59,16 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v7
         with:
+          # Pin to the commit the triggering Post-Merge Build actually validated.
+          # In a workflow_run context the DEFAULT checkout ref is the current tip
+          # of the default branch — with two quick pushes, the release run fired
+          # by push #1 would otherwise build/publish push #2's snapshot before its
+          # own post-merge validation finished. With the pin, each queued run
+          # (serialized by the concurrency group above) publishes exactly its
+          # validated snapshot; a newer push simply produces the next run, and
+          # `changeset publish` is idempotent across them. The tag backfill below
+          # (HEAD_SHA) then also points at the validated commit.
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           persist-credentials: false
 
