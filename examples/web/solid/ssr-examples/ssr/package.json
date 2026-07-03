@@ -17,7 +17,7 @@
     "@real-router/ssr-data-plugin": "workspace:^",
     "@solidjs/meta": "0.29.4",
     "express": "5.1.0",
-    "solid-js": "1.9.13"
+    "solid-js": "1.9.14"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",

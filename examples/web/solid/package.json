@@ -4,6 +4,6 @@
   "private": true,
   "dependencies": {
     "@real-router/solid": "workspace:^",
-    "solid-js": "1.9.13"
+    "solid-js": "1.9.14"
   }
 }
