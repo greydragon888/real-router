@@ -43,20 +43,23 @@ function snapshot(router) {
 // completeStart. So STARTING is observable only by an interceptor running
 // synchronously between sendStart and completeStart.
 
-// We approximate via a path-matcher that throws — leaves FSM in STARTING.
+// HISTORICAL NOTE (refreshed 2026-07-03): the original comment expected the FSM
+// to be "stuck in STARTING" per the pre-#670 start audit Bug #1 — that recovery
+// landed long ago. More importantly, `start("/nonexistent")` is NOT a failure
+// under the DEFAULT options: `allowNotFound` defaults to TRUE
+// (OptionsNamespace/constants.ts), so this start RESOLVES to UNKNOWN_ROUTE and
+// `isActive() === true` here is the CORRECT post-success value. The
+// pre-commit-unwind contract (rejected ROUTE_NOT_FOUND → IDLE, isActive=false)
+// only applies with `{ allowNotFound: false }` — verified 2026-07-03.
 {
   const router = createRouter(routes);
-  // Attempt to capture state mid-STARTING via an interceptor that observes.
-  // (Cannot easily install one without using internal API.)
-  console.log("[STARTING — observed via failed start]");
+  console.log("[not-found start — resolves to UNKNOWN_ROUTE under default allowNotFound:true]");
   try {
     await router.start("/nonexistent");
   } catch (e) {
-    // doesn't matter
+    // unreachable under default options
   }
-  // Now should still be in STARTING if start failed before completeStart
-  // (per start audit Bug #1). Or — IDLE per recover branch.
-  console.log("  post-failed-start isActive:", router.isActive());
+  console.log("  post-not-found-start isActive (true = committed UNKNOWN_ROUTE):", router.isActive());
 }
 
 // === READY ===

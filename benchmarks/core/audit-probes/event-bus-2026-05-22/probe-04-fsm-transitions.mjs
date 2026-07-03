@@ -1,32 +1,37 @@
 // Probe-04: FSM transition coverage for ANY→DISPOSED.
 //
-// Cross-ref start audit Bug #1 + #2: STARTING / TRANSITION_STARTED /
-// LEAVE_APPROVED do not have transitions to DISPOSED. Verify by directly
-// instantiating the FSM with each starting state via forceState, then sending
-// DISPOSE.
-
-// Hard-coded mirror of fsm/routerFSM.ts transitions table for direct review.
-// Source file: packages/core/src/fsm/routerFSM.ts:73-104.
+// HISTORICAL NOTE (refreshed 2026-07-03): the original 2026-05-22 run verified
+// the then-missing DISPOSE transitions (start audit Bug #1/#2). They were ADDED
+// in #669 (a80ef226) — the static table below is refreshed to the current
+// routerFSM.ts, so the "missing" scan now prints "(none)". The behavioural part
+// (dispose mid-STARTING / mid-TRANSITION) remains the live regression check.
+//
+// ⚠️ The table is a HARD-CODED MIRROR (routerFSM's config is not exported) and
+// can go stale again — when this probe's static scan disagrees with
+// packages/core/src/fsm/routerFSM.ts, trust the source, then refresh the copy.
 
 const config = {
   IDLE: { START: "STARTING", DISPOSE: "DISPOSED" },
-  STARTING: { STARTED: "READY", FAIL: "IDLE" },
+  STARTING: { STARTED: "READY", FAIL: "IDLE", DISPOSE: "DISPOSED" },
   READY: {
     NAVIGATE: "TRANSITION_STARTED",
     FAIL: "READY",
     STOP: "IDLE",
+    DISPOSE: "DISPOSED",
   },
   TRANSITION_STARTED: {
     NAVIGATE: "TRANSITION_STARTED",
     LEAVE_APPROVE: "LEAVE_APPROVED",
     CANCEL: "READY",
     FAIL: "READY",
+    DISPOSE: "DISPOSED",
   },
   LEAVE_APPROVED: {
     NAVIGATE: "TRANSITION_STARTED",
     COMPLETE: "READY",
     CANCEL: "READY",
     FAIL: "READY",
+    DISPOSE: "DISPOSED",
   },
   DISPOSED: {},
 };
