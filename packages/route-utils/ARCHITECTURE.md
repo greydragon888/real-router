@@ -111,11 +111,13 @@ The curried form is useful for creating reusable predicates (e.g., in `filter()`
 ### Validation Pipeline
 
 ```
-Input → Type check (string?) → Empty check → Null check → Currying check
+Input → Compute invalidName (route name non-string or empty) — no short-circuit
+  → Null check (segment) → Currying check
+  → invalidName → false  → Segment type/empty check
   → Length check (≤ 10,000) → Character check (SAFE_SEGMENT_PATTERN) → Regex build + cache
 ```
 
-Validation is split: type/empty/null checks happen in the returned function, length/character checks happen in `buildRegex`. This avoids redundant checks in the curried path.
+Validation is split: name/segment type-empty-null checks happen in the returned function, length/character checks happen in `buildRegex`. The route-name check is computed once as `invalidName` but is **deferred** — it never short-circuits before the currying branch, so the single-arg form always returns a tester function per its overload contract (#769). Each return path (curried body + direct form) applies `invalidName` after its own segment checks.
 
 ---
 
