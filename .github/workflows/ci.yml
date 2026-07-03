@@ -1074,6 +1074,19 @@ jobs:
             exit 1
           fi
 
+          # check must have SUCCEEDED before ANY of its outputs can be trusted.
+          # A check that dies before the change-detection step writes should_run
+          # (transient checkout/diff failure) leaves should_run empty — which the
+          # docs-only short-circuit below would otherwise read as a green skip,
+          # passing this required gate while check is RED and every functional job
+          # was skipped (vacuous pass, #1133). Placed before the short-circuit so
+          # the empty-output case is caught; also subsumes the old "plan step
+          # died" case (check.result=failure either way).
+          if [[ "${{ needs.check.result }}" != "success" ]]; then
+            echo "❌ check job failed — cannot trust its outputs (mode/should_run)"
+            exit 1
+          fi
+
           if [[ "${{ needs.check.outputs.should_run }}" != "true" ]]; then
             echo "✅ Skipped — no code changes (actionlint passed)"
             exit 0
@@ -1090,9 +1103,9 @@ jobs:
           LINTS="${{ needs.repo-lints.result }}"
           echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE sonar=$SONAR lints=$LINTS"
 
-          # check now carries the shard plan (R2.19); if its plan step died, MODE
-          # is empty and every path job skipped — must not pass vacuously. (A
-          # change-detection failure leaves should_run empty → handled above.)
+          # Defensive belt-and-suspenders on the shard-plan output (R2.19): the
+          # check-result guard at the top of this step already exits on any check
+          # failure (#1133), so this is now redundant — kept as a cheap guard.
           if [[ "$PLAN" != "success" ]]; then
             echo "❌ check / shard plan failed"
             exit 1
