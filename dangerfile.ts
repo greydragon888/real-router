@@ -57,9 +57,6 @@ const matchesPattern = (file: string, patterns: RegExp[]) =>
   patterns.some((pattern) => pattern.test(file));
 
 const prBody = danger.github?.pr?.body ?? "";
-const prTitle = danger.github?.pr?.title ?? "";
-const isTrivial =
-  prTitle.includes("#trivial") || prBody.includes("#trivial");
 const isBot = danger.github?.pr?.user?.type === "Bot";
 
 // =============================================================================
@@ -72,7 +69,7 @@ const isBot = danger.github?.pr?.user?.type === "Bot";
  * When infrastructure files are changed, remind to update documentation.
  */
 function checkImplementationNotes() {
-  if (isTrivial || isBot) return;
+  if (isBot) return;
 
   const changedInfraFiles = allChangedFiles.filter((f) =>
     matchesPattern(f, INFRASTRUCTURE_PATTERNS)
@@ -97,7 +94,7 @@ function checkImplementationNotes() {
  * remind to update documentation.
  */
 function checkArchitecturalChanges() {
-  if (isTrivial || isBot) return;
+  if (isBot) return;
 
   const changedArchFiles = allChangedFiles.filter((f) =>
     matchesPattern(f, ARCHITECTURE_PATTERNS)
@@ -153,7 +150,7 @@ function checkArchitecturalChanges() {
  * When source files are changed, remind to add a changeset.
  */
 function checkChangeset() {
-  if (isTrivial || isBot) return;
+  if (isBot) return;
 
   const changedSourceFiles = allChangedFiles.filter((f) =>
     matchesPattern(f, SOURCE_PATTERNS)
@@ -177,7 +174,7 @@ function checkChangeset() {
  * Warn about large PRs that are hard to review.
  */
 function checkPRSize() {
-  if (isTrivial || isBot) return;
+  if (isBot) return;
 
   const linesChanged =
     (danger.github?.pr?.additions ?? 0) +
@@ -201,7 +198,7 @@ function checkPRSize() {
  * Remind to add a description for non-trivial PRs.
  */
 function checkPRDescription() {
-  if (isTrivial || isBot) return;
+  if (isBot) return;
 
   const hasDescription = prBody.trim().length > 50;
 
@@ -269,7 +266,7 @@ async function checkLockfileSync() {
  * Remind to add tests for new source files.
  */
 function checkTestCoverage() {
-  if (isTrivial || isBot) return;
+  if (isBot) return;
 
   const newSourceFiles = createdFiles.filter(
     (f) =>
@@ -300,7 +297,7 @@ function checkTestCoverage() {
  * Warn about console.log in production code (not tests).
  */
 async function checkConsoleStatements() {
-  if (isTrivial || isBot) return;
+  if (isBot) return;
 
   const sourceFiles = modifiedFiles.filter(
     (f) =>

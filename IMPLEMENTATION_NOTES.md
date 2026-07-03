@@ -907,7 +907,7 @@ refused — this workflow only removes the dedupe-only chore.
 | Console statements      | console.log added to source files  | Warn           |
 | PR statistics           | Always                             | Markdown table |
 
-**Skip checks:** Add `#trivial` to PR title or body.
+**Skip checks:** bot PRs only — all checks are advisory (they never fail the build; the `#trivial` opt-out was removed, #1132).
 
 **Local testing:**
 
@@ -955,11 +955,21 @@ Three independent gaps in the single required `CI Result` gate and its upstream 
 
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
+> **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**
+
 **Problem.** `changeset-check.yml`'s `require-changeset` job — the **required** status check `Require Changeset` — hard-fails when a public package's `src/` changes without a changeset, and its own error message tells contributors to *"add #trivial to PR title"*. But nothing in the job read the title: `#trivial` was honoured only by the **advisory** DangerJS "Changeset reminder" (`dangerfile.ts`, "Skip checks: Add `#trivial`"). So a docs/comment/JSDoc-only edit inside a public package's `src/` — which trips the **path-based** source-changed check even with zero behaviour change — had no changeset-free path to green, contradicting the message the gate itself printed. Surfaced by the audit-doc batch (#801/#764/#770): correcting a misleading JSDoc/comment inside `src/` needs no release, yet failed the required gate.
 
 **Solution.** Added `&& !contains(github.event.pull_request.title, '#trivial')` to the `Fail if changeset missing` step's `if:` in `changeset-check.yml`. The required gate now honours the same `#trivial` marker Danger already does, so a PR titled with `#trivial` skips **both** the advisory warn and the required hard-fail — the escape hatch the error message always advertised.
 
 **Why title-only (not body).** `changeset-check.yml`'s own error text says *"add #trivial to PR **title**"*, so the required gate reads the title to match its own advertised contract (Danger separately accepts title *or* body for its advisory warn). Title is also stable per `pull_request` event, avoiding a "green only after a body edit + re-run" race on a **gating** check. Use `#trivial` only for changes with no release impact (docs/comments/JSDoc); a real behaviour change still needs a changeset.
+
+### `#trivial` removed — path-based gate + manual override marker was inherently fragile (#1132)
+
+**Problem.** The `#trivial` marker had two consumers with **different** rules: the required `changeset-check` gate read it **title-only** (deliberately — race avoidance, above), while DangerJS read it **title-or-body**. A `#trivial` in the PR *body* silenced Danger's advisory reminder yet still tripped the required gate → "Danger is quiet but CI is red". A path-based required gate plus a hand-typed override marker is fragile by construction: the marker must be read identically in two places, and that desync is exactly where 3.2 broke. The hatch itself was used ~once (`gh pr list --search '#trivial in:title'` → #1124 merged; #442 was a closed config PR).
+
+**Solution.** Removed `#trivial` entirely — all 6 sites: `dangerfile.ts` (`isTrivial` const + 7 `if (isTrivial || isBot) return;` → `if (isBot) return;`; `prTitle` deleted as now-unused, `prBody` kept for the PR-description check), `changeset-check.yml` (the `!contains(title, '#trivial')` from the gate `if:`, its comment, and the error-message hint), `.changeset/README.md`, and this record (superseded banner above). No marker → no dual interpretation → the desync class is structurally impossible.
+
+**Consequence (accepted).** Any change to a public package's `src/` — or shared `*.ts` shipped source — now **requires a changeset**, including comment/JSDoc-only edits. Cost is low and often legitimate: JSDoc on an exported symbol ships in the `.d.ts` (verified: 84/140 built `.d.ts` carry JSDoc), so a `patch` release delivers updated tooltips to consumers; a pure internal-comment change gets a trivial `patch` changeset. (Empty changesets are rejected by `check-changeset.mjs`; a carve-out for them is a separate ~5-line design decision if the churn ever bites — the RFC's B-fallback.) Danger's 7 advisory checks now run on every non-bot PR — they never block, so this is only comment noise. Full analysis + audit: `.claude/rfc-1132-trivial-removal-and-ci-hygiene.md`.
 
 ### CI minute savings: `duplication` dlx-only + `bundle-size` base-from-master (#734)
 

@@ -282,7 +282,7 @@ push is never blocked. What it checks:
 - If public-package source files changed → a changeset is REQUIRED
 ```
 
-**Escape hatch:** Add `#trivial` to PR title to skip the requirement.
+Any change to a public package's source (or shared `*.ts` shipped source) needs a changeset — including comment/JSDoc-only edits. For a no-behaviour-change edit, add a `patch` changeset (`pnpm changeset`); JSDoc on an exported symbol ships in the `.d.ts`, so a patch release is legitimate.
 
 ## Additional Resources
 
