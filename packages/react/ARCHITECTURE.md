@@ -59,7 +59,8 @@ src/
 ├── ink.ts                         # Ink entry: terminal UI runtime
 ├── index.react-server.ts          # RSC type-only entry (root, react-server condition)
 ├── ssr.react-server.ts            # RSC type-only entry (/ssr, react-server condition)
-├── RouterProvider.tsx             # Context provider — announcer / scroll / VT effects
+├── RouterProviderCore.tsx         # DOM-free core: Router/Route/Navigator contexts + useSyncExternalStore wiring (#800)
+├── RouterProvider.tsx             # DOM-aware wrapper over the core — announcer / scroll / VT effects
 ├── context.ts                     # createContext<T | null>(null) for Router/Route/Navigator
 ├── types.ts                       # RouteContext, LinkProps (DOM)
 ├── ink-types.ts                   # InkLinkProps, InkRouterProviderProps (terminal)
@@ -86,7 +87,7 @@ src/
 ├── components/
 │   ├── Link.tsx                   # memo'd link with custom areLinkPropsEqual + active state; inline onClick (no useCallback)
 │   ├── InkLink.tsx                # /ink — focusable text link via useFocus + useInput
-│   ├── InkRouterProvider.tsx      # /ink — wrapper that omits announceNavigation
+│   ├── InkRouterProvider.tsx      # /ink — composes RouterProviderCore only (keeps dom-utils out of the ink chunk, #800)
 │   ├── RouterErrorBoundary.tsx    # Declarative navigation error handling (useLayoutEffect for onErrorRef, useMemo'd source)
 │   ├── ClientOnly.tsx             # /ssr — server fallback → client children swap after mount
 │   ├── ServerOnly.tsx             # /ssr — symmetric inverse of ClientOnly
