@@ -61,8 +61,20 @@ jobs:
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
 
-          # Get changed files, excluding docs and CI configs
-          CODE_CHANGES=$(git diff --name-only "$BASE" "$HEAD" | grep -vE '^(\.github/|.*\.md$)' | head -1)
+          # "Code" = anything that isn't docs or CI config — EXCEPT .github/actions/**.
+          # Composite actions (e.g. actions/setup) execute in every build job, so a
+          # change there must run the full pipeline that exercises them. #733 closed
+          # this class for workflow files (actionlint on every PR), but composite
+          # actions are outside actionlint's scope AND outside a bare '^\.github/'
+          # exclude — a setup-only PR skipped ALL CI and broke only after merge (#1128).
+          # ERE has no lookahead, so do it in two passes over the changed set (docs
+          # dropped up front): (1) everything not under .github/, plus (2) anything
+          # under .github/actions/. The '|| true' guards keep a grep no-match exit
+          # from tripping the step's `set -eo pipefail`.
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep -vE '\.md$' || true)
+          NON_GH=$(printf '%s\n' "$CHANGED" | grep -vE '^\.github/' || true)
+          GH_ACTIONS=$(printf '%s\n' "$CHANGED" | grep -E '^\.github/actions/' || true)
+          CODE_CHANGES=$(printf '%s\n%s\n' "$NON_GH" "$GH_ACTIONS" | grep . | head -1 || true)
 
           if [ -z "$CODE_CHANGES" ]; then
             echo "should_run=false" >> $GITHUB_OUTPUT
