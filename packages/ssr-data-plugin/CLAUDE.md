@@ -330,6 +330,8 @@ The post-hydration scratchpad-skip path uses `config.namespace in hydrationState
 
 In practice this only matters for in-memory hydration paths — JSON-roundtrip strips `undefined` values, so a typical `serializeRouterState(state)` → `<script>window.__SSR_STATE__=…</script>` → `hydrateRouter` flow can't carry `data: undefined` across. The contract is documented here so a future refactor that flips to `!== undefined` knows it's a behaviour change, not a bug fix. Frozen by `tests/functional/data-loader.test.ts` "treats explicit `data: undefined` in hydrated context as missing" (the test name is from the user's perspective: "no value", and the plugin honours that as "server said: no value, stop here").
 
+**Guarded against a missing `context` (#762).** The `in` check is preceded by `hydrationState.context !== undefined`. A hand-built partial source (`{ name, path }` with no `context` — type-legal via `hydrateRouter`'s `{ path: string }` object-source cast, which stashes it in the scratchpad with no runtime validation) no longer crashes `start()` with a bare `TypeError: Cannot use 'in' operator … in undefined`; a missing `context` is treated as "no server value for this namespace" and the loader runs. This is orthogonal to presence-wins, which is about presence of the *namespace key* within an existing `context`. Frozen by `data-loader.test.ts` "runs the loader instead of crashing when the hydration source has no context".
+
 ### Loader errors propagate
 
 If a loader throws, the error propagates through the `start()` promise. The caller's `try/catch` handles it — same as any async guard failure.
