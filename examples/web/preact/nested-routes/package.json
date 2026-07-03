@@ -18,7 +18,7 @@
     "preact": "10.29.3"
   },
   "devDependencies": {
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.61.1",
     "@preact/preset-vite": "2.10.5",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/preact": "3.2.4",
