@@ -365,6 +365,12 @@ export function createSsrLoaderPlugin<
         if (
           hydrationState !== null &&
           hydrationState.name === state.name &&
+          // A hand-built partial source (`{ name, path }` with no `context`) is
+          // type-legal via hydrateRouter's `{ path: string }` object-source
+          // cast to SerializedRouterState — guard so the `in` below can't throw
+          // `Cannot use 'in' operator … in undefined` (#762). A missing context
+          // means "no server value for this namespace" → fall through to the loader.
+          hydrationState.context !== undefined &&
           // `in` — not `!== undefined` — is intentional. The contract is
           // "scratchpad presence wins": if the server explicitly serialised
           // a value into this namespace (even an `undefined` left over from
