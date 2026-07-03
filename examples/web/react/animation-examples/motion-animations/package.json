@@ -14,7 +14,7 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@real-router/react": "workspace:^",
-    "motion": "12.40.0",
+    "motion": "12.42.2",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
