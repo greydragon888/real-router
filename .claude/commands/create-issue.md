@@ -96,7 +96,7 @@ gh label list --repo greydragon888/real-router --limit 100
 - **solid → `area:solid`** (без пробела!)
 - **vue → `vue`**, **svelte → `svelte`**, **angular → `angular`** (вообще без префикса `area:`)
 - **dependencies → `dependencies`** (bare; для dep-bump / dep-migration задач)
-- **private-пакеты (search-params, path-matcher, route-tree, fsm, …) area-лейбла НЕ имеют** — issue получает **2 labels** (тип + priority), area живёт только в титульном токене `[search-params]…` (прецеденты #1051, #1155)
+- **foundation-пакеты (search-params, path-matcher, route-tree, event-emitter, fsm — последний публичный, но тоже) area-лейбла НЕ имеют** — критерий не приватность пакета, а отсутствие лейбла в `gh label list`; issue получает **2 labels** (тип + priority), area живёт только в титульном токене `[search-params]…` (прецеденты #1051, #1155, #1159)
 - тип: `bug` / `enhancement` / `performance` / `documentation` / `good first issue`
 - priority: `priority: critical|high|medium|low`
 
