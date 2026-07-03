@@ -802,7 +802,13 @@ jobs:
 
   bundle-size:
     name: Bundle Size
-    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
+    # bundle-size starts from dist artifacts (dist-base + dist-<shard>) plus a
+    # cache-fill bundle — base-test produces NO dist (coverage only), so it does
+    # not belong on this job's path. Same class as smoke (#1130); the win here is
+    # an earlier PR size comment, not gate wall-clock (bundle-size is not in the
+    # `ci` gate). coverage/sonarcloud DO keep base-test — they consume its
+    # coverage-reports-base artifact.
+    needs: [check, pipeline-leaf, base-bundle, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
@@ -813,7 +819,6 @@ jobs:
           needs.pipeline-leaf.outputs.built == 'true') ||
         (needs.check.outputs.mode == 'sharded' &&
           needs.base-bundle.result == 'success' &&
-          needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
       )
     runs-on: ubuntu-latest
