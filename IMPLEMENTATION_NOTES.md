@@ -935,6 +935,14 @@ pnpm danger:local
 
 **Verification:** ran the pinned version locally (`actionlint` 1.7.8 + shellcheck 0.11.0). With `SHELLCHECK_OPTS=--severity=warning` the full workflow set lints clean (exit 0); at full severity only the suppressed `SC2086` info remains, and no expression/injection findings survive.
 
+### `#trivial` now skips the *required* changeset gate, not just Danger
+
+**Problem.** `changeset-check.yml`'s `require-changeset` job — the **required** status check `Require Changeset` — hard-fails when a public package's `src/` changes without a changeset, and its own error message tells contributors to *"add #trivial to PR title"*. But nothing in the job read the title: `#trivial` was honoured only by the **advisory** DangerJS "Changeset reminder" (`dangerfile.ts`, "Skip checks: Add `#trivial`"). So a docs/comment/JSDoc-only edit inside a public package's `src/` — which trips the **path-based** source-changed check even with zero behaviour change — had no changeset-free path to green, contradicting the message the gate itself printed. Surfaced by the audit-doc batch (#801/#764/#770): correcting a misleading JSDoc/comment inside `src/` needs no release, yet failed the required gate.
+
+**Solution.** Added `&& !contains(github.event.pull_request.title, '#trivial')` to the `Fail if changeset missing` step's `if:` in `changeset-check.yml`. The required gate now honours the same `#trivial` marker Danger already does, so a PR titled with `#trivial` skips **both** the advisory warn and the required hard-fail — the escape hatch the error message always advertised.
+
+**Why title-only (not body).** `changeset-check.yml`'s own error text says *"add #trivial to PR **title**"*, so the required gate reads the title to match its own advertised contract (Danger separately accepts title *or* body for its advisory warn). Title is also stable per `pull_request` event, avoiding a "green only after a body edit + re-run" race on a **gating** check. Use `#trivial` only for changes with no release impact (docs/comments/JSDoc); a real behaviour change still needs a changeset.
+
 ### CI minute savings: `duplication` dlx-only + `bundle-size` base-from-master (#734)
 
 **Problem:** Two **informational** downstream jobs (neither in the required gate) spent CI minutes on redundant installs/builds. With turbo's remote-cache hit-rate high, the dominant cost is repeated `pnpm install`, not rebuilds.
