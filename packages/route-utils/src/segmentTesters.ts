@@ -84,14 +84,12 @@ const makeSegmentTester = (start: string, end: string) => {
     // State.name is always string by real-router type definition
     const name = typeof route === "string" ? route : route.name;
 
-    if (typeof name !== "string") {
-      return false;
-    }
-
-    // Empty route name always returns false
-    if (name.length === 0) {
-      return false;
-    }
+    // An empty or non-string route name matches nothing, so every tester
+    // ultimately returns `false`. But this MUST NOT short-circuit before the
+    // currying branch: the single-arg overload unconditionally promises a
+    // tester function, so the name check is deferred to each return path
+    // (curried body + direct form) instead of running up front (#769).
+    const invalidName = typeof name !== "string" || name.length === 0;
 
     // null always returns false (consistent behavior)
     if (segment === null) {
@@ -117,9 +115,22 @@ const makeSegmentTester = (start: string, end: string) => {
           return false;
         }
 
+        // An empty/non-string route name matches nothing (deferred from the
+        // outer guard so the single-arg form still yields a function, #769).
+        if (invalidName) {
+          return false;
+        }
+
         // Use buildRegex (type and empty checks already done above)
         return buildRegex(localSegment).test(name);
       };
+    }
+
+    // An empty/non-string route name matches nothing. Checked BEFORE the
+    // segment-type guard so the direct form keeps its original output for an
+    // invalid name (`false`, never a TypeError from the segment check) (#769).
+    if (invalidName) {
+      return false;
     }
 
     if (typeof segment !== "string") {
