@@ -1,5 +1,13 @@
 # ssr-data-plugin
 
+## 0.4.12
+
+### Patch Changes
+
+- [#1138](https://github.com/greydragon888/real-router/pull/1138) [`c48e5b9`](https://github.com/greydragon888/real-router/commit/c48e5b903ca245f6c0be4aa2fa7b44ed98c93f53) Thanks [@greydragon888](https://github.com/greydragon888)! - Handle a hydration source without a `context` field without crashing ([#762](https://github.com/greydragon888/real-router/issues/762))
+
+  A partial hydration source object (`{ name, path }` with no `context`) is type-legal via `hydrateRouter`'s `{ path: string }` object-source cast, yet the `start()` interceptor's `config.namespace in hydrationState.context` check threw a bare `TypeError: Cannot use 'in' operator to search for 'data' in undefined`. The shared SSR loader factory now guards `hydrationState.context !== undefined` before the lookup — a missing context is treated as "no server value for this namespace", so the loader runs normally. Behavior for every valid hydration input is unchanged.
+
 ## 0.4.11
 
 ### Patch Changes

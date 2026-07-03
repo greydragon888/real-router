@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-03]
 
+### @real-router/rsc-server-plugin@0.2.12
+
+### Patch Changes
+
+- [#1138](https://github.com/greydragon888/real-router/pull/1138) [`c48e5b9`](https://github.com/greydragon888/real-router/commit/c48e5b903ca245f6c0be4aa2fa7b44ed98c93f53) Thanks [@greydragon888](https://github.com/greydragon888)! - Handle a hydration source without a `context` field without crashing ([#762](https://github.com/greydragon888/real-router/issues/762))
+
+  `rsc-server-plugin` shares the SSR loader factory with `ssr-data-plugin`. A partial hydration source object (`{ name, path }` with no `context`) previously crashed `start()` with a bare `TypeError: Cannot use 'in' operator to search for 'rsc' in undefined`. The factory now guards `hydrationState.context !== undefined` before the namespace lookup, so a missing context falls through to the loader. No API change.
+
+### @real-router/ssr-data-plugin@0.4.12
+
+### Patch Changes
+
+- [#1138](https://github.com/greydragon888/real-router/pull/1138) [`c48e5b9`](https://github.com/greydragon888/real-router/commit/c48e5b903ca245f6c0be4aa2fa7b44ed98c93f53) Thanks [@greydragon888](https://github.com/greydragon888)! - Handle a hydration source without a `context` field without crashing ([#762](https://github.com/greydragon888/real-router/issues/762))
+
+  A partial hydration source object (`{ name, path }` with no `context`) is type-legal via `hydrateRouter`'s `{ path: string }` object-source cast, yet the `start()` interceptor's `config.namespace in hydrationState.context` check threw a bare `TypeError: Cannot use 'in' operator to search for 'data' in undefined`. The shared SSR loader factory now guards `hydrationState.context !== undefined` before the lookup — a missing context is treated as "no server value for this namespace", so the loader runs normally. Behavior for every valid hydration input is unchanged.
+
+
 ### @real-router/route-utils@0.2.6
 
 ### Patch Changes

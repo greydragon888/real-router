@@ -564,6 +564,31 @@ describe("@real-router/ssr-data-plugin", () => {
       expect(loader).not.toHaveBeenCalled();
       expect(state.context.data).toBeUndefined();
     });
+
+    it("runs the loader instead of crashing when the hydration source has no context (#762)", async () => {
+      const loader = vi.fn().mockResolvedValue({ from: "client" });
+
+      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+
+      // Hand-built partial source: `name` matches the resolved route (so the
+      // interceptor reaches the namespace lookup) but there is NO `context`.
+      // hydrateRouter's `{ path: string }` object-source type accepts it and
+      // casts to SerializedRouterState with no runtime validation, so this is
+      // reachable from the public API. Before the fix,
+      // `config.namespace in hydrationState.context` threw a bare
+      // `TypeError: Cannot use 'in' operator to search for 'data' in undefined`.
+      const partialSource = {
+        name: "users.profile",
+        params: { id: "42" },
+        path: "/users/42",
+      };
+
+      const state = await hydrateRouter(router, partialSource);
+
+      // No context → treat as "no hydrated data" → run the loader gracefully.
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(state.context.data).toStrictEqual({ from: "client" });
+    });
   });
 
   describe("Stress", () => {
