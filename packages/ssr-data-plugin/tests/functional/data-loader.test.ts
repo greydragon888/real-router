@@ -14,8 +14,8 @@ import { markStale } from "../../src/shared-ssr";
 import {
   __resetRegistryForTests,
   ensureRegistryPromise,
-  getDeferBootstrapScript,
-} from "../../src/shared-ssr/deferRegistry";
+} from "../../src/shared-ssr/deferRegistryClient";
+import { getDeferBootstrapScript } from "../../src/shared-ssr/deferWireFormat";
 
 import type { DataLoaderFactoryMap, SsrMode } from "../../src";
 import type { Router, State } from "@real-router/core";

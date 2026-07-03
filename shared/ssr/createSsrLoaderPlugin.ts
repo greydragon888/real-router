@@ -2,7 +2,7 @@ import { getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
 import { isDeferred } from "./defer.js";
-import { ensureRegistryPromise } from "./deferRegistry.js";
+import { ensureRegistryPromise } from "./deferRegistryClient.js";
 import { clearStale, isStale } from "./staleRegistry.js";
 import { ALL_SSR_MODES } from "./types.js";
 

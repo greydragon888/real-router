@@ -1,80 +1,19 @@
 /**
- * Client-side registry for deferred values streamed from the server.
+ * Server-only wire-format for the deferred-value transport.
  *
- * The contract spans three actors:
- *
- * 1. **Server stream injects `<script>__rrDefer__("key", "json")</script>`
- *    tags** as each loader-returned promise resolves. The bootstrap script
- *    (also server-emitted) installs `__rrDefer__` and the registry on
- *    `globalThis` before any settle script runs.
- *
- * 2. **Plugin start interceptor** (post-hydration scratchpad path) reads the
- *    `<deferredKeysNamespace>` list from the hydrated state, then calls
- *    `ensureRegistryPromise(key)` once per key to obtain the promise that
- *    `useDeferred()` will return. This ensures a stable Promise reference
- *    across the initial render and any inline-script settlements.
- *
- * 3. **Adapter `useDeferred(key)`** reads from `state.context.<deferredNamespace>`
- *    which the plugin populated above. The returned Promise integrates with
- *    React `use()`, Solid `<Await/>`, Svelte `{#await}`, etc.
+ * Produces the inline `<script>` sources that stream deferred settlements to
+ * the client registry (`deferRegistryClient.ts`): the one-time bootstrap
+ * installer plus per-promise settle scripts. Reached only from each plugin's
+ * `./server` entry — never from the client `.` bundle (#761), so its
+ * module-level `RegExp` / `Object.fromEntries` initialisers (which the bundler
+ * cannot treat as pure) stay out of browser bundles.
  */
 
-interface RegistryEntry {
-  promise: Promise<unknown>;
-  resolve: (value: unknown) => void;
-  reject: (error: unknown) => void;
-}
-
-const REGISTRY_GLOBAL_KEY = "__rrDeferRegistry__";
-const SETTLE_FN_NAME = "__rrDefer__";
-const REJECT_FN_NAME = "__rrDeferError__";
-
-interface DeferGlobal {
-  [REGISTRY_GLOBAL_KEY]?: Map<string, RegistryEntry>;
-  [SETTLE_FN_NAME]?: (key: string, json: string) => void;
-  [REJECT_FN_NAME]?: (key: string, json: string) => void;
-}
-
-function getGlobal(): DeferGlobal {
-  return globalThis as unknown as DeferGlobal;
-}
-
-function getOrCreateRegistry(): Map<string, RegistryEntry> {
-  const g = getGlobal();
-  let registry = g[REGISTRY_GLOBAL_KEY];
-
-  if (registry === undefined) {
-    registry = new Map<string, RegistryEntry>();
-    g[REGISTRY_GLOBAL_KEY] = registry;
-  }
-
-  return registry;
-}
-
-/**
- * Returns the registered Promise for `key`, creating a fresh pending entry on
- * first access. Stable across calls — `useDeferred` relies on Promise
- * reference identity for React `use()` to track resolution.
- */
-export function ensureRegistryPromise(key: string): Promise<unknown> {
-  const registry = getOrCreateRegistry();
-  let entry = registry.get(key);
-
-  if (entry === undefined) {
-    let resolve!: (value: unknown) => void;
-    let reject!: (error: unknown) => void;
-
-    const promise = new Promise<unknown>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-
-    entry = { promise, resolve, reject };
-    registry.set(key, entry);
-  }
-
-  return entry.promise;
-}
+import {
+  REGISTRY_GLOBAL_KEY,
+  REJECT_FN_NAME,
+  SETTLE_FN_NAME,
+} from "./deferRegistryClient.js";
 
 /**
  * Returns the inline bootstrap script (no `<script>` wrapper). Embed in a
@@ -163,15 +102,15 @@ const ESCAPE_FOR_SCRIPT_REGEX = new RegExp(
  *     1. **Plain JS literal** (e.g. the deferred KEY): the JS parser hands
  *        back the original string directly.
  *     2. **JS literal containing JSON** (e.g. the deferred VALUE): the JS
- *        parser hands back a string with `<` text inside (the leading
+ *        parser hands back a string with `\u003c` text inside (the leading
  *        `\\` of `\\u003c` escaped to `\`, then `u003c` is plain text), and
- *        `JSON.parse` then unescapes `<` → `<`. Net round-trip is
+ *        `JSON.parse` then unescapes `\u003c` → `<`. Net round-trip is
  *        identity.
  *   Both decode paths land on the original string — so the same
  *   `escapeForScript` works for both keys (parsed as JS literal) and values
  *   (parsed as JS literal containing JSON).
  *
- * The `&` → `&` substitution defends against `<![CDATA[` / template
+ * The `&` → `&amp;` substitution defends against `<![CDATA[` / template
  * engine post-processing that might re-interpret HTML entities; it is not
  * strictly necessary for `<script>` body parsing but cheap and conservative.
  */
@@ -225,12 +164,4 @@ export function formatSettleScript(
   const safeValue = escapeForScript(serializedValue);
 
   return `<script>${fn}(${safeKey},${safeValue})</script>`;
-}
-
-/** Test-only — clears the global registry. Not exported from index.ts. */
-export function __resetRegistryForTests(): void {
-  const g = getGlobal();
-  delete g[REGISTRY_GLOBAL_KEY];
-  delete g[SETTLE_FN_NAME];
-  delete g[REJECT_FN_NAME];
 }

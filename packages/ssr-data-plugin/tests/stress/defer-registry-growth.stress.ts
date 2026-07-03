@@ -11,8 +11,8 @@ import {
 import {
   __resetRegistryForTests,
   ensureRegistryPromise,
-  getDeferBootstrapScript,
-} from "../../src/shared-ssr/deferRegistry";
+} from "../../src/shared-ssr/deferRegistryClient";
+import { getDeferBootstrapScript } from "../../src/shared-ssr/deferWireFormat";
 
 const noop = (): void => undefined;
 
