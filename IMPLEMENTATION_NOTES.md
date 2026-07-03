@@ -953,6 +953,24 @@ Three independent gaps in the single required `CI Result` gate and its upstream 
 
 **Why / verification.** No vitest harness exists for bash-in-YAML gate logic, so each fix was validated with a faithful **shell model** of the gate + change-detection (`${{ needs.* }}` → env vars, the fix behind a toggle): the buggy input flips `exit 0 → exit 1` while every healthy scenario (docs-only skip, leaf/sharded pass, real failure, plan-died-after-should_run) stays unchanged, and the change-detection snippet was re-run under the exact GitHub shell (`bash --noprofile --norc -eo pipefail`) to confirm the `grep` no-match exits don't crash the step. `actionlint` clean on the final file.
 
+### Post-audit low-severity sweep — bundle-size off the base-test path, release checkout pinned, smoke-script empty-array guards
+
+The three low-severity residuals left open by the 2026-07-03 audit wave (re-audit §5.2.1 + deep-audit §2.2/§4.2 in `.claude/infra-review-report-2026-07-03.md` / `ci-cd-audit-2026-07-03.md`), fixed straight on master (infra — no changeset).
+
+**Problem.**
+
+1. **`bundle-size` serialized behind `base-test`.** Same class as smoke before #1130: the job starts from dist artifacts (`dist-base` + `dist-<shard>`) plus a cache-fill bundle — `base-test` produces NO dist, only coverage. Keeping it in `needs`/`if` delayed the job by the full core property-test run for zero integrity gain. Unlike #1130 the cost was latency of the PR size *comment*, not the merge gate (`bundle-size` is not in the `ci` gate's needs).
+2. **Release run could build a snapshot its trigger never validated.** In a `workflow_run` context the default checkout ref is the **current** default-branch tip, not the commit the triggering Post-Merge Build ran on. With two quick pushes, the release run fired by push #1 checked out push #2's tree and bundled/published it before push #2's own post-merge validation finished. Mitigated in practice by the serializing concurrency group + idempotent publish, but the "published ≠ validated" window existed.
+3. **`smoke-test-packages.sh` empty-array hazard on bash 3.2.** Expanding an EMPTY array with `"${arr[@]}"` under `set -u` is an "unbound variable" error on bash 3.2 — the CLAUDE.md lower bound for locally-run scripts (CI's bash 5 is unaffected). `PACKAGES`/`INSTALL_ARGS` are never empty today, so this was latent; and an empty tarball set would anyway have reached `npm install` as a literal unmatched glob rather than a clear error.
+
+**Solution.**
+
+1. Dropped `base-test` from `bundle-size`'s `needs` and its sharded `if:` arm (mirror of #1130). `coverage`/`sonarcloud` deliberately keep `base-test` — they consume its `coverage-reports-base` artifact.
+2. `ref: ${{ github.event.workflow_run.head_sha }}` on the release checkout — every queued run now builds exactly the snapshot its triggering post-merge validated, and the tag backfill (`HEAD_SHA=$(git rev-parse HEAD)`) consequently points at that validated commit too. A newer push simply produces the next queued run, which publishes its own snapshot.
+3. Fail-loud guards after the pack phase and the tarball scan (`[ "${#arr[@]}" -eq 0 ] → exit 1`). `${#arr[@]}` (length) is safe on empty arrays even on bash 3.2 — only element expansion is not — so the guards double as the portability fix: past them, every `"${arr[@]}"` expansion is provably non-empty. Chosen over the `${arr[@]+"${arr[@]}"}` idiom because a silent empty set here means a broken pack phase — failing loudly is strictly more useful than expanding to nothing.
+
+**Verification.** `actionlint` (1.7.8 + shellcheck, `SHELLCHECK_OPTS=--severity=warning` — the CI gate's exact mode) clean on both workflows; `bash -n` + standalone `shellcheck -S warning` clean on the smoke script. The `ref:` pin is expression-only (`with:` input, not `run:`), so no injection surface; detached-HEAD checkout is fine for every downstream step (changesets/action branches off the SHA; `git rev-parse HEAD` works detached).
+
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
 > **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**
