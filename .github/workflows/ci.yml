@@ -589,9 +589,15 @@ jobs:
   smoke:
     name: Package Smoke Test
     runs-on: ubuntu-latest
-    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
-    # Active path succeeded: leaf → pipeline-leaf; sharded → base-bundle + base-test
-    # + all shards (empty matrix.include → pipeline-sharded 'skipped', carried by the base jobs).
+    # smoke bundles every package (base-bundle + shards warm the cache) and
+    # resolves exports — it needs BUNDLES, not test results, so it does NOT depend
+    # on base-test. Dropping base-test lets smoke run in PARALLEL with the core
+    # property-tests instead of serialized behind the heaviest job (~2-4 min
+    # wall-clock on a sharded PR, #1130). Gating integrity is unchanged: the CI
+    # Result gate still requires base-test == success independently (job `ci`).
+    needs: [check, pipeline-leaf, base-bundle, pipeline-sharded]
+    # Active path succeeded: leaf → pipeline-leaf; sharded → base-bundle
+    # + all shards (empty matrix.include → pipeline-sharded 'skipped', carried by base-bundle).
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
@@ -600,7 +606,6 @@ jobs:
           needs.pipeline-leaf.result == 'success') ||
         (needs.check.outputs.mode == 'sharded' &&
           needs.base-bundle.result == 'success' &&
-          needs.base-test.result == 'success' &&
           (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
       )
     steps:
