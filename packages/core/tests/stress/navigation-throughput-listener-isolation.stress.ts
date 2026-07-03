@@ -1,3 +1,10 @@
+// Formerly `event-depth-stress.stress.ts` — renamed 2026-07-03 (event-bus deep
+// audit): the depth mechanism it was named after (`maxEventDepth` +
+// `RecursionDepthError`) was removed in #1033 (re-entrant emits are coalesced
+// at the emitter; sync reentrant navigate is banned outright, #1030). What the
+// suite actually exercises — and always kept exercising — is navigation
+// throughput (S7.4) and per-listener error isolation under storm (S7.5); the
+// S7 id is kept for cross-references in historical audit reports.
 import { describe, it, expect } from "vitest";
 
 import { events } from "@real-router/core";
