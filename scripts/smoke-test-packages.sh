@@ -51,6 +51,16 @@ for pkg_json in "$REPO_ROOT"/packages/*/package.json; do
   (cd "$pkg_dir" && pnpm pack --pack-destination "$TARBALLS_DIR") > /dev/null 2>&1
 done
 
+# Fail loudly if nothing was packed. Doubles as bash-3.2 safety: expanding an
+# EMPTY array with "${arr[@]}" under `set -u` is an "unbound variable" error on
+# bash 3.2 (the CLAUDE.md lower bound for locally-run scripts; CI's bash 5 is
+# unaffected) — past this guard every "${PACKAGES[@]}" expansion is non-empty.
+# `${#arr[@]}` (length) is safe on empty arrays even on 3.2.
+if [ "${#PACKAGES[@]}" -eq 0 ]; then
+  echo "ERROR: no public packages found under packages/ — nothing to smoke-test"
+  exit 1
+fi
+
 echo "  Packed ${#PACKAGES[@]} packages"
 
 echo ""
@@ -73,6 +83,14 @@ INSTALL_ARGS=()
 for tarball in "$TARBALLS_DIR"/*.tgz; do
   INSTALL_ARGS+=("$tarball")
 done
+
+# Same guard pair as PACKAGES above: an empty tarball set means the pack phase
+# silently produced nothing (would reach `npm install` as a literal unmatched
+# glob), and a non-empty guarantee keeps "${INSTALL_ARGS[@]}" bash-3.2-safe.
+if [ "${#INSTALL_ARGS[@]}" -eq 0 ]; then
+  echo "ERROR: no tarballs in $TARBALLS_DIR — pack phase produced nothing"
+  exit 1
+fi
 
 # Optional peer deps are not auto-installed by npm — add them explicitly so
 # their subpath entries can be imported by Phase 3. A real consumer using
