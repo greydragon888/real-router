@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-03]
 
+### @real-router/rsc-server-plugin@0.2.11
+
+### Patch Changes
+
+- [#1134](https://github.com/greydragon888/real-router/pull/1134) [`6be188f`](https://github.com/greydragon888/real-router/commit/6be188f097f6fe3c9db39520bd15814a96f22394) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep the server-only defer wire-format out of the client `.` bundle ([#761](https://github.com/greydragon888/real-router/issues/761))
+
+  `rsc-server-plugin` shares `shared/ssr` with `ssr-data-plugin`. Splitting `deferRegistry.ts` into a client registry module and a server-only `deferWireFormat.ts` removes the dead defer wire-format — including its impure module-level `RegExp` initialiser — from the chunk behind `dist/esm/index.mjs`. RSC never calls `defer()`, so this code was pure dead weight in the client bundle. No API or runtime behavior change.
+
+### @real-router/ssr-data-plugin@0.4.11
+
+### Patch Changes
+
+- [#1134](https://github.com/greydragon888/real-router/pull/1134) [`6be188f`](https://github.com/greydragon888/real-router/commit/6be188f097f6fe3c9db39520bd15814a96f22394) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep the server-only defer wire-format out of the client `.` bundle ([#761](https://github.com/greydragon888/real-router/issues/761))
+
+  `shared/ssr/deferRegistry.ts` is split into `deferRegistryClient.ts` (client hydration — `ensureRegistryPromise` + the registry global) and `deferWireFormat.ts` (server-only `escapeForScript` / `formatSettleScript` / `getDeferBootstrapScript`, plus their module-level `RegExp` / `Object.fromEntries` initialisers the bundler cannot prove pure). `createSsrLoaderPlugin` now imports only the client module, so the chunk behind `dist/esm/index.mjs` sheds the ~600–800 B of server-only wire-format that used to ride along. Public API and runtime behavior are unchanged — the wire-format still ships from `@real-router/ssr-data-plugin/server`.
+
+
 ### @real-router/react@0.28.3
 
 ### Patch Changes
