@@ -30,7 +30,7 @@ ssr-data-plugin/
 │   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout (subpath: /errors)
 │   ├── types.ts            — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap, DataRouteEntry, SsrLoaderContext, SsrMode
 │   ├── constants.ts        — ERROR_PREFIX (LOGGER_CONTEXT — internal)
-│   └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, defer, deferRegistry, staleRegistry, errors, types)
+│   └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, defer, deferRegistryClient, deferWireFormat, staleRegistry, errors, types)
 ```
 
 ## Module Dependency Graph
@@ -43,13 +43,13 @@ index.ts
     │       ├── shared-ssr/createSsrLoaderPlugin.ts
     │       │       ├── shared-ssr/staleRegistry.ts (isStale + clearStale)
     │       │       ├── shared-ssr/defer.ts (isDeferred — slow-path branch in writeLoaderResult)
-    │       │       └── shared-ssr/deferRegistry.ts (ensureRegistryPromise — client-side hydration path)
+    │       │       └── shared-ssr/deferRegistryClient.ts (ensureRegistryPromise — client-side hydration path; #761)
     │       └── types.ts
     ├── invalidate.ts → shared-ssr/staleRegistry.ts (markStale)
     ├── getSsrDataMode.ts → shared-ssr (ALL_SSR_MODES, SsrMode)
     └── (re-exports defer, isDeferred, DeferredPayload from shared-ssr)
 
-server.ts → shared-ssr/deferRegistry.ts (formatSettleScript, getDeferBootstrapScript, escapeForScript)
+server.ts → shared-ssr/deferWireFormat.ts (formatSettleScript, getDeferBootstrapScript, escapeForScript) — server-only, kept out of the client `.` chunk (#761)
 errors.ts → shared-ssr/errors.ts (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ```
 

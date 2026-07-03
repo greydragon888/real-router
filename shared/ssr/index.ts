@@ -8,12 +8,13 @@ export { defer, isDeferred, DEFER_BRAND } from "./defer.js";
 
 export type { DeferredPayload } from "./defer.js";
 
+export { ensureRegistryPromise } from "./deferRegistryClient.js";
+
 export {
-  ensureRegistryPromise,
   getDeferBootstrapScript,
   formatSettleScript,
   escapeForScript,
-} from "./deferRegistry.js";
+} from "./deferWireFormat.js";
 
 export { ALL_SSR_MODES } from "./types.js";
 

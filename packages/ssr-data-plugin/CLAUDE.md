@@ -134,7 +134,7 @@ src/
 ├── server.ts      — Server-side wire-format helpers: injectDeferredScripts, getDeferBootstrapScript, Serializer (#610). Subpath: @real-router/ssr-data-plugin/server.
 ├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
 ├── index.ts       — Public exports + module augmentation (@real-router/types for StateContext, including ssrDataDeferred / ssrDataDeferredKeys)
-└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistry, staleRegistry, types)
+└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
 ```
 
 The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding inlined here after the deleted `validation.ts`) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).

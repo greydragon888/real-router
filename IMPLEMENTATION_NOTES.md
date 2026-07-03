@@ -605,7 +605,7 @@ lands: search SonarCloud for a `shared/` file (e.g. `link-utils.ts`) — it must
 `shared/dom-utils`, and only there.
 **First-scan outcome (2026-06-12, PR #817 run):** the expanded scope crashed the scanner
 (`EXECUTION FAILURE`, exit 3) on **raw U+2028/U+2029 line separators** in newly-scanned files
-(`shared/ssr/deferRegistry.ts` JSDoc; `packages/{angular,svelte}/tests/property/linkUtils.properties.ts`
+(`shared/ssr/deferWireFormat.ts` JSDoc, formerly `deferRegistry.ts`; `packages/{angular,svelte}/tests/property/linkUtils.properties.ts`
 string constants). The JS bridge counts LS/PS as line terminators per the ES spec, the Java side does
 not — the line tables diverge (`Line 238 is out of range … has 237 lines`), and slicing by the shifted
 offsets cuts a 3-byte UTF-8 sequence mid-char (`Failed to deserialize Protobuf message: Protocol
@@ -687,7 +687,7 @@ leak the workspace graph the way the bare `src/**` wildcard does. Its tests cove
 namespaces). Audit rule applied throughout (classify before testing): genuinely dead branches were
 **removed** (resolveMode `client-only` reject, parseTokens empty-value guard, withTimeout timer
 guard), defensive-for-impossible-input branches got a justified `/* v8 ignore … -- @preserve */`
-(scroll-spy detection re-entry, deferRegistry `?? c` escape fallback — the `@preserve` is required
+(scroll-spy detection re-entry, deferWireFormat `?? c` escape fallback — the `@preserve` is required
 or esbuild strips the hint during transform and v8 never sees it), and everything reachable got a
 real test (dom-utils 100%, browser-env 50→100%, shared/ssr 95.5→100%).
 
@@ -3500,7 +3500,8 @@ shared/ssr/
 ├── createSsrLoaderPlugin.ts  # generic factory: compile loop + start interceptor + subscribeLeave + 4-claim teardown
 ├── createLoadersValidator.ts # generic shape validator (rejects unknown keys, allowed-mode strings only)
 ├── defer.ts                  # defer({ critical, deferred }) API + DEFER_BRAND symbol + shallow-clone freeze
-├── deferRegistry.ts          # __rrDeferRegistry__ global Map + escapeForScript + formatSettleScript + getDeferBootstrapScript
+├── deferRegistryClient.ts    # __rrDeferRegistry__ global Map + ensureRegistryPromise (client hydration path)
+├── deferWireFormat.ts        # server-only <script> wire-format: escapeForScript + formatSettleScript + getDeferBootstrapScript — split from the client registry so it stays out of the client `.` bundle (#761)
 ├── errors.ts                 # LoaderRedirect / LoaderNotFound / LoaderTimeout + withTimeout (AbortSignal.any composer)
 ├── staleRegistry.ts          # markStale / isStale / clearStale — WeakMap<Router, Set<namespace>> for invalidate()
 ├── types.ts                  # SsrLoaderFn<T> with optional { signal }, SsrLoaderFnFactory<T,D>, SsrMode, SsrLoaderPluginConfig
@@ -3696,7 +3697,7 @@ The plugin:
 - Writes the keys array to `state.context.ssrDataDeferredKeys` for post-hydration registry reconstruction (so the client can pre-create awaiter slots before the inline scripts arrive).
 - Total of **four claims** per loader plugin: `data`, `ssrDataMode`, `ssrDataDeferred`, `ssrDataDeferredKeys` — all released atomically on teardown.
 
-**Wire format** (`shared/ssr/deferRegistry.ts` + `@real-router/ssr-data-plugin/server`):
+**Wire format** (`shared/ssr/deferWireFormat.ts` + `@real-router/ssr-data-plugin/server`):
 
 ```html
 <!-- Server emits one inline script per deferred key, in resolution order -->
