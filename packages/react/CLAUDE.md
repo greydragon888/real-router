@@ -95,7 +95,7 @@ src/
 ├── components/                     # Shared components
 │   ├── Link.tsx                    # memo + areLinkPropsEqual; inline onClick (no useCallback)
 │   ├── InkLink.tsx                 # /ink — focusable text link via useFocus + useInput
-│   ├── InkRouterProvider.tsx       # /ink — wrapper that omits announceNavigation
+│   ├── InkRouterProvider.tsx       # /ink — composes RouterProviderCore only (DOM-free, #800)
 │   ├── RouterErrorBoundary.tsx     # Declarative navigation error handling
 │   ├── ClientOnly.tsx              # /ssr — server fallback → client children swap after mount
 │   ├── ServerOnly.tsx              # /ssr — symmetric inverse of ClientOnly
@@ -120,7 +120,8 @@ src/
 │   └── index.ts
 ├── utils/
 │   └── createHttpStatusSink.ts     # /ssr — fresh { code: undefined } sink per request
-├── RouterProvider.tsx              # Shared provider (announcer / scroll / VT effects)
+├── RouterProviderCore.tsx          # DOM-free core: contexts + useSyncExternalStore wiring (#800)
+├── RouterProvider.tsx              # DOM-aware wrapper over the core (announcer / scroll / VT effects)
 ├── context.ts                      # RouterContext, RouteContext, NavigatorContext (createContext<T | null>)
 ├── types.ts                        # RouteState, RouteContext, LinkProps (DOM)
 ├── ink-types.ts                    # InkLinkProps, InkRouterProviderProps (terminal)
@@ -557,7 +558,8 @@ snapshot live even with zero subscribers.
 - **Ink v7+ pins React 19.2+** — the `/ink` entry is paired with the main entry's React version, not `/legacy`. Ink v7 cannot run on React 18.
 - **No `<Link>`** — DOM-only, uses `<a>` + `MouseEvent<HTMLAnchorElement>`. Use `InkLink` which keys off `useFocus` + `useInput`.
 - **No `RouteView`** — `<Activity>` in terminal UIs is untested. Compose routes via `useRouteNode("")` and a switch/case on `route.name`.
-- **No `announceNavigation`** — `InkRouterProvider` is a thin wrapper that **does not** forward this prop; `createRouteAnnouncer` is unreachable from `/ink`. The DOM announcer uses `document.querySelector`/`requestAnimationFrame` and cannot run in Ink.
+- **No `announceNavigation`** — `InkRouterProvider` composes `RouterProviderCore` (contexts + `useSyncExternalStore` wiring), **not** the DOM-aware `RouterProvider`, so it never forwards this prop; `createRouteAnnouncer` is unreachable from `/ink`. The DOM announcer uses `document.querySelector`/`requestAnimationFrame` and cannot run in Ink.
+- **Chunk isolation (#800)** — because the announcer / scroll-restore / scroll-spy / view-transitions factories are imported and _called_ only in `RouterProvider.tsx`, and `InkRouterProvider` reaches only `RouterProviderCore.tsx` (which imports none of them), the chunk behind `dist/esm/ink.mjs` carries **zero** dom-utils implementation — no `IntersectionObserver` / `startViewTransition` / `aria-live` / scroll code lands in the terminal bundle. Guarded by `tests/functional/ink-chunk-isolation.test.ts`, which walks the static module graph from `src/ink.ts` (a re-export barrel is tree-shakeable; only a live value import counts).
 - **`ink` is an optional peer** (`peerDependenciesMeta.ink.optional = true`) — DOM consumers won't be prompted to install it.
 - **Navigation contract:** Tab moves focus across `InkLink`s (Ink's focus ring), Enter triggers `router.navigate(...)`. `ignoreQueryParams` defaults to `true` like DOM `Link`; `activeClassName` is replaced by `activeColor`/`activeInverse`, `onClick` by `onSelect`.
 - **`onSelect` is throw-isolated:** a throwing `onSelect` is caught + logged via `console.error`, then navigation proceeds. An uncaught throw inside `useInput` would otherwise escape into ink's stdin handler as an `uncaughtException` (no browser event-listener safety net) **and** swallow the navigation — mirrors `route-announcer`'s consumer-callback isolation (#799).
