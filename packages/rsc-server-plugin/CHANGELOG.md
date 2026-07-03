@@ -1,5 +1,13 @@
 # @real-router/rsc-server-plugin
 
+## 0.2.12
+
+### Patch Changes
+
+- [#1138](https://github.com/greydragon888/real-router/pull/1138) [`c48e5b9`](https://github.com/greydragon888/real-router/commit/c48e5b903ca245f6c0be4aa2fa7b44ed98c93f53) Thanks [@greydragon888](https://github.com/greydragon888)! - Handle a hydration source without a `context` field without crashing ([#762](https://github.com/greydragon888/real-router/issues/762))
+
+  `rsc-server-plugin` shares the SSR loader factory with `ssr-data-plugin`. A partial hydration source object (`{ name, path }` with no `context`) previously crashed `start()` with a bare `TypeError: Cannot use 'in' operator to search for 'rsc' in undefined`. The factory now guards `hydrationState.context !== undefined` before the namespace lookup, so a missing context falls through to the loader. No API change.
+
 ## 0.2.11
 
 ### Patch Changes
