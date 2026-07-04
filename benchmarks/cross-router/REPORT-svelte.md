@@ -4,9 +4,9 @@
 
 **Cohort:** `@real-router/svelte` · `sv-router` (community Svelte-5-first full router) · `@mateothegreat/svelte5-router` — Svelte 5 SFC apps (`vite-plugin-svelte`, `dedupe: ['svelte']`). **No `@tanstack/svelte-router` exists** (npm 404), so this cohort has no TanStack column; the popular `svelte-spa-router` (hash + regex) and `svelte-routing` are minimalist-class and excluded like `wouter`, and SvelteKit is framework-bundled (not a standalone router).
 
-**Scope — three full routers, like-for-like** (SvelteKit + hash/minimalist routers excluded). The honest split has **two axes plus a capability axis**. **Matcher scale** (`wide-config`): **real-router wins** — its segment trie stays flat @1000 (0.44) while sv-router degrades O(N) (0.80) and mateo-router floors high (0.89); the structural trie win holds in Svelte (as in React/Vue). **Per-nav render + memory** (cold-start, nav-latency, param-nav, nav-churn, table-heap, nested-switch, link-build): **sv-router wins** — a remarkably lean router (heap @10k 2.26 MB vs real-router 8.38; link-build 3.3 ms vs 14.6). **Capability**: **real-router is the ONLY full-pipeline router** (guards + validated search + data + scroll); sv-router covers data + guard, mateo-router guard only. real-router's adapter soft-spots: deep-nesting `RouteView` O(depth) (#1094) and a heavy `<Link>` (link-build 14.6 ms — the reverse-matcher per link). mateo-router renders depth 90 (no error boundary, unlike `@tanstack/solid-router`).
+**Scope — three full routers, like-for-like** (SvelteKit + hash/minimalist routers excluded). The honest split has **two axes plus a capability axis**. **Matcher scale** (`wide-config`): **real-router wins** — its segment trie stays flat @1000 (0.44) while sv-router degrades O(N) (0.80) and mateo-router floors high (0.89); the structural trie win holds in Svelte (as in React/Vue). **Per-nav render + memory** (cold-start, nav-latency, param-nav, nav-churn, table-heap, nested-switch, link-build): **sv-router wins** — a remarkably lean router (heap @10k 2.26 MB vs real-router 8.38; link-build 3.2 ms vs 12.0). **Capability**: **real-router is the ONLY full-pipeline router** (guards + validated search + data + scroll); sv-router covers data + guard, mateo-router guard only. real-router's adapter soft-spots: deep-nesting `RouteView` O(depth) (#1094) and a heavy `<Link>` (link-build 12.0 ms — `buildPath` + per-component instantiation, the residual after #1101's shared-selector fix). mateo-router renders depth 90 (no error boundary, unlike `@tanstack/solid-router`).
 
-**Run:** runs 10 · warmup 5 · throttle off · 2026-07-02T07:27:17.548Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
+**Run:** runs 15 · warmup 5 · throttle off · 2026-07-04T08:24:22.826Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
 
 ⚠️ Preliminary local numbers — directional, not a published verdict. Reported metrics are the stable signals — CPU (`script`), heap, FCP. Felt latency was dropped (render/frame-bound). `nav-churn` navsPerSec is frame-capped here (read CPU/nav + heap). **Caveat — `script` is V8-only:** CDP `ScriptDuration` excludes Blink C++ (`history.pushState` ~identical across routers), so `script` ratios overstate the `total` per-nav gap.
 
@@ -16,9 +16,9 @@ App init + parse/exec to first route painted. **sv-router is the lightest to boo
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| main-thread script (ms) | 5.13 | **3.79** | 4.22 |
+| main-thread script (ms) | 4.87 | **3.56** | 3.94 |
 | JS heap (MB) | 2.98 | **2.54** | 2.60 |
-| FCP (ms) | 24.00 | **16.00** | **16.00** |
+| FCP (ms) | 20.00 | 20.00 | **16.00** |
 
 ## Navigation — per-nav total main-thread (script + history) — `nav-latency`
 
@@ -26,9 +26,9 @@ Per-navigation total (script + Blink history), steady-state. **sv-router is the 
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | 0.489 | **0.358** | 0.499 |
-| · script (V8 only) (ms) | 0.304 | **0.163** | 0.279 |
-| · Blink history (pushState) (ms) | **0.195** | 0.207 | 0.225 |
+| ≈ total main-thread (ms) | 0.786 | **0.482** | 0.724 |
+| · script (V8 only) (ms) | 0.494 | **0.220** | 0.431 |
+| · Blink history (pushState) (ms) | 0.288 | **0.260** | 0.290 |
 
 ## Param navigation — per-nav total (script + history) — `param-nav`
 
@@ -36,9 +36,9 @@ Per-nav total changing :id (steady-state). **sv-router leanest (0.272); real-rou
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | 0.418 | **0.272** | 0.451 |
-| · script (V8 only) (ms) | 0.227 | **0.092** | 0.254 |
-| · Blink history (pushState) (ms) | 0.192 | **0.178** | 0.197 |
+| ≈ total main-thread (ms) | 0.561 | **0.383** | 0.602 |
+| · script (V8 only) (ms) | 0.263 | **0.107** | 0.302 |
+| · Blink history (pushState) (ms) | 0.300 | **0.274** | 0.292 |
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
@@ -46,12 +46,12 @@ Navigate into a flat 1000-route table — **the matcher crossover, and real-rout
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total @10 (ms) | 0.474 | **0.328** | 0.920 |
-| ≈ total @100 (ms) | 0.434 | **0.360** | 0.860 |
-| ≈ total @1000 (ms) | **0.442** | 0.796 | 0.888 |
-| · script (matcher) @10 (ms) | 0.404 | **0.269** | 0.847 |
-| · script (matcher) @100 (ms) | 0.368 | **0.298** | 0.795 |
-| · script (matcher) @1000 (ms) | **0.371** | 0.738 | 0.820 |
+| ≈ total @10 (ms) | 0.420 | **0.301** | 0.839 |
+| ≈ total @100 (ms) | 0.378 | **0.342** | 0.791 |
+| ≈ total @1000 (ms) | **0.382** | 0.782 | 0.820 |
+| · script (matcher) @10 (ms) | 0.358 | **0.244** | 0.770 |
+| · script (matcher) @100 (ms) | 0.320 | **0.289** | 0.729 |
+| · script (matcher) @1000 (ms) | **0.324** | 0.728 | 0.760 |
 
 ## Route-table memory — heap to hold N routes (sweep) — `table-heap`
 
@@ -59,9 +59,9 @@ Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **sv-router wins d
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| heap @1 (floor) (MB) | 2.03 | **1.82** | 1.87 |
-| heap @1k (MB) | 2.86 | **1.97** | 2.70 |
-| heap @10k (MB) | 8.38 | **2.26** | 9.20 |
+| heap @1 (floor) (MB) | 2.04 | **1.82** | 1.87 |
+| heap @1k (MB) | 2.87 | **1.97** | 2.70 |
+| heap @10k (MB) | 8.40 | **2.26** | 9.20 |
 
 ## Deep config — nesting depth (sweep) — `deep-config`
 
@@ -69,14 +69,14 @@ Navigate into a 90-level nested chain. **All three rise O(depth)** — real-rout
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total @3 (ms) | 0.654 | **0.434** | 0.792 |
-| ≈ total @30 (ms) | 1.79 | **1.10** | 2.31 |
-| ≈ total @60 (ms) | 3.13 | **1.74** | 3.26 |
-| ≈ total @90 (ms) | 4.95 | **2.94** | 4.22 |
-| · script (matcher) @3 (ms) | 0.589 | **0.367** | 0.714 |
-| · script (matcher) @30 (ms) | 1.72 | **1.02** | 2.24 |
-| · script (matcher) @60 (ms) | 3.06 | **1.67** | 3.18 |
-| · script (matcher) @90 (ms) | 4.87 | **2.87** | 4.14 |
+| ≈ total @3 (ms) | 0.637 | **0.377** | 0.668 |
+| ≈ total @30 (ms) | 1.69 | **0.994** | 2.14 |
+| ≈ total @60 (ms) | 3.02 | **1.58** | 3.00 |
+| ≈ total @90 (ms) | 4.67 | **2.66** | 3.94 |
+| · script (matcher) @3 (ms) | 0.576 | **0.320** | 0.606 |
+| · script (matcher) @30 (ms) | 1.62 | **0.940** | 2.08 |
+| · script (matcher) @60 (ms) | 2.97 | **1.52** | 2.93 |
+| · script (matcher) @90 (ms) | 4.61 | **2.60** | 3.87 |
 
 ## Param scaling — path-param count (sweep) — `param-scaling`
 
@@ -84,12 +84,12 @@ Routes with 1 / 10 / 100 path params — floor-bound (matcher barely stressed). 
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total @1 (ms) | 0.507 | **0.476** | 0.523 |
-| ≈ total @10 (ms) | **0.470** | 0.477 | 0.497 |
-| ≈ total @100 (ms) | 0.547 | 0.567 | **0.521** |
-| · script (matcher) @1 (ms) | 0.436 | **0.414** | 0.452 |
-| · script (matcher) @10 (ms) | **0.406** | 0.417 | 0.433 |
-| · script (matcher) @100 (ms) | 0.477 | 0.496 | **0.454** |
+| ≈ total @1 (ms) | 0.466 | **0.412** | 0.488 |
+| ≈ total @10 (ms) | 0.441 | **0.426** | 0.479 |
+| ≈ total @100 (ms) | 0.523 | 0.480 | **0.460** |
+| · script (matcher) @1 (ms) | 0.404 | **0.360** | 0.422 |
+| · script (matcher) @10 (ms) | 0.377 | **0.370** | 0.416 |
+| · script (matcher) @100 (ms) | 0.460 | 0.424 | **0.397** |
 
 ## Nav churn (stress) — `nav-churn`
 
@@ -97,11 +97,11 @@ Routes with 1 / 10 / 100 path params — floor-bound (matcher barely stressed). 
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total / nav (ms) | 0.523 | **0.436** | 0.617 |
-| · script / nav (V8) (ms) | 0.323 | **0.241** | 0.414 |
-| · Blink / nav (pushState) (ms) | 0.204 | **0.183** | 0.230 |
-| heap retained (200 navs) (KB) | 377 | **243** | 295 |
-| throughput (frame-capped) (/s) | 121 | **121** | 121 |
+| ≈ total / nav (ms) | 0.837 | **0.512** | 0.789 |
+| · script / nav (V8) (ms) | 0.536 | **0.257** | 0.494 |
+| · Blink / nav (pushState) (ms) | 0.296 | **0.256** | 0.294 |
+| heap retained (200 navs) (KB) | 380 | **243** | 295 |
+| throughput (frame-capped) (/s) | 121 | 121 | **121** |
 
 ## Active links (100) — per-nav total (script + history) — `active-links`
 
@@ -109,17 +109,17 @@ Per-nav total recompute across 100 links (steady-state toggle). **real-router WI
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.461** | 0.594 | 0.541 |
-| · script (V8 only) (ms) | **0.214** | 0.277 | 0.350 |
-| · Blink history (pushState) (ms) | 0.235 | 0.291 | **0.173** |
+| ≈ total main-thread (ms) | **0.550** | 0.628 | 0.737 |
+| · script (V8 only) (ms) | **0.245** | 0.307 | 0.431 |
+| · Blink history (pushState) (ms) | **0.300** | 0.337 | 0.301 |
 
 ## Link build — mount 1000 links (href construction) — `link-build`
 
-CPU to mount 1000 links, each building its href. **sv-router leanest (3.31 ms ≈ the bare-`<a>` floor 3.03) — plain `<a href>` intercepted by a global click handler, no per-link component**; mateo-router 7.41; **real-router heaviest (14.6 ms)** — `@real-router/svelte`'s `<Link>` runs the reverse-matcher (`buildPath`) per link, a real adapter cost at 1000 links (echoes the Vue `<Link>` soft-spot).
+CPU to mount 1000 links, each building its href. **sv-router leanest (3.23 ms ≈ the bare-`<a>` floor 3.03) — plain `<a href>` intercepted by a global click handler, no per-link component**; mateo-router 7.02; **real-router heaviest (12.0 ms)** — after #1101's shared active-name selector removed the per-link subscription, the residual is `@real-router/svelte`'s `<Link>` running `buildPath` per link + per-component instantiation; sv-router avoids both with a literal `<a href>` (`buildPath` is inherent — React/Solid/Angular rr pay it and win their link-build).
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| script (1000 links) (ms) | 14.61 | **3.31** | 7.41 |
+| script (1000 links) (ms) | 11.97 | **3.23** | 7.02 |
 
 ## Nested switch (reuse) — per-nav total (script + history) — `nested-switch`
 
@@ -127,9 +127,9 @@ Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. 
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | 0.501 | **0.347** | 0.442 |
-| · script (V8 only) (ms) | 0.246 | **0.129** | 0.190 |
-| · Blink history (pushState) (ms) | 0.246 | **0.221** | 0.253 |
+| ≈ total main-thread (ms) | 0.593 | **0.421** | 0.541 |
+| · script (V8 only) (ms) | 0.298 | **0.146** | 0.236 |
+| · Blink history (pushState) (ms) | 0.295 | **0.273** | 0.304 |
 
 ## Feature support — capability, NOT a perf race
 
@@ -157,10 +157,10 @@ Among three full routers, first-class API coverage differs sharply. `✓` = buil
 
 | metric | bare Svelte | real-router | sv-router | mateo-router |
 |---|---|---|---|---|
-| cold-start script (ms) | 2.17 | 5.13 (+3.0) | 3.79 (+1.6) | 4.22 (+2.1) |
+| cold-start script (ms) | 1.97 | 4.87 (+2.9) | 3.56 (+1.6) | 3.94 (+2.0) |
 | cold-start heap (MB) | 2.39 | 2.98 (+0.6) | 2.54 (+0.1) | 2.60 (+0.2) |
-| nav script (ms) | 0.166 | 0.304 (+0.1) | 0.163 (−0.0) | 0.279 (+0.1) |
-| link-build script (ms) | 3.03 | 14.61 (+11.6) | 3.31 (+0.3) | 7.41 (+4.4) |
+| nav script (ms) | 0.293 | 0.494 (+0.2) | 0.220 (−0.1) | 0.431 (+0.1) |
+| link-build script (ms) | 2.95 | 11.97 (+9.0) | 3.23 (+0.3) | 7.02 (+4.1) |
 
 **Reading:** over bare Svelte, sv-router adds almost nothing on the hot path (nav-latency + link-build sit ~at the floor); real-router adds the most on boot and on links (its `<Link>` reverse-matcher). real-router's separation is the matcher-scale win (wide @1000) + the full capability set, not the simple hot path.
 
@@ -169,11 +169,11 @@ Among three full routers, first-class API coverage differs sharply. `✓` = buil
 - **No cross-framework ranking** — each column is the same framework (Svelte); the delta is router work. (Do NOT compare to the React/Vue/Solid cohorts.)
 - **No `@tanstack/svelte-router`** — it does not exist (npm 404); the popular `svelte-spa-router` (hash + regex) and `svelte-routing` are minimalist-class (excluded like `wouter`), SvelteKit is framework-bundled. The cohort is real-router + the two community full routers that exist.
 - **Deep-nesting rises O(depth) (script 4.87 ms @90) — cause not yet decomposed for Svelte.** #1094's Solid research showed the analogous rise was ~60% a *Solid-specific* benchmark-app artifact (O(d²) lazy props) + adapter bugs (cache-key + subtree remount), reduced to ~1.1 ms @90 in prototype. The Svelte deep app was not analyzed the same way — treat the curve as directional pending a #1094-style decomposition. The core matcher is flat-capable (Vue 0.24 @90).
-- **`@real-router/svelte` `<Link>` is heavy** — link-build 14.6 ms for 1000 links (vs bare-`<a>` 3.0, sv-router 3.3): the reverse-matcher (`buildPath`) runs per link. An adapter optimization target (echoes the Vue `<Link>` soft-spot); a follow-up finding.
+- **`@real-router/svelte` `<Link>` is heavy** — link-build 12.0 ms for 1000 links (vs bare-`<a>` 3.0, sv-router 3.2). #1101's shared active-name selector already removed the per-link subscription (14.6 → 12.0); the residual is `buildPath` per link (inherent) + per-`<Link>`-component instantiation. sv-router avoids both via a literal `<a href>` + a global click handler.
 - **`mateo-router` renders depth 90** — no internal error boundary at deep nesting (contrast the Solid cohort's `@tanstack/solid-router`, which errored past ~30).
 - `real-router` includes `browser-plugin` (real History API) — part of its per-nav floor by contract.
 - `wide`/`deep`/`param-scaling` are scaling sweeps — the per-size *curve* matters (wide separates real-router flat-trie from sv-router O(N); deep separates the adapters' composition cost).
-- **Elevated RME on two `nav-latency` `script` medians (n=10)** — `_baseline` (18.9%) and sv-router (15.0%) `scriptDurationMs` carry RME >15% because their per-nav script is sub-0.2 ms (near timer granularity → inflated *relative* variance). The nav-latency *total* and the headline findings (wide/deep sweeps, table-heap, cold-start heap, link-build) rest on stable, larger-magnitude signals (RME < ~5%).
+- **Per-nav `nav-latency` `script` medians are near timer granularity** (`_baseline` and sv-router per-nav script is sub-0.2 ms → inflated *relative* variance); at n=15 they sit within the RME gate. The nav-latency *total* and the headline findings (wide/deep sweeps, table-heap, cold-start heap, link-build) rest on stable, larger-magnitude signals (RME < ~5%).
 
 Regenerate: `node cross-router/run-all.mjs && node cross-router/harness/report.mjs svelte`.
 
