@@ -1,7 +1,8 @@
 import { errorCodes } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
+import { createActiveRouteSource } from "@real-router/sources";
 import { act, renderHook } from "@testing-library/react";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouterProvider } from "@real-router/react";
 
@@ -35,6 +36,33 @@ describe("useIsActiveRoute", () => {
     );
 
     expect(result.current).toBe(true);
+  });
+
+  it("a default useIsActiveRoute uses the shared name-selector fast path, NOT a per-instance createActiveRouteSource (#1248)", () => {
+    // #1248 — a default-options call (no params, non-strict, ignoreQueryParams,
+    // no hash) resolves active state through the per-router
+    // `createActiveNameSelector` (ONE shared `router.subscribe` for any number
+    // of distinct-name links) instead of a per-instance `createActiveRouteSource`
+    // (a BaseSource + its own router subscription EACH). Direct port of svelte
+    // (#1101) / angular (#1104).
+    //
+    // Discriminator: the canonical undefined-params slow-path source is
+    // therefore still UNBUILT after the hook mounts. Building it now is a cache
+    // MISS — `buildActiveRouteSource` computes its initial value via
+    // `router.isActiveRoute`. (Pre-#1248 the hook built this exact source, so the
+    // same call was a cache HIT and `isActiveRoute` was NOT re-run.)
+    renderHook(() => useIsActiveRoute("users"), {
+      wrapper: (props) => wrapper({ ...props, router }),
+    });
+
+    const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+    createActiveRouteSource(router, "users", undefined, {
+      strict: false,
+      ignoreQueryParams: true,
+    });
+
+    expect(isActiveRouteSpy).toHaveBeenCalled();
   });
 
   it("should handle non-strict mode", () => {

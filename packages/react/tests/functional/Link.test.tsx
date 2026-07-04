@@ -837,8 +837,13 @@ describe("Link component", () => {
       // constructs a fresh source and calls `isActiveRoute` exactly once for its initial
       // value. So if the canonical undefined-params lookup is a HIT, the Link already
       // owns that exact instance.
+      // #1248 re-target: the default-options fast path no longer builds a
+      // `createActiveRouteSource` (it uses the shared name-selector), so this
+      // #776 undefined-vs-"{}" dedup guard now exercises the SLOW path via
+      // `ignoreQueryParams={false}` — which still passes `routeParams` straight
+      // through as `undefined` (keying "", not "{}").
       render(
-        <Link routeName="users" data-testid="link">
+        <Link routeName="users" ignoreQueryParams={false} data-testid="link">
           Users
         </Link>,
         { wrapper },
@@ -846,10 +851,10 @@ describe("Link component", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      // Exactly what `useIsActiveRoute("users")` builds internally.
+      // Exactly what `useIsActiveRoute("users", undefined, false, false)` builds.
       createActiveRouteSource(router, "users", undefined, {
         strict: false,
-        ignoreQueryParams: true,
+        ignoreQueryParams: false,
       });
 
       // GREEN: the Link created this same "" entry → cache hit → no recompute.
