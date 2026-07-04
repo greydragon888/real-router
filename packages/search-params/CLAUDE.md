@@ -59,7 +59,15 @@ Calling `parse()` or `build()` without options resolves to the cached `DEFAULT_O
 
 ### Empty arrays produce empty string
 
-`build({ items: [] })` returns `""` for all array formats including `comma` — the key is erased uniformly (INVARIANTS #9). Roundtripping empty arrays through `build` then `parse` loses the key.
+`build({ items: [] })` returns `""` for all array formats including `comma` — the key is erased uniformly (INVARIANTS Parse/Build #9). Roundtripping empty arrays through `build` then `parse` loses the key.
+
+### Null array elements round-trip via the bare-key form (#1155)
+
+`parse` yields a `null` array element from a key-only chunk on a repeated/bracketed key (`parse("a&a=1")` → `{ a: [null, 1] }`, `parse("a[]", { arrayFormat: "brackets" })` → `{ a: [null] }`). `build` now encodes each null element to the SAME wire token a scalar null does — the bare key per format (`none` → `a`, `brackets` → `a[]`, `index` → `a[i]`) under `nullFormat: "default"`, dropped under `"hidden"`. `comma` has no per-element bare form, so a null element (reachable only via a bracketed chunk under a comma config — a wire/format mismatch) is dropped. This closes `range(parse) ⊆ dom(build)`, so `build(parse(qs))` never throws (INVARIANTS Format Roundtrips #9, Parse/Build #12). Only `undefined` / object array elements still throw. The `ArrayStrategy.encodeArray` signature therefore takes the resolved null strategy as a third argument (`encodeArray(name, values, nullStrategy)`); `comma`'s impl omits it (a 2-arg impl satisfies the 3-arg interface).
+
+### Empty query chunks are skipped in parse (#1156)
+
+A `&&`, a leading `&`, or a trailing `&` is an empty chunk (zero-length span) — `parse` skips it instead of decoding it to a junk `{ "": null }` param: `parse("&a=1")` → `{ a: 1 }`, `parse("x=1&&&x=2")` → `{ x: [1, 2] }`. An intentional empty-key chunk carries an `=` (`parse("=1")` → `{ "": 1 }`), so its span is non-empty and is unaffected (INVARIANTS Parse/Build #13).
 
 ### `empty-true` reserves the bare key for `true` — `null` is not representable
 
