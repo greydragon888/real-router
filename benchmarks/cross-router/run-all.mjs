@@ -38,14 +38,34 @@ const SCENARIOS = [
 // no-router analog. Run after the main matrix of each cohort.
 const BASELINE_SCENARIOS = ["cold-start", "nav-latency", "link-build"];
 
+// Documented competitor limitations — (cohort → scenario → [engines]) cells that
+// CANNOT produce a result because the COMPETING router itself errors on the
+// scenario (not a harness or app bug). These are SKIPPED: not run, not counted as
+// a failure — the per-cohort REPORT documents the N/A. Remove an entry if the
+// competitor fixes the limitation and the cell should measure again.
+const KNOWN_NA = {
+  // @tanstack/solid-router trips its internal error boundary on 60+-segment
+  // deep-nested routes (renders 3/30, errors at 60/90). @tanstack/react-router
+  // renders depth 90 — a solid-port limitation. See REPORT-solid.md.
+  solid: { "deep-config": ["tanstack"] },
+};
+const isKnownNA = (framework, scenario, engine) =>
+  KNOWN_NA[framework]?.[scenario]?.includes(engine) ?? false;
+
 const runs = process.argv[2] ?? "15";
 const fwArg = process.argv[3];
 const frameworks = fwArg ? [fwArg] : Object.keys(COHORT_ENGINES);
 
 let ok = 0;
 let failed = 0;
+let skipped = 0;
 
 const runOne = (scenario, engine, framework) => {
+  if (isKnownNA(framework, scenario, engine)) {
+    skipped += 1;
+    console.error(`⊘ ${framework} · ${scenario} × ${engine}: documented competitor N/A — skipped (see REPORT-${framework}.md)`);
+    return;
+  }
   console.error(`\n=== ${framework} · ${scenario} × ${engine} (runs=${runs}) ===`);
   const result = spawnSync(
     "node",
@@ -73,5 +93,7 @@ for (const framework of frameworks) {
   for (const scenario of BASELINE_SCENARIOS) runOne(scenario, "_baseline", framework);
 }
 
-console.error(`\nmatrix done: ${ok} ok, ${failed} failed`);
+console.error(
+  `\nmatrix done: ${ok} ok, ${failed} failed, ${skipped} n/a (documented)`,
+);
 process.exit(failed > 0 ? 1 : 0);

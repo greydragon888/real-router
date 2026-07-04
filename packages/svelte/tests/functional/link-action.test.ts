@@ -10,10 +10,12 @@ import CreateLinkActionInEffect from "../helpers/CreateLinkActionInEffect.svelte
 import CreateLinkActionInTimeout from "../helpers/CreateLinkActionInTimeout.svelte";
 import LinkActionAnchorTest from "../helpers/LinkActionAnchorTest.svelte";
 import LinkActionDoubleTest from "../helpers/LinkActionDoubleTest.svelte";
+import LinkActionNestedChild from "../helpers/LinkActionNestedChild.svelte";
 import LinkActionTest from "../helpers/LinkActionTest.svelte";
 import LinkActionTestNoProvider from "../helpers/LinkActionTestNoProvider.svelte";
 import LinkActionUpdateTest from "../helpers/LinkActionUpdateTest.svelte";
 import LinkActionWithPresetAttributes from "../helpers/LinkActionWithPresetAttrs.svelte";
+import ManyLinkActionsFn from "../helpers/ManyLinkActionsFn.svelte";
 
 import type { Router } from "@real-router/core";
 
@@ -27,6 +29,95 @@ describe("createLinkAction", () => {
 
   afterEach(() => {
     router.stop();
+  });
+
+  it("N use:link nodes register ZERO per-node click/keydown listeners — event delegation (#1253)", () => {
+    // #1253 — the action delegated its click/keydown to a per-router singleton
+    // at `document` instead of attaching 2 listeners per node. Mounting N nodes
+    // must register ZERO per-node click/keydown listeners; the delegated pair
+    // lives on `document` (not an HTMLElement, so the prototype spy misses it).
+    const addSpy = vi.spyOn(HTMLElement.prototype, "addEventListener");
+
+    renderWithRouter(router, ManyLinkActionsFn, { count: 4 });
+
+    const perNode = addSpy.mock.calls.filter(
+      ([type]) => type === "click" || type === "keydown",
+    );
+
+    expect(perNode).toHaveLength(0);
+
+    addSpy.mockRestore();
+  });
+
+  it("delegated handler walks up from a descendant target to the registered link (#1253)", async () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionNestedChild, { name: "home" });
+
+    // Click the inner <span> — the delegated `document` handler walks up from
+    // the descendant target to the nearest registered node (the <a>).
+    const child = document.querySelector("[data-testid='child']")!;
+
+    child.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+  });
+
+  it("delegated click with no registered link ancestor is ignored (#1253)", () => {
+    vi.spyOn(router, "navigate");
+
+    // Mount a link so the per-router `document` delegation listener is attached.
+    renderWithRouter(router, LinkActionTest, {
+      params: { name: "home" },
+      element: "button",
+    });
+
+    // A click bubbling to `document` from an element with no registered
+    // ancestor: findRegisteredNode walks to the root and returns undefined.
+    const stray = document.createElement("div");
+
+    document.body.append(stray);
+
+    stray.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+
+    // And a click whose target is `document` itself (not an HTMLElement) —
+    // exercises the non-HTMLElement guard in findRegisteredNode.
+    document.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+
+    expect(router.navigate).not.toHaveBeenCalled();
+
+    stray.remove();
+  });
+
+  it("delegated Enter with no registered link ancestor is ignored (#1253)", () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionTest, {
+      params: { name: "home" },
+      element: "div",
+    });
+
+    const stray = document.createElement("div");
+
+    document.body.append(stray);
+
+    stray.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+
+    expect(router.navigate).not.toHaveBeenCalled();
+
+    stray.remove();
   });
 
   it("should navigate on click", async () => {
@@ -541,14 +632,14 @@ describe("createLinkAction", () => {
     expect(navigateSpy).toHaveBeenLastCalledWith("about", {}, {});
   });
 
-  // Closes review §5.11 row 16: when the element is removed from the DOM
-  // while the action's listeners are still bound, click events naturally
-  // don't fire (no element to receive them). Svelte's `use:` lifecycle
-  // calls `destroy()` on unmount, so the standard path is element removal
-  // BY unmount. Manual `element.remove()` without unmount would leave the
-  // listeners bound — but since the element is detached, no further user
-  // interaction can fire them. Pin this defensive contract.
-  it("element manually removed from DOM → no navigation, no error", async () => {
+  // #1253 — with event delegation the listeners live on `document`, not on the
+  // node. A manually-detached element (removed WITHOUT Svelte unmount, so
+  // `destroy()` never ran and its WeakMap entry survives) no longer fires the
+  // handler: a click on a detached node doesn't bubble up to `document`, so the
+  // delegated handler never sees it. This is a DELIBERATE behavior change from
+  // the per-node-listener era (where a detached node still navigated) — it
+  // matches sv-router's global delegation and is documented in CLAUDE.md.
+  it("element manually removed from DOM → no navigation, no error (delegated)", () => {
     vi.spyOn(router, "navigate");
 
     renderWithRouter(router, LinkActionTest, {
@@ -562,15 +653,12 @@ describe("createLinkAction", () => {
 
     expect(document.body.contains(button)).toBe(false);
 
-    // Dispatching a click on a detached element fires the listener (the
-    // listener was attached directly to the node). The action navigates.
-    // This is documented behavior — Svelte's unmount path is what stops
-    // navigation, not DOM detachment. Locks the contract.
+    // Click on a detached node doesn't reach the `document` delegation root.
     const event = new MouseEvent("click", { bubbles: true, cancelable: true });
 
     button.dispatchEvent(event);
 
-    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   // Closes review §5.11 row 17: hash asymmetry pin-test. The action's
