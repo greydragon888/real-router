@@ -18,7 +18,6 @@ import { navChurn } from "./scenarios/nav-churn.mjs";
 import { navLatency } from "./scenarios/nav-latency.mjs";
 import { nestedSwitch } from "./scenarios/nested-switch.mjs";
 import { paramNav } from "./scenarios/param-nav.mjs";
-import { paramScaling } from "./scenarios/param-scaling.mjs";
 import { searchParamScaling } from "./scenarios/search-param-scaling.mjs";
 import { tableHeap } from "./scenarios/table-heap.mjs";
 import { wideConfig } from "./scenarios/wide-config.mjs";
@@ -29,7 +28,6 @@ const SCENARIOS = {
   "param-nav": paramNav,
   "wide-config": wideConfig,
   "deep-config": deepConfig,
-  "param-scaling": paramScaling,
   "search-param-scaling": searchParamScaling,
   "table-heap": tableHeap,
   "nav-churn": navChurn,
@@ -43,7 +41,6 @@ const SCENARIOS = {
 const VARIANT = {
   "wide-config": "wide",
   "deep-config": "deep",
-  "param-scaling": "params",
   "search-param-scaling": "searchparams",
   "table-heap": "tableheap",
   "link-build": "linkbuild",

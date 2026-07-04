@@ -78,19 +78,6 @@ Navigate into a 90-level nested chain; **total** + **script** (matcher). **real-
 | · script (matcher) @60 (ms) | 0.193 | **0.089** | 0.765 |
 | · script (matcher) @90 (ms) | 0.204 | **0.082** | 0.993 |
 
-## Param scaling — path-param count (sweep) — `param-scaling`
-
-Routes with 1 / 10 / 100 path params — **floor-bound, matcher barely stressed.** **vue-router lightest** (~0.13–0.17 total, its lean Vue per-nav floor), real-router ~0.27–0.37, tanstack highest. Param count ~a non-factor for all; the gap is the per-nav floor, **not** param extraction — contrast wide@1000, where the matcher IS stressed and real-router wins.
-
-| metric | real-router | vue-router | tanstack |
-|---|---|---|---|
-| ≈ total @1 (ms) | 0.237 | **0.144** | 0.317 |
-| ≈ total @10 (ms) | 0.238 | **0.119** | 0.338 |
-| ≈ total @100 (ms) | 0.324 | **0.162** | 0.463 |
-| · script (matcher) @1 (ms) | 0.173 | **0.066** | 0.256 |
-| · script (matcher) @10 (ms) | 0.180 | **0.042** | 0.283 |
-| · script (matcher) @100 (ms) | 0.261 | **0.072** | 0.399 |
-
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
 Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **vue-router lightest and FLAT (~0.19 @50)** — `route.query` is a plain reactive object, cheap to read at any count. **real-router is also flat (~0.32 @50, slope ~0)** — eager immutable params. **tanstack rises steeply — 1.10 ms @50 (slope ~15 µs/param)**, its O(count) search parse/validate/structural-share pipeline. So on query params vue-router's plain-object query edges real-router's flat curve, and tanstack degrades at scale.

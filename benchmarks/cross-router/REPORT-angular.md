@@ -4,7 +4,7 @@
 
 **Cohort:** `@real-router/angular` · `@angular/router` — Angular 22 zoneless standalone-component apps (`@analogjs/vite-plugin-angular`, AOT). `@angular/router` is Angular's official router — a standalone routing library you configure (`provideRouter`, like vue-router), NOT framework-bundled — and the ONLY serious Angular router (no third-party alternatives), so this is a two-engine cohort by ecosystem reality.
 
-**Scope — the two Angular full routers, like-for-like.** The honest picture: **`@angular/router` is a mature, well-optimized official router that wins most raw metrics** — cold-start (~3× lighter boot), nav-latency, param-nav, wide-config (flat AND a lighter floor — its matcher does not degrade), param-scaling, table-heap memory (3.67 vs 8.72 MB @10k), nav-churn CPU, nested-switch. **real-router wins two:** `active-links` (its shared cached active-source vs per-link `routerLinkActive`) and `link-build` (reverse-matcher vs URL-tree serialization). deep-config is ~a wash (both O(depth)). Unlike React/Vue (trie wins scale + memory) and Svelte (trie wins scale vs an O(N) competitor), **Angular's official matcher is flat AND lean, so real-router's structural trie advantage doesn't separate here** — and real-router pays a heavier boot (upfront trie build) and route-table memory. real-router's genuine edges here are active-links, link-build, validated search (capability), and the cross-framework single routing model.
+**Scope — the two Angular full routers, like-for-like.** The honest picture: **`@angular/router` is a mature, well-optimized official router that wins most raw metrics** — cold-start (~3× lighter boot), nav-latency, param-nav, wide-config (flat AND a lighter floor — its matcher does not degrade), table-heap memory (3.67 vs 8.72 MB @10k), nav-churn CPU, nested-switch. **real-router wins two:** `active-links` (its shared cached active-source vs per-link `routerLinkActive`) and `link-build` (reverse-matcher vs URL-tree serialization). deep-config is ~a wash (both O(depth)). Unlike React/Vue (trie wins scale + memory) and Svelte (trie wins scale vs an O(N) competitor), **Angular's official matcher is flat AND lean, so real-router's structural trie advantage doesn't separate here** — and real-router pays a heavier boot (upfront trie build) and route-table memory. real-router's genuine edges here are active-links, link-build, validated search (capability), and the cross-framework single routing model.
 
 **Run:** runs 15 · warmup 5 · throttle off · 2026-07-04T08:38:00.315Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
 
@@ -77,19 +77,6 @@ Navigate into a 90-level nested chain. Both rise O(depth); real-router edges it 
 | · script (matcher) @30 (ms) | **2.39** | 2.46 |
 | · script (matcher) @60 (ms) | **3.43** | 3.69 |
 | · script (matcher) @90 (ms) | **4.66** | 5.34 |
-
-## Param scaling — path-param count (sweep) — `param-scaling`
-
-Routes with 1 / 10 / 100 path params — floor-bound. **@angular/router leaner (0.435 @100) vs real-router 0.64.** Param count ~a non-factor for both.
-
-| metric | real-router | angular-router |
-|---|---|---|
-| ≈ total @1 (ms) | 0.438 | **0.401** |
-| ≈ total @10 (ms) | 0.406 | **0.333** |
-| ≈ total @100 (ms) | 0.595 | **0.405** |
-| · script (matcher) @1 (ms) | 0.378 | **0.343** |
-| · script (matcher) @10 (ms) | 0.359 | **0.277** |
-| · script (matcher) @100 (ms) | 0.534 | **0.344** |
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
@@ -185,7 +172,7 @@ Both are full routers. `✓` = built-in API, `N/A` = none. `@angular/router` is 
 - **real-router's heavier cold-start (~3× the boot script) is the upfront segment-trie build** (createRouter + start) — cross-cohort-consistent (~4.5–7 ms across solid/svelte/angular), the price of O(1) matching paid at boot; a design trade-off, not a defect.
 - **`@real-router/angular` `<Link>` link-build** — the shared active-name selector fast path already shipped (#1104, parallel to Svelte's #1101); the residual link-build cost is `buildPath` per link (inherent — React/Solid rr pay it and still win link-build) + Angular directive/effect instantiation, not a per-link subscription.
 - `real-router` includes `browser-plugin` (real History API) — part of its per-nav floor by contract.
-- `wide`/`deep`/`param-scaling` are scaling sweeps — the per-size *curve* matters (both flat on wide/param; deep both O(depth)).
+- `wide`/`deep` are scaling sweeps — the per-size *curve* matters (both flat on wide; deep both O(depth)).
 - **real-router `nav-latency` `script` is near timer granularity** (sub-0.6 ms → inflated *relative* variance); at n=15 it sits within the RME gate. The nav-latency *total* + the headline findings (cold-start, wide/deep sweeps, table-heap, active-links, link-build) rest on stable, larger-magnitude signals (RME < ~5%).
 
 Regenerate: `node cross-router/run-all.mjs && node cross-router/harness/report.mjs angular`.

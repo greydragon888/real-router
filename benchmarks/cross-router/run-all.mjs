@@ -27,7 +27,6 @@ const SCENARIOS = [
   "param-nav",
   "wide-config",
   "deep-config",
-  "param-scaling",
   "search-param-scaling",
   "table-heap",
   "nav-churn",

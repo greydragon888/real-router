@@ -78,19 +78,6 @@ Navigate into a 90-level nested chain. **All three rise O(depth)** — real-rout
 | · script (matcher) @60 (ms) | 2.97 | **1.52** | 2.93 |
 | · script (matcher) @90 (ms) | 4.61 | **2.60** | 3.87 |
 
-## Param scaling — path-param count (sweep) — `param-scaling`
-
-Routes with 1 / 10 / 100 path params — floor-bound (matcher barely stressed). All three tight + flat (real-router 0.51–0.55, sv-router 0.48–0.57, mateo-router 0.50–0.52). Param count is ~a non-factor.
-
-| metric | real-router | sv-router | mateo-router |
-|---|---|---|---|
-| ≈ total @1 (ms) | 0.466 | **0.412** | 0.488 |
-| ≈ total @10 (ms) | 0.441 | **0.426** | 0.479 |
-| ≈ total @100 (ms) | 0.523 | 0.480 | **0.460** |
-| · script (matcher) @1 (ms) | 0.404 | **0.360** | 0.422 |
-| · script (matcher) @10 (ms) | 0.377 | **0.370** | 0.416 |
-| · script (matcher) @100 (ms) | 0.460 | 0.424 | **0.397** |
-
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
 Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **real-router is FLAT (~0.58 @50, slope ~0)** — eager immutable params. **sv-router wins @50 by a whisker (0.565 vs 0.575)** but RISES (slope ~1.7 µs/param — its reactive `route.search`), converging from its @1 lead (0.48 vs 0.55); **mateo-router rises steepest (~4.7 µs/param)**. real-router's eager params keep a flat curve while the reactive-query routers climb with count — the eager cost is paid once at nav, not per-read.
@@ -185,7 +172,7 @@ Among three full routers, first-class API coverage differs sharply. `✓` = buil
 - **`@real-router/svelte` `<Link>` is heavy** — link-build 12.0 ms for 1000 links (vs bare-`<a>` 3.0, sv-router 3.2). #1101's shared active-name selector already removed the per-link subscription (14.6 → 12.0); the residual is `buildPath` per link (inherent) + per-`<Link>`-component instantiation. sv-router avoids both via a literal `<a href>` + a global click handler.
 - **`mateo-router` renders depth 90** — no internal error boundary at deep nesting (contrast the Solid cohort's `@tanstack/solid-router`, which errored past ~30).
 - `real-router` includes `browser-plugin` (real History API) — part of its per-nav floor by contract.
-- `wide`/`deep`/`param-scaling` are scaling sweeps — the per-size *curve* matters (wide separates real-router flat-trie from sv-router O(N); deep separates the adapters' composition cost).
+- `wide`/`deep` are scaling sweeps — the per-size *curve* matters (wide separates real-router flat-trie from sv-router O(N); deep separates the adapters' composition cost).
 - **Per-nav `nav-latency` `script` medians are near timer granularity** (`_baseline` and sv-router per-nav script is sub-0.2 ms → inflated *relative* variance); at n=15 they sit within the RME gate. The nav-latency *total* and the headline findings (wide/deep sweeps, table-heap, cold-start heap, link-build) rest on stable, larger-magnitude signals (RME < ~5%).
 
 Regenerate: `node cross-router/run-all.mjs && node cross-router/harness/report.mjs svelte`.

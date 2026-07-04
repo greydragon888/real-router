@@ -4,7 +4,7 @@
 
 **Cohort:** `@real-router/solid` · `@solidjs/router` (the official Solid router) · `@tanstack/solid-router` — three full routers, like-for-like. Solid JSX apps (`vite-plugin-solid`, `dedupe: ['solid-js']`).
 
-**Scope — three full routers, like-for-like** (no minimalist exclusion needed). The honest picture, DIFFERENT from the React/Vue cohorts: **`@solidjs/router` is a remarkably lean router** and leads the scale floor (wide / param-scaling), table-heap memory, cold-start, nav-churn heap, and active-links. **real-router leads the per-nav *totals*** — nav-latency (0.347, the leanest here), param-nav, nested-switch, link-build — where its lean script + single `pushState` beat @solidjs/router's 2× Blink history; and it brings the full pipeline (guards, validated search, data, scroll). Two adapter soft-spots surface: real-router's heaviest per-nav FLOOR at scale (transition pipeline + browser-plugin History), and **`@real-router/solid`'s deep-nesting `RouteView` cost (#1094 — now ~linear after a bench-app fix removed an O(depth²) getter-chain artifact: 1.07 ms @90)** — an adapter issue, not the (framework-agnostic, flat-capable) core. **`@tanstack/solid-router` is generally heaviest** and cannot render 60+-deep nested routes (errors).
+**Scope — three full routers, like-for-like** (no minimalist exclusion needed). The honest picture, DIFFERENT from the React/Vue cohorts: **`@solidjs/router` is a remarkably lean router** and leads the scale floor (wide), table-heap memory, cold-start, nav-churn heap, and active-links. **real-router leads the per-nav *totals*** — nav-latency (0.347, the leanest here), param-nav, nested-switch, link-build — where its lean script + single `pushState` beat @solidjs/router's 2× Blink history; and it brings the full pipeline (guards, validated search, data, scroll). Two adapter soft-spots surface: real-router's heaviest per-nav FLOOR at scale (transition pipeline + browser-plugin History), and **`@real-router/solid`'s deep-nesting `RouteView` cost (#1094 — now ~linear after a bench-app fix removed an O(depth²) getter-chain artifact: 1.07 ms @90)** — an adapter issue, not the (framework-agnostic, flat-capable) core. **`@tanstack/solid-router` is generally heaviest** and cannot render 60+-deep nested routes (errors).
 
 **Run:** runs 15 · warmup 5 · throttle off · 2026-07-04T08:11:51.865Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
 
@@ -77,19 +77,6 @@ Navigate into a 90-level nested chain. **@solidjs/router stays flat (~0.16 total
 | · script (matcher) @30 (ms) | 0.674 | **0.065** | — |
 | · script (matcher) @60 (ms) | 0.715 | **0.067** | — |
 | · script (matcher) @90 (ms) | 1.01 | **0.069** | — |
-
-## Param scaling — path-param count (sweep) — `param-scaling`
-
-Routes with 1 / 10 / 100 path params — floor-bound (matcher barely stressed). **@solidjs/router leanest (~0.17 total, flat); real-router ~0.44–0.52; tanstack ~0.26–0.29.** Param count ~a non-factor for all; the gap is the per-nav floor, not param extraction.
-
-| metric | real-router | solid-router | tanstack |
-|---|---|---|---|
-| ≈ total @1 (ms) | 0.396 | **0.146** | 0.234 |
-| ≈ total @10 (ms) | 0.376 | **0.137** | 0.234 |
-| ≈ total @100 (ms) | 0.480 | **0.150** | 0.255 |
-| · script (matcher) @1 (ms) | 0.336 | **0.064** | 0.174 |
-| · script (matcher) @10 (ms) | 0.319 | **0.065** | 0.176 |
-| · script (matcher) @100 (ms) | 0.417 | **0.067** | 0.193 |
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
@@ -184,8 +171,8 @@ Among three full routers, first-class API coverage differs. `✓` = built-in API
 - **`@real-router/solid` deep-nesting rises O(depth)** — the `RouteView` composition cost, tracked as #1094 (an adapter issue; the core matcher is flat-capable, cf. the Vue cohort at ~0.24 ms @90). Real apps rarely nest past ~10.
 - **`nav-churn` navsPerSec is NOT comparable** — real-router navigates synchronously (~14.7k/s), @solidjs/router + tanstack yield to frames (~123/s). Read CPU/nav + retained heap.
 - `real-router` includes `browser-plugin` (real History API) — part of its per-nav floor by contract.
-- `wide`/`deep`/`param-scaling` are scaling sweeps — the per-size *curve* matters (here wide/param are flat for all; deep separates real-router O(depth) from @solidjs/router flat).
-- **Per-nav `script` medians sit near timer granularity** (Solid's per-nav work is sub-0.1 ms → inflated *relative* variance). At n=15 they are within the RME gate except one — `@solidjs/router` `nav-latency` `scriptDurationMs` (16.3%). The close per-nav *totals* (active-links, nested-switch) turn on differences inside that noise; the headline findings (cold-start heap, wide/deep/param sweeps, table-heap, nav-latency total) rest on stable, larger-magnitude signals (RME < ~5%).
+- `wide`/`deep` are scaling sweeps — the per-size *curve* matters (here wide is flat for all; deep separates real-router O(depth) from @solidjs/router flat).
+- **Per-nav `script` medians sit near timer granularity** (Solid's per-nav work is sub-0.1 ms → inflated *relative* variance). At n=15 they are within the RME gate except one — `@solidjs/router` `nav-latency` `scriptDurationMs` (16.3%). The close per-nav *totals* (active-links, nested-switch) turn on differences inside that noise; the headline findings (cold-start heap, wide/deep sweeps, table-heap, nav-latency total) rest on stable, larger-magnitude signals (RME < ~5%).
 
 Regenerate: `node cross-router/run-all.mjs && node cross-router/harness/report.mjs solid`.
 

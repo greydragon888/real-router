@@ -78,19 +78,6 @@ Navigate into a 90-level nested chain (sweep 3 / 30 / 60 / 90). **real-router an
 | · script (matcher) @60 (ms) | **1.21** | 2.42 | 5.41 |
 | · script (matcher) @90 (ms) | **1.64** | 2.79 | 1.68 |
 
-## Param scaling — path-param count (sweep) — `param-scaling`
-
-Navigate into routes with 1 / 10 / 100 path params; **total** + **script** (matcher). Param count is **~a non-factor** (per-param extraction is sub-µs, dwarfed by React render — flat-ish for all, only a slight bump @100). **real-router wins every size** (total 0.58–0.69); tanstack highest, react-router middle.
-
-| metric | real-router | tanstack | react-router |
-|---|---|---|---|
-| ≈ total @1 (ms) | **0.522** | 0.883 | 0.662 |
-| ≈ total @10 (ms) | **0.502** | 0.850 | 0.649 |
-| ≈ total @100 (ms) | **0.628** | 0.995 | 0.804 |
-| · script (matcher) @1 (ms) | **0.456** | 0.825 | 0.601 |
-| · script (matcher) @10 (ms) | **0.436** | 0.792 | 0.596 |
-| · script (matcher) @100 (ms) | **0.558** | 0.934 | 0.741 |
-
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
 Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`) — the realistic high-count vector (marketplace filters / analytics / tracking; path params top out at ~4). The leaf reads EVERY value, so lazy query is materialized (apples-to-apples). **real-router stays FLAT (~0.62 ms, slope ~0) and wins @50** — its eager immutable params make reading all 50 a cheap property access. **tanstack EXPLODES — 2.60 ms @50 (~4× real-router), slope ~22 µs/param**: its per-nav search parse + validate + structural-share pipeline is O(query-count). react-router is flat too (0.79 @50 — `URLSearchParams` is a cheap plain object) but a higher floor. At realistic marketplace query counts real-router's flat curve is the win — the eager snapshot never degrades.
