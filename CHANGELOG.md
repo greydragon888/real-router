@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-04]
 
+### @real-router/svelte@0.15.0
+
+### Minor Changes
+
+- [#1255](https://github.com/greydragon888/real-router/pull/1255) [`136f11c`](https://github.com/greydragon888/real-router/commit/136f11c23579f6ab3e632c18f1b66363188a8a3d) Thanks [@greydragon888](https://github.com/greydragon888)! - Event-delegate `createLinkAction` (`use:link`) — one shared listener pair per router instead of two per node ([#1253](https://github.com/greydragon888/real-router/issues/1253))
+
+  - `use:link` now registers a single delegated `click` + `keydown` listener on `document` per router (a per-router singleton, ref-counted attach/detach), instead of attaching two listeners to every node. O(1) listeners for any number of links makes the recommended link-heavy path (nav menus, sitemaps, paginated lists) lighter at mount (~5.99 → ~4.3 ms per 1000 links, directional).
+  - **Behavior change (edge cases):** a descendant that calls `event.stopPropagation()` before the click reaches `document` now blocks navigation; and an element removed from the DOM without Svelte unmount (`element.remove()`) no longer navigates. Both are irrelevant under the normal `use:` lifecycle. `applyLinkA11y` stays per-node (it sets `role`/`tabindex`, not listeners).
+
+
 ### @real-router/core@0.63.2
 
 ### Patch Changes
