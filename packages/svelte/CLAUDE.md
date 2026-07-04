@@ -538,6 +538,34 @@ The factory returns an action function that can be used with the `use:` directiv
 <!-- When userId changes, the action's update() is called automatically -->
 ```
 
+### `use:link` Delegates Events (One Listener Per Router, Not Per Node) — #1253
+
+`createLinkAction` does **not** attach click/keydown listeners to each node. All
+`use:link` nodes for one router share **one** delegated `click` + `keydown`
+listener on `document` (a per-router singleton, `WeakMap<Router, …>`), and each
+node registers its params into a `WeakMap`. The delegated handler walks up from
+`event.target` to the nearest registered node. This gives **O(1) listeners for
+any number of links** (was 2 per node) — matching sv-router's global delegation
+and making `use:link` the light path for nav menus / sitemaps / paginated lists.
+`applyLinkA11y` stays per-node (it sets `role`/`tabindex` attributes, not
+listeners). The two `document` listeners attach on the first registered node and
+detach on the last `destroy()` (ref-counted, like `createActiveNameSelector`'s
+lazy connect/disconnect), so a stopped/disposed router stays GC-able.
+
+Two behavioral consequences of delegation:
+
+- **`stopPropagation()` on a descendant blocks navigation.** A per-node listener
+  fired regardless; the delegated handler only sees events that bubble to
+  `document`. If a child element calls `event.stopPropagation()` on click before
+  the event reaches `document`, the link won't navigate. Rare, but a real change
+  — don't stop propagation inside a `use:link` element (or put an explicit
+  `onclick` on the `<a>` itself).
+- **A manually-detached element no longer navigates.** Removing the element from
+  the DOM *without* Svelte unmount (`element.remove()`) leaves its `WeakMap`
+  entry intact, but a click on a detached node doesn't bubble to `document`, so
+  nothing fires. Under Svelte's normal `use:` lifecycle this is irrelevant —
+  unmount calls `destroy()`, which unregisters the node.
+
 ## SSR
 
 SSR-friendly without a separate entry. The same `RouterProvider`, `RouteView`, `Link`, and composables work under `svelte/server` (`render`) — no SSR-specific imports, no `if (typeof window !== "undefined")` shims, no platform branches in hot paths.
@@ -569,7 +597,8 @@ See also: [Svelte Integration — Server-Side Rendering](https://github.com/grey
 - `useIsActiveRoute` uses cached `createActiveRouteSource` — params hashed via `canonicalJson` (key-order-insensitive)
 - No `memo()` needed — Svelte compiles to fine-grained DOM updates
 - `Link` uses `$derived` for `href` and `class` derivation, `useIsActiveRoute` for active state
-- All WeakMap caches live in `@real-router/sources` — auto-evicted on router GC, no local caches in this adapter
+- Most WeakMap caches live in `@real-router/sources` — auto-evicted on router GC. The one **local** per-router cache is `createLinkAction`'s event-delegation state (`WeakMap<Router, …>`, #1253 — see the `use:link` delegation gotcha) — also GC'd with the router
+- `use:link` (`createLinkAction`) **delegates events** — one `click` + one `keydown` listener per router on `document` (per-router singleton), not two per node → O(1) listeners for any number of links, ref-counted attach/detach (#1253)
 - `EMPTY_PARAMS`, `EMPTY_OPTIONS` (frozen singletons in `src/constants.ts`) are used as default props in `Link` and as fallbacks in `createLinkAction` — avoids `{}` allocation per render / per click
 - `createRouteContext` builds `route`/`previousRoute` getter objects **once** per `RouterProvider` / `useRouteNode` call — avoids the per-access object allocation of a naïve double-getter pattern
 - `createSubscriber` is lazy — no subscription overhead until `.current` is read in a reactive context
