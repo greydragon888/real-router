@@ -52,20 +52,23 @@ gh search issues --repo greydragon888/real-router "<keywords>" --limit 20
 
 - Проверяй **и closed тоже**: закрытый как `wontfix`/`duplicate` означает, что вопрос уже решён — не воскрешай его молча.
 - Нашёл вероятный дубль/родственника → **покажи его (номер, заголовок, state) и СПРОСИ**, прежде чем создавать. Часто верный ход — не новый issue, а комментарий к существующему или ссылка `parallel to #NNN` / `follow-up of #NNN` в теле нового (так делают реальные issue репо).
+- **Батч по аудиту → дополнительно свипни день**: `gh issue list --state all --search "created:$(date +%F)" --limit 30`. Параллельные аудит-волны того же дня уже могли завести родственные issues, которые keyword-поиск по одной находке не свяжет в общую карту (прецедент 2026-07-03: #1147–#1176 от пяти волн за день; главный Bug navigate-аудита уже был заведён другой волной как #1169 — вместо дубля ушёл комментарий с дополнениями и bump priority). Каждый кандидат батча сверь с картой дня; при частичном пересечении — комментарий/`parallel to`, не новый issue.
 
 ## Шаг 3 — Собери заголовок (реальная конвенция)
 
 Формат: **`[<area>][<type>] <concise declarative description>`**
 
 - `<area>` — короткий токен пакета: `core`, `react`, `vue`, `svelte`, `solid`, `ci`, `build`, … (НЕ полный `area: core`).
-- `<type>` — только для баг/perf: `[bug]`, `[perf]`. Для фич/рефактора/cleanup type-токен **опускается**.
+- `<type>` — для баг/perf: `[bug]`, `[perf]`; для **test-gap / пина поведения** — `[test]` (прецеденты #741, #1178–#1184; label типа при этом `enhancement`). Для фич/рефактора/cleanup type-токен **опускается**.
 - Описание — техничное, по сути, без точки в конце. Указывай симптом → следствие через `→`, добавляй `(parallel to #NNN)` при родстве.
+- ⚠️ **Порядок — И НАЛИЧИЕ — токенов НЕ универсальны, сверяйся с прецедентами пакета.** Для `core` area первый (`[core][bug]`), но **`logger` инвертирует: `[bug][logger]` / `[docs][logger]`** (type первый — прецеденты #895/#897/#791/#792), а **`sources`-баги идут `[sources]` вовсе БЕЗ `[bug]`** (#765–#767, #1206; docs при этом type-first: `[docs][sources]` #768/#1208). Слепое следование `[<area>][<type>]` дало бы `[logger][bug]` / `[sources][bug]`, расходясь с историей пакета. До создания прогоняй `gh issue list --search "<pkg>" --state all` и повторяй фактические токены, а не шаблон формата.
 
 Реальные примеры из репо:
 ```
 [core][bug] add() does not dedupe names within a single batch — second route silently overwrites the first
 [core][perf] cloneRouter allocates ~156 KB per clone (~2x the 20-80 KB target)
 [core] RoutesNamespace.#getBuildPathOptions silently ignores its options argument after the first call
+[bug][logger] configure() validates level with "in", accepting Object.prototype keys as valid levels   # logger: type-first!
 ```
 
 ## Шаг 4 — Собери тело по структуре шаблона
@@ -96,9 +99,12 @@ gh label list --repo greydragon888/real-router --limit 100
 - **solid → `area:solid`** (без пробела!)
 - **vue → `vue`**, **svelte → `svelte`**, **angular → `angular`** (вообще без префикса `area:`)
 - **dependencies → `dependencies`** (bare; для dep-bump / dep-migration задач)
-- **foundation-пакеты (search-params, path-matcher, route-tree, event-emitter, fsm — последний публичный, но тоже) area-лейбла НЕ имеют** — критерий не приватность пакета, а отсутствие лейбла в `gh label list`; issue получает **2 labels** (тип + priority), area живёт только в титульном токене `[search-params]…` (прецеденты #1051, #1155, #1159)
+- **foundation-пакеты (search-params, path-matcher, route-tree, event-emitter, fsm — последний публичный, но тоже) area-лейбла НЕ имеют** — issue получает **2 labels** (тип + priority), area живёт только в титульном токене `[search-params]…` (прецеденты #1051, #1155, #1159)
+- **⚠️ `logger` (и logger-plugin) де-факто идут БЕЗ area-лейбла (2 labels) — хотя `area: plugins` СУЩЕСТВУЕТ и его описание буквально включает logger** («Browser, logger, persistent-params plugins»). Чистые logger-issues его не несут (прецеденты #895/#897/#791 = `bug, priority: …`; #792 = `documentation, priority: …`). `area: plugins` появляется лишь когда корень в **core** (#789 = `…, area: core`). Так что **критерий «нет лейбла в `gh label list`» НЕДОСТАТОЧЕН** — здесь лейбл в списке есть, но на пакете не используется: истина — прецедент `gh issue list --search "<pkg>"`, не наличие лейбла. Не ставь `area: plugins` на logger по одному описанию лейбла.
+- **`sources` → `area: plugins`** (прецеденты #765–#768, #1206/#1208) — зеркальный контраст с logger: описание лейбла sources НЕ упоминает, но пакет его несёт всегда. Оба случая решает только прецедент-греп, описание лейбла врёт в обе стороны.
 - тип: `bug` / `enhancement` / `performance` / `documentation` / `good first issue`
 - priority: `priority: critical|high|medium|low`
+- **test-gap пакета с СОБСТВЕННЫМ area-лейблом → `area: <pkg>`, НЕ `area: tests`** (прецедент #1178–#1184 = `area: core`). `area: tests` по описанию — тест-инфраструктура (vitest-конфиги, раннеры) и test-gap'ы foundation-пакетов без area (#741)
 
 `gh issue create --label X` падает, если label не существует. Поэтому **каждый** label сначала подтверди по выводу `gh label list`. Нужного нет → возьми ближайший реальный или (с согласия пользователя) создай через `gh label create`.
 
@@ -121,7 +127,7 @@ EOF
 
 Выведи номер и URL созданного issue.
 
-**Батч связанных issues** (типовой случай — пачка находок одного аудита): создай **якорный** (главный) первым → компаньоны создавай уже с его реальным номером в теле (`#NNN`) → затем `gh issue view NNN --json body` + правка + `gh issue edit NNN --body-file …`, подставив номера компаньонов в якорный. Не вставляй плейсхолдеры `#<tbd>` в создаваемые тела.
+**Батч связанных issues** (типовой случай — пачка находок одного аудита): создай **якорный** (главный) первым → компаньоны создавай уже с его реальным номером в теле (`#NNN`) → затем `gh issue view NNN --json body` + правка + `gh issue edit NNN --body-file …`, подставив номера компаньонов в якорный. Не вставляй плейсхолдеры `#<tbd>` в создаваемые тела. Взаимные ссылки **между компаньонами** разруливай так же, как с якорем: создай первого без ссылки, второго — с реальным номером первого, затем допиши первому недостающий номер тем же `gh issue edit`-проходом, что и якорю (один финальный edit-проход на все обратные ссылки).
 
 **Опционально предложи** завести рабочую ветку `<number>-<slug>` — скиллы `/changeset` и `/create-pr` извлекают номер issue именно из этого формата имени ветки. (Багфиксы при этом часто **батчат** в одну ветку — не создавай ветку, если идёт работа в существующей батч-ветке.)
 
