@@ -163,6 +163,8 @@ All composables must be called during component initialization (not inside `$eff
 
 Navigation link with automatic active state detection. Uses `$derived` for href and class — only the DOM attributes update when active state changes.
 
+> **Rendering many links?** For nav menus, sitemaps or long/paginated lists, [`use:link`](#createlinkaction) is a lighter alternative — it enhances a plain `<a>` instead of instantiating a component per link (roughly **2× cheaper to mount** at ~1000 links).
+
 ```svelte
 <Link
   routeName="users.profile"
@@ -329,6 +331,8 @@ Implementation: `$state(false)` + `$effect(() => mounted = true)`. The Svelte co
 ### `createLinkAction`
 
 Factory function that creates a low-level action for adding navigation to any element. Must be called during component initialization to capture the router context.
+
+> **Prefer `use:link` for link-heavy pages.** Because it enhances a plain element instead of instantiating a Svelte component per link, `use:link` skips the component overhead `<Link>` pays on every instance — mounting a large batch of `use:link` anchors costs roughly **half** the script time of the same batch of `<Link>`s (directional, measured on ~1000 links). For nav menus, sitemaps, mega-menus and paginated lists, reach for `use:link` — set `href` yourself via `router.buildPath(name, params)` for real, middle-clickable anchors. Keep `<Link>` for its ergonomics (automatic active state, `hash` support) on ordinary links.
 
 ```svelte
 <script lang="ts">
