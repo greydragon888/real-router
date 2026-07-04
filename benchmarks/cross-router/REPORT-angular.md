@@ -91,6 +91,19 @@ Routes with 1 / 10 / 100 path params — floor-bound. **@angular/router leaner (
 | · script (matcher) @10 (ms) | 0.359 | **0.277** |
 | · script (matcher) @100 (ms) | 0.534 | **0.344** |
 
+## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
+
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **real-router edges @50 (0.597 vs 0.607)** — both stay near-flat (real-router eager params; @angular/router reads `snapshot.queryParams`, a plain object). Unlike the reactive-store cohorts (Solid `useSearchParams`, Svelte `route.search`) or tanstack (whose search pipeline explodes ~15–22 µs/param), **neither Angular router degrades on query count** — real-router's flat eager curve holds the realistic high-count end.
+
+| metric | real-router | angular-router |
+|---|---|---|
+| ≈ total @1 (ms) | **0.545** | 0.569 |
+| ≈ total @10 (ms) | **0.526** | 0.531 |
+| ≈ total @50 (ms) | **0.597** | 0.607 |
+| · script (query-parse) @1 (ms) | **0.470** | 0.495 |
+| · script (query-parse) @10 (ms) | **0.460** | **0.460** |
+| · script (query-parse) @50 (ms) | **0.525** | 0.526 |
+
 ## Nav churn (stress) — `nav-churn`
 
 200-nav stress; CPU/nav + retained heap. **@angular/router leaner CPU/nav (0.208 vs real-router 0.512) but retains MORE heap (1035 KB vs 547).** navsPerSec ~121 for both (frame-capped) — read CPU/nav + heap.

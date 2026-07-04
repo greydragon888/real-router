@@ -91,6 +91,19 @@ Routes with 1 / 10 / 100 path params — floor-bound (matcher barely stressed). 
 | · script (matcher) @10 (ms) | 0.319 | **0.065** | 0.176 |
 | · script (matcher) @100 (ms) | 0.417 | **0.067** | 0.193 |
 
+## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
+
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value — and **this is where forcing materialization bites the lazy routers.** **real-router stays FLAT (~0.49 @50, slope ~0)** — eager immutable params. **@solidjs/router RISES — slope ~5.5 µs/param**: its `useSearchParams()` reactive store charges a reactive read per value, so @1 it crushes real-router (0.18 vs 0.49) but by @50 they **CONVERGE (0.46 ≈ 0.49)**. tanstack also rises (~3.6 µs/param). At the realistic high-count end the lazy advantage erodes to parity — real-router's eager snapshot is the flat, predictable cost (read once, cheap forever).
+
+| metric | real-router | solid-router | tanstack |
+|---|---|---|---|
+| ≈ total @1 (ms) | 0.490 | **0.176** | 0.312 |
+| ≈ total @10 (ms) | 0.475 | **0.198** | 0.326 |
+| ≈ total @50 (ms) | 0.493 | **0.460** | 0.489 |
+| · script (query-parse) @1 (ms) | 0.410 | **0.087** | 0.244 |
+| · script (query-parse) @10 (ms) | 0.388 | **0.108** | 0.264 |
+| · script (query-parse) @50 (ms) | 0.405 | **0.357** | 0.419 |
+
 ## Nav churn (stress) — `nav-churn`
 
 200-nav stress; CPU/nav + retained heap. **real-router leanest CPU/nav — 0.324 total / 0.061 script per nav** (< tanstack 0.445 < @solidjs/router 0.533); **@solidjs/router retains the least heap (235 KB), real-router 299, tanstack 638.** `navsPerSec` is NOT comparable here: real-router navigates synchronously (churns 200 navs without yielding to frames → ~15k/s) while @solidjs/router + tanstack defer to the frame cadence (~121/s) — read CPU/nav + heap.

@@ -91,6 +91,19 @@ Routes with 1 / 10 / 100 path params — **floor-bound, matcher barely stressed.
 | · script (matcher) @10 (ms) | 0.180 | **0.042** | 0.283 |
 | · script (matcher) @100 (ms) | 0.261 | **0.072** | 0.399 |
 
+## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
+
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **vue-router lightest and FLAT (~0.19 @50)** — `route.query` is a plain reactive object, cheap to read at any count. **real-router is also flat (~0.32 @50, slope ~0)** — eager immutable params. **tanstack rises steeply — 1.10 ms @50 (slope ~15 µs/param)**, its O(count) search parse/validate/structural-share pipeline. So on query params vue-router's plain-object query edges real-router's flat curve, and tanstack degrades at scale.
+
+| metric | real-router | vue-router | tanstack |
+|---|---|---|---|
+| ≈ total @1 (ms) | 0.279 | **0.181** | 0.382 |
+| ≈ total @10 (ms) | 0.301 | **0.150** | 0.515 |
+| ≈ total @50 (ms) | 0.324 | **0.186** | 1.10 |
+| · script (query-parse) @1 (ms) | 0.206 | **0.090** | 0.305 |
+| · script (query-parse) @10 (ms) | 0.232 | **0.057** | 0.443 |
+| · script (query-parse) @50 (ms) | 0.246 | **0.080** | 1.03 |
+
 ## Nav churn (stress) — `nav-churn`
 
 200-nav stress; per-nav total (script + Blink) + heap. **vue-router lightest CPU/nav (0.54 total)**, tanstack 0.58, real-router 0.67; **real-router retains the least heap (509 ≈ vue-router; tanstack ~2× at 1071)**. navsPerSec frame-capped.

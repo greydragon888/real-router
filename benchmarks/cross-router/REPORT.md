@@ -91,6 +91,19 @@ Navigate into routes with 1 / 10 / 100 path params; **total** + **script** (matc
 | · script (matcher) @10 (ms) | **0.436** | 0.792 | 0.596 |
 | · script (matcher) @100 (ms) | **0.558** | 0.934 | 0.741 |
 
+## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
+
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`) — the realistic high-count vector (marketplace filters / analytics / tracking; path params top out at ~4). The leaf reads EVERY value, so lazy query is materialized (apples-to-apples). **real-router stays FLAT (~0.62 ms, slope ~0) and wins @50** — its eager immutable params make reading all 50 a cheap property access. **tanstack EXPLODES — 2.60 ms @50 (~4× real-router), slope ~22 µs/param**: its per-nav search parse + validate + structural-share pipeline is O(query-count). react-router is flat too (0.79 @50 — `URLSearchParams` is a cheap plain object) but a higher floor. At realistic marketplace query counts real-router's flat curve is the win — the eager snapshot never degrades.
+
+| metric | real-router | tanstack | react-router |
+|---|---|---|---|
+| ≈ total @1 (ms) | **0.618** | 1.53 | 0.815 |
+| ≈ total @10 (ms) | **0.594** | 1.67 | 0.766 |
+| ≈ total @50 (ms) | **0.643** | 2.60 | 0.785 |
+| · script (query-parse) @1 (ms) | **0.547** | 1.47 | 0.740 |
+| · script (query-parse) @10 (ms) | **0.520** | 1.62 | 0.690 |
+| · script (query-parse) @50 (ms) | **0.557** | 2.53 | 0.705 |
+
 ## Nav churn (stress) — `nav-churn`
 
 200-nav stress; per-nav total (script + Blink) + heap. **real-router lightest CPU/nav (0.94 total)**, tanstack 1.16, react-router 1.30 — **and retains the least heap (684 KB)**. navsPerSec frame-capped.

@@ -91,6 +91,19 @@ Routes with 1 / 10 / 100 path params — floor-bound (matcher barely stressed). 
 | · script (matcher) @10 (ms) | 0.377 | **0.370** | 0.416 |
 | · script (matcher) @100 (ms) | 0.460 | 0.424 | **0.397** |
 
+## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
+
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **real-router is FLAT (~0.58 @50, slope ~0)** — eager immutable params. **sv-router wins @50 by a whisker (0.565 vs 0.575)** but RISES (slope ~1.7 µs/param — its reactive `route.search`), converging from its @1 lead (0.48 vs 0.55); **mateo-router rises steepest (~4.7 µs/param)**. real-router's eager params keep a flat curve while the reactive-query routers climb with count — the eager cost is paid once at nav, not per-read.
+
+| metric | real-router | sv-router | mateo-router |
+|---|---|---|---|
+| ≈ total @1 (ms) | 0.550 | **0.481** | 0.597 |
+| ≈ total @10 (ms) | 0.519 | **0.493** | 0.637 |
+| ≈ total @50 (ms) | 0.575 | **0.565** | 0.826 |
+| · script (query-parse) @1 (ms) | 0.478 | **0.413** | 0.520 |
+| · script (query-parse) @10 (ms) | 0.444 | **0.427** | 0.567 |
+| · script (query-parse) @50 (ms) | **0.492** | 0.494 | 0.750 |
+
 ## Nav churn (stress) — `nav-churn`
 
 200-nav stress; CPU/nav + retained heap. **sv-router leanest — CPU/nav 0.241, retained heap 243 KB**; real-router 0.323 / 377 KB; mateo-router 0.414 / 295 KB. `navsPerSec` is ~121 for all three (frame-capped in this cohort — read CPU/nav + heap).
