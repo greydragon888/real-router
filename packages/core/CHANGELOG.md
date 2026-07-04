@@ -1,5 +1,29 @@
 # @real-router/core
 
+## 0.63.2
+
+### Patch Changes
+
+- [#1245](https://github.com/greydragon888/real-router/pull/1245) [`5953297`](https://github.com/greydragon888/real-router/commit/59532971e86a695d292f216974e1c08410034adf) Thanks [@greydragon888](https://github.com/greydragon888)! - Harden `matchPath`: a throw from the post-match path rewrite no longer escapes as a crash ([#1157](https://github.com/greydragon888/real-router/issues/1157))
+
+  `matchPath` rebuilds `state.path` after a successful match (`rewritePathOnMatch`, on by default) via `buildPath` → the query codec. A throw there — e.g. a custom `encodeParams` handing the codec an unserialisable value — propagated as a raw `TypeError` out of `matchPath`, crashing `router.start()` / `navigate()` on a forgeable URL (the concrete [#1155](https://github.com/greydragon888/real-router/issues/1155) trigger; this is the defense-in-depth companion).
+
+  Fix: the rewrite is wrapped so a throw keeps the source path un-rewritten — the match already succeeded (route found, params decoded), only the cosmetic re-canonicalisation failed, so a valid match is preserved instead of discarded. This is the opposite policy to the parse side ([#737](https://github.com/greydragon888/real-router/issues/737), "match() must never throw → treat URL as unmatched"): there a throw means the URL can't be understood; here it was understood and matched. A `decodeParams` throw (which runs while producing the state, before the match is finalized) still propagates, unchanged.
+
+- [#1245](https://github.com/greydragon888/real-router/pull/1245) [`5953297`](https://github.com/greydragon888/real-router/commit/59532971e86a695d292f216974e1c08410034adf) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `search-params` `parse`→`build` inverse-pair crash: null array elements now round-trip instead of throwing ([#1155](https://github.com/greydragon888/real-router/issues/1155))
+
+  `parse` produced `null` array elements (a key-only chunk on a repeated/bracketed key: `parse("a&a=1")` → `{a:[null,1]}`) that `build`'s `encodeArray` rejected with a raw `TypeError`. Because core glues `parse`→`build` on every match (`rewritePathOnMatch` + `queryParamsMode: "loose"`), an external URL like `/x?a&a=1` crashed `router.start()` with an unhandled `TypeError` (SSR 500, single-request, unauthenticated).
+
+  Fix (encode side — close the domains): a `null` array element now encodes to the same wire token a scalar null does, per array format — the bare key under `nullFormat: "default"` (`none`→`name`, `brackets`→`name[]`, `index`→`name[i]`), dropped under `nullFormat: "hidden"`. `comma` has no per-element bare form, so a null element (reachable only via a bracketed chunk under comma config) is dropped. `range(parse) ⊆ dom(build)` now holds.
+
+  The blind zone that let three audit waves + [#1037](https://github.com/greydragon888/real-router/issues/1037) miss this is closed by construction: a new grammar-first property (`tests/property/inversePair.properties.ts`) generates query strings from the wire grammar (key-only / repeats / brackets / empty chunks), not from `build`, and asserts `build(parse(qs))` never throws over the full option matrix.
+
+- [#1245](https://github.com/greydragon888/real-router/pull/1245) [`5953297`](https://github.com/greydragon888/real-router/commit/59532971e86a695d292f216974e1c08410034adf) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `search-params` `parse` injecting a junk `""` param from empty query chunks ([#1156](https://github.com/greydragon888/real-router/issues/1156))
+
+  An empty chunk — a `&&`, a leading `&`, or a trailing `&` — was parsed as an empty name with a missing value, injecting `{ "": null }` (and `[null, …]` on repeats): `parse("&a=1")` → `{ "": null, a: "1" }`, `parse("x=1&&&x=2")` → `{ "": [null, null], x: [1, 2] }`.
+
+  Fix: empty chunks (a zero-length span) are skipped in `parseIntoInternal`. An intentional empty-key chunk still carries an `=` (`parse("=1")` → `{ "": "1" }`), so its span is non-empty and it is unaffected.
+
 ## 0.63.1
 
 ### Patch Changes
