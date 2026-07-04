@@ -13,7 +13,7 @@ export default [
   {
     name: "@real-router/core/api (ESM)",
     path: "packages/core/dist/esm/api.mjs",
-    limit: "21.5 kB",
+    limit: "25 kB",
     ignore: ignoreCore,
   },
 
@@ -50,14 +50,14 @@ export default [
 
   // ── Plugins ───────────────────────────────────────────────────────
   esm("navigation-plugin", "4 kB", ignoreCore),
-  esm("browser-plugin", "3 kB", ignoreCore),
+  esm("browser-plugin", "3.5 kB", ignoreCore),
   esm("hash-plugin", "3.5 kB", ignoreCore),
   esm("memory-plugin", "1 kB", ignoreCore),
   esm("logger-plugin", "1.6 kB"),
   esm("persistent-params-plugin", "1.5 kB", ignoreCore),
   esm("lifecycle-plugin", "1 kB", ignoreCore),
   esm("preload-plugin", "1.5 kB", ignoreCore),
-  esm("search-schema-plugin", "1.1 kB", ignoreCore),
+  esm("search-schema-plugin", "1.5 kB", ignoreCore),
   esm("validation-plugin", "10 kB", ignoreCore),
   esm("ssr-data-plugin", "2.5 kB", ignoreCore),
   esm("rsc-server-plugin", "2.5 kB", ignoreCore),

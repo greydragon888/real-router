@@ -52,6 +52,7 @@ benchmarks/
 │      #  type-check (ungated, manual/IDE): tsc -p cross-router/tsconfig.json (react) · -p cross-router/apps/vue/tsconfig.json (vue) · -p cross-router/apps/solid/tsconfig.json (solid). NB: IDE tsserver mis-applies react-jsx to solid files (flood of false "React.JSX / --jsx" errors) — the `tsc -p apps/solid` run is AUTHORITATIVE (0 errors); ignore the IDE noise for solid apps. Svelte apps have NO tsc step — `vite build` (svelte plugin) is the check; verify via `run.mjs <scenario> <engine> svelte`. Angular apps: NO separate tsc — the AOT build (@analogjs/vite-plugin-angular, strictTemplates) type-checks; IDE shows FALSE "tslib / Cannot find ./pages" noise (stale tsserver, not the AOT resolver) — authoritative is `run.mjs <scenario> <engine> angular`
 ├── bench-compare.sh               # Core comparison script (sudo, thermal monitoring)
 ├── bench-compare-vs-tanstack.sh   # TanStack comparison script (sudo, thermal monitoring)
+├── bench-cross-router.sh          # Cross-router unattended full-run orchestrator (sudo): rebuild dist → machine-readiness → per-cohort n=15 matrix + REPORT regen. Workload runs as $SUDO_USER (Playwright/Chromium can't run as root)
 ├── compare.mjs                    # Analyze and compare core/.bench/ results
 └── check-rme.sh                   # Validate RME stability across core/.bench/ JSON files
 ```
@@ -122,6 +123,14 @@ sudo ./bench-compare-vs-tanstack.sh
 `node cross-router/run.mjs <scenario> <engine> [framework=react] [runs=30]` — engine ∈ `real-router`|`tanstack`|`react-router` (react) · `real-router`|`vue-router`|`tanstack` (vue) · `real-router`|`solid-router`|`tanstack` (solid) · `real-router`|`sv-router`|`mateo-router` (svelte) · `real-router`|`angular-router` (angular); scenario ∈ `cold-start`|`nav-latency`|`param-nav`|`wide-config`|`deep-config`|`param-scaling`|`table-heap`|`link-build`|`nav-churn`|`active-links`|`nested-switch` (11). Big-table scenarios resolve to `apps/<fw>/<engine>/<variant>/` via the `VARIANT` map (`wide-config`→`wide`, `deep-config`→`deep`, `param-scaling`→`params`, `table-heap`→`tableheap`, `link-build`→`linkbuild`, `nested-switch`→`nested`, `active-links`→`links`); base scenarios use `apps/<fw>/<engine>/`. `_baseline` (bare React, no router) is a reference engine run for cold-start/nav-latency/link-build → REPORT.md "Router overhead over bare React".
 
 ```bash
+# Full unattended refresh (RECOMMENDED for the n=15 big-refresh) — sudo orchestrator:
+#   rebuild all dist → machine-readiness gate (power/thermal/apps) → per-cohort matrix
+#   (thermal cooldown between cohorts) → rme-gate + REPORT regen. Chromium runs as you, not root.
+sudo ./bench-cross-router.sh                                  # all 5 cohorts, n=15, rebuild first
+sudo ./bench-cross-router.sh --smoke                          # n=1 dry matrix first (fail-fast), then the full run
+sudo ./bench-cross-router.sh --runs 30 solid                  # one cohort at n=30
+sudo ./bench-cross-router.sh --no-build angular               # skip rebuild (dist already fresh)
+
 pnpm bench:cross-router -- nav-latency real-router react 30   # one (scenario × engine)
 node cross-router/run-all.mjs 15                              # FULL matrix — all cohorts (react+vue+solid, per-cohort engines) → results/
 node cross-router/run-all.mjs 15 angular                      # one cohort (react|vue|solid|svelte|angular) with its own engine roster
