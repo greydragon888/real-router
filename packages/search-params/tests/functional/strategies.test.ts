@@ -174,55 +174,146 @@ describe("search-params strategies", () => {
   describe("array strategies", () => {
     describe("noneArrayStrategy", () => {
       it("should encode as repeated keys", () => {
-        expect(noneArrayStrategy.encodeArray("items", ["a", "b"])).toBe(
-          "items=a&items=b",
-        );
+        expect(
+          noneArrayStrategy.encodeArray(
+            "items",
+            ["a", "b"],
+            defaultNullStrategy,
+          ),
+        ).toBe("items=a&items=b");
       });
 
       it("should return empty string for empty array", () => {
-        expect(noneArrayStrategy.encodeArray("items", [])).toBe("");
+        expect(
+          noneArrayStrategy.encodeArray("items", [], defaultNullStrategy),
+        ).toBe("");
+      });
+
+      it("should encode a null element as the bare key (#1155)", () => {
+        expect(
+          noneArrayStrategy.encodeArray(
+            "items",
+            [null, "a"],
+            defaultNullStrategy,
+          ),
+        ).toBe("items&items=a");
+      });
+
+      it("should drop a null element under hidden null format (#1155)", () => {
+        expect(
+          noneArrayStrategy.encodeArray(
+            "items",
+            [null, "a"],
+            hiddenNullStrategy,
+          ),
+        ).toBe("items=a");
       });
     });
 
     describe("bracketsArrayStrategy", () => {
       it("should encode with empty brackets", () => {
-        expect(bracketsArrayStrategy.encodeArray("items", ["a", "b"])).toBe(
-          "items[]=a&items[]=b",
-        );
+        expect(
+          bracketsArrayStrategy.encodeArray(
+            "items",
+            ["a", "b"],
+            defaultNullStrategy,
+          ),
+        ).toBe("items[]=a&items[]=b");
       });
 
       it("should return empty string for empty array", () => {
-        expect(bracketsArrayStrategy.encodeArray("items", [])).toBe("");
+        expect(
+          bracketsArrayStrategy.encodeArray("items", [], defaultNullStrategy),
+        ).toBe("");
+      });
+
+      it("should encode a null element as the bare bracket key (#1155)", () => {
+        expect(
+          bracketsArrayStrategy.encodeArray(
+            "items",
+            [null],
+            defaultNullStrategy,
+          ),
+        ).toBe("items[]");
       });
     });
 
     describe("indexArrayStrategy", () => {
       it("should encode with indexed brackets", () => {
-        expect(indexArrayStrategy.encodeArray("items", ["a", "b", "c"])).toBe(
-          "items[0]=a&items[1]=b&items[2]=c",
-        );
+        expect(
+          indexArrayStrategy.encodeArray(
+            "items",
+            ["a", "b", "c"],
+            defaultNullStrategy,
+          ),
+        ).toBe("items[0]=a&items[1]=b&items[2]=c");
       });
 
       it("should return empty string for empty array", () => {
-        expect(indexArrayStrategy.encodeArray("items", [])).toBe("");
+        expect(
+          indexArrayStrategy.encodeArray("items", [], defaultNullStrategy),
+        ).toBe("");
+      });
+
+      it("should encode a null element as the bare indexed key (#1155)", () => {
+        expect(
+          indexArrayStrategy.encodeArray(
+            "items",
+            [null, "a"],
+            defaultNullStrategy,
+          ),
+        ).toBe("items[0]&items[1]=a");
+      });
+
+      it("should drop a null element under hidden null format (#1155)", () => {
+        expect(
+          indexArrayStrategy.encodeArray(
+            "items",
+            [null, "a"],
+            hiddenNullStrategy,
+          ),
+        ).toBe("items[1]=a");
       });
     });
 
     describe("commaArrayStrategy", () => {
       it("should encode as comma-separated values", () => {
-        expect(commaArrayStrategy.encodeArray("items", ["a", "b", "c"])).toBe(
-          "items=a,b,c",
-        );
+        expect(
+          commaArrayStrategy.encodeArray(
+            "items",
+            ["a", "b", "c"],
+            defaultNullStrategy,
+          ),
+        ).toBe("items=a,b,c");
       });
 
       it("should return empty string for empty array", () => {
-        expect(commaArrayStrategy.encodeArray("items", [])).toBe("");
+        expect(
+          commaArrayStrategy.encodeArray("items", [], defaultNullStrategy),
+        ).toBe("");
+      });
+
+      it("should drop null elements (unrepresentable in comma) (#1155)", () => {
+        expect(
+          commaArrayStrategy.encodeArray(
+            "items",
+            [null, "a"],
+            defaultNullStrategy,
+          ),
+        ).toBe("items=a");
+        expect(
+          commaArrayStrategy.encodeArray("items", [null], defaultNullStrategy),
+        ).toBe("");
       });
 
       it("should encode special characters", () => {
-        expect(commaArrayStrategy.encodeArray("items", ["a b", "c&d"])).toBe(
-          "items=a%20b,c%26d",
-        );
+        expect(
+          commaArrayStrategy.encodeArray(
+            "items",
+            ["a b", "c&d"],
+            defaultNullStrategy,
+          ),
+        ).toBe("items=a%20b,c%26d");
       });
 
       describe("decodeValue", () => {

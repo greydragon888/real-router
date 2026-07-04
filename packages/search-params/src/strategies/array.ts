@@ -6,6 +6,7 @@
  * @module search-params/strategies/array
  */
 
+import type { NullStrategy } from "./null";
 import type { ArrayFormat } from "../types";
 
 // =============================================================================
@@ -21,9 +22,16 @@ export interface ArrayStrategy {
    *
    * @param name - URL-encoded parameter name
    * @param values - Array values to encode
+   * @param nullStrategy - Null strategy, so a `null` element encodes to the same
+   *   wire token a scalar null does (bare key under `default`, dropped under
+   *   `hidden`) — closing `range(parse) ⊆ dom(build)` (#1155)
    * @returns Query string segment (e.g., "items=a&items=b" or "items=a,b")
    */
-  encodeArray: (name: string, values: unknown[]) => string;
+  encodeArray: (
+    name: string,
+    values: unknown[],
+    nullStrategy: NullStrategy,
+  ) => string;
 
   /**
    * Splits a raw (URI-encoded) value into array parts during parsing.
@@ -45,35 +53,51 @@ export interface ArrayStrategy {
 // Helpers
 // =============================================================================
 
+// Encodes a non-null array element. `null` is handled per-format by the caller
+// (bare-key / skip); this throws only on genuinely unserialisable elements
+// (`undefined`, objects) — which `parse` never produces in an array.
 const encodeValue = (value: unknown): string => {
   const type = typeof value;
 
   if (type !== "string" && type !== "number" && type !== "boolean") {
-    const received = type === "object" && value === null ? "null" : type;
-
+    // `null` is handled by the caller (bare-key / skip) and never reaches here,
+    // so `type` names the offender directly (`undefined`, `object`, `symbol`, …).
     throw new TypeError(
-      `[search-params] Array element must be a string, number, or boolean — received ${received}`,
+      `[search-params] Array element must be a string, number, or boolean — received ${type}`,
     );
   }
 
   return encodeURIComponent(value as string | number | boolean);
 };
 
-// Repeats `${name}${suffix}=${value}` joined by `&`. Shared between
-// `none` (suffix `""`) and `brackets` (suffix `"[]"`) strategies.
-const repeatKey = (name: string, values: unknown[], suffix: string): string => {
-  if (values.length === 0) {
-    return "";
-  }
-
+// Repeats `${name}${suffix}` keys joined by `&`. Shared between `none` (suffix
+// `""`) and `brackets` (suffix `"[]"`). A `null` element encodes to the SAME
+// wire token a scalar null does via `nullStrategy` — the bare key
+// `${name}${suffix}` under `nullFormat: "default"`, or `""` (dropped, filtered
+// below so no `&&` appears) under `"hidden"`. So `parse("a&a=1")` →
+// `{a:[null,"1"]}` round-trips to `"a&a=1"` instead of throwing (#1155).
+const repeatKey = (
+  name: string,
+  values: unknown[],
+  suffix: string,
+  nullStrategy: NullStrategy,
+): string => {
   const key = `${name}${suffix}`;
-  let result = `${key}=${encodeValue(values[0])}`;
+  const parts: string[] = [];
 
-  for (let i = 1; i < values.length; i++) {
-    result += `&${key}=${encodeValue(values[i])}`;
+  for (const value of values) {
+    if (value === null) {
+      const encoded = nullStrategy.encode(key);
+
+      if (encoded) {
+        parts.push(encoded);
+      }
+    } else {
+      parts.push(`${key}=${encodeValue(value)}`);
+    }
   }
 
-  return result;
+  return parts.join("&");
 };
 
 // =============================================================================
@@ -85,7 +109,8 @@ const repeatKey = (name: string, values: unknown[], suffix: string): string => {
  * Example: items=a&items=b
  */
 export const noneArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) => repeatKey(name, values, ""),
+  encodeArray: (name, values, nullStrategy) =>
+    repeatKey(name, values, "", nullStrategy),
 };
 
 /**
@@ -93,7 +118,8 @@ export const noneArrayStrategy: ArrayStrategy = {
  * Example: items[]=a&items[]=b
  */
 export const bracketsArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) => repeatKey(name, values, "[]"),
+  encodeArray: (name, values, nullStrategy) =>
+    repeatKey(name, values, "[]", nullStrategy),
 };
 
 /**
@@ -101,18 +127,24 @@ export const bracketsArrayStrategy: ArrayStrategy = {
  * Example: items[0]=a&items[1]=b
  */
 export const indexArrayStrategy: ArrayStrategy = {
-  encodeArray: (name, values) => {
-    if (values.length === 0) {
-      return "";
+  encodeArray: (name, values, nullStrategy) => {
+    const parts: string[] = [];
+
+    for (const [i, value] of values.entries()) {
+      const key = `${name}[${i}]`;
+
+      if (value === null) {
+        const encoded = nullStrategy.encode(key);
+
+        if (encoded) {
+          parts.push(encoded);
+        }
+      } else {
+        parts.push(`${key}=${encodeValue(value)}`);
+      }
     }
 
-    let result = `${name}[0]=${encodeValue(values[0])}`;
-
-    for (let i = 1; i < values.length; i++) {
-      result += `&${name}[${i}]=${encodeValue(values[i])}`;
-    }
-
-    return result;
+    return parts.join("&");
   },
 
   indexed: true,
@@ -121,20 +153,29 @@ export const indexArrayStrategy: ArrayStrategy = {
 /**
  * Comma-separated values.
  * Example: items=a,b,c
+ *
+ * Comma has no per-element bare-key form (an empty part like `a=,` decodes to
+ * the empty string, not `null`), so a `null` element is unrepresentable and
+ * dropped. `parse` only yields null-in-array under `comma` via a bracketed
+ * chunk (`a[]`) — a wire/format mismatch, never the comma-native path — so this
+ * is a total-but-lossy edge. The `nullStrategy` arg is intentionally omitted
+ * (a 2-arg impl satisfies the 3-arg interface).
  */
 export const commaArrayStrategy: ArrayStrategy = {
   encodeArray: (name, values) => {
-    if (values.length === 0) {
+    const parts: string[] = [];
+
+    for (const value of values) {
+      if (value !== null) {
+        parts.push(encodeValue(value));
+      }
+    }
+
+    if (parts.length === 0) {
       return "";
     }
 
-    let result = `${name}=${encodeValue(values[0])}`;
-
-    for (let i = 1; i < values.length; i++) {
-      result += `,${encodeValue(values[i])}`;
-    }
-
-    return result;
+    return `${name}=${parts.join(",")}`;
   },
 
   decodeValue: (rawValue) => {

@@ -391,8 +391,11 @@ describe("array element validation", () => {
     fc.boolean(),
   );
 
+  // `null` was moved OUT of the invalid set (#1155): a null array element now
+  // encodes to the format's bare-key form (round-trippable), so it no longer
+  // throws — covered by the inverse-pair totality property. `undefined` and
+  // objects remain unserialisable.
   const arbInvalidElement = fc.oneof(
-    fc.constant(null),
     fc.constant(undefined as unknown),
     fc.record({ key: arbSafeString }) as fc.Arbitrary<unknown>,
   );
@@ -410,7 +413,7 @@ describe("array element validation", () => {
   );
 
   test.prop([arbSafeKey, arbInvalidElement], { numRuns: NUM_RUNS.standard })(
-    "invalid elements: null, undefined, objects throw TypeError",
+    "invalid elements: undefined, objects throw TypeError",
     (key: string, value: unknown) => {
       expect(() => {
         build({ [key]: [value] });

@@ -375,9 +375,25 @@ describe("search-params", () => {
       );
     });
 
-    it("throws TypeError for null elements in arrays", () => {
-      expect(() => build({ items: [null] })).toThrow(TypeError);
-      expect(() => build({ items: [null] })).toThrow("received null");
+    it("encodes null elements in arrays as the format's bare-key form (#1155)", () => {
+      // A null element encodes symmetric to a scalar null: the bare key per
+      // format under nullFormat "default", so parse round-trips it back.
+      expect(build({ items: [null] })).toBe("items");
+      expect(build({ items: [null, "x"] })).toBe("items&items=x");
+      expect(build({ items: [null] }, { arrayFormat: "brackets" })).toBe(
+        "items[]",
+      );
+      expect(build({ items: [null] }, { arrayFormat: "index" })).toBe(
+        "items[0]",
+      );
+      // nullFormat "hidden" drops the element (symmetric with scalar null).
+      expect(build({ items: [null, "x"] }, { nullFormat: "hidden" })).toBe(
+        "items=x",
+      );
+      // comma has no bare-key form → null is dropped.
+      expect(build({ items: [null, "x"] }, { arrayFormat: "comma" })).toBe(
+        "items=x",
+      );
     });
 
     it("throws TypeError for undefined elements in arrays", () => {
@@ -1014,6 +1030,38 @@ describe("search-params", () => {
       expect(result).toBe("a b c");
       // Verify the output is correct even without % decoding
       expect(result).not.toContain("%");
+    });
+  });
+
+  describe("inverse-pair domain closure (#1155/#1156)", () => {
+    it('skips empty chunks instead of injecting a junk "" param (#1156)', () => {
+      expect(parse("&a=1")).toStrictEqual({ a: 1 }); // leading
+      expect(parse("a=1&&b=2")).toStrictEqual({ a: 1, b: 2 }); // interior
+      expect(parse("a=1&")).toStrictEqual({ a: 1 }); // trailing
+      expect(parse("x=1&&&x=2")).toStrictEqual({ x: [1, 2] }); // double empty
+    });
+
+    it("preserves an intentional empty-key chunk that carries a value (#1156)", () => {
+      // `=1` has an `=`, so its span is non-empty and it is NOT an empty chunk.
+      expect(parse("=1")).toStrictEqual({ "": 1 });
+    });
+
+    it("round-trips null array elements produced by parse (#1155)", () => {
+      // none: bare key mixed with valued keys
+      expect(parse("a&a=1")).toStrictEqual({ a: [null, 1] });
+      expect(build(parse("a&a=1"))).toBe("a&a=1");
+
+      // brackets
+      const br = { arrayFormat: "brackets" } as const;
+
+      expect(parse("a[]&a[]=x", br)).toStrictEqual({ a: [null, "x"] });
+      expect(build(parse("a[]&a[]=x", br), br)).toBe("a[]&a[]=x");
+
+      // index
+      const ix = { arrayFormat: "index" } as const;
+
+      expect(parse("a[0]&a[1]=x", ix)).toStrictEqual({ a: [null, "x"] });
+      expect(build(parse("a[0]&a[1]=x", ix), ix)).toBe("a[0]&a[1]=x");
     });
   });
 });
