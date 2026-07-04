@@ -14,16 +14,25 @@
   // table is built once and never needs to react.
   let { k, base }: { k: number; base: string } = $props();
 
+  // Fixed per instance (see above): capture the initial values into plain locals
+  // so the route table is built once from them. The `state_referenced_locally`
+  // suppressions are intentional — these props never change for a given instance,
+  // so reading the initial value is correct, not a missed reaction.
+  // svelte-ignore state_referenced_locally
+  const level = k;
+  // svelte-ignore state_referenced_locally
+  const basePath = base;
+
   const child: RouteConfig[] = [];
-  if (k < DEEP_DEPTH) {
+  if (level < DEEP_DEPTH) {
     child.push({
-      path: `/l${k + 1}`,
+      path: `/l${level + 1}`,
       component: DeepLevel,
-      props: { k: k + 1, base: `${base}/l${k + 1}` },
+      props: { k: level + 1, base: `${basePath}/l${level + 1}` },
     });
   }
-  if (k >= 1) {
-    child.push({ component: CatalogItem, props: { n: String(k) } });
+  if (level >= 1) {
+    child.push({ component: CatalogItem, props: { n: String(level) } });
   }
 </script>
 
