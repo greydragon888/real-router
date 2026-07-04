@@ -1,5 +1,12 @@
 # router-benchmarks
 
+## 0.3.78
+
+### Patch Changes
+
+- Updated dependencies [[`136f11c`](https://github.com/greydragon888/real-router/commit/136f11c23579f6ab3e632c18f1b66363188a8a3d)]:
+  - @real-router/svelte@0.15.0
+
 ## 0.3.77
 
 ### Patch Changes
