@@ -135,7 +135,11 @@ export const encode = (
       }
       // Array check
       if (Array.isArray(value)) {
-        return opts.strategies.array.encodeArray(encodedName, value);
+        return opts.strategies.array.encodeArray(
+          encodedName,
+          value,
+          opts.strategies.null,
+        );
       }
 
       // Fallback for other objects - treat as string

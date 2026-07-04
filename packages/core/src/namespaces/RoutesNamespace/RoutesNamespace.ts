@@ -279,13 +279,23 @@ export class RoutesNamespace<
 
       const ts = opts.trailingSlash;
 
-      builtPath = this.#store.matcher.buildPath(routeName, buildParams, {
-        trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
-        queryParamsMode: opts.queryParamsMode,
-      });
+      try {
+        builtPath = this.#store.matcher.buildPath(routeName, buildParams, {
+          trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+          queryParamsMode: opts.queryParamsMode,
+        });
 
-      if (ts === "preserve") {
-        builtPath = matchSourceTrailingSlash(path, builtPath);
+        if (ts === "preserve") {
+          builtPath = matchSourceTrailingSlash(path, builtPath);
+        }
+      } catch {
+        // The match already succeeded (route found, params decoded); only the
+        // post-match path rewrite threw — e.g. a custom encoder handed buildPath
+        // a query value its codec cannot serialise. Keep the source path
+        // un-rewritten rather than discard a valid match (#1157). Opposite of the
+        // parse side (#737): there a throw means "URL not understood" → unmatched;
+        // here the URL WAS matched and only re-canonicalisation failed.
+        builtPath = path;
       }
     }
 

@@ -379,14 +379,23 @@ function parseIntoInternal(
       end = length;
     }
 
-    processParamChunk(
-      searchPart,
-      start,
-      end,
-      params,
-      strategies,
-      indexedGroups,
-    );
+    // Skip empty chunks — a `&&`, a leading `&`, or a trailing `&` produces a
+    // zero-length span that carries no name and no value. Processing it would
+    // decode the empty name to `""` and the missing value to `null`, injecting a
+    // junk `{ "": null }` param (and `[null, …]` on repeats) (#1156). An
+    // intentional empty-key chunk always carries an `=` (`"=1"` → `end > start`),
+    // so it is unaffected.
+    if (end > start) {
+      processParamChunk(
+        searchPart,
+        start,
+        end,
+        params,
+        strategies,
+        indexedGroups,
+      );
+    }
+
     start = end + 1;
   }
 

@@ -156,7 +156,16 @@ interface NumberStrategy {
 }
 
 interface ArrayStrategy {
-  encodeArray(name: string, values: unknown[]): string;
+  // A `null` element encodes to the bare-key form via `nullStrategy` (the bare
+  // key under `nullFormat: "default"`, dropped under `"hidden"`) so parse's
+  // null-in-array round-trips instead of throwing (#1155).
+  encodeArray(
+    name: string,
+    values: unknown[],
+    nullStrategy: NullStrategy,
+  ): string;
+  decodeValue?(rawValue: string): string[] | null; // comma: split raw into parts
+  indexed?: boolean; // index: order elements by the bracket index `[n]` (#856)
 }
 ```
 
@@ -385,10 +394,10 @@ No circular dependencies.
 
 | Case                       | Behavior                                                          |
 | -------------------------- | ----------------------------------------------------------------- |
-| Invalid array element type | `TypeError` during `build()` (only string/number/boolean allowed) |
+| Invalid array element type | `TypeError` during `build()` for `undefined` / objects only; a `null` element round-trips via the bare-key form per array format (#1155) |
 | `undefined` values         | Skipped in `build()` (not serializable)                           |
 | Objects in params          | Fallback to `encodeURIComponent(obj)` → `"%5Bobject%20Object%5D"` |
-| Malformed query string     | Best-effort parse (missing `=` → `null` value)                    |
+| Malformed query string     | Best-effort parse: missing `=` → `null` (scalar or array element — round-trips via the bare-key form, #1155); empty chunks (`&&`, leading/trailing `&`) are skipped, not injected as a `""` param (#1156) |
 
 ## See Also
 

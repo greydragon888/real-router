@@ -769,6 +769,53 @@ describe("core/routes/routePath/matchPath", () => {
     });
   });
 
+  describe("rewrite failure (#1157)", () => {
+    it("keeps the successful match when the post-match path rewrite throws", () => {
+      // The match already succeeded (route found, params decoded); only the
+      // cosmetic path rewrite fails — here a custom encoder feeds buildPath an
+      // unserialisable query value so the codec throws. Defense-in-depth guard:
+      // keep the match with the source path rather than crash or drop to 404.
+      const customRouter = createTestRouter();
+
+      getRoutesApi(customRouter).add({
+        name: "enc",
+        path: "/enc?q",
+        // deliberately out-of-domain: hands buildPath an unserialisable query
+        // value so the codec throws during the rewrite
+        encodeParams: (params) => ({
+          ...params,
+          q: [undefined] as unknown as string[],
+        }),
+      });
+
+      const state = getPluginApi(customRouter).matchPath("/enc?q=1");
+
+      expect(state?.name).toBe("enc");
+      expect(state?.params.q).toBe(1);
+      // path kept un-rewritten (source), match preserved
+      expect(state?.path).toBe("/enc?q=1");
+    });
+
+    it("does not catch a decodeParams throw (that still propagates, #631)", () => {
+      // The guard wraps only the post-match REWRITE — a decoder throw happens
+      // while producing the state (before the match is finalized) and must still
+      // propagate, unchanged by #1157.
+      const customRouter = createTestRouter();
+
+      getRoutesApi(customRouter).add({
+        name: "dec",
+        path: "/dec/:id",
+        decodeParams: () => {
+          throw new Error("decoder boom");
+        },
+      });
+
+      expect(() => getPluginApi(customRouter).matchPath("/dec/1")).toThrow(
+        "decoder boom",
+      );
+    });
+  });
+
   describe("forwardTo", () => {
     it("should resolve forwardTo and use target route name", () => {
       const customRouter = createTestRouter();
