@@ -1173,8 +1173,13 @@ describe("Link component", () => {
       // Discriminator: a cache HIT returns the shared source without re-running
       // `router.isActiveRoute`; a cache MISS constructs a fresh source and calls it
       // once for its initial value.
+      // #1249 re-target: the default-options fast path no longer builds a
+      // `createActiveRouteSource` (it uses the shared name-selector), so this
+      // #776 undefined-vs-"{}" dedup guard now exercises the SLOW path via
+      // `ignoreQueryParams={false}` — which still passes `routeParams` straight
+      // through as `undefined` (keying "", not "{}").
       render(
-        <Link routeName="users" data-testid="link">
+        <Link routeName="users" ignoreQueryParams={false} data-testid="link">
           Users
         </Link>,
         { wrapper },
@@ -1184,7 +1189,7 @@ describe("Link component", () => {
 
       createActiveRouteSource(router, "users", undefined, {
         strict: false,
-        ignoreQueryParams: true,
+        ignoreQueryParams: false,
       });
 
       expect(isActiveRouteSpy).not.toHaveBeenCalled();
