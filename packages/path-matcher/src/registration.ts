@@ -430,13 +430,40 @@ function ensureParamChild(
   ownNodes: Set<SegmentNode>,
 ): SegmentNode {
   if (!node.paramChild) {
-    node.paramChild = { node: createSegmentNode(), name: paramName };
+    // `fork` initialized here (not added conditionally by the optional-fork
+    // marker below) so every paramChild shares one hidden class — the fork check
+    // in `#traverseFrom` stays monomorphic (~0 hot-path tax, spike Stage 1).
+    node.paramChild = {
+      node: createSegmentNode(),
+      name: paramName,
+      fork: undefined,
+    };
     ownNodes.add(node);
   } else if (node.paramChild.name !== paramName && !ownNodes.has(node)) {
     throwParamNameConflict(node.paramChild.name, paramName, ":");
   }
 
   return node.paramChild.node;
+}
+
+/**
+ * #1263/#1264: marks a `paramChild` created by the optional fork as a fork so
+ * `match` does try-take-if-valid — take the segment as the optional only if its
+ * DECODED value satisfies the constraint, else skip to the splat sibling. Called
+ * ONLY from the optional fork, so a non-optional param+splat sibling (#1266) is
+ * untouched. `constraint` is required — an UNCONSTRAINED optional→splat is
+ * rejected at registration (reject-with-hint), so a fork always has one.
+ */
+function markConstrainedOptSplatFork(
+  node: SegmentNode,
+  compiled: CompiledRoute,
+  paramName: string,
+): void {
+  const constraintPattern = compiled.constraintPatterns.get(paramName)?.pattern;
+
+  if (constraintPattern && node.paramChild && node.splatChild) {
+    node.paramChild.fork = { constraint: constraintPattern };
+  }
 }
 
 /** Splat counterpart of {@link ensureParamChild}. */
@@ -564,6 +591,10 @@ function insertIntoTrieFrom(
           visited,
         );
       }
+
+      // #1263/#1264: mark this optional's paramChild as a fork so `match` does
+      // try-take-if-valid before skipping to the splat sibling.
+      markConstrainedOptSplatFork(node, compiled, paramName);
 
       return;
     }

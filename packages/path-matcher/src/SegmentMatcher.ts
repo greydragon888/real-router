@@ -6,6 +6,7 @@ import { registerNode } from "./registration";
 import type {
   BuildPathOptions,
   CompiledRoute,
+  ForkMeta,
   MatcherInputNode,
   MatchResult,
   ResolvedMatcherOptions,
@@ -541,8 +542,21 @@ export class SegmentMatcher {
       if (lookupKey in node.staticChildren) {
         next = node.staticChildren[lookupKey];
       } else if (node.paramChild) {
-        next = node.paramChild.node;
-        params[node.paramChild.name] = segment;
+        const pc = node.paramChild;
+
+        // #1263/#1264: a constrained-optional-before-splat fork takes the segment
+        // as the optional only if valid (`#tryTakeFork` isolates the decode +
+        // constraint check), else skips to the splat sibling.
+        if (
+          pc.fork !== undefined &&
+          node.splatChild &&
+          !this.#tryTakeFork(pc.fork, segment)
+        ) {
+          return this.#matchSplat(node.splatChild, path, start, params);
+        }
+
+        next = pc.node;
+        params[pc.name] = segment;
       } else if (node.splatChild) {
         return this.#matchSplat(node.splatChild, path, start, params);
       } else {
@@ -583,6 +597,24 @@ export class SegmentMatcher {
     params[splatChild.name] = path.slice(start);
 
     return sn.route;
+  }
+
+  /**
+   * #1263/#1264 try-take-if-valid: whether a `segment` at a constrained-optional
+   * fork should be TAKEN as the optional (its DECODED value, #857, satisfies the
+   * constraint) rather than skipped to the splat. Inline-decodes because the
+   * decision happens during traverse, before `#decodeParams`; a malformed-percent
+   * segment cannot be the decoded optional → not taken (→ skip, and the splat then
+   * carries it into `#decodeParams`, which rejects it, #737).
+   */
+  #tryTakeFork(fork: ForkMeta, segment: string): boolean {
+    try {
+      return fork.constraint.test(
+        this.#decode ? this.#decode(segment) : segment,
+      );
+    } catch {
+      return false;
+    }
   }
 
   #decodeParams(params: Record<string, string>): boolean {

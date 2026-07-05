@@ -164,10 +164,25 @@ export interface BuildPathOptions {
 // Segment Trie Types
 // =============================================================================
 
+/**
+ * Marks a `paramChild` as an OPTIONAL-successor fork (#1263/#1264): the param
+ * came from an optional `:opt<constraint>?` whose skip-branch leads to a sibling
+ * (a splat here; a renamed param in the opt+required case). At match time this
+ * drives `try-take-if-valid` — take the segment as the optional only if it
+ * satisfies `constraint` on the DECODED value (#857); otherwise skip to the
+ * sibling. `constraint` is always present: an UNCONSTRAINED optional before a
+ * splat is rejected at registration (reject-with-hint, #1264).
+ */
+export interface ForkMeta {
+  readonly constraint: RegExp;
+}
+
 export interface SegmentNode {
   readonly staticChildren: Record<string, SegmentNode>;
   hasChildren: boolean;
-  paramChild?: { node: SegmentNode; name: string } | undefined;
+  paramChild?:
+    | { node: SegmentNode; name: string; fork?: ForkMeta | undefined }
+    | undefined;
   splatChild?: { node: SegmentNode; name: string } | undefined;
   route?: CompiledRoute | undefined;
   slashChildRoute?: CompiledRoute | undefined;
