@@ -1,11 +1,13 @@
-import { createActiveRouteSource } from "@real-router/sources";
+import {
+  createActiveNameSelector,
+  createActiveRouteSource,
+} from "@real-router/sources";
 import { useMemo } from "preact/hooks";
 
 import { useSyncExternalStore } from "../useSyncExternalStore";
 import { useRouter } from "./useRouter";
 
 import type { Params } from "@real-router/core";
-import type { ActiveRouteSourceOptions } from "@real-router/sources";
 
 export function useIsActiveRoute(
   routeName: string,
@@ -16,27 +18,43 @@ export function useIsActiveRoute(
 ): boolean {
   const router = useRouter();
 
-  // createActiveRouteSource is per-router + canonical-args cached in
-  // @real-router/sources. Caching the opts object + memoising the source
-  // lookup avoids (a) re-allocating the literal on every render and (b)
-  // re-running canonicalJson(params) on the cache lookup path. The `hash`
-  // argument (#532) participates in the cache key — a tab Link pointing to
-  // `/settings#account` shares its source only with consumers using the
-  // same routeName + params + hash. exactOptionalPropertyTypes forbids
-  // `{ hash: undefined }` literally, so we conditionally include the key
-  // only when the caller passed a value.
-  const opts = useMemo<ActiveRouteSourceOptions>(
-    () =>
+  // Fast path (#1249) — the default-options active check: no custom `params`,
+  // non-strict, query params ignored, no `hash`. Resolve through the per-router
+  // shared `createActiveNameSelector` — ONE `router.subscribe` handle serves any
+  // number of distinct-`routeName` links — instead of a per-instance
+  // `createActiveRouteSource` (a `BaseSource` AND its own router subscription for
+  // every distinct name). Direct port of the svelte (#1101) / angular (#1104) /
+  // react (#1248) fast paths; the selector's `isActive` is exactly non-strict,
+  // query-ignoring, name-only matching. Any deviation falls to the slow path,
+  // whose canonical-args cache handles the full surface (custom params, strict,
+  // `ignoreQueryParams: false`, hash-aware #532).
+  //
+  // The `useMemo` wrap skips the branch + `canonicalJson(params)` + cache lookup
+  // on every render when all primitive deps and the `params` reference are stable.
+  // exactOptionalPropertyTypes forbids `{ hash: undefined }` literally, so we
+  // conditionally spread the key only when the caller passed a value.
+  const store = useMemo(() => {
+    if (
+      params === undefined &&
+      !strict &&
+      ignoreQueryParams &&
       hash === undefined
-        ? { strict, ignoreQueryParams }
-        : { strict, ignoreQueryParams, hash },
-    [strict, ignoreQueryParams, hash],
-  );
+    ) {
+      const selector = createActiveNameSelector(router);
 
-  const store = useMemo(
-    () => createActiveRouteSource(router, routeName, params, opts),
-    [router, routeName, params, opts],
-  );
+      return {
+        subscribe: (onChange: () => void) =>
+          selector.subscribe(routeName, onChange),
+        getSnapshot: () => selector.isActive(routeName),
+      };
+    }
+
+    return createActiveRouteSource(router, routeName, params, {
+      strict,
+      ignoreQueryParams,
+      ...(hash !== undefined && { hash }),
+    });
+  }, [router, routeName, params, strict, ignoreQueryParams, hash]);
 
   return useSyncExternalStore(
     store.subscribe,

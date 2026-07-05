@@ -130,7 +130,7 @@ interface ActiveNameSelector {
 
 Only notifies a listener when the `routeName`-specific active status actually flips (internal prev/next diff). Non-strict matching (descendants included).
 
-**Per-router cached.** Currently only Solid `RouterProvider` uses an inline equivalent; other adapters (React/Preact/Vue/Svelte/Angular) are still on the slow path via `createActiveRouteSource`. Migration is a Link-component-level concern — see the [Adapter Guide / "When to migrate a Link component to the fast path"](https://github.com/greydragon888/real-router/wiki/sources-adapter-guide#when-to-migrate-a-link-component-to-the-fast-path) for a concrete recipe and the cost-comparison table. `destroy()` is a no-op.
+**Per-router cached.** Every framework adapter now resolves default-options `Link` active state through this selector — Svelte (#1101), Angular (#1104), React (#1248), Preact (#1249), Vue (#1250) — while Solid `RouterProvider` uses an inline `createSelector` equivalent of the same pattern. The slow path via `createActiveRouteSource` is reserved for the full argument surface (custom params, strict, `ignoreQueryParams: false`, hash-aware). Migration is a Link-component-level concern — see the [Adapter Guide / "When to migrate a Link component to the fast path"](https://github.com/greydragon888/real-router/wiki/sources-adapter-guide#when-to-migrate-a-link-component-to-the-fast-path) for the recipe and cost-comparison table. `destroy()` is a no-op.
 
 ## Lazy vs Eager Subscription
 

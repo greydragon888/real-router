@@ -351,9 +351,15 @@ describe("InkLink", () => {
     // and splits from the canonical undefined key "" used by useIsActiveRoute(name).
     // Discriminator: a cache HIT skips construction (no router.isActiveRoute); a MISS
     // constructs a fresh source and calls isActiveRoute once.
+    // #1248 re-target: default-options fast path no longer builds a
+    // `createActiveRouteSource`; this #776 undefined-vs-"{}" dedup now exercises
+    // the SLOW path via `ignoreQueryParams={false}` (still passes `routeParams`
+    // through as `undefined`, keying "").
     render(
       <InkRouterProvider router={router}>
-        <InkLink routeName="users.list">Users</InkLink>
+        <InkLink routeName="users.list" ignoreQueryParams={false}>
+          Users
+        </InkLink>
       </InkRouterProvider>,
     );
 
@@ -361,7 +367,7 @@ describe("InkLink", () => {
 
     createActiveRouteSource(router, "users.list", undefined, {
       strict: false,
-      ignoreQueryParams: true,
+      ignoreQueryParams: false,
     });
 
     expect(isActiveRouteSpy).not.toHaveBeenCalled();
