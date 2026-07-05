@@ -2,11 +2,12 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { render, screen, act } from "@testing-library/react";
-import { lazy, memo, useEffect, useRef } from "react";
+import { lazy, memo, useEffect, useReducer, useRef } from "react";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouteView, RouterProvider } from "@real-router/react";
 
+import * as routeViewHelpers from "../../src/components/modern/RouteView/helpers";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -21,6 +22,47 @@ describe("RouteView", () => {
 
   afterEach(() => {
     router.stop();
+  });
+
+  describe("Render-list memoization (#1251)", () => {
+    it("does not re-walk buildRenderList on a non-route parent re-render", async () => {
+      await router.start("/users/list");
+
+      let forceParent: () => void = () => {};
+      // Stable `children` reference → the `elements` memo stays hit across the
+      // parent re-render, which is the precondition for the buildRenderList memo
+      // to hit as well (elements + routeName + nodeName all unchanged).
+      const routeViewChildren = (
+        <RouteView.Match segment="users">
+          <div>users</div>
+        </RouteView.Match>
+      );
+      const Parent: FC = () => {
+        const [, force] = useReducer((n: number) => n + 1, 0);
+
+        forceParent = force;
+
+        return <RouteView nodeName="">{routeViewChildren}</RouteView>;
+      };
+
+      render(
+        <RouterProvider router={router}>
+          <Parent />
+        </RouterProvider>,
+      );
+
+      const buildRenderListSpy = vi.spyOn(routeViewHelpers, "buildRenderList");
+
+      act(() => {
+        forceParent();
+      });
+
+      // #1251 — with elements / routeName / nodeName all unchanged, the render
+      // walk is memoized and must NOT re-run. Before the fix, buildRenderList
+      // re-walked on every render because it mutated the keepAlive Set inline,
+      // coupling the pure winner computation to a side effect and blocking memo.
+      expect(buildRenderListSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("Segment matching", () => {
