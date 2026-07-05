@@ -44,7 +44,7 @@ shared/
 | Turbo           | 2.10    | root `devDependencies`                                                      |
 | ESLint          | 10.5    | root `devDependencies` (flat config)                                        |
 | @changesets/cli | 2.31    | root `devDependencies`                                                      |
-| Prettier        | 3.8     | root `devDependencies`                                                      |
+| Prettier        | 3.9     | root `devDependencies`                                                      |
 | husky           | 9.1     | root `devDependencies` (v9 config format — `.husky/*` are plain scripts)    |
 | fast-check      | 4.8     | root `devDependencies` (property tests)                                     |
 | OS              | dev: macOS (Darwin 26.x) · CI: Ubuntu (Linux) | local `uname` / `runs-on` in workflows         |
