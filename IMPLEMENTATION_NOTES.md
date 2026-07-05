@@ -733,6 +733,7 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 - Runs CodeQL analysis on push/PR to master
 - Weekly scheduled scan (cron: `0 3 * * 1`)
 - Uses config file `.github/codeql/codeql-config.yml` for query configuration
+- Analysis is **scoped to shipped source** via the config's `paths` allow-list (`packages/*/src/**` + `packages/*/index.ts`). `paths-ignore` mirrors the repo's test conventions — the `tests/` folder plus the `.test` / `.properties` / `.stress` / `.bench` suffixes (`.ts` **and** `.tsx`) — so intentional security anti-patterns in unit/property/stress/bench fixtures never raise false-positive alerts. Since the allow-list is src-only, `paths-ignore` is belt-and-suspenders: it only bites if a test is ever co-located under `src/` (glob `*.test.ts` would miss a `.test.tsx` there, hence both extensions are listed)
 - Dependency review on PRs (fails on moderate+ severity, uses `.github/dependency-review-config.yml` for license allow-list and inline `allow-ghsas:` for individual GHSA exemptions)
 
 #### Local Dependency Audit (PR #643)

@@ -2,15 +2,21 @@ name: "CodeQL Config"
 
 # Paths to exclude from CodeQL analysis
 paths-ignore:
-  # Benchmark tests - contain intentional edge cases and extreme inputs
-  - "**/benchmarks/**"
-  - "**/*.bench.ts"
-  - "**/*.bench.js"
-
-  # Test files may also contain intentional security anti-patterns
-  - "**/__tests__/**"
+  # Test sources may contain intentional security anti-patterns / extreme
+  # inputs (unit, property, stress, bench). Convention: everything under a
+  # `tests/` folder, plus these suffixes anywhere — both `.ts` and `.tsx`.
+  - "**/tests/**"
   - "**/*.test.ts"
-  - "**/*.spec.ts"
+  - "**/*.test.tsx"
+  - "**/*.properties.ts"
+  - "**/*.properties.tsx"
+  - "**/*.stress.ts"
+  - "**/*.stress.tsx"
+  - "**/*.bench.ts"
+  - "**/*.bench.tsx"
+
+  # Benchmark harness sources (intentional edge cases and extreme inputs)
+  - "**/benchmarks/**"
 
   # Build artifacts and dependencies
   - "**/node_modules/**"
