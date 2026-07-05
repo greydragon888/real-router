@@ -41,4 +41,26 @@ describe("optional inverse-half (#1147/#1148/#1149)", () => {
       expect(m.buildPath("tail", {})).toBe("/home");
     });
   });
+
+  describe("#1148 — constraint on an omitted optional must not test undefined", () => {
+    it("routes the omit form — constraint applies only when the param is present", () => {
+      const m = createMatcher([
+        { name: "s", path: String.raw`/search/:query<\d+>?` },
+      ]);
+
+      expect(m.buildPath("s", {})).toBe("/search");
+      // was undefined: #validateConstraints tested `undefined` → "undefined",
+      // and \d+ ⊭ "undefined" → the omit form was unroutable
+      expect(m.match("/search")).toBeDefined();
+    });
+
+    it("still enforces the constraint when the optional IS present", () => {
+      const m = createMatcher([
+        { name: "s", path: String.raw`/search/:query<\d+>?` },
+      ]);
+
+      expect(m.match("/search/42")).toBeDefined();
+      expect(m.match("/search/abc")).toBeUndefined();
+    });
+  });
 });
