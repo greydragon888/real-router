@@ -119,9 +119,9 @@ function processMatch(
   child: ReactElement,
   routeName: string,
   nodeName: string,
-  hasBeenActivated: Set<string>,
+  hasBeenActivated: ReadonlySet<string>,
   alreadyActive: boolean,
-): { rendered: ReactElement | null; matched: boolean } {
+): { rendered: ReactElement | null; activatedName: string | null } {
   const matchProps = child.props as MatchProps;
   const { segment, exact = false, keepAlive = false, fallback } = matchProps;
   const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
@@ -129,8 +129,11 @@ function processMatch(
     !alreadyActive && isSegmentMatch(routeName, fullSegmentName, exact);
 
   if (isActive) {
-    hasBeenActivated.add(fullSegmentName);
-
+    // The keepAlive Set is NOT mutated here — RouteView commits the activation
+    // in a post-render effect (#1251). Mutating during render coupled the pure
+    // winner computation to a side effect (blocking memoization) and, under
+    // concurrent rendering, a discarded render would leave a phantom entry that
+    // later renders an un-committed match as a hidden keepAlive subtree.
     return {
       rendered: renderSlotElement(
         matchProps.children,
@@ -139,7 +142,7 @@ function processMatch(
         "visible",
         fallback,
       ),
-      matched: true,
+      activatedName: fullSegmentName,
     };
   }
 
@@ -152,11 +155,11 @@ function processMatch(
         "hidden",
         fallback,
       ),
-      matched: false,
+      activatedName: null,
     };
   }
 
-  return { rendered: null, matched: false };
+  return { rendered: null, activatedName: null };
 }
 
 function appendFallback(
@@ -190,15 +193,23 @@ export function buildRenderList(
   elements: ReactElement[],
   routeName: string,
   nodeName: string,
-  hasBeenActivated: Set<string>,
-): { rendered: ReactElement[]; activeMatchFound: boolean } {
+  hasBeenActivated: ReadonlySet<string>,
+): {
+  rendered: ReactElement[];
+  activeMatchFound: boolean;
+  activatedName: string | null;
+} {
   const slots: FallbackSlots = {
     selfChildren: null,
     selfFallback: undefined,
     selfFound: false,
     notFoundChildren: null,
   };
-  let activeMatchFound = false;
+  // The segment that activated this render, or null. Reported to the caller so
+  // RouteView can commit it to the keepAlive Set post-render (#1251) — this pure
+  // walk no longer mutates the Set. At most one match activates (first-wins via
+  // the `alreadyActive` short-circuit), so a single name suffices.
+  let activatedName: string | null = null;
   const rendered: ReactElement[] = [];
 
   for (const child of elements) {
@@ -211,11 +222,11 @@ export function buildRenderList(
       routeName,
       nodeName,
       hasBeenActivated,
-      activeMatchFound,
+      activatedName !== null,
     );
 
-    if (result.matched) {
-      activeMatchFound = true;
+    if (result.activatedName !== null) {
+      activatedName = result.activatedName;
     }
 
     if (result.rendered !== null) {
@@ -223,9 +234,9 @@ export function buildRenderList(
     }
   }
 
-  if (!activeMatchFound) {
+  if (activatedName === null) {
     appendFallback(rendered, routeName, nodeName, slots);
   }
 
-  return { rendered, activeMatchFound };
+  return { rendered, activeMatchFound: activatedName !== null, activatedName };
 }

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { Match, NotFound, Self } from "./components";
 import { buildRenderList, collectElements } from "./helpers";
@@ -16,6 +16,8 @@ function RouteViewRoot({
 
   // eslint-disable-next-line @eslint-react/refs -- lazy init: assign once when null to avoid `new Set()` allocation on every render
   hasBeenActivatedRef.current ??= new Set();
+  // eslint-disable-next-line @eslint-react/refs -- stable render cache; the ref is never reassigned after lazy init
+  const hasBeenActivated = hasBeenActivatedRef.current;
 
   // Skip the Children.forEach + collectElements traversal when the children
   // reference is unchanged. The common SPA case is a stable JSX tree across
@@ -34,17 +36,40 @@ function RouteViewRoot({
     return collected;
   }, [children]);
 
-  if (!route) {
-    return null;
-  }
+  const routeName = route?.name ?? null;
 
-  const { rendered } = buildRenderList(
-    elements,
-    route.name,
-    nodeName,
-    // eslint-disable-next-line @eslint-react/refs -- stable Set ref read for keepAlive tracking (never reassigned)
-    hasBeenActivatedRef.current,
-  );
+  // Memoize the render walk by its pure inputs. Previously `buildRenderList` ran
+  // on EVERY render because `processMatch` mutated the keepAlive Set inline —
+  // coupling the pure winner/`rendered` computation to a side effect, so a
+  // parent re-render with no route change re-walked every Match and re-diffed
+  // the identical output (preact, whose `buildRenderList` is a 3-arg pure
+  // function, already memoizes here). The Set mutation now lives in the effect
+  // below, so the walk memoizes on `[elements, routeName, nodeName]` too. #1251.
+  const { rendered, activatedName } = useMemo(() => {
+    if (routeName === null) {
+      return { rendered: [] as ReactElement[], activatedName: null };
+    }
+
+    const result = buildRenderList(
+      elements,
+      routeName,
+      nodeName,
+      hasBeenActivated,
+    );
+
+    return { rendered: result.rendered, activatedName: result.activatedName };
+  }, [elements, routeName, nodeName, hasBeenActivated]);
+
+  // Commit the keepAlive activation AFTER render, not during it. A render that
+  // React discards under concurrent rendering must not record an activation
+  // that never committed — otherwise a later render would show that
+  // never-mounted match as a hidden keepAlive subtree. Adding the same name
+  // twice is a no-op, so the effect is safe to re-run.
+  useEffect(() => {
+    if (activatedName !== null) {
+      hasBeenActivated.add(activatedName);
+    }
+  }, [activatedName, hasBeenActivated]);
 
   if (rendered.length > 0) {
     return <>{rendered}</>;

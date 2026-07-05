@@ -83,17 +83,27 @@ trees of `<Match>` / `<Self>` / `<NotFound>` leaves (optionally
 | 4   | `buildRenderList` first-Self wins                  | N copies of `<Self>` with `routeName === nodeName` produce exactly one rendered entry with key `__route-view-self__`. Subsequent `<Self>` elements update no state in `recordFallback`.                       |
 | 5   | `buildRenderList` Self priority over NotFound      | When `<Self>` matches (`routeName === nodeName`), `<NotFound>` is never appended even if the route also satisfies `UNKNOWN_ROUTE`. Self has priority in `appendFallback`.                                    |
 | 6   | `buildRenderList` activeMatchFound precludes fallback | Any activating `<Match>` suppresses both `<Self>` and `<NotFound>` from the render list. `appendFallback` is gated by `!activeMatchFound`.                                                                  |
-| 7   | `processMatch` keepAlive sticky activation         | Once a `keepAlive=true` segment becomes visible, it stays in `hasBeenActivated` for the RouteView's lifetime. Subsequent navigations to a different route still render it (in hidden mode).                  |
+| 7   | `processMatch` keepAlive sticky activation         | Once a `keepAlive=true` segment activates, `buildRenderList` reports it via `activatedName`; RouteView commits it to `hasBeenActivated` in a post-render effect (#1251), keeping it sticky for the RouteView's lifetime. Subsequent navigations to a different route still render it (in hidden mode). |
 | 8   | `processMatch` alreadyActive short-circuit         | After the first `<Match>` activates within a `buildRenderList` pass, subsequent matches with overlapping segments are short-circuited via the `alreadyActive` flag — exactly one entry rendered per pass.    |
 | 9   | `collectElements` recursion termination            | Depth-N Fragment wrapping (N up to 10) terminates and returns the inner Match element. Defends against an iterator regression that loses the terminating case.                                              |
 | 10  | `buildRenderList` stability                        | Two consecutive calls with identical `(elements, routeName, freshSet)` produce render lists of equal length, identical `activeMatchFound`, and identical per-index `type` + `key`. No hidden state.         |
-| 11  | `processMatch` keepAlive monotonicity              | Across a sequence of `buildRenderList` passes with distinct route names targeting different `<Match keepAlive>` segments, `hasBeenActivated` grows monotonically — no entry is ever removed.                |
+| 11  | `processMatch` keepAlive monotonicity              | Across a sequence of `buildRenderList` passes with distinct route names targeting different `<Match keepAlive>` segments, the committed `hasBeenActivated` (grown by RouteView's effect from each pass's `activatedName`) grows monotonically — no entry is ever removed. |
 | 12  | Large element arrays                               | `buildRenderList` correctly resolves first-match-wins and NotFound conditional across 50..120 Match elements. Guards against an O(n²) regression in the linear walk.                                       |
-| 13  | keepAlive with falsy routeName                     | `<Match keepAlive segment="x">` against `routeName=""` does NOT activate and does NOT enter the keepAlive set. A segment previously activated stays in `hasBeenActivated` and renders hidden during a `routeName=""` transition. |
+| 13  | keepAlive with falsy routeName                     | `<Match keepAlive segment="x">` against `routeName=""` does NOT activate and does NOT enter the keepAlive set. A segment previously activated (committed via the effect) stays in `hasBeenActivated` and renders hidden during a `routeName=""` transition. |
 
 Cross-check (not in #626, tightens fallback contract): `<NotFound>` is
 appended to the render list **only** when `routeName === UNKNOWN_ROUTE`
 AND no `<Match>` activated AND no `<Self>` consumed the slot.
+
+**#1251 — `buildRenderList` is a pure walk:** it no longer mutates
+`hasBeenActivated` inline (which coupled the pure winner computation to a side
+effect — blocking memoization — and was unsafe under concurrent rendering, where
+a discarded render would leave a phantom entry that later renders an un-committed
+match as a hidden keepAlive subtree). It READS the Set (a `ReadonlySet`) for the
+hidden-render decision and RETURNS `activatedName`; RouteView commits it to the
+Set in a post-render `useEffect`, so only committed renders record an activation.
+Invariants 7 / 11 / 13 simulate that effect (adding `activatedName` to the Set)
+between passes.
 
 ## Segment Matching (isSegmentMatch)
 

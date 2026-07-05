@@ -13,8 +13,11 @@
  *   matches. Invariants: first-match wins, first-Self wins, Self priority
  *   over NotFound, activeMatchFound precludes fallback.
  * - `processMatch` (private; reached via `buildRenderList`) — handles the
- *   keepAlive sticky-activation and `alreadyActive` short-circuit. The
- *   shared `hasBeenActivated: Set<string>` is the persistence vehicle.
+ *   keepAlive sticky-activation and `alreadyActive` short-circuit. Since #1251
+ *   the walk is pure: it READS `hasBeenActivated` (a `ReadonlySet`) for the
+ *   hidden-render decision and REPORTS the activated segment via `activatedName`
+ *   rather than mutating the Set — RouteView commits it in a post-render effect,
+ *   so the keepAlive tests below simulate that commit between passes.
  *
  * The React-element generators here build well-formed trees without JSX
  * (vitest config is `environment: "node"` for property tests). Each
@@ -326,7 +329,9 @@ describe("RouteView pipeline — Property Tests", () => {
         const elements = [makeMatch(matchSegment, { keepAlive: true })];
         const hasBeenActivated = new Set<string>();
 
-        // Pass 1: route activates the Match.
+        // Pass 1: route activates the Match. buildRenderList is now a pure walk
+        // (#1251) — it REPORTS the activation via `activatedName` instead of
+        // mutating the Set; RouteView commits it in a post-render effect.
         const first = buildRenderList(
           elements,
           matchSegment,
@@ -335,10 +340,15 @@ describe("RouteView pipeline — Property Tests", () => {
         );
 
         expect(first.activeMatchFound).toBe(true);
+        expect(first.activatedName).toBe(matchSegment);
         expect(first.rendered).toHaveLength(1);
-        expect(hasBeenActivated.has(matchSegment)).toBe(true);
+        // Pure: the walk did NOT mutate the Set.
+        expect(hasBeenActivated.has(matchSegment)).toBe(false);
 
-        // Pass 2: different route, keepAlive must keep it in the render list.
+        // Simulate RouteView's post-render effect committing the activation.
+        hasBeenActivated.add(first.activatedName!);
+
+        // Pass 2: different route; keepAlive reads the committed Set → hidden.
         const second = buildRenderList(
           elements,
           otherSegment,
@@ -347,6 +357,7 @@ describe("RouteView pipeline — Property Tests", () => {
         );
 
         expect(second.activeMatchFound).toBe(false);
+        expect(second.activatedName).toBeNull();
         expect(second.rendered).toHaveLength(1);
         // Sticky: still in the activated set.
         expect(hasBeenActivated.has(matchSegment)).toBe(true);
@@ -529,7 +540,18 @@ describe("RouteView pipeline — Property Tests", () => {
         let previousSize = 0;
 
         for (const seg of uniqueSegments) {
-          buildRenderList(elements, seg, "", hasBeenActivated);
+          const { activatedName } = buildRenderList(
+            elements,
+            seg,
+            "",
+            hasBeenActivated,
+          );
+
+          // Simulate RouteView's post-render effect committing the activation
+          // (#1251 — the pure walk reports it, the effect grows the Set).
+          if (activatedName !== null) {
+            hasBeenActivated.add(activatedName);
+          }
 
           // After visiting `seg`, every previously-visited segment must
           // still be in the set.
@@ -647,10 +669,15 @@ describe("RouteView pipeline — Property Tests", () => {
         const elements = [makeMatch(segment, { keepAlive: true })];
         const hasBeenActivated = new Set<string>();
 
-        // Pass 1: activate.
+        // Pass 1: activate. buildRenderList reports the activation (#1251);
+        // simulate RouteView's effect committing it to the Set.
         const first = buildRenderList(elements, segment, "", hasBeenActivated);
 
         expect(first.activeMatchFound).toBe(true);
+        expect(first.activatedName).toBe(segment);
+
+        hasBeenActivated.add(first.activatedName!);
+
         expect(hasBeenActivated.has(segment)).toBe(true);
 
         // Pass 2: transition through empty route name. The segment stays
