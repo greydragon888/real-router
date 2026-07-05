@@ -63,4 +63,20 @@ describe("optional inverse-half (#1147/#1148/#1149)", () => {
       expect(m.match("/search/abc")).toBeUndefined();
     });
   });
+
+  describe("#1149 — optional splat *name? rejected at registration", () => {
+    it("throws at registration (path-matcher backstop, sibling of #858/#1050)", () => {
+      // was: silently compiled a plain param; buildPath({path:'a/b'}) emitted
+      // '/files/a/b' the matcher rejects (three-way match/build/meta desync)
+      expect(() =>
+        createMatcher([{ name: "f", path: "/files/*path?" }]),
+      ).toThrow(/Optional splat/);
+    });
+
+    it("a required splat *name is unaffected", () => {
+      const m = createMatcher([{ name: "f", path: "/files/*path" }]);
+
+      expect(m.match("/files/a/b/c")?.params?.path).toBe("a/b/c");
+    });
+  });
 });

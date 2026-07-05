@@ -98,6 +98,19 @@ function hasFusedMidSegmentMarker(path: string): boolean {
 }
 
 /**
+ * An optional splat `*name?`: `buildParamMeta`/build classify it as a splat
+ * (multi-segment, `/`-preserving encoder) but the trie's optional fork compiles a
+ * single-segment plain param — so `buildPath` emits multi-segment URLs its own
+ * `match` rejects. Rejected (product decision, #1149); path-matcher backstops at
+ * `registerTree`. Tested on the query-stripped `pathPattern`, so a required splat
+ * followed by a query (`*path?download`) is NOT flagged. A splat name cannot
+ * contain `?` (`PARAM_NAME_PATTERN` excludes it), so the `?` right after the name
+ * is unambiguously the optional marker: `\*[^/?]*\?` is exact. Sibling of the
+ * fused (#1050) / name-less (#863) marker rejections.
+ */
+const OPTIONAL_SPLAT_RGX = /\*[^/?]*\?/;
+
+/**
  * Validates route path format.
  * Throws a descriptive error if validation fails.
  *
@@ -215,6 +228,17 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": parameter marker (':' or '*') must begin a segment, but "${path}" fuses one to a static prefix (use a boundary marker like "/a/:b")`,
+    );
+  }
+
+  // Optional splat `*name?`. build treats it as a multi-segment splat but the
+  // trie's optional fork compiles a single-segment plain param — so `buildPath`
+  // emits a URL its own `match` rejects. Reject at the gate (path-matcher
+  // backstops at `registerTree`), the sibling of #1050/#863 (#1149).
+  if (OPTIONAL_SPLAT_RGX.test(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": optional splat ('*name?') is not supported in "${path}" — a splat cannot be optional (use a required splat '*name')`,
     );
   }
 

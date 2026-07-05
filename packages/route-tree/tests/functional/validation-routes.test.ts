@@ -393,6 +393,27 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("should throw for an optional splat '*name?' (#1149)", () => {
+        const paths = [
+          "/files/*path?", // optional splat
+          "/:lang?/files/*rest?", // optional splat after an optional param
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/optional splat/u);
+        });
+      });
+
+      it("should NOT flag a required splat followed by a query (control, #1149)", () => {
+        // `?download` is the query separator, `*path` a required splat — the
+        // query-stripped pathPattern has no optional marker on the splat.
+        expect(() => {
+          validateRoutePath("/files/*path?download", routeName, methodName);
+        }).not.toThrow();
+      });
+
       it("should NOT flag a boundary marker or a marker-led greedy name (controls)", () => {
         const paths = [
           "/a/:b", // boundary marker — the canonical correct form

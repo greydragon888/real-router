@@ -337,6 +337,24 @@ function throwFusedMarker(segment: string): never {
 }
 
 /**
+ * Rejects an optional splat (`*name?`): `buildParamMeta`/`compileBuildParts`
+ * classify it as a splat (multi-segment, splat encoder preserves "/"), but the
+ * optional fork would compile a plain param node that eats a single segment — a
+ * three-way match/build/meta desync (`buildPath` emits multi-segment URLs `match`
+ * rejects). The shape only "worked" for 0–1 segments, so rejecting loses nothing
+ * real. The sibling of {@link throwEmptyParamName} (#858) / {@link throwFusedMarker}
+ * (#1050). route-tree's validation gate catches this first with a route-contextual
+ * error; this is the standalone registration backstop. (#1149)
+ */
+function throwOptionalSplat(segment: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Optional splat "${segment}" is not supported: ` +
+      `a splat cannot be optional — build emits multi-segment URLs the matcher ` +
+      `rejects. Use a required splat "*name".`,
+  );
+}
+
+/**
  * An unbalanced `<`/`>` desyncs match vs build: the name is truncated at the
  * stray `<`, the unclosed constraint survives as a literal in the trie path, and
  * `buildPath` emits a URL its own `match` rejects (#804 — the residual gap #749
@@ -511,6 +529,13 @@ function insertIntoTrieFrom(
     const segment = path.slice(start, segmentEnd);
 
     if (segment.endsWith("?")) {
+      if (segment.startsWith("*")) {
+        // Optional splat `*name?`: build uses the splat encoder (multi-segment)
+        // but this fork would compile a plain single-segment param — a
+        // match/build desync. Rejected (product decision, #1149).
+        throwOptionalSplat(segment);
+      }
+
       const paramName = extractParamName(segment);
       const paramChildNode = ensureParamChild(node, paramName, ownNodes);
 
