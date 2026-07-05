@@ -22,7 +22,8 @@
 #
 # Flow: preflight (power/thermal/apps) → disable distractions → rebuild all
 # package dist (pnpm bundle) → [optional n=1 smoke] → cooldown → per-cohort
-# n=15 matrix (thermal cooldown between cohorts) → rme-gate + REPORT regen.
+# n=15 matrix → rme-gate → sub-ms sanity re-measure (#1261) → REPORT regen,
+# with thermal cooldown + heavy-process recheck between cohorts.
 #
 # NOTE: deliberately NOT `set -e` — a 3 h unattended run must survive a single
 # flaky cell / RME flag and continue to the next cohort. Hard failures (bundle,
@@ -45,6 +46,8 @@ COOLDOWN="${COOLDOWN:-60}"               # fallback cooldown when thermal unread
 MAX_COOLDOWN_WAIT="${MAX_COOLDOWN_WAIT:-300}"
 RME_STABLE="${RME_STABLE:-15}"           # RME % threshold — stable metric families
 RME_NOISY="${RME_NOISY:-40}"             # RME % threshold — noisy families (blink/latency/fcp)
+SANITY_RUNS="${SANITY_RUNS:-12}"         # post-cohort sub-ms sanity re-measure n (0 = skip)
+SANITY_SHIFT="${SANITY_SHIFT:-20}"       # % median shift (recorded vs fresh) that flags load
 SMOKE=false                              # --smoke: n=1 dry matrix first, abort on any failure
 NO_BUILD=false                           # --no-build: skip pnpm bundle (use existing dist)
 ASSUME_YES=false                         # --yes / -y: skip interactive prompts (unattended)
@@ -75,6 +78,8 @@ show_help() {
     echo "  MAX_COOLDOWN_WAIT  Max thermal cooldown between cohorts  (default: 300)"
     echo "  RME_STABLE         RME % gate, stable families          (default: 15)"
     echo "  RME_NOISY          RME % gate, noisy families           (default: 40)"
+    echo "  SANITY_RUNS        Post-cohort sub-ms sanity re-measure n (default: 12; 0 = skip)"
+    echo "  SANITY_SHIFT       % shift vs fresh re-measure that flags load inflation (default: 20)"
     echo ""
     echo "Examples:"
     echo "  sudo ./bench-cross-router.sh                  # rebuild + all 5 cohorts, n=15"
@@ -241,6 +246,27 @@ wait_for_cooldown() {
     return 0
 }
 
+# Heavy CPU processes (same filter as `pnpm cpu`; ignore our own tooling).
+heavy_processes() {
+    ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 " (" $1 "%)"}' | head -5
+}
+
+# Mid-run load recheck (#1261): the Step-1 gate runs BEFORE the run, so load
+# starting mid-run goes unnoticed there. Re-run the same heavy-process filter at
+# the between-cohort cooldown points — warn-only (an unattended run must keep
+# going), tallied for the summary. Thermal is already rechecked by
+# wait_for_cooldown at the same points; this adds the process-load half.
+LOAD_FLAGGED=""
+recheck_load() {
+    local heavy
+    heavy=$(heavy_processes)
+    if [[ -n "$heavy" ]]; then
+        echo -e "${YELLOW}  ⚠ heavy processes detected mid-run (>10% CPU) — sub-ms cells near this point are suspect:${NC}"
+        echo "$heavy"
+        LOAD_FLAGGED="$LOAD_FLAGGED $1"
+    fi
+}
+
 # --- Cleanup (runs on exit, error, or interrupt) -----------------------------
 cleanup() {
     echo ""
@@ -287,8 +313,7 @@ if [[ -n "$DISTRACTING_APPS" ]]; then
     echo -e "$DISTRACTING_APPS"
 fi
 
-# Heavy CPU processes (same filter as `pnpm cpu`; ignore our own tooling).
-HEAVY_PROCESSES=$(ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 " (" $1 "%)"}' | head -5)
+HEAVY_PROCESSES=$(heavy_processes)
 if [[ -n "$HEAVY_PROCESSES" ]]; then
     echo -e "${RED}Warning: heavy processes detected (>10% CPU):${NC}"
     echo "$HEAVY_PROCESSES"
@@ -317,6 +342,7 @@ echo "  Runs (n): $RUNS"
 echo "  Rebuild: $([[ "$NO_BUILD" == true ]] && echo 'skipped (--no-build)' || echo 'pnpm bundle (all packages)')"
 echo "  Smoke: $([[ "$SMOKE" == true ]] && echo 'yes (n=1 dry matrix first)' || echo 'no')"
 echo "  RME gate: stable ${RME_STABLE}% · noisy ${RME_NOISY}%"
+echo "  Sub-ms sanity: $([[ "$SANITY_RUNS" -gt 0 ]] && echo "nav-latency × real-router re-measure, n=$SANITY_RUNS, flag |shift| > ${SANITY_SHIFT}%" || echo 'disabled (SANITY_RUNS=0)')"
 echo "  Cooldown: wait for Nominal between cohorts (max ${MAX_COOLDOWN_WAIT}s, fallback ${COOLDOWN}s)"
 
 # -----------------------------------------------------------------------------
@@ -391,6 +417,7 @@ if warn_if_throttling; then confirm_or_abort; fi
 LAST_COHORT="${COHORTS[${#COHORTS[@]}-1]}"   # bash 3.2: no ${arr[-1]}
 FAILED_COHORTS=""
 RME_FLAGGED=""
+SANITY_FLAGGED=""
 REPORT_FAILED=""
 
 for cohort in "${COHORTS[@]}"; do
@@ -426,6 +453,26 @@ for cohort in "${COHORTS[@]}"; do
         RME_FLAGGED="$RME_FLAGGED $cohort"
     fi
 
+    # Sub-ms sanity re-measure (non-fatal, #1261): the readiness gate can't see
+    # load that appears MID-RUN, and the RME gate can't either — a uniformly
+    # load-inflated cell is internally consistent (07-05: nav-latency +47% with
+    # RME green). Re-measure the canonical sub-ms cell at small n (results/ is
+    # NOT touched) and compare medians vs what the matrix just wrote — a material
+    # shift means this cohort's sub-ms per-nav absolutes are load-tainted.
+    if [[ "$SANITY_RUNS" -gt 0 ]]; then
+        echo -e "${BLUE}  Sub-ms sanity re-measure (nav-latency × real-router, n=$SANITY_RUNS)...${NC}"
+        as_user "cd '$SCRIPT_DIR' && node cross-router/harness/sanity-remeasure.mjs $cohort $SANITY_RUNS $SANITY_SHIFT"
+        sanity_rc=$?
+        if [[ "$sanity_rc" -eq 0 ]]; then
+            echo -e "${GREEN}  ✓ $cohort sub-ms consistent with a fresh re-measure${NC}"
+        elif [[ "$sanity_rc" -eq 2 ]]; then
+            echo -e "${YELLOW}  ⚠ $cohort sanity re-measure skipped (no recorded nav-latency cell)${NC}"
+        else
+            echo -e "${YELLOW}  ⚠ $cohort sub-ms shifted vs fresh re-measure — sub-ms absolutes suspect${NC}"
+            SANITY_FLAGGED="$SANITY_FLAGGED $cohort"
+        fi
+    fi
+
     # Regenerate the committed REPORT from results/.
     if as_user "cd '$SCRIPT_DIR' && node cross-router/harness/report.mjs $cohort"; then
         echo -e "${GREEN}  ✓ REPORT regenerated${NC}"
@@ -437,6 +484,7 @@ for cohort in "${COHORTS[@]}"; do
     if [[ "$cohort" != "$LAST_COHORT" ]]; then
         echo ""
         echo -e "${YELLOW}Cohort $cohort done. Thermal cooldown before the next...${NC}"
+        recheck_load "$cohort"
         wait_for_cooldown "$MAX_COOLDOWN_WAIT"
     fi
 done
@@ -459,11 +507,20 @@ if [[ -n "$RME_FLAGGED" ]]; then
     echo -e "${YELLOW}  ⚠ cohorts flagged by the RME gate:$RME_FLAGGED${NC}"
     echo -e "${YELLOW}    → inspect the offenders above; consider re-running (thermal/noise).${NC}"
 fi
+if [[ -n "$SANITY_FLAGGED" ]]; then
+    echo -e "${YELLOW}  ⚠ cohorts whose sub-ms class failed the sanity re-measure:$SANITY_FLAGGED${NC}"
+    echo -e "${YELLOW}    → sub-ms per-nav absolutes are load-tainted (stable classes are fine);${NC}"
+    echo -e "${YELLOW}      re-run those cohorts before trusting/committing sub-ms numbers.${NC}"
+fi
+if [[ -n "$LOAD_FLAGGED" ]]; then
+    echo -e "${YELLOW}  ⚠ heavy processes appeared mid-run (after cohorts:$LOAD_FLAGGED)${NC}"
+    echo -e "${YELLOW}    → sub-ms cells measured near those points are suspect.${NC}"
+fi
 if [[ -n "$REPORT_FAILED" ]]; then
     echo -e "${RED}  ⚠ REPORT regeneration failed for:$REPORT_FAILED${NC}"
 fi
-if [[ -z "$FAILED_COHORTS" && -z "$RME_FLAGGED" && -z "$REPORT_FAILED" ]]; then
-    echo -e "${GREEN}  ✓ clean run — all cohorts complete, RME within thresholds, REPORTs regenerated.${NC}"
+if [[ -z "$FAILED_COHORTS" && -z "$RME_FLAGGED" && -z "$SANITY_FLAGGED" && -z "$LOAD_FLAGGED" && -z "$REPORT_FAILED" ]]; then
+    echo -e "${GREEN}  ✓ clean run — all cohorts complete, RME + sub-ms sanity clean, REPORTs regenerated.${NC}"
     echo -e "${GREEN}    Review git diff of cross-router/REPORT*.md, then commit.${NC}"
 fi
 echo ""

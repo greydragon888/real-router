@@ -45,14 +45,14 @@ benchmarks/
 │   │   #  angular cohort: real-router · @angular/router (Angular's OFFICIAL router — standalone lib configured via provideRouter like vue-router, NOT framework-bundled; ONLY serious Angular router, no 3rd-party → 2-engine cohort by ecosystem reality); REPORT-angular.md; Angular 22 ZONELESS standalone-component apps (@analogjs/vite-plugin-angular AOT + @angular/build peer) · _baseline = bare Angular. Findings: @angular/router WINS most (boot ~3× lighter, nav/param, wide FLAT+lean 0.33, memory 3.67@10k, churn-CPU, nested); rr WINS only active-links (cached active-source) + link-build (14.3<18.05); deep ~wash (both O(depth)); capability rr 4/4 vs angular-router 3/4 (only validated-search edge). TOUGHEST cohort for rr — @angular/router objectively excellent
 │   ├── scenarios/*.mjs            # 8 engine-agnostic drivers: cold-start · nav-latency · param-nav · wide-config ·
 │   │   #  deep-config · nav-churn · active-links · nested-switch  (sweeps emit per-size @N/@D keys)
-│   ├── harness/                   # cdp.mjs (CDPSession: Performance.getMetrics + HeapProfiler) · stats.mjs (median/p95/RME) · measure.mjs · report.mjs
+│   ├── harness/                   # cdp.mjs (CDPSession: Performance.getMetrics + HeapProfiler) · stats.mjs (median/p95/RME) · measure.mjs · report.mjs · rme-gate.mjs · sanity-remeasure.mjs (#1261 mid-run load guard) · status-tables.mjs · verify-features.mjs
 │   ├── run.mjs · run-all.mjs      # one run / full matrix → results/<fw>/<scenario>/<engine>.json; VARIANT map routes big-table scenarios to <engine>/<variant>/
 │   ├── results/ (gitignored) · REPORT.md (react) + REPORT-vue.md + REPORT-solid.md + REPORT-svelte.md + REPORT-angular.md (committed, curated)
 │   └── tsconfig.json (react-jsx; excludes apps/vue + apps/solid) · apps/vue/tsconfig.json (jsxImportSource vue) · apps/solid/tsconfig.json (jsxImportSource solid-js) · apps/svelte: NO tsconfig (SFC) · apps/angular/<engine>/{tsconfig,tsconfig.app}.json (per-app; Angular AOT via analog, strictTemplates type-checks at build) · .gitignore
 │      #  type-check (ungated, manual/IDE): tsc -p cross-router/tsconfig.json (react) · -p cross-router/apps/vue/tsconfig.json (vue) · -p cross-router/apps/solid/tsconfig.json (solid). NB: IDE tsserver mis-applies react-jsx to solid files (flood of false "React.JSX / --jsx" errors) — the `tsc -p apps/solid` run is AUTHORITATIVE (0 errors); ignore the IDE noise for solid apps. Svelte apps have NO tsc step — `vite build` (svelte plugin) is the check; verify via `run.mjs <scenario> <engine> svelte`. Angular apps: NO separate tsc — the AOT build (@analogjs/vite-plugin-angular, strictTemplates) type-checks; IDE shows FALSE "tslib / Cannot find ./pages" noise (stale tsserver, not the AOT resolver) — authoritative is `run.mjs <scenario> <engine> angular`
 ├── bench-compare.sh               # Core comparison script (sudo, thermal monitoring)
 ├── bench-compare-vs-tanstack.sh   # TanStack comparison script (sudo, thermal monitoring)
-├── bench-cross-router.sh          # Cross-router unattended full-run orchestrator (sudo): rebuild dist → machine-readiness → per-cohort n=15 matrix + REPORT regen. Workload runs as $SUDO_USER (Playwright/Chromium can't run as root)
+├── bench-cross-router.sh          # Cross-router unattended full-run orchestrator (sudo): rebuild dist → machine-readiness → per-cohort n=15 matrix → rme-gate → sub-ms sanity re-measure (#1261) + REPORT regen, load recheck between cohorts. Workload runs as $SUDO_USER (Playwright/Chromium can't run as root)
 ├── compare.mjs                    # Analyze and compare core/.bench/ results
 └── check-rme.sh                   # Validate RME stability across core/.bench/ JSON files
 ```
@@ -125,7 +125,8 @@ sudo ./bench-compare-vs-tanstack.sh
 ```bash
 # Full unattended refresh (RECOMMENDED for the n=15 big-refresh) — sudo orchestrator:
 #   rebuild all dist → machine-readiness gate (power/thermal/apps) → per-cohort matrix
-#   (thermal cooldown between cohorts) → rme-gate + REPORT regen. Chromium runs as you, not root.
+#   → rme-gate → sub-ms sanity re-measure (#1261) + REPORT regen, with thermal cooldown
+#   + heavy-process recheck between cohorts. Chromium runs as you, not root.
 sudo ./bench-cross-router.sh                                  # all 5 cohorts, n=15, rebuild first
 sudo ./bench-cross-router.sh --smoke                          # n=1 dry matrix first (fail-fast), then the full run
 sudo ./bench-cross-router.sh --runs 30 solid                  # one cohort at n=30
@@ -138,6 +139,7 @@ node cross-router/harness/verify-features.mjs                 # functional capab
 node cross-router/harness/report.mjs [react|vue|solid|svelte|angular] # results/<fw>/ → REPORT.md / REPORT-vue.md / REPORT-solid.md / REPORT-svelte.md / REPORT-angular.md — perf tables + capability matrix
 node cross-router/harness/status-tables.mjs [react|vue|solid|svelte|angular] # committed REPORT*.md → flat status view: `сценарий | metric | engines | rr status` (🟡 parity <10%, else 🟢/🔴 delta from winner or, if rr first, nearest competitor). Reads the committed REPORTs (no results/ needed); `> view.md` to snapshot
 node cross-router/harness/rme-gate.mjs [stable=15] [noisy=40] [cohort] # RME-gate: scans results/ and exits non-zero (1) if any metric's RME exceeds its family threshold — `stable` for reliable signals (total/script/heap/throughput), looser `noisy` for inherently-jittery blink/latency/fcp. Cross-router analogue of check-rme.sh; run AFTER run-all (exit 2 = no results). Env: RME_STABLE/RME_NOISY
+node cross-router/harness/sanity-remeasure.mjs <fw> [runs=12] [shift%=20] # Sub-ms sanity (#1261): re-measures nav-latency × real-router at small n WITHOUT writing results/, compares medians vs the recorded cell — catches MID-RUN load inflation neither the readiness gate (pre-run only) nor the RME gate (a uniformly-inflated cell is internally consistent — 07-05: +47% with RME green) can see. Exit 1 = |shift| > threshold, either direction (fresh ≪ recorded = matrix was loaded; fresh ≫ recorded = load NOW): sub-ms per-nav class suspect, stable classes unaffected · 2 = no recorded cell/app ("cannot judge"). Run per cohort by bench-cross-router.sh (env SANITY_RUNS=12 / SANITY_SHIFT=20; SANITY_RUNS=0 skips); alloc row printed as control (bytes ≠ duration — alloc flat + totalMs shifted = load, not code)
 ```
 
 Capability matrix (`✓ⁱ` = verified in-harness via a functional demo app under `apps/react/<engine>/{data,search,guard}/`) shows feature gaps a perf table can't — among the full routers, `react-router` lacks first-class validated search. `wouter` is excluded from the roster (minimalist location-matcher, different class + no cross-framework analog — see REPORT.md **Scope**). Per-cohort, never cross-framework.
