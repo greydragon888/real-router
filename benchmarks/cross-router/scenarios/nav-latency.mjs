@@ -5,11 +5,16 @@
 // 2×/nav) looks lean on script alone while paying it in Blink — so script-only is
 // misleading; total is fair. Two passes: pass 1 clean ScriptDuration (no trace
 // overhead), pass 2 traces Blink (its event `dur` is the real work).
-import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
+import {
+  getMetrics,
+  sampleAllocationBytes,
+  traceBlinkUs,
+} from "../harness/cdp.mjs";
 
 const WARMUP_NAVS = 12;
 const SCRIPT_NAVS = 40;
 const BLINK_NAVS = 24;
+const ALLOC_NAVS = 60;
 
 export const navLatency = {
   name: "nav-latency",
@@ -55,6 +60,17 @@ export const navLatency = {
       BLINK_NAVS /
       1000;
 
-    return { totalMs: scriptDurationMs + blinkMs, scriptDurationMs, blinkMs };
+    // Allocation pass — transient bytes/nav (GC pressure), same navs, sampled.
+    const allocKBPerNav =
+      (await sampleAllocationBytes(client, () => drive(ALLOC_NAVS, 0))) /
+      ALLOC_NAVS /
+      1024;
+
+    return {
+      totalMs: scriptDurationMs + blinkMs,
+      scriptDurationMs,
+      blinkMs,
+      allocKBPerNav,
+    };
   },
 };

@@ -6,7 +6,7 @@
 
 **Scope — three full routers, like-for-like** (no minimalist exclusion needed). The honest picture, DIFFERENT from the React/Vue cohorts: **`@solidjs/router` is a remarkably lean router** and leads the scale floor (wide), table-heap memory, cold-start, nav-churn heap, and active-links. **real-router leads the per-nav *totals*** — nav-latency (0.347, the leanest here), param-nav, nested-switch, link-build — where its lean script + single `pushState` beat @solidjs/router's 2× Blink history; and it brings the full pipeline (guards, validated search, data, scroll). Two adapter soft-spots surface: real-router's heaviest per-nav FLOOR at scale (transition pipeline + browser-plugin History), and **`@real-router/solid`'s deep-nesting `RouteView` cost (#1094 — now ~linear after a bench-app fix removed an O(depth²) getter-chain artifact: 1.07 ms @90)** — an adapter issue, not the (framework-agnostic, flat-capable) core. **`@tanstack/solid-router` is generally heaviest** and cannot render 60+-deep nested routes (errors).
 
-**Run:** runs 15 · warmup 5 · throttle off · 2026-07-04T08:11:51.865Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
+**Run:** runs 30 · warmup 5 · throttle off · 2026-07-05T02:52:56.441Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
 
 ⚠️ Preliminary local numbers — directional, not a published verdict. Reported metrics are the stable signals — CPU (`script`), heap, FCP. Felt latency was dropped (render/frame-bound). **`nav-churn` navsPerSec is NOT comparable in this cohort** (real-router navigates synchronously; the others yield to frames) — read CPU/nav + heap. **Caveat — `script` is V8-only:** CDP `ScriptDuration` excludes Blink C++ (`history.pushState` ~identical across routers), so `script` ratios overstate the `total` per-nav gap.
 
@@ -16,7 +16,7 @@ App init + parse/exec to first route painted. **@solidjs/router is the lightest 
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| main-thread script (ms) | 4.29 | **2.62** | 3.74 |
+| main-thread script (ms) | 4.32 | **2.64** | 3.86 |
 | JS heap (MB) | 2.78 | **2.48** | 3.09 |
 | FCP (ms) | 20.00 | **16.00** | 20.00 |
 
@@ -26,9 +26,10 @@ Per-navigation total (script + Blink history), steady-state. **real-router is th
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.347** | 0.520 | 0.417 |
-| · script (V8 only) (ms) | **0.061** | 0.075 | 0.130 |
-| · Blink history (pushState) (ms) | **0.283** | 0.442 | **0.283** |
+| ≈ total main-thread (ms) | **0.349** | 0.525 | 0.417 |
+| · script (V8 only) (ms) | **0.061** | 0.078 | 0.130 |
+| · Blink history (pushState) (ms) | 0.289 | 0.446 | **0.285** |
+| alloc / nav (GC pressure) (KB) | — | — | — |
 
 ## Param navigation — per-nav total (script + history) — `param-nav`
 
@@ -36,9 +37,10 @@ Per-nav total changing :id (steady-state). **real-router leanest total (0.345)**
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.345** | 0.492 | 0.367 |
-| · script (V8 only) (ms) | 0.070 | **0.048** | 0.083 |
-| · Blink history (pushState) (ms) | **0.282** | 0.444 | 0.283 |
+| ≈ total main-thread (ms) | **0.349** | 0.507 | 0.423 |
+| · script (V8 only) (ms) | 0.071 | **0.049** | 0.084 |
+| · Blink history (pushState) (ms) | **0.277** | 0.457 | 0.340 |
+| alloc / nav (GC pressure) (KB) | — | — | — |
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
@@ -46,12 +48,12 @@ Navigate into a flat 1000-route table. **All three matchers are FLAT** (no O(N) 
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| ≈ total @10 (ms) | 0.355 | **0.155** | 0.211 |
-| ≈ total @100 (ms) | 0.313 | **0.146** | 0.215 |
-| ≈ total @1000 (ms) | 0.327 | **0.151** | 0.209 |
-| · script (matcher) @10 (ms) | 0.297 | **0.070** | 0.154 |
-| · script (matcher) @100 (ms) | 0.255 | **0.068** | 0.161 |
-| · script (matcher) @1000 (ms) | 0.270 | **0.066** | 0.156 |
+| ≈ total @10 (ms) | 0.365 | **0.152** | 0.217 |
+| ≈ total @100 (ms) | 0.329 | **0.144** | 0.221 |
+| ≈ total @1000 (ms) | 0.335 | **0.150** | 0.220 |
+| · script (matcher) @10 (ms) | 0.305 | **0.066** | 0.161 |
+| · script (matcher) @100 (ms) | 0.274 | **0.066** | 0.165 |
+| · script (matcher) @1000 (ms) | 0.276 | **0.068** | 0.161 |
 
 ## Route-table memory — heap to hold N routes (sweep) — `table-heap`
 
@@ -69,57 +71,58 @@ Navigate into a 90-level nested chain. **@solidjs/router stays flat (~0.16 total
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| ≈ total @3 (ms) | 0.468 | **0.139** | — |
-| ≈ total @30 (ms) | 0.731 | **0.146** | — |
-| ≈ total @60 (ms) | 0.775 | **0.155** | — |
-| ≈ total @90 (ms) | 1.07 | **0.162** | — |
-| · script (matcher) @3 (ms) | 0.408 | **0.064** | — |
-| · script (matcher) @30 (ms) | 0.674 | **0.065** | — |
-| · script (matcher) @60 (ms) | 0.715 | **0.067** | — |
-| · script (matcher) @90 (ms) | 1.01 | **0.069** | — |
+| ≈ total @3 (ms) | 0.473 | **0.137** | — |
+| ≈ total @30 (ms) | 0.752 | **0.143** | — |
+| ≈ total @60 (ms) | 0.790 | **0.152** | — |
+| ≈ total @90 (ms) | 1.09 | **0.163** | — |
+| · script (matcher) @3 (ms) | 0.413 | **0.061** | — |
+| · script (matcher) @30 (ms) | 0.691 | **0.065** | — |
+| · script (matcher) @60 (ms) | 0.726 | **0.067** | — |
+| · script (matcher) @90 (ms) | 1.03 | **0.070** | — |
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
-Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value — and **this is where forcing materialization bites the lazy routers.** **real-router stays FLAT (~0.49 @50, slope ~0)** — eager immutable params. **@solidjs/router RISES — slope ~5.5 µs/param**: its `useSearchParams()` reactive store charges a reactive read per value, so @1 it crushes real-router (0.18 vs 0.49) but by @50 they **CONVERGE (0.46 ≈ 0.49)**. tanstack also rises (~3.6 µs/param). At the realistic high-count end the lazy advantage erodes to parity — real-router's eager snapshot is the flat, predictable cost (read once, cheap forever).
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value — and **this is where forcing materialization bites the lazy routers.** **real-router stays FLAT (~0.49 @50, slope ~0)** — eager immutable params. **@solidjs/router RISES — slope ~5.5 µs/param**: its `useSearchParams()` reactive store charges a reactive read per value, so @1 it crushes real-router (0.18 vs 0.49) but by @50 they **CONVERGE (0.46 ≈ 0.49)**. tanstack also rises (~3.6 µs/param). At the realistic high-count end the lazy advantage erodes to parity — real-router's eager snapshot is the flat, predictable cost (read once, cheap forever). **`alloc/nav`** (GC-pressure axis): real-router's eager params reference URL-parsed strings, so per-nav allocation stays **flat** with query count — the memory counterpart to the flat `script` curve (react-cohort probe: real-router the leanest allocator; parse/validate pipelines allocate O(count) garbage).
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| ≈ total @1 (ms) | 0.490 | **0.176** | 0.312 |
-| ≈ total @10 (ms) | 0.475 | **0.198** | 0.326 |
-| ≈ total @50 (ms) | 0.493 | **0.460** | 0.489 |
-| · script (query-parse) @1 (ms) | 0.410 | **0.087** | 0.244 |
-| · script (query-parse) @10 (ms) | 0.388 | **0.108** | 0.264 |
-| · script (query-parse) @50 (ms) | 0.405 | **0.357** | 0.419 |
+| ≈ total @1 (ms) | 0.410 | **0.141** | 0.247 |
+| ≈ total @10 (ms) | 0.386 | **0.163** | 0.274 |
+| ≈ total @50 (ms) | 0.412 | **0.402** | 0.434 |
+| · script (query-parse) @1 (ms) | 0.346 | **0.064** | 0.186 |
+| · script (query-parse) @10 (ms) | 0.328 | **0.087** | 0.218 |
+| · script (query-parse) @50 (ms) | 0.352 | **0.311** | 0.370 |
+| alloc / nav @50↔@1 (GC pressure) (KB) | — | — | — |
 
 ## Nav churn (stress) — `nav-churn`
 
-200-nav stress; CPU/nav + retained heap. **real-router leanest CPU/nav — 0.324 total / 0.061 script per nav** (< tanstack 0.445 < @solidjs/router 0.533); **@solidjs/router retains the least heap (235 KB), real-router 299, tanstack 638.** `navsPerSec` is NOT comparable here: real-router navigates synchronously (churns 200 navs without yielding to frames → ~15k/s) while @solidjs/router + tanstack defer to the frame cadence (~121/s) — read CPU/nav + heap.
+200-nav stress; CPU/nav + retained heap. **real-router leanest CPU/nav — 0.35 total / 0.064 script per nav** (< tanstack 0.459 < @solidjs/router 0.534); **@solidjs/router retains the least heap (235 KB), real-router 299, tanstack 638.** `navsPerSec` is NOT comparable here: real-router navigates synchronously (churns 200 navs without yielding to frames → ~15k/s) while @solidjs/router + tanstack defer to the frame cadence (~121/s) — read CPU/nav + heap.
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| ≈ total / nav (ms) | **0.324** | 0.533 | 0.445 |
-| · script / nav (V8) (ms) | **0.061** | 0.087 | 0.164 |
-| · Blink / nav (pushState) (ms) | **0.264** | 0.445 | 0.278 |
+| ≈ total / nav (ms) | **0.350** | 0.534 | 0.459 |
+| · script / nav (V8) (ms) | **0.064** | 0.086 | 0.168 |
+| · Blink / nav (pushState) (ms) | **0.287** | 0.446 | 0.292 |
 | heap retained (200 navs) (KB) | 299 | **235** | 638 |
-| throughput (frame-capped) (/s) | **15504** | 121 | 121 |
+| throughput (frame-capped) (/s) | **14816** | 121 | 121 |
 
 ## Active links (100) — per-nav total (script + history) — `active-links`
 
-Per-nav total recompute across 100 links (steady-state toggle). **All three tight — tanstack 0.345 < real-router 0.375 < @solidjs/router 0.439** (~1.3× spread, unlike the React cohort's wide spread). @solidjs/router's `<A>` is inherently active-aware; real-router recomputes a cached active-source per link.
+Per-nav total recompute across 100 links (steady-state toggle). **All three tight — tanstack 0.351 < real-router 0.369 < @solidjs/router 0.446** (~1.3× spread, unlike React/Svelte/Angular's wide spread). @solidjs/router's `<A>` is inherently active-aware and Solid's fine-grained reactivity is already lean, so real-router's shared cached active-source ties rather than wins here — near-parity, not a loss.
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| ≈ total main-thread (ms) | 0.375 | 0.439 | **0.345** |
-| · script (V8 only) (ms) | 0.075 | **0.041** | 0.060 |
-| · Blink history (pushState) (ms) | 0.300 | 0.399 | **0.294** |
+| ≈ total main-thread (ms) | 0.369 | 0.446 | **0.351** |
+| · script (V8 only) (ms) | 0.073 | **0.042** | 0.058 |
+| · Blink history (pushState) (ms) | 0.297 | 0.404 | **0.294** |
 
 ## Link build — mount 1000 links (href construction) — `link-build`
 
-CPU to mount 1000 links, each building its href. **real-router leanest (9.4 ms); @solidjs/router 10.3; tanstack ~3× (29.1).** Over the bare-`<a>` floor (2.0 ms) real-router adds the least reverse-matcher cost.
+CPU to mount 1000 links, each building its href. **real-router leanest (8.82 ms); @solidjs/router 9.93; tanstack ~3× (26.5).** Over the bare-`<a>` floor (1.9 ms) real-router adds the least reverse-matcher cost.
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| script (1000 links) (ms) | **8.74** | 9.94 | 26.52 |
+| script (1000 links) (ms) | **8.82** | 9.93 | 26.54 |
 
 ## Nested switch (reuse) — per-nav total (script + history) — `nested-switch`
 
@@ -127,9 +130,9 @@ Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. 
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.357** | 0.497 | 0.361 |
-| · script (V8 only) (ms) | 0.077 | **0.055** | 0.081 |
-| · Blink history (pushState) (ms) | 0.281 | 0.447 | **0.277** |
+| ≈ total main-thread (ms) | **0.354** | 0.513 | 0.366 |
+| · script (V8 only) (ms) | 0.076 | **0.050** | 0.082 |
+| · Blink history (pushState) (ms) | **0.279** | 0.461 | 0.285 |
 
 ## Feature support — capability, NOT a perf race
 
@@ -157,10 +160,10 @@ Among three full routers, first-class API coverage differs. `✓` = built-in API
 
 | metric | bare Solid | real-router | solid-router | tanstack |
 |---|---|---|---|---|
-| cold-start script (ms) | 0.815 | 4.29 (+3.5) | 2.62 (+1.8) | 3.74 (+2.9) |
+| cold-start script (ms) | 0.835 | 4.32 (+3.5) | 2.64 (+1.8) | 3.86 (+3.0) |
 | cold-start heap (MB) | 2.29 | 2.78 (+0.5) | 2.48 (+0.2) | 3.09 (+0.8) |
-| nav script (ms) | 0.036 | 0.061 (+0.0) | 0.075 (+0.0) | 0.130 (+0.1) |
-| link-build script (ms) | 1.94 | 8.74 (+6.8) | 9.94 (+8.0) | 26.52 (+24.6) |
+| nav script (ms) | 0.036 | 0.061 (+0.0) | 0.078 (+0.0) | 0.130 (+0.1) |
+| link-build script (ms) | 1.93 | 8.82 (+6.9) | 9.93 (+8.0) | 26.54 (+24.6) |
 
 **Reading:** over bare Solid, all three add little on the hot path. real-router adds the least on navigation (nav-latency ≈ the floor) and links; @solidjs/router adds the least on cold-start. The separation is at scale (floor) and deep nesting (the adapter), not on the simple hot path.
 

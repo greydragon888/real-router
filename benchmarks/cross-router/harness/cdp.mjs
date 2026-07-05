@@ -48,3 +48,23 @@ export async function forceGcHeapBytes(client) {
   const m = await getMetrics(client);
   return m.JSHeapUsedSize;
 }
+
+// Transient allocation (bytes) produced during `fn` — the memory counterpart to
+// the script/Blink CPU metrics. Wraps the work in a HeapProfiler allocation
+// sample and sums the profile's self-sizes = total bytes allocated (garbage
+// included), the driver of GC pressure / jank under load. Pair with a nav count
+// → KB/nav. A finer `samplingInterval` = more samples = tighter estimate at some
+// overhead; 256 B yields ~30+ samples even for the leanest router over ~60 navs,
+// which the warmup+K aggregation then stabilizes. Distinct from
+// `forceGcHeapBytes` (retained heap after GC) — this counts churn, not footprint.
+export async function sampleAllocationBytes(client, fn, samplingInterval = 256) {
+  await client.send("HeapProfiler.enable");
+  await client.send("HeapProfiler.startSampling", { samplingInterval });
+  await fn();
+  const { profile } = await client.send("HeapProfiler.stopSampling");
+  await client.send("HeapProfiler.disable");
+  const sumSelf = (node) =>
+    (node.selfSize || 0) +
+    (node.children || []).reduce((acc, c) => acc + sumSelf(c), 0);
+  return sumSelf(profile.head);
+}

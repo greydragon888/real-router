@@ -2,11 +2,16 @@
 // STEADY-STATE: sweep /users/1 → /2 → /3 … (link-user-next advances id by 1),
 // N navs ÷ N. total = script (`ScriptDuration`, V8) + Blink history (history.push
 // State's `updateForSameDocumentNavigation`, which V8 does not count).
-import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
+import {
+  getMetrics,
+  sampleAllocationBytes,
+  traceBlinkUs,
+} from "../harness/cdp.mjs";
 
 const WARMUP_NAVS = 6;
 const SCRIPT_NAVS = 20;
 const BLINK_NAVS = 16;
+const ALLOC_NAVS = 60;
 
 export const paramNav = {
   name: "param-nav",
@@ -54,6 +59,17 @@ export const paramNav = {
       BLINK_NAVS /
       1000;
 
-    return { totalMs: scriptDurationMs + blinkMs, scriptDurationMs, blinkMs };
+    // Allocation pass — transient bytes/nav (GC pressure), same navs, sampled.
+    const allocKBPerNav =
+      (await sampleAllocationBytes(client, () => drive(ALLOC_NAVS, 0))) /
+      ALLOC_NAVS /
+      1024;
+
+    return {
+      totalMs: scriptDurationMs + blinkMs,
+      scriptDurationMs,
+      blinkMs,
+      allocKBPerNav,
+    };
   },
 };
