@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-05]
 
+### @real-router/core@0.63.3
+
+### Patch Changes
+
+- [#1262](https://github.com/greydragon888/real-router/pull/1262) [`d431c3e`](https://github.com/greydragon888/real-router/commit/d431c3ec9bfb326b537dfcacfeeedaf0c9fba196) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `buildPath` emitting `//…` when a leading optional param is omitted ([#1147](https://github.com/greydragon888/real-router/issues/1147))
+
+  For a route whose FIRST segment is an optional param (`/:lang?/home` — the optional-locale-prefix pattern), omitting it made `#buildUrlPath` produce `//home`: the trailing-slash trim only fired for `result.length > 1`, so the lone leading `/` was never trimmed before appending the next `/`-prefixed part. That URL is one the matcher itself rejects (double slash), and `rewritePathOnMatch` then wrote the unmatchable `//home` into `state.path`, silently replacing a valid input URL with an invalid one.
+
+  Fix: at an optional-omit point the leading-slash case (`result === "/"`) now drops the lone slash when the next part starts with `/`, so exactly one separator is emitted (`/home`). Mid/trailing optional omits (`/a/:b?/c` → `/a/c`, `/home/:x?` → `/home`) and a route that is only a leading optional (`/:lang?` → `/`) are unchanged.
+
+- [#1262](https://github.com/greydragon888/real-router/pull/1262) [`d431c3e`](https://github.com/greydragon888/real-router/commit/d431c3ec9bfb326b537dfcacfeeedaf0c9fba196) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix constraint on an omitted optional param being tested against `undefined` ([#1148](https://github.com/greydragon888/real-router/issues/1148))
+
+  `route.constraintPatterns` is collected across all segments, including optional params. On the omit branch the param is never captured, so `#validateConstraints` ran `constraint.pattern.test(params[paramName])` with `params[paramName] === undefined` → coerced to the string `"undefined"`. Whether the omit form of the route matched then depended on whether the constraint regex happened to match `"undefined"`: `/search/:query<\d+>?` matching `/search` returned `undefined` (unroutable), while `<\w+>?` matched by accident.
+
+  Fix: `#validateConstraints` now skips a constraint when its param is absent from `params` (`Object.hasOwn`), so an omitted optional is not constraint-checked — symmetric with the build side (`#validateBuildConstraints` already skipped absent params). The constraint still applies when the param is present.
+
+- [#1262](https://github.com/greydragon888/real-router/pull/1262) [`d431c3e`](https://github.com/greydragon888/real-router/commit/d431c3ec9bfb326b537dfcacfeeedaf0c9fba196) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject optional splat `*name?` at registration instead of silently building unmatchable URLs ([#1149](https://github.com/greydragon888/real-router/issues/1149))
+
+  `*path?` (optional splat) desynced three ways: `buildParamMeta`/`compileBuildParts` classified it as a splat (multi-segment, `/`-preserving encoder) while the trie's optional fork compiled a plain single-segment param. `buildPath({ path: "a/b" })` emitted `/files/a/b`, which `match()` rejected — a deep-link to a router-built URL was dead (`UNKNOWN_ROUTE`), and navigate-then-reload diverged. The exact class of [#858](https://github.com/greydragon888/real-router/issues/858) (name-less marker) / [#1050](https://github.com/greydragon888/real-router/issues/1050) (fused marker).
+
+  Fix (product decision — reject, not support): the shape only ever "worked" for 0–1 segments, so it is rejected at registration like its [#858](https://github.com/greydragon888/real-router/issues/858)/[#1050](https://github.com/greydragon888/real-router/issues/1050) siblings. `path-matcher`'s `registerTree` throws `Optional splat … is not supported` (the bare-core backstop, covering `createRouter`), and `route-tree`'s validation gate throws a route-contextual `optional splat ('*name?') is not supported …` first on the plugin `add`/`replace` paths. A required splat `*name` (incl. `*path?query`, where `?` is the query separator) is unaffected.
+
+
 ### @real-router/react@0.28.5
 
 ### Patch Changes
