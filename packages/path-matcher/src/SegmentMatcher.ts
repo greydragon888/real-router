@@ -249,9 +249,17 @@ export class SegmentMatcher {
           );
         }
 
-        // Stryker disable next-line MethodExpression,StringLiteral: equivalent — at an optional-omit point result always ends in '/', so endsWith('/')/startsWith('/')/endsWith('') coincide (proven by injection)
-        if (result.length > 1 && result.endsWith("/")) {
+        // At an optional-omit point `result` always ends in "/" (the separator
+        // before the omitted segment) — trim it so `parts[i + 1]` re-supplies
+        // exactly one separator, not two.
+        if (result.length > 1) {
           result = result.slice(0, -1);
+        } else if (parts[i + 1].startsWith("/")) {
+          // Leading optional omitted (`result === "/"`): a naive append yields
+          // "//" — a URL the matcher itself rejects (double slash), which
+          // `rewritePathOnMatch` then writes into `state.path`. Drop the lone
+          // leading slash so `parts[i + 1]` re-supplies exactly one. (#1147)
+          result = "";
         }
 
         result += parts[i + 1];
