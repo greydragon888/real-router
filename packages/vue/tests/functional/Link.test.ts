@@ -622,13 +622,18 @@ describe("Link component", () => {
       //
       // Discriminator: a cache HIT returns the shared source without re-running
       // `router.isActiveRoute`; a cache MISS constructs a fresh source and calls it once.
-      mountLink(router, { routeName: "users" });
+      // #1250 re-target: the default-options fast path no longer builds a
+      // `createActiveRouteSource` (it uses the shared name-selector), so this
+      // #776 undefined-vs-"{}" dedup guard now exercises the SLOW path via
+      // `ignoreQueryParams: false` — which still passes `routeParams` straight
+      // through as `undefined` (keying "", not "{}").
+      mountLink(router, { routeName: "users", ignoreQueryParams: false });
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
       createActiveRouteSource(router, "users", undefined, {
         strict: false,
-        ignoreQueryParams: true,
+        ignoreQueryParams: false,
       });
 
       expect(isActiveRouteSpy).not.toHaveBeenCalled();
