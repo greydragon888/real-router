@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const CR = join(dirname(fileURLToPath(import.meta.url)), "..");
-const FILES = { react: "REPORT.md", vue: "REPORT-vue.md", solid: "REPORT-solid.md", svelte: "REPORT-svelte.md", angular: "REPORT-angular.md" };
+const FILES = { react: "REPORT-react.md", vue: "REPORT-vue.md", solid: "REPORT-solid.md", svelte: "REPORT-svelte.md", angular: "REPORT-angular.md" };
 const ENG = {
   react: ["real-router", "tanstack", "react-router"],
   vue: ["real-router", "vue-router", "tanstack"],

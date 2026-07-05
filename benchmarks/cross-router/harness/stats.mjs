@@ -1,5 +1,5 @@
 // Aggregation for one (scenario × engine) sample set: median + p95 + RME.
-// Reuses the RME discipline from benchmarks/core (RME < 5% = stable).
+// Reuses the RME discipline from the retired core mitata suite (RME < 5% = stable).
 function round(x) {
   return Math.round(x * 1000) / 1000;
 }

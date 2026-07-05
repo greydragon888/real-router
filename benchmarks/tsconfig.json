@@ -1,6 +1,6 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["core"],
+  "include": ["audit-probes"],
   "references": [
     { "path": "./tsconfig.node.json" }
   ]

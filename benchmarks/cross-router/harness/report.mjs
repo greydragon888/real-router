@@ -368,6 +368,6 @@ lines.push("");
 lines.push(`Regenerate: \`node cross-router/run-all.mjs && node cross-router/harness/report.mjs ${FRAMEWORK}\`.`);
 lines.push("");
 
-const outFile = FRAMEWORK === "react" ? "REPORT.md" : `REPORT-${FRAMEWORK}.md`;
+const outFile = `REPORT-${FRAMEWORK}.md`;
 writeFileSync(`${here}/${outFile}`, `${lines.join("\n")}\n`);
 console.log(`Wrote ${here}/${outFile}`);

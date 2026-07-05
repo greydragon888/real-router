@@ -385,7 +385,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   // ── Side-effect / lifecycle invariants ────────────────────────────────────
   // `canNavigateTo` is a read-only predicate: it must not mutate state, move the
   // FSM, or fire subscriptions. Verified empirically in
-  // benchmarks/core/audit-probes/can-navigate-to-2026-06-25/probe-01.
+  // benchmarks/audit-probes/can-navigate-to-2026-06-25/probe-01.
 
   it("does not mutate router state (getState() is reference-identical)", async () => {
     await router.navigate("users.list");

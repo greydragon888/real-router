@@ -241,37 +241,6 @@ The Segment Trie matcher traverses in O(segments), not O(routes).
 | Solid     | **~7× fewer allocations** |
 | Vue       | **~2× fewer allocations** |
 
-> Benchmark: [benchmarks/vs-tanstack](benchmarks/vs-tanstack) · [detailed tables](benchmarks/README.md#performance--vs-tanstack-router) — identical workload, JSDOM, Vite production build, `--expose-gc`. Absolute hz/heap are machine-dependent; both ratios are stable across runs (±1–3%). Memory is allocation rate per navigation (heap growth between forced GCs), not a leak claim.
->
-> **Note on Vue:** the smaller speed ratio (~2.3× vs ~14×/11.5× for React/Solid) reflects Vue runtime overhead, not router overhead. \
-> On this workload (44 route-state subscribers rendering `null`) Vue proxy access + scheduler dominate navigation time for both routers. \
-> Three targeted Vue-adapter rewrites were attempted and reverted after measuring only noise-level gains — see [Vue Runtime Floor](packages/vue/ARCHITECTURE.md#vue-runtime-floor-vs-tanstack-benchmark).
-
-<details>
-<summary><b>Benchmarks vs router5 and router6 (core-level)</b></summary>
-
-**vs [router5](https://github.com/router5/router5):**
-
-| Metric             | Improvement                              |
-| ------------------ | ---------------------------------------- |
-| Navigation         | 2-3x faster                              |
-| URL building       | 8-35x faster                             |
-| URL matching       | 3-5x faster                              |
-| Memory allocations | 5-18x fewer                              |
-| Scaling            | O(1) vs O(n) — up to 14x at 1000+ routes |
-
-**vs [router6](https://github.com/nicolo-ribaudo/router6):**
-
-| Metric             | Improvement                        |
-| ------------------ | ---------------------------------- |
-| Navigation         | ~2x faster                         |
-| URL building       | 3-10x faster                       |
-| URL matching       | ~2x faster                         |
-| Memory allocations | 5-8x fewer                         |
-| Scaling            | Both O(1) — up to 5x on deep trees |
-
-</details>
-
 ### Key Features
 
 - **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, Angular, or vanilla JS

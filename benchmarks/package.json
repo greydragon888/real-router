@@ -4,19 +4,8 @@
   "private": true,
   "description": "Benchmark tests for @real-router/core",
   "scripts": {
-    "prebench": "pnpm --filter @real-router/core... build",
-    "bench": "BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx core/index.ts",
-    "bench:router5": "BENCH_ROUTER=router5 NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx core/index.ts",
-    "bench:router6": "BENCH_ROUTER=router6 NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx core/index.ts",
-    "bench:current": "pnpm prebench && BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx core/index.ts",
-    "bench:vs-tanstack": "node vs-tanstack/run.mjs",
-    "bench:vs-tanstack:real-router": "node vs-tanstack/run.mjs client-nav real-router react speed",
-    "bench:vs-tanstack:tanstack": "node vs-tanstack/run.mjs client-nav tanstack react speed",
-    "bench:bundle-size": "node vs-tanstack/bundle-size/build-all.mjs",
     "bench:cross-router": "node cross-router/run.mjs",
-    "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
-    "bench:type-check": "tsc --noEmit && tsc --noEmit -p vs-tanstack/tsconfig.solid.json",
-    "bench:lint": "eslint --cache core/ vs-tanstack/ --fix --max-warnings 0"
+    "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10"
   },
   "dependencies": {
     "@angular/common": "22.0.5",
@@ -47,8 +36,6 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-router": "8.1.0",
-    "router5": "8.0.1",
-    "router6": "1.0.2",
     "solid-js": "1.9.14",
     "sv-router": "0.17.0",
     "svelte": "5.56.4",
@@ -63,16 +50,13 @@
     "@angular/compiler": "22.0.5",
     "@angular/compiler-cli": "22.0.5",
     "@sveltejs/vite-plugin-svelte": "6.2.4",
-    "@tanstack/router-core": "1.171.13",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
     "@vitejs/plugin-vue": "6.0.7",
     "@vitejs/plugin-vue-jsx": "5.1.5",
-    "jsdom": "29.1.1",
     "playwright": "1.61.1",
     "vite": "7.3.6",
-    "vite-plugin-solid": "2.11.12",
-    "vitest": "4.1.9"
+    "vite-plugin-solid": "2.11.12"
   }
 }

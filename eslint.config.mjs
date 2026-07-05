@@ -87,6 +87,7 @@ export default tsEslint.config(
     "cz.config.js", // cz-git configuration
     ".changeset/**", // Changesets configuration and markdown files
     "**/e2e/**", // Playwright e2e tests — not type-checked by ESLint
+    "**/benchmarks/audit-probes/**", // ad-hoc /deep-audit diagnostic probes — linter disabled
   ]),
 
   // ============================================
@@ -1117,7 +1118,6 @@ export default tsEslint.config(
     files: [
       "**/*.bench.ts",
       "**/*.mitata.ts",
-      "**/benchmarks/core/**/*.ts",
       "**/tests/benchmarks/**/*.ts",
     ],
     rules: {
