@@ -249,9 +249,17 @@ export class SegmentMatcher {
           );
         }
 
-        // Stryker disable next-line MethodExpression,StringLiteral: equivalent — at an optional-omit point result always ends in '/', so endsWith('/')/startsWith('/')/endsWith('') coincide (proven by injection)
-        if (result.length > 1 && result.endsWith("/")) {
+        // At an optional-omit point `result` always ends in "/" (the separator
+        // before the omitted segment) — trim it so `parts[i + 1]` re-supplies
+        // exactly one separator, not two.
+        if (result.length > 1) {
           result = result.slice(0, -1);
+        } else if (parts[i + 1].startsWith("/")) {
+          // Leading optional omitted (`result === "/"`): a naive append yields
+          // "//" — a URL the matcher itself rejects (double slash), which
+          // `rewritePathOnMatch` then writes into `state.path`. Drop the lone
+          // leading slash so `parts[i + 1]` re-supplies exactly one. (#1147)
+          result = "";
         }
 
         result += parts[i + 1];
@@ -617,7 +625,16 @@ export class SegmentMatcher {
     route: CompiledRoute,
   ): boolean {
     for (const [paramName, constraint] of route.constraintPatterns) {
-      if (!constraint.pattern.test(params[paramName])) {
+      // An omitted optional param is ABSENT from `params` — nothing to validate.
+      // Testing the missing value would coerce `undefined` to the string
+      // "undefined" and reject the omit form (`/search/:query<\d+>?` matching
+      // "/search"). Presence check via `Object.hasOwn` (params is typed
+      // `Record<string, string>`, so the runtime-absent key is a type-lie);
+      // symmetric with the build side's absent-param skip. (#1148)
+      if (
+        Object.hasOwn(params, paramName) &&
+        !constraint.pattern.test(params[paramName])
+      ) {
         return false;
       }
     }

@@ -98,6 +98,41 @@ function hasFusedMidSegmentMarker(path: string): boolean {
 }
 
 /**
+ * Reports whether a path contains an optional splat `*name?` — a segment that
+ * both starts with `*` (splat) and carries the optional `?`. `buildParamMeta`/
+ * build classify it as a splat (multi-segment, `/`-preserving encoder) but the
+ * trie's optional fork compiles a single-segment plain param, so `buildPath`
+ * emits multi-segment URLs its own `match` rejects. Rejected (product decision,
+ * #1149); path-matcher backstops at `registerTree`.
+ *
+ * A linear scan, not a regex — matches the `hasFusedMidSegmentMarker` /
+ * `isConstraintBalanced` convention (and dodges a `sonarjs/super-linear-regex`
+ * false positive on the char-class-then-`?` form). Runs on the query-stripped
+ * `pathPattern`, so a required splat followed by a query (`*path?download`) is
+ * NOT flagged. A splat name cannot contain `?` (`PARAM_NAME_PATTERN` excludes
+ * it), so a `?` anywhere in a `*`-led segment is unambiguously the optional
+ * marker. Sibling of the fused (#1050) / name-less (#863) marker rejections.
+ */
+function hasOptionalSplat(path: string): boolean {
+  let atSegmentStart = true;
+  let splatSegment = false;
+
+  for (const char of path) {
+    if (char === "/") {
+      atSegmentStart = true;
+      splatSegment = false;
+    } else if (atSegmentStart) {
+      splatSegment = char === "*";
+      atSegmentStart = false;
+    } else if (char === "?" && splatSegment) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Validates route path format.
  * Throws a descriptive error if validation fails.
  *
@@ -215,6 +250,17 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": parameter marker (':' or '*') must begin a segment, but "${path}" fuses one to a static prefix (use a boundary marker like "/a/:b")`,
+    );
+  }
+
+  // Optional splat `*name?`. build treats it as a multi-segment splat but the
+  // trie's optional fork compiles a single-segment plain param — so `buildPath`
+  // emits a URL its own `match` rejects. Reject at the gate (path-matcher
+  // backstops at `registerTree`), the sibling of #1050/#863 (#1149).
+  if (hasOptionalSplat(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": optional splat ('*name?') is not supported in "${path}" — a splat cannot be optional (use a required splat '*name')`,
     );
   }
 
