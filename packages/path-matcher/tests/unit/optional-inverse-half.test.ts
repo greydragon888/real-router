@@ -76,7 +76,7 @@ describe("optional inverse-half (#1147/#1148/#1149)", () => {
     it("a required splat *name is unaffected", () => {
       const m = createMatcher([{ name: "f", path: "/files/*path" }]);
 
-      expect(m.match("/files/a/b/c")?.params?.path).toBe("a/b/c");
+      expect(m.match("/files/a/b/c")?.params.path).toBe("a/b/c");
     });
   });
 });

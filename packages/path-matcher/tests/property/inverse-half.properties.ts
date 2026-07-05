@@ -1,7 +1,6 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
-import { createTestMatcher } from "../helpers/createTestMatcher";
 import {
   arbEncoding,
   arbMatchSafeEncodableSplatValue,
@@ -12,6 +11,7 @@ import {
   createRootWithChildren,
   NUM_RUNS,
 } from "./helpers";
+import { createTestMatcher } from "../helpers/createTestMatcher";
 
 /**
  * Inverse-pair contract for the PATH grammar: `range(buildPath) ⊆ dom(match)` —
@@ -39,7 +39,11 @@ import {
 // `none` — real encoding teeth without leaving the round-trippable set.
 const arbValue = fc.oneof(arbSafeParamValue, arbMatchSafeEncodableValue);
 
-type Unit = { path: string; name?: string; value?: string };
+interface Unit {
+  path: string;
+  name?: string;
+  value?: string;
+}
 
 // A unit whose optional (if any) is always followed by a static within the unit,
 // so an optional is NEVER adjacent to another param (positional reuse is #736).
@@ -54,19 +58,25 @@ function arbUnit(i: number): fc.Arbitrary<Unit> {
       name: p,
       value,
     })),
-    fc.tuple(fc.boolean(), arbValue).map(([present, value]) =>
-      present ? { path: `/:${p}?/t${i}`, name: p, value } : { path: `/:${p}?/t${i}` },
-    ),
-    fc.tuple(fc.boolean(), arbNumericParam).map(([present, value]) =>
-      present
-        ? { path: String.raw`/:${p}<\d+>?/t${i}`, name: p, value }
-        : { path: String.raw`/:${p}<\d+>?/t${i}` },
-    ),
+    fc
+      .tuple(fc.boolean(), arbValue)
+      .map(([present, value]) =>
+        present
+          ? { path: `/:${p}?/t${i}`, name: p, value }
+          : { path: `/:${p}?/t${i}` },
+      ),
+    fc
+      .tuple(fc.boolean(), arbNumericParam)
+      .map(([present, value]) =>
+        present
+          ? { path: String.raw`/:${p}<\d+>?/t${i}`, name: p, value }
+          : { path: String.raw`/:${p}<\d+>?/t${i}` },
+      ),
   );
 }
 
 // A required-only unit (no optionals) — for splat routes.
-function arbReqUnit(i: number): fc.Arbitrary<Unit> {
+function arbRequiredUnit(i: number): fc.Arbitrary<Unit> {
   const p = `p${i}`;
 
   return fc.oneof(
@@ -88,7 +98,7 @@ function fold(units: Unit[], splat?: string) {
     path += u.path;
 
     if (u.name !== undefined) {
-      params[u.name] = u.value as string;
+      params[u.name] = u.value!;
     }
   }
 
@@ -124,9 +134,15 @@ const arbOptionalRoute = fc
 
       if (trailing) {
         const marker = trailing.constrained ? String.raw`/:pT<\d+>?` : "/:pT?";
-        const value = trailing.constrained ? trailing.numValue : trailing.strValue;
+        const value = trailing.constrained
+          ? trailing.numValue
+          : trailing.strValue;
 
-        extra.push(trailing.present ? { path: marker, name: "pT", value } : { path: marker });
+        extra.push(
+          trailing.present
+            ? { path: marker, name: "pT", value }
+            : { path: marker },
+        );
       }
 
       return fold([...units, ...extra]);
@@ -140,7 +156,9 @@ const arbSplatRoute = fc
     arbMatchSafeEncodableSplatValue,
   )
   .chain(([counts, splat]) =>
-    tupleOf(counts.map((_, i) => arbReqUnit(i))).map((units) => fold(units, splat)),
+    tupleOf(counts.map((_, i) => arbRequiredUnit(i))).map((units) =>
+      fold(units, splat),
+    ),
   );
 
 const arbRoute = fc.oneof(arbOptionalRoute, arbSplatRoute);
