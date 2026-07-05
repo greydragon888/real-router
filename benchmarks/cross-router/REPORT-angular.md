@@ -6,7 +6,7 @@
 
 **Scope — the two Angular full routers, like-for-like.** The honest picture: **`@angular/router` is a mature, well-optimized official router that wins most raw metrics** — cold-start (~3× lighter boot), nav-latency, param-nav, wide-config (flat AND a lighter floor — its matcher does not degrade), table-heap memory (3.67 vs 8.72 MB @10k), nav-churn CPU, nested-switch. **real-router wins two:** `active-links` (its shared cached active-source vs per-link `routerLinkActive`) and `link-build` (reverse-matcher vs URL-tree serialization). deep-config is ~a wash (both O(depth)). Unlike React/Vue (trie wins scale + memory) and Svelte (trie wins scale vs an O(N) competitor), **Angular's official matcher is flat AND lean, so real-router's structural trie advantage doesn't separate here** — and real-router pays a heavier boot (upfront trie build) and route-table memory. real-router's genuine edges here are active-links, link-build, validated search (capability), and the cross-framework single routing model.
 
-**Run:** runs 30 · warmup 5 · throttle off · 2026-07-05T03:37:19.712Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
+**Run:** runs 30 · warmup 5 · throttle off · 2026-07-05T07:18:31.632Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
 
 ⚠️ Preliminary local numbers — directional, not a published verdict. Reported metrics are the stable signals — CPU (`script`), heap, FCP. Felt latency was dropped (render/frame-bound). `nav-churn` navsPerSec is frame-capped (read CPU/nav + heap). **Caveat — `script` is V8-only:** CDP `ScriptDuration` excludes Blink C++, so `script` ratios overstate the `total` per-nav gap. Angular 22 (zoneless), built via `@analogjs/vite-plugin-angular` (AOT).
 
@@ -16,31 +16,31 @@ App init + parse/exec to first route painted. **@angular/router boots far lighte
 
 | metric | real-router | angular-router |
 |---|---|---|
-| main-thread script (ms) | 6.04 | **2.07** |
+| main-thread script (ms) | 6.09 | **2.11** |
 | JS heap (MB) | 3.51 | **3.29** |
 | FCP (ms) | **24.00** | **24.00** |
 
 ## Navigation — per-nav total main-thread (script + history) — `nav-latency`
 
-Per-navigation total (script + Blink), steady-state. **@angular/router leanest — 0.523 ms** (script 0.237) vs real-router 0.831 (0.561). (The bare-Angular baseline's manual `(click)`→`pushState`→signal path is not cheaper than either router here; read the two routers against each other — and note this scenario's per-nav `script` is timer-granular, see caveats.)
+Per-navigation total (script + Blink), steady-state. **@angular/router leanest** — real-router trails (its eager transition pipeline vs @angular/router's lean nav). (The bare-Angular baseline's manual `(click)`→`pushState`→signal path is not cheaper than either router; read the two routers against each other. *Sub-ms — session/load-dependent; per-nav `script` is also timer-granular here, see caveats.*)
 
 | metric | real-router | angular-router |
 |---|---|---|
-| ≈ total main-thread (ms) | 0.915 | **0.563** |
-| · script (V8 only) (ms) | 0.601 | **0.248** |
-| · Blink history (pushState) (ms) | **0.315** | 0.317 |
-| alloc / nav (GC pressure) (KB) | — | — |
+| ≈ total main-thread (ms) | 0.929 | **0.559** |
+| · script (V8 only) (ms) | 0.614 | **0.248** |
+| · Blink history (pushState) (ms) | 0.316 | **0.311** |
+| alloc / nav (GC pressure) (KB) | **0.178** | 0.446 |
 
 ## Param navigation — per-nav total (script + history) — `param-nav`
 
-Per-nav total changing :id (steady-state). **@angular/router leanest (0.362); real-router 0.446.**
+Per-nav total changing :id (steady-state). **@angular/router leanest; real-router second** — @angular/router's lean per-nav vs real-router's eager pipeline. *(Sub-ms — session/load-dependent.)*
 
 | metric | real-router | angular-router |
 |---|---|---|
-| ≈ total main-thread (ms) | 0.633 | **0.514** |
-| · script (V8 only) (ms) | 0.312 | **0.205** |
-| · Blink history (pushState) (ms) | 0.325 | **0.318** |
-| alloc / nav (GC pressure) (KB) | — | — |
+| ≈ total main-thread (ms) | 0.657 | **0.516** |
+| · script (V8 only) (ms) | 0.343 | **0.201** |
+| · Blink history (pushState) (ms) | 0.323 | **0.313** |
+| alloc / nav (GC pressure) (KB) | 0.600 | **0.358** |
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
@@ -48,12 +48,12 @@ Navigate into a flat 1000-route table. **Both matchers are FLAT** (no O(N) degra
 
 | metric | real-router | angular-router |
 |---|---|---|
-| ≈ total @10 (ms) | 0.434 | **0.289** |
-| ≈ total @100 (ms) | 0.421 | **0.309** |
-| ≈ total @1000 (ms) | 0.434 | **0.281** |
-| · script (matcher) @10 (ms) | 0.379 | **0.229** |
-| · script (matcher) @100 (ms) | 0.370 | **0.249** |
-| · script (matcher) @1000 (ms) | 0.380 | **0.218** |
+| ≈ total @10 (ms) | 0.440 | **0.289** |
+| ≈ total @100 (ms) | 0.425 | **0.305** |
+| ≈ total @1000 (ms) | 0.429 | **0.276** |
+| · script (matcher) @10 (ms) | 0.381 | **0.227** |
+| · script (matcher) @100 (ms) | 0.371 | **0.246** |
+| · script (matcher) @1000 (ms) | 0.375 | **0.214** |
 
 ## Route-table memory — heap to hold N routes (sweep) — `table-heap`
 
@@ -71,14 +71,14 @@ Navigate into a 90-level nested chain. Both rise O(depth); real-router edges it 
 
 | metric | real-router | angular-router |
 |---|---|---|
-| ≈ total @3 (ms) | 0.843 | **0.666** |
-| ≈ total @30 (ms) | **2.44** | 2.53 |
-| ≈ total @60 (ms) | **3.47** | 3.78 |
-| ≈ total @90 (ms) | **4.73** | 5.41 |
-| · script (matcher) @3 (ms) | 0.785 | **0.609** |
-| · script (matcher) @30 (ms) | **2.39** | 2.48 |
-| · script (matcher) @60 (ms) | **3.40** | 3.71 |
-| · script (matcher) @90 (ms) | **4.67** | 5.35 |
+| ≈ total @3 (ms) | 0.844 | **0.678** |
+| ≈ total @30 (ms) | **2.45** | 2.52 |
+| ≈ total @60 (ms) | **3.48** | 3.78 |
+| ≈ total @90 (ms) | **4.73** | 5.37 |
+| · script (matcher) @3 (ms) | 0.788 | **0.619** |
+| · script (matcher) @30 (ms) | **2.39** | 2.47 |
+| · script (matcher) @60 (ms) | **3.42** | 3.71 |
+| · script (matcher) @90 (ms) | **4.67** | 5.30 |
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
@@ -86,13 +86,13 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 | metric | real-router | angular-router |
 |---|---|---|
-| ≈ total @1 (ms) | **0.453** | 0.475 |
-| ≈ total @10 (ms) | **0.420** | 0.443 |
-| ≈ total @50 (ms) | **0.500** | 0.524 |
-| · script (query-parse) @1 (ms) | **0.394** | 0.414 |
-| · script (query-parse) @10 (ms) | **0.367** | 0.388 |
-| · script (query-parse) @50 (ms) | **0.441** | 0.464 |
-| alloc / nav @50↔@1 (GC pressure) (KB) | — | — |
+| ≈ total @1 (ms) | **0.445** | 0.471 |
+| ≈ total @10 (ms) | **0.424** | 0.434 |
+| ≈ total @50 (ms) | **0.493** | 0.530 |
+| · script (query-parse) @1 (ms) | **0.384** | 0.412 |
+| · script (query-parse) @10 (ms) | **0.371** | 0.378 |
+| · script (query-parse) @50 (ms) | **0.432** | 0.466 |
+| alloc / nav @50↔@1 (GC pressure) (KB) | **0.238** | 0.758 |
 
 ## Nav churn (stress) — `nav-churn`
 
@@ -100,21 +100,21 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 | metric | real-router | angular-router |
 |---|---|---|
-| ≈ total / nav (ms) | 0.990 | **0.586** |
-| · script / nav (V8) (ms) | 0.675 | **0.286** |
-| · Blink / nav (pushState) (ms) | 0.317 | **0.307** |
+| ≈ total / nav (ms) | 0.982 | **0.603** |
+| · script / nav (V8) (ms) | 0.667 | **0.288** |
+| · Blink / nav (pushState) (ms) | **0.317** | 0.318 |
 | heap retained (200 navs) (KB) | **549** | 1035 |
-| throughput (frame-capped) (/s) | **121** | 121 |
+| throughput (frame-capped) (/s) | 121 | **121** |
 
 ## Active links (100) — per-nav total (script + history) — `active-links`
 
-Per-nav total recompute across 100 links (steady-state toggle). **real-router WINS — 0.586** (script 0.264) vs @angular/router 1.058 (0.755, ~2× heavier). real-router's shared cached active-source (one `router.subscribe`) beats `@angular/router`'s per-link `routerLinkActive` router-event subscription. real-router's clearest win in this cohort — and part of its cross-cohort active-links lead (React + Svelte win too).
+Per-nav total recompute across 100 links (steady-state toggle). **real-router WINS — ~2× lighter** — its shared cached active-source (one `router.subscribe`) beats `@angular/router`'s per-link `routerLinkActive` router-event subscription. real-router's clearest win in this cohort — and part of its cross-cohort active-links lead (React + Svelte win too). *(The ~2× win is robust; absolute ms session/load-dependent.)*
 
 | metric | real-router | angular-router |
 |---|---|---|
-| ≈ total main-thread (ms) | **0.586** | 1.06 |
-| · script (V8 only) (ms) | **0.264** | 0.755 |
-| · Blink history (pushState) (ms) | 0.318 | **0.312** |
+| ≈ total main-thread (ms) | **0.649** | 1.10 |
+| · script (V8 only) (ms) | **0.296** | 0.767 |
+| · Blink history (pushState) (ms) | 0.360 | **0.337** |
 
 ## Link build — mount 1000 links (href construction) — `link-build`
 
@@ -122,17 +122,17 @@ CPU to mount 1000 links, each building its href. **real-router leaner — 12.72 
 
 | metric | real-router | angular-router |
 |---|---|---|
-| script (1000 links) (ms) | **12.70** | 17.54 |
+| script (1000 links) (ms) | **12.90** | 17.75 |
 
 ## Nested switch (reuse) — per-nav total (script + history) — `nested-switch`
 
-Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **@angular/router leaner (0.341); real-router 0.496.**
+Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **@angular/router leaner; real-router second** on this sub-ms per-nav-render metric. *(Sub-ms — session/load-dependent.)*
 
 | metric | real-router | angular-router |
 |---|---|---|
-| ≈ total main-thread (ms) | 0.666 | **0.490** |
-| · script (V8 only) (ms) | 0.343 | **0.176** |
-| · Blink history (pushState) (ms) | 0.325 | **0.321** |
+| ≈ total main-thread (ms) | 0.667 | **0.489** |
+| · script (V8 only) (ms) | 0.348 | **0.173** |
+| · Blink history (pushState) (ms) | 0.320 | **0.314** |
 
 ## Feature support — capability, NOT a perf race
 
@@ -160,10 +160,10 @@ Both are full routers. `✓` = built-in API, `N/A` = none. `@angular/router` is 
 
 | metric | bare Angular | real-router | angular-router |
 |---|---|---|---|
-| cold-start script (ms) | 1.76 | 6.04 (+4.3) | 2.07 (+0.3) |
+| cold-start script (ms) | 1.76 | 6.09 (+4.3) | 2.11 (+0.4) |
 | cold-start heap (MB) | 2.80 | 3.51 (+0.7) | 3.29 (+0.5) |
-| nav script (ms) | 0.402 | 0.601 (+0.2) | 0.248 (−0.2) |
-| link-build script (ms) | 5.07 | 12.70 (+7.6) | 17.54 (+12.5) |
+| nav script (ms) | 0.420 | 0.614 (+0.2) | 0.248 (−0.2) |
+| link-build script (ms) | 5.03 | 12.90 (+7.9) | 17.75 (+12.7) |
 
 **Reading:** over bare Angular, `@angular/router` adds very little at boot (~0.4 ms) and on the hot path; real-router adds ~5 ms at boot (upfront trie build) and more per-nav. (The baseline's `nav-latency` reads oddly high — its manual click→pushState→signal path — so read the two routers against each other there, not vs baseline.)
 
