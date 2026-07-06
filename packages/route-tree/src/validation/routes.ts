@@ -51,6 +51,39 @@ function validateConstraintSyntax(
 }
 
 /**
+ * Rejects a param name repeated within one route's own path (`/:id/:id`, a
+ * param+splat clash `/:x/*x`, #1151). `buildParamMeta.urlParams` lists every
+ * path-binding name — params AND splats — in order, keeping duplicates (`/:x/*x`
+ * → `["x", "x"]`), so a single pass over it catches both. The trie binds the
+ * duplicates at different positions under one name, so match's later capture
+ * silently overwrites the earlier and `rewritePathOnMatch` then rewrites the
+ * user's URL from the single survivor. The #736 conflict guard only fires on
+ * DIFFERENTLY-named params at one position, so this same-name case slips through.
+ * path-matcher's `registerTree` backstop additionally catches CROSS-level dups (a
+ * parent's param reused by a child), which this per-path gate cannot see.
+ * Extracted so `validateRoutePath` stays within the cognitive-complexity budget.
+ */
+function validateUniqueParamNames(
+  urlParams: readonly string[],
+  routeName: string,
+  methodName: string,
+  path: string,
+): void {
+  const seen = new Set<string>();
+
+  for (const name of urlParams) {
+    if (seen.has(name)) {
+      throw createRouterError(
+        methodName,
+        `Invalid path for route "${routeName}": duplicate parameter name ':${name}' in "${path}" (a param name must be unique within a route — the second binding would overwrite the first)`,
+      );
+    }
+
+    seen.add(name);
+  }
+}
+
+/**
  * Matches a `:`/`*` marker NOT followed by a valid param-name char — a name-less
  * marker (`:`, `*`, `:?`, `:<\d+>`). Derived from the single `PARAM_NAME_PATTERN`
  * grammar (#738) so this validation gate can never drift from the matcher's own
@@ -90,6 +123,86 @@ function hasFusedMidSegmentMarker(path: string): boolean {
       segmentStartedWithMarker = char === ":" || char === "*";
       atSegmentStart = false;
     } else if ((char === ":" || char === "*") && !segmentStartedWithMarker) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Reports whether a path fuses static text (or a second marker) to a constraint's
+ * closing `>` within a segment (`/:year<\d+>-archive`, `/:id<\d+>.html`, #1150).
+ * Meta terminates the param name at `<` (name `year`), but the build side strips
+ * `<…>` then re-extracts the name greedily (name `year-archive`) — build name ≠
+ * meta name, so the route compiles to a silent dead route (`buildPath` throws
+ * `Missing required param`, `match` keys the constraint on a phantom name). The
+ * mirror of #1050 on the OTHER side of the param: a static SUFFIX after the
+ * constraint, not a static PREFIX before the marker.
+ *
+ * Runs AFTER `validateConstraintSyntax`, so `isConstraintBalanced` already
+ * guarantees every `>` is a constraint closer: a `>` NOT followed by a segment
+ * boundary (`/`), an optional/query `?`, or end-of-input is a fused suffix. A
+ * linear scan (constraints may contain `/`), same convention as the siblings.
+ */
+function hasFusedConstraintSuffix(path: string): boolean {
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] !== ">") {
+      continue;
+    }
+
+    // `charAt` yields "" past the end — a constraint ending the path is not fused.
+    const next = path.charAt(i + 1);
+
+    if (next !== "" && next !== "/" && next !== "?") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Reports whether a path has a raw non-ASCII code point (≥ U+0080) in a STATIC
+ * segment (`/café`, `/меню`, #1154). match rejects any non-ASCII input byte
+ * (`#scanPath`) and compares static trie keys raw, so such a route registers but
+ * is unmatchable — `buildPath` emits `/café`, which its own `match` rejects. Only
+ * static text is flagged: a marker-led segment (`:café`, a non-ASCII param NAME)
+ * and a constraint body (`:id<[а-я]+>`, matched against the DECODED value) are
+ * skipped. A `for…of` code-point scan tracking segment start + constraint depth
+ * (constraints may contain `/`, so no split).
+ */
+function hasNonAsciiStatic(path: string): boolean {
+  let atSegmentStart = true;
+  let segmentIsMarker = false;
+  let inConstraint = false;
+
+  for (const char of path) {
+    if (inConstraint) {
+      inConstraint = char !== ">";
+
+      continue;
+    }
+
+    if (char === "<") {
+      inConstraint = true;
+
+      continue;
+    }
+
+    if (char === "/") {
+      atSegmentStart = true;
+
+      continue;
+    }
+
+    if (atSegmentStart) {
+      segmentIsMarker = char === ":" || char === "*";
+      atSegmentStart = false;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-empty code point from for-of
+    if (!segmentIsMarker && char.codePointAt(0)! >= 0x80) {
       return true;
     }
   }
@@ -264,7 +377,10 @@ export function validateRoutePath(
   // Both marker checks below scan only the URL-path portion: `buildParamMeta`
   // strips the query the same way the trie does, so a `:`/`*` inside a query
   // declaration is not falsely flagged.
-  const { pathPattern } = buildParamMeta(path);
+  const { pathPattern, urlParams } = buildParamMeta(path);
+
+  // Duplicate param name within this route's own path (`/:id/:id`, `/:x/*x`, #1151).
+  validateUniqueParamNames(urlParams, routeName, methodName, path);
 
   // Name-less parameter marker. A `:`/`*` with no following name passes every
   // format check above, but path-matcher rejects it at `registerTree` (#858) with
@@ -288,6 +404,18 @@ export function validateRoutePath(
     );
   }
 
+  // Static text fused to a constraint's closing '>' (`/:year<\d+>-archive`, #1150).
+  // Meta ends the name at '<' but build strips '<…>' and re-extracts the name
+  // greedily, fusing the suffix — build name ≠ meta name ⇒ a silent dead route.
+  // Reject at the gate (path-matcher backstops at `registerTree`), the mirror of
+  // #1050 on the other side of the param.
+  if (hasFusedConstraintSuffix(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": text fused to a constraint '>' in "${path}" (a '<...>' must end its segment or be followed by '/' or an optional '?' — use "/:id<...>/rest", not "/:id<...>rest")`,
+    );
+  }
+
   // Optional splat `*name?`. build treats it as a multi-segment splat but the
   // trie's optional fork compiles a single-segment plain param — so `buildPath`
   // emits a URL its own `match` rejects. Reject at the gate (path-matcher
@@ -308,6 +436,17 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": an unconstrained optional param before a splat is not supported in "${path}" — it is ambiguous (every multi-segment value has two readings). Add a constraint (e.g. ':lang<[a-z]+>?') or model it as two routes`,
+    );
+  }
+
+  // Raw non-ASCII in a STATIC segment (`/café`, `/меню`, #1154). match rejects
+  // non-ASCII input and compares static keys raw, so the route registers but never
+  // matches. Reject with the percent-encode workaround (path-matcher backstops at
+  // `registerTree`); a non-ASCII param NAME or constraint body is unaffected.
+  if (hasNonAsciiStatic(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": non-ASCII static segment in "${path}" — match compares static segments raw and rejects non-ASCII input, so this route would never match. Percent-encode it (e.g. '/caf%C3%A9') or use a param`,
     );
   }
 

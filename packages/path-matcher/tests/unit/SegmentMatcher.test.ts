@@ -160,6 +160,7 @@ describe("createSegmentNode", () => {
       "paramChild",
       "splatChild",
       "route",
+      "routeIsStrong",
       "slashChildRoute",
     ]);
   });
@@ -444,9 +445,13 @@ describe("SegmentMatcher", () => {
         path: "/profile",
         fullName: "userP.profile",
       });
+      // Both routes reuse the SAME ':id' position with the SAME name — the #736
+      // case that must NOT throw. They terminate at DISTINCT paths, though
+      // (`/user/:id/settings` vs `/user/:id` vs `/user/:id/profile`), so the #1153
+      // duplicate-effective-path guard is not (correctly) triggered.
       const user = createInputNode({
         name: "user",
-        path: "/user/:id",
+        path: "/user/:id/settings",
         fullName: "user",
       });
       const userP = createInputNode({
@@ -462,7 +467,7 @@ describe("SegmentMatcher", () => {
       }).not.toThrow();
     });
 
-    it("does NOT throw when same-named splat positions are shared", () => {
+    it("reuses a same-named splat position without a #736 conflict (the dup is then a #1153 reject)", () => {
       const matcher = createTestMatcher();
 
       const file = createInputNode({
@@ -476,9 +481,12 @@ describe("SegmentMatcher", () => {
         fullName: "fileMeta",
       });
 
+      // The #736 guard reuses the same-named splat position without a name
+      // conflict; a splat is terminal, so the two routes then resolve to the SAME
+      // effective path — #1153 rejects the duplicate (it is NOT a #736 error).
       expect(() => {
         matcher.registerTree(twoRouteRoot(file, fileMeta));
-      }).not.toThrow();
+      }).toThrow(/Duplicate route path/);
     });
 
     it("does NOT treat a single route's consecutive optionals as a conflict", () => {
@@ -551,7 +559,9 @@ describe("SegmentMatcher", () => {
     it("captures params under the terminal route's name once the conflict is removed", () => {
       const matcher = createTestMatcher();
 
-      // Same position, same name — the only valid shared-position config.
+      // Same ':id' position, same name, DISTINCT terminals (#1153-safe): the
+      // routes reuse the shared param position without a #736 conflict and without
+      // a duplicate effective path.
       const profile = createInputNode({
         name: "profile",
         path: "/profile",
@@ -559,7 +569,7 @@ describe("SegmentMatcher", () => {
       });
       const user = createInputNode({
         name: "user",
-        path: "/user/:id",
+        path: "/user/:id/settings",
         fullName: "user",
       });
       const userP = createInputNode({
@@ -668,6 +678,165 @@ describe("SegmentMatcher", () => {
       expect(() => {
         createMatcher([{ name: "r", path: "/:a:b" }]);
       }).not.toThrow();
+    });
+  });
+
+  // Static text fused AFTER a constraint (`/:year<\d+>-archive`, `/:id<\d+>.html`):
+  // meta terminates the name at `<` (name `year`), but build strips `<…>` then
+  // re-extracts greedily (name `year-archive`) — build name ≠ meta name, so the
+  // route compiles to a silent dead route. The mirror of #1050 on the other side
+  // of the param; route-tree's gate backstops with a route-contextual message.
+  describe("registerTree — fused constraint suffix rejection (#1150)", () => {
+    it("throws on static text fused after a constraint (/:year<...>-archive)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: String.raw`/:year<\d+>-archive` }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("throws on a '.html' suffix fused after a constraint", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: String.raw`/post/:id<\d+>.html` }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("still accepts a constraint that ends its segment (controls)", () => {
+      for (const path of [
+        String.raw`/:id<\d+>`, // constraint at end
+        String.raw`/:id<\d+>/edit`, // followed by '/'
+        String.raw`/:id<\d+>?`, // followed by an optional '?'
+        "/:id<[a/b]>", // '/' inside the constraint body
+      ]) {
+        expect(() => createMatcher([{ name: "r", path }])).not.toThrow();
+      }
+    });
+  });
+
+  // A param name repeated within one route (`/:id/:id`, a param+splat clash
+  // `/:x/*x`, or a parent's param reused by a child) binds two trie positions under
+  // one name — match's later capture overwrites the earlier and rewrites the user's
+  // URL (#1151). The #736 conflict guard only fires on DIFFERENTLY-named params.
+  describe("registerTree — duplicate param name rejection (#1151)", () => {
+    it("throws on the same param name twice in one path (/:id/:id)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/:id/:id" }]);
+      }).toThrow(/Duplicate parameter name/);
+    });
+
+    it("throws on a param+splat name clash (/:x/*x)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/:x/*x" }]);
+      }).toThrow(/Duplicate parameter name/);
+    });
+
+    it("throws on a parent's param reused by a child (cross-level)", () => {
+      expect(() => {
+        createMatcher([
+          { name: "p", path: "/a/:x", children: [{ name: "c", path: "/:x" }] },
+        ]);
+      }).toThrow(/Duplicate parameter name/);
+    });
+
+    it("still accepts distinct names, incl. #736 consecutive optionals (controls)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: "/:a/:b" }]),
+      ).not.toThrow();
+      expect(() =>
+        createMatcher([{ name: "r", path: "/a/:b?/:c?/d" }]),
+      ).not.toThrow();
+      // the SAME name in DIFFERENT routes is fine — only intra-route dups reject
+      expect(() =>
+        createMatcher([
+          { name: "a", path: "/x/:id" },
+          { name: "b", path: "/y/:id" },
+        ]),
+      ).not.toThrow();
+    });
+  });
+
+  // Two routes compiling to the SAME trie terminal — flat /a/b vs nested a→b, or
+  // /x vs /x/ — silently shadowed each other (the later's deep link resolved to the
+  // earlier route). A STRONG (full-insertion) terminal write now rejects a second
+  // strong write by a DIFFERENT route; a WEAK (optional-omit) owner is legitimately
+  // displaced, and a same-route revisit is idempotent (#1153).
+  describe("registerTree — duplicate effective path rejection (#1153)", () => {
+    it("throws when a flat and a nested route resolve to the same path", () => {
+      expect(() => {
+        createMatcher([
+          { name: "a", path: "/a", children: [{ name: "b", path: "/b" }] },
+          { name: "ab", path: "/a/b" },
+        ]);
+      }).toThrow(/Duplicate route path/);
+    });
+
+    it("throws on trailing-slash variants (/x vs /x/)", () => {
+      expect(() => {
+        createMatcher([
+          { name: "a", path: "/x" },
+          { name: "b", path: "/x/" },
+        ]);
+      }).toThrow(/Duplicate route path/);
+    });
+
+    it("throws on two routes at the root path", () => {
+      expect(() => {
+        createMatcher([
+          { name: "a", path: "/" },
+          { name: "b", path: "/" },
+        ]);
+      }).toThrow(/Duplicate route path/);
+    });
+
+    it("still accepts distinct routes, optional-omit fan-out, and weak→strong (controls)", () => {
+      expect(() =>
+        createMatcher([
+          { name: "a", path: "/a" },
+          { name: "b", path: "/b" },
+        ]),
+      ).not.toThrow();
+      // a single route's optional-omit revisits its own terminal — idempotent
+      expect(() =>
+        createMatcher([{ name: "r", path: "/a/:b?/:c?/d" }]),
+      ).not.toThrow();
+      // an optional's omit weakly claims the root; a full "/" route displaces it
+      expect(() =>
+        createMatcher([
+          { name: "opt", path: "/:a?" },
+          { name: "root", path: "/" },
+        ]),
+      ).not.toThrow();
+    });
+  });
+
+  // A raw non-ASCII code point in a STATIC segment (/café, /меню) registers but
+  // never matches — match rejects non-ASCII input (#scanPath) and compares static
+  // keys raw (#1154). Reject at registration with the percent-encode workaround.
+  describe("registerTree — non-ASCII static segment rejection (#1154)", () => {
+    it("throws on a Latin-1 static segment (/café)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/café" }]);
+      }).toThrow(/Non-ASCII static segment/);
+    });
+
+    it("throws on Cyrillic and CJK static segments", () => {
+      expect(() => createMatcher([{ name: "r", path: "/меню" }])).toThrow(
+        /Non-ASCII static segment/,
+      );
+      expect(() => createMatcher([{ name: "r", path: "/新闻" }])).toThrow(
+        /Non-ASCII static segment/,
+      );
+    });
+
+    it("still accepts the percent-encoded form, a non-ASCII param name, and ASCII (controls)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: "/caf%C3%A9" }]),
+      ).not.toThrow();
+      // a non-ASCII PARAM name is fine — only static text is compared raw
+      expect(() =>
+        createMatcher([{ name: "r", path: "/:café" }]),
+      ).not.toThrow();
+      expect(() =>
+        createMatcher([{ name: "r", path: "/users/list" }]),
+      ).not.toThrow();
     });
   });
 

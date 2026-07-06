@@ -88,6 +88,15 @@ export function registerNode(
     throwEmptyConstraint(rawNodePath);
   }
 
+  // Static text fused to a constraint's closing '>' (`/:year<\d+>-archive`, #1150):
+  // meta ends the name at '<' but the build side strips '<…>' then re-extracts the
+  // name greedily, fusing the suffix — build name ≠ meta name ⇒ a silent dead route
+  // (buildPath throws, match keys the constraint on a phantom name). The mirror of
+  // #1050 on the OTHER side of the param. route-tree's gate catches it first.
+  if (hasFusedConstraintSuffix(rawNodePath)) {
+    throwFusedConstraintSuffix(rawNodePath);
+  }
+
   // Strip constraint patterns (e.g., <\d+>, <[^/]+>) from path before trie insertion.
   // Constraints like <[^/]+> contain "/" which breaks segment splitting in indexOf("/", start).
   const nodePath = rawNodePath.replaceAll(CONSTRAINT_PATTERN_RGX, "");
@@ -153,6 +162,21 @@ function compileAndRegisterRoute(
     state.options.urlParamsEncoding,
   );
 
+  // #1151: reject a duplicate param name within one route's full path (`/:id/:id`,
+  // a param+splat clash `/:x/*x`, or a parent `/a/:x` + child `/:x`). buildParamSlots
+  // keeps duplicates; the trie stores them at DIFFERENT positions under the SAME
+  // name, so match's later capture silently overwrites the earlier and
+  // rewritePathOnMatch then rewrites the user's URL from the single survivor. The
+  // #736 conflict guard only fires on DIFFERENTLY-named params at ONE position, so
+  // this same-name case slips through.
+  const buildParamNames = buildParamSlots.map((slot) => slot.paramName);
+  const buildParamNamesSet =
+    buildParamNames.length === 0 ? EMPTY_STRING_SET : new Set(buildParamNames);
+
+  if (buildParamNamesSet.size !== buildParamNames.length) {
+    throwDuplicateParamName(node.fullName, buildParamNames);
+  }
+
   const compiled: CompiledRoute = {
     name: node.fullName,
     parent: parentRoute,
@@ -169,10 +193,7 @@ function compileAndRegisterRoute(
     hasConstraints: constraintPatterns.size > 0,
     buildStaticParts,
     buildParamSlots,
-    buildParamNamesSet:
-      buildParamSlots.length === 0
-        ? EMPTY_STRING_SET
-        : new Set(buildParamSlots.map((slot) => slot.paramName)),
+    buildParamNamesSet,
     // Initialized here (not added conditionally below) so static and param
     // routes share one hidden class — avoids a megamorphic CompiledRoute (#1009).
     cachedResult: undefined,
@@ -337,6 +358,31 @@ function throwFusedMarker(segment: string): never {
 }
 
 /**
+ * #1154: whether a STATIC segment carries a code point outside ASCII (≥ U+0080).
+ * A raw non-ASCII static (`café`) registers but never matches — match rejects
+ * non-ASCII input and compares static keys raw. A per-code-point scan (`for…of`
+ * iterates by code point, so surrogate pairs are handled).
+ */
+function hasNonAsciiSegment(segment: string): boolean {
+  for (const char of segment) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- `char` is a non-empty code point from for-of, so codePointAt(0) is defined
+    if (char.codePointAt(0)! >= 0x80) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function throwNonAsciiStatic(segment: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Non-ASCII static segment "${segment}": match ` +
+      `rejects non-ASCII input and compares static keys raw, so this route would ` +
+      `never match. Percent-encode it (e.g. "/caf%C3%A9") or use a param.`,
+  );
+}
+
+/**
  * Rejects an optional splat (`*name?`): `buildParamMeta`/`compileBuildParts`
  * classify it as a splat (multi-segment, splat encoder preserves "/"), but the
  * optional fork would compile a plain param node that eats a single segment — a
@@ -398,6 +444,94 @@ function throwEmptyConstraint(path: string): never {
     `[SegmentMatcher.registerTree] Empty constraint '<>' in path "${path}": ` +
       `a constraint body must be non-empty (e.g. '<[0-9]+>'). An empty '<>' ` +
       `compiles to a never-matching pattern.`,
+  );
+}
+
+/**
+ * Reports whether a path fuses static text (or a second marker) to a constraint's
+ * closing '>' within a segment (`/:year<\d+>-archive`, #1150). Runs after the
+ * balance check, so every '>' is a constraint closer: a '>' NOT followed by a
+ * segment boundary ('/'), an optional/query '?', or end-of-input is a fused suffix.
+ * A linear scan (constraints may contain '/'). The mirror of the fused-marker
+ * rejection (#1050) on the OTHER side of the param.
+ */
+function hasFusedConstraintSuffix(path: string): boolean {
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] !== ">") {
+      continue;
+    }
+
+    // `charAt` yields "" past the end — a constraint ending the path is not fused.
+    const next = path.charAt(i + 1);
+
+    if (next !== "" && next !== "/" && next !== "?") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function throwFusedConstraintSuffix(path: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Text fused to a constraint '>' in path "${path}": ` +
+      `a '<...>' constraint must end its segment or be followed by '/' or an ` +
+      `optional '?' — use "/:id<...>/rest", not "/:id<...>rest".`,
+  );
+}
+
+function throwDuplicateParamName(
+  routeName: string,
+  names: readonly string[],
+): never {
+  const seen = new Set<string>();
+  let duplicate = "";
+
+  for (const name of names) {
+    if (seen.has(name)) {
+      duplicate = name;
+
+      break;
+    }
+
+    seen.add(name);
+  }
+
+  throw new Error(
+    `[SegmentMatcher.registerTree] Duplicate parameter name ':${duplicate}' in ` +
+      `route "${routeName}": a param name must be unique within a route — two ` +
+      `positions cannot both bind ':${duplicate}' (the second silently overwrites ` +
+      `the first). Rename one.`,
+  );
+}
+
+/**
+ * #1153: writes a STRONG (full-insertion) terminal route, rejecting a second strong
+ * write by a DIFFERENT route — two routes compiling to the same effective path
+ * (flat vs nested `/a/b`, or `/x` vs `/x/`), where the later would silently shadow
+ * the earlier (its deep link would resolve to the other route). A revisit by the
+ * SAME route (the optional-omit fan-out) is idempotent, and a WEAK (omit `??=`)
+ * owner is legitimately displaced by a strong write — neither throws.
+ */
+function writeStrongRoute(node: SegmentNode, compiled: CompiledRoute): void {
+  if (
+    node.route !== undefined &&
+    node.route !== compiled &&
+    node.routeIsStrong === true
+  ) {
+    throwDuplicateRoutePath(node.route.name, compiled.name);
+  }
+
+  node.route = compiled;
+  node.routeIsStrong = true;
+}
+
+function throwDuplicateRoutePath(existingName: string, newName: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Duplicate route path: routes "${existingName}" ` +
+      `and "${newName}" resolve to the same URL. The later registration would ` +
+      `silently shadow the earlier (its deep link would resolve to the other ` +
+      `route). Give them distinct paths.`,
   );
 }
 
@@ -552,7 +686,7 @@ function insertIntoTrie(
   const normalized = normalizeTrailingSlash(fullPath);
 
   if (normalized === "/") {
-    state.root.route = compiled;
+    writeStrongRoute(state.root, compiled);
 
     return;
   }
@@ -662,7 +796,7 @@ function insertIntoTrieFrom(
     start = segmentEnd + 1;
   }
 
-  node.route = compiled;
+  writeStrongRoute(node, compiled);
 }
 
 function insertSlashChildIntoTrie(
@@ -765,6 +899,16 @@ function processSegment(
   // Reject it — the backstop for route-tree's route-contextual gate.
   if (FUSED_MARKER_RGX.test(segment)) {
     throwFusedMarker(segment);
+  }
+
+  // #1154: a raw non-ASCII code point in a STATIC segment (`/café`, `/меню`).
+  // match rejects any input byte ≥ 0x80 (`#scanPath`) AND compares static trie
+  // keys raw (never percent-decoded), so such a route registers but is
+  // unmatchable — `buildPath` emits `/café`, which its own `match` rejects (a dead
+  // route). Reject at registration with the percent-encode workaround. A non-ASCII
+  // PARAM name or constraint is unaffected (only static text is compared raw).
+  if (hasNonAsciiSegment(segment)) {
+    throwNonAsciiStatic(segment);
   }
 
   const key = state.options.caseSensitive ? segment : segment.toLowerCase();

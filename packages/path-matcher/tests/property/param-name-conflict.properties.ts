@@ -113,9 +113,13 @@ describe("Param-name conflict properties (#736)", () => {
           path: "/end",
           fullName: "b.child",
         });
+        // `a` shares the `:${paramName}` position with `b`/`b.child` but terminates
+        // DEEPER (`/leaf`), so the #736 same-name reuse is exercised without a
+        // #1153 duplicate effective path (which `a` == `b` at `/area/:${paramName}`
+        // would now, correctly, be).
         const a = createInputNode({
           name: "a",
-          path: `/area/:${paramName}`,
+          path: `/area/:${paramName}/leaf`,
           fullName: "a",
         });
         const b = createInputNode({
@@ -128,7 +132,7 @@ describe("Param-name conflict properties (#736)", () => {
 
         matcher.registerTree(createRootWithChildren([a, b]));
 
-        // Both the short route (a) and the deeper route (b.child) must bind the
+        // Both the shallow route (b) and the deeper route (b.child) must bind the
         // shared position under exactly `paramName` — no swap, no extra keys.
         const shallow = matcher.match(`/area/${value}`);
         const deep = matcher.match(`/area/${value}/end`);

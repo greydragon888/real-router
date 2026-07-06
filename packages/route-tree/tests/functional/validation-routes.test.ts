@@ -393,6 +393,86 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("should throw for static text fused to a constraint '>' (#1150)", () => {
+        const paths = [
+          String.raw`/:year<\d+>-archive`, // static suffix after a constraint
+          String.raw`/post/:id<\d+>.html`, // ".html" suffix
+          String.raw`/x/:id<\d+>x`, // letter suffix
+          String.raw`/x/:a<\d+>:b`, // a second marker fused after the constraint
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/fused to a constraint/u);
+        });
+      });
+
+      it("should NOT flag a constraint that ends its segment (controls, #1150)", () => {
+        const paths = [
+          String.raw`/:id<\d+>`, // constraint at end of path
+          String.raw`/:id<\d+>/edit`, // followed by a segment boundary
+          String.raw`/:id<\d+>?`, // followed by an optional marker
+          "/:id<[a<b]>", // '<' inside the constraint body
+          "/:id<[a/b]>", // '/' inside the constraint body
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
+      it("should throw for a duplicate param name within one route (#1151)", () => {
+        const paths = [
+          "/:id/:id", // same name, two segments
+          "/:x/*x", // param + splat name clash
+          "/a/:id/b/:id", // repeated across static segments
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/duplicate parameter name/u);
+        });
+      });
+
+      it("should NOT flag distinct param names (control, #1151)", () => {
+        const paths = ["/:a/:b", "/a/:b?/:c?/d", "/:x/*rest"];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
+      it("should throw for a non-ASCII static segment (#1154)", () => {
+        const paths = ["/café", "/меню", "/新闻", "/a/café/b"];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/non-ASCII static segment/u);
+        });
+      });
+
+      it("should NOT flag percent-encoded statics, non-ASCII param names, or constraints (control, #1154)", () => {
+        const paths = [
+          "/caf%C3%A9", // percent-encoded — already works today
+          "/:café", // a non-ASCII PARAM name (only static text is compared raw)
+          "/:id<[а-я]+>", // a Cyrillic constraint body (matched against decoded value)
+          "/users",
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
       it("should throw for an optional splat '*name?' (#1149)", () => {
         const paths = [
           "/files/*path?", // optional splat
@@ -531,13 +611,16 @@ describe("validateRoutePath", () => {
       }).not.toThrow();
     });
 
-    it("should handle paths with unicode characters", () => {
+    it("rejects unicode static segments with the percent-encode hint (#1154)", () => {
+      // Raw non-ASCII statics register but never match (match compares static keys
+      // raw and rejects non-ASCII input) — the #1154 dead-route class. Rejected at
+      // the gate now; percent-encode the segment instead.
       const unicodePaths = ["/użytkownik", "/用户", "/مستخدم", "/пользователь"];
 
       unicodePaths.forEach((path) => {
         expect(() => {
           validateRoutePath(path, routeName, methodName);
-        }).not.toThrow();
+        }).toThrow(/non-ASCII static segment/u);
       });
     });
 
