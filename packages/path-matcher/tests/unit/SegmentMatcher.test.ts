@@ -1067,6 +1067,33 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // #1287: two (or more) optional params directly before a splat can't be represented
+  // by a single trie-slot fork — the outer optional's mark overwrites the inner's,
+  // silently reshaping the omit-outer/take-inner form into the splat
+  // (`/:a<c1>?/:b<c2>?/*rest`: `/ab/x` → {rest:"ab/x"} instead of {b:"ab",rest:"x"}).
+  // Rejected at registration (both must be constrained, else #1264 B caught the inner).
+  describe("registerTree — two optionals before a splat rejected (#1287)", () => {
+    it("throws for two constrained optionals directly before a splat", () => {
+      expect(() =>
+        createMatcher([
+          { name: "r", path: String.raw`/:a<\d+>?/:b<[a-f]+>?/*rest` },
+        ]),
+      ).toThrow(/optional/i);
+    });
+
+    it("still accepts a single constrained optional before a splat (#1264 A1)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: String.raw`/:v<v\d+>?/*rest` }]),
+      ).not.toThrow();
+    });
+
+    it("still accepts two optionals NOT before a splat (opt→opt, static tail)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: "/:a?/:b?/tail" }]),
+      ).not.toThrow();
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted

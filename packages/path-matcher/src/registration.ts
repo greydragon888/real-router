@@ -107,6 +107,16 @@ export function registerNode(
   // Constraints like <[^/]+> contain "/" which breaks segment splitting in indexOf("/", start).
   const nodePath = rawNodePath.replaceAll(CONSTRAINT_PATTERN_RGX, "");
 
+  // #1287: two optional params directly before a splat can't be represented by a
+  // single trie-slot fork — the outer optional's mark overwrites the inner's, silently
+  // reshaping the omit-outer/take-inner form into the splat (`/:a<c1>?/:b<c2>?/*rest`).
+  // Reject. Scanned on the CONSTRAINT-STRIPPED path so a plain segment split is safe (a
+  // constraint body can contain '/'). Both must be constrained, else #1264 B already
+  // rejects the inner unconstrained optional→splat.
+  if (hasMultipleOptionalsBeforeSplat(nodePath)) {
+    throwMultipleOptionalsBeforeSplat(rawNodePath);
+  }
+
   const matchPath = isAbsolute ? nodePath : buildFullPath(parentPath, nodePath);
 
   const compileParentPath = isAbsolute ? "" : parentPath;
@@ -399,6 +409,38 @@ function hasNonAsciiSegment(segment: string): boolean {
   }
 
   return false;
+}
+
+// #1287: ≥2 optional params directly before a splat. Runs on the CONSTRAINT-STRIPPED
+// path, so a plain `/` split is safe (a constraint body can contain '/').
+function hasMultipleOptionalsBeforeSplat(strippedPath: string): boolean {
+  const segments = strippedPath.split("/");
+
+  for (let i = 2; i < segments.length; i++) {
+    if (
+      segments[i].startsWith("*") &&
+      isOptionalParamSegment(segments[i - 1]) &&
+      isOptionalParamSegment(segments[i - 2])
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isOptionalParamSegment(segment: string): boolean {
+  return segment.startsWith(":") && segment.endsWith("?");
+}
+
+function throwMultipleOptionalsBeforeSplat(path: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Two optional params directly before a splat in ` +
+      `"${path}": a single trie slot carries only one optional→splat fork, so the ` +
+      `outer optional would overwrite the inner and the omit-outer/take-inner form ` +
+      `would silently reshape into the splat. Split into separate routes, or drop the ` +
+      `'?' on one.`,
+  );
 }
 
 function throwNonAsciiStatic(segment: string): never {
