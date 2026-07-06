@@ -473,6 +473,34 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("should throw for a constraint leaked into a query name (#1242 §5.1)", () => {
+        expect(() => {
+          validateRoutePath(String.raw`/a/:b?<\d+>`, routeName, methodName);
+        }).toThrow(/invalid query-param name/u);
+      });
+
+      it("should throw for a path-param / query-param name collision (#1242 §5.3)", () => {
+        expect(() => {
+          validateRoutePath("/a/:tab?tab", routeName, methodName);
+        }).toThrow(/declared as both a path param and a query param/u);
+      });
+
+      it("should NOT flag clean query declarations, incl. tolerated ?name=value (control, #1242)", () => {
+        const paths = [
+          "/a?valid",
+          "/a/:id?q",
+          "/a?a&b",
+          "/a?tab=1", // '=' in the declaration is tolerated (§5.2 not folded in)
+          "/search?first&second",
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
       it("should throw for an optional splat '*name?' (#1149)", () => {
         const paths = [
           "/files/*path?", // optional splat

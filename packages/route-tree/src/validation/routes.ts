@@ -83,6 +83,42 @@ function validateUniqueParamNames(
   }
 }
 
+const INVALID_QUERY_NAME_RGX = new RegExp("[<>]", "u");
+
+/**
+ * #1242 §5.1/§5.3: rejects a malformed query-param declaration — a query name
+ * carrying `<`/`>` (a constraint leaked in via a reverse-order modifier typo
+ * `:id?<c>`), or one that collides with a path-param name (`/a/:tab?tab`, where
+ * buildPath emits the value twice). Narrow to `<>`: a `=` in the declaration
+ * (`?tab=1`, §5.2) is tolerated today and left as a separate call. path-matcher's
+ * `registerTree` backstops both; this gate adds the route-contextual message.
+ */
+function validateQueryParamDeclarations(
+  urlParams: readonly string[],
+  queryParams: readonly string[],
+  routeName: string,
+  methodName: string,
+  path: string,
+): void {
+  const urlParamSet = new Set(urlParams);
+
+  for (const name of queryParams) {
+    if (INVALID_QUERY_NAME_RGX.test(name)) {
+      throw createRouterError(
+        methodName,
+        `Invalid path for route "${routeName}": invalid query-param name "${name}" in "${path}" (a query-param name cannot contain '<' or '>' — a reverse-order modifier typo that leaked a constraint into the query; put the optional '?' after the constraint, ':id<...>?')`,
+      );
+    }
+
+    if (urlParamSet.has(name)) {
+      throw createRouterError(
+        methodName,
+        `Invalid path for route "${routeName}": "${name}" is declared as both a path param and a query param in "${path}" — buildPath would emit its value twice (rename one)`,
+      );
+    }
+  }
+}
+
 /**
  * Matches a `:`/`*` marker NOT followed by a valid param-name char — a name-less
  * marker (`:`, `*`, `:?`, `:<\d+>`). Derived from the single `PARAM_NAME_PATTERN`
@@ -377,10 +413,20 @@ export function validateRoutePath(
   // Both marker checks below scan only the URL-path portion: `buildParamMeta`
   // strips the query the same way the trie does, so a `:`/`*` inside a query
   // declaration is not falsely flagged.
-  const { pathPattern, urlParams } = buildParamMeta(path);
+  const { pathPattern, urlParams, queryParams } = buildParamMeta(path);
 
   // Duplicate param name within this route's own path (`/:id/:id`, `/:x/*x`, #1151).
   validateUniqueParamNames(urlParams, routeName, methodName, path);
+
+  // Malformed query-param declarations (#1242 §5.1/§5.2/§5.3): a query name with
+  // `<>=&?#/`, or one that collides with a path-param name.
+  validateQueryParamDeclarations(
+    urlParams,
+    queryParams,
+    routeName,
+    methodName,
+    path,
+  );
 
   // Name-less parameter marker. A `:`/`*` with no following name passes every
   // format check above, but path-matcher rejects it at `registerTree` (#858) with

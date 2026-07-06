@@ -840,6 +840,78 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // Malformed query-param declarations (#1242 §5.1/§5.2/§5.3): a query name carrying
+  // constraint/query metacharacters (a modifier-order typo or a '=' in the decl), or
+  // one colliding with a path-param name — all degraded silently before.
+  describe("registerTree — malformed query-param declaration rejection (#1242)", () => {
+    it("throws on a reverse-order modifier leaking a constraint into the query name (§5.1)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: String.raw`/a/:b?<\d+>` }]),
+      ).toThrow(/Invalid query-param declaration/);
+    });
+
+    it("throws on a path-param / query-param name collision (§5.3)", () => {
+      expect(() => createMatcher([{ name: "r", path: "/a/:tab?tab" }])).toThrow(
+        /Name collision/,
+      );
+    });
+
+    it("still accepts clean query declarations, incl. tolerated ?name=value (controls)", () => {
+      for (const path of [
+        "/a?valid",
+        "/a/:id?q",
+        "/a?a&b", // '&' separates two query names — neither is malformed
+        String.raw`/a/:id<\d+>?q`, // correct modifier order: constraint, then query
+        "/a?tab=1", // a '=' in the declaration is tolerated today (§5.2 not folded in)
+        "/search?first&second",
+      ]) {
+        expect(() => createMatcher([{ name: "r", path }])).not.toThrow();
+      }
+    });
+  });
+
+  // An index route (path "/") under an OPTIONAL-param or SPLAT parent is
+  // unreachable/inconsistent (#1242 §5.4). A REQUIRED-param parent has no omit form,
+  // so its slash-child is coherent (existing behaviour) — allowed.
+  describe("registerTree — index under an optional/splat parent rejection (#1242 §5.4)", () => {
+    it("throws for an index (path '/') under an optional-param parent", () => {
+      expect(() =>
+        createMatcher([
+          { name: "p", path: "/a/:b?", children: [{ name: "idx", path: "/" }] },
+        ]),
+      ).toThrow(/Index route .* is not supported/);
+    });
+
+    it("throws for an index under a splat parent", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/files/*rest",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).toThrow(/Index route .* is not supported/);
+    });
+
+    it("still accepts an index under a required-param or static parent (controls)", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/users/:id",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).not.toThrow();
+      expect(() =>
+        createMatcher([
+          { name: "p", path: "/a/b", children: [{ name: "idx", path: "/" }] },
+        ]),
+      ).not.toThrow();
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted
