@@ -5,6 +5,154 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-06]
+
+### @real-router/core@0.64.0
+
+### Minor Changes
+
+- [#1267](https://github.com/greydragon888/real-router/pull/1267) [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8) Thanks [@greydragon888](https://github.com/greydragon888)! - Match an optional param directly followed by a required param ([#1263](https://github.com/greydragon888/real-router/issues/1263))
+
+  `/:a?/:b` bound a single-segment URL under the optional's name (`match("/x")` → `{ a: "x" }`) instead of the successor's (`{ b: "x" }`), and `/:a<\d+>?/:b` was unmatchable when the optional was omitted — `buildPath` emitted a dead deep-link. The omit form is now disambiguated by segment count: because it is one segment shorter, on the LAST segment the optional is omitted and the segment binds under the successor's name. The optional's own constraint is validated only when it is present (≥2 segments). Consecutive optionals (`/:a?/:b?/…`) are unchanged.
+
+- [#1267](https://github.com/greydragon888/real-router/pull/1267) [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8) Thanks [@greydragon888](https://github.com/greydragon888)! - Support a constrained optional before a splat; reject the unconstrained form ([#1264](https://github.com/greydragon888/real-router/issues/1264))
+
+  `/:v<c>?/*rest` — a constrained optional before a splat, e.g. a versioned-API (`/:v<v\d+>?/*rest`) or preview-mode (`/:mode<(preview|draft)>?/*path`) prefix — was unmatchable when the optional was omitted (`buildPath` emitted a dead deep-link). It now matches via try-take-if-valid: the segment is taken as the optional only if its **decoded** value satisfies the constraint (so `/%76%31/users` → `{ v: "v1" }`), otherwise the splat captures it.
+
+  An **unconstrained** optional before a splat (`/:v?/*rest`) is now rejected at registration with a hint to add a constraint. Without one there is no signal to disambiguate "take the optional" from "let the splat capture", so every multi-segment value has two readings and matching would silently reshape half the input space. Add a constraint (`:v<…>?`) or model it as two routes.
+
+### @real-router/angular@0.13.2
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+  - @real-router/sources@0.10.3
+
+### @real-router/browser-plugin@0.18.3
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/hash-plugin@0.8.3
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/lifecycle-plugin@0.6.6
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/logger-plugin@0.5.18
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/memory-plugin@0.4.14
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/navigation-plugin@0.7.15
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/persistent-params-plugin@0.2.18
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/preact@0.16.3
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+  - @real-router/sources@0.10.3
+
+### @real-router/preload-plugin@0.6.8
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/react@0.28.6
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+  - @real-router/sources@0.10.3
+
+### @real-router/rx@0.3.19
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/search-schema-plugin@0.4.6
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/solid@0.16.2
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+  - @real-router/sources@0.10.3
+
+### @real-router/sources@0.10.3
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/svelte@0.15.1
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+  - @real-router/sources@0.10.3
+
+### @real-router/validation-plugin@0.9.4
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+
+### @real-router/vue@0.16.3
+
+### Patch Changes
+
+- Updated dependencies [[`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8), [`f80df75`](https://github.com/greydragon888/real-router/commit/f80df75ae7d3b007f3606f0b9446a01e79ab87b8)]:
+  - @real-router/core@0.64.0
+  - @real-router/sources@0.10.3
+
 ## [2026-07-05]
 
 ### @real-router/core@0.63.3
