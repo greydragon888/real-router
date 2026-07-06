@@ -183,6 +183,17 @@ function compileAndRegisterRoute(
     throwDuplicateParamName(node.fullName, buildParamNames);
   }
 
+  // #1242 §5.1/§5.2/§5.3: validate query-param DECLARATIONS. A declared query name
+  // must be a clean token — reject one carrying constraint/query metacharacters
+  // (`:b?<\d+>` declares query `<\d+>`; `?tab=1` declares `tab=1`), and reject a name
+  // shared with a path param (`/a/:tab?tab`), where buildPath would emit the value
+  // twice (`/a/x?tab=x`). Both degraded silently before.
+  validateQueryParamDeclarations(
+    node.fullName,
+    declaredQueryParams,
+    buildParamNamesSet,
+  );
+
   const compiled: CompiledRoute = {
     name: node.fullName,
     parent: parentRoute,
@@ -514,6 +525,48 @@ function throwDuplicateParamName(
       `route "${routeName}": a param name must be unique within a route — two ` +
       `positions cannot both bind ':${duplicate}' (the second silently overwrites ` +
       `the first). Rename one.`,
+  );
+}
+
+// #1242 §5.1: a query-param name containing `<`/`>` is a malformed declaration — a
+// constraint leaked into it via a reverse-order modifier typo (`:b?<\d+>` parses the
+// `?` as the query start, so `<\d+>` becomes the query name). Deliberately narrow to
+// `<>`: `?name=value` (a `=` in the declaration, §5.2) is a separate call — bare core
+// tolerates it today and it is not folded in here.
+const INVALID_QUERY_NAME_RGX = new RegExp("[<>]", "u");
+
+function validateQueryParamDeclarations(
+  routeName: string,
+  queryParams: readonly string[],
+  urlParamNames: ReadonlySet<string>,
+): void {
+  for (const name of queryParams) {
+    if (INVALID_QUERY_NAME_RGX.test(name)) {
+      throwInvalidQueryParamName(routeName, name);
+    }
+
+    if (urlParamNames.has(name)) {
+      throwPathQueryNameCollision(routeName, name);
+    }
+  }
+}
+
+function throwInvalidQueryParamName(routeName: string, name: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Invalid query-param declaration "${name}" in ` +
+      `route "${routeName}": a query-param name cannot contain '<' or '>'. This is a ` +
+      `reverse-order modifier typo that leaked a constraint into the query — put the ` +
+      `optional '?' AFTER the constraint (':id<...>?', not ':id?<...>'). It would ` +
+      `never round-trip.`,
+  );
+}
+
+function throwPathQueryNameCollision(routeName: string, name: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Name collision in route "${routeName}": "${name}" ` +
+      `is declared as BOTH a path param (':${name}') and a query param ('?${name}'). ` +
+      `buildPath would emit its value twice (once in the path, once in the query). ` +
+      `Rename one.`,
   );
 }
 
