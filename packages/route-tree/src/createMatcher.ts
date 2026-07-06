@@ -11,7 +11,7 @@
  */
 
 import { SegmentMatcher } from "path-matcher";
-import { parse, build } from "search-params";
+import { parseQuery, build } from "search-params";
 
 import type { Options } from "search-params";
 
@@ -83,7 +83,10 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
     ...(options?.urlParamsEncoding !== undefined && {
       urlParamsEncoding: options.urlParamsEncoding,
     }),
-    parseQueryString: (qs: string) => parse(qs, qp),
+    // qs is ALREADY the query substring (SegmentMatcher split at the first "?");
+    // parseQuery skips the redundant getSearch that would split again inside a
+    // query value and drop the param (#1292).
+    parseQueryString: (qs: string) => parseQuery(qs, qp),
     buildQueryString: (params: Record<string, unknown>) => build(params, qp),
   });
 }

@@ -218,3 +218,48 @@ describe("createMatcher", () => {
     expect(result?.params.limit).toBe(20);
   });
 });
+
+describe("createMatcher — legal '?' inside a query value (#1292)", () => {
+  it("keeps a '?' in a query value (loose) — the seam must not split twice", () => {
+    const tree = createRouteTree("", "", [{ name: "r", path: "/r?x" }]);
+    const matcher = createMatcher();
+
+    matcher.registerTree(tree);
+
+    // "?" is legal inside a query value per RFC 3986; SegmentMatcher already split
+    // the URL at the first "?", so the DI parser must not split again (#1292).
+    expect(matcher.match("/r?x=a?b")?.params).toStrictEqual({ x: "a?b" });
+    // control — no inner "?"
+    expect(matcher.match("/r?x=ab")?.params).toStrictEqual({ x: "ab" });
+  });
+
+  it("does not unmatch a legal '?'-in-value URL under strictQueryParams (#1292)", () => {
+    const tree = createRouteTree("", "", [{ name: "s", path: "/s?q" }]);
+    const matcher = createMatcher({ strictQueryParams: true });
+
+    matcher.registerTree(tree);
+
+    // the second split spawned a phantom undeclared key → strict rejected the whole
+    // URL; the declared "q" must carry the full "a?b" value.
+    expect(matcher.match("/s?q=a?b")?.params).toStrictEqual({ q: "a?b" });
+    // control
+    expect(matcher.match("/s?q=ab")?.params).toStrictEqual({ q: "ab" });
+  });
+});
+
+describe("createMatcher — a literal '__proto__' query key survives (#1293)", () => {
+  it("keeps '__proto__' from search-params as an own param end-to-end", () => {
+    const tree = createRouteTree("", "", [{ name: "r", path: "/r?x" }]);
+    const matcher = createMatcher();
+
+    matcher.registerTree(tree);
+
+    // search-params materializes __proto__ as a real own key (#855); the matcher's
+    // #mergeQueryParams must fold it in with defineProperty, not a plain assign that
+    // hits the inherited setter and drops it (#1293).
+    const result = matcher.match("/r?__proto__=zzz");
+
+    expect(result).toBeDefined();
+    expect(Object.hasOwn(result!.params, "__proto__")).toBe(true);
+  });
+});

@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { build, keep, omit, parse } from "../../src";
+import { build, keep, omit, parse, parseQuery } from "../../src";
 import { decodeValue } from "../../src/decode";
 import { encode, encodeValue, makeOptions } from "../../src/encode";
 import { getSearch } from "../../src/utils";
@@ -326,6 +326,30 @@ describe("search-params", () => {
         price: 12.5,
         name: "abc",
       });
+    });
+  });
+
+  // ===========================================================================
+  // parseQuery (already-extracted query — no getSearch, #1292)
+  // ===========================================================================
+
+  describe("parseQuery", () => {
+    it("does NOT split at a '?' inside a value (unlike parse)", () => {
+      // parse re-runs getSearch and splits at the inner "?" — the #1292 bug shape
+      expect(parse("q=a?b")).toStrictEqual({ b: null });
+      // parseQuery treats the whole input as the query — the value keeps its "?"
+      expect(parseQuery("q=a?b")).toStrictEqual({ q: "a?b" });
+    });
+
+    it("parses a normal query identically to parse", () => {
+      expect(parseQuery("page=1&sort=name")).toStrictEqual(
+        parse("page=1&sort=name"),
+      );
+    });
+
+    it("fast-paths an empty query to {}", () => {
+      expect(parseQuery("")).toStrictEqual({});
+      expect(parseQuery("?")).toStrictEqual({});
     });
   });
 

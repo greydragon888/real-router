@@ -983,15 +983,20 @@ function insertSlashChildIntoTrie(
   compiled: CompiledRoute,
   parentPath: string,
 ): void {
-  // #1242 §5.4: an index route (path "/") under an OPTIONAL-param or SPLAT parent is
-  // unreachable/inconsistent — under an optional param the index binds only the
-  // take-node (`start("/a")` → parent, `start("/a/x")` → index), and under a splat
-  // `slashChildRoute` sits on the splat node, which `#matchSplat`'s fast path never
-  // reads, so the index is unreachable entirely. A REQUIRED-param parent (`/users/:id`)
-  // has no omit form and its slash-child is coherent (existing behaviour) — allowed.
+  // #1242 §5.4 + #1294: an index route (path "/") under a parent whose path carries an
+  // OPTIONAL param in ANY position, or ends in a SPLAT, is unreachable/inconsistent.
+  // Under an optional the index binds only the take form (`/a/:b?/c` + idx: `/a/x/c/` →
+  // index, `/a/c/` → parent) — `walkTrie` lands `slashChildRoute` on the full-take
+  // terminal only and does not fan out omit forms; under a splat `slashChildRoute` sits
+  // on the splat node, which `#matchSplat`'s fast path never reads, so the index is
+  // unreachable entirely. #1242 checked only the LAST segment, missing mid-path
+  // optionals (#1294). A REQUIRED-param parent (`/users/:id`, `/a/:b/c`) has a single
+  // form and its slash-child is coherent (existing behaviour) — allowed. parentPath is
+  // constraint-stripped (walkTrie requires it), so "/" is a clean segment separator.
   const lastSegment = parentPath.slice(parentPath.lastIndexOf("/") + 1);
-  const optionalParamParent =
-    lastSegment.startsWith(":") && lastSegment.endsWith("?");
+  const optionalParamParent = parentPath
+    .split("/")
+    .some((segment) => segment.startsWith(":") && segment.endsWith("?"));
   const splatParent = lastSegment.startsWith("*");
 
   if (optionalParamParent || splatParent) {

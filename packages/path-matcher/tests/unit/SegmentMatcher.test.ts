@@ -912,6 +912,49 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // #1294: the §5.4 gate checked only the LAST parent segment, so an index under a
+  // parent with an optional param in a MID-path position registered silently while
+  // the index bound only the take form (present on the full path, absent on every
+  // omit form — `/a/:b?/c` + idx: `/a/x/c/` → idx, `/a/c/` → parent). Extended to
+  // reject an optional param ANYWHERE in the parent path (follow-up of #1242 §5.4).
+  describe("registerTree — index under a mid-path optional parent rejection (#1294)", () => {
+    it("throws for an index whose parent's optional is NOT the last segment", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/a/:b?/c",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).toThrow(/Index route .* is not supported/);
+    });
+
+    it("throws for an index under two mid-path optionals", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/a/:b?/:c?/d",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).toThrow(/Index route .* is not supported/);
+    });
+
+    it("still accepts an index under a REQUIRED mid-path param (one form, coherent)", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/a/:b/c",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).not.toThrow();
+    });
+  });
+
   // #1266: a `/*rest` catch-all next to a constrained `/:v<c>/*rest` sibling. The `:v`
   // paramChild greedily commits (INVARIANTS #8), the constraint is validated only
   // after the full traverse (#857, no backtrack), so a first segment failing `v\d+`
@@ -4659,6 +4702,59 @@ describe("SegmentMatcher", () => {
 
       expect(result).toBeDefined();
       expect(result!.params).toStrictEqual({});
+    });
+
+    // #1293: search-params materializes a literal "__proto__" query key as a REAL
+    // own property (#855). The path-matcher test parser (createTestMatcher) does NOT
+    // — a plain assign drops it before the merge — so this local parser reproduces
+    // the #855 own-key shape. #mergeQueryParams must then fold the key in with
+    // defineProperty, not a plain `params[key] = …` (which hits the inherited
+    // "__proto__" setter and silently drops the param one layer up).
+    function protoOwnKeyParser(qs: string): Record<string, unknown> {
+      const out: Record<string, unknown> = {};
+
+      for (const chunk of qs.split("&")) {
+        if (chunk === "") {
+          continue;
+        }
+
+        const eq = chunk.indexOf("=");
+        const key = eq === -1 ? chunk : chunk.slice(0, eq);
+        const value = eq === -1 ? null : chunk.slice(eq + 1);
+
+        Object.defineProperty(out, key, {
+          value,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      }
+
+      return out;
+    }
+
+    it("keeps a '__proto__' query key as an own property (#1293)", () => {
+      const matcher = createQueryMatcher({
+        parseQueryString: protoOwnKeyParser,
+      });
+
+      const result = matcher.match("/search?__proto__=zzz");
+
+      expect(Object.hasOwn(result!.params, "__proto__")).toBe(true);
+      expect(
+        Object.getOwnPropertyDescriptor(result!.params, "__proto__")?.value,
+      ).toBe("zzz");
+    });
+
+    it("does not pollute Object.prototype via a '__proto__' query key (#1293)", () => {
+      const matcher = createQueryMatcher({
+        parseQueryString: protoOwnKeyParser,
+      });
+
+      matcher.match("/search?__proto__=zzz");
+
+      expect((Object.prototype as Record<string, unknown>).zzz).toBeUndefined();
+      expect(Object.getPrototypeOf({})).toBe(Object.prototype);
     });
 
     // #737: the injected query parser decodes percent-encoding too, so a
