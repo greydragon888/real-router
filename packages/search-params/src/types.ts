@@ -123,30 +123,6 @@ export type QueryParamValue = QueryParamPrimitive | QueryParamPrimitive[];
 export type SearchParams = Record<string, QueryParamValue | undefined>;
 
 // =============================================================================
-// Response Types
-// =============================================================================
-
-/**
- * Result of omit() operation.
- */
-export interface OmitResponse {
-  /** Remaining query string after removal */
-  querystring: string;
-  /** Parsed object of removed parameters */
-  removedParams: Record<string, unknown>;
-}
-
-/**
- * Result of keep() operation.
- */
-export interface KeepResponse {
-  /** Query string with only kept parameters */
-  querystring: string;
-  /** Parsed object of kept parameters */
-  keptParams: Record<string, unknown>;
-}
-
-// =============================================================================
 // Internal Types
 // =============================================================================
 

@@ -6,14 +6,27 @@ import { createMatcher } from "../../../src/createMatcher";
 
 import type { CreateMatcherOptions } from "../../../src/createMatcher";
 import type {
-  MatchOptions,
   MatchResult,
   RouteTree,
   RouteTreeState,
 } from "../../../src/types";
 
+// Test-only per-call matching options. The matcher-honoured subset is
+// strictTrailingSlash / queryParamsMode / urlParamsEncoding / queryParams;
+// strongMatching / trailingSlashMode are accepted for these legacy per-call
+// tests but have NEVER been implemented (they are ignored — the phantom option
+// types were dropped from the public API in #1302).
+interface MatchOptions {
+  strictTrailingSlash?: boolean;
+  queryParamsMode?: "default" | "strict" | "loose";
+  urlParamsEncoding?: CreateMatcherOptions["urlParamsEncoding"];
+  queryParams?: CreateMatcherOptions["queryParams"];
+  strongMatching?: boolean;
+  trailingSlashMode?: "default" | "never" | "always";
+}
+
 /**
- * Maps legacy MatchOptions to CreateMatcherOptions for per-call matcher creation.
+ * Maps per-call MatchOptions to CreateMatcherOptions for per-call matcher creation.
  */
 function toMatcherOptions(options?: MatchOptions): CreateMatcherOptions {
   if (!options) {

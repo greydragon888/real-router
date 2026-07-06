@@ -19,7 +19,6 @@
 | 2   | Route preservation                    | Over randomly-generated nested trees, `createRouteTree` drops nothing at **any** level: `tree.children.size === routes.length` AND the total node count equals the total definition count. No routes are silently lost during construction.                                                                                                                                      |
 | 3   | Absolute path normalization           | After tree building, no node's `path` property anywhere in the tree starts with `~` (verified over `arbRouteForest`). The tilde prefix is consumed during normalization and replaced by the `absolute: true` flag.                                                                                                                        |
 | 4   | Absolute path roundtrip               | For randomized trees with absolute path children, `~` is stripped from stored paths AND `routeTreeToDefinitions` → `createRouteTree` roundtrip preserves the `absolute` flag and path for every node.                                                                               |
-| 5   | Builder accumulation equivalence | Over `arbRouteForest`, building incrementally — `createRouteTreeBuilder().add()` once per route, then `build()` — reproduces the input definitions **exactly** (`routeTreeToDefinitions ∘ build === input`), identical to the batch `addMany()`/`createRouteTree` path. Proves the two accumulation paths (push-in-loop vs spread) agree. |
 
 ## Computed Caches
 
@@ -29,7 +28,6 @@
 | 2   | Non-absolute children filtering | For every node (over `arbRouteForest`), `nonAbsoluteChildren` equals the children from the `children` Map where `absolute === false` **as an ordered sequence** (definition order) — verified by ordered equality, not bare membership, so a reordering is caught. Absolute children appear in `children` but not in `nonAbsoluteChildren`.                                                                                                        |
 | 3   | paramTypeMap classification     | For every node, each entry in `paramTypeMap` correctly classifies the parameter source: URL path parameters (`:param`) **and splat params** (`*param`) are typed `"url"` (splat also appears in `paramMeta.spatParams`), and query string parameters (`?param`) are typed `"query"`. No extra entries exist beyond the declared URL/splat/query params. Validated by building trees from randomized URL+query+splat param combinations. |
 | 4   | fullName correctness            | For every node (over `arbRouteForest`), `fullName` equals the dot-joined chain of `name` fields from the root to that node, independently reconstructed by walking the `parent` chain. Validates `computeFullName` in `computeCaches` over arbitrary structures. |
-| 5   | Immutability opt-out (`skipFreeze`) | The inverse of CC1: with `createRouteTree(…, { skipFreeze: true })`, no node — nor its `paramMeta`/`paramTypeMap`/`urlParams`/`queryParams`/`spatParams`, nor its **computed** (non-leaf) `children` Map and `nonAbsoluteChildren` array — passes `Object.isFrozen` (over `arbRouteForest`). Leaf nodes reuse the shared frozen empty sentinels (`EMPTY_CHILDREN_MAP`/`EMPTY_CHILDREN_ARRAY`) regardless; `addRoute` mutates a leaf by **replacing** `node.children` (the node object is itself mutable), so the frozen sentinel is no constraint. Gates the mutable trees `addRoute` relies on. |
 
 ## getSegmentsByName
 
@@ -99,7 +97,7 @@
 | File                                       | Invariants          | Category                                           |
 | ------------------------------------------ | ------------------- | -------------------------------------------------- |
 | `tests/property/roundtrip.properties.ts`   | R1–R4               | buildPath/match integration roundtrips             |
-| `tests/property/tree.properties.ts`        | N1–N5, CC1–CC5, ND1     | createRouteTree normalization + caches + nodeToDef + skipFreeze + builder (generative via `arbRouteForest`) |
+| `tests/property/tree.properties.ts`        | N1–N4, CC1–CC4, ND1     | createRouteTree normalization + caches + nodeToDef (generative via `arbRouteForest`) |
 | `tests/property/segments.properties.ts`    | S1–S3                   | getSegmentsByName correctness (generative via `arbRouteForest`)                      |
 | `tests/property/queryParams.properties.ts` | Q1–Q2                   | Query param extraction and separation              |
 | `tests/property/validation.properties.ts`  | VN1–VN4, VP1–VP8, VD1–VD5 | Route name/path validation + duplicate detection   |

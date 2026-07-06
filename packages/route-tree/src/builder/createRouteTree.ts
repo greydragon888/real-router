@@ -3,7 +3,7 @@
 /**
  * Route Tree Builder.
  *
- * Creates immutable RouteTree from route definitions.
+ * Creates an immutable RouteTree from route definitions.
  *
  * @module builder/createRouteTree
  */
@@ -11,78 +11,14 @@
 import { buildTree } from "./buildTree";
 import { computeCaches } from "./computeCaches";
 
-import type {
-  RouteDefinition,
-  RouteTree,
-  RouteTreeBuilder,
-  TreeBuildOptions,
-} from "../types";
-
-// =============================================================================
-// Builder Implementation
-// =============================================================================
+import type { RouteDefinition, RouteTree } from "../types";
 
 /**
- * Creates a RouteTreeBuilder for constructing route trees.
- *
- * @param name - Root node name (typically empty string)
- * @param path - Root node path (typically empty string)
- * @returns RouteTreeBuilder instance
- *
- * @example
- * ```typescript
- * const tree = createRouteTreeBuilder("", "")
- *   .add({ name: "users", path: "/users" })
- *   .add({ name: "users.profile", path: "/:id" })
- *   .build();
- * ```
- */
-export function createRouteTreeBuilder(
-  name: string,
-  path: string,
-): RouteTreeBuilder {
-  const routes: RouteDefinition[] = [];
-
-  const builder: RouteTreeBuilder = {
-    add(route: RouteDefinition): RouteTreeBuilder {
-      routes.push(route);
-
-      return builder;
-    },
-
-    addMany(newRoutes: readonly RouteDefinition[]): RouteTreeBuilder {
-      routes.push(...newRoutes);
-
-      return builder;
-    },
-
-    build(options?: TreeBuildOptions): RouteTree {
-      // Step 1: Build mutable tree structure
-      const mutableTree = buildTree(name, path, routes);
-
-      // Step 2: Compute all caches and optionally freeze
-      const freeze = !options?.skipFreeze;
-
-      return computeCaches(mutableTree, freeze);
-    },
-  };
-
-  return builder;
-}
-
-// =============================================================================
-// Convenience Function
-// =============================================================================
-
-/**
- * Creates a RouteTree directly from route definitions.
- *
- * Convenience wrapper around createRouteTreeBuilder().
+ * Creates an immutable RouteTree from route definitions.
  *
  * @param name - Root node name (typically empty string)
  * @param path - Root node path (typically empty string)
  * @param routes - Route definitions to add
- * @param options - Build options (e.g., skipFreeze)
  * @returns Immutable RouteTree
  *
  * @example
@@ -97,7 +33,6 @@ export function createRouteTree(
   name: string,
   path: string,
   routes: readonly RouteDefinition[],
-  options?: TreeBuildOptions,
 ): RouteTree {
-  return createRouteTreeBuilder(name, path).addMany(routes).build(options);
+  return computeCaches(buildTree(name, path, routes));
 }

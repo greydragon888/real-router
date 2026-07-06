@@ -51,13 +51,10 @@ export { validateRoute } from "./validation/route-batch";
 // =============================================================================
 
 export type {
-  BuildOptions,
-  MatchOptions,
   MatchResult,
   RouteDefinition,
   RouteParams,
   RouteTree,
   RouteTreeState,
   RouteTreeStateMeta,
-  TrailingSlashMode,
 } from "./types";

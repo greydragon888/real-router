@@ -9,51 +9,6 @@
  */
 
 import type { RouteTree } from "../builder";
-import type { URLParamsEncodingType } from "path-matcher";
-import type { Options as QueryParamsOptions } from "search-params";
-
-// =============================================================================
-// Mode Types
-// =============================================================================
-
-/**
- * Controls how query parameters are handled during matching.
- */
-export type QueryParamsMode = "default" | "strict" | "loose";
-
-/**
- * Controls how trailing slashes are handled in paths.
- */
-export type TrailingSlashMode = "default" | "never" | "always";
-
-// =============================================================================
-// Options Types
-// =============================================================================
-
-/**
- * Base options for path operations.
- */
-export interface BasePathOptions {
-  trailingSlashMode?: TrailingSlashMode;
-  queryParamsMode?: QueryParamsMode;
-  queryParams?: QueryParamsOptions;
-  urlParamsEncoding?: URLParamsEncodingType;
-}
-
-/**
- * Options for building paths.
- */
-export interface BuildOptions extends BasePathOptions {
-  ignoreConstraints?: boolean;
-}
-
-/**
- * Options for matching paths.
- */
-export interface MatchOptions extends BasePathOptions {
-  strictTrailingSlash?: boolean;
-  strongMatching?: boolean;
-}
 
 // =============================================================================
 // Meta Types
@@ -80,9 +35,8 @@ export type RouteTreeStateMeta = Record<string, ParamTypeMap>;
 // =============================================================================
 
 /**
- * Result of matching a path against the route tree.
- *
- * This is used by matchSegments() to return detailed matching info.
+ * Result of matching a path against the route tree — detailed matching info
+ * (matched segments, extracted params, per-segment meta).
  */
 export interface MatchResult<P extends RouteParams = RouteParams> {
   /** Matched route segments (with slashChild) — for createRouteState() */

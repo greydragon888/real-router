@@ -1,14 +1,14 @@
 /**
  * Tests for search-params module.
  *
- * Covers: parse, build, omit, keep functions with various options.
+ * Covers: parse, build functions with various options.
  *
  * @module tests/functional/search-params
  */
 
 import { describe, it, expect } from "vitest";
 
-import { build, keep, omit, parse, parseQuery } from "../../src";
+import { build, parse, parseQuery } from "../../src";
 import { decodeValue } from "../../src/decode";
 import { encode, encodeValue, makeOptions } from "../../src/encode";
 import { getSearch } from "../../src/utils";
@@ -462,175 +462,6 @@ describe("search-params", () => {
   });
 
   // ===========================================================================
-  // omit
-  // ===========================================================================
-
-  describe("omit", () => {
-    it("removes specified parameters", () => {
-      expect(
-        omit("page=1&sort=name&limit=10", ["sort", "limit"]),
-      ).toStrictEqual({
-        querystring: "page=1",
-        removedParams: { sort: "name", limit: 10 },
-      });
-    });
-
-    it("returns empty for empty query string", () => {
-      expect(omit("", ["page"])).toStrictEqual({
-        querystring: "",
-        removedParams: {},
-      });
-    });
-
-    it("handles query with ? prefix", () => {
-      expect(omit("?page=1&sort=name", ["sort"])).toStrictEqual({
-        querystring: "?page=1",
-        removedParams: { sort: "name" },
-      });
-    });
-
-    it("handles removing FIRST parameter with ? prefix", () => {
-      // This was a bug: first param had ?prefix which prevented matching
-      expect(omit("?page=1&sort=name", ["page"])).toStrictEqual({
-        querystring: "?sort=name",
-        removedParams: { page: 1 },
-      });
-    });
-
-    it("handles removing all parameters with ? prefix", () => {
-      expect(omit("?page=1&sort=name", ["page", "sort"])).toStrictEqual({
-        querystring: "",
-        removedParams: { page: 1, sort: "name" },
-      });
-    });
-
-    it("handles bracket notation parameters", () => {
-      expect(
-        omit("items[]=1&items[]=2&page=1", ["items"], {
-          arrayFormat: "brackets",
-        }),
-      ).toStrictEqual({
-        querystring: "page=1",
-        removedParams: { items: [1, 2] },
-      });
-    });
-
-    it("handles empty paramsToOmit with ? prefix", () => {
-      expect(omit("?a=1&b=2", [])).toStrictEqual({
-        querystring: "?a=1&b=2",
-        removedParams: {},
-      });
-    });
-
-    it("handles empty paramsToOmit without ? prefix", () => {
-      expect(omit("a=1&b=2", [])).toStrictEqual({
-        querystring: "a=1&b=2",
-        removedParams: {},
-      });
-    });
-
-    it("handles params without values", () => {
-      expect(omit("flag&page=1", ["flag"])).toStrictEqual({
-        querystring: "page=1",
-        removedParams: { flag: null },
-      });
-    });
-  });
-
-  // ===========================================================================
-  // keep
-  // ===========================================================================
-
-  describe("keep", () => {
-    it("keeps only specified parameters", () => {
-      expect(keep("page=1&sort=name&limit=10", ["page"])).toStrictEqual({
-        querystring: "page=1",
-        keptParams: { page: 1 },
-      });
-    });
-
-    it("keeps multiple parameters", () => {
-      expect(
-        keep("page=1&sort=name&limit=10", ["page", "limit"]),
-      ).toStrictEqual({
-        querystring: "page=1&limit=10",
-        keptParams: { page: 1, limit: 10 },
-      });
-    });
-
-    it("returns empty for empty query string", () => {
-      expect(keep("", ["page"])).toStrictEqual({
-        querystring: "",
-        keptParams: {},
-      });
-    });
-
-    it("returns empty when no parameters match", () => {
-      const result = keep("page=1&sort=name", ["limit"]);
-
-      expect(result.querystring).toBe("");
-    });
-
-    it("handles keeping FIRST parameter with ? prefix", () => {
-      // This was a bug: first param had ?prefix which prevented matching
-      expect(keep("?page=1&sort=name", ["page"])).toStrictEqual({
-        querystring: "page=1",
-        keptParams: { page: 1 },
-      });
-    });
-
-    it("handles keeping multiple parameters with ? prefix", () => {
-      expect(keep("?a=1&b=2&c=3", ["a", "c"])).toStrictEqual({
-        querystring: "a=1&c=3",
-        keptParams: { a: 1, c: 3 },
-      });
-    });
-
-    it("handles bracket notation parameters", () => {
-      expect(
-        keep("items[]=1&items[]=2&page=1", ["items"], {
-          arrayFormat: "brackets",
-        }),
-      ).toStrictEqual({
-        querystring: "items[]=1&items[]=2",
-        keptParams: { items: [1, 2] },
-      });
-    });
-
-    it("handles index notation parameters", () => {
-      expect(
-        keep("items[0]=a&items[1]=b&page=1", ["items"], {
-          arrayFormat: "index",
-        }),
-      ).toStrictEqual({
-        querystring: "items[0]=a&items[1]=b",
-        keptParams: { items: ["a", "b"] },
-      });
-    });
-
-    it("handles all parameters kept", () => {
-      expect(keep("a=1&b=2", ["a", "b"])).toStrictEqual({
-        querystring: "a=1&b=2",
-        keptParams: { a: 1, b: 2 },
-      });
-    });
-
-    it("handles empty paramsToKeep array", () => {
-      expect(keep("a=1&b=2", [])).toStrictEqual({
-        querystring: "",
-        keptParams: {},
-      });
-    });
-
-    it("handles params without values", () => {
-      expect(keep("flag&page=1", ["flag"])).toStrictEqual({
-        querystring: "flag",
-        keptParams: { flag: null },
-      });
-    });
-  });
-
-  // ===========================================================================
   // decodeValue (internal)
   // ===========================================================================
 
@@ -934,81 +765,6 @@ describe("search-params", () => {
   });
 
   // ===========================================================================
-  // Additional keep tests for mutation coverage
-  // ===========================================================================
-
-  describe("keep (mutation coverage)", () => {
-    it("verifies empty string fast path returns correct structure", () => {
-      // This kills the BlockStatement mutation on line 383
-      const result = keep("", ["page"]);
-
-      expect(result.querystring).toBe("");
-      expect(result.keptParams).toStrictEqual({});
-      // Verify the specific structure
-      expect(result).toHaveProperty("querystring");
-      expect(result).toHaveProperty("keptParams");
-    });
-
-    it("verifies empty paramsToKeep returns correct structure", () => {
-      // This kills the BlockStatement mutation on line 388
-      const result = keep("a=1&b=2", []);
-
-      expect(result.querystring).toBe("");
-      expect(result.keptParams).toStrictEqual({});
-      // Verify it's not undefined or missing properties
-      expect(result).toHaveProperty("querystring");
-      expect(result).toHaveProperty("keptParams");
-    });
-
-    it("both empty querystring AND empty paramsToKeep", () => {
-      const result = keep("", []);
-
-      expect(result).toStrictEqual({
-        querystring: "",
-        keptParams: {},
-      });
-    });
-  });
-
-  // ===========================================================================
-  // Additional omit tests for mutation coverage
-  // ===========================================================================
-
-  describe("omit (mutation coverage)", () => {
-    it("verifies empty string fast path returns correct structure", () => {
-      const result = omit("", ["page"]);
-
-      expect(result.querystring).toBe("");
-      expect(result.removedParams).toStrictEqual({});
-      expect(result).toHaveProperty("querystring");
-      expect(result).toHaveProperty("removedParams");
-    });
-
-    it("verifies empty paramsToOmit returns original", () => {
-      const result = omit("a=1&b=2", []);
-
-      expect(result.querystring).toBe("a=1&b=2");
-      expect(result.removedParams).toStrictEqual({});
-    });
-
-    it("handles single parameter without trailing &", () => {
-      // Tests while (start < len) boundary - no extra iteration
-      const result = omit("a=1", ["b"]);
-
-      expect(result.querystring).toBe("a=1");
-      expect(result.removedParams).toStrictEqual({});
-    });
-
-    it("handles parameter with = at boundary position", () => {
-      // Edge case for eqPos < end check
-      const result = omit("a=", ["a"]);
-
-      expect(result.querystring).toBe("");
-      expect(result.removedParams).toStrictEqual({ a: "" });
-    });
-  });
-
-  // ===========================================================================
   // Additional decodeValue tests for mutation coverage
   // ===========================================================================
 
@@ -1092,7 +848,7 @@ describe("search-params", () => {
 
 // =============================================================================
 // Mutation guards — assert observable behavior that line coverage exercised but
-// did not pin. Each kills a specific survivor via the public parse/build/omit/keep.
+// did not pin. Each kills a specific survivor via the public parse/build.
 // =============================================================================
 
 describe("mutation guards (observable-behavior kills)", () => {
@@ -1125,12 +881,10 @@ describe("mutation guards (observable-behavior kills)", () => {
     );
   });
 
-  // searchParams.ts parse/omit/keep loop bound: a trailing "&" must NOT spawn an
+  // searchParams.ts parse loop bound: a trailing "&" must NOT spawn an
   // extra empty-name chunk (the `start < length` guard, not `<=`).
   it("a trailing & yields no empty-name param", () => {
     expect(parse("a=1&")).toStrictEqual({ a: 1 });
-    expect(omit("a=1&", ["x"]).querystring).toBe("a=1");
-    expect(keep("a=1&", ["a"]).querystring).toBe("a=1");
   });
 
   // searchParams.ts __proto__ via defineProperty: enumerable AND configurable.

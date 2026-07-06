@@ -23,13 +23,11 @@ Internal package that builds an immutable routing tree from route definitions, p
 | `Matcher` | Opaque type (backed by `SegmentMatcher`) with `match()`, `buildPath()`, `hasRoute()` |
 | `MatchResult` | Match output: `{ segments, params, meta }` |
 | `RouteTreeState` / `RouteTreeStateMeta` | State types used by core |
-| `BuildOptions` / `MatchOptions` | Options for path building and matching |
-| `TrailingSlashMode` | `"default"` / `"always"` / `"never"` |
 | `CreateMatcherOptions` / `QueryParamsConfig` | Matcher factory configuration |
 
 ## Gotchas
 
-- **Immutable by default** -- `createRouteTree` calls `Object.freeze` on the tree; pass `{ skipFreeze: true }` only for mutation scenarios (e.g., `addRoute`)
+- **Immutable, always** -- `createRouteTree` always `Object.freeze`s the tree (no opt-out; the former `skipFreeze` `TreeBuildOptions` — and the standalone `createRouteTreeBuilder` — were removed in #1302 as core-unreachable API). `addRoute` rebuilds the whole tree via `createRouteTree`.
 - **`paramMeta` is frozen too (#747)** -- `processNode` freezes the nested `paramMeta` object and its `urlParams`/`queryParams`/`spatParams` arrays, not just the node. `constraintPatterns` is a `Map` — deliberately NOT frozen (`Object.freeze` can't lock Map entries; it's protected by the `ReadonlyMap` type). Don't "fix" that with a pointless `Object.freeze(map)` — it would imply a guarantee it can't provide (CC1 exception)
 - **Dot-notation is internal** -- User-provided route names must NOT contain dots; dots are only used in computed `fullName` (e.g., `"users.profile"`)
 - **`createMatcher` hides DI** -- It wires `search-params` parse/build into `SegmentMatcher` so consumers never import `search-params` directly
@@ -48,7 +46,7 @@ Internal package that builds an immutable routing tree from route definitions, p
 ## File Map
 
 ```
-src/builder/createRouteTree.ts  -- createRouteTree, createRouteTreeBuilder
+src/builder/createRouteTree.ts  -- createRouteTree
 src/builder/buildTree.ts        -- mutable tree construction from definitions
 src/builder/computeCaches.ts    -- cache computation + Object.freeze
 src/operations/query.ts         -- getSegmentsByName

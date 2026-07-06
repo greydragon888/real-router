@@ -9,8 +9,6 @@ Internal package for query string parsing and building with configurable strateg
 | `parse(path, opts?)` | function | Parse query string into params object (`getSearch` + `parseQuery`) |
 | `parseQuery(search, opts?)` | function | Parse an ALREADY-extracted query string, **without** `getSearch` — the entry route-tree's matcher uses (#1292) |
 | `build(params, opts?)` | function | Build query string from params object                  |
-| `omit(path, keys, opts?)` | function | Remove specified params from query string           |
-| `keep(path, keys, opts?)` | function | Keep only specified params from query string         |
 | `DEFAULT_QUERY_PARAMS` | const  | Default encoding options                                 |
 
 ### Types
@@ -26,15 +24,13 @@ Internal package for query string parsing and building with configurable strateg
 | `SearchParams`     | `Record<string, QueryParamValue \| undefined>`            |
 | `QueryParamValue`  | `QueryParamPrimitive \| QueryParamPrimitive[]`            |
 | `QueryParamPrimitive` | `string \| number \| boolean \| null`                  |
-| `OmitResponse`     | `{ querystring, removedParams }`                          |
-| `KeepResponse`     | `{ querystring, keptParams }`                             |
 | `DecodeResult`     | `boolean \| string \| number \| null`                     |
 
 ## Module Structure
 
 ```
 src/
-├── searchParams.ts     -- parse, parseQuery, build, omit, keep
+├── searchParams.ts     -- parse, parseQuery, build
 ├── encode.ts           -- encode(key, value, options), makeOptions, DEFAULT_QUERY_PARAMS
 ├── decode.ts           -- decode(rawValue, strategies), decodeValue(raw)
 ├── utils.ts            -- getSearch(path) — extracts query part from path
@@ -85,10 +81,6 @@ Under `booleanFormat: "empty-true"` the key-only form `?flag` means `true`. A `n
 ### Prototype-name keys are own properties
 
 The parse accumulator detects repeated keys with `Object.hasOwn`, not `params[name] !== undefined` — so a query key shadowing an `Object.prototype` member (`valueOf`, `constructor`, `toString`, …) is a plain param, not the inherited function. `__proto__` is assigned via `Object.defineProperty` so it becomes a real own entry instead of mutating the prototype. Without this, `?constructor=x` parsed to `{ constructor: [<fn>, "x"] }`.
-
-### `omit`/`keep` work on raw query string
-
-These functions operate on the string level (slicing chunks by `&`) rather than parsing first. This avoids double-decoding and preserves original encoding.
 
 ### Comma array format splits before decoding
 
