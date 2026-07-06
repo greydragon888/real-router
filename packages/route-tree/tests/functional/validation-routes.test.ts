@@ -424,6 +424,30 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("should throw for a duplicate param name within one route (#1151)", () => {
+        const paths = [
+          "/:id/:id", // same name, two segments
+          "/:x/*x", // param + splat name clash
+          "/a/:id/b/:id", // repeated across static segments
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/duplicate parameter name/u);
+        });
+      });
+
+      it("should NOT flag distinct param names (control, #1151)", () => {
+        const paths = ["/:a/:b", "/a/:b?/:c?/d", "/:x/*rest"];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
       it("should throw for an optional splat '*name?' (#1149)", () => {
         const paths = [
           "/files/*path?", // optional splat

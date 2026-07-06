@@ -51,6 +51,39 @@ function validateConstraintSyntax(
 }
 
 /**
+ * Rejects a param name repeated within one route's own path (`/:id/:id`, a
+ * param+splat clash `/:x/*x`, #1151). `buildParamMeta.urlParams` lists every
+ * path-binding name — params AND splats — in order, keeping duplicates (`/:x/*x`
+ * → `["x", "x"]`), so a single pass over it catches both. The trie binds the
+ * duplicates at different positions under one name, so match's later capture
+ * silently overwrites the earlier and `rewritePathOnMatch` then rewrites the
+ * user's URL from the single survivor. The #736 conflict guard only fires on
+ * DIFFERENTLY-named params at one position, so this same-name case slips through.
+ * path-matcher's `registerTree` backstop additionally catches CROSS-level dups (a
+ * parent's param reused by a child), which this per-path gate cannot see.
+ * Extracted so `validateRoutePath` stays within the cognitive-complexity budget.
+ */
+function validateUniqueParamNames(
+  urlParams: readonly string[],
+  routeName: string,
+  methodName: string,
+  path: string,
+): void {
+  const seen = new Set<string>();
+
+  for (const name of urlParams) {
+    if (seen.has(name)) {
+      throw createRouterError(
+        methodName,
+        `Invalid path for route "${routeName}": duplicate parameter name ':${name}' in "${path}" (a param name must be unique within a route — the second binding would overwrite the first)`,
+      );
+    }
+
+    seen.add(name);
+  }
+}
+
+/**
  * Matches a `:`/`*` marker NOT followed by a valid param-name char — a name-less
  * marker (`:`, `*`, `:?`, `:<\d+>`). Derived from the single `PARAM_NAME_PATTERN`
  * grammar (#738) so this validation gate can never drift from the matcher's own
@@ -296,7 +329,10 @@ export function validateRoutePath(
   // Both marker checks below scan only the URL-path portion: `buildParamMeta`
   // strips the query the same way the trie does, so a `:`/`*` inside a query
   // declaration is not falsely flagged.
-  const { pathPattern } = buildParamMeta(path);
+  const { pathPattern, urlParams } = buildParamMeta(path);
+
+  // Duplicate param name within this route's own path (`/:id/:id`, `/:x/*x`, #1151).
+  validateUniqueParamNames(urlParams, routeName, methodName, path);
 
   // Name-less parameter marker. A `:`/`*` with no following name passes every
   // format check above, but path-matcher rejects it at `registerTree` (#858) with

@@ -162,6 +162,21 @@ function compileAndRegisterRoute(
     state.options.urlParamsEncoding,
   );
 
+  // #1151: reject a duplicate param name within one route's full path (`/:id/:id`,
+  // a param+splat clash `/:x/*x`, or a parent `/a/:x` + child `/:x`). buildParamSlots
+  // keeps duplicates; the trie stores them at DIFFERENT positions under the SAME
+  // name, so match's later capture silently overwrites the earlier and
+  // rewritePathOnMatch then rewrites the user's URL from the single survivor. The
+  // #736 conflict guard only fires on DIFFERENTLY-named params at ONE position, so
+  // this same-name case slips through.
+  const buildParamNames = buildParamSlots.map((slot) => slot.paramName);
+  const buildParamNamesSet =
+    buildParamNames.length === 0 ? EMPTY_STRING_SET : new Set(buildParamNames);
+
+  if (buildParamNamesSet.size !== buildParamNames.length) {
+    throwDuplicateParamName(node.fullName, buildParamNames);
+  }
+
   const compiled: CompiledRoute = {
     name: node.fullName,
     parent: parentRoute,
@@ -178,10 +193,7 @@ function compileAndRegisterRoute(
     hasConstraints: constraintPatterns.size > 0,
     buildStaticParts,
     buildParamSlots,
-    buildParamNamesSet:
-      buildParamSlots.length === 0
-        ? EMPTY_STRING_SET
-        : new Set(buildParamSlots.map((slot) => slot.paramName)),
+    buildParamNamesSet,
     // Initialized here (not added conditionally below) so static and param
     // routes share one hidden class — avoids a megamorphic CompiledRoute (#1009).
     cachedResult: undefined,
@@ -440,6 +452,31 @@ function throwFusedConstraintSuffix(path: string): never {
     `[SegmentMatcher.registerTree] Text fused to a constraint '>' in path "${path}": ` +
       `a '<...>' constraint must end its segment or be followed by '/' or an ` +
       `optional '?' — use "/:id<...>/rest", not "/:id<...>rest".`,
+  );
+}
+
+function throwDuplicateParamName(
+  routeName: string,
+  names: readonly string[],
+): never {
+  const seen = new Set<string>();
+  let duplicate = "";
+
+  for (const name of names) {
+    if (seen.has(name)) {
+      duplicate = name;
+
+      break;
+    }
+
+    seen.add(name);
+  }
+
+  throw new Error(
+    `[SegmentMatcher.registerTree] Duplicate parameter name ':${duplicate}' in ` +
+      `route "${routeName}": a param name must be unique within a route — two ` +
+      `positions cannot both bind ':${duplicate}' (the second silently overwrites ` +
+      `the first). Rename one.`,
   );
 }
 

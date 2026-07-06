@@ -701,6 +701,48 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // A param name repeated within one route (`/:id/:id`, a param+splat clash
+  // `/:x/*x`, or a parent's param reused by a child) binds two trie positions under
+  // one name — match's later capture overwrites the earlier and rewrites the user's
+  // URL (#1151). The #736 conflict guard only fires on DIFFERENTLY-named params.
+  describe("registerTree — duplicate param name rejection (#1151)", () => {
+    it("throws on the same param name twice in one path (/:id/:id)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/:id/:id" }]);
+      }).toThrow(/Duplicate parameter name/);
+    });
+
+    it("throws on a param+splat name clash (/:x/*x)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/:x/*x" }]);
+      }).toThrow(/Duplicate parameter name/);
+    });
+
+    it("throws on a parent's param reused by a child (cross-level)", () => {
+      expect(() => {
+        createMatcher([
+          { name: "p", path: "/a/:x", children: [{ name: "c", path: "/:x" }] },
+        ]);
+      }).toThrow(/Duplicate parameter name/);
+    });
+
+    it("still accepts distinct names, incl. #736 consecutive optionals (controls)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: "/:a/:b" }]),
+      ).not.toThrow();
+      expect(() =>
+        createMatcher([{ name: "r", path: "/a/:b?/:c?/d" }]),
+      ).not.toThrow();
+      // the SAME name in DIFFERENT routes is fine — only intra-route dups reject
+      expect(() =>
+        createMatcher([
+          { name: "a", path: "/x/:id" },
+          { name: "b", path: "/y/:id" },
+        ]),
+      ).not.toThrow();
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted
