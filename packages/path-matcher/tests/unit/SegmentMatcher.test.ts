@@ -912,6 +912,55 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // #1266: a `/*rest` catch-all next to a constrained `/:v<c>/*rest` sibling. The `:v`
+  // paramChild greedily commits (INVARIANTS #8), the constraint is validated only
+  // after the full traverse (#857, no backtrack), so a first segment failing `v\d+`
+  // dies in the param branch instead of falling to the `/*rest` splat sibling — the
+  // catch-all is unreachable and its `buildPath` yields dead deep-links. Generalizes
+  // the optional-successor try-take-if-valid (#1264 A1) to a REQUIRED param — no
+  // `optional` anywhere.
+  describe("match — catch-all reachable next to a constrained param+splat sibling (#1266)", () => {
+    const routes = [
+      { name: "all", path: "/*rest" },
+      { name: "ver", path: String.raw`/:v<v\d+>/*rest` },
+    ];
+
+    it("falls back to the /*rest catch-all when the first segment fails the constraint", () => {
+      const m = createMatcher(routes);
+      const one = m.match("/users");
+
+      expect(one?.segments.at(-1)?.name).toBe("all");
+      expect(one?.params).toStrictEqual({ rest: "users" });
+      // multi-segment too
+      expect(m.match("/a/b")?.params).toStrictEqual({ rest: "a/b" });
+    });
+
+    it("still resolves the constrained versioned form (constraint passes → param)", () => {
+      const m = createMatcher(routes);
+      const r = m.match("/v1/users");
+
+      expect(r?.segments.at(-1)?.name).toBe("ver");
+      expect(r?.params).toStrictEqual({ v: "v1", rest: "users" });
+    });
+
+    it("buildPath on the catch-all round-trips (no dead deep-link)", () => {
+      const m = createMatcher(routes);
+      const url = m.buildPath("all", { rest: "users" });
+
+      expect(m.match(url)?.segments.at(-1)?.name).toBe("all");
+    });
+
+    it("is registration-order independent (splat sibling registered second)", () => {
+      const m = createMatcher([routes[1], routes[0]]);
+
+      expect(m.match("/users")?.params).toStrictEqual({ rest: "users" });
+      expect(m.match("/v1/users")?.params).toStrictEqual({
+        v: "v1",
+        rest: "users",
+      });
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted

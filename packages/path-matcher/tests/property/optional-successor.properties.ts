@@ -84,3 +84,54 @@ describe("optional-successor inverse-pair (#1263/#1264)", () => {
     },
   );
 });
+
+/**
+ * #1266: the SAME try-take-if-valid mechanism, generalized to a REQUIRED param with
+ * a splat sibling from another route — no `optional` anywhere. A `/*rest` catch-all
+ * next to `/:v<v\d+>/*rest`: a first segment failing the constraint must fall to the
+ * catch-all (INVARIANTS #8), not die in the greedy param branch.
+ */
+const catchAll = () => [
+  createInputNode({ name: "all", path: "/*rest", fullName: "all" }),
+  createInputNode({
+    name: "ver",
+    path: String.raw`/:v<v\d+>/*rest`,
+    fullName: "ver",
+  }),
+];
+
+function catchAllMatcher() {
+  const m = createTestMatcher();
+
+  m.registerTree(createRootWithChildren(catchAll()));
+
+  return m;
+}
+
+describe("catch-all reachable next to a constrained param+splat sibling (#1266)", () => {
+  test.prop([arbNonVersionSplat], { numRuns: NUM_RUNS.standard })(
+    "a non-version path reaches the /*rest catch-all — buildPath round-trips (no dead deep-link)",
+    (rest) => {
+      const m = catchAllMatcher();
+      const url = m.buildPath("all", { rest });
+      const result = m.match(url);
+
+      expect(result, `"${url}" did not reach the catch-all`).toBeDefined();
+      expect(result!.segments.at(-1)?.name).toBe("all");
+      expect(result!.params).toStrictEqual({ rest });
+    },
+  );
+
+  test.prop([fc.stringMatching(/^v\d{1,6}$/), arbNonVersionSplat], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "a version-satisfying first segment routes to the constrained param (not the catch-all)",
+    (version, rest) => {
+      const m = catchAllMatcher();
+      const result = m.match(`/${version}/${rest}`);
+
+      expect(result?.segments.at(-1)?.name).toBe("ver");
+      expect(result?.params).toStrictEqual({ v: version, rest });
+    },
+  );
+});

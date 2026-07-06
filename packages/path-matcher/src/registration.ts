@@ -723,6 +723,40 @@ function markOptionalFork(
   }
 }
 
+/**
+ * #1266: mark a CONSTRAINED required param sharing its trie level with a splat sibling
+ * (cross-route: `/*rest` + `/:v<c>/*rest`) as a try-take-if-valid fork — the same
+ * mechanism `markOptionalFork`'s A1 gives the constrained-optional→splat case, but for
+ * a REQUIRED param (no `optional` anywhere). Without it the param greedily commits
+ * (INVARIANTS #8), its constraint is validated only after the full traverse (#857, no
+ * backtrack), and the match returns `undefined` instead of falling to the splat
+ * sibling — leaving the catch-all unreachable and its `buildPath` a dead deep-link.
+ *
+ * Marked UNCONDITIONALLY for every constrained required param — `match` acts on the
+ * fork only when a splat sibling is ALSO present at the node (`node.splatChild`), so a
+ * constrained param without a splat sibling is unaffected. Unconditional marking is
+ * what makes it registration-order independent: the splat sibling may be registered by
+ * another route before or after this param, and need not exist at the node yet here.
+ * `??=` preserves an optional fork already marked at this position (#1264 wins).
+ */
+function markConstrainedParamFork(
+  node: SegmentNode,
+  compiled: CompiledRoute,
+  segment: string,
+): void {
+  if (!segment.startsWith(":") || node.paramChild === undefined) {
+    return;
+  }
+
+  const constraintPattern = compiled.constraintPatterns.get(
+    extractParamName(segment),
+  )?.pattern;
+
+  if (constraintPattern !== undefined) {
+    node.paramChild.fork ??= { constraint: constraintPattern };
+  }
+}
+
 /** Splat counterpart of {@link ensureParamChild}. */
 function ensureSplatChild(
   node: SegmentNode,
@@ -857,7 +891,13 @@ function insertIntoTrieFrom(
       return;
     }
 
+    const parent = node;
+
     node = processSegment(state, node, segment, ownNodes);
+    // #1266: mark a CONSTRAINED required param as a try-take-if-valid fork so `match`
+    // can fall to a splat sibling when the constraint fails, instead of greedily
+    // committing and dying post-traverse.
+    markConstrainedParamFork(parent, compiled, segment);
     start = segmentEnd + 1;
   }
 
