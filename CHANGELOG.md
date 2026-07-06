@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-06]
 
+### @real-router/core@0.68.2
+
+### Patch Changes
+
+- [#1306](https://github.com/greydragon888/real-router/pull/1306) [`7680079`](https://github.com/greydragon888/real-router/commit/768007933af11f52af233ee9df14ed970a767e89) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove core-unreachable API ([#1302](https://github.com/greydragon888/real-router/issues/1302)): `createRouteTree` now inlines the former standalone `createRouteTreeBuilder` (removed) and always freezes — the `skipFreeze` `TreeBuildOptions` is gone and `computeCaches` loses its `freeze` param. Also drops the phantom option types `MatchOptions` / `BuildOptions` / `BasePathOptions` / `TrailingSlashMode` (+ orphaned `QueryParamsMode`), which described options that were never implemented. Deliberate surface reduction of this private package.
+
+- [#1306](https://github.com/greydragon888/real-router/pull/1306) [`7680079`](https://github.com/greydragon888/real-router/commit/768007933af11f52af233ee9df14ed970a767e89) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `omit()` / `keep()` (+ private helpers and `OmitResponse` / `KeepResponse` types) — API unreachable from `@real-router/core` ([#1302](https://github.com/greydragon888/real-router/issues/1302)). Deliberate surface reduction of this private package; the functions were tested but had no core consumer.
+
+
 ### @real-router/core@0.68.1
 
 ### Patch Changes
