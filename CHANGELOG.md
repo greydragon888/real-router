@@ -7,6 +7,153 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-06]
 
+### @real-router/core@0.66.0
+
+### Minor Changes
+
+- [#1278](https://github.com/greydragon888/real-router/pull/1278) [`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject three more malformed route configs at registration ([#1242](https://github.com/greydragon888/real-router/issues/1242))
+
+  The wave-3 registration-hardening batch — malformed configs that registered silently but produced dead or aliased routes now throw with a route-contextual message, like the [#858](https://github.com/greydragon888/real-router/issues/858)/[#1050](https://github.com/greydragon888/real-router/issues/1050)/[#1150](https://github.com/greydragon888/real-router/issues/1150)/[#1151](https://github.com/greydragon888/real-router/issues/1151)/[#1154](https://github.com/greydragon888/real-router/issues/1154) rejects:
+
+  - A **query-param name that leaked a constraint** via a reverse-order modifier typo (`/a/:b?<\d+>` — the `?` parses as the query start, so `<\d+>` becomes the query name) (§5.1).
+  - A **path-param ↔ query-param name collision** (`/a/:tab?tab`), where `buildPath` emitted the value twice (`/a/x?tab=x`) (§5.3).
+  - An **index route (`path: "/"`) under an optional-param or splat parent** (`/a/:b?`, `/files/*rest`), which was unreachable or inconsistent. A required-param parent's index is unaffected (§5.4).
+
+  Two findings were resolved without a behaviour change: `<…>` in a static segment (§5.5) is already caught by [#1150](https://github.com/greydragon888/real-router/issues/1150), and `?name=value` in a route definition (§5.2) is left tolerated — bare core accepts it and it never declared a default — both documented.
+
+### @real-router/angular@0.13.4
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+  - @real-router/sources@0.10.5
+
+### @real-router/browser-plugin@0.18.5
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/hash-plugin@0.8.5
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/lifecycle-plugin@0.6.8
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/logger-plugin@0.5.20
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/memory-plugin@0.4.16
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/navigation-plugin@0.7.17
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/persistent-params-plugin@0.2.20
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/preact@0.16.5
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+  - @real-router/sources@0.10.5
+
+### @real-router/preload-plugin@0.6.10
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/react@0.28.8
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+  - @real-router/sources@0.10.5
+
+### @real-router/rx@0.3.21
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/search-schema-plugin@0.4.8
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/solid@0.16.4
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+  - @real-router/sources@0.10.5
+
+### @real-router/sources@0.10.5
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/svelte@0.15.3
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+  - @real-router/sources@0.10.5
+
+### @real-router/validation-plugin@0.9.6
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+
+### @real-router/vue@0.16.5
+
+### Patch Changes
+
+- Updated dependencies [[`e07838f`](https://github.com/greydragon888/real-router/commit/e07838f7ad20e5bb3352735bb11f260f686d7c22)]:
+  - @real-router/core@0.66.0
+  - @real-router/sources@0.10.5
+
+
 ### @real-router/core@0.65.1
 
 ### Patch Changes
