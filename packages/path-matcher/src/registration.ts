@@ -752,8 +752,29 @@ function markConstrainedParamFork(
     extractParamName(segment),
   )?.pattern;
 
-  if (constraintPattern !== undefined) {
-    node.paramChild.fork ??= { constraint: constraintPattern };
+  if (constraintPattern === undefined) {
+    return;
+  }
+
+  const pc = node.paramChild;
+
+  // #1284: one trie slot legally serves several routes with DIFFERENT constraints
+  // under the same param name. The fork's validity signal must be the DISJUNCTION —
+  // `match` skips to the splat sibling only when EVERY route's constraint fails, else
+  // a value matching a LATER route wrongly falls to the splat (killing that route,
+  // order-dependent). Composite of the anchored sources → one `.test` at match;
+  // post-traverse per-route validation still filters the correct winner. `fork` is
+  // re-created (not mutated) since `ForkMeta.constraint` is readonly.
+  if (pc.fork?.constraint === undefined) {
+    pc.fork = { ...pc.fork, constraint: constraintPattern };
+  } else if (pc.fork.constraint.source !== constraintPattern.source) {
+    pc.fork = {
+      ...pc.fork,
+      constraint: new RegExp(
+        `(?:${pc.fork.constraint.source})|(?:${constraintPattern.source})`,
+        pc.fork.constraint.flags,
+      ),
+    };
   }
 }
 

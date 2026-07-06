@@ -1013,6 +1013,60 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // #1284: one trie slot legally serves several routes with DIFFERENT constraints
+  // under the same param name. #1266 marked `fork.constraint ??= <first>`, so with a
+  // splat sibling present, `match` used only the FIRST-registered route's constraint
+  // as the slot-wide validity signal — a value matching a LATER route's constraint
+  // failed the fork and fell to the catch-all, killing that route (order-dependent).
+  describe("registerTree — same-name constrained siblings coexist under a splat sibling (#1284)", () => {
+    const routes = [
+      { name: "num", path: String.raw`/user/:id<\d+>/a` },
+      { name: "hex", path: "/user/:id<[a-f]+>/b" },
+      { name: "all", path: "/user/*rest" },
+    ];
+
+    it("routes to the hex sibling when the numeric constraint fails (not the catch-all)", () => {
+      const m = createMatcher(routes);
+      const r = m.match("/user/abc/b");
+
+      expect(r?.segments.at(-1)?.name).toBe("hex");
+      expect(r?.params).toStrictEqual({ id: "abc" });
+    });
+
+    it("still routes a numeric id to the numeric sibling", () => {
+      const m = createMatcher(routes);
+
+      expect(m.match("/user/123/a")?.segments.at(-1)?.name).toBe("num");
+    });
+
+    it("is registration-order independent (hex registered first)", () => {
+      const m = createMatcher([routes[1], routes[0], routes[2]]);
+
+      expect(m.match("/user/123/a")?.params).toStrictEqual({ id: "123" });
+      expect(m.match("/user/abc/b")?.params).toStrictEqual({ id: "abc" });
+    });
+
+    it("a value matching NEITHER constraint still falls to the catch-all", () => {
+      const m = createMatcher(routes);
+      const r = m.match("/user/xyz/b"); // xyz ∉ \d+ and ∉ [a-f]+
+
+      expect(r?.segments.at(-1)?.name).toBe("all");
+      expect(r?.params).toStrictEqual({ rest: "xyz/b" });
+    });
+
+    it("two SAME-constraint siblings need no disjunction (identical source is a no-op)", () => {
+      const m = createMatcher([
+        { name: "a", path: String.raw`/user/:id<\d+>/a` },
+        { name: "c", path: String.raw`/user/:id<\d+>/c` }, // identical \d+ constraint
+        { name: "all", path: "/user/*rest" },
+      ]);
+
+      expect(m.match("/user/1/a")?.segments.at(-1)?.name).toBe("a");
+      expect(m.match("/user/2/c")?.segments.at(-1)?.name).toBe("c");
+      expect(m.match("/user/xyz/a")?.segments.at(-1)?.name).toBe("all");
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted
