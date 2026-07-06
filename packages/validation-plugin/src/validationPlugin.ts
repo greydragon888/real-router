@@ -90,7 +90,7 @@ import type {
   Plugin,
   Options,
 } from "@real-router/core";
-import type { RouterInternals } from "@real-router/core/validation";
+import type { RouterInternals, Matcher } from "@real-router/core/validation";
 
 function buildValidatorObject(ctx: RouterInternals): RouterValidator {
   return {
@@ -108,12 +108,14 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       validateRoutes(routes, store) {
         const typedStore = store as {
           tree?: unknown;
+          matcher?: unknown;
           config?: { forwardMap?: Record<string, string> };
         };
 
         validateRoutes(
           routes as Route[],
           typedStore.tree as RouteTree | undefined,
+          typedStore.matcher as Matcher | undefined,
           typedStore.config?.forwardMap,
         );
       },

@@ -7,7 +7,7 @@
  */
 
 import { resolveForwardChain } from "@real-router/core";
-import { validateRoute } from "route-tree";
+import { validateRoute } from "@real-router/core/validation";
 import {
   isString,
   validateRouteName,
@@ -23,7 +23,7 @@ import type {
   DefaultDependencies,
   Params,
 } from "@real-router/core";
-import type { Matcher, RouteTree } from "route-tree";
+import type { Matcher, RouteTree } from "@real-router/core/validation";
 
 // Internal constant (matches core's INTERNAL_ROUTE_PREFIX)
 const INTERNAL_ROUTE_PREFIX = "@@";
@@ -399,12 +399,14 @@ export function validateShouldUpdateNodeArgs(
  *
  * @param routes - Routes to validate
  * @param tree - Current route tree (optional for initial validation)
+ * @param matcher - Current route matcher (segment lookup + existence for forwardTo)
  * @param forwardMap - Current forward map for cycle detection
  * @param parentName - Optional parent route fullName for nesting via addRoute({ parent })
  */
 export function validateRoutes<Dependencies extends DefaultDependencies>(
   routes: Route<Dependencies>[],
   tree?: RouteTree,
+  matcher?: Matcher,
   forwardMap?: Record<string, string>,
   parentName?: string,
 ): void {
@@ -438,8 +440,8 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
     );
   }
 
-  if (tree && forwardMap) {
-    validateForwardToTargets(routes, forwardMap, tree);
+  if (matcher && forwardMap) {
+    validateForwardToTargets(routes, forwardMap, matcher);
   }
 }
 
