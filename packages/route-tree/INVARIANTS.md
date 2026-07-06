@@ -93,6 +93,20 @@
 | 4   | Tree name duplicate                | Validating a route whose name already exists in the supplied existing tree throws `[…] Route "<name>" already exists` (the tree-relative check, used by `addRoute`).                                                                          |
 | 5   | All-distinct acceptance            | A batch with all-unique names and all-unique paths passes validation without throwing — the duplicate checks produce no false positives on legitimate route sets.                                                                            |
 
+## Gate ↔ Backstop Parity
+
+> The route-tree `validateRoutePath` **gate** (a whole-path pre-pass) and the path-matcher `registerTree` **backstop** (per-segment, during trie insertion) independently reject the same malformed single-path shapes. Tier 1 of #1320 single-sourced the whole-path scans the two layers could literally share (`isConstraintBalanced`, `hasConstraintInStaticSegment`, `hasFusedConstraintSuffix`); the scans below keep **separate** implementations (gate char-scan vs backstop regex/embedded fork logic) because merging them would restructure the perf-sensitive (#1285) / trie-interleaved backstop. This parity contract locks them against drift — proven across the generated input space, not merged in code. If a future edit makes one layer stricter than the other, a generated shape lands in the gap and the property fails.
+
+| #    | Invariant                                     | Description                                                                                                                                                              |
+| ---- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GBP1 | Fused mid-segment marker parity               | A marker fused to a static prefix (`/a:b`, `/foo*bar`) is rejected by BOTH the gate (VP8) and the backstop (`FUSED_MARKER_RGX`); a clean marker-led segment (`/:id`, `/*rest`) is accepted by both (#1050).       |
+| GBP2 | Non-ASCII static parity                       | A non-ASCII code point in a static segment (`/café`) is rejected by both (VP13 ↔ `hasNonAsciiSegment`); a pure-ASCII static segment by neither (#1154).                                                            |
+| GBP3 | Optional splat parity                         | An optional splat (`/*path?`) is rejected by both (VP10 ↔ backstop optional fork); a required splat (`/*rest`) by neither (#1149).                                                                                 |
+| GBP4 | Unconstrained optional-before-splat parity    | An unconstrained optional directly before a splat (`/:v?/*rest`) is rejected by both (VP11 ↔ backstop); a required param before a splat (`/:id/*rest`) by neither (#1264).                                          |
+| GBP5 | Duplicate param name parity                   | A same-name param repeated in one path (`/:id/:id`) is rejected by both (VP12 ↔ backstop cross-position dup); two distinct names (`/:a/:b`) by neither (#1151).                                                     |
+
+> **Excluded — documented single-layer behaviour, NOT parity bugs:** gate-only string-format checks (`//` double-slash VP4, whitespace VP3, non-string VP2) — the backstop consumes an already-segmented path; and a `*` fused to the END of a param (`/:y*`) — the gate reads the `*` as a name-less marker (reject, VP7), the backstop as the param name `y*` (accept), a grammar divergence that is gate-masked in production and tracked separately.
+
 ## Test Files
 
 | File                                       | Invariants          | Category                                           |
@@ -102,3 +116,4 @@
 | `tests/property/segments.properties.ts`    | S1–S3                   | getSegmentsByName correctness (generative via `arbRouteForest`)                      |
 | `tests/property/queryParams.properties.ts` | Q1–Q2                   | Query param extraction and separation              |
 | `tests/property/validation.properties.ts`  | VN1–VN4, VP1–VP8, VD1–VD5 | Route name/path validation + duplicate detection   |
+| `tests/property/gate-backstop-parity.properties.ts` | GBP1–GBP5 | Gate ↔ backstop reject-parity for the parallel scans (#1320 Tier 2) |
