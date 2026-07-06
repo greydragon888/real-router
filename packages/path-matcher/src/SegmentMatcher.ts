@@ -610,7 +610,18 @@ export class SegmentMatcher {
     const childParams: Record<string, string> = {};
     const specific = this.#traverseFrom(sn, path, start, childParams);
 
-    if (specific) {
+    // #1288: a structurally-complete specific child whose OWN constraints fail on
+    // the scratch values must fall back to the wildcard capture, not kill the
+    // whole match post-traverse. Before this check, `/files/*any` + child
+    // `/:id<\d+>` made `match("/files/xx")` return undefined while
+    // `buildPath("blob", { any: "xx" })` emitted exactly that URL — the specific
+    // branch won structurally, then died in `#validateConstraints` where no
+    // fallback exists (the constraint-blind spot of INVARIANTS Matching #24).
+    if (
+      specific &&
+      (!specific.hasConstraints ||
+        this.#branchConstraintsHold(specific, childParams))
+    ) {
       Object.assign(params, childParams);
 
       return specific;
@@ -677,6 +688,44 @@ export class SegmentMatcher {
         // `%C0%80`, `%FF`) still makes `decodeURIComponent`/`decodeURI` throw a
         // URIError. `match()` must never throw — reject the path so the router
         // resolves to UNKNOWN_ROUTE instead of crashing on start() (#737).
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * #1288: constraints of a sub-traverse CANDIDATE route, checked on the RAW
+   * scratch params with on-the-fly decode — a constraint describes the decoded
+   * value (#857), but the branch decision happens during traverse, before
+   * `#decodeParams`. A failing (or undecodable, #737) branch falls back to the
+   * splat capture instead of killing the whole match post-traverse. Absent
+   * params are skipped (#1148). The scratch values themselves stay raw — the
+   * committed winner is decoded once, later, by `#decodeParams`.
+   */
+  #branchConstraintsHold(
+    route: CompiledRoute,
+    params: Record<string, string>,
+  ): boolean {
+    const decode = this.#decode;
+
+    for (const [paramName, constraint] of route.constraintPatterns) {
+      if (!Object.hasOwn(params, paramName)) {
+        continue;
+      }
+
+      let value = params[paramName];
+
+      if (decode && value.includes("%")) {
+        try {
+          value = decode(value);
+        } catch {
+          return false;
+        }
+      }
+
+      if (!constraint.pattern.test(value)) {
         return false;
       }
     }
