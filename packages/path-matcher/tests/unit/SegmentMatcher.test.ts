@@ -1094,6 +1094,28 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // #1286: the A2 optional-successor rename (#1263) disambiguates by segment count on
+  // the LAST segment only, so it covers a TERMINAL successor (`/:a?/:b`) but NOT a
+  // non-terminal one (`/:a?/:b/c`) — the omit form then binds under the OPTIONAL's
+  // name, not the successor's. Pinned as a documented limitation (the general fix,
+  // variable-depth remaining-segment counting, is disproportionate); see CLAUDE.md.
+  describe("match — A2 rename covers only a terminal successor (#1286, caveat-lock)", () => {
+    it("binds the omit form under the optional's name for a NON-terminal successor (known limitation)", () => {
+      const m = createMatcher([{ name: "r", path: "/:a?/:b/c" }]);
+
+      // wanted { b: "x" }; the A2 rename does not reach a non-terminal successor
+      expect(m.match("/x/c")?.params).toStrictEqual({ a: "x" });
+      // the present form is unaffected
+      expect(m.match("/1/x/c")?.params).toStrictEqual({ a: "1", b: "x" });
+    });
+
+    it("still renames correctly for a TERMINAL successor (#1263 A2)", () => {
+      const m = createMatcher([{ name: "r", path: "/:a?/:b" }]);
+
+      expect(m.match("/x")?.params).toStrictEqual({ b: "x" });
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted
