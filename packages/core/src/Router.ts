@@ -915,6 +915,7 @@ function deriveMatcherOptions(
 ): CreateMatcherOptions {
   return {
     strictTrailingSlash: options.trailingSlash === "strict",
+    caseSensitive: options.caseSensitive,
     strictQueryParams: options.queryParamsMode === "strict",
     urlParamsEncoding: options.urlParamsEncoding,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion

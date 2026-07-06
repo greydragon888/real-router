@@ -26,6 +26,7 @@ const KNOWN_OPTIONS = new Set<string>([
   "defaultRoute",
   "defaultParams",
   "trailingSlash",
+  "caseSensitive",
   "queryParamsMode",
   "queryParams",
   "urlParamsEncoding",
@@ -254,6 +255,15 @@ export function validateOptions(options: unknown, methodName: string): void {
   ) {
     throw new TypeError(
       `[router.${methodName}] Invalid "rewritePathOnMatch": expected boolean, got ${typeof opts.rewritePathOnMatch}`,
+    );
+  }
+
+  if (
+    opts.caseSensitive !== undefined &&
+    typeof opts.caseSensitive !== "boolean"
+  ) {
+    throw new TypeError(
+      `[router.${methodName}] Invalid "caseSensitive": expected boolean, got ${typeof opts.caseSensitive}`,
     );
   }
 
