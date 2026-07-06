@@ -157,3 +157,96 @@ describe("catch-all reachable next to a constrained param+splat sibling (#1266)"
     },
   );
 });
+
+/**
+ * #1288: with the validated sub-traverse, totality + path-fixpoint (#18) hold on
+ * a FREE splat value — no first-segment filtering. `arbNonVersionSplat` above
+ * deliberately avoided version-looking first segments (the pre-#1288 blind spot);
+ * this layer generates them on purpose: a colliding value canonicalizes to the
+ * take reading (same URL back), everything else keeps its params.
+ */
+const arbFreeSplat = fc
+  .array(fc.oneof(arbSafeParamValue, fc.stringMatching(/^v\d{1,6}$/)), {
+    minLength: 1,
+    maxLength: 3,
+  })
+  .map((segs) => segs.join("/"));
+
+describe("free-generator totality + path-fixpoint (#1288)", () => {
+  test.prop([arbFreeSplat], { numRuns: NUM_RUNS.standard })(
+    "constrained-opt→splat: EVERY built omit form matches and path-fixpoints",
+    (rest) => {
+      const m = matcherFor(versioned());
+      const url = m.buildPath("r", { rest });
+      const result = m.match(url);
+
+      expect(result, `"${url}" did not match`).toBeDefined();
+      expect(m.buildPath("r", result!.params)).toBe(url);
+    },
+  );
+
+  test.prop([arbFreeSplat], { numRuns: NUM_RUNS.standard })(
+    "catch-all next to a param+splat sibling: EVERY built catch-all URL matches",
+    (rest) => {
+      const m = catchAllMatcher();
+      const url = m.buildPath("all", { rest });
+      const result = m.match(url);
+
+      expect(result, `"${url}" did not match`).toBeDefined();
+
+      // path-fixpoint (#18) rebuilds via the MATCHED route — a colliding URL
+      // (version-looking first segment) canonicalizes to the `ver` reading.
+      const winner = result!.segments.at(-1)!.name;
+
+      expect(m.buildPath(winner, result!.params)).toBe(url);
+    },
+  );
+});
+
+/**
+ * #1288 deep constraint dead-end (D2): a constraint BELOW the junction failing
+ * must fall back to the catch-all, not kill the whole match — the branch commits
+ * only when the REACHED route's constraints hold.
+ */
+describe("deep constraint dead-end falls to the catch-all (#1288)", () => {
+  const deep = () => [
+    createInputNode({ name: "all", path: "/*rest", fullName: "all" }),
+    createInputNode({
+      name: "ver",
+      path: String.raw`/:v<v\d+>/:id<\d+>`,
+      fullName: "ver",
+    }),
+  ];
+
+  test.prop([fc.stringMatching(/^v\d{1,6}$/), fc.stringMatching(/^\d{1,6}$/)], {
+    numRuns: NUM_RUNS.standard,
+  })("both constraints holding resolve to the specific route", (s1, s2) => {
+    const m = createTestMatcher();
+
+    m.registerTree(createRootWithChildren(deep()));
+
+    const result = m.match(`/${s1}/${s2}`);
+
+    expect(result?.segments.at(-1)?.name).toBe("ver");
+    expect(result?.params).toStrictEqual({ v: s1, id: s2 });
+  });
+
+  test.prop(
+    [
+      fc
+        .tuple(arbSafeParamValue, arbSafeParamValue)
+        .filter(([s1, s2]) => !/^v\d+$/.test(s1) || !/^\d+$/.test(s2)),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )("any constraint failing anywhere falls to the catch-all", ([s1, s2]) => {
+    const m = createTestMatcher();
+
+    m.registerTree(createRootWithChildren(deep()));
+
+    const result = m.match(`/${s1}/${s2}`);
+
+    expect(result, `"/${s1}/${s2}" did not match`).toBeDefined();
+    expect(result!.segments.at(-1)?.name).toBe("all");
+    expect(result!.params).toStrictEqual({ rest: `${s1}/${s2}` });
+  });
+});
