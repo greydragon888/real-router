@@ -355,6 +355,25 @@ function throwOptionalSplat(segment: string): never {
 }
 
 /**
+ * Rejects an UNCONSTRAINED optional param directly before a splat (`/:v?/*rest`,
+ * #1264, product decision). Without a constraint there is no validity signal to
+ * disambiguate "take the optional" from "let the splat capture", so every
+ * multi-segment value has two readings and `match` would silently reshape half the
+ * input space — a wrong-name in new clothing, worse than the loud UNMATCH it had.
+ * A CONSTRAINED optional→splat (`:v<c>?/*rest`) IS supported (A1). Sibling of the
+ * optional-splat (#1149) / fused (#1050) rejections; route-tree's gate catches it
+ * first with a route-contextual error.
+ */
+function throwUnconstrainedOptionalSplat(paramName: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Optional param ":${paramName}?" before a splat ` +
+      `must be constrained: an unconstrained optional before a splat is ambiguous ` +
+      `(every multi-segment value has two readings). Add a constraint, e.g. ` +
+      `":${paramName}<[a-z]+>?", or model it as two routes.`,
+  );
+}
+
+/**
  * An unbalanced `<`/`>` desyncs match vs build: the name is truncated at the
  * stray `<`, the unclosed constraint survives as a literal in the trie path, and
  * `buildPath` emits a URL its own `match` rejects (#804 — the residual gap #749
@@ -430,13 +449,79 @@ function ensureParamChild(
   ownNodes: Set<SegmentNode>,
 ): SegmentNode {
   if (!node.paramChild) {
-    node.paramChild = { node: createSegmentNode(), name: paramName };
+    // `fork` initialized here (not added conditionally by the optional-fork
+    // marker below) so every paramChild shares one hidden class — the fork check
+    // in `#traverseFrom` stays monomorphic (~0 hot-path tax, spike Stage 1).
+    node.paramChild = {
+      node: createSegmentNode(),
+      name: paramName,
+      fork: undefined,
+    };
     ownNodes.add(node);
   } else if (node.paramChild.name !== paramName && !ownNodes.has(node)) {
     throwParamNameConflict(node.paramChild.name, paramName, ":");
   }
 
   return node.paramChild.node;
+}
+
+/**
+ * #1263/#1264: marks a `paramChild` created by the optional fork so `match` can
+ * disambiguate the omit form. Called ONLY from the optional fork, so a
+ * non-optional param+splat sibling (#1266) is untouched.
+ *
+ * - **A1 opt→splat** (`/:v<c>?/*rest`): a constraint + a splat sibling → mark the
+ *   constraint (try-take-if-valid). An unconstrained optional→splat is rejected
+ *   at registration (reject-with-hint), so a splat fork always carries one.
+ * - **A2 opt→required-param** (`/:a?/:b`): the successor is a required param →
+ *   mark its name (`skipName`), bound on the omit form. Constraints are stripped
+ *   from `path` before trie insertion, so the successor segment is `:b` and its
+ *   own constraint (if any) is validated post-traverse via `constraintPatterns`.
+ */
+function markOptionalFork(
+  node: SegmentNode,
+  compiled: CompiledRoute,
+  paramName: string,
+  path: string,
+  segmentEnd: number,
+  length: number,
+): void {
+  const constraintPattern = compiled.constraintPatterns.get(paramName)?.pattern;
+
+  if (node.paramChild && node.splatChild) {
+    // opt→splat. Reject-with-hint if UNCONSTRAINED (#1264, product decision): an
+    // unconstrained optional before a splat has no validity signal — every
+    // multi-segment value has two readings, so `match` would silently reshape
+    // half the input space (wrong-name in new clothing). A constraint gives the
+    // signal `try-take-if-valid` needs (A1).
+    if (constraintPattern === undefined) {
+      throwUnconstrainedOptionalSplat(paramName);
+    }
+
+    node.paramChild.fork = { constraint: constraintPattern };
+
+    return;
+  }
+
+  const nextStart = segmentEnd + 1;
+
+  if (nextStart <= length) {
+    const nextEnd = path.indexOf("/", nextStart);
+    const nextSegment = path.slice(
+      nextStart,
+      nextEnd === -1 ? length : nextEnd,
+    );
+
+    // A required param (`:b`, not `:b?` — an optional successor is the opt+opt
+    // case, present-first, out of this fix's scope).
+    if (
+      node.paramChild &&
+      nextSegment.startsWith(":") &&
+      !nextSegment.endsWith("?")
+    ) {
+      node.paramChild.fork = { skipName: extractParamName(nextSegment) };
+    }
+  }
 }
 
 /** Splat counterpart of {@link ensureParamChild}. */
@@ -564,6 +649,11 @@ function insertIntoTrieFrom(
           visited,
         );
       }
+
+      // #1263/#1264: mark this optional's paramChild as a fork so `match` can
+      // disambiguate the omit form (opt→splat via constraint, opt→param via the
+      // successor's name).
+      markOptionalFork(node, compiled, paramName, path, segmentEnd, length);
 
       return;
     }

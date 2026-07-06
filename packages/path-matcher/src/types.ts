@@ -164,10 +164,32 @@ export interface BuildPathOptions {
 // Segment Trie Types
 // =============================================================================
 
+/**
+ * Marks a `paramChild` as an OPTIONAL-successor fork (#1263/#1264): the param came
+ * from an optional `:opt<constraint>?` directly followed by a dynamic segment, so
+ * `match` must disambiguate the omit form. Exactly one field is set:
+ *
+ * - `constraint` — the optional is followed by a **splat** (`/:v<c>?/*rest`). Take
+ *   the segment as the optional only if its DECODED value (#857) satisfies the
+ *   constraint (`try-take-if-valid`), else skip and let the splat capture. An
+ *   UNCONSTRAINED optional→splat is rejected at registration (reject-with-hint).
+ * - `skipName` — the optional is followed by a **required param** (`/:a?/:b`).
+ *   On the LAST segment the optional is omitted, so the segment is the successor:
+ *   bind it under `skipName` (the successor's name), not the optional's. When the
+ *   optional is present (≥2 segments) it binds normally and its constraint (if
+ *   any) is validated post-traverse.
+ */
+export interface ForkMeta {
+  readonly constraint?: RegExp | undefined;
+  readonly skipName?: string | undefined;
+}
+
 export interface SegmentNode {
   readonly staticChildren: Record<string, SegmentNode>;
   hasChildren: boolean;
-  paramChild?: { node: SegmentNode; name: string } | undefined;
+  paramChild?:
+    | { node: SegmentNode; name: string; fork?: ForkMeta | undefined }
+    | undefined;
   splatChild?: { node: SegmentNode; name: string } | undefined;
   route?: CompiledRoute | undefined;
   slashChildRoute?: CompiledRoute | undefined;
