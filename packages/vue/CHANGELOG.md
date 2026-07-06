@@ -1,5 +1,13 @@
 # @real-router/vue
 
+## 0.16.7
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+  - @real-router/sources@0.10.7
+
 ## 0.16.6
 
 ### Patch Changes
