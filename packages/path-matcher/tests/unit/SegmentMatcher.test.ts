@@ -4661,6 +4661,59 @@ describe("SegmentMatcher", () => {
       expect(result!.params).toStrictEqual({});
     });
 
+    // #1293: search-params materializes a literal "__proto__" query key as a REAL
+    // own property (#855). The path-matcher test parser (createTestMatcher) does NOT
+    // — a plain assign drops it before the merge — so this local parser reproduces
+    // the #855 own-key shape. #mergeQueryParams must then fold the key in with
+    // defineProperty, not a plain `params[key] = …` (which hits the inherited
+    // "__proto__" setter and silently drops the param one layer up).
+    function protoOwnKeyParser(qs: string): Record<string, unknown> {
+      const out: Record<string, unknown> = {};
+
+      for (const chunk of qs.split("&")) {
+        if (chunk === "") {
+          continue;
+        }
+
+        const eq = chunk.indexOf("=");
+        const key = eq === -1 ? chunk : chunk.slice(0, eq);
+        const value = eq === -1 ? null : chunk.slice(eq + 1);
+
+        Object.defineProperty(out, key, {
+          value,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      }
+
+      return out;
+    }
+
+    it("keeps a '__proto__' query key as an own property (#1293)", () => {
+      const matcher = createQueryMatcher({
+        parseQueryString: protoOwnKeyParser,
+      });
+
+      const result = matcher.match("/search?__proto__=zzz");
+
+      expect(Object.hasOwn(result!.params, "__proto__")).toBe(true);
+      expect(
+        Object.getOwnPropertyDescriptor(result!.params, "__proto__")?.value,
+      ).toBe("zzz");
+    });
+
+    it("does not pollute Object.prototype via a '__proto__' query key (#1293)", () => {
+      const matcher = createQueryMatcher({
+        parseQueryString: protoOwnKeyParser,
+      });
+
+      matcher.match("/search?__proto__=zzz");
+
+      expect((Object.prototype as Record<string, unknown>).zzz).toBeUndefined();
+      expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+    });
+
     // #737: the injected query parser decodes percent-encoding too, so a
     // valid-hex/invalid-UTF-8 query value makes it throw URIError. match() must
     // honor its never-throw contract — a malformed query → unmatched URL.

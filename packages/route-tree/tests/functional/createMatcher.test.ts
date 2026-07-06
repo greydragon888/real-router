@@ -246,3 +246,20 @@ describe("createMatcher — legal '?' inside a query value (#1292)", () => {
     expect(matcher.match("/s?q=ab")?.params).toStrictEqual({ q: "ab" });
   });
 });
+
+describe("createMatcher — a literal '__proto__' query key survives (#1293)", () => {
+  it("keeps '__proto__' from search-params as an own param end-to-end", () => {
+    const tree = createRouteTree("", "", [{ name: "r", path: "/r?x" }]);
+    const matcher = createMatcher();
+
+    matcher.registerTree(tree);
+
+    // search-params materializes __proto__ as a real own key (#855); the matcher's
+    // #mergeQueryParams must fold it in with defineProperty, not a plain assign that
+    // hits the inherited setter and drops it (#1293).
+    const result = matcher.match("/r?__proto__=zzz");
+
+    expect(result).toBeDefined();
+    expect(Object.hasOwn(result!.params, "__proto__")).toBe(true);
+  });
+});
