@@ -55,7 +55,6 @@ describe("type compilation", () => {
     const route: CompiledRoute = {
       name: "home",
       parent: null,
-      depth: 0,
       matchSegments: [],
       meta: {},
       declaredQueryParams: [],
@@ -71,7 +70,6 @@ describe("type compilation", () => {
 
     expect(route.name).toBe("home");
     expect(route.parent).toBeNull();
-    expect(route.depth).toBe(0);
   });
 
   it("should compile BuildParamSlot interface", () => {
@@ -3023,7 +3021,7 @@ describe("SegmentMatcher", () => {
       expect(result!.segments).toHaveLength(3);
     });
 
-    it("should set correct depth on nested routes", () => {
+    it("should expose the full ancestor chain via getSegmentsByName on nested routes", () => {
       const { matcher } = createNestedMatcher();
 
       const usersSegments = matcher.getSegmentsByName("users");
@@ -3032,7 +3030,7 @@ describe("SegmentMatcher", () => {
         "users.profile.settings",
       );
 
-      // depth = segments.length - 1: users→0, profile→1, settings→2
+      // getSegmentsByName returns the ancestor chain: users→1, profile→2, settings→3
       expect(usersSegments).toHaveLength(1);
       expect(profileSegments).toHaveLength(2);
       expect(settingsSegments).toHaveLength(3);

@@ -207,7 +207,6 @@ function compileAndRegisterRoute(
   const compiled: CompiledRoute = {
     name: node.fullName,
     parent: parentRoute,
-    depth: segments.length - 1,
     matchSegments: frozenSegments,
     meta: frozenMeta,
     declaredQueryParams,
