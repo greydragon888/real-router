@@ -7,6 +7,149 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-06]
 
+### @real-router/core@0.70.0
+
+### Minor Changes
+
+- [#1313](https://github.com/greydragon888/real-router/pull/1313) [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject a `<...>` constraint in a clean static segment ([#1311](https://github.com/greydragon888/real-router/issues/1311)). `/foo<bar>` / `/a<b>` — a constraint filling a STATIC segment (no `:`/`*` marker) — was silently stripped to `/foo` / `/a` at registration, reshaping the route with no signal ([#1150](https://github.com/greydragon888/real-router/issues/1150) caught only a constraint fused with TRAILING text, e.g. `/:id<\d+>x`; one cleanly ending a static segment slipped through). Now rejected at the route-tree validation gate (route-contextual message) + the path-matcher `registerTree` backstop — the sibling of [#1050](https://github.com/greydragon888/real-router/issues/1050) / [#1150](https://github.com/greydragon888/real-router/issues/1150) on the static-segment axis. A constraint on a param (`/:id<\d+>`) is unaffected.
+
+### Patch Changes
+
+- [#1313](https://github.com/greydragon888/real-router/pull/1313) [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the write-only `depth` field from path-matcher's `CompiledRoute` ([#1310](https://github.com/greydragon888/real-router/issues/1310)). It was assigned at registration but never read on any production path — only a unit test pinned the dead value. Internal cleanup, no behaviour change.
+
+### @real-router/angular@0.13.8
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+  - @real-router/sources@0.10.9
+
+### @real-router/browser-plugin@0.18.9
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/hash-plugin@0.8.9
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/lifecycle-plugin@0.6.12
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/logger-plugin@0.5.24
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/memory-plugin@0.4.20
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/navigation-plugin@0.7.21
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/persistent-params-plugin@0.2.24
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/preact@0.16.9
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+  - @real-router/sources@0.10.9
+
+### @real-router/preload-plugin@0.6.14
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/react@0.28.12
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+  - @real-router/sources@0.10.9
+
+### @real-router/rx@0.3.25
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/search-schema-plugin@0.4.12
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/solid@0.16.8
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+  - @real-router/sources@0.10.9
+
+### @real-router/sources@0.10.9
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/svelte@0.15.7
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+  - @real-router/sources@0.10.9
+
+### @real-router/validation-plugin@0.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+
+### @real-router/vue@0.16.9
+
+### Patch Changes
+
+- Updated dependencies [[`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da), [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da)]:
+  - @real-router/core@0.70.0
+  - @real-router/sources@0.10.9
+
+
 ### @real-router/core@0.69.0
 
 ### Minor Changes
