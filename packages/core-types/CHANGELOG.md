@@ -1,5 +1,11 @@
 # @real-router/types
 
+## 0.39.0
+
+### Minor Changes
+
+- [#1308](https://github.com/greydragon888/real-router/pull/1308) [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `caseSensitive: boolean` to router `Options` ([#1303](https://github.com/greydragon888/real-router/issues/1303)) — opt-in case-insensitive path matching, default `true` (case-sensitive).
+
 ## 0.38.0
 
 ### Minor Changes

@@ -7,6 +7,197 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-06]
 
+### @real-router/core@0.69.0
+
+### Minor Changes
+
+- [#1308](https://github.com/greydragon888/real-router/pull/1308) [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3) Thanks [@greydragon888](https://github.com/greydragon888)! - Wire opt-in case-insensitive routing via `caseSensitive` ([#1303](https://github.com/greydragon888/real-router/issues/1303))
+
+  The engine already implemented `caseSensitive` end-to-end, but the option was severed at the core seam — `Options` had no field and `deriveMatcherOptions` never mapped it, so `createRouter({ caseSensitive: false })` was silently ignored. `caseSensitive` is now a public router option, mapped through to the matcher. **Default stays `true` (case-sensitive, spec-correct per RFC 3986 §6.2.2.1)** — case-insensitive is an explicit opt-in (`caseSensitive: false`) for server-less / hash / static-hosted / legacy routing. Only static literal segments are compared case-insensitively; dynamic param values keep their case. Note the divergence from React Router v7 / TanStack / vue-router, which default to case-insensitive.
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/types@0.39.0
+
+### @real-router/types@0.39.0
+
+### Minor Changes
+
+- [#1308](https://github.com/greydragon888/real-router/pull/1308) [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `caseSensitive: boolean` to router `Options` ([#1303](https://github.com/greydragon888/real-router/issues/1303)) — opt-in case-insensitive path matching, default `true` (case-sensitive).
+
+### @real-router/validation-plugin@0.10.0
+
+### Minor Changes
+
+- [#1308](https://github.com/greydragon888/real-router/pull/1308) [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3) Thanks [@greydragon888](https://github.com/greydragon888)! - Validate the new `caseSensitive` router option ([#1303](https://github.com/greydragon888/real-router/issues/1303)): accept it as a known option and reject a non-boolean value.
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+
+### @real-router/angular@0.13.7
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/sources@0.10.8
+  - @real-router/route-utils@0.2.7
+
+### @real-router/browser-plugin@0.18.8
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3), [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/types@0.39.0
+
+### @real-router/hash-plugin@0.8.8
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3), [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/types@0.39.0
+
+### @real-router/lifecycle-plugin@0.6.11
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3), [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/types@0.39.0
+
+### @real-router/logger-plugin@0.5.23
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+
+### @real-router/memory-plugin@0.4.19
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3), [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/types@0.39.0
+
+### @real-router/navigation-plugin@0.7.20
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3), [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/types@0.39.0
+
+### @real-router/persistent-params-plugin@0.2.23
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3), [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/types@0.39.0
+
+### @real-router/preact@0.16.8
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/sources@0.10.8
+  - @real-router/route-utils@0.2.7
+
+### @real-router/preload-plugin@0.6.13
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3), [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/types@0.39.0
+
+### @real-router/react@0.28.11
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/sources@0.10.8
+  - @real-router/route-utils@0.2.7
+
+### @real-router/route-utils@0.2.7
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/types@0.39.0
+
+### @real-router/rsc-server-plugin@0.2.13
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/types@0.39.0
+
+### @real-router/rx@0.3.24
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+
+### @real-router/search-schema-plugin@0.4.11
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+
+### @real-router/solid@0.16.7
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/sources@0.10.8
+  - @real-router/route-utils@0.2.7
+
+### @real-router/sources@0.10.8
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/route-utils@0.2.7
+
+### @real-router/ssr-data-plugin@0.4.13
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/types@0.39.0
+
+### @real-router/svelte@0.15.6
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/sources@0.10.8
+  - @real-router/route-utils@0.2.7
+
+### @real-router/vue@0.16.8
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+  - @real-router/sources@0.10.8
+  - @real-router/route-utils@0.2.7
+
+
 ### @real-router/core@0.68.2
 
 ### Patch Changes

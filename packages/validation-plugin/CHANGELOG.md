@@ -1,5 +1,16 @@
 # @real-router/validation-plugin
 
+## 0.10.0
+
+### Minor Changes
+
+- [#1308](https://github.com/greydragon888/real-router/pull/1308) [`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3) Thanks [@greydragon888](https://github.com/greydragon888)! - Validate the new `caseSensitive` router option ([#1303](https://github.com/greydragon888/real-router/issues/1303)): accept it as a known option and reject a non-boolean value.
+
+### Patch Changes
+
+- Updated dependencies [[`381c597`](https://github.com/greydragon888/real-router/commit/381c5974fd0899390f37bc0b793f2c728f494fa3)]:
+  - @real-router/core@0.69.0
+
 ## 0.9.9
 
 ### Patch Changes
