@@ -1,5 +1,15 @@
 # @real-router/core
 
+## 0.70.0
+
+### Minor Changes
+
+- [#1313](https://github.com/greydragon888/real-router/pull/1313) [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject a `<...>` constraint in a clean static segment ([#1311](https://github.com/greydragon888/real-router/issues/1311)). `/foo<bar>` / `/a<b>` — a constraint filling a STATIC segment (no `:`/`*` marker) — was silently stripped to `/foo` / `/a` at registration, reshaping the route with no signal ([#1150](https://github.com/greydragon888/real-router/issues/1150) caught only a constraint fused with TRAILING text, e.g. `/:id<\d+>x`; one cleanly ending a static segment slipped through). Now rejected at the route-tree validation gate (route-contextual message) + the path-matcher `registerTree` backstop — the sibling of [#1050](https://github.com/greydragon888/real-router/issues/1050) / [#1150](https://github.com/greydragon888/real-router/issues/1150) on the static-segment axis. A constraint on a param (`/:id<\d+>`) is unaffected.
+
+### Patch Changes
+
+- [#1313](https://github.com/greydragon888/real-router/pull/1313) [`13504a6`](https://github.com/greydragon888/real-router/commit/13504a638f614c5b24b73a68dc367ecb48dee7da) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the write-only `depth` field from path-matcher's `CompiledRoute` ([#1310](https://github.com/greydragon888/real-router/issues/1310)). It was assigned at registration but never read on any production path — only a unit test pinned the dead value. Internal cleanup, no behaviour change.
+
 ## 0.69.0
 
 ### Minor Changes
