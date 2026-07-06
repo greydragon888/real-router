@@ -6,7 +6,6 @@ import { registerNode } from "./registration";
 import type {
   BuildPathOptions,
   CompiledRoute,
-  ForkMeta,
   MatcherInputNode,
   MatchResult,
   ResolvedMatcherOptions,
@@ -521,11 +520,11 @@ export class SegmentMatcher {
     return this.#traverseFrom(this.#root, path, 1, params);
   }
 
-  // The core match hot loop. The #1263/#1264 fork branches (A1 opt→splat, A2
-  // opt→required-param) are inlined here rather than extracted into helpers,
-  // because a per-param helper call regresses the common single-param path ~5%
-  // (spike-measured); decode/constraint detail still lives in #tryTakeFork /
-  // #forkTakesSplat.
+  // The core match hot loop. The #1263/#1264 fork branches (A2 rename) and the
+  // #1288 param+splat junction are inlined here rather than extracted into
+  // helpers, because a per-param helper call regresses the common single-param
+  // path ~5% (spike-measured); decode/constraint detail still lives in
+  // #tryTakeFork / #branchConstraintsHold.
   // eslint-disable-next-line sonarjs/cognitive-complexity -- inlined fork branches (see above)
   #traverseFrom(
     startNode: SegmentNode,
@@ -551,21 +550,49 @@ export class SegmentMatcher {
         const pc = node.paramChild;
         const fork = pc.fork;
 
-        // #1264 A1 (opt→splat): an invalid take (constraint fails on the decoded
-        // value) skips to the splat sibling. #1283: ALSO skip when a
-        // constraint-SATISFYING take would dead-end on the LAST segment — the
-        // take-node carries no terminal route (only a param/splat child needing more
-        // segments), so committing strands the match while the splat sibling can
-        // still terminate here. A take-node WITH a route (or slash-child) is a valid
-        // terminal → present-first preserved.
-        if (
-          fork !== undefined &&
-          node.splatChild !== undefined &&
-          (this.#forkTakesSplat(fork, segment) ||
-            (segmentEnd >= length &&
-              pc.node.route === undefined &&
-              pc.node.slashChildRoute === undefined))
-        ) {
+        // #1288: validated sub-traverse on a param+splat junction. The param
+        // branch is tried on a scratch object and commits ONLY if it structurally
+        // completes AND its route's constraints hold on the decoded scratch
+        // values (#branchConstraintsHold); otherwise the splat sibling captures.
+        // "Param wins if its branch can complete" — the uniform INVARIANTS #8
+        // rule that subsumes the former per-signal carve-outs: the #1264 A1
+        // constraint-skip (kept below as an allocation-free fast-reject), the
+        // #1283 last-segment dead-end (a sub-traverse past the end returns the
+        // take-node's terminal or nothing), the deep dead-end of #1288 itself,
+        // and the constraint-failing branch that used to kill the whole match
+        // post-traverse. Junction-free param hops (no splat sibling) never enter
+        // this block — the common single-param path is untouched.
+        if (node.splatChild !== undefined) {
+          if (
+            fork?.constraint !== undefined &&
+            !this.#tryTakeFork(fork.constraint, segment)
+          ) {
+            return this.#matchSplat(node.splatChild, path, start, params);
+          }
+
+          const bindName =
+            fork?.skipName !== undefined && segmentEnd >= length
+              ? fork.skipName
+              : pc.name;
+          const childParams: Record<string, string> = { [bindName]: segment };
+
+          const taken = this.#traverseFrom(
+            pc.node,
+            path,
+            segmentEnd + 1,
+            childParams,
+          );
+
+          if (
+            taken !== undefined &&
+            (!taken.hasConstraints ||
+              this.#branchConstraintsHold(taken, childParams))
+          ) {
+            Object.assign(params, childParams);
+
+            return taken;
+          }
+
           return this.#matchSplat(node.splatChild, path, start, params);
         }
 
@@ -646,18 +673,6 @@ export class SegmentMatcher {
     } catch {
       return false;
     }
-  }
-
-  /**
-   * #1264 A1: whether an opt→splat fork should SKIP to the splat — it carries a
-   * constraint and the segment fails `#tryTakeFork` (its DECODED value doesn't
-   * satisfy the constraint).
-   */
-  #forkTakesSplat(fork: ForkMeta, segment: string): boolean {
-    return (
-      fork.constraint !== undefined &&
-      !this.#tryTakeFork(fork.constraint, segment)
-    );
   }
 
   #decodeParams(params: Record<string, string>): boolean {
