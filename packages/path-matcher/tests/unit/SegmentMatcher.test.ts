@@ -55,7 +55,6 @@ describe("type compilation", () => {
     const route: CompiledRoute = {
       name: "home",
       parent: null,
-      depth: 0,
       matchSegments: [],
       meta: {},
       declaredQueryParams: [],
@@ -71,7 +70,6 @@ describe("type compilation", () => {
 
     expect(route.name).toBe("home");
     expect(route.parent).toBeNull();
-    expect(route.depth).toBe(0);
   });
 
   it("should compile BuildParamSlot interface", () => {
@@ -707,6 +705,18 @@ describe("SegmentMatcher", () => {
         "/:id<[a/b]>", // '/' inside the constraint body
       ]) {
         expect(() => createMatcher([{ name: "r", path }])).not.toThrow();
+      }
+    });
+
+    it("throws on a `<...>` constraint in a CLEAN static segment (/foo<bar>, #1311)", () => {
+      // A constraint filling a static segment (no ':'/'*' marker) is silently
+      // stripped to '/foo' by CONSTRAINT_PATTERN_RGX — #1150 catches only a
+      // constraint fused with TRAILING text (`/:id<\d+>x`); a constraint that
+      // cleanly ends a static segment slips through. Reject it, sibling of #1050.
+      for (const path of ["/foo<bar>", "/a<b>", String.raw`/x<\d+>`]) {
+        expect(() => createMatcher([{ name: "r", path }])).toThrow(
+          /\[SegmentMatcher\.registerTree\]/,
+        );
       }
     });
   });
@@ -3023,7 +3033,7 @@ describe("SegmentMatcher", () => {
       expect(result!.segments).toHaveLength(3);
     });
 
-    it("should set correct depth on nested routes", () => {
+    it("should expose the full ancestor chain via getSegmentsByName on nested routes", () => {
       const { matcher } = createNestedMatcher();
 
       const usersSegments = matcher.getSegmentsByName("users");
@@ -3032,7 +3042,7 @@ describe("SegmentMatcher", () => {
         "users.profile.settings",
       );
 
-      // depth = segments.length - 1: users→0, profile→1, settings→2
+      // getSegmentsByName returns the ancestor chain: users→1, profile→2, settings→3
       expect(usersSegments).toHaveLength(1);
       expect(profileSegments).toHaveLength(2);
       expect(settingsSegments).toHaveLength(3);

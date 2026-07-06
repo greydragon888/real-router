@@ -1,6 +1,7 @@
 import { PARAM_NAME_PATTERN } from "./buildParamMeta";
 import {
   CONSTRAINT_BODY_PATTERN,
+  hasConstraintInStaticSegment,
   isConstraintBalanced,
 } from "./constraint-grammar";
 import { encodeParam, ENCODING_METHODS } from "./encoding";
@@ -101,6 +102,15 @@ export function registerNode(
   // #1050 on the OTHER side of the param. route-tree's gate catches it first.
   if (hasFusedConstraintSuffix(rawNodePath)) {
     throwFusedConstraintSuffix(rawNodePath);
+  }
+
+  // A `<...>` constraint in a STATIC segment (no ':'/'*' marker) — `/foo<bar>`,
+  // `/a<b>` — is silently stripped by CONSTRAINT_PATTERN_RGX below (`/foo<bar>` →
+  // `/foo`), reshaping the route with no signal. #1150 catches only a constraint
+  // fused with TRAILING text; one cleanly ending a static segment slips through.
+  // Reject it, the sibling of #1050/#1150 on the static-segment axis (#1311).
+  if (hasConstraintInStaticSegment(rawNodePath)) {
+    throwConstraintInStaticSegment(rawNodePath);
   }
 
   // Strip constraint patterns (e.g., <\d+>, <[^/]+>) from path before trie insertion.
@@ -207,7 +217,6 @@ function compileAndRegisterRoute(
   const compiled: CompiledRoute = {
     name: node.fullName,
     parent: parentRoute,
-    depth: segments.length - 1,
     matchSegments: frozenSegments,
     meta: frozenMeta,
     declaredQueryParams,
@@ -546,6 +555,15 @@ function throwFusedConstraintSuffix(path: string): never {
     `[SegmentMatcher.registerTree] Text fused to a constraint '>' in path "${path}": ` +
       `a '<...>' constraint must end its segment or be followed by '/' or an ` +
       `optional '?' — use "/:id<...>/rest", not "/:id<...>rest".`,
+  );
+}
+
+function throwConstraintInStaticSegment(path: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Constraint '<...>' in a static segment in path "${path}": ` +
+      `a '<...>' constraint must follow a parameter marker (':' or '*') — a static ` +
+      `segment carrying '<...>' is silently stripped. Attach it to a param ` +
+      `(e.g. "/:id<...>") or drop it.`,
   );
 }
 

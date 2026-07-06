@@ -125,7 +125,6 @@ export interface CompiledRoute {
   readonly name: string;
 
   readonly parent: CompiledRoute | null;
-  readonly depth: number;
 
   readonly matchSegments: readonly MatcherInputNode[];
   readonly meta: Readonly<Record<string, Record<string, "url" | "query">>>;

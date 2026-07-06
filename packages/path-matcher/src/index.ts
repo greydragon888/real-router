@@ -16,10 +16,11 @@ export { buildParamMeta, PARAM_NAME_PATTERN } from "./buildParamMeta";
 // route-tree's former local `hasBalancedConstraints`. `CONSTRAINT_BODY_PATTERN` (the
 // atom every *internal* match/strip/build regex here derives from) is exported as a
 // reserved/future constraint-grammar atom: it currently has NO external consumer
-// (route-tree consumes only `isConstraintBalanced`), kept exported so the `<...>`
-// grammar stays single-sourced from this package.
+// (route-tree consumes `isConstraintBalanced` + `hasConstraintInStaticSegment`),
+// kept exported so the `<...>` grammar stays single-sourced from this package.
 export {
   CONSTRAINT_BODY_PATTERN,
+  hasConstraintInStaticSegment,
   isConstraintBalanced,
 } from "./constraint-grammar";
 
