@@ -107,6 +107,16 @@ export function registerNode(
   // Constraints like <[^/]+> contain "/" which breaks segment splitting in indexOf("/", start).
   const nodePath = rawNodePath.replaceAll(CONSTRAINT_PATTERN_RGX, "");
 
+  // #1287: two optional params directly before a splat can't be represented by a
+  // single trie-slot fork — the outer optional's mark overwrites the inner's, silently
+  // reshaping the omit-outer/take-inner form into the splat (`/:a<c1>?/:b<c2>?/*rest`).
+  // Reject. Scanned on the CONSTRAINT-STRIPPED path so a plain segment split is safe (a
+  // constraint body can contain '/'). Both must be constrained, else #1264 B already
+  // rejects the inner unconstrained optional→splat.
+  if (hasMultipleOptionalsBeforeSplat(nodePath)) {
+    throwMultipleOptionalsBeforeSplat(rawNodePath);
+  }
+
   const matchPath = isAbsolute ? nodePath : buildFullPath(parentPath, nodePath);
 
   const compileParentPath = isAbsolute ? "" : parentPath;
@@ -387,14 +397,50 @@ function throwFusedMarker(segment: string): never {
  * iterates by code point, so surrogate pairs are handled).
  */
 function hasNonAsciiSegment(segment: string): boolean {
-  for (const char of segment) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- `char` is a non-empty code point from for-of, so codePointAt(0) is defined
-    if (char.codePointAt(0)! >= 0x80) {
+  // #1285: charCodeAt (code UNIT) index loop, not for-of code points. For a
+  // "has non-ASCII" predicate the result is identical — any surrogate (≥ 0xD800) is
+  // itself ≥ 0x80, so an astral char is still flagged — without the iterator +
+  // code-point decoding cost per static segment of every registered route.
+  for (let i = 0; i < segment.length; i++) {
+    // eslint-disable-next-line unicorn/prefer-code-point -- charCodeAt (code unit) is intentional: a "has non-ASCII" test needs only units (a surrogate is itself >= 0x80), and it skips the code-point decoding that codePointAt does per index (#1285)
+    if (segment.charCodeAt(i) >= 0x80) {
       return true;
     }
   }
 
   return false;
+}
+
+// #1287: ≥2 optional params directly before a splat. Runs on the CONSTRAINT-STRIPPED
+// path, so a plain `/` split is safe (a constraint body can contain '/').
+function hasMultipleOptionalsBeforeSplat(strippedPath: string): boolean {
+  const segments = strippedPath.split("/");
+
+  for (let i = 2; i < segments.length; i++) {
+    if (
+      segments[i].startsWith("*") &&
+      isOptionalParamSegment(segments[i - 1]) &&
+      isOptionalParamSegment(segments[i - 2])
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isOptionalParamSegment(segment: string): boolean {
+  return segment.startsWith(":") && segment.endsWith("?");
+}
+
+function throwMultipleOptionalsBeforeSplat(path: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Two optional params directly before a splat in ` +
+      `"${path}": a single trie slot carries only one optional→splat fork, so the ` +
+      `outer optional would overwrite the inner and the omit-outer/take-inner form ` +
+      `would silently reshape into the splat. Split into separate routes, or drop the ` +
+      `'?' on one.`,
+  );
 }
 
 function throwNonAsciiStatic(segment: string): never {
@@ -744,7 +790,14 @@ function markConstrainedParamFork(
   compiled: CompiledRoute,
   segment: string,
 ): void {
-  if (!segment.startsWith(":") || node.paramChild === undefined) {
+  // #1285: short-circuit the whole helper for the common UNCONSTRAINED route (first,
+  // cheapest check) before the `extractParamName` regex — the constraint lookup would
+  // always miss anyway, and registerTree is ~58% of the SSR clone tax.
+  if (
+    !compiled.hasConstraints ||
+    !segment.startsWith(":") ||
+    node.paramChild === undefined
+  ) {
     return;
   }
 
@@ -752,8 +805,29 @@ function markConstrainedParamFork(
     extractParamName(segment),
   )?.pattern;
 
-  if (constraintPattern !== undefined) {
-    node.paramChild.fork ??= { constraint: constraintPattern };
+  if (constraintPattern === undefined) {
+    return;
+  }
+
+  const pc = node.paramChild;
+
+  // #1284: one trie slot legally serves several routes with DIFFERENT constraints
+  // under the same param name. The fork's validity signal must be the DISJUNCTION —
+  // `match` skips to the splat sibling only when EVERY route's constraint fails, else
+  // a value matching a LATER route wrongly falls to the splat (killing that route,
+  // order-dependent). Composite of the anchored sources → one `.test` at match;
+  // post-traverse per-route validation still filters the correct winner. `fork` is
+  // re-created (not mutated) since `ForkMeta.constraint` is readonly.
+  if (pc.fork?.constraint === undefined) {
+    pc.fork = { ...pc.fork, constraint: constraintPattern };
+  } else if (pc.fork.constraint.source !== constraintPattern.source) {
+    pc.fork = {
+      ...pc.fork,
+      constraint: new RegExp(
+        `(?:${pc.fork.constraint.source})|(?:${constraintPattern.source})`,
+        pc.fork.constraint.flags,
+      ),
+    };
   }
 }
 

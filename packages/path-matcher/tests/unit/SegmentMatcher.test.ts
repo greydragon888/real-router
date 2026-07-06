@@ -961,6 +961,161 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // #1283: the try-take-if-valid fork (A1 #1264 / required #1266) skips to the splat
+  // only when the constraint FAILS. When a constraint-SATISFYING segment is also the
+  // LAST one and the take-node is a dead terminal (no route, only a would-be-empty
+  // splat child), the take dead-ends → UNMATCH while buildPath emits that URL — a
+  // `range(buildPath) ⊄ dom(match)` dead deep-link, the exact class try-take-if-valid
+  // was built to close.
+  describe("match — try-take-if-valid fork last-segment dead-end falls to splat (#1283)", () => {
+    it("opt→splat: a single constraint-satisfying last segment resolves the omit form", () => {
+      const m = createMatcher([
+        { name: "r", path: String.raw`/:v<v\d+>?/*rest` },
+      ]);
+
+      // build of the omit form is "/v1"; match must resolve it, not UNMATCH
+      expect(m.match("/v1")?.params).toStrictEqual({ rest: "v1" });
+      // the take form (multi-segment) still resolves under the optional's name
+      expect(m.match("/v1/users")?.params).toStrictEqual({
+        v: "v1",
+        rest: "users",
+      });
+    });
+
+    it("#1266 required→splat: a single constraint-satisfying segment falls to the catch-all sibling", () => {
+      const m = createMatcher([
+        { name: "all", path: "/*rest" },
+        { name: "ver", path: String.raw`/:v<v\d+>/*rest` },
+      ]);
+
+      const r = m.match("/v1");
+
+      expect(r?.segments.at(-1)?.name).toBe("all");
+      expect(r?.params).toStrictEqual({ rest: "v1" });
+      // the multi-segment versioned form still resolves to ver
+      expect(m.match("/v1/users")?.params).toStrictEqual({
+        v: "v1",
+        rest: "users",
+      });
+    });
+
+    it("preserves present-first: a take-node WITH a terminal route still takes (not skip)", () => {
+      const m = createMatcher([
+        { name: "rest", path: String.raw`/:v<v\d+>?/*rest` },
+        { name: "bare", path: String.raw`/:v<v\d+>` },
+      ]);
+
+      // /v1 → the bare :v terminal (a valid take), NOT the splat omit form
+      const r = m.match("/v1");
+
+      expect(r?.segments.at(-1)?.name).toBe("bare");
+      expect(r?.params).toStrictEqual({ v: "v1" });
+    });
+  });
+
+  // #1284: one trie slot legally serves several routes with DIFFERENT constraints
+  // under the same param name. #1266 marked `fork.constraint ??= <first>`, so with a
+  // splat sibling present, `match` used only the FIRST-registered route's constraint
+  // as the slot-wide validity signal — a value matching a LATER route's constraint
+  // failed the fork and fell to the catch-all, killing that route (order-dependent).
+  describe("registerTree — same-name constrained siblings coexist under a splat sibling (#1284)", () => {
+    const routes = [
+      { name: "num", path: String.raw`/user/:id<\d+>/a` },
+      { name: "hex", path: "/user/:id<[a-f]+>/b" },
+      { name: "all", path: "/user/*rest" },
+    ];
+
+    it("routes to the hex sibling when the numeric constraint fails (not the catch-all)", () => {
+      const m = createMatcher(routes);
+      const r = m.match("/user/abc/b");
+
+      expect(r?.segments.at(-1)?.name).toBe("hex");
+      expect(r?.params).toStrictEqual({ id: "abc" });
+    });
+
+    it("still routes a numeric id to the numeric sibling", () => {
+      const m = createMatcher(routes);
+
+      expect(m.match("/user/123/a")?.segments.at(-1)?.name).toBe("num");
+    });
+
+    it("is registration-order independent (hex registered first)", () => {
+      const m = createMatcher([routes[1], routes[0], routes[2]]);
+
+      expect(m.match("/user/123/a")?.params).toStrictEqual({ id: "123" });
+      expect(m.match("/user/abc/b")?.params).toStrictEqual({ id: "abc" });
+    });
+
+    it("a value matching NEITHER constraint still falls to the catch-all", () => {
+      const m = createMatcher(routes);
+      const r = m.match("/user/xyz/b"); // xyz ∉ \d+ and ∉ [a-f]+
+
+      expect(r?.segments.at(-1)?.name).toBe("all");
+      expect(r?.params).toStrictEqual({ rest: "xyz/b" });
+    });
+
+    it("two SAME-constraint siblings need no disjunction (identical source is a no-op)", () => {
+      const m = createMatcher([
+        { name: "a", path: String.raw`/user/:id<\d+>/a` },
+        { name: "c", path: String.raw`/user/:id<\d+>/c` }, // identical \d+ constraint
+        { name: "all", path: "/user/*rest" },
+      ]);
+
+      expect(m.match("/user/1/a")?.segments.at(-1)?.name).toBe("a");
+      expect(m.match("/user/2/c")?.segments.at(-1)?.name).toBe("c");
+      expect(m.match("/user/xyz/a")?.segments.at(-1)?.name).toBe("all");
+    });
+  });
+
+  // #1287: two (or more) optional params directly before a splat can't be represented
+  // by a single trie-slot fork — the outer optional's mark overwrites the inner's,
+  // silently reshaping the omit-outer/take-inner form into the splat
+  // (`/:a<c1>?/:b<c2>?/*rest`: `/ab/x` → {rest:"ab/x"} instead of {b:"ab",rest:"x"}).
+  // Rejected at registration (both must be constrained, else #1264 B caught the inner).
+  describe("registerTree — two optionals before a splat rejected (#1287)", () => {
+    it("throws for two constrained optionals directly before a splat", () => {
+      expect(() =>
+        createMatcher([
+          { name: "r", path: String.raw`/:a<\d+>?/:b<[a-f]+>?/*rest` },
+        ]),
+      ).toThrow(/optional/i);
+    });
+
+    it("still accepts a single constrained optional before a splat (#1264 A1)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: String.raw`/:v<v\d+>?/*rest` }]),
+      ).not.toThrow();
+    });
+
+    it("still accepts two optionals NOT before a splat (opt→opt, static tail)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: "/:a?/:b?/tail" }]),
+      ).not.toThrow();
+    });
+  });
+
+  // #1286: the A2 optional-successor rename (#1263) disambiguates by segment count on
+  // the LAST segment only, so it covers a TERMINAL successor (`/:a?/:b`) but NOT a
+  // non-terminal one (`/:a?/:b/c`) — the omit form then binds under the OPTIONAL's
+  // name, not the successor's. Pinned as a documented limitation (the general fix,
+  // variable-depth remaining-segment counting, is disproportionate); see CLAUDE.md.
+  describe("match — A2 rename covers only a terminal successor (#1286, caveat-lock)", () => {
+    it("binds the omit form under the optional's name for a NON-terminal successor (known limitation)", () => {
+      const m = createMatcher([{ name: "r", path: "/:a?/:b/c" }]);
+
+      // wanted { b: "x" }; the A2 rename does not reach a non-terminal successor
+      expect(m.match("/x/c")?.params).toStrictEqual({ a: "x" });
+      // the present form is unaffected
+      expect(m.match("/1/x/c")?.params).toStrictEqual({ a: "1", b: "x" });
+    });
+
+    it("still renames correctly for a TERMINAL successor (#1263 A2)", () => {
+      const m = createMatcher([{ name: "r", path: "/:a?/:b" }]);
+
+      expect(m.match("/x")?.params).toStrictEqual({ b: "x" });
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted
