@@ -8,7 +8,7 @@
  * @module search-params
  */
 
-export { build, keep, omit, parse, parseQuery } from "./searchParams";
+export { build, parse, parseQuery } from "./searchParams";
 
 export { DEFAULT_QUERY_PARAMS } from "./encode";
 
@@ -17,10 +17,8 @@ export type {
   BooleanFormat,
   DecodeResult,
   FinalOptions,
-  KeepResponse,
   NullFormat,
   NumberFormat,
-  OmitResponse,
   Options,
   QueryParamPrimitive,
   QueryParamValue,

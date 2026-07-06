@@ -20,21 +20,6 @@
 | 12  | Inverse-pair totality (`range(parse) ⊆ dom(build)`) | `build(parse(qs, opts), opts)` **never throws** for any wire string `qs` over the full option matrix. The oracle generator (`tests/property/inversePair.properties.ts` `arbRawQueryString`) derives `qs` from the **wire grammar** (key-only / `=value` / repeats / brackets / empty chunks), not from `build`, so it reaches the `parse→build` half the `build`-derived generators are blind to — the class that let #1155 (null array element) crash `router.start()` on a forgeable URL. (#1155, axis A7) |
 | 13  | Empty-chunk skip                  | An empty query chunk — a `&&`, a leading `&`, or a trailing `&` — is **skipped** in `parse`, not decoded into a junk `{ "": null }` param (`parse("&a=1")` → `{a: 1}`, `parse("x=1&&&x=2")` → `{x: [1, 2]}`). An intentional empty-key chunk carries an `=` (`parse("=1")` → `{ "": 1 }`) so its span is non-empty and is unaffected. (#1156) |
 
-## Omit / Keep
-
-| #   | Invariant                  | Description                                                                                                                                                                                                                                 |
-| --- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Partitioning               | Every key from `parse(qs)` ends up in exactly one of `removedParams` or the remaining `querystring` after `omit`. No key is lost or duplicated. Holds for **array-valued** params across all array formats, where one key spans multiple chunks. |
-| 2   | Omit idempotency           | `omit(omit(qs, keys).querystring, keys).querystring === omit(qs, keys).querystring`. Applying `omit` twice with the same keys changes nothing on the second pass.                                                                           |
-| 3   | Omit identity              | `omit(qs, []).querystring === qs`. Omitting an empty key list leaves the query string unchanged.                                                                                                                                            |
-| 4   | Keep identity              | `keep(qs, allKeys).querystring === qs`. Keeping all keys leaves the query string unchanged.                                                                                                                                                 |
-| 5   | Omit complement            | No key from the omit list appears in the remaining query string after `omit`.                                                                                                                                                               |
-| 6   | Keep complement            | No key absent from the keep list appears in `keptParams` after `keep`.                                                                                                                                                                      |
-| 7   | Omit ? prefix preservation | If the input path starts with `?` and omit does not remove all parameters, the returned `querystring` also starts with `?`.                                                                                                                 |
-| 8   | Keep empty list            | `keep(qs, [])` always returns `{keptParams: {}, querystring: ""}` regardless of the input query string.                                                                                                                                     |
-| 9   | Omit/keep duality          | `{...parse(omit(qs, keys).querystring, opts), ...parse(keep(qs, keys).querystring, opts)} ≡ parse(qs, opts)`. Removing keys with `omit` and keeping the same keys with `keep` produces complementary subsets that reconstruct the original. |
-| 10  | Keep no `?` prefix         | `keep(qs, keys).querystring` never starts with `?`, regardless of whether the input has a `?` prefix. This contrasts with `omit` which preserves the `?` prefix (invariant #7).                                                             |
-
 ## Format Roundtrips
 
 | #   | Invariant                            | Description                                                                                                                                                                                                                                              |
@@ -64,5 +49,4 @@
 | File                                      | Invariants | Category                   |
 | ----------------------------------------- | ---------- | -------------------------- |
 | `tests/property/parseBuild.properties.ts` | 1–11       | Core parse/build cycle     |
-| `tests/property/omitKeep.properties.ts`   | 1–10       | Omit and keep operations   |
 | `tests/property/formats.properties.ts`    | 1–19       | Format-specific roundtrips |

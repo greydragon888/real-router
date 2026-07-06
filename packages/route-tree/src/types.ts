@@ -23,8 +23,6 @@ export type {
   QueryParamPrimitive,
   QueryParamValue,
   SearchParams,
-  OmitResponse,
-  KeepResponse,
   DecodeResult,
 } from "search-params";
 
@@ -32,24 +30,14 @@ export type {
 // Builder Types
 // =============================================================================
 
-export type {
-  RouteDefinition,
-  RouteTree,
-  TreeBuildOptions,
-  RouteTreeBuilder,
-} from "./builder/types";
+export type { RouteDefinition, RouteTree } from "./builder/types";
 
 // =============================================================================
 // Operations Types
 // =============================================================================
 
 export type {
-  QueryParamsMode,
-  TrailingSlashMode,
   URLParamsEncodingType,
-  BasePathOptions,
-  BuildOptions,
-  MatchOptions,
   ParamSource,
   ParamTypeMap,
   RouteTreeStateMeta,

@@ -3,10 +3,7 @@
 import { fc, test } from "@fast-check/vitest";
 
 import { arbRouteForest, NUM_RUNS } from "./helpers";
-import {
-  createRouteTree,
-  createRouteTreeBuilder,
-} from "../../src/builder/createRouteTree";
+import { createRouteTree } from "../../src/builder/createRouteTree";
 import {
   nodeToDefinition,
   routeTreeToDefinitions,
@@ -299,79 +296,6 @@ describe("nodeToDefinition Properties", () => {
             expect(def.path).toBe(node.path);
           }
         }
-      },
-    );
-  });
-});
-
-// =============================================================================
-// Immutability Opt-Out (skipFreeze) — mirror of CC1, negated
-// =============================================================================
-
-describe("Immutability Opt-Out Properties", () => {
-  describe("skipFreeze:true leaves every node mutable, over arbitrary shapes (high)", () => {
-    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
-      "with skipFreeze:true no node / paramMeta / paramTypeMap / arrays are frozen",
-      (routes: RouteDefinition[]) => {
-        const tree = createRouteTree("", "", routes, { skipFreeze: true });
-
-        for (const node of [tree, ...collectAllNodes(tree)]) {
-          expect(Object.isFrozen(node)).toBe(false);
-          expect(Object.isFrozen(node.paramMeta)).toBe(false);
-
-          // Empty param collections reuse shared FROZEN sentinels
-          // (EMPTY_PARAM_TYPE_MAP / EMPTY_PARAM_NAMES, #1009) regardless of
-          // skipFreeze — same rationale as the EMPTY_CHILDREN sentinels below:
-          // they are never mutated in place (node mutability is what matters),
-          // so only the computed (non-empty) collections reflect the flag.
-          if (Object.keys(node.paramTypeMap).length > 0) {
-            expect(Object.isFrozen(node.paramTypeMap)).toBe(false);
-          }
-          if (node.paramMeta.urlParams.length > 0) {
-            expect(Object.isFrozen(node.paramMeta.urlParams)).toBe(false);
-          }
-          if (node.paramMeta.queryParams.length > 0) {
-            expect(Object.isFrozen(node.paramMeta.queryParams)).toBe(false);
-          }
-          if (node.paramMeta.spatParams.length > 0) {
-            expect(Object.isFrozen(node.paramMeta.spatParams)).toBe(false);
-          }
-
-          // Leaf nodes reuse the shared FROZEN empty sentinels
-          // (EMPTY_CHILDREN_MAP / EMPTY_CHILDREN_ARRAY) regardless of skipFreeze,
-          // so only the computed (non-leaf) collections reflect the flag. addRoute
-          // mutates a leaf by REPLACING node.children (the node itself is mutable),
-          // so the frozen empty sentinel is not a problem — node mutability is.
-          if (node.children.size > 0) {
-            expect(Object.isFrozen(node.children)).toBe(false);
-            expect(Object.isFrozen(node.nonAbsoluteChildren)).toBe(false);
-          }
-        }
-      },
-    );
-  });
-});
-
-// =============================================================================
-// RouteTreeBuilder — incremental .add() agrees with createRouteTree
-// =============================================================================
-
-describe("RouteTreeBuilder Properties", () => {
-  describe("incremental .add() reproduces the input, over arbitrary shapes (high)", () => {
-    test.prop([arbRouteForest], { numRuns: NUM_RUNS.standard })(
-      "building one route at a time via .add() round-trips to the input (≡ addMany/createRouteTree)",
-      (routes: RouteDefinition[]) => {
-        const builder = createRouteTreeBuilder("", "");
-
-        for (const route of routes) {
-          builder.add(route);
-        }
-
-        // N1 proves createRouteTree (= addMany().build()) round-trips to the
-        // input; asserting .add()-per-route round-trips to the SAME input proves
-        // the two accumulation paths (push-in-loop vs spread) agree. Oracle is the
-        // input, not the other code path.
-        expect(routeTreeToDefinitions(builder.build())).toStrictEqual(routes);
       },
     );
   });

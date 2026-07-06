@@ -1,7 +1,7 @@
 // Tests for the new pure function API - Builder
 import { describe, it, expect } from "vitest";
 
-import { createRouteTree, createRouteTreeBuilder } from "../../src/builder";
+import { createRouteTree } from "../../src/builder";
 
 describe("createRouteTree", () => {
   describe("basic tree creation", () => {
@@ -154,75 +154,6 @@ describe("createRouteTree", () => {
       expect(leaf.nonAbsoluteChildren).toHaveLength(0);
       expect(Object.isFrozen(leaf.children)).toBe(true);
       expect(Object.isFrozen(leaf.nonAbsoluteChildren)).toBe(true);
-    });
-  });
-});
-
-describe("createRouteTreeBuilder", () => {
-  it("should build tree with add()", () => {
-    const tree = createRouteTreeBuilder("", "")
-      .add({ name: "home", path: "/" })
-      .add({ name: "users", path: "/users" })
-      .build();
-
-    expect(tree.children.size).toBe(2);
-  });
-
-  it("should build tree with addMany()", () => {
-    const tree = createRouteTreeBuilder("", "")
-      .addMany([
-        { name: "home", path: "/" },
-        { name: "users", path: "/users" },
-      ])
-      .build();
-
-    expect(tree.children.size).toBe(2);
-  });
-
-  it("should chain add() and addMany()", () => {
-    const tree = createRouteTreeBuilder("", "")
-      .add({ name: "home", path: "/" })
-      .addMany([
-        { name: "users", path: "/users" },
-        { name: "about", path: "/about" },
-      ])
-      .add({ name: "contact", path: "/contact" })
-      .build();
-
-    expect(tree.children.size).toBe(4);
-  });
-});
-
-describe("skipFreeze option", () => {
-  it("should not freeze tree when skipFreeze is true", () => {
-    const tree = createRouteTree("", "", [{ name: "home", path: "/" }], {
-      skipFreeze: true,
-    });
-
-    // Tree should not be frozen
-    expect(Object.isFrozen(tree)).toBe(false);
-    expect(Object.isFrozen(tree.children)).toBe(false);
-  });
-
-  it("should freeze tree by default (without skipFreeze)", () => {
-    const tree = createRouteTree("", "", [{ name: "home", path: "/" }]);
-
-    // Tree should be frozen by default
-    expect(Object.isFrozen(tree)).toBe(true);
-    expect(Object.isFrozen(tree.children)).toBe(true);
-  });
-});
-
-describe("mutation testing coverage - buildTree", () => {
-  describe("route processing order", () => {
-    it("should handle route with empty children array as simple route", () => {
-      // Empty children array should be treated as no children (falsy check)
-      const tree = createRouteTree("", "", [
-        { name: "parent", path: "/parent", children: [] },
-        { name: "sibling", path: "/sibling" },
-      ]);
-
-      expect(tree.children.size).toBe(2);
     });
   });
 });

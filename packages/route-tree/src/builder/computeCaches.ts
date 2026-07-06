@@ -74,13 +74,11 @@ function computeChildrenMap(
  *
  * @param mutableChildren - Array of mutable child nodes
  * @param parent - Already-processed parent node
- * @param freeze - Whether to freeze the result
  * @returns Children map and non-absolute children array
  */
 function processChildren(
   mutableChildren: readonly MutableRouteNode[],
   parent: RouteTree,
-  freeze: boolean,
 ): {
   childrenMap: ReadonlyMap<string, RouteTree>;
   nonAbsoluteChildren: RouteTree[];
@@ -89,7 +87,7 @@ function processChildren(
   const nonAbsoluteChildren: RouteTree[] = [];
 
   for (const childMutable of mutableChildren) {
-    const child = processNode(childMutable, parent, freeze);
+    const child = processNode(childMutable, parent);
 
     childrenArray.push(child);
 
@@ -105,20 +103,18 @@ function processChildren(
 }
 
 /**
- * Recursively processes a mutable node into a RouteTree.
+ * Recursively processes a mutable node into a frozen RouteTree.
  *
- * This creates a new object with all caches computed.
- * Optionally freezes the result for immutability.
+ * This creates a new object with all caches computed and freezes it for
+ * immutability.
  *
  * @param mutable - Mutable node to process
  * @param parent - Already-processed parent node (null for root)
- * @param freeze - Whether to freeze the result
- * @returns RouteTree (frozen if freeze=true)
+ * @returns Frozen RouteTree
  */
 function processNode(
   mutable: MutableRouteNode,
   parent: RouteTree | null,
-  freeze: boolean,
 ): RouteTree {
   const paramMeta = buildParamMeta(mutable.path);
   const paramTypeMap = paramMeta.paramTypeMap;
@@ -147,52 +143,42 @@ function processNode(
     const { childrenMap, nonAbsoluteChildren } = processChildren(
       mutable.children,
       node,
-      freeze,
     );
 
     node.children = childrenMap;
     node.nonAbsoluteChildren = nonAbsoluteChildren;
+
+    Object.freeze(node.nonAbsoluteChildren);
+    Object.freeze(node.children);
   }
 
-  if (freeze) {
-    if (mutable.children.length > 0) {
-      Object.freeze(node.nonAbsoluteChildren);
-      Object.freeze(node.children);
-    }
+  Object.freeze(paramTypeMap);
 
-    Object.freeze(paramTypeMap);
+  // Close the immutability contract on the nested paramMeta (#747): the node
+  // is frozen, but its paramMeta object and arrays were left mutable, so a
+  // tree reachable from the public API could be mutated. paramTypeMap is the
+  // same ref frozen just above. constraintPatterns is a Map — intentionally
+  // not frozen here (Object.freeze can't lock Map entries); it is protected
+  // at the type level via ReadonlyMap (CC2 documents this exception).
+  Object.freeze(paramMeta.urlParams);
+  Object.freeze(paramMeta.queryParams);
+  Object.freeze(paramMeta.spatParams);
+  Object.freeze(paramMeta);
 
-    // Close the immutability contract on the nested paramMeta (#747): the node
-    // is frozen, but its paramMeta object and arrays were left mutable, so a
-    // tree reachable from the public API could be mutated. paramTypeMap is the
-    // same ref frozen just above. constraintPatterns is a Map — intentionally
-    // not frozen here (Object.freeze can't lock Map entries); it is protected
-    // at the type level via ReadonlyMap (CC2 documents this exception).
-    Object.freeze(paramMeta.urlParams);
-    Object.freeze(paramMeta.queryParams);
-    Object.freeze(paramMeta.spatParams);
-    Object.freeze(paramMeta);
-
-    Object.freeze(node);
-  }
+  Object.freeze(node);
 
   return node;
 }
 
 /**
- * Computes all caches and optionally freezes the tree.
+ * Computes all caches and freezes the tree.
  *
- * This is the final step in building a RouteTree.
- * When freeze=true (default), the tree is completely immutable.
+ * This is the final step in building a RouteTree — the result is completely
+ * immutable.
  *
  * @param mutableRoot - Mutable root node
- * @param freeze - Whether to freeze the result (default: true)
- * @returns RouteTree (frozen if freeze=true)
+ * @returns Frozen RouteTree
  */
-export function computeCaches(
-  mutableRoot: MutableRouteNode,
-  // Stryker disable next-line BooleanLiteral: equivalent — defensive default expressing the package's immutable-by-default contract; the sole caller (createRouteTree) always passes `freeze` explicitly, so the default is never exercised (NoCoverage artifact).
-  freeze = true,
-): RouteTree {
-  return processNode(mutableRoot, null, freeze);
+export function computeCaches(mutableRoot: MutableRouteNode): RouteTree {
+  return processNode(mutableRoot, null);
 }
