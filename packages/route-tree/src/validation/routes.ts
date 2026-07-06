@@ -2,6 +2,7 @@
 
 import {
   buildParamMeta,
+  hasConstraintInStaticSegment,
   isConstraintBalanced,
   PARAM_NAME_PATTERN,
 } from "path-matcher";
@@ -459,6 +460,17 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": text fused to a constraint '>' in "${path}" (a '<...>' must end its segment or be followed by '/' or an optional '?' — use "/:id<...>/rest", not "/:id<...>rest")`,
+    );
+  }
+
+  // A `<...>` constraint in a STATIC segment (no ':'/'*' marker) — `/foo<bar>` — is
+  // silently stripped by path-matcher, reshaping the route with no signal. #1150
+  // catches only a constraint fused with trailing text; one cleanly ending a static
+  // segment slips through. The sibling of #1050/#1150 on the static-segment axis (#1311).
+  if (hasConstraintInStaticSegment(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": constraint '<...>' in a static segment in "${path}" (a '<...>' must follow a parameter marker ':' or '*' — attach it to a param like "/:id<...>", or drop it)`,
     );
   }
 

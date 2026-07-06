@@ -424,6 +424,21 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("should throw for a `<...>` constraint in a clean static segment (#1311)", () => {
+        const paths = [
+          "/foo<bar>", // constraint filling a static segment
+          "/a<b>", // minimal
+          String.raw`/x<\d+>`, // constraint body on a static segment
+          "/users/x<[a/b]>", // '/' inside the constraint body, static segment
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/constraint '<\.\.\.>' in a static segment/u);
+        });
+      });
+
       it("should throw for a duplicate param name within one route (#1151)", () => {
         const paths = [
           "/:id/:id", // same name, two segments

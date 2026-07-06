@@ -62,3 +62,58 @@ export function isConstraintBalanced(path: string): boolean {
 
   return !insideConstraint; // a still-open `<` is an unclosed constraint
 }
+
+/**
+ * Reports whether a `<...>` constraint occupies a STATIC segment — one WITHOUT a
+ * leading `:`/`*` marker (`/foo<bar>`, `/a<b>`). The marker-agnostic constraint
+ * strip (`CONSTRAINT_PATTERN_RGX`) silently removes such a constraint
+ * (`/foo<bar>` → `/foo`), reshaping the route with no signal. `hasFusedConstraintSuffix`
+ * (#1150) catches only a constraint fused with TRAILING text (`/:id<\d+>x`); one
+ * cleanly ENDING a static segment slips through. The sibling of #1050/#1150 on the
+ * static-segment axis (#1311).
+ *
+ * A linear scan (a constraint body may contain `/` — `<[a/b]>` — so a plain
+ * segment split is unsafe). `isConstraintBalanced` runs first, so every `<` has a
+ * matching `>`. Like `isConstraintBalanced`, authoritative in the producing layer:
+ * `route-tree`'s `validateRoutePath` gate and `path-matcher`'s `registerTree`
+ * backstop both consume this — no layer re-rolls the scan (#804 discipline).
+ */
+export function hasConstraintInStaticSegment(path: string): boolean {
+  let atSegmentStart = true;
+  let segmentIsParam = false;
+  let inConstraint = false;
+
+  for (const char of path) {
+    if (inConstraint) {
+      // A `<` inside the body belongs to it; the FIRST `>` closes (mirrors
+      // isConstraintBalanced). A `/` inside a constraint is not a segment boundary.
+      if (char === ">") {
+        inConstraint = false;
+      }
+
+      continue;
+    }
+
+    if (char === "/") {
+      atSegmentStart = true;
+      segmentIsParam = false;
+
+      continue;
+    }
+
+    if (atSegmentStart) {
+      segmentIsParam = char === ":" || char === "*";
+      atSegmentStart = false;
+    }
+
+    if (char === "<") {
+      if (!segmentIsParam) {
+        return true;
+      }
+
+      inConstraint = true;
+    }
+  }
+
+  return false;
+}

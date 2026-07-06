@@ -707,6 +707,18 @@ describe("SegmentMatcher", () => {
         expect(() => createMatcher([{ name: "r", path }])).not.toThrow();
       }
     });
+
+    it("throws on a `<...>` constraint in a CLEAN static segment (/foo<bar>, #1311)", () => {
+      // A constraint filling a static segment (no ':'/'*' marker) is silently
+      // stripped to '/foo' by CONSTRAINT_PATTERN_RGX — #1150 catches only a
+      // constraint fused with TRAILING text (`/:id<\d+>x`); a constraint that
+      // cleanly ends a static segment slips through. Reject it, sibling of #1050.
+      for (const path of ["/foo<bar>", "/a<b>", String.raw`/x<\d+>`]) {
+        expect(() => createMatcher([{ name: "r", path }])).toThrow(
+          /\[SegmentMatcher\.registerTree\]/,
+        );
+      }
+    });
   });
 
   // A param name repeated within one route (`/:id/:id`, a param+splat clash
