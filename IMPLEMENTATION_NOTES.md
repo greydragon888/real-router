@@ -4930,6 +4930,23 @@ Add the three transitive, override-pinned deps to the npm ecosystem's `ignore` l
 
 **Not removing/loosening the overrides** — they are the actual fix that makes osv-scanner clean; dropping them re-opens the vulnerabilities. **Not disabling Dependabot security updates repo-wide** — that would blind us to advisories on *direct* deps (Dependabot's real job). **Not adding undici/piscina as direct devDeps** — pollutes manifests with transitive internals, and wouldn't help: Dependabot's resolver still can't reach 7.28.0 through the parent chain. The `ignore` list is surgical and codified. **Recurring-pattern note (in the config comment):** every future transitive-advisory-via-override adds another `ignore` entry, or Dependabot re-halts the whole npm ecosystem.
 
+## Dependabot npm job errors when it bumps ONE member of a peer-coupled set — nanostores, vite major (2026-07-02 / 2026-07-06)
+
+### Problem
+
+A **second, distinct** way Dependabot errors the whole npm job (→ zero PRs → risk of the same repo-wide auto-halt as the advisory case above): it bumps each dep **individually**, but some deps are locked to siblings by **strict peer ranges**. Raising one member ahead of the rest makes the `pnpm install --lockfile-only` re-resolve fail with `ERR_PNPM_PEER_DEP_ISSUES` (we run `strictPeerDependencies: true` in `pnpm-workspace.yaml`), and that non-zero exit fails the entire update job. Two observed instances:
+
+- **nanostores** (benchmark-only, `benchmarks/package.json`): the `@nanostores/*` framework adapters peer-pin `nanostores` in strict ranges (`@nanostores/react@0.8.x` peers `nanostores ^0.9||^0.10||^0.11`; `@1.x` peers `^1.2`). Dependabot bumping `nanostores` OR one adapter alone breaks the other's peer range. Observed: run 28643677860, "3 error(s)". Fixed in `0a626308`.
+- **vite major** (direct dev-dep in **127** example workspaces, all pinned `7.3.6`): vite 8 released, Dependabot tried `vite 7.3.6 → 8.1.3`, but the whole test/plugin stack still peers `vite >=7.3.5 <8` — `vitest@4.1.x` + `@vitest/mocker`, `vite-plugin-solid`, `@sveltejs/vite-plugin-svelte`, `@analogjs/vite-plugin-angular`, `vite-tsconfig-paths`, `@testing-library/svelte`, `vitefu`. Re-resolve failed. Observed: run 28767218145 (`vite | dependency_file_not_resolvable | "Missing or invalid configuration while installing peer dependencies."`).
+
+### Solution
+
+`ignore` the coupled dep in `.github/dependabot.yml`. For a version-COUPLED **set** where no single member can move alone (nanostores), ignore the whole set (`nanostores` + `@nanostores/*`) and bump it manually + together on a benchmark refresh. For a dep whose **major** is gated by ecosystem peers but whose minor/patch are safe (vite), scope the ignore to `update-types: ["version-update:semver-major"]` — 7.x patch/minor keep flowing, only the 8.x jump is blocked. Lift the vite entry once `vitest` peers vite 8, then bump the vite major manually across the ecosystem.
+
+### Why this and not the alternatives
+
+**Not `strictPeerDependencies: false`** — pnpm's own hint suggests it, but it would mask genuine peer breakage across the real install (not just Dependabot's dry-run), defeating the reason it's on. **Not letting Dependabot open the doomed PR anyway** — the job errors *before* producing any PR, taking the whole batch (and the other ecosystems' PRs) down with it, and repeated errors auto-halt Dependabot repo-wide (same failure mode as the advisory-override case above). **Not manually widening peer ranges / force-resolving vite 8** — the plugins genuinely don't support vite 8 yet; the router doesn't get to decide that. `ignore` is the surgical, codified block. **Recurring-pattern note (in the config comment):** every version-coupled set or ecosystem-gated major that Dependabot can't move in isolation adds another `ignore` entry (whole-set for coupled peers, major-scoped for gated majors), or the npm job re-errors.
+
 ## CI shard MEMBERSHIP is input-aware, not the declared-dep graph — shared-source PRs (build-matrix.mjs) (2026-07-01)
 
 ### Problem

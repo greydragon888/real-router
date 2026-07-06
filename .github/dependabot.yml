@@ -84,6 +84,19 @@ updates:
       # the set manually + together if a benchmark refresh needs it.
       - dependency-name: "nanostores"
       - dependency-name: "@nanostores/*"
+      # vite is a direct dev-dep across 127 example workspaces (all pinned 7.3.6),
+      # so Dependabot bumps it INDIVIDUALLY ahead of its ecosystem. On a new MAJOR
+      # (vite 8) the whole plugin/test stack still peers `vite >=7.3.5 <8` —
+      # vitest@4.1.x + @vitest/mocker, vite-plugin-solid, @sveltejs/vite-plugin-svelte,
+      # @analogjs/vite-plugin-angular, vite-tsconfig-paths, @testing-library/svelte,
+      # vitefu — so the `pnpm install --lockfile-only` re-resolve fails with
+      # ERR_PNPM_PEER_DEP_ISSUES (strictPeerDependencies: true) and ERRORS THE ENTIRE
+      # npm job (observed: run 28767218145, vite 8.1.3), risking a repo-wide halt —
+      # same coupled-peer class as nanostores above. Block the major only; 7.x
+      # patch/minor keep flowing. Lift this when vitest peers vite 8, then bump the
+      # vite major manually + together across the ecosystem.
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
