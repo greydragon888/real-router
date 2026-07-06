@@ -533,7 +533,7 @@ function throwDuplicateParamName(
 // `?` as the query start, so `<\d+>` becomes the query name). Deliberately narrow to
 // `<>`: `?name=value` (a `=` in the declaration, §5.2) is a separate call — bare core
 // tolerates it today and it is not folded in here.
-const INVALID_QUERY_NAME_RGX = new RegExp("[<>]", "u");
+const INVALID_QUERY_NAME_RGX = /[<>]/u;
 
 function validateQueryParamDeclarations(
   routeName: string,
