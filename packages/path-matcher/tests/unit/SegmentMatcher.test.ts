@@ -912,6 +912,49 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // #1294: the §5.4 gate checked only the LAST parent segment, so an index under a
+  // parent with an optional param in a MID-path position registered silently while
+  // the index bound only the take form (present on the full path, absent on every
+  // omit form — `/a/:b?/c` + idx: `/a/x/c/` → idx, `/a/c/` → parent). Extended to
+  // reject an optional param ANYWHERE in the parent path (follow-up of #1242 §5.4).
+  describe("registerTree — index under a mid-path optional parent rejection (#1294)", () => {
+    it("throws for an index whose parent's optional is NOT the last segment", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/a/:b?/c",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).toThrow(/Index route .* is not supported/);
+    });
+
+    it("throws for an index under two mid-path optionals", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/a/:b?/:c?/d",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).toThrow(/Index route .* is not supported/);
+    });
+
+    it("still accepts an index under a REQUIRED mid-path param (one form, coherent)", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/a/:b/c",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).not.toThrow();
+    });
+  });
+
   // #1266: a `/*rest` catch-all next to a constrained `/:v<c>/*rest` sibling. The `:v`
   // paramChild greedily commits (INVARIANTS #8), the constraint is validated only
   // after the full traverse (#857, no backtrack), so a first segment failing `v\d+`
