@@ -83,7 +83,7 @@ function validateUniqueParamNames(
   }
 }
 
-const INVALID_QUERY_NAME_RGX = new RegExp("[<>]", "u");
+const INVALID_QUERY_NAME_RGX = /[<>]/u;
 
 /**
  * #1242 §5.1/§5.3: rejects a malformed query-param declaration — a query name
