@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-06]
 
+### @real-router/core@0.68.1
+
+### Patch Changes
+
+- [#1304](https://github.com/greydragon888/real-router/pull/1304) [`2b63604`](https://github.com/greydragon888/real-router/commit/2b636041aa136f4e4e36bda88cb1c7ad8bc33cee) Thanks [@greydragon888](https://github.com/greydragon888)! - Re-export `validateRoute` (+ `Matcher` / `RouteTree` types) from the `@real-router/core/validation` subpath ([#1301](https://github.com/greydragon888/real-router/issues/1301))
+
+  So `@real-router/validation-plugin` reaches the batch route validator through core instead of importing the foundation `route-tree` package directly — keeping core the sole consumer of the routing engine. Plumbing on the plugin-facing subpath (off the main public index); no runtime behaviour change.
+
+### @real-router/validation-plugin@0.9.9
+
+### Patch Changes
+
+- [#1304](https://github.com/greydragon888/real-router/pull/1304) [`2b63604`](https://github.com/greydragon888/real-router/commit/2b636041aa136f4e4e36bda88cb1c7ad8bc33cee) Thanks [@greydragon888](https://github.com/greydragon888)! - Reach the routing engine only through `@real-router/core`, not `route-tree` ([#1301](https://github.com/greydragon888/real-router/issues/1301))
+
+  The plugin no longer imports the foundation package `route-tree`: `validateRoute` now comes from the `@real-router/core/validation` subpath, and forwardTo segment lookup + existence use the matcher's own `getSegmentsByName` / `hasRoute` (the `RouteTree` / `Matcher` types come from core). `route-tree` is dropped from the plugin's devDependencies. Core is now the sole consumer of the routing engine; validation behaviour is unchanged. A package-level guard test prevents re-coupling.
+
+- Updated dependencies [[`2b63604`](https://github.com/greydragon888/real-router/commit/2b636041aa136f4e4e36bda88cb1c7ad8bc33cee)]:
+  - @real-router/core@0.68.1
+
+
 ### @real-router/core@0.68.0
 
 ### Minor Changes
