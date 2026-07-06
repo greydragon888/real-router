@@ -6,7 +6,8 @@ Internal package for query string parsing and building with configurable strateg
 
 | Export               | Kind     | Description                                              |
 | -------------------- | -------- | -------------------------------------------------------- |
-| `parse(path, opts?)` | function | Parse query string into params object                    |
+| `parse(path, opts?)` | function | Parse query string into params object (`getSearch` + `parseQuery`) |
+| `parseQuery(search, opts?)` | function | Parse an ALREADY-extracted query string, **without** `getSearch` — the entry route-tree's matcher uses (#1292) |
 | `build(params, opts?)` | function | Build query string from params object                  |
 | `omit(path, keys, opts?)` | function | Remove specified params from query string           |
 | `keep(path, keys, opts?)` | function | Keep only specified params from query string         |
@@ -33,7 +34,7 @@ Internal package for query string parsing and building with configurable strateg
 
 ```
 src/
-├── searchParams.ts     -- parse, build, omit, keep
+├── searchParams.ts     -- parse, parseQuery, build, omit, keep
 ├── encode.ts           -- encode(key, value, options), makeOptions, DEFAULT_QUERY_PARAMS
 ├── decode.ts           -- decode(rawValue, strategies), decodeValue(raw)
 ├── utils.ts            -- getSearch(path) — extracts query part from path
@@ -52,6 +53,10 @@ src/
 ### No options = the same `auto` defaults for `parse` and `build` (#744)
 
 Calling `parse()` or `build()` without options resolves to the cached `DEFAULT_OPTIONS` (`DEFAULT_QUERY_PARAMS` — all `auto`), so `parse(build(x)) === x` even with no options. The lookup is allocation-free (a cached singleton), so there is no string-only fast path anymore — the previous asymmetry (`build` used `auto`, `parse` used a `none`-like `parseSimple`) silently dropped types and was removed.
+
+### `parse` splits at the first `?`; `parseQuery` does not (#1292)
+
+`parse(path)` runs `getSearch(path)` first, discarding everything up to the first `?` — it accepts a full path OR a bare query. `parseQuery(search)` skips that step and parses its input verbatim (`parse` = `getSearch` + `parseQuery`). A consumer that has ALREADY split the URL at the first `?` — route-tree's matcher does, in `SegmentMatcher.#preparePath`, before the DI call — MUST use `parseQuery`: routing through `parse` would split a SECOND time at a `?` **inside** a query value (legal per RFC 3986), silently dropping the param (and unmatching the whole URL under `strictQueryParams`). Only route-tree's `createMatcher` consumes the query parser, and it uses `parseQuery`.
 
 ### Negative zero `-0` stays a string under `auto`
 
