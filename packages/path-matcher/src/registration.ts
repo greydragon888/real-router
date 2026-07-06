@@ -24,8 +24,14 @@ import type {
 // fresh empty Set/Map/array per route (#1009). All are ReadonlySet/Map/[] and
 // read-only on the match/build hot paths.
 const EMPTY_STRINGS: readonly string[] = Object.freeze([]);
-const EMPTY_STRING_SET: ReadonlySet<string> = new Set();
-const EMPTY_CONSTRAINTS: ReadonlyMap<string, ConstraintPattern> = new Map();
+// #1240 §5: freeze the Set/Map shells too, so the "Shared frozen sentinels" claim
+// above holds for ALL of them and the #1009 sentinels are consistent with route-tree's
+// frozen `EMPTY_CHILDREN_MAP`. `Object.freeze` locks only the shell (not `.add`/`.set`
+// — see route-tree INVARIANTS CC1), but these are `Readonly`-typed and never mutated.
+const EMPTY_STRING_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
+const EMPTY_CONSTRAINTS: ReadonlyMap<string, ConstraintPattern> = Object.freeze(
+  new Map<string, ConstraintPattern>(),
+);
 const EMPTY_PARAM_SLOTS: readonly BuildParamSlot[] = Object.freeze([]);
 const EMPTY_PARAMS: Readonly<Record<string, unknown>> = Object.freeze({});
 
