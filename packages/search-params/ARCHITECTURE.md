@@ -13,7 +13,7 @@
 ```
 search-params/
 ├── src/
-│   ├── searchParams.ts       — Core functions: parse, build, omit, keep
+│   ├── searchParams.ts       — Core functions: parse, parseQuery, build
 │   ├── encode.ts             — Encoding logic + option resolution (makeOptions)
 │   ├── decode.ts             — Decoding logic (value + strategy dispatch)
 │   ├── utils.ts              — getSearch() — query string extraction
@@ -65,16 +65,13 @@ new SegmentMatcher({
 
 ```typescript
 parse(path: string, opts?: Options): Record<string, unknown>
-// Parse query string to object. Extracts "?" portion from full path.
+// Parse query string to object. Runs getSearch() first — extracts the "?" portion from a full path.
+
+parseQuery(search: string, opts?: Options): Record<string, unknown>
+// Parse an ALREADY-extracted query string, WITHOUT getSearch (#1292) — route-tree's matcher uses this.
 
 build(params: Record<string, unknown>, opts?: Options): string
 // Build query string from object. Returns string without leading "?".
-
-omit(path: string, paramsToOmit: string[], opts?: Options): OmitResponse
-// Remove specified parameters from query string.
-
-keep(path: string, paramsToKeep: string[], opts?: Options): KeepResponse
-// Keep only specified parameters from query string.
 ```
 
 ### Types
@@ -98,16 +95,6 @@ interface Options {
 type QueryParamPrimitive = string | number | boolean | null;
 type QueryParamValue = QueryParamPrimitive | QueryParamPrimitive[];
 type SearchParams = Record<string, QueryParamValue | undefined>;
-
-// Response types
-interface OmitResponse {
-  querystring: string;
-  removedParams: Record<string, unknown>;
-}
-interface KeepResponse {
-  querystring: string;
-  keptParams: Record<string, unknown>;
-}
 
 // Also exported
 interface FinalOptions {
@@ -277,39 +264,6 @@ build(params, opts?)
   parts.join("&")
 ```
 
-### Omit/Keep Flow
-
-```
-omit(path, paramsToOmit, opts?)
-       │
-       ▼
-┌─────────────────┐
-│  getSearch()    │  Extract query string
-└──────┬──────────┘
-       │
-       ▼
-┌─────────────────┐
-│  Set creation   │  new Set(paramsToOmit) — O(1) lookup
-└──────┬──────────┘
-       │
-       ▼
-┌─────────────────┐
-│  Inline iterate │  Loop over "&"-separated chunks (no closure)
-│  searchPart     │  For each chunk:
-│                 │    1. sliceParamName() — 1 slice for name (no intermediates)
-│                 │    2. Set.has(name) → appendChunk to keptStr or removedStr
-│                 │  No arrays — direct string concatenation
-└──────┬──────────┘
-       │
-       ▼
-  { querystring: hasPrefix && keptStr ? `?${keptStr}` : keptStr,
-    removedParams: parse(removedStr, options) }
-```
-
-**`hasPrefix` logic:** If the input `path` started with `?`, the output `querystring` is re-prefixed with `?` (only when the result is non-empty — empty `querystring` is never prefixed).
-
-**`keep()` is similar but inverted** — keeps chunks IN the set. Unlike `omit()`, `keep()` does NOT have the `hasPrefix` re-prefix logic — its `querystring` output never starts with `?`.
-
 ### Value Decoding
 
 ```typescript
@@ -361,8 +315,6 @@ No circular dependencies.
 | ------------- | ---------- | ------------------------------------- |
 | `parse()`     | O(n)       | n = query string length, single pass  |
 | `build()`     | O(n)       | n = total value lengths               |
-| `omit()`      | O(n + m)   | n = query string length, m = omit set |
-| `keep()`      | O(n + m)   | n = query string length, m = keep set |
 
 ### Optimizations
 
@@ -375,18 +327,13 @@ No circular dependencies.
 | `decodeValue` two-check                  | Most values skip decoding entirely               |
 | `replaceAll` instead of `split().join()` | No intermediate array for `+` replacement         |
 | Inline bracket scan in parse             | No `{ name, hasBrackets }` object allocation      |
-| `sliceParamName` in omit/keep            | 1 slice instead of 2-3 for param name extraction  |
-| String concat in omit/keep               | No `kept[]`/`removed[]` array allocations          |
 | Loop instead of `.map().join()` in arrays | No intermediate array during encoding              |
 | `codePointAt` scan in numberFormat       | No regex engine overhead                          |
-| Set-based omit/keep                      | O(1) per-param lookup instead of O(m) scan        |
 
 ### Memory
 
 - No intermediate arrays in parse (index-based iteration)
 - Strategy objects are singletons (one per format combination)
-- `Set` for omit/keep (O(m) space, recycled after call)
-- No intermediate arrays in omit/keep (string concatenation via `appendChunk`)
 - No intermediate arrays in array strategies (loop instead of `.map().join()`)
 - No object allocation for param name extraction (inline index scan)
 
