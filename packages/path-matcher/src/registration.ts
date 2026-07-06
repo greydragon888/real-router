@@ -330,12 +330,18 @@ function throwParamNameConflict(
  * desync of the same class as #736/#738 (#858). Reject it at registration,
  * symmetrically for both markers, instead of corrupting the trie.
  */
-function throwEmptyParamName(marker: ":" | "*"): never {
+function throwEmptyParamName(): never {
+  // Marker-agnostic: this fires for a bare ':'/'*' (`/x/:`, `/x/*`), a marker
+  // carrying only a modifier/constraint (`/x/:?`, `/x/:<\d+>`), AND a static
+  // segment with a trailing '?' (`/faq?`) — which the optional fork routes here
+  // via `extractParamName`. So the message must NOT claim a specific ':' marker
+  // (there isn't one for `/faq?`, #1241).
   throw new Error(
-    `[SegmentMatcher.registerTree] Empty parameter name: a bare '${marker}' ` +
-      `marker must be followed by a name (e.g. '${marker}id'). A name-less ` +
-      `marker would capture under an empty key at match but emit a literal ` +
-      `'${marker}' at build — the two disagree, so it is rejected.`,
+    `[SegmentMatcher.registerTree] Empty parameter name: a parameter marker ` +
+      `(':' or '*') or an optional '?' must be followed by a name (e.g. ':id', ` +
+      `'*rest', ':id?'). A name-less marker or modifier would capture under an ` +
+      `empty key at match but emit a literal at build — the two disagree, so it ` +
+      `is rejected.`,
   );
 }
 
@@ -566,7 +572,7 @@ function extractParamName(segment: string): string {
   const paramName = PARAM_NAME_RGX.exec(segment)?.[1] ?? "";
 
   if (paramName === "") {
-    throwEmptyParamName(":");
+    throwEmptyParamName();
   }
 
   return paramName;
@@ -872,7 +878,7 @@ function processSegment(
     const splatName = segment.slice(1);
 
     if (splatName === "") {
-      throwEmptyParamName("*");
+      throwEmptyParamName();
     }
 
     const child = ensureSplatChild(node, splatName, ownNodes);
