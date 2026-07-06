@@ -98,6 +98,38 @@ function hasFusedMidSegmentMarker(path: string): boolean {
 }
 
 /**
+ * Reports whether a path fuses static text (or a second marker) to a constraint's
+ * closing `>` within a segment (`/:year<\d+>-archive`, `/:id<\d+>.html`, #1150).
+ * Meta terminates the param name at `<` (name `year`), but the build side strips
+ * `<…>` then re-extracts the name greedily (name `year-archive`) — build name ≠
+ * meta name, so the route compiles to a silent dead route (`buildPath` throws
+ * `Missing required param`, `match` keys the constraint on a phantom name). The
+ * mirror of #1050 on the OTHER side of the param: a static SUFFIX after the
+ * constraint, not a static PREFIX before the marker.
+ *
+ * Runs AFTER `validateConstraintSyntax`, so `isConstraintBalanced` already
+ * guarantees every `>` is a constraint closer: a `>` NOT followed by a segment
+ * boundary (`/`), an optional/query `?`, or end-of-input is a fused suffix. A
+ * linear scan (constraints may contain `/`), same convention as the siblings.
+ */
+function hasFusedConstraintSuffix(path: string): boolean {
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] !== ">") {
+      continue;
+    }
+
+    // `charAt` yields "" past the end — a constraint ending the path is not fused.
+    const next = path.charAt(i + 1);
+
+    if (next !== "" && next !== "/" && next !== "?") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Reports whether a path contains an optional splat `*name?` — a segment that
  * both starts with `*` (splat) and carries the optional `?`. `buildParamMeta`/
  * build classify it as a splat (multi-segment, `/`-preserving encoder) but the
@@ -285,6 +317,18 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": parameter marker (':' or '*') must begin a segment, but "${path}" fuses one to a static prefix (use a boundary marker like "/a/:b")`,
+    );
+  }
+
+  // Static text fused to a constraint's closing '>' (`/:year<\d+>-archive`, #1150).
+  // Meta ends the name at '<' but build strips '<…>' and re-extracts the name
+  // greedily, fusing the suffix — build name ≠ meta name ⇒ a silent dead route.
+  // Reject at the gate (path-matcher backstops at `registerTree`), the mirror of
+  // #1050 on the other side of the param.
+  if (hasFusedConstraintSuffix(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": text fused to a constraint '>' in "${path}" (a '<...>' must end its segment or be followed by '/' or an optional '?' — use "/:id<...>/rest", not "/:id<...>rest")`,
     );
   }
 

@@ -88,6 +88,15 @@ export function registerNode(
     throwEmptyConstraint(rawNodePath);
   }
 
+  // Static text fused to a constraint's closing '>' (`/:year<\d+>-archive`, #1150):
+  // meta ends the name at '<' but the build side strips '<…>' then re-extracts the
+  // name greedily, fusing the suffix — build name ≠ meta name ⇒ a silent dead route
+  // (buildPath throws, match keys the constraint on a phantom name). The mirror of
+  // #1050 on the OTHER side of the param. route-tree's gate catches it first.
+  if (hasFusedConstraintSuffix(rawNodePath)) {
+    throwFusedConstraintSuffix(rawNodePath);
+  }
+
   // Strip constraint patterns (e.g., <\d+>, <[^/]+>) from path before trie insertion.
   // Constraints like <[^/]+> contain "/" which breaks segment splitting in indexOf("/", start).
   const nodePath = rawNodePath.replaceAll(CONSTRAINT_PATTERN_RGX, "");
@@ -398,6 +407,39 @@ function throwEmptyConstraint(path: string): never {
     `[SegmentMatcher.registerTree] Empty constraint '<>' in path "${path}": ` +
       `a constraint body must be non-empty (e.g. '<[0-9]+>'). An empty '<>' ` +
       `compiles to a never-matching pattern.`,
+  );
+}
+
+/**
+ * Reports whether a path fuses static text (or a second marker) to a constraint's
+ * closing '>' within a segment (`/:year<\d+>-archive`, #1150). Runs after the
+ * balance check, so every '>' is a constraint closer: a '>' NOT followed by a
+ * segment boundary ('/'), an optional/query '?', or end-of-input is a fused suffix.
+ * A linear scan (constraints may contain '/'). The mirror of the fused-marker
+ * rejection (#1050) on the OTHER side of the param.
+ */
+function hasFusedConstraintSuffix(path: string): boolean {
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] !== ">") {
+      continue;
+    }
+
+    // `charAt` yields "" past the end — a constraint ending the path is not fused.
+    const next = path.charAt(i + 1);
+
+    if (next !== "" && next !== "/" && next !== "?") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function throwFusedConstraintSuffix(path: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Text fused to a constraint '>' in path "${path}": ` +
+      `a '<...>' constraint must end its segment or be followed by '/' or an ` +
+      `optional '?' — use "/:id<...>/rest", not "/:id<...>rest".`,
   );
 }
 

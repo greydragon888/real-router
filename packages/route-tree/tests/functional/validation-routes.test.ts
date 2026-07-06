@@ -393,6 +393,37 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("should throw for static text fused to a constraint '>' (#1150)", () => {
+        const paths = [
+          String.raw`/:year<\d+>-archive`, // static suffix after a constraint
+          String.raw`/post/:id<\d+>.html`, // ".html" suffix
+          String.raw`/x/:id<\d+>x`, // letter suffix
+          String.raw`/x/:a<\d+>:b`, // a second marker fused after the constraint
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/fused to a constraint/u);
+        });
+      });
+
+      it("should NOT flag a constraint that ends its segment (controls, #1150)", () => {
+        const paths = [
+          String.raw`/:id<\d+>`, // constraint at end of path
+          String.raw`/:id<\d+>/edit`, // followed by a segment boundary
+          String.raw`/:id<\d+>?`, // followed by an optional marker
+          "/:id<[a<b]>", // '<' inside the constraint body
+          "/:id<[a/b]>", // '/' inside the constraint body
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
       it("should throw for an optional splat '*name?' (#1149)", () => {
         const paths = [
           "/files/*path?", // optional splat

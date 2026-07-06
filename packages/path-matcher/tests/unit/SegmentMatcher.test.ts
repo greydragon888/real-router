@@ -671,6 +671,36 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // Static text fused AFTER a constraint (`/:year<\d+>-archive`, `/:id<\d+>.html`):
+  // meta terminates the name at `<` (name `year`), but build strips `<…>` then
+  // re-extracts greedily (name `year-archive`) — build name ≠ meta name, so the
+  // route compiles to a silent dead route. The mirror of #1050 on the other side
+  // of the param; route-tree's gate backstops with a route-contextual message.
+  describe("registerTree — fused constraint suffix rejection (#1150)", () => {
+    it("throws on static text fused after a constraint (/:year<...>-archive)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: String.raw`/:year<\d+>-archive` }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("throws on a '.html' suffix fused after a constraint", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: String.raw`/post/:id<\d+>.html` }]);
+      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+    });
+
+    it("still accepts a constraint that ends its segment (controls)", () => {
+      for (const path of [
+        String.raw`/:id<\d+>`, // constraint at end
+        String.raw`/:id<\d+>/edit`, // followed by '/'
+        String.raw`/:id<\d+>?`, // followed by an optional '?'
+        "/:id<[a/b]>", // '/' inside the constraint body
+      ]) {
+        expect(() => createMatcher([{ name: "r", path }])).not.toThrow();
+      }
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted
