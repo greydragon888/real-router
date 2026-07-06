@@ -91,6 +91,25 @@ export interface Options {
   trailingSlash: "strict" | "never" | "always" | "preserve";
 
   /**
+   * Whether route matching is case-sensitive.
+   *
+   * When `false`, a mixed-case URL matches a lower-case route (`/Team` matches a
+   * `/team` route). Dynamic param **values** keep their original case — only
+   * static literal segments are compared case-insensitively.
+   *
+   * Default `true` (spec-correct: RFC 3986 §6.2.2.1 treats URL paths as
+   * case-sensitive). Case-insensitive is an explicit **opt-in** for a narrow
+   * niche — server-less / hash / static-hosted / legacy routing where no server
+   * or edge layer can normalize the URL's case before it reaches the router. For
+   * public SSR/edge apps, prefer a canonical-lowercase redirect at the server
+   * instead (SEO / dedup). Note the divergence from React Router v7 / TanStack /
+   * vue-router, which default to case-**insensitive**.
+   *
+   * @default true
+   */
+  caseSensitive: boolean;
+
+  /**
    * How to encode URL parameters.
    * - "default": Standard encoding
    * - "uri": URI encoding (encodeURI)

@@ -11,6 +11,7 @@ export const defaultOptions: Options = {
   defaultRoute: "",
   defaultParams: {},
   trailingSlash: "preserve",
+  caseSensitive: true,
   queryParamsMode: "loose",
   queryParams: DEFAULT_QUERY_PARAMS,
   urlParamsEncoding: "default",

@@ -793,6 +793,21 @@ describe("Phase 2 options validators", () => {
       }).toThrow("rewritePathOnMatch");
     });
 
+    it("throws for invalid caseSensitive (non-boolean)", () => {
+      expect(() => {
+        validateOptions({ caseSensitive: "no" }, "test");
+      }).toThrow(TypeError);
+      expect(() => {
+        validateOptions({ caseSensitive: "no" }, "test");
+      }).toThrow("caseSensitive");
+    });
+
+    it("accepts a boolean caseSensitive", () => {
+      expect(() => {
+        validateOptions({ caseSensitive: false }, "test");
+      }).not.toThrow();
+    });
+
     it("throws for invalid defaultRoute", () => {
       expect(() => {
         validateOptions({ defaultRoute: 42 }, "test");
