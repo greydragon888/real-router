@@ -36,8 +36,6 @@ export interface RouteDefinition {
  *
  * All caches are pre-computed at build time:
  * - nonAbsoluteChildren: filtered children without absolute paths
- * - absoluteDescendants: all descendants with absolute paths (recursive)
- * - parentSegments: array from root to parent
  * - fullName: pre-computed "users.profile" instead of runtime join
  */
 export interface RouteTree {

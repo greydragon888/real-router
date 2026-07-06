@@ -161,8 +161,6 @@ interface MutableRouteNode {
   absolute: boolean;
   children: MutableRouteNode[];
   parent: MutableRouteNode | null;
-  nonAbsoluteChildren: MutableRouteNode[]; // initialized empty, populated in Phase 2
-  fullName: string; // initialized empty, computed in Phase 2
 }
 ```
 
@@ -178,8 +176,7 @@ Recursively processes each `MutableRouteNode` into `RouteTree`:
 2. **`buildParamTypeMap(paramMeta)`** — maps param names to `"url"` | `"query"`
 3. **`computeFullName(node)`** — builds dot-notation name from parent chain (`"users.profile"`)
 4. **`processChildren()`** — recursively processes children, builds `ReadonlyMap`, filters `nonAbsoluteChildren`
-5. **`computeStaticPath(node)`** — pre-builds full path string for parameterless routes (walks parent chain, checks all segments for params; returns `null` for empty-path nodes)
-6. **`Object.freeze()`** — freezes node, children map, arrays, paramTypeMap
+5. **`Object.freeze()`** — freezes node, children map, arrays, paramTypeMap
 
 **Skeleton node pattern:** Node is created as a mutable skeleton, then fields are assigned after recursive child processing (children need parent reference).
 
