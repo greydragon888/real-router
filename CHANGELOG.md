@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-06]
 
+### @real-router/core@0.65.1
+
+### Patch Changes
+
+- [#1271](https://github.com/greydragon888/real-router/pull/1271) [`3b6b14d`](https://github.com/greydragon888/real-router/commit/3b6b14df51825bb36d897a005b212475dcc595e3) Thanks [@greydragon888](https://github.com/greydragon888)! - Clearer rejection message for a name-less parameter marker or modifier ([#1241](https://github.com/greydragon888/real-router/issues/1241))
+
+  Registering a static segment with a trailing `?` (`/faq?`) — which the optional fork routes through the same name-less check as a bare `:`/`*` — threw `Empty parameter name: a bare ':' marker …`, naming a `:` the segment does not contain. The message is now marker-agnostic (`a parameter marker (':' or '*') or an optional '?' must be followed by a name …`), so it is accurate for the bare `:`/`*`, the modifier-only (`:?`, `:<\d+>`), and the trailing-`?`-on-static cases alike. The rejection itself is unchanged.
+
+
 ### @real-router/core@0.65.0
 
 ### Minor Changes
