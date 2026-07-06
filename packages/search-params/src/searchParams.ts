@@ -332,14 +332,22 @@ function processParamChunk(
  * // => { items: ["a", "b"] }
  * ```
  */
-export const parse = (
-  path: string,
+/**
+ * Parse an ALREADY-EXTRACTED query string (no path prefix, no leading "?").
+ *
+ * `parse` is `getSearch` + `parseQuery`. A consumer that has already split the
+ * URL at the first "?" — e.g. route-tree's matcher, which does so in
+ * `SegmentMatcher.#preparePath` before the DI call — MUST use this entry point:
+ * routing through `parse` would run `getSearch` a SECOND time and split again at
+ * a "?" *inside* a query value (legal per RFC 3986), silently dropping the param
+ * (and unmatching the whole URL under `strictQueryParams`). (#1292)
+ */
+export const parseQuery = (
+  search: string,
   opts?: Options,
 ): Record<string, unknown> => {
-  const searchPart = getSearch(path);
-
   // Fast path: empty query string
-  if (searchPart === "" || searchPart === "?") {
+  if (search === "" || search === "?") {
     return {};
   }
 
@@ -347,10 +355,13 @@ export const parse = (
   // defaults `build` uses — so parse(build(x)) === x even without options. (#744)
   const params: Record<string, unknown> = {};
 
-  parseIntoInternal(searchPart, params, makeOptions(opts).strategies);
+  parseIntoInternal(search, params, makeOptions(opts).strategies);
 
   return params;
 };
+
+export const parse = (path: string, opts?: Options): Record<string, unknown> =>
+  parseQuery(getSearch(path), opts);
 
 /**
  * Internal function to parse a query string into a target object.
