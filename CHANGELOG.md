@@ -7,6 +7,157 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-06]
 
+### @real-router/core@0.68.0
+
+### Minor Changes
+
+- [#1299](https://github.com/greydragon888/real-router/pull/1299) [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject an index child under a MID-PATH optional parent ([#1294](https://github.com/greydragon888/real-router/issues/1294))
+
+  The [#1242](https://github.com/greydragon888/real-router/issues/1242) §5.4 gate rejected an index route (`path: "/"`) under a parent whose LAST segment is an optional param or splat, but checked only that last segment — so a parent with an optional param in a MID-path position (`/a/:b?/c`) registered silently while the index bound only the take form (`/a/x/c/` → index, `/a/c/` → parent). The gate now rejects an optional param in ANY position of the parent path, matching the form-consistency it already promised. A required-param parent (`/users/:id`, `/a/:b/c`) has a single form and stays allowed. Follow-up of [#1242](https://github.com/greydragon888/real-router/issues/1242) §5.4.
+
+### Patch Changes
+
+- [#1299](https://github.com/greydragon888/real-router/pull/1299) [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep a "**proto**" query key as an own param ([#1293](https://github.com/greydragon888/real-router/issues/1293))
+
+  search-params materializes a literal "**proto**" query key as a real own property ([#855](https://github.com/greydragon888/real-router/issues/855)), but `SegmentMatcher.#mergeQueryParams` folded the parsed query into the params accumulator with a plain `params[key] = …` assign — which for the literal key "**proto**" invokes the inherited setter and silently drops the param one layer up (a string value vanishes; an array value swaps the local prototype). The merge now writes each key with `Object.defineProperty`, so a legal (if exotic) "**proto**" query param survives. No prototype pollution either way.
+
+- [#1299](https://github.com/greydragon888/real-router/pull/1299) [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep a legal "?" inside a query value ([#1292](https://github.com/greydragon888/real-router/issues/1292))
+
+  `SegmentMatcher` already splits the URL at the first "?" before handing the query substring to the search-params parser, but `parse()` re-ran `getSearch()` and split it again — so a "?" inside a query value (legal per RFC 3986) silently dropped the parameter, and under `queryParamsMode: "strict"` unmatched the whole URL (`matchPath("/r?x=a?b")` → `{ b: null }`; strict `matchPath("/s?q=a?b")` → `undefined`). search-params now exposes `parseQuery` (parse an already-extracted query, without `getSearch`), and route-tree's matcher wires that into the DI — so the URL is split exactly once and the value keeps its "?".
+
+### @real-router/angular@0.13.6
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+  - @real-router/sources@0.10.7
+
+### @real-router/browser-plugin@0.18.7
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/hash-plugin@0.8.7
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/lifecycle-plugin@0.6.10
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/logger-plugin@0.5.22
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/memory-plugin@0.4.18
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/navigation-plugin@0.7.19
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/persistent-params-plugin@0.2.22
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/preact@0.16.7
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+  - @real-router/sources@0.10.7
+
+### @real-router/preload-plugin@0.6.12
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/react@0.28.10
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+  - @real-router/sources@0.10.7
+
+### @real-router/rx@0.3.23
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/search-schema-plugin@0.4.10
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/solid@0.16.6
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+  - @real-router/sources@0.10.7
+
+### @real-router/sources@0.10.7
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/svelte@0.15.5
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+  - @real-router/sources@0.10.7
+
+### @real-router/validation-plugin@0.9.8
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+
+### @real-router/vue@0.16.7
+
+### Patch Changes
+
+- Updated dependencies [[`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730), [`0b229e8`](https://github.com/greydragon888/real-router/commit/0b229e88bd57029dab2a7df32189fb52f247f730)]:
+  - @real-router/core@0.68.0
+  - @real-router/sources@0.10.7
+
+
 ### @real-router/core@0.67.1
 
 ### Patch Changes
