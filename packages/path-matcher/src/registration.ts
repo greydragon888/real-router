@@ -387,9 +387,13 @@ function throwFusedMarker(segment: string): never {
  * iterates by code point, so surrogate pairs are handled).
  */
 function hasNonAsciiSegment(segment: string): boolean {
-  for (const char of segment) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- `char` is a non-empty code point from for-of, so codePointAt(0) is defined
-    if (char.codePointAt(0)! >= 0x80) {
+  // #1285: charCodeAt (code UNIT) index loop, not for-of code points. For a
+  // "has non-ASCII" predicate the result is identical — any surrogate (≥ 0xD800) is
+  // itself ≥ 0x80, so an astral char is still flagged — without the iterator +
+  // code-point decoding cost per static segment of every registered route.
+  for (let i = 0; i < segment.length; i++) {
+    // eslint-disable-next-line unicorn/prefer-code-point -- charCodeAt (code unit) is intentional: a "has non-ASCII" test needs only units (a surrogate is itself >= 0x80), and it skips the code-point decoding that codePointAt does per index (#1285)
+    if (segment.charCodeAt(i) >= 0x80) {
       return true;
     }
   }
@@ -744,7 +748,14 @@ function markConstrainedParamFork(
   compiled: CompiledRoute,
   segment: string,
 ): void {
-  if (!segment.startsWith(":") || node.paramChild === undefined) {
+  // #1285: short-circuit the whole helper for the common UNCONSTRAINED route (first,
+  // cheapest check) before the `extractParamName` regex — the constraint lookup would
+  // always miss anyway, and registerTree is ~58% of the SSR clone tax.
+  if (
+    !compiled.hasConstraints ||
+    !segment.startsWith(":") ||
+    node.paramChild === undefined
+  ) {
     return;
   }
 
