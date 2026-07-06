@@ -1,6 +1,6 @@
 # route-tree
 
-Internal package that builds an immutable routing tree from route definitions, provides URL matching via `createMatcher`, and supports tree queries and validation. Not published to npm — consumed by `@real-router/core`.
+Internal package that builds an immutable routing tree from route definitions, provides URL matching via `createMatcher`, and supports tree queries and validation. Not published to npm — consumed **only** by `@real-router/core`, the sole consumer of the routing engine. `@real-router/validation-plugin` reaches `validateRoute` through core's `@real-router/core/validation` subpath (segment lookup / existence via the matcher), never importing this package directly (#1301, enforced by a plugin-level guard test).
 
 ## Exports
 

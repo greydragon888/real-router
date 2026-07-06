@@ -1,11 +1,10 @@
 // packages/validation-plugin/src/validators/forwardTo.ts
 
 import { resolveForwardChain } from "@real-router/core";
-import { getSegmentsByName } from "route-tree";
 import { getTypeDescription } from "type-guards";
 
 import type { Route, DefaultDependencies } from "@real-router/core";
-import type { RouteTree } from "route-tree";
+import type { Matcher, RouteTree } from "@real-router/core/validation";
 
 // ============================================================================
 // Route Property Validation
@@ -214,30 +213,18 @@ function getRequiredParams(segments: readonly RouteTree[]): Set<string> {
   return params;
 }
 
-function routeExistsInTree(tree: RouteTree, routeName: string): boolean {
-  const segments = routeName.split(".");
-  let current: RouteTree | undefined = tree;
-
-  for (const segment of segments) {
-    current = current.children.get(segment);
-
-    if (!current) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 function getTargetParams<Dependencies extends DefaultDependencies>(
   targetRoute: string,
-  existsInTree: boolean,
-  tree: RouteTree,
+  existsInMatcher: boolean,
+  matcher: Matcher,
   routes: readonly Route<Dependencies>[],
 ): Set<string> {
-  if (existsInTree) {
-    /* v8 ignore next -- @preserve: ?? fallback unreachable — existsInTree guarantees non-null */
-    return getRequiredParams(getSegmentsByName(tree, targetRoute) ?? []);
+  if (existsInMatcher) {
+    /* v8 ignore next -- @preserve: ?? fallback unreachable — existsInMatcher guarantees non-null */
+    return getRequiredParams(
+      (matcher.getSegmentsByName(targetRoute) as
+        readonly RouteTree[] | undefined) ?? [],
+    );
   }
 
   return extractParamsFromPaths(collectPathsToRoute(routes, targetRoute));
@@ -248,12 +235,12 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
   targetRoute: string,
   routes: readonly Route<Dependencies>[],
   batchNames: Set<string>,
-  tree: RouteTree,
+  matcher: Matcher,
 ): void {
-  const existsInTree = routeExistsInTree(tree, targetRoute);
+  const existsInMatcher = matcher.hasRoute(targetRoute);
   const existsInBatch = batchNames.has(targetRoute);
 
-  if (!existsInTree && !existsInBatch) {
+  if (!existsInMatcher && !existsInBatch) {
     throw new ReferenceError(
       `[router.addRoute] forwardTo target "${targetRoute}" does not exist ` +
         `for route "${fromRoute}"`,
@@ -264,7 +251,12 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
     collectPathsToRoute(routes, fromRoute),
   );
 
-  const toParams = getTargetParams(targetRoute, existsInTree, tree, routes);
+  const toParams = getTargetParams(
+    targetRoute,
+    existsInMatcher,
+    matcher,
+    routes,
+  );
 
   const missingParams = [...toParams].filter((param) => !fromParams.has(param));
 
@@ -281,7 +273,7 @@ export function validateForwardToTargets<
 >(
   routes: readonly Route<Dependencies>[],
   existingForwardMap: Record<string, string>,
-  tree: RouteTree,
+  matcher: Matcher,
 ): void {
   const batchNames = collectRouteNames(routes);
   const batchForwards = collectForwardMappings(routes);
@@ -293,7 +285,7 @@ export function validateForwardToTargets<
   }
 
   for (const [fromRoute, targetRoute] of batchForwards) {
-    validateSingleForward(fromRoute, targetRoute, routes, batchNames, tree);
+    validateSingleForward(fromRoute, targetRoute, routes, batchNames, matcher);
   }
 
   for (const fromRoute of Object.keys(combinedForwardMap)) {

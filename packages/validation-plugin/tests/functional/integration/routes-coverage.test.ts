@@ -307,7 +307,12 @@ describe("validateRoutes — direct calls", () => {
 
   it("passes with undefined tree and forwardMap — skips forwardTo targets check", () => {
     expect(() => {
-      validateRoutes([{ name: "child", path: "/child" }], undefined, {});
+      validateRoutes(
+        [{ name: "child", path: "/child" }],
+        undefined,
+        undefined,
+        {},
+      );
     }).not.toThrow();
   });
 
@@ -321,6 +326,7 @@ describe("validateRoutes — direct calls", () => {
       validateRoutes(
         [{ name: "child", path: "/child" }],
         mockTree as never,
+        undefined,
         {},
         "nonexistent",
       );
@@ -341,6 +347,7 @@ describe("validateRoutes — direct calls", () => {
       validateRoutes(
         [{ name: "child", path: "/child" }],
         store.tree as never,
+        store.matcher as never,
         store.config.forwardMap,
         "home",
       );

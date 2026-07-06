@@ -6537,9 +6537,6 @@ importers:
         specifier: workspace:^
         version: link:../logger
     devDependencies:
-      route-tree:
-        specifier: workspace:^
-        version: link:../route-tree
       type-guards:
         specifier: workspace:^
         version: link:../type-guards
