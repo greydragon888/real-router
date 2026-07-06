@@ -272,8 +272,9 @@ describe("core/routes/routePath/matchPath", () => {
           rewritePathOnMatch: true,
         });
 
-        getRoutesApi(customRouter).add({ name: "root", path: "/" });
-
+        // `createTestRouter` already registers `index` at "/"; a second route at
+        // the same path is a duplicate effective path, rejected at registration
+        // (#1153). Use the existing root route.
         const state = getPluginApi(customRouter).matchPath("/");
 
         expect(state?.path).toBe("/");
