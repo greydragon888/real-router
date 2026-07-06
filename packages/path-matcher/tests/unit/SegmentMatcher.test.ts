@@ -807,6 +807,39 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // A raw non-ASCII code point in a STATIC segment (/café, /меню) registers but
+  // never matches — match rejects non-ASCII input (#scanPath) and compares static
+  // keys raw (#1154). Reject at registration with the percent-encode workaround.
+  describe("registerTree — non-ASCII static segment rejection (#1154)", () => {
+    it("throws on a Latin-1 static segment (/café)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/café" }]);
+      }).toThrow(/Non-ASCII static segment/);
+    });
+
+    it("throws on Cyrillic and CJK static segments", () => {
+      expect(() => createMatcher([{ name: "r", path: "/меню" }])).toThrow(
+        /Non-ASCII static segment/,
+      );
+      expect(() => createMatcher([{ name: "r", path: "/新闻" }])).toThrow(
+        /Non-ASCII static segment/,
+      );
+    });
+
+    it("still accepts the percent-encoded form, a non-ASCII param name, and ASCII (controls)", () => {
+      expect(() =>
+        createMatcher([{ name: "r", path: "/caf%C3%A9" }]),
+      ).not.toThrow();
+      // a non-ASCII PARAM name is fine — only static text is compared raw
+      expect(() =>
+        createMatcher([{ name: "r", path: "/:café" }]),
+      ).not.toThrow();
+      expect(() =>
+        createMatcher([{ name: "r", path: "/users/list" }]),
+      ).not.toThrow();
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted

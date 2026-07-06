@@ -163,6 +163,54 @@ function hasFusedConstraintSuffix(path: string): boolean {
 }
 
 /**
+ * Reports whether a path has a raw non-ASCII code point (≥ U+0080) in a STATIC
+ * segment (`/café`, `/меню`, #1154). match rejects any non-ASCII input byte
+ * (`#scanPath`) and compares static trie keys raw, so such a route registers but
+ * is unmatchable — `buildPath` emits `/café`, which its own `match` rejects. Only
+ * static text is flagged: a marker-led segment (`:café`, a non-ASCII param NAME)
+ * and a constraint body (`:id<[а-я]+>`, matched against the DECODED value) are
+ * skipped. A `for…of` code-point scan tracking segment start + constraint depth
+ * (constraints may contain `/`, so no split).
+ */
+function hasNonAsciiStatic(path: string): boolean {
+  let atSegmentStart = true;
+  let segmentIsMarker = false;
+  let inConstraint = false;
+
+  for (const char of path) {
+    if (inConstraint) {
+      inConstraint = char !== ">";
+
+      continue;
+    }
+
+    if (char === "<") {
+      inConstraint = true;
+
+      continue;
+    }
+
+    if (char === "/") {
+      atSegmentStart = true;
+
+      continue;
+    }
+
+    if (atSegmentStart) {
+      segmentIsMarker = char === ":" || char === "*";
+      atSegmentStart = false;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-empty code point from for-of
+    if (!segmentIsMarker && char.codePointAt(0)! >= 0x80) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Reports whether a path contains an optional splat `*name?` — a segment that
  * both starts with `*` (splat) and carries the optional `?`. `buildParamMeta`/
  * build classify it as a splat (multi-segment, `/`-preserving encoder) but the
@@ -388,6 +436,17 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": an unconstrained optional param before a splat is not supported in "${path}" — it is ambiguous (every multi-segment value has two readings). Add a constraint (e.g. ':lang<[a-z]+>?') or model it as two routes`,
+    );
+  }
+
+  // Raw non-ASCII in a STATIC segment (`/café`, `/меню`, #1154). match rejects
+  // non-ASCII input and compares static keys raw, so the route registers but never
+  // matches. Reject with the percent-encode workaround (path-matcher backstops at
+  // `registerTree`); a non-ASCII param NAME or constraint body is unaffected.
+  if (hasNonAsciiStatic(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": non-ASCII static segment in "${path}" — match compares static segments raw and rejects non-ASCII input, so this route would never match. Percent-encode it (e.g. '/caf%C3%A9') or use a param`,
     );
   }
 

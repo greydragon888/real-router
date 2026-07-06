@@ -448,6 +448,31 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("should throw for a non-ASCII static segment (#1154)", () => {
+        const paths = ["/café", "/меню", "/新闻", "/a/café/b"];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/non-ASCII static segment/u);
+        });
+      });
+
+      it("should NOT flag percent-encoded statics, non-ASCII param names, or constraints (control, #1154)", () => {
+        const paths = [
+          "/caf%C3%A9", // percent-encoded — already works today
+          "/:café", // a non-ASCII PARAM name (only static text is compared raw)
+          "/:id<[а-я]+>", // a Cyrillic constraint body (matched against decoded value)
+          "/users",
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
       it("should throw for an optional splat '*name?' (#1149)", () => {
         const paths = [
           "/files/*path?", // optional splat
@@ -586,13 +611,16 @@ describe("validateRoutePath", () => {
       }).not.toThrow();
     });
 
-    it("should handle paths with unicode characters", () => {
+    it("rejects unicode static segments with the percent-encode hint (#1154)", () => {
+      // Raw non-ASCII statics register but never match (match compares static keys
+      // raw and rejects non-ASCII input) — the #1154 dead-route class. Rejected at
+      // the gate now; percent-encode the segment instead.
       const unicodePaths = ["/użytkownik", "/用户", "/مستخدم", "/пользователь"];
 
       unicodePaths.forEach((path) => {
         expect(() => {
           validateRoutePath(path, routeName, methodName);
-        }).not.toThrow();
+        }).toThrow(/non-ASCII static segment/u);
       });
     });
 
