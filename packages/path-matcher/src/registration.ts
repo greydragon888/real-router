@@ -869,9 +869,37 @@ function insertSlashChildIntoTrie(
   compiled: CompiledRoute,
   parentPath: string,
 ): void {
+  // #1242 §5.4: an index route (path "/") under an OPTIONAL-param or SPLAT parent is
+  // unreachable/inconsistent — under an optional param the index binds only the
+  // take-node (`start("/a")` → parent, `start("/a/x")` → index), and under a splat
+  // `slashChildRoute` sits on the splat node, which `#matchSplat`'s fast path never
+  // reads, so the index is unreachable entirely. A REQUIRED-param parent (`/users/:id`)
+  // has no omit form and its slash-child is coherent (existing behaviour) — allowed.
+  const lastSegment = parentPath.slice(parentPath.lastIndexOf("/") + 1);
+  const optionalParamParent =
+    lastSegment.startsWith(":") && lastSegment.endsWith("?");
+  const splatParent = lastSegment.startsWith("*");
+
+  if (optionalParamParent || splatParent) {
+    throwSlashChildUnderDynamicParent(compiled.name, parentPath);
+  }
+
   const node = walkTrie(state, parentPath);
 
   node.slashChildRoute = compiled;
+}
+
+function throwSlashChildUnderDynamicParent(
+  routeName: string,
+  parentPath: string,
+): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Index route "${routeName}" (path "/") under the ` +
+      `dynamic parent "${parentPath}" is not supported: the index cannot reliably ` +
+      `replace the parent on every form of its path — under an optional param it ` +
+      `binds only the present form, under a splat it is unreachable. Give the index ` +
+      `a distinct path, or make the parent static.`,
+  );
 }
 
 // =============================================================================

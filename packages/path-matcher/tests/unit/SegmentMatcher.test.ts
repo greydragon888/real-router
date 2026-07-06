@@ -870,6 +870,48 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // An index route (path "/") under an OPTIONAL-param or SPLAT parent is
+  // unreachable/inconsistent (#1242 §5.4). A REQUIRED-param parent has no omit form,
+  // so its slash-child is coherent (existing behaviour) — allowed.
+  describe("registerTree — index under an optional/splat parent rejection (#1242 §5.4)", () => {
+    it("throws for an index (path '/') under an optional-param parent", () => {
+      expect(() =>
+        createMatcher([
+          { name: "p", path: "/a/:b?", children: [{ name: "idx", path: "/" }] },
+        ]),
+      ).toThrow(/Index route .* is not supported/);
+    });
+
+    it("throws for an index under a splat parent", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/files/*rest",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).toThrow(/Index route .* is not supported/);
+    });
+
+    it("still accepts an index under a required-param or static parent (controls)", () => {
+      expect(() =>
+        createMatcher([
+          {
+            name: "p",
+            path: "/users/:id",
+            children: [{ name: "idx", path: "/" }],
+          },
+        ]),
+      ).not.toThrow();
+      expect(() =>
+        createMatcher([
+          { name: "p", path: "/a/b", children: [{ name: "idx", path: "/" }] },
+        ]),
+      ).not.toThrow();
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted
