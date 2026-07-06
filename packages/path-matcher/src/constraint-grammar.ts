@@ -117,3 +117,45 @@ export function hasConstraintInStaticSegment(path: string): boolean {
 
   return false;
 }
+
+/**
+ * Reports whether static text (or a second marker) is fused to a constraint's
+ * closing `>` within a segment (`/:year<\d+>-archive`, `/:id<\d+>.html`, #1150).
+ *
+ * Runs AFTER `isConstraintBalanced`, so every `>` is a constraint closer: a `>`
+ * NOT followed by a segment boundary (`/`), an optional/query `?`, or end-of-input
+ * is a fused suffix. build strips `<…>` then re-extracts the param name greedily,
+ * fusing the suffix (name `year-archive`) while meta ends at `<` (name `year`) —
+ * build name ≠ meta name, so the route compiles to a silent dead route. The mirror
+ * of the fused mid-segment marker (#1050) on the OTHER side of the param.
+ *
+ * A linear scan (constraints may contain `/`). Single-sourced like
+ * `isConstraintBalanced`: `route-tree`'s `validateRoutePath` gate and
+ * `path-matcher`'s `registerTree` backstop both consume this — no layer re-rolls
+ * the scan (#804 discipline, #1150).
+ */
+export function hasFusedConstraintSuffix(path: string): boolean {
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] !== ">") {
+      continue;
+    }
+
+    // `charAt` yields "" past the end — a constraint ending the path is not fused.
+    const next = path.charAt(i + 1);
+
+    if (next !== "" && next !== "/" && next !== "?") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * A query-param NAME may not contain `<`/`>` (#1242 §5.1) — such a char is a
+ * constraint delimiter leaked into the query, e.g. a reverse-order modifier typo
+ * `/a/:b?<\d+>` parses the `?` as the query start, making `<\d+>` the query name.
+ * Single-sourced so the route-tree gate and the `registerTree` backstop share one
+ * definition of "invalid query-name char".
+ */
+export const INVALID_QUERY_NAME_RGX = /[<>]/u;

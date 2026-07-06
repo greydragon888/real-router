@@ -2,6 +2,8 @@ import { PARAM_NAME_PATTERN } from "./buildParamMeta";
 import {
   CONSTRAINT_BODY_PATTERN,
   hasConstraintInStaticSegment,
+  hasFusedConstraintSuffix,
+  INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
 } from "./constraint-grammar";
 import { encodeParam, ENCODING_METHODS } from "./encoding";
@@ -525,31 +527,6 @@ function throwEmptyConstraint(path: string): never {
   );
 }
 
-/**
- * Reports whether a path fuses static text (or a second marker) to a constraint's
- * closing '>' within a segment (`/:year<\d+>-archive`, #1150). Runs after the
- * balance check, so every '>' is a constraint closer: a '>' NOT followed by a
- * segment boundary ('/'), an optional/query '?', or end-of-input is a fused suffix.
- * A linear scan (constraints may contain '/'). The mirror of the fused-marker
- * rejection (#1050) on the OTHER side of the param.
- */
-function hasFusedConstraintSuffix(path: string): boolean {
-  for (let i = 0; i < path.length; i++) {
-    if (path[i] !== ">") {
-      continue;
-    }
-
-    // `charAt` yields "" past the end — a constraint ending the path is not fused.
-    const next = path.charAt(i + 1);
-
-    if (next !== "" && next !== "/" && next !== "?") {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 function throwFusedConstraintSuffix(path: string): never {
   throw new Error(
     `[SegmentMatcher.registerTree] Text fused to a constraint '>' in path "${path}": ` +
@@ -591,13 +568,6 @@ function throwDuplicateParamName(
       `the first). Rename one.`,
   );
 }
-
-// #1242 §5.1: a query-param name containing `<`/`>` is a malformed declaration — a
-// constraint leaked into it via a reverse-order modifier typo (`:b?<\d+>` parses the
-// `?` as the query start, so `<\d+>` becomes the query name). Deliberately narrow to
-// `<>`: `?name=value` (a `=` in the declaration, §5.2) is a separate call — bare core
-// tolerates it today and it is not folded in here.
-const INVALID_QUERY_NAME_RGX = /[<>]/u;
 
 function validateQueryParamDeclarations(
   routeName: string,
