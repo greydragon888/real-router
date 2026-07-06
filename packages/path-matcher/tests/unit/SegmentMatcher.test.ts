@@ -160,6 +160,7 @@ describe("createSegmentNode", () => {
       "paramChild",
       "splatChild",
       "route",
+      "routeIsStrong",
       "slashChildRoute",
     ]);
   });
@@ -444,9 +445,13 @@ describe("SegmentMatcher", () => {
         path: "/profile",
         fullName: "userP.profile",
       });
+      // Both routes reuse the SAME ':id' position with the SAME name — the #736
+      // case that must NOT throw. They terminate at DISTINCT paths, though
+      // (`/user/:id/settings` vs `/user/:id` vs `/user/:id/profile`), so the #1153
+      // duplicate-effective-path guard is not (correctly) triggered.
       const user = createInputNode({
         name: "user",
-        path: "/user/:id",
+        path: "/user/:id/settings",
         fullName: "user",
       });
       const userP = createInputNode({
@@ -462,7 +467,7 @@ describe("SegmentMatcher", () => {
       }).not.toThrow();
     });
 
-    it("does NOT throw when same-named splat positions are shared", () => {
+    it("reuses a same-named splat position without a #736 conflict (the dup is then a #1153 reject)", () => {
       const matcher = createTestMatcher();
 
       const file = createInputNode({
@@ -476,9 +481,12 @@ describe("SegmentMatcher", () => {
         fullName: "fileMeta",
       });
 
+      // The #736 guard reuses the same-named splat position without a name
+      // conflict; a splat is terminal, so the two routes then resolve to the SAME
+      // effective path — #1153 rejects the duplicate (it is NOT a #736 error).
       expect(() => {
         matcher.registerTree(twoRouteRoot(file, fileMeta));
-      }).not.toThrow();
+      }).toThrow(/Duplicate route path/);
     });
 
     it("does NOT treat a single route's consecutive optionals as a conflict", () => {
@@ -551,7 +559,9 @@ describe("SegmentMatcher", () => {
     it("captures params under the terminal route's name once the conflict is removed", () => {
       const matcher = createTestMatcher();
 
-      // Same position, same name — the only valid shared-position config.
+      // Same ':id' position, same name, DISTINCT terminals (#1153-safe): the
+      // routes reuse the shared param position without a #736 conflict and without
+      // a duplicate effective path.
       const profile = createInputNode({
         name: "profile",
         path: "/profile",
@@ -559,7 +569,7 @@ describe("SegmentMatcher", () => {
       });
       const user = createInputNode({
         name: "user",
-        path: "/user/:id",
+        path: "/user/:id/settings",
         fullName: "user",
       });
       const userP = createInputNode({
@@ -738,6 +748,60 @@ describe("SegmentMatcher", () => {
         createMatcher([
           { name: "a", path: "/x/:id" },
           { name: "b", path: "/y/:id" },
+        ]),
+      ).not.toThrow();
+    });
+  });
+
+  // Two routes compiling to the SAME trie terminal — flat /a/b vs nested a→b, or
+  // /x vs /x/ — silently shadowed each other (the later's deep link resolved to the
+  // earlier route). A STRONG (full-insertion) terminal write now rejects a second
+  // strong write by a DIFFERENT route; a WEAK (optional-omit) owner is legitimately
+  // displaced, and a same-route revisit is idempotent (#1153).
+  describe("registerTree — duplicate effective path rejection (#1153)", () => {
+    it("throws when a flat and a nested route resolve to the same path", () => {
+      expect(() => {
+        createMatcher([
+          { name: "a", path: "/a", children: [{ name: "b", path: "/b" }] },
+          { name: "ab", path: "/a/b" },
+        ]);
+      }).toThrow(/Duplicate route path/);
+    });
+
+    it("throws on trailing-slash variants (/x vs /x/)", () => {
+      expect(() => {
+        createMatcher([
+          { name: "a", path: "/x" },
+          { name: "b", path: "/x/" },
+        ]);
+      }).toThrow(/Duplicate route path/);
+    });
+
+    it("throws on two routes at the root path", () => {
+      expect(() => {
+        createMatcher([
+          { name: "a", path: "/" },
+          { name: "b", path: "/" },
+        ]);
+      }).toThrow(/Duplicate route path/);
+    });
+
+    it("still accepts distinct routes, optional-omit fan-out, and weak→strong (controls)", () => {
+      expect(() =>
+        createMatcher([
+          { name: "a", path: "/a" },
+          { name: "b", path: "/b" },
+        ]),
+      ).not.toThrow();
+      // a single route's optional-omit revisits its own terminal — idempotent
+      expect(() =>
+        createMatcher([{ name: "r", path: "/a/:b?/:c?/d" }]),
+      ).not.toThrow();
+      // an optional's omit weakly claims the root; a full "/" route displaces it
+      expect(() =>
+        createMatcher([
+          { name: "opt", path: "/:a?" },
+          { name: "root", path: "/" },
         ]),
       ).not.toThrow();
     });

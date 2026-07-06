@@ -481,6 +481,36 @@ function throwDuplicateParamName(
 }
 
 /**
+ * #1153: writes a STRONG (full-insertion) terminal route, rejecting a second strong
+ * write by a DIFFERENT route — two routes compiling to the same effective path
+ * (flat vs nested `/a/b`, or `/x` vs `/x/`), where the later would silently shadow
+ * the earlier (its deep link would resolve to the other route). A revisit by the
+ * SAME route (the optional-omit fan-out) is idempotent, and a WEAK (omit `??=`)
+ * owner is legitimately displaced by a strong write — neither throws.
+ */
+function writeStrongRoute(node: SegmentNode, compiled: CompiledRoute): void {
+  if (
+    node.route !== undefined &&
+    node.route !== compiled &&
+    node.routeIsStrong === true
+  ) {
+    throwDuplicateRoutePath(node.route.name, compiled.name);
+  }
+
+  node.route = compiled;
+  node.routeIsStrong = true;
+}
+
+function throwDuplicateRoutePath(existingName: string, newName: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Duplicate route path: routes "${existingName}" ` +
+      `and "${newName}" resolve to the same URL. The later registration would ` +
+      `silently shadow the earlier (its deep link would resolve to the other ` +
+      `route). Give them distinct paths.`,
+  );
+}
+
+/**
  * The param name is the run of grammar chars right after the marker, up to a
  * `<…>` constraint or a trailing optional `?`. `PARAM_NAME_PATTERN` (`[^/?<]+`)
  * already excludes `/`, `?`, and `<`, so one positive match captures the name.
@@ -631,7 +661,7 @@ function insertIntoTrie(
   const normalized = normalizeTrailingSlash(fullPath);
 
   if (normalized === "/") {
-    state.root.route = compiled;
+    writeStrongRoute(state.root, compiled);
 
     return;
   }
@@ -741,7 +771,7 @@ function insertIntoTrieFrom(
     start = segmentEnd + 1;
   }
 
-  node.route = compiled;
+  writeStrongRoute(node, compiled);
 }
 
 function insertSlashChildIntoTrie(

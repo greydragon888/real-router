@@ -192,6 +192,14 @@ export interface SegmentNode {
     | undefined;
   splatChild?: { node: SegmentNode; name: string } | undefined;
   route?: CompiledRoute | undefined;
+  /**
+   * #1153: `true` when `route` was set by a STRONG (full-insertion) terminal write,
+   * `false` for a WEAK (optional-omit `??=`) write or when unset. Registration-only
+   * — the match hot path never reads it. A second strong write by a DIFFERENT route
+   * means two routes share an effective path (a silent-shadow dup); a weak owner is
+   * legitimately displaced by a strong write.
+   */
+  routeIsStrong?: boolean | undefined;
   slashChildRoute?: CompiledRoute | undefined;
 }
 
