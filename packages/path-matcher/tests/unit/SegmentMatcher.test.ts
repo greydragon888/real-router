@@ -961,6 +961,58 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // #1283: the try-take-if-valid fork (A1 #1264 / required #1266) skips to the splat
+  // only when the constraint FAILS. When a constraint-SATISFYING segment is also the
+  // LAST one and the take-node is a dead terminal (no route, only a would-be-empty
+  // splat child), the take dead-ends → UNMATCH while buildPath emits that URL — a
+  // `range(buildPath) ⊄ dom(match)` dead deep-link, the exact class try-take-if-valid
+  // was built to close.
+  describe("match — try-take-if-valid fork last-segment dead-end falls to splat (#1283)", () => {
+    it("opt→splat: a single constraint-satisfying last segment resolves the omit form", () => {
+      const m = createMatcher([
+        { name: "r", path: String.raw`/:v<v\d+>?/*rest` },
+      ]);
+
+      // build of the omit form is "/v1"; match must resolve it, not UNMATCH
+      expect(m.match("/v1")?.params).toStrictEqual({ rest: "v1" });
+      // the take form (multi-segment) still resolves under the optional's name
+      expect(m.match("/v1/users")?.params).toStrictEqual({
+        v: "v1",
+        rest: "users",
+      });
+    });
+
+    it("#1266 required→splat: a single constraint-satisfying segment falls to the catch-all sibling", () => {
+      const m = createMatcher([
+        { name: "all", path: "/*rest" },
+        { name: "ver", path: String.raw`/:v<v\d+>/*rest` },
+      ]);
+
+      const r = m.match("/v1");
+
+      expect(r?.segments.at(-1)?.name).toBe("all");
+      expect(r?.params).toStrictEqual({ rest: "v1" });
+      // the multi-segment versioned form still resolves to ver
+      expect(m.match("/v1/users")?.params).toStrictEqual({
+        v: "v1",
+        rest: "users",
+      });
+    });
+
+    it("preserves present-first: a take-node WITH a terminal route still takes (not skip)", () => {
+      const m = createMatcher([
+        { name: "rest", path: String.raw`/:v<v\d+>?/*rest` },
+        { name: "bare", path: String.raw`/:v<v\d+>` },
+      ]);
+
+      // /v1 → the bare :v terminal (a valid take), NOT the splat omit form
+      const r = m.match("/v1");
+
+      expect(r?.segments.at(-1)?.name).toBe("bare");
+      expect(r?.params).toStrictEqual({ v: "v1" });
+    });
+  });
+
   // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
   // empty `<>` desyncs match vs build the same way name-less (#858) / fused
   // (#1050) markers do: bare core built these silently and buildPath then emitted

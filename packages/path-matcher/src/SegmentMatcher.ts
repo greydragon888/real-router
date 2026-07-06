@@ -552,11 +552,19 @@ export class SegmentMatcher {
         const fork = pc.fork;
 
         // #1264 A1 (opt→splat): an invalid take (constraint fails on the decoded
-        // value) skips to the splat sibling.
+        // value) skips to the splat sibling. #1283: ALSO skip when a
+        // constraint-SATISFYING take would dead-end on the LAST segment — the
+        // take-node carries no terminal route (only a param/splat child needing more
+        // segments), so committing strands the match while the splat sibling can
+        // still terminate here. A take-node WITH a route (or slash-child) is a valid
+        // terminal → present-first preserved.
         if (
           fork !== undefined &&
           node.splatChild !== undefined &&
-          this.#forkTakesSplat(fork, segment)
+          (this.#forkTakesSplat(fork, segment) ||
+            (segmentEnd >= length &&
+              pc.node.route === undefined &&
+              pc.node.slashChildRoute === undefined))
         ) {
           return this.#matchSplat(node.splatChild, path, start, params);
         }

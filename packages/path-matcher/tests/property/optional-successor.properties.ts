@@ -83,6 +83,28 @@ describe("optional-successor inverse-pair (#1263/#1264)", () => {
       }
     },
   );
+
+  // #1283: a SINGLE-segment omit form — including a version-LOOKING value that
+  // satisfies the take-constraint — is exactly the case `arbNonVersionSplat` filtered
+  // out (the generator blind spot that hid #1283). The last-segment take dead-ends
+  // (an empty splat is invalid), so `match` must fall to the omit reading, not UNMATCH.
+  test.prop([fc.oneof(fc.stringMatching(/^v\d{1,6}$/), arbSafeParamValue)], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "constrained-opt→splat: a single-segment omit form (incl. version-looking) round-trips (#1283)",
+    (seg) => {
+      const m = matcherFor(versioned());
+      const url = m.buildPath("r", { rest: seg });
+      const result = m.match(url);
+
+      // TOTALITY — the last-segment omit form must resolve, not dead-end
+      expect(
+        result,
+        `"${url}" (single-segment omit) did not match`,
+      ).toBeDefined();
+      expect(m.buildPath("r", result!.params)).toBe(url); // path-fixpoint #18
+    },
+  );
 });
 
 /**
