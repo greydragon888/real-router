@@ -1,5 +1,12 @@
 # @real-router/lifecycle-plugin
 
+## 0.6.7
+
+### Patch Changes
+
+- Updated dependencies [[`fb99baf`](https://github.com/greydragon888/real-router/commit/fb99bafcfec02d876d3107c620d62b23e192be47), [`fb99baf`](https://github.com/greydragon888/real-router/commit/fb99bafcfec02d876d3107c620d62b23e192be47), [`fb99baf`](https://github.com/greydragon888/real-router/commit/fb99bafcfec02d876d3107c620d62b23e192be47), [`fb99baf`](https://github.com/greydragon888/real-router/commit/fb99bafcfec02d876d3107c620d62b23e192be47)]:
+  - @real-router/core@0.65.0
+
 ## 0.6.6
 
 ### Patch Changes
