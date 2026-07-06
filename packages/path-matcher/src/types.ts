@@ -165,16 +165,23 @@ export interface BuildPathOptions {
 // =============================================================================
 
 /**
- * Marks a `paramChild` as an OPTIONAL-successor fork (#1263/#1264): the param
- * came from an optional `:opt<constraint>?` whose skip-branch leads to a sibling
- * (a splat here; a renamed param in the opt+required case). At match time this
- * drives `try-take-if-valid` — take the segment as the optional only if it
- * satisfies `constraint` on the DECODED value (#857); otherwise skip to the
- * sibling. `constraint` is always present: an UNCONSTRAINED optional before a
- * splat is rejected at registration (reject-with-hint, #1264).
+ * Marks a `paramChild` as an OPTIONAL-successor fork (#1263/#1264): the param came
+ * from an optional `:opt<constraint>?` directly followed by a dynamic segment, so
+ * `match` must disambiguate the omit form. Exactly one field is set:
+ *
+ * - `constraint` — the optional is followed by a **splat** (`/:v<c>?/*rest`). Take
+ *   the segment as the optional only if its DECODED value (#857) satisfies the
+ *   constraint (`try-take-if-valid`), else skip and let the splat capture. An
+ *   UNCONSTRAINED optional→splat is rejected at registration (reject-with-hint).
+ * - `skipName` — the optional is followed by a **required param** (`/:a?/:b`).
+ *   On the LAST segment the optional is omitted, so the segment is the successor:
+ *   bind it under `skipName` (the successor's name), not the optional's. When the
+ *   optional is present (≥2 segments) it binds normally and its constraint (if
+ *   any) is validated post-traverse.
  */
 export interface ForkMeta {
-  readonly constraint: RegExp;
+  readonly constraint?: RegExp | undefined;
+  readonly skipName?: string | undefined;
 }
 
 export interface SegmentNode {

@@ -116,3 +116,80 @@ describe("optional-successor binding — A1: constrained-opt → splat (#1264)",
     });
   });
 });
+
+/**
+ * Part A2: an optional param directly followed by a REQUIRED param (`/:a?/:b`,
+ * #1263). Disambiguated by segment count — the omit form is one segment shorter,
+ * so on the LAST segment the optional is omitted and the segment binds under the
+ * SUCCESSOR's name (not the optional's, the wrong-name bug). The optional's own
+ * constraint (if any) is validated post-traverse when the optional is present.
+ */
+describe("optional-successor binding — A2: opt → required param (#1263)", () => {
+  describe("unconstrained /:a?/:b — segment count drives the binding", () => {
+    const tenant = () => createMatcher([{ name: "r", path: "/:a?/:b" }]);
+
+    it("omit form: a single segment binds under the SUCCESSOR name, not the optional's", () => {
+      // was {a:"users"} — the wrong-name bug of #1263
+      expect(tenant().match("/users")?.params).toStrictEqual({ b: "users" });
+    });
+
+    it("present form: two segments bind both params", () => {
+      expect(tenant().match("/admin/users")?.params).toStrictEqual({
+        a: "admin",
+        b: "users",
+      });
+    });
+
+    it("an over-long path (3 segments) does not match a 2-param route", () => {
+      expect(tenant().match("/a/b/c")).toBeUndefined();
+    });
+  });
+
+  describe("numeric-constrained optional before a required param", () => {
+    const route = () =>
+      createMatcher([{ name: "r", path: String.raw`/:a<\d+>?/:b` }]);
+
+    it("omit form ignores the optional's constraint (it is absent)", () => {
+      // `users` fails `\d+`, but the optional is omitted → the constraint never applies
+      expect(route().match("/users")?.params).toStrictEqual({ b: "users" });
+    });
+
+    it("present form validates the optional's constraint", () => {
+      expect(route().match("/42/users")?.params).toStrictEqual({
+        a: "42",
+        b: "users",
+      });
+    });
+
+    it("present form with a constraint-violating optional is UNMATCH", () => {
+      // `p` fails `\d+`; skip would leave `x` extra → neither interpretation valid
+      expect(route().match("/p/x")).toBeUndefined();
+    });
+  });
+
+  describe("constrained required successor", () => {
+    const route = () =>
+      createMatcher([{ name: "r", path: String.raw`/:a?/:b<\d+>` }]);
+
+    it("omit form validates the successor's constraint on the bound value", () => {
+      expect(route().match("/42")?.params).toStrictEqual({ b: "42" });
+      expect(route().match("/users")).toBeUndefined();
+    });
+
+    it("present form binds a and validates b's constraint", () => {
+      expect(route().match("/admin/42")?.params).toStrictEqual({
+        a: "admin",
+        b: "42",
+      });
+    });
+  });
+
+  describe("opt+opt is left as documented (out of SUPPORT-NARROWER scope)", () => {
+    it("consecutive optionals still reuse one position (present-first)", () => {
+      const m = createMatcher([{ name: "r", path: "/:a?/:b?/d" }]);
+
+      expect(m.match("/d")?.params).toStrictEqual({});
+      expect(m.match("/p/q/d")?.params).toStrictEqual({ a: "p", b: "q" });
+    });
+  });
+});

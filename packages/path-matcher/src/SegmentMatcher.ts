@@ -521,6 +521,12 @@ export class SegmentMatcher {
     return this.#traverseFrom(this.#root, path, 1, params);
   }
 
+  // The core match hot loop. The #1263/#1264 fork branches (A1 opt→splat, A2
+  // opt→required-param) are inlined here rather than extracted into helpers,
+  // because a per-param helper call regresses the common single-param path ~5%
+  // (spike-measured); decode/constraint detail still lives in #tryTakeFork /
+  // #forkTakesSplat.
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- inlined fork branches (see above)
   #traverseFrom(
     startNode: SegmentNode,
     path: string,
@@ -543,20 +549,28 @@ export class SegmentMatcher {
         next = node.staticChildren[lookupKey];
       } else if (node.paramChild) {
         const pc = node.paramChild;
+        const fork = pc.fork;
 
-        // #1263/#1264: a constrained-optional-before-splat fork takes the segment
-        // as the optional only if valid (`#tryTakeFork` isolates the decode +
-        // constraint check), else skips to the splat sibling.
+        // #1264 A1 (opt→splat): an invalid take (constraint fails on the decoded
+        // value) skips to the splat sibling.
         if (
-          pc.fork !== undefined &&
-          node.splatChild &&
-          !this.#tryTakeFork(pc.fork, segment)
+          fork !== undefined &&
+          node.splatChild !== undefined &&
+          this.#forkTakesSplat(fork, segment)
         ) {
           return this.#matchSplat(node.splatChild, path, start, params);
         }
 
         next = pc.node;
-        params[pc.name] = segment;
+        // #1263 A2 (opt→required-param): on the LAST segment the optional is
+        // omitted → bind under the successor's name. The common non-fork param is
+        // fast-pathed inline (no helper call — spike: extraction cost ~5% on
+        // single-param).
+        if (fork?.skipName !== undefined && segmentEnd >= length) {
+          params[fork.skipName] = segment;
+        } else {
+          params[pc.name] = segment;
+        }
       } else if (node.splatChild) {
         return this.#matchSplat(node.splatChild, path, start, params);
       } else {
@@ -607,14 +621,24 @@ export class SegmentMatcher {
    * segment cannot be the decoded optional → not taken (→ skip, and the splat then
    * carries it into `#decodeParams`, which rejects it, #737).
    */
-  #tryTakeFork(fork: ForkMeta, segment: string): boolean {
+  #tryTakeFork(constraint: RegExp, segment: string): boolean {
     try {
-      return fork.constraint.test(
-        this.#decode ? this.#decode(segment) : segment,
-      );
+      return constraint.test(this.#decode ? this.#decode(segment) : segment);
     } catch {
       return false;
     }
+  }
+
+  /**
+   * #1264 A1: whether an opt→splat fork should SKIP to the splat — it carries a
+   * constraint and the segment fails `#tryTakeFork` (its DECODED value doesn't
+   * satisfy the constraint).
+   */
+  #forkTakesSplat(fork: ForkMeta, segment: string): boolean {
+    return (
+      fork.constraint !== undefined &&
+      !this.#tryTakeFork(fork.constraint, segment)
+    );
   }
 
   #decodeParams(params: Record<string, string>): boolean {
