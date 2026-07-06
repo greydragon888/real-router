@@ -11,9 +11,13 @@
 export { buildParamMeta, PARAM_NAME_PATTERN } from "./buildParamMeta";
 
 // `CONSTRAINT_BODY_PATTERN` + `isConstraintBalanced` are the constraint-`<...>`
-// axis counterpart of `PARAM_NAME_PATTERN` (#804): the one atom every
-// match/strip/build regex derives from, and the one balance predicate route-tree's
-// gate consumes — replacing route-tree's former local `hasBalancedConstraints`.
+// axis counterpart of `PARAM_NAME_PATTERN` (#804). `isConstraintBalanced` (the
+// balance predicate) is the one route-tree's validation gate consumes — replacing
+// route-tree's former local `hasBalancedConstraints`. `CONSTRAINT_BODY_PATTERN` (the
+// atom every *internal* match/strip/build regex here derives from) is exported as a
+// reserved/future constraint-grammar atom: it currently has NO external consumer
+// (route-tree consumes only `isConstraintBalanced`), kept exported so the `<...>`
+// grammar stays single-sourced from this package.
 export {
   CONSTRAINT_BODY_PATTERN,
   isConstraintBalanced,
