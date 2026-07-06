@@ -193,3 +193,37 @@ describe("optional-successor binding — A2: opt → required param (#1263)", ()
     });
   });
 });
+
+/**
+ * Part B: an UNCONSTRAINED optional before a splat (`/:v?/*rest`, #1264) is
+ * REJECTED at registration with a hint (reject-with-hint, #1149 style). Without a
+ * constraint there is no validity signal to disambiguate take vs skip — every
+ * multi-segment value has two readings, so support would silently reshape half the
+ * input space. A CONSTRAINED optional→splat is supported (A1).
+ */
+describe("optional-successor binding — B: reject unconstrained opt → splat (#1264)", () => {
+  it("throws at registration with a hint to add a constraint", () => {
+    expect(() => createMatcher([{ name: "r", path: "/:v?/*rest" }])).toThrow(
+      /must be constrained/,
+    );
+    expect(() => createMatcher([{ name: "r", path: "/:lang?/*path" }])).toThrow(
+      /Add a constraint/,
+    );
+  });
+
+  it("does NOT reject a CONSTRAINED optional before a splat (that is A1)", () => {
+    expect(() =>
+      createMatcher([{ name: "r", path: String.raw`/:v<v\d+>?/*rest` }]),
+    ).not.toThrow();
+  });
+
+  it("does NOT reject a required splat or an optional before a static/param", () => {
+    expect(() =>
+      createMatcher([{ name: "r", path: "/files/*rest" }]),
+    ).not.toThrow();
+    expect(() => createMatcher([{ name: "r", path: "/:a?/:b" }])).not.toThrow();
+    expect(() =>
+      createMatcher([{ name: "r", path: "/:lang?/home" }]),
+    ).not.toThrow();
+  });
+});

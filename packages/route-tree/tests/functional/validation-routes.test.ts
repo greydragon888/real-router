@@ -414,6 +414,31 @@ describe("validateRoutePath", () => {
         }).not.toThrow();
       });
 
+      it("should throw for an unconstrained optional param before a splat (#1264)", () => {
+        const paths = ["/:v?/*rest", "/:lang?/*path", "/api/:version?/*rest"];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/unconstrained optional param before a splat/u);
+        });
+      });
+
+      it("should NOT flag a CONSTRAINED optional before a splat, nor opt→param/static (#1264)", () => {
+        const paths = [
+          String.raw`/:v<v\d+>?/*rest`, // constrained → try-take-if-valid (A1)
+          "/:id<[^/]+>?/*rest", // constraint containing '/'
+          "/:a?/:b", // optional before a param, not a splat (A2)
+          "/:lang?/home", // optional before a static
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
       it("should NOT flag a boundary marker or a marker-led greedy name (controls)", () => {
         const paths = [
           "/a/:b", // boundary marker — the canonical correct form

@@ -355,6 +355,25 @@ function throwOptionalSplat(segment: string): never {
 }
 
 /**
+ * Rejects an UNCONSTRAINED optional param directly before a splat (`/:v?/*rest`,
+ * #1264, product decision). Without a constraint there is no validity signal to
+ * disambiguate "take the optional" from "let the splat capture", so every
+ * multi-segment value has two readings and `match` would silently reshape half the
+ * input space — a wrong-name in new clothing, worse than the loud UNMATCH it had.
+ * A CONSTRAINED optional→splat (`:v<c>?/*rest`) IS supported (A1). Sibling of the
+ * optional-splat (#1149) / fused (#1050) rejections; route-tree's gate catches it
+ * first with a route-contextual error.
+ */
+function throwUnconstrainedOptionalSplat(paramName: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Optional param ":${paramName}?" before a splat ` +
+      `must be constrained: an unconstrained optional before a splat is ambiguous ` +
+      `(every multi-segment value has two readings). Add a constraint, e.g. ` +
+      `":${paramName}<[a-z]+>?", or model it as two routes.`,
+  );
+}
+
+/**
  * An unbalanced `<`/`>` desyncs match vs build: the name is truncated at the
  * stray `<`, the unclosed constraint survives as a literal in the trie path, and
  * `buildPath` emits a URL its own `match` rejects (#804 — the residual gap #749
@@ -469,7 +488,16 @@ function markOptionalFork(
 ): void {
   const constraintPattern = compiled.constraintPatterns.get(paramName)?.pattern;
 
-  if (constraintPattern && node.paramChild && node.splatChild) {
+  if (node.paramChild && node.splatChild) {
+    // opt→splat. Reject-with-hint if UNCONSTRAINED (#1264, product decision): an
+    // unconstrained optional before a splat has no validity signal — every
+    // multi-segment value has two readings, so `match` would silently reshape
+    // half the input space (wrong-name in new clothing). A constraint gives the
+    // signal `try-take-if-valid` needs (A1).
+    if (constraintPattern === undefined) {
+      throwUnconstrainedOptionalSplat(paramName);
+    }
+
     node.paramChild.fork = { constraint: constraintPattern };
 
     return;

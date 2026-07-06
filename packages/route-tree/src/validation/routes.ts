@@ -133,6 +133,36 @@ function hasOptionalSplat(path: string): boolean {
 }
 
 /**
+ * Reports whether a path has an UNCONSTRAINED optional param directly before a
+ * splat (`/:v?/*rest`, #1264). Without a constraint there is no validity signal to
+ * disambiguate "take the optional" from "let the splat capture" — every
+ * multi-segment value has two readings, so support would silently reshape half the
+ * input space. Rejected with a hint (product decision); a CONSTRAINED
+ * optional→splat (`/:v<c>?/*rest`) IS supported. path-matcher backstops at
+ * `registerTree`; this gate adds the route-contextual message.
+ *
+ * A linear scan (same convention as `hasOptionalSplat`; constraints may contain
+ * `/`, so no split/regex): an optional marker `?` whose preceding char is NOT `>`
+ * (a constrained optional ends `<…>?`) and which is immediately followed by `/*`.
+ * A `?` inside a constraint (`<\d?>`) is followed by `>`, not `/*`, so it is not
+ * flagged.
+ */
+function hasUnconstrainedOptionalBeforeSplat(path: string): boolean {
+  for (let i = 1; i < path.length; i++) {
+    if (
+      path[i] === "?" &&
+      path[i - 1] !== ">" &&
+      path[i + 1] === "/" &&
+      path[i + 2] === "*"
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Validates route path format.
  * Throws a descriptive error if validation fails.
  *
@@ -166,6 +196,11 @@ function hasOptionalSplat(path: string): boolean {
  * validateRoutePath("/users//list", "users.list", "add");           // throws (double slash)
  * validateRoutePath("~dash", "dash", "add", paramParent);           // throws (~ under parameterized parent)
  */
+// A format-validation gate: a flat sequence of INDEPENDENT guard clauses (type,
+// whitespace, format, double-slash, constraint syntax, name-less / fused /
+// optional-splat / unconstrained-opt-before-splat markers, absolute-under-param).
+// Each is a simple early throw; extracting them would only scatter one checklist.
+// eslint-disable-next-line sonarjs/cognitive-complexity -- linear guard sequence (see above)
 export function validateRoutePath(
   path: unknown,
   routeName: string,
@@ -261,6 +296,18 @@ export function validateRoutePath(
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": optional splat ('*name?') is not supported in "${path}" — a splat cannot be optional (use a required splat '*name')`,
+    );
+  }
+
+  // Unconstrained optional param before a splat (`/:v?/*rest`). No constraint =
+  // no validity signal to disambiguate take vs skip → every multi-segment value
+  // has two readings, so `match` would silently reshape half the input space.
+  // Reject with a hint (path-matcher backstops at `registerTree`); a CONSTRAINED
+  // optional→splat (`/:v<c>?/*rest`) IS supported (#1264, SUPPORT-NARROWER A1).
+  if (hasUnconstrainedOptionalBeforeSplat(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": an unconstrained optional param before a splat is not supported in "${path}" — it is ambiguous (every multi-segment value has two readings). Add a constraint (e.g. ':lang<[a-z]+>?') or model it as two routes`,
     );
   }
 
