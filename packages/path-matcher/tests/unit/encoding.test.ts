@@ -40,6 +40,21 @@ describe("encodeURIComponentExcludingSubDelims", () => {
     );
   });
 
+  it("should encode a PAIRED surrogate (emoji) normally", () => {
+    // The `u` flag coalesces the pair into one code point encodeURIComponent accepts.
+    expect(encodeURIComponentExcludingSubDelims("🎉")).toBe("%F0%9F%8E%89");
+    expect(encodeURIComponentExcludingSubDelims("😀")).toBe("%F0%9F%98%80");
+  });
+
+  it("should sanitize a LONE surrogate to U+FFFD instead of throwing (#1315)", () => {
+    // An unpaired surrogate throws URIError in encodeURIComponent; the slow path
+    // catches it and re-encodes the toWellFormed replacement (U+FFFD → %EF%BF%BD).
+    expect(encodeURIComponentExcludingSubDelims("\uD800")).toBe("%EF%BF%BD");
+    expect(encodeURIComponentExcludingSubDelims("a\uD800b")).toBe(
+      "a%EF%BF%BDb",
+    );
+  });
+
   it("should encode @ and = signs", () => {
     expect(encodeURIComponentExcludingSubDelims("user@host")).toBe(
       "user%40host",
@@ -59,6 +74,16 @@ describe("ENCODING_METHODS", () => {
   it("none encoder should return value unchanged", () => {
     expect(ENCODING_METHODS.none("hello world")).toBe("hello world");
     expect(ENCODING_METHODS.none("日本")).toBe("日本");
+  });
+
+  it("all throwing modes sanitize a lone surrogate to U+FFFD — buildPath stays total (#1315)", () => {
+    for (const mode of ["default", "uri", "uriComponent"] as const) {
+      expect(() => ENCODING_METHODS[mode]("\uD800")).not.toThrow();
+      expect(ENCODING_METHODS[mode]("\uD800")).toBe("%EF%BF%BD");
+    }
+
+    // `none` passes through (no encoding), so it never throws either.
+    expect(ENCODING_METHODS.none("\uD800")).toBe("\uD800");
   });
 });
 
@@ -130,5 +155,13 @@ describe("encodeParam", () => {
   it("should encode '/' in a non-splat param", () => {
     expect(encodeParam("a/b", "default", false)).toBe("a%2Fb");
     expect(encodeParam("a/b", "uriComponent", false)).toBe("a%2Fb");
+  });
+
+  it("sanitizes a lone surrogate on the public buildPath path (#1315)", () => {
+    expect(encodeParam("\uD800", "default", false)).toBe("%EF%BF%BD");
+    // Splat: each `/`-segment is encoded independently, so each is sanitized.
+    expect(encodeParam("a/\uD800", "default", true)).toBe("a/%EF%BF%BD");
+    // A PAIRED surrogate (emoji) is unaffected.
+    expect(encodeParam("🎉", "default", false)).toBe("%F0%9F%8E%89");
   });
 });
