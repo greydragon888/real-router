@@ -3,6 +3,8 @@
 import {
   buildParamMeta,
   hasConstraintInStaticSegment,
+  hasFusedConstraintSuffix,
+  INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
   PARAM_NAME_PATTERN,
 } from "path-matcher";
@@ -84,8 +86,6 @@ function validateUniqueParamNames(
   }
 }
 
-const INVALID_QUERY_NAME_RGX = /[<>]/u;
-
 /**
  * #1242 §5.1/§5.3: rejects a malformed query-param declaration — a query name
  * carrying `<`/`>` (a constraint leaked in via a reverse-order modifier typo
@@ -160,38 +160,6 @@ function hasFusedMidSegmentMarker(path: string): boolean {
       segmentStartedWithMarker = char === ":" || char === "*";
       atSegmentStart = false;
     } else if ((char === ":" || char === "*") && !segmentStartedWithMarker) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * Reports whether a path fuses static text (or a second marker) to a constraint's
- * closing `>` within a segment (`/:year<\d+>-archive`, `/:id<\d+>.html`, #1150).
- * Meta terminates the param name at `<` (name `year`), but the build side strips
- * `<…>` then re-extracts the name greedily (name `year-archive`) — build name ≠
- * meta name, so the route compiles to a silent dead route (`buildPath` throws
- * `Missing required param`, `match` keys the constraint on a phantom name). The
- * mirror of #1050 on the OTHER side of the param: a static SUFFIX after the
- * constraint, not a static PREFIX before the marker.
- *
- * Runs AFTER `validateConstraintSyntax`, so `isConstraintBalanced` already
- * guarantees every `>` is a constraint closer: a `>` NOT followed by a segment
- * boundary (`/`), an optional/query `?`, or end-of-input is a fused suffix. A
- * linear scan (constraints may contain `/`), same convention as the siblings.
- */
-function hasFusedConstraintSuffix(path: string): boolean {
-  for (let i = 0; i < path.length; i++) {
-    if (path[i] !== ">") {
-      continue;
-    }
-
-    // `charAt` yields "" past the end — a constraint ending the path is not fused.
-    const next = path.charAt(i + 1);
-
-    if (next !== "" && next !== "/" && next !== "?") {
       return true;
     }
   }
