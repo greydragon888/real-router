@@ -104,6 +104,23 @@ const arbBrutalChunk: fc.Arbitrary<string> = fc.oneof(
   fc
     .tuple(arbBrutalKey, fc.nat({ max: 3 }), fc.nat({ max: 3 }))
     .map(([k, i, j]) => `${k}[${i}][${j}]`), // nested brackets
+  // Non-numeric bracket content (`a[b]`): the bracket carries a NAME, not an
+  // index — `parse` treats it as an array push, not a positional insert. Was a
+  // qs-first generator gap (audit 2026-07-07): the wire grammar emitted only
+  // numeric `[i]` / empty `[]`, so `build(parse("a[b]=x"))` was never exercised.
+  fc
+    .tuple(arbBrutalKey, fc.constantFrom("b", "x", "id"))
+    .map(([k, b]) => `${k}[${b}]`),
+  fc
+    .tuple(arbBrutalKey, fc.constantFrom("b", "x", "id"), arbBrutalValue)
+    .map(([k, b, v]) => `${k}[${b}]=${v}`),
+  // Percent-encoded brackets (`a%5B%5D`): the `[]` is ENCODED, so `parse` reads
+  // the literal key `a[]` (a scalar), NOT an array — the encoded-bracket edge.
+  // Same audit gap: only raw `[]` was generated.
+  arbBrutalKey.map((k) => `${k}%5B%5D`),
+  fc
+    .tuple(arbBrutalKey, arbBrutalValue)
+    .map(([k, v]) => `${k}%5B%5D=${v}`),
 );
 
 const arbBrutalQs: fc.Arbitrary<string> = fc
