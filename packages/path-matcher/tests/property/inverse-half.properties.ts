@@ -114,7 +114,8 @@ function tupleOf(arbs: fc.Arbitrary<Unit>[]): fc.Arbitrary<Unit[]> {
   return arbs.length === 0 ? fc.constant<Unit[]>([]) : fc.tuple(...arbs);
 }
 
-// Mode A: 1–5 optional-bearing units + an optional terminal bare optional, NO splat.
+// Mode A: 1–5 optional-bearing units + an optional terminal bare optional (which
+// may carry a stray empty-query `?` — the #1324 F2 `/:a??` class), NO splat.
 const arbOptionalRoute = fc
   .tuple(
     fc.array(fc.nat({ max: 4 }), { minLength: 1, maxLength: 5 }),
@@ -122,6 +123,7 @@ const arbOptionalRoute = fc
       fc.record({
         constrained: fc.boolean(),
         present: fc.boolean(),
+        emptyQuery: fc.boolean(),
         strValue: arbValue,
         numValue: arbNumericParam,
       }),
@@ -133,7 +135,14 @@ const arbOptionalRoute = fc
       const extra: Unit[] = [];
 
       if (trailing) {
-        const marker = trailing.constrained ? String.raw`/:pT<\d+>?` : "/:pT?";
+        // A stray trailing `?` after the terminal optional marker is an EMPTY query
+        // declaration (`/:pT??`, `/:pT<\d+>??`) — the #1324 F2 degenerate the L2
+        // `compileBuildParts` reconstruction drops (`buildPath` emits `/v0`, not the
+        // pre-migration `/v0?`), so it must still fall in `dom(match)`. Only valid at
+        // the route END (mid-path it would be a real query separator, not a segment).
+        const marker =
+          (trailing.constrained ? String.raw`/:pT<\d+>?` : "/:pT?") +
+          (trailing.emptyQuery ? "?" : "");
         const value = trailing.constrained
           ? trailing.numValue
           : trailing.strValue;
