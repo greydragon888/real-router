@@ -1,16 +1,14 @@
-import { PARAM_NAME_PATTERN } from "./buildParamMeta";
 import {
   CONSTRAINT_BODY_PATTERN,
-  hasConstraintInStaticSegment,
-  hasFusedConstraintSuffix,
   INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
 } from "./constraint-grammar";
 import { encodeParam, ENCODING_METHODS } from "./encoding";
 import {
   parseSegment,
-  splitPathSegments,
+  type SegmentErrorCode,
   type SegmentTokens,
+  splitPathSegments,
 } from "./parseSegment";
 import {
   buildFullPath,
@@ -89,35 +87,33 @@ export function registerNode(
       : pathPattern;
   const rawNodePath = isAbsolute ? strippedPattern : pathPattern;
 
-  // Bare-core backstop for constraint-delimiter grammar (#804): reject an
-  // unbalanced `<`/`>` or a semantically-empty `<>` before trie insertion — the
-  // same producing-layer defense name-less (#858) and fused (#1050) markers get.
-  // Without it, `createRouter([{ path: "/x/:id<\\d+" }])` built silently and
-  // buildPath then emitted a garbage URL. Uses the single balance predicate.
+  // Bare-core backstop for constraint-delimiter grammar (#804): reject a stray
+  // unbalanced `<`/`>` before trie insertion. This is the ONE grammar check that
+  // `parseSegment` cannot make per-segment — its name class `[^/?<]+` includes `>`,
+  // so a `>` with no matching `<` is visible only by the balance COUNT over the
+  // whole path. Runs first, so the per-segment pass below never sees an unbalanced
+  // `<` (it would otherwise surface there as a spurious `unbalanced-constraint`).
   if (!isConstraintBalanced(rawNodePath)) {
     throwUnbalancedConstraint(rawNodePath);
   }
 
-  if (rawNodePath.includes("<>")) {
-    throwEmptyConstraint(rawNodePath);
-  }
+  // Per-segment grammar backstop (Реш.2): the trie's own grammar verdict now reads
+  // the SAME `parseSegment` tokenizer the route-tree gate reads (`findSegmentGrammarError`),
+  // so backstop and gate cannot drift on a per-segment form. One pass over the RAW
+  // path (`splitPathSegments` is constraint-aware — a body can hold `/`) rejects
+  // every such form: name-less (#858), fused marker (#1050), trailing marker
+  // (#1324), optional splat (#1149), and the constraint forms empty / fused-suffix /
+  // in-static (#804/#1150/#1311). Each code maps to the existing matcher-level
+  // message (reject reason preserved per code; only the first-error ORDER on a
+  // multi-error path follows the left-to-right scan). So `processSegment` /
+  // `extractParamName` / `insertIntoTrieFrom` downstream see only grammatically
+  // valid segments — their former per-segment throws are removed.
+  for (const segment of splitPathSegments(rawNodePath)) {
+    const token = parseSegment(segment);
 
-  // Static text fused to a constraint's closing '>' (`/:year<\d+>-archive`, #1150):
-  // meta ends the name at '<' but the build side strips '<…>' then re-extracts the
-  // name greedily, fusing the suffix — build name ≠ meta name ⇒ a silent dead route
-  // (buildPath throws, match keys the constraint on a phantom name). The mirror of
-  // #1050 on the OTHER side of the param. route-tree's gate catches it first.
-  if (hasFusedConstraintSuffix(rawNodePath)) {
-    throwFusedConstraintSuffix(rawNodePath);
-  }
-
-  // A `<...>` constraint in a STATIC segment (no ':'/'*' marker) — `/foo<bar>`,
-  // `/a<b>` — is silently stripped by CONSTRAINT_PATTERN_RGX below (`/foo<bar>` →
-  // `/foo`), reshaping the route with no signal. #1150 catches only a constraint
-  // fused with TRAILING text; one cleanly ending a static segment slips through.
-  // Reject it, the sibling of #1050/#1150 on the static-segment axis (#1311).
-  if (hasConstraintInStaticSegment(rawNodePath)) {
-    throwConstraintInStaticSegment(rawNodePath);
+    if ("error" in token) {
+      throwSegmentGrammarError(token.error, segment, rawNodePath);
+    }
   }
 
   // Strip constraint patterns (e.g., <\d+>, <[^/]+>) from path before trie insertion.
@@ -568,6 +564,48 @@ function throwConstraintInStaticSegment(path: string): never {
   );
 }
 
+/**
+ * Dispatches a `parseSegment` grammar-error code (the per-segment backstop, Реш.2)
+ * to the matching matcher-level throw — the single place mapping the tokenizer's
+ * verdict onto the existing messages, so the reject reason stays byte-identical per
+ * code. `unbalanced-constraint` is unreachable (`isConstraintBalanced` rejects a
+ * stray delimiter first); kept for `SegmentErrorCode` exhaustiveness.
+ */
+function throwSegmentGrammarError(
+  code: SegmentErrorCode,
+  segment: string,
+  path: string,
+): never {
+  switch (code) {
+    case "name-less": {
+      return throwEmptyParamName();
+    }
+    case "trailing-marker": {
+      return throwTrailingMarker(segment);
+    }
+    case "fused-marker": {
+      return throwFusedMarker(segment);
+    }
+    case "optional-splat": {
+      return throwOptionalSplat(segment);
+    }
+    case "empty-constraint": {
+      return throwEmptyConstraint(path);
+    }
+    case "fused-constraint-suffix": {
+      return throwFusedConstraintSuffix(path);
+    }
+    case "constraint-in-static": {
+      return throwConstraintInStaticSegment(path);
+    }
+    /* v8 ignore start -- unreachable: isConstraintBalanced rejects a stray '<'/'>' before this runs */
+    case "unbalanced-constraint": {
+      return throwUnbalancedConstraint(path);
+    }
+    /* v8 ignore stop */
+  }
+}
+
 function throwDuplicateParamName(
   routeName: string,
   names: readonly string[],
@@ -659,14 +697,6 @@ function throwDuplicateRoutePath(existingName: string, newName: string): never {
 }
 
 /**
- * A `:`/`*` marker followed by a name. Detects a fused marker in a static-led
- * segment (#1050 backstop): reuses `PARAM_NAME_PATTERN` so it matches exactly
- * what the build/meta regexes would extract — a marker with NO name is left to
- * the name-less path ({@link throwEmptyParamName}, #858).
- */
-const FUSED_MARKER_RGX = new RegExp(`[:*]${PARAM_NAME_PATTERN}`);
-
-/**
  * Extracts the param name from a marker-led segment (`:name` / `:name?` /
  * `*name`), delegating the boundary to the canonical `parseSegment` tokenizer
  * (#1324) so the trie backstop, the route-tree gate, and `buildParamMeta` share
@@ -680,26 +710,12 @@ const FUSED_MARKER_RGX = new RegExp(`[:*]${PARAM_NAME_PATTERN}`);
 function extractParamName(segment: string): string {
   const token = parseSegment(segment);
 
-  if ("error" in token) {
-    // #1324: `:y*`/`:y:` — a name ending in a bare marker. parseSegment is the
-    // single owner of this boundary, so the backstop now agrees with the gate
-    // (was the one excluded divergence in gate-backstop-parity).
-    if (token.error === "trailing-marker") {
-      throwTrailingMarker(segment);
-    }
-
-    // Name-less `:`/`*`/`:?`/`:<…>` (#858), AND a `?`-suffixed non-marker segment
-    // the optional fork routed in (`faq?`, #1241): parseSegment now yields name-less
-    // for that too (an optional `?` with no param name), so the gate — reading the
-    // SAME tokenizer — rejects it identically (closes the last gate↔backstop drift,
-    // #1324 §4).
-    throwEmptyParamName();
-  }
-
-  // A `:`/`*`-led segment tokenizes as param|splat, and a `?`-suffixed static is
-  // name-less above, so `static` is unreachable here — narrowed for the type only.
-  /* v8 ignore start -- unreachable: no input reaching here tokenizes as static */
-  if (token.kind === "static") {
+  // registerNode's per-segment grammar pass (Реш.2) rejects every malformed segment
+  // — name-less (#858), trailing-marker (#1324), fused-marker (#1050), constraint
+  // forms — before trie insertion, so a param|splat name is guaranteed here. The
+  // error/`static` branches are unreachable, kept as a typed defensive backstop.
+  /* v8 ignore start -- unreachable: registerNode's grammar pass rejects non-name segments first */
+  if ("error" in token || token.kind === "static") {
     throwEmptyParamName();
   }
   /* v8 ignore stop */
@@ -945,13 +961,9 @@ function insertIntoTrieFrom(
     const segment = path.slice(start, segmentEnd);
 
     if (segment.endsWith("?")) {
-      if (segment.startsWith("*")) {
-        // Optional splat `*name?`: build uses the splat encoder (multi-segment)
-        // but this fork would compile a plain single-segment param — a
-        // match/build desync. Rejected (product decision, #1149).
-        throwOptionalSplat(segment);
-      }
-
+      // Optional param fork. An optional SPLAT (`*name?`, #1149) was already
+      // rejected by registerNode's per-segment grammar pass, so a `?`-suffixed
+      // segment reaching here is always an optional param.
       const paramName = extractParamName(segment);
       const paramChildNode = ensureParamChild(node, paramName, ownNodes);
 
@@ -1126,14 +1138,10 @@ function processSegment(
     return child;
   }
 
-  // The segment does not START with a marker, so it is compiled as a static
-  // literal below. A `:`/`*` (with a name) still lurking inside it is a marker
-  // fused to a static prefix (`a:b`, `x:id`, `a*b`): build/meta extract it as a
-  // param while this literal compilation ignores it, so the two drift (#1050).
-  // Reject it — the backstop for route-tree's route-contextual gate.
-  if (FUSED_MARKER_RGX.test(segment)) {
-    throwFusedMarker(segment);
-  }
+  // The segment does not start with a marker, so it compiles as a static literal.
+  // A `:`/`*` fused to a static prefix within it (`a:b`, `x:id`, `a*b`, #1050) was
+  // already rejected by the per-segment grammar pass in `registerNode` — a
+  // fused-marker segment never reaches this literal compilation.
 
   // #1154: a raw non-ASCII code point in a STATIC segment (`/café`, `/меню`).
   // match rejects any input byte ≥ 0x80 (`#scanPath`) AND compares static trie
