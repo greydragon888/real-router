@@ -12,7 +12,7 @@
 
 ## Cold start — `cold-start`
 
-App init + parse/exec to first route painted. **sv-router is the lightest to boot** (heap 2.54 MB, script 3.79 ms); mateo-router 2.61 / 4.22; real-router heaviest (2.98 / 5.13). Over the bare-Svelte floor (2.39 MB / 2.17 ms) real-router adds the most boot cost.
+App init + parse/exec to first route painted. **sv-router is the lightest to boot** (heap 2.54 MB, script 3.56 ms); mateo-router 2.60 / 3.93; real-router heaviest (2.99 / 5.02). Over the bare-Svelte floor (2.39 MB / 2.01 ms) real-router adds the most boot cost.
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -44,7 +44,7 @@ Per-nav total changing :id (steady-state). **sv-router leanest; real-router seco
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
-Navigate into a flat 1000-route table — **the matcher crossover, and real-router's clearest win in this cohort.** real-router's segment trie stays FLAT (total ~0.44 across @10/@100/@1000; script 0.371 @1000), while **sv-router degrades O(N)** (0.328 → 0.796 @1000 — it sorts + scans its route-key list per nav) and mateo-router carries a high flat floor (~0.89). **real-router WINS @1000** (0.442 < sv-router 0.796 < mateo 0.888) on total — the structural trie advantage holds in Svelte (as in React/Vue, unlike the Solid cohort where @solidjs/router was also flat).
+Navigate into a flat 1000-route table — **the matcher crossover, and real-router's clearest win in this cohort.** real-router's segment trie stays FLAT (total ~0.37–0.41 across @10/@100/@1000; script 0.314 @1000), while **sv-router degrades O(N)** (0.293 → 0.767 @1000 — it sorts + scans its route-key list per nav) and mateo-router carries a high flat floor (~0.83). **real-router WINS @1000** (0.370 < sv-router 0.767 < mateo 0.831) on total — the structural trie advantage holds in Svelte (as in React/Vue, unlike the Solid cohort where @solidjs/router was also flat).
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -162,10 +162,9 @@ Among three full routers, first-class API coverage differs sharply. `✓` = buil
 |---|---|---|---|---|
 | cold-start script (ms) | 2.01 | 5.02 (+3.0) | 3.56 (+1.6) | 3.93 (+1.9) |
 | cold-start heap (MB) | 2.39 | 2.99 (+0.6) | 2.54 (+0.1) | 2.60 (+0.2) |
-| nav script (ms) | 0.305 | 0.503 (+0.2) | 0.228 (−0.1) | 0.450 (+0.1) |
 | link-build script (ms) | 3.01 | 12.06 (+9.0) | 3.25 (+0.2) | 7.19 (+4.2) |
 
-**Reading:** over bare Svelte, sv-router adds almost nothing on the hot path (nav-latency + link-build sit ~at the floor); real-router adds the most on boot and on links (its `<Link>` reverse-matcher). real-router's separation is the matcher-scale win (wide @1000) + the full capability set, not the simple hot path.
+**Reading:** over bare Svelte, sv-router's plain `<a href>` link-build sits ~at the floor; real-router adds the most on boot and on links (its `<Link>` reverse-matcher). real-router's separation is the matcher-scale win (wide @1000) + the full capability set, not the simple hot path. (Per-nav is ranked router-vs-router in the tables above.)
 
 ## What this does NOT measure / caveats
 

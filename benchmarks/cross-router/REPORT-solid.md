@@ -4,7 +4,7 @@
 
 **Cohort:** `@real-router/solid` · `@solidjs/router` (the official Solid router) · `@tanstack/solid-router` — three full routers, like-for-like. Solid JSX apps (`vite-plugin-solid`, `dedupe: ['solid-js']`).
 
-**Scope — three full routers, like-for-like** (no minimalist exclusion needed). The honest picture, DIFFERENT from the React/Vue cohorts: **`@solidjs/router` is a remarkably lean router** and leads the scale floor (wide), table-heap memory, cold-start, nav-churn heap, and active-links. **real-router leads the per-nav *totals*** — nav-latency (0.347, the leanest here), param-nav, nested-switch, link-build — where its lean script + single `pushState` beat @solidjs/router's 2× Blink history; and it brings the full pipeline (guards, validated search, data, scroll). Two adapter soft-spots surface: real-router's heaviest per-nav FLOOR at scale (transition pipeline + browser-plugin History), and **`@real-router/solid`'s deep-nesting `RouteView` cost (#1094 — now ~linear after a bench-app fix removed an O(depth²) getter-chain artifact: 1.07 ms @90)** — an adapter issue, not the (framework-agnostic, flat-capable) core. **`@tanstack/solid-router` is generally heaviest** and cannot render 60+-deep nested routes (errors).
+**Scope — three full routers, like-for-like** (no minimalist exclusion needed). The honest picture, DIFFERENT from the React/Vue cohorts: **`@solidjs/router` is a remarkably lean router** and leads the scale floor (wide), table-heap memory, cold-start, nav-churn heap, and active-links. **real-router leads the per-nav *totals*** — nav-latency (0.344, the leanest here), param-nav, nested-switch, link-build — where its lean script + single `pushState` beat @solidjs/router's 2× Blink history; and it brings the full pipeline (guards, validated search, data, scroll). Two adapter soft-spots surface: real-router's heaviest per-nav FLOOR at scale (transition pipeline + browser-plugin History), and **`@real-router/solid`'s deep-nesting `RouteView` cost (#1094 — now ~linear after a bench-app fix removed an O(depth²) getter-chain artifact: 1.04 ms @90)** — an adapter issue, not the (framework-agnostic, flat-capable) core. **`@tanstack/solid-router` is generally heaviest** and cannot render 60+-deep nested routes (errors).
 
 **Run:** runs 30 · warmup 5 · throttle off · 2026-07-06T22:33:33.005Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
 
@@ -12,7 +12,7 @@
 
 ## Cold start — `cold-start`
 
-App init + parse/exec to first route painted. **@solidjs/router is the lightest to boot** (~2.6 ms script); **real-router is heaviest (~4.3 ms), tanstack ~3.8** — cold-start is real-router's known weak axis (eager `@real-router/core` parse + init, #1106; cross-cohort-consistent). Over the bare-Solid floor (~0.9 ms) all three add real startup, @solidjs/router the least.
+App init + parse/exec to first route painted. **@solidjs/router is the lightest to boot** (~2.6 ms script); **real-router is heaviest (~4.4 ms), tanstack ~3.8** — cold-start is real-router's known weak axis (eager `@real-router/core` parse + init, #1106; cross-cohort-consistent). Over the bare-Solid floor (~0.9 ms) all three add real startup, @solidjs/router the least.
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
@@ -44,7 +44,7 @@ Per-nav total changing :id (steady-state). **real-router leanest total** — @so
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
-Navigate into a flat 1000-route table. **All three matchers are FLAT** (no O(N) degradation): @solidjs/router total ~0.16, tanstack ~0.24, real-router ~0.38 across @10/@100/@1000. The differentiator is the per-nav FLOOR, not matcher scaling — **@solidjs/router's minimal pipeline is the leanest floor; real-router's full pipeline (transition + browser-plugin History) is the heaviest**, but flat. (Contrast React/Vue, where a competitor's matcher degrades O(N) and real-router's trie wins @1000 — here no competitor degrades, so the trie's structural edge doesn't separate them.)
+Navigate into a flat 1000-route table. **All three matchers are FLAT** (no O(N) degradation): @solidjs/router total ~0.15, tanstack ~0.21, real-router ~0.33 across @10/@100/@1000. The differentiator is the per-nav FLOOR, not matcher scaling — **@solidjs/router's minimal pipeline is the leanest floor; real-router's full pipeline (transition + browser-plugin History) is the heaviest**, but flat. (Contrast React/Vue, where a competitor's matcher degrades O(N) and real-router's trie wins @1000 — here no competitor degrades, so the trie's structural edge doesn't separate them.)
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
@@ -57,7 +57,7 @@ Navigate into a flat 1000-route table. **All three matchers are FLAT** (no O(N) 
 
 ## Route-table memory — heap to hold N routes (sweep) — `table-heap`
 
-Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **@solidjs/router lightest at 10k (5.61 MB); real-router 8.27; tanstack heaviest (10.66).** Unlike the React/Vue cohorts (real-router's trie wins memory), @solidjs/router's minimal route storage is leaner here.
+Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **@solidjs/router lightest at 10k (5.61 MB); real-router 8.30; tanstack heaviest (10.66).** Unlike the React/Vue cohorts (real-router's trie wins memory), @solidjs/router's minimal route storage is leaner here.
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
@@ -67,7 +67,7 @@ Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **@solidjs/router 
 
 ## Deep config — nesting depth (sweep) — `deep-config`
 
-Navigate into a 90-level nested chain. **@solidjs/router stays flat (~0.16 total); real-router rises ~linearly — 0.47 → 1.07 ms @90** (script 0.41 → 1.01). The steep O(d²) rise seen in earlier runs was a **bench-app artifact** (an O(depth²) lazy-getter chain, since fixed) — the residual ~linear cost is **`@real-router/solid`'s `RouteView` per-level composition (#1094)**, not the core matcher (the Vue adapter keeps deep-nav flat at ~0.20 ms @90). **@tanstack/solid-router is N/A** — it triggers its internal error boundary on 60+-segment deep routes (the @tanstack/react-router equivalent renders depth 90). Real apps rarely nest past ~10, where the gap is ~0.3 ms.
+Navigate into a 90-level nested chain. **@solidjs/router stays flat (~0.15 total); real-router rises ~linearly — 0.46 → 1.04 ms @90** (script 0.40 → 0.98). The steep O(d²) rise seen in earlier runs was a **bench-app artifact** (an O(depth²) lazy-getter chain, since fixed) — the residual ~linear cost is **`@real-router/solid`'s `RouteView` per-level composition (#1094)**, not the core matcher (the Vue adapter keeps deep-nav flat at ~0.20 ms @90). **@tanstack/solid-router is N/A** — it triggers its internal error boundary on 60+-segment deep routes (the @tanstack/react-router equivalent renders depth 90). Real apps rarely nest past ~10, where the gap is ~0.3 ms.
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
@@ -82,7 +82,7 @@ Navigate into a 90-level nested chain. **@solidjs/router stays flat (~0.16 total
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
-Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value — and **this is where forcing materialization bites the lazy routers.** **real-router stays FLAT (~0.49 @50, slope ~0)** — eager immutable params. **@solidjs/router RISES — slope ~5.5 µs/param**: its `useSearchParams()` reactive store charges a reactive read per value, so @1 it crushes real-router (0.18 vs 0.49) but by @50 they **CONVERGE (0.46 ≈ 0.49)**. tanstack also rises (~3.6 µs/param). At the realistic high-count end the lazy advantage erodes to parity — real-router's eager snapshot is the flat, predictable cost (read once, cheap forever). **`alloc/nav`** (GC-pressure axis): real-router's eager params reference URL-parsed strings, so per-nav allocation stays **flat** with query count — the memory counterpart to the flat `script` curve (react-cohort probe: real-router the leanest allocator; parse/validate pipelines allocate O(count) garbage).
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value — and **this is where forcing materialization bites the lazy routers.** **real-router stays FLAT (~0.40 @50, slope ~0)** — eager immutable params. **@solidjs/router RISES — slope ~5 µs/param**: its `useSearchParams()` reactive store charges a reactive read per value, so @1 it crushes real-router (0.14 vs 0.40) but by @50 they **CONVERGE (0.39 ≈ 0.40)**. tanstack also rises (~3.7 µs/param). At the realistic high-count end the lazy advantage erodes to parity — real-router's eager snapshot is the flat, predictable cost (read once, cheap forever). **`alloc/nav`** (GC-pressure axis): real-router's eager params reference URL-parsed strings, so per-nav allocation stays **flat** with query count — the memory counterpart to the flat `script` curve (react-cohort probe: real-router the leanest allocator; parse/validate pipelines allocate O(count) garbage).
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
@@ -96,7 +96,7 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 ## Nav churn (stress) — `nav-churn`
 
-200-nav stress; CPU/nav + retained heap. **real-router leanest CPU/nav — 0.35 total / 0.064 script per nav** (< tanstack 0.459 < @solidjs/router 0.534); **@solidjs/router retains the least heap (235 KB), real-router 299, tanstack 638.** `navsPerSec` is NOT comparable here: real-router navigates synchronously (churns 200 navs without yielding to frames → ~15k/s) while @solidjs/router + tanstack defer to the frame cadence (~121/s) — read CPU/nav + heap.
+200-nav stress; CPU/nav + retained heap. **real-router leanest CPU/nav — 0.32 total / 0.061 script per nav** (< tanstack 0.44 < @solidjs/router 0.52); **@solidjs/router retains the least heap (235 KB), real-router 299, tanstack 638.** `navsPerSec` is NOT comparable here: real-router navigates synchronously (churns 200 navs without yielding to frames → ~15k/s) while @solidjs/router + tanstack defer to the frame cadence (~121/s) — read CPU/nav + heap.
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
@@ -118,7 +118,7 @@ Per-nav total recompute across 100 links (steady-state toggle). **All three tigh
 
 ## Link build — mount 1000 links (href construction) — `link-build`
 
-CPU to mount 1000 links, each building its href. **real-router leanest (8.82 ms); @solidjs/router 9.93; tanstack ~3× (26.5).** Over the bare-`<a>` floor (1.9 ms) real-router adds the least reverse-matcher cost.
+CPU to mount 1000 links, each building its href. **real-router leanest (8.74 ms); @solidjs/router 9.91; tanstack ~3× (26.3).** Over the bare-`<a>` floor (1.9 ms) real-router adds the least reverse-matcher cost.
 
 | metric | real-router | solid-router | tanstack |
 |---|---|---|---|
@@ -162,10 +162,9 @@ Among three full routers, first-class API coverage differs. `✓` = built-in API
 |---|---|---|---|---|
 | cold-start script (ms) | 0.819 | 4.40 (+3.6) | 2.63 (+1.8) | 3.79 (+3.0) |
 | cold-start heap (MB) | 2.29 | 2.79 (+0.5) | 2.48 (+0.2) | 3.09 (+0.8) |
-| nav script (ms) | 0.036 | 0.061 (+0.0) | 0.078 (+0.0) | 0.129 (+0.1) |
 | link-build script (ms) | 1.94 | 8.74 (+6.8) | 9.91 (+8.0) | 26.26 (+24.3) |
 
-**Reading:** over bare Solid, all three add little on the hot path. real-router adds the least on navigation (nav-latency ≈ the floor) and links; @solidjs/router adds the least on cold-start. The separation is at scale (floor) and deep nesting (the adapter), not on the simple hot path.
+**Reading:** over bare Solid, all three add little. real-router adds the least on links; @solidjs/router adds the least on cold-start. The separation is at scale (floor) and deep nesting (the adapter), not on the simple hot path. (Per-nav is ranked router-vs-router in the tables above — real-router leads nav-latency here.)
 
 ## What this does NOT measure / caveats
 
@@ -175,7 +174,7 @@ Among three full routers, first-class API coverage differs. `✓` = built-in API
 - **`nav-churn` navsPerSec is NOT comparable** — real-router navigates synchronously (~14.7k/s), @solidjs/router + tanstack yield to frames (~123/s). Read CPU/nav + retained heap.
 - `real-router` includes `browser-plugin` (real History API) — part of its per-nav floor by contract.
 - `wide`/`deep` are scaling sweeps — the per-size *curve* matters (here wide is flat for all; deep separates real-router O(depth) from @solidjs/router flat).
-- **Per-nav `script` medians sit near timer granularity** (Solid's per-nav work is sub-0.1 ms → inflated *relative* variance). At n=15 they are within the RME gate except one — `@solidjs/router` `nav-latency` `scriptDurationMs` (16.3%). The close per-nav *totals* (active-links, nested-switch) turn on differences inside that noise; the headline findings (cold-start heap, wide/deep sweeps, table-heap, nav-latency total) rest on stable, larger-magnitude signals (RME < ~5%).
+- **Per-nav `script` medians sit near timer granularity** (Solid's per-nav work is sub-0.1 ms → inflated *relative* variance). At n=30 they all sit within the RME gate (worst: `@solidjs/router` `nav-latency` `scriptDurationMs`, ~7%). The close per-nav *totals* (active-links, nested-switch) turn on differences inside that noise; the headline findings (cold-start heap, wide/deep sweeps, table-heap, nav-latency total) rest on stable, larger-magnitude signals (RME < ~5%).
 
 Regenerate: `node cross-router/run-all.mjs && node cross-router/harness/report.mjs solid`.
 

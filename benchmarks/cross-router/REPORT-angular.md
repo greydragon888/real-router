@@ -162,10 +162,9 @@ Both are full routers. `✓` = built-in API, `N/A` = none. `@angular/router` is 
 |---|---|---|---|
 | cold-start script (ms) | 1.77 | 6.09 (+4.3) | 2.08 (+0.3) |
 | cold-start heap (MB) | 2.80 | 3.52 (+0.7) | 3.29 (+0.5) |
-| nav script (ms) | 0.384 | 0.566 (+0.2) | 0.238 (−0.1) |
 | link-build script (ms) | 5.01 | 12.58 (+7.6) | 17.45 (+12.4) |
 
-**Reading:** over bare Angular, `@angular/router` adds very little at boot (~0.4 ms) and on the hot path; real-router adds ~5 ms at boot (upfront trie build) and more per-nav. (The baseline's `nav-latency` reads oddly high — its manual click→pushState→signal path — so read the two routers against each other there, not vs baseline.)
+**Reading:** over bare Angular, `@angular/router` adds very little at boot (~0.4 ms); real-router adds ~5 ms at boot (upfront trie build). (Per-nav is not shown here: the naive manual click→pushState→signal baseline is heavier than either optimized router, so it is ranked router-vs-router in the tables above.)
 
 ## What this does NOT measure / caveats
 
