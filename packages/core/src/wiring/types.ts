@@ -16,12 +16,11 @@ import type { Limits } from "../types";
 import type { DefaultDependencies } from "@real-router/types";
 
 /**
- * Constructor options bag for RouterWiringBuilder.
- *
- * Contains all namespaces, FSM, emitter, and accessors needed to wire
- * inter-namespace dependencies.
+ * Shared bag of namespaces + accessors passed to {@link wireNamespaces} and its
+ * `wire*` functions — the sole input to wiring. One interface, referenced by
+ * every wire function, instead of a field list repeated across a builder class.
  */
-export interface WiringOptions<Dependencies extends DefaultDependencies> {
+export interface NamespaceBag<Dependencies extends DefaultDependencies> {
   /** Router instance — passed to namespaces for factory initialization */
   router: Router<Dependencies>;
   /** Options namespace */

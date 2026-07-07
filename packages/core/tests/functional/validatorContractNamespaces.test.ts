@@ -13,7 +13,7 @@ import type { RouterValidator, PluginFactory, Router } from "@real-router/core";
  * `RouteLifecycleNamespace`). Companion to api/validatorContract.test.ts.
  *
  * The getter is wired as `() => getInternals(router).validator`
- * (RouterWiringBuilder), so installing a spy validator after construction is
+ * (wireNamespaces), so installing a spy validator after construction is
  * picked up dynamically by the namespaces. See helpers/spyValidator for why a
  * spy (not the real validation-plugin) is the correct probe here.
  */

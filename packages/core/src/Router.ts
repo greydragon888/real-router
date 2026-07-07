@@ -34,7 +34,7 @@ import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamesp
 import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
 import { assertLoggerConfig } from "./typeGuards";
-import { RouterWiringBuilder, wireRouter } from "./wiring";
+import { wireNamespaces } from "./wiring";
 
 import type { RouterInternals } from "./internals";
 import type { DependenciesStore } from "./namespaces";
@@ -323,21 +323,19 @@ export class Router<
     // Wire Dependencies
     // =========================================================================
 
-    wireRouter(
-      new RouterWiringBuilder<Dependencies>({
-        router: this,
-        options: this.#options,
-        limits: this.#limits,
-        dependenciesStore: this.#dependenciesStore,
-        state: this.#state,
-        routes: this.#routes,
-        routeLifecycle: this.#routeLifecycle,
-        plugins: this.#plugins,
-        navigation: this.#navigation,
-        lifecycle: this.#lifecycle,
-        eventBus: this.#eventBus,
-      }),
-    );
+    wireNamespaces<Dependencies>({
+      router: this,
+      options: this.#options,
+      limits: this.#limits,
+      dependenciesStore: this.#dependenciesStore,
+      state: this.#state,
+      routes: this.#routes,
+      routeLifecycle: this.#routeLifecycle,
+      plugins: this.#plugins,
+      navigation: this.#navigation,
+      lifecycle: this.#lifecycle,
+      eventBus: this.#eventBus,
+    });
 
     // =========================================================================
     // Bind Public Methods

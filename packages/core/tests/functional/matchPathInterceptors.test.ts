@@ -12,7 +12,7 @@ import type { Params } from "@real-router/core";
  *
  * - **`forwardState` interceptors → applied.** `matchPath` calls
  *   `this.#deps.forwardState(...)` (`RoutesNamespace.ts:261`), which is wired
- *   through `ctx.forwardState` (`RouterWiringBuilder.ts:89-99`), which goes
+ *   through `ctx.forwardState` (`wireNamespaces.ts`), which goes
  *   through `createInterceptable2("forwardState", …)` in `Router.ts:195`.
  *
  * - **`buildPath` interceptors → NOT applied.** `matchPath` calls
@@ -140,7 +140,7 @@ describe("matchPath: interceptor application audit (#525, Q1)", () => {
       expect(buildPathCalls).toBe(0);
 
       // Plugin-equivalent flow: forward (name, params) into router.navigate.
-      // buildNavigateState (RouterWiringBuilder.ts:153) calls
+      // buildNavigateState (wireNamespaces.ts) calls
       // ctx.buildPath(name, params) — interceptor MUST run here.
       await router.navigate(matched!.name, matched!.params);
 

@@ -13,7 +13,7 @@ import { getPluginApi } from "@real-router/core/api";
  *    propagated to the committed `state.path`.
  *
  * 2. `router.navigate(name, params)` without source URL produces the
- *    canonical path. `buildNavigateState` (`RouterWiringBuilder.ts:135-156`)
+ *    canonical path. `buildNavigateState` (`wireNamespaces.ts`)
  *    has no source-URL hint, so the matcher's default policy applies. This
  *    is the documented contract for programmatic-only callers.
  *

@@ -1,7 +1,5 @@
 // packages/core/src/wiring/index.ts
 
-export { RouterWiringBuilder } from "./RouterWiringBuilder";
+export { wireNamespaces } from "./wireNamespaces";
 
-export { wireRouter } from "./wireRouter";
-
-export type { WiringOptions } from "./types";
+export type { NamespaceBag } from "./types";
