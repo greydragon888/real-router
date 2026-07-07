@@ -843,6 +843,15 @@ describe("search-params", () => {
       expect(parse("a[0]&a[1]=x", ix)).toStrictEqual({ a: [null, "x"] });
       expect(build(parse("a[0]&a[1]=x", ix), ix)).toBe("a[0]&a[1]=x");
     });
+
+    it("sanitizes a lone surrogate to U+FFFD instead of throwing (safeEncode, #1314)", () => {
+      // `parse` accepts a literal lone surrogate (identity decode), so `build` must
+      // stay total on it. Both encode sites — scalar/key and array element — route
+      // through `safeEncode` → `toWellFormed`.
+      expect(build({ a: "\uD800" })).toBe("a=%EF%BF%BD");
+      expect(build({ a: ["\uD800"] })).toBe("a=%EF%BF%BD");
+      expect(build(parse("a=\uD800"))).toBe("a=%EF%BF%BD");
+    });
   });
 });
 
