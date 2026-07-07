@@ -203,6 +203,9 @@ const arbOptionalSplatPath = fc
  */
 const arbUnconstrainedOptBeforeSplatPath = fc
   .tuple(arbSafeSegment, arbSafeSegment)
+  // distinct names — `/:ref?/*ref` (opt === rest) is a duplicate-param name, which
+  // the gate rejects via the dup-param check (VP12), not this one (VP11).
+  .filter(([opt, rest]) => opt !== rest)
   .map(([opt, rest]) => `/:${opt}?/*${rest}`);
 
 /**
