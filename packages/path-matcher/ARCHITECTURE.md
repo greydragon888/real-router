@@ -16,8 +16,12 @@
 path-matcher/
 ├── src/
 │   ├── SegmentMatcher.ts         — Main class: match(), buildPath(), registerTree()
-│   ├── registration.ts           — Route registration & trie building
+│   ├── registration/             — Route registration & trie building (split by concern:
+│   │                                index=entry+orchestration, context, errors, trieNodes, trie, buildParts)
 │   ├── buildParamMeta.ts         — Parameter metadata extraction from patterns
+│   ├── parseSegment.ts           — Segment grammar tokenizer (#1324): single owner of the per-segment
+│   │                                name/marker/constraint/optional grammar; splitPathSegments, findSegmentGrammarError
+│   ├── constraint-grammar.ts     — <…> constraint atom (CONSTRAINT_BODY_PATTERN) + isConstraintBalanced (whole-path)
 │   ├── encoding.ts               — URL parameter encoding/decoding (4 strategies)
 │   ├── percentEncoding.ts        — Percent encoding validation (%XX)
 │   ├── pathUtils.ts              — SegmentNode factory, trailing slash normalization, buildFullPath
@@ -276,6 +280,30 @@ Parameterless routes are stored in a `Map<normalizedPath, CompiledRoute>`:
 - Populated during `registerTree()`
 - O(1) lookup bypasses trie traversal entirely
 
+## Segment Grammar (`parseSegment`)
+
+`parseSegment(segment)` is the **single owner of the per-segment path grammar** (#1324). It
+char-scans one segment and returns a token — `static | param | splat` (with optional
+`constraint` / `optional`) — or one of **8 error codes**: `name-less`, `fused-marker`,
+`trailing-marker`, `optional-splat`, `constraint-in-static`, `fused-constraint-suffix`,
+`empty-constraint`, `unbalanced-constraint`. Every layer that reads path grammar consumes it, so
+none can disagree on where a name ends or whether a segment is malformed:
+
+| Layer          | Consumer                                                        | Via                                        |
+| -------------- | --------------------------------------------------------------- | ------------------------------------------ |
+| L1 meta        | `buildParamMeta` (`collectUrlParams`)                           | `splitPathSegments` + `parseSegment`       |
+| L2 build       | `compileBuildParts` (`registration/buildParts.ts`)              | `splitPathSegments` + `parseSegment` (#1324) |
+| L3 registration| `registerNode` grammar pre-pass + `extractParamName`            | `splitPathSegments` + `parseSegment` (#1324) |
+| L4 gate        | `route-tree`'s `validateRoutePath`                              | `findSegmentGrammarError`                  |
+
+- **`splitPathSegments`** splits a path on `/` **outside** `<…>` (a constraint body can contain
+  `/`), so it is safe on the raw, un-stripped path — the strip is now only a trie-insertion detail.
+- **`isConstraintBalanced`** (`constraint-grammar.ts`) is the ONE grammar check kept OUTSIDE
+  `parseSegment`: a stray `>` with no `<` is a whole-path balance property invisible to a
+  per-segment scan (`[^/?<]+` includes `>`).
+- **`findSegmentGrammarError`** is the narrow validation-facing entry (returns the first error code
+  or `undefined`); the tokenizer primitives stay internal (#740).
+
 ## Route Registration
 
 ### Registration Pipeline
@@ -287,6 +315,11 @@ registerTree(node)
 registerNode() — recursive walk of MatcherInputNode tree
     │
     ├── Compute full path (handle absolute paths)
+    ├── isConstraintBalanced() — reject a stray/unbalanced `<…>` (whole-path)
+    ├── Grammar pre-pass — parseSegment each RAW segment; reject any malformed form
+    │     (name-less / fused-marker / trailing-marker / optional-splat /
+    │      constraint-in-static / fused-suffix / empty) via throwSegmentGrammarError (#1324)
+    ├── hasMultipleOptionalsBeforeSplat() — reject ≥2 optionals before a splat (#1287)
     ├── Strip constraint patterns from path (for trie insertion)
     ├── compileAndRegisterRoute()
     │       ├── Detect slash-child routes
@@ -309,7 +342,12 @@ registerNode() — recursive walk of MatcherInputNode tree
 - **`:param` segments** → create `paramChild` with captured name
 - **`*splat` segments** → create `splatChild` with captured name
 - **Optional params** (`:param?`) → fork: insert both WITH and WITHOUT param node
-- **Name-less markers** (bare `:` / `*`, or `:?` / `:<…>` with no name) → **rejected** via `throwEmptyParamName`: an empty-keyed slot would desync match/build/meta (#858)
+
+**Malformed segments never reach insertion.** The `registerNode` grammar pre-pass (parseSegment,
+#1324) rejects every malformed form — name-less `:`/`*`, fused marker `a:b`, trailing marker
+`:y*`, optional splat `*x?`, constraint-in-static `foo<c>`, fused suffix `:id<c>x`, empty `<>` —
+before the trie is touched, so the insert path sees only valid segments (#858/#1050/#1149/#1150/#1311/#1324).
+`extractParamName` keeps a defensive `throwEmptyParamName` for the now-unreachable case.
 
 ### Build Parts Compilation
 
@@ -443,10 +481,13 @@ interface SegmentMatcherOptions {
 types.ts (leaf — no imports)
     ↓
     ├── percentEncoding.ts (leaf)
+    ├── constraint-grammar.ts (leaf — <…> atom + isConstraintBalanced)
+    ├── parseSegment.ts (leaf — the segment grammar tokenizer, #1324)
     ├── encoding.ts → types
     ├── pathUtils.ts → types
-    ├── buildParamMeta.ts → types  (exports PARAM_NAME_PATTERN — the single param-name grammar)
-    ├── registration.ts → types, pathUtils, encoding, buildParamMeta
+    ├── buildParamMeta.ts → types, parseSegment, constraint-grammar  (exports PARAM_NAME_PATTERN)
+    ├── registration/ → types, pathUtils, encoding, parseSegment, constraint-grammar
+    │                    (internal order: context ← errors ← trieNodes ← trie ← buildParts ← index)
     └── SegmentMatcher.ts → types, encoding, pathUtils, registration,
                             percentEncoding
 ```

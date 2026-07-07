@@ -258,6 +258,22 @@ const arbConstraintInStaticPath = fc
   .tuple(arbSafeSegment, arbSafeSegment)
   .map(([seg, body]) => `/${seg}<${body}>`);
 
+/**
+ * A param whose constraint body is BALANCED and non-empty (so
+ * `validateConstraintSyntax` lets it through) yet is NOT a valid regular
+ * expression — `<*x>`, `<(>`, `<[>`, `<+>`. `buildParamMeta` throws when it
+ * compiles the body to a `RegExp`; the gate must re-throw it as its
+ * route-contextual `TypeError` (not leak a bare `[buildParamMeta]` Error). This is
+ * the invalid-regex axis path-matcher #1324 closed at `registerTree`, mirrored at
+ * the gate — the one malformed class that previously escaped the gate's contract.
+ */
+const arbInvalidRegexConstraintPath = fc
+  .tuple(
+    fc.constantFrom("id", "x", "p", "slug"),
+    fc.constantFrom("*x", "(", "[", "+", "?", "*", "a(", "(?"),
+  )
+  .map(([name, body]) => `/:${name}<${body}>`);
+
 // =============================================================================
 // Route Name Validation
 // =============================================================================
@@ -496,6 +512,22 @@ describe("Route Path Validation", () => {
         expect(() => {
           validateRoutePath(path, "test", "add");
         }).toThrow(/constraint.*in a static segment/u);
+      },
+    );
+  });
+
+  describe("16: invalid-regex constraint body — '<*x>' throws the gate's route-contextual TypeError (high)", () => {
+    test.prop([arbInvalidRegexConstraintPath], { numRuns: NUM_RUNS.fast })(
+      "a constraint body that is not a valid regex re-throws as the gate's route-contextual TypeError, not a bare [buildParamMeta] Error (F1-residual, consistent with path-matcher #1324)",
+      (path: string) => {
+        // Must be the gate's own error type (TypeError), not the plain Error
+        // `buildParamMeta` throws — and must carry the route context.
+        expect(() => {
+          validateRoutePath(path, "myroute", "add");
+        }).toThrow(TypeError);
+        expect(() => {
+          validateRoutePath(path, "myroute", "add");
+        }).toThrow(/\[router\.add\] Invalid path for route "myroute"/u);
       },
     );
   });

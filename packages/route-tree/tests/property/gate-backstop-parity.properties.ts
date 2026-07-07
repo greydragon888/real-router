@@ -30,10 +30,12 @@ import { validateRoutePath } from "../../src/validation/routes";
  *
  * Deliberately EXCLUDED — documented single-layer behaviour, NOT parity bugs:
  * - gate-only string-format checks (`//`, whitespace, non-string, `~`): the
- *   backstop consumes an already-segmented, well-formed path;
- * - a `*` fused to the END of a param (`/:y*`): the gate reads the `*` as a
- *   name-less marker (reject), the backstop as the param name `y*` (accept) — a
- *   real grammar divergence, gate-masked in production, tracked separately.
+ *   backstop consumes an already-segmented, well-formed path.
+ *
+ * The trailing-marker `/:y*` divergence — gate rejected, backstop accepted — is
+ * now CLOSED (#1324): the backstop routes its param/splat name boundary through
+ * the same `parseSegment` tokenizer as the gate, so both reject it. It is a
+ * parity SCAN class below, no longer an exclusion.
  */
 
 // A route segment of safe lowercase letters — no markers, no constraints, ASCII.
@@ -89,6 +91,31 @@ const SCANS: readonly ScanClass[] = [
       .map(([m, n]) => `/${m}${n}`),
   },
   {
+    name: "trailing parameter marker (#1324)",
+    // a param/splat name ending in a bare marker — /:y*, /:y:, /*y:
+    malformed: fc
+      .tuple(
+        fc.constantFrom(":", "*"),
+        arbSafeSegment,
+        fc.constantFrom(":", "*"),
+      )
+      .map(([m, n, t]) => `/${m}${n}${t}`),
+    // a clean marker-led name, no trailing marker — /:id, /*rest
+    valid: fc
+      .tuple(fc.constantFrom(":", "*"), arbSafeSegment)
+      .map(([m, n]) => `/${m}${n}`),
+  },
+  {
+    name: "optional modifier on a marker-less segment (#1241 / #1324 §4)",
+    // a marker-less segment with a trailing `?` — `/faq?` — is an optional with no
+    // param name. The backstop rejects it via its `endsWith("?")` optional fork and
+    // the gate via `findSegmentGrammarError`; both now consume parseSegment's SAME
+    // name-less verdict, so they agree (this was the F1 gate↔backstop drift).
+    malformed: arbSafeSegment.map((s) => `/${s}?`),
+    // the same static without the trailing `?`
+    valid: arbSafeSegment.map((s) => `/${s}`),
+  },
+  {
     name: "non-ASCII static (#1154)",
     // a non-ASCII code point in a STATIC segment — /café, /меню
     malformed: fc
@@ -125,6 +152,21 @@ const SCANS: readonly ScanClass[] = [
       .tuple(arbSafeSegment, arbSafeSegment)
       .filter(([a, b]) => a !== b)
       .map(([a, b]) => `/:${a}/:${b}`),
+  },
+  {
+    name: "two optionals before splat (#1287)",
+    // two CONSTRAINED optionals directly before a splat — /:a<c>?/:b<c>?/*rest.
+    // Constrained so #1264's single-unconstrained-optional scan doesn't fire first;
+    // all three names distinct so it isn't a #1151 dup / param+splat clash instead.
+    malformed: fc
+      .tuple(arbSafeSegment, arbSafeSegment, arbSafeSegment)
+      .filter(([a, b, r]) => new Set([a, b, r]).size === 3)
+      .map(([a, b, r]) => `/:${a}<[a-z]+>?/:${b}<[a-z]+>?/*${r}`),
+    // a SINGLE constrained optional before a splat IS supported (#1264 A1) — both accept
+    valid: fc
+      .tuple(arbSafeSegment, arbSafeSegment)
+      .filter(([v, r]) => v !== r)
+      .map(([v, r]) => `/:${v}<[a-z]+>?/*${r}`),
   },
 ];
 

@@ -336,6 +336,29 @@ describe("validateRoutePath", () => {
           }).toThrow(/empty constraint/);
         });
       });
+
+      // A constraint body that is BALANCED and non-empty (so it clears the two
+      // checks above) but is NOT a valid regular expression — `<*x>`, `<(>`, `<[>`.
+      // `buildParamMeta` throws a plain `Error` compiling the body to a `RegExp`
+      // (path-matcher #1324); `validateRoutePath` wraps that call so it surfaces as
+      // the gate's route-contextual `TypeError`, not a bare `[buildParamMeta]` Error
+      // — the one malformed class that used to escape the gate contract (F1-residual).
+      it("should re-throw an invalid-regex constraint body as a route-contextual TypeError (#1324)", () => {
+        const paths = [
+          "/u/:id<*x>", // leading quantifier — "Nothing to repeat"
+          "/u/:id<(>", // unterminated group
+          "/u/:id<[>", // unterminated character class
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(TypeError);
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/^\[router\./);
+        });
+      });
     });
 
     describe("Name-less parameter markers (#863)", () => {
@@ -553,6 +576,32 @@ describe("validateRoutePath", () => {
           "/:id<[^/]+>?/*rest", // constraint containing '/'
           "/:a?/:b", // optional before a param, not a splat (A2)
           "/:lang?/home", // optional before a static
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
+      it("should throw for two optional params directly before a splat (#1287)", () => {
+        const paths = [
+          "/:a<[a-z]+>?/:b<[a-z]+>?/*rest", // two constrained optionals before a splat
+          "/:a<[^/]+>?/:b<[^/]+>?/*rest", // constraint containing '/'
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/two optional params directly before a splat/u);
+        });
+      });
+
+      it("should NOT flag a single constrained optional before a splat (#1287)", () => {
+        const paths = [
+          "/:v<[a-z]+>?/*rest", // one constrained optional → supported (#1264 A1)
+          "/:a<[a-z]+>?/:b<[a-z]+>?/end", // two optionals, but before a static
         ];
 
         paths.forEach((path) => {

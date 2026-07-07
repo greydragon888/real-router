@@ -10,19 +10,34 @@
 // it (#863) so the validation layer cannot drift from the matcher's own grammar.
 export { buildParamMeta, PARAM_NAME_PATTERN } from "./buildParamMeta";
 
+// The validation-facing entry over the segment tokenizer (#1324): route-tree's
+// `validateRoutePath` calls `findSegmentGrammarError` to detect the per-segment
+// grammar rejections (name-less / fused-marker / fused-constraint-suffix /
+// constraint-in-static / optional-splat / trailing-marker) via the SAME parser the
+// matcher uses, so the gate cannot drift from the matcher's grammar. The tokenizer
+// primitives (`parseSegment`, `splitPathSegments`) stay internal — only the
+// validation entry + its error-code type are public.
+export {
+  findSegmentGrammarError,
+  hasMultipleOptionalsBeforeSplat,
+} from "./parseSegment";
+
+export type { SegmentErrorCode } from "./parseSegment";
+
 // `CONSTRAINT_BODY_PATTERN` + `isConstraintBalanced` are the constraint-`<...>`
-// axis counterpart of `PARAM_NAME_PATTERN` (#804). `isConstraintBalanced` (the
-// balance predicate) is the one route-tree's validation gate consumes — replacing
-// route-tree's former local `hasBalancedConstraints`. `CONSTRAINT_BODY_PATTERN` (the
-// atom every *internal* match/strip/build regex here derives from) is exported as a
-// reserved/future constraint-grammar atom: it currently has NO external consumer
-// (route-tree consumes `isConstraintBalanced`, `hasConstraintInStaticSegment`,
-// `hasFusedConstraintSuffix` + `INVALID_QUERY_NAME_RGX`), kept exported so the
-// `<...>` grammar stays single-sourced from this package.
+// axis counterpart of `PARAM_NAME_PATTERN` (#804). route-tree's validation gate
+// consumes `isConstraintBalanced` (the balance predicate, replacing its former
+// local `hasBalancedConstraints`) + `INVALID_QUERY_NAME_RGX`. `CONSTRAINT_BODY_PATTERN`
+// (the atom the internal strip + query-mask regexes derive from) has NO external
+// consumer — kept exported as a reserved constraint-grammar atom so the `<...>`
+// grammar stays single-sourced. `isConstraintBalanced` is the ONE whole-path
+// constraint check left in `registerNode` (a stray `>` is invisible per-segment);
+// every OTHER grammar form — empty / fused-suffix / in-static / fused-marker /
+// name-less / trailing-marker / optional-splat — is now decided by the shared
+// `parseSegment` tokenizer (Реш.2 replaced the former `hasConstraintInStaticSegment`
+// / `hasFusedConstraintSuffix` char-scans, now removed).
 export {
   CONSTRAINT_BODY_PATTERN,
-  hasConstraintInStaticSegment,
-  hasFusedConstraintSuffix,
   INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
 } from "./constraint-grammar";
