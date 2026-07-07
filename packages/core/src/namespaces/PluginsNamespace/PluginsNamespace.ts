@@ -7,7 +7,6 @@ import { validatePlugin } from "./validators";
 
 import type { PluginsDependencies } from "./types";
 import type { PluginFactory } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   DefaultDependencies,
   Plugin,
@@ -27,7 +26,6 @@ export class PluginsNamespace<
   readonly #unsubscribes = new Set<Unsubscribe>();
 
   #deps!: PluginsDependencies<Dependencies>;
-  #getValidator: (() => RouterValidator | null) | null = null;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -44,10 +42,6 @@ export class PluginsNamespace<
 
   setDependencies(deps: PluginsDependencies<Dependencies>): void {
     this.#deps = deps;
-  }
-
-  setValidatorGetter(getter: () => RouterValidator | null): void {
-    this.#getValidator = getter;
   }
 
   // =========================================================================
@@ -72,9 +66,9 @@ export class PluginsNamespace<
    */
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
     // Emit warnings for count thresholds (not validation, just warnings)
-    this.#getValidator?.()?.plugins.validateCountThresholds(
-      this.#plugins.size + factories.length,
-    );
+    this.#deps
+      .getValidator()
+      ?.plugins.validateCountThresholds(this.#plugins.size + factories.length);
 
     // Fast path for single plugin (common case)
     if (factories.length === 1) {
@@ -215,7 +209,7 @@ export class PluginsNamespace<
 
     for (const plugin of plugins) {
       if (seenInBatch.has(plugin)) {
-        this.#getValidator?.()?.plugins.warnBatchDuplicates(plugins);
+        this.#deps.getValidator()?.plugins.warnBatchDuplicates(plugins);
       } else {
         seenInBatch.add(plugin);
       }
@@ -228,7 +222,7 @@ export class PluginsNamespace<
     const appliedPlugin = this.#deps.compileFactory(pluginFactory);
 
     PluginsNamespace.validatePlugin(appliedPlugin);
-    this.#getValidator?.()?.plugins.validatePluginKeys(appliedPlugin);
+    this.#deps.getValidator()?.plugins.validatePluginKeys(appliedPlugin);
 
     Object.freeze(appliedPlugin);
 
@@ -247,10 +241,10 @@ export class PluginsNamespace<
           );
 
           if (methodName === "onStart" && this.#deps.canNavigate()) {
-            this.#getValidator?.()?.plugins.warnPluginAfterStart(methodName);
+            this.#deps.getValidator()?.plugins.warnPluginAfterStart(methodName);
           }
         } else {
-          this.#getValidator?.()?.plugins.warnPluginMethodType(methodName);
+          this.#deps.getValidator()?.plugins.warnPluginMethodType(methodName);
         }
       }
     }

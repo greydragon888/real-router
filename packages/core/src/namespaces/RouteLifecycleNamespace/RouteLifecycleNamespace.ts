@@ -4,7 +4,6 @@ import { logger } from "@real-router/logger";
 
 import type { RouteLifecycleDependencies } from "./types";
 import type { GuardFnFactory } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
 
 // Boolean shorthand has only two possible values, so the guard and its factory
@@ -80,14 +79,9 @@ export class RouteLifecycleNamespace<
   ];
 
   #deps!: RouteLifecycleDependencies<Dependencies>;
-  #getValidator: (() => RouterValidator | null) | null = null;
 
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
     this.#deps = deps;
-  }
-
-  setValidatorGetter(getter: () => RouterValidator | null): void {
-    this.#getValidator = getter;
   }
 
   getHandlerCount(type: "activate" | "deactivate"): number {
@@ -141,7 +135,7 @@ export class RouteLifecycleNamespace<
     deactivateNames: Iterable<string>,
     clearsDefinition: boolean,
   ): void {
-    const validator = this.#getValidator?.();
+    const validator = this.#deps.getValidator();
 
     if (!validator) {
       return;
@@ -513,7 +507,9 @@ export class RouteLifecycleNamespace<
     const isOverwrite = targetMap.has(name) || otherMap.has(name);
 
     if (isOverwrite) {
-      this.#getValidator?.()?.lifecycle.warnOverwrite(name, type, methodName);
+      this.#deps
+        .getValidator()
+        ?.lifecycle.warnOverwrite(name, type, methodName);
     } else {
       // Single enforcement choke point for EVERY registration path: programmatic
       // (getLifecycleApi) and route-config (getRoutesApi.add/update, where
@@ -522,7 +518,7 @@ export class RouteLifecycleNamespace<
       // warning follows. Only new slots count toward the limit — an overwrite
       // leaves the count unchanged. `getHandlerCount` is read once and only when
       // the validator is installed (opt-in), so the no-plugin path stays free.
-      const validator = this.#getValidator?.();
+      const validator = this.#deps.getValidator();
 
       if (validator) {
         const count = this.getHandlerCount(type);
@@ -653,7 +649,7 @@ export class RouteLifecycleNamespace<
         return result;
       }
 
-      this.#getValidator?.()?.lifecycle.warnAsyncGuardSync(name, methodName);
+      this.#deps.getValidator()?.lifecycle.warnAsyncGuardSync(name, methodName);
 
       return false;
     } catch (error) {

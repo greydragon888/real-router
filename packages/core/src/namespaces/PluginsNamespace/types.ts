@@ -1,6 +1,7 @@
 // packages/core/src/namespaces/PluginsNamespace/types.ts
 
 import type { EventMethodMap, PluginFactory } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   DefaultDependencies,
   EventName,
@@ -19,4 +20,11 @@ export interface PluginsDependencies<
   canNavigate: () => boolean;
 
   compileFactory: (factory: PluginFactory<Dependencies>) => Plugin;
+
+  /**
+   * Returns the opt-in DX validator, or `null` when no validation-plugin is
+   * installed. A plain deps field (#1331) — internals are registered before
+   * wiring, so `getInternals(router)` never throws and no try/catch is needed.
+   */
+  getValidator: () => RouterValidator | null;
 }

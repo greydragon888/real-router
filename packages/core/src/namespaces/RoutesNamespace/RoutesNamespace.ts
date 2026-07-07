@@ -154,11 +154,28 @@ export class RoutesNamespace<
   // =========================================================================
 
   /**
-   * Sets dependencies and registers pending canActivate handlers.
-   * canActivate handlers from initial routes are deferred until deps are set.
+   * Sets dependencies. Pure assignment — no side effects (#1331).
+   *
+   * The pending canActivate/canDeactivate factories from initial routes are
+   * flushed separately by {@link flushPendingGuards}, called once wiring is
+   * complete, so the order of the wire-* calls is unconstrained.
    */
   setDependencies(deps: RoutesDependencies<Dependencies>): void {
     this.#store.depsStore = deps;
+  }
+
+  /**
+   * Registers the pending guard factories collected from initial route
+   * definitions. Deferred out of {@link setDependencies} (#1331) so it runs on
+   * a fully-built, fully-bound router: a guard factory that calls any
+   * `router.*` method sees a ready instance instead of a half-assembled one.
+   *
+   * Invoked as the last step of the Router constructor. Idempotent after the
+   * first call (the pending maps are cleared). Runtime `add()`/`replace()`
+   * compile guards in their own PREPARE phase and never populate these maps.
+   */
+  flushPendingGuards(): void {
+    const deps = this.#deps;
 
     for (const [routeName, handler] of this.#store.pendingCanActivate) {
       deps.addActivateGuard(routeName, handler);

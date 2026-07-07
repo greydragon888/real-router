@@ -247,3 +247,58 @@ describe("boolean-shorthand guard factory caching (#962)", () => {
     router.stop();
   });
 });
+
+describe("initial-route guard factories see a fully-built router (#1331)", () => {
+  it("does not throw from router.* calls made inside a canActivate factory", () => {
+    // Regression for D1: guard factories from initial route definitions used to
+    // run mid-construction on a half-assembled router — buildPath /
+    // isActiveRoute / usePlugin threw a misleading "Invalid router instance —
+    // not found in internals registry". Deferring the flush to the last line of
+    // the constructor (#1331) makes the factory see a fully wired, registered,
+    // and bound instance.
+    const calls: Record<string, string> = {};
+
+    const record = (label: string, fn: () => unknown): void => {
+      try {
+        fn();
+        calls[label] = "ok";
+      } catch (error) {
+        calls[label] = error instanceof Error ? error.message : String(error);
+      }
+    };
+
+    let factoryRan = false;
+
+    const router = createRouter([
+      {
+        name: "a",
+        path: "/a",
+        canActivate: (r) => {
+          factoryRan = true;
+          record("getState", () => r.getState());
+          record("buildPath", () => r.buildPath("a"));
+          record("isActiveRoute", () => r.isActiveRoute("a"));
+          record("usePlugin", () => r.usePlugin(() => ({})));
+
+          return () => true;
+        },
+      },
+    ]);
+
+    // The factory ran during construction (flushPendingGuards), before here.
+    expect(factoryRan).toBe(true);
+    expect(calls).toStrictEqual({
+      getState: "ok",
+      buildPath: "ok",
+      isActiveRoute: "ok",
+      usePlugin: "ok",
+    });
+
+    // The guard is genuinely registered and enforced afterwards.
+    const routes = getRoutesApi(router);
+
+    expect(routes.get("a")?.canActivate).toBeDefined();
+
+    router.stop();
+  });
+});

@@ -53,19 +53,12 @@ export class RouterWiringBuilder<
   wireRouteLifecycleDeps(): void {
     const routeLifecycleDeps: RouteLifecycleDependencies<Dependencies> = {
       compileFactory: this.createCompileFactory(),
+      // Internals are registered before wiring (#1331), so this never throws —
+      // returns null until validation-plugin installs the validator.
+      getValidator: () => getInternals(this.router).validator,
     };
 
     this.routeLifecycle.setDependencies(routeLifecycleDeps);
-    this.routeLifecycle.setValidatorGetter(
-      /* v8 ignore next 3 -- @preserve: returns null during construction (before registerInternals) */
-      () => {
-        try {
-          return getInternals(this.router).validator;
-        } catch {
-          return null;
-        }
-      },
-    );
   }
 
   wireRoutesDeps(): void {
@@ -113,19 +106,12 @@ export class RouterWiringBuilder<
         this.eventBus.addEventListener(eventName, cb),
       canNavigate: () => this.eventBus.canBeginTransition(),
       compileFactory: this.createCompileFactory(),
+      // Internals are registered before wiring (#1331), so this never throws —
+      // returns null until validation-plugin installs the validator.
+      getValidator: () => getInternals(this.router).validator,
     };
 
     this.plugins.setDependencies(pluginsDeps);
-    this.plugins.setValidatorGetter(
-      /* v8 ignore next 3 -- @preserve: returns null during construction (before registerInternals) */
-      () => {
-        try {
-          return getInternals(this.router).validator;
-        } catch {
-          return null;
-        }
-      },
-    );
   }
 
   wireNavigationDeps(): void {

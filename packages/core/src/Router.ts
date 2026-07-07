@@ -204,28 +204,12 @@ export class Router<
     });
 
     // =========================================================================
-    // Wire Dependencies
-    // =========================================================================
-
-    wireRouter(
-      new RouterWiringBuilder<Dependencies>({
-        router: this,
-        options: this.#options,
-        limits: this.#limits,
-        dependenciesStore: this.#dependenciesStore,
-        state: this.#state,
-        routes: this.#routes,
-        routeLifecycle: this.#routeLifecycle,
-        plugins: this.#plugins,
-        navigation: this.#navigation,
-        lifecycle: this.#lifecycle,
-        eventBus: this.#eventBus,
-      }),
-    );
-
-    // =========================================================================
     // Register Internals (WeakMap for plugin/infrastructure access)
     // =========================================================================
+    // Registered BEFORE wiring (#1331) so every namespace's deps-closure sees a
+    // router already present in the internals registry — `getInternals(router)`
+    // never throws during wiring, and guard factories flushed at the end of the
+    // constructor see a fully-registered instance.
 
     const interceptorsMap: RouterInternals["interceptors"] = new Map();
 
@@ -336,6 +320,26 @@ export class Router<
     });
 
     // =========================================================================
+    // Wire Dependencies
+    // =========================================================================
+
+    wireRouter(
+      new RouterWiringBuilder<Dependencies>({
+        router: this,
+        options: this.#options,
+        limits: this.#limits,
+        dependenciesStore: this.#dependenciesStore,
+        state: this.#state,
+        routes: this.#routes,
+        routeLifecycle: this.#routeLifecycle,
+        plugins: this.#plugins,
+        navigation: this.#navigation,
+        lifecycle: this.#lifecycle,
+        eventBus: this.#eventBus,
+      }),
+    );
+
+    // =========================================================================
     // Bind Public Methods
     // =========================================================================
     // All public methods that access private fields must be bound to preserve
@@ -374,6 +378,17 @@ export class Router<
     this.subscribe = this.subscribe.bind(this);
     this.subscribeLeave = this.subscribeLeave.bind(this);
     this.isLeaveApproved = this.isLeaveApproved.bind(this);
+
+    // =========================================================================
+    // Flush initial-route guard factories
+    // =========================================================================
+    // Deferred out of wiring (#1331): the pending canActivate/canDeactivate
+    // factories from initial route definitions are compiled and executed HERE,
+    // on the fully-built and bound router — so a factory that calls
+    // `router.buildPath()` / `isActiveRoute()` / `usePlugin()` no longer hits a
+    // half-assembled instance. Runtime add()/replace() compile guards in their
+    // own PREPARE phase and never touch these pending maps.
+    this.#routes.flushPendingGuards();
   }
 
   // ============================================================================

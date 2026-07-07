@@ -4,14 +4,15 @@ import type { RouterWiringBuilder } from "./RouterWiringBuilder";
 import type { DefaultDependencies } from "@real-router/types";
 
 /**
- * Director function — calls RouterWiringBuilder methods in the correct dependency order.
+ * Director function — invokes the wire-* methods that inject inter-namespace
+ * dependencies.
  *
- * ORDER MATTERS:
- * - `wireLimits()` first: all namespaces must have limits before any other setup
- * - `wireRouteLifecycleDeps()` BEFORE `wireRoutesDeps()`: RoutesNamespace.setDependencies()
- *   registers pending canActivate handlers which require RouteLifecycleNamespace to be ready
- * - `wireNavigationDeps()` BEFORE `wireLifecycleDeps()`: lifecycle deps reference
- *   NavigationNamespace.navigate() which requires navigation deps to be set
+ * Call order is arbitrary (#1331). Each wire-* method only stores deps-closures
+ * on its namespace; none runs user code or eagerly reads another namespace's
+ * deps, so there is no ordering constraint between them. (The former
+ * "RouteLifecycle before Routes" requirement was an artifact of flushing pending
+ * guards inside `RoutesNamespace.setDependencies`; that flush now runs after all
+ * wiring completes, from the constructor's `flushPendingGuards()` call.)
  */
 export function wireRouter<Dependencies extends DefaultDependencies>(
   builder: RouterWiringBuilder<Dependencies>,
