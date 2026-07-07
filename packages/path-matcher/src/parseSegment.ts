@@ -253,3 +253,35 @@ export function findSegmentGrammarError(
 
   return undefined;
 }
+
+/**
+ * Whether a path places ≥2 optional params DIRECTLY before a splat
+ * (`/:a?/:b?/*rest`, `/:a<c>?/:b<c>?/*rest`, #1287). A single trie slot carries
+ * only one optional→splat fork, so the outer optional's mark overwrites the
+ * inner's — the omit-outer/take-inner form silently reshapes into the splat.
+ *
+ * A whole-path (cross-segment) property that `parseSegment` cannot decide per
+ * segment — so, like `isConstraintBalanced`, it is shared verbatim between the
+ * matcher's `registerTree` backstop and `route-tree`'s validation gate, and the
+ * two cannot drift. Runs on the RAW path: `splitPathSegments` is constraint-aware,
+ * so a `<[^/]+>` body does not break the segment split.
+ */
+export function hasMultipleOptionalsBeforeSplat(path: string): boolean {
+  const segments = splitPathSegments(path);
+
+  for (let i = 2; i < segments.length; i += 1) {
+    if (
+      segments[i].startsWith("*") &&
+      isOptionalParamSegment(segments[i - 1]) &&
+      isOptionalParamSegment(segments[i - 2])
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isOptionalParamSegment(segment: string): boolean {
+  return segment.startsWith(":") && segment.endsWith("?");
+}

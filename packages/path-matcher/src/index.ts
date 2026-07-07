@@ -17,7 +17,10 @@ export { buildParamMeta, PARAM_NAME_PATTERN } from "./buildParamMeta";
 // matcher uses, so the gate cannot drift from the matcher's grammar. The tokenizer
 // primitives (`parseSegment`, `splitPathSegments`) stay internal — only the
 // validation entry + its error-code type are public.
-export { findSegmentGrammarError } from "./parseSegment";
+export {
+  findSegmentGrammarError,
+  hasMultipleOptionalsBeforeSplat,
+} from "./parseSegment";
 
 export type { SegmentErrorCode } from "./parseSegment";
 

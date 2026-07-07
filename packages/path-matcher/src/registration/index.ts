@@ -7,7 +7,11 @@ import {
   INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
 } from "../constraint-grammar";
-import { parseSegment, splitPathSegments } from "../parseSegment";
+import {
+  hasMultipleOptionalsBeforeSplat,
+  parseSegment,
+  splitPathSegments,
+} from "../parseSegment";
 import { buildFullPath, normalizeTrailingSlash } from "../pathUtils";
 import { compileBuildParts } from "./buildParts";
 import {
@@ -93,10 +97,9 @@ export function registerNode(
   // #1287: two optional params directly before a splat can't be represented by a
   // single trie-slot fork — the outer optional's mark overwrites the inner's, silently
   // reshaping the omit-outer/take-inner form into the splat (`/:a<c1>?/:b<c2>?/*rest`).
-  // Reject. Scanned on the CONSTRAINT-STRIPPED path so a plain segment split is safe (a
-  // constraint body can contain '/'). Both must be constrained, else #1264 B already
-  // rejects the inner unconstrained optional→splat.
-  if (hasMultipleOptionalsBeforeSplat(nodePath)) {
+  // Reject. The predicate is shared verbatim with route-tree's validation gate (it runs
+  // on the RAW path — `splitPathSegments` is constraint-aware), so the two can't drift.
+  if (hasMultipleOptionalsBeforeSplat(rawNodePath)) {
     throwMultipleOptionalsBeforeSplat(rawNodePath);
   }
 
@@ -329,26 +332,4 @@ function validateQueryParamDeclarations(
       throwPathQueryNameCollision(routeName, name);
     }
   }
-}
-
-// #1287: ≥2 optional params directly before a splat. Runs on the CONSTRAINT-STRIPPED
-// path, so a plain `/` split is safe (a constraint body can contain '/').
-function hasMultipleOptionalsBeforeSplat(strippedPath: string): boolean {
-  const segments = strippedPath.split("/");
-
-  for (let i = 2; i < segments.length; i++) {
-    if (
-      segments[i].startsWith("*") &&
-      isOptionalParamSegment(segments[i - 1]) &&
-      isOptionalParamSegment(segments[i - 2])
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function isOptionalParamSegment(segment: string): boolean {
-  return segment.startsWith(":") && segment.endsWith("?");
 }

@@ -562,6 +562,32 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("should throw for two optional params directly before a splat (#1287)", () => {
+        const paths = [
+          "/:a<[a-z]+>?/:b<[a-z]+>?/*rest", // two constrained optionals before a splat
+          "/:a<[^/]+>?/:b<[^/]+>?/*rest", // constraint containing '/'
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/two optional params directly before a splat/u);
+        });
+      });
+
+      it("should NOT flag a single constrained optional before a splat (#1287)", () => {
+        const paths = [
+          "/:v<[a-z]+>?/*rest", // one constrained optional → supported (#1264 A1)
+          "/:a<[a-z]+>?/:b<[a-z]+>?/end", // two optionals, but before a static
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).not.toThrow();
+        });
+      });
+
       it("should NOT flag a boundary marker or a marker-led greedy name (controls)", () => {
         const paths = [
           "/a/:b", // boundary marker — the canonical correct form

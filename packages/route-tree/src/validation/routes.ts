@@ -3,6 +3,7 @@
 import {
   buildParamMeta,
   findSegmentGrammarError,
+  hasMultipleOptionalsBeforeSplat,
   INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
 } from "path-matcher";
@@ -198,6 +199,35 @@ function hasUnconstrainedOptionalBeforeSplat(path: string): boolean {
 }
 
 /**
+ * Rejects an optional param placed directly before a splat, in both shapes: a
+ * single UNCONSTRAINED optional (`/:v?/*rest`, #1264 — no validity signal to
+ * disambiguate take-vs-skip) and TWO optionals (`/:a<c>?/:b<c>?/*rest`, #1287 —
+ * one trie slot carries a single fork). Both silently reshape multi-segment input.
+ * Both predicates are shared with path-matcher's `registerTree` backstop, so the
+ * gate and the backstop can't drift; this adds the route-contextual message.
+ */
+function validateOptionalBeforeSplat(
+  pathPattern: string,
+  routeName: string,
+  path: string,
+  methodName: string,
+): void {
+  if (hasUnconstrainedOptionalBeforeSplat(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": an unconstrained optional param before a splat is not supported in "${path}" — it is ambiguous (every multi-segment value has two readings). Add a constraint (e.g. ':lang<[a-z]+>?') or model it as two routes`,
+    );
+  }
+
+  if (hasMultipleOptionalsBeforeSplat(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": two optional params directly before a splat are not supported in "${path}" — a single trie slot carries one optional→splat fork, so the omit-outer/take-inner form would silently reshape into the splat. Split into two routes, or drop the '?' on one`,
+    );
+  }
+}
+
+/**
  * Maps a per-segment grammar error code (from `findSegmentGrammarError`) to the
  * gate's route-contextual message. The messages are the ones the removed per-check
  * scans threw, verbatim (#1324). `trailing-marker` reuses the name-less message —
@@ -367,17 +397,10 @@ export function validateRoutePath(
     );
   }
 
-  // Unconstrained optional param before a splat (`/:v?/*rest`). No constraint =
-  // no validity signal to disambiguate take vs skip → every multi-segment value
-  // has two readings, so `match` would silently reshape half the input space.
-  // Reject with a hint (path-matcher backstops at `registerTree`); a CONSTRAINED
-  // optional→splat (`/:v<c>?/*rest`) IS supported (#1264, SUPPORT-NARROWER A1).
-  if (hasUnconstrainedOptionalBeforeSplat(pathPattern)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": an unconstrained optional param before a splat is not supported in "${path}" — it is ambiguous (every multi-segment value has two readings). Add a constraint (e.g. ':lang<[a-z]+>?') or model it as two routes`,
-    );
-  }
+  // Reject an optional param placed directly before a splat — a single
+  // UNCONSTRAINED optional (#1264) or TWO optionals (#1287). Both predicates are
+  // shared verbatim with path-matcher's `registerTree` backstop.
+  validateOptionalBeforeSplat(pathPattern, routeName, path, methodName);
 
   // Raw non-ASCII in a STATIC segment (`/café`, `/меню`, #1154). match rejects
   // non-ASCII input and compares static keys raw, so the route registers but never

@@ -153,6 +153,21 @@ const SCANS: readonly ScanClass[] = [
       .filter(([a, b]) => a !== b)
       .map(([a, b]) => `/:${a}/:${b}`),
   },
+  {
+    name: "two optionals before splat (#1287)",
+    // two CONSTRAINED optionals directly before a splat — /:a<c>?/:b<c>?/*rest.
+    // Constrained so #1264's single-unconstrained-optional scan doesn't fire first;
+    // all three names distinct so it isn't a #1151 dup / param+splat clash instead.
+    malformed: fc
+      .tuple(arbSafeSegment, arbSafeSegment, arbSafeSegment)
+      .filter(([a, b, r]) => new Set([a, b, r]).size === 3)
+      .map(([a, b, r]) => `/:${a}<[a-z]+>?/:${b}<[a-z]+>?/*${r}`),
+    // a SINGLE constrained optional before a splat IS supported (#1264 A1) — both accept
+    valid: fc
+      .tuple(arbSafeSegment, arbSafeSegment)
+      .filter(([v, r]) => v !== r)
+      .map(([v, r]) => `/:${v}<[a-z]+>?/*${r}`),
+  },
 ];
 
 describe("gate ↔ backstop parity (#1320 Tier 2)", () => {

@@ -74,6 +74,7 @@ describe("L2 build (#1324) — trailing '?' on an optional param + empty query (
     const m = createMatcher([{ name: "r", path: "/:a??" }]);
 
     const url = m.buildPath("r", { a: "v0" });
+
     expect(url).toBe("/v0"); // was "/v0?" under the old paramRgx build
 
     // Both the new and the pre-migration URL round-trip to the same params.
