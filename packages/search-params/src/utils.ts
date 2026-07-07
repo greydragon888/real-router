@@ -58,8 +58,15 @@ const LONE_SURROGATE_RGX =
 export const safeEncode = (value: string | number | boolean): string => {
   try {
     return encodeURIComponent(value);
-  } catch {
-    // URIError: lone surrogate → U+FFFD, keeping build total.
+  } catch (error) {
+    // Only a lone surrogate (URIError) is sanitized. Anything else is a real error
+    // the caller must see — e.g. a Symbol value throws `TypeError` here, and
+    // `String(symbol)` would silently coerce it to "Symbol(…)" instead of rethrowing.
+    if (!(error instanceof URIError)) {
+      throw error;
+    }
+
+    // Lone surrogate → U+FFFD, keeping build total.
     return encodeURIComponent(
       String(value).replaceAll(LONE_SURROGATE_RGX, "�"),
     );
