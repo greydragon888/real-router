@@ -44,7 +44,7 @@ graph LR
 
 | Consumer       | What it uses        | Purpose                                      |
 | -------------- | ------------------- | -------------------------------------------- |
-| **route-tree** | `parse()`           | DI into SegmentMatcher as `parseQueryString` |
+| **route-tree** | `parseQuery()`      | DI into SegmentMatcher as `parseQueryString` |
 | **route-tree** | `build()`           | DI into SegmentMatcher as `buildQueryString` |
 | **route-tree** | `ArrayFormat`, etc. | Type re-exports for public API               |
 
@@ -54,7 +54,7 @@ graph LR
 // route-tree/createMatcher.ts
 const qp = options?.queryParams;
 new SegmentMatcher({
-  parseQueryString: (qs) => parse(qs, qp), // DI: search-params
+  parseQueryString: (qs) => parseQuery(qs, qp), // DI: search-params
   buildQueryString: (p) => build(p, qp), // DI: search-params
 });
 ```
@@ -177,10 +177,10 @@ interface ArrayStrategy {
 
 #### Number Formats
 
-| Format   | Decoding                                                                  |
-| -------- | ------------------------------------------------------------------------- |
-| `"none"` | No conversion — numbers remain strings                                    |
-| `"auto"` | `/^-?(0\|[1-9]\d*)(\.\d+)?$/` → `Number()` (codePointAt scan, no regex engine; rejects leading-zero/exponent/unsafe-int) |
+| Format   | Decoding                                                                                                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"none"` | No conversion — numbers remain strings                                                                                                                                                            |
+| `"auto"` | `/^-?(0\|[1-9]\d*)(\.\d+)?$/` → `Number()` (codePointAt scan, no regex engine; rejects leading-zero/exponent/unsafe-int, and negative-zero via an `Object.is` guard the grammar alone would miss) |
 
 Encoding is not needed — `encode.ts` handles `typeof value === "number"` via `encodeURIComponent` regardless of format.
 
@@ -311,24 +311,24 @@ No circular dependencies.
 
 ### Complexity
 
-| Operation     | Complexity | Notes                                 |
-| ------------- | ---------- | ------------------------------------- |
-| `parse()`     | O(n)       | n = query string length, single pass  |
-| `build()`     | O(n)       | n = total value lengths               |
+| Operation | Complexity | Notes                                |
+| --------- | ---------- | ------------------------------------ |
+| `parse()` | O(n)       | n = query string length, single pass |
+| `build()` | O(n)       | n = total value lengths              |
 
 ### Optimizations
 
-| Optimization                             | Benefit                                          |
-| ---------------------------------------- | ------------------------------------------------ |
-| Empty string fast path                   | O(1) for empty query strings                     |
-| No-options path                          | Reuses cached `DEFAULT_OPTIONS` — no re-resolution or allocation |
-| `DEFAULT_OPTIONS` constant               | Cached default strategies, no allocation         |
-| Index-based iteration                    | No `split("&")` intermediate array               |
-| `decodeValue` two-check                  | Most values skip decoding entirely               |
-| `replaceAll` instead of `split().join()` | No intermediate array for `+` replacement         |
-| Inline bracket scan in parse             | No `{ name, hasBrackets }` object allocation      |
-| Loop instead of `.map().join()` in arrays | No intermediate array during encoding              |
-| `codePointAt` scan in numberFormat       | No regex engine overhead                          |
+| Optimization                              | Benefit                                                          |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| Empty string fast path                    | O(1) for empty query strings                                     |
+| No-options path                           | Reuses cached `DEFAULT_OPTIONS` — no re-resolution or allocation |
+| `DEFAULT_OPTIONS` constant                | Cached default strategies, no allocation                         |
+| Index-based iteration                     | No `split("&")` intermediate array                               |
+| `decodeValue` two-check                   | Most values skip decoding entirely                               |
+| `replaceAll` instead of `split().join()`  | No intermediate array for `+` replacement                        |
+| Inline bracket scan in parse              | No `{ name, hasBrackets }` object allocation                     |
+| Loop instead of `.map().join()` in arrays | No intermediate array during encoding                            |
+| `codePointAt` scan in numberFormat        | No regex engine overhead                                         |
 
 ### Memory
 
@@ -339,11 +339,11 @@ No circular dependencies.
 
 ## Error Handling
 
-| Case                       | Behavior                                                          |
-| -------------------------- | ----------------------------------------------------------------- |
-| Invalid array element type | `TypeError` during `build()` for `undefined` / objects only; a `null` element round-trips via the bare-key form per array format (#1155) |
-| `undefined` values         | Skipped in `build()` (not serializable)                           |
-| Objects in params          | Fallback to `encodeURIComponent(obj)` → `"%5Bobject%20Object%5D"` |
+| Case                       | Behavior                                                                                                                                                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invalid array element type | `TypeError` during `build()` for `undefined` / objects only; a `null` element round-trips via the bare-key form per array format (#1155)                                                                  |
+| `undefined` values         | Skipped in `build()` (not serializable)                                                                                                                                                                   |
+| Objects in params          | Fallback to `encodeURIComponent(obj)` → `"%5Bobject%20Object%5D"`                                                                                                                                         |
 | Malformed query string     | Best-effort parse: missing `=` → `null` (scalar or array element — round-trips via the bare-key form, #1155); empty chunks (`&&`, leading/trailing `&`) are skipped, not injected as a `""` param (#1156) |
 
 ## See Also
