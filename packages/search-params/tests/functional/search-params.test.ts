@@ -858,9 +858,7 @@ describe("search-params", () => {
       // `TypeError` in `encodeURIComponent`, and `String(symbol)` would silently
       // coerce it to "Symbol(…)" — the catch must rethrow so core still rejects the
       // navigation (core `edge-cases-input-validation` pins this).
-      expect(() =>
-        build({ a: Symbol("s") as unknown as string }),
-      ).toThrow(TypeError);
+      expect(() => build({ a: Symbol("s") })).toThrow(TypeError);
     });
   });
 });
