@@ -10,6 +10,17 @@
 // it (#863) so the validation layer cannot drift from the matcher's own grammar.
 export { buildParamMeta, PARAM_NAME_PATTERN } from "./buildParamMeta";
 
+// The validation-facing entry over the segment tokenizer (#1324): route-tree's
+// `validateRoutePath` calls `findSegmentGrammarError` to detect the per-segment
+// grammar rejections (name-less / fused-marker / fused-constraint-suffix /
+// constraint-in-static / optional-splat / trailing-marker) via the SAME parser the
+// matcher uses, so the gate cannot drift from the matcher's grammar. The tokenizer
+// primitives (`parseSegment`, `splitPathSegments`) stay internal — only the
+// validation entry + its error-code type are public.
+export { findSegmentGrammarError } from "./parseSegment";
+
+export type { SegmentErrorCode } from "./parseSegment";
+
 // `CONSTRAINT_BODY_PATTERN` + `isConstraintBalanced` are the constraint-`<...>`
 // axis counterpart of `PARAM_NAME_PATTERN` (#804). `isConstraintBalanced` (the
 // balance predicate) is the one route-tree's validation gate consumes — replacing

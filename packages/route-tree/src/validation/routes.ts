@@ -2,14 +2,13 @@
 
 import {
   buildParamMeta,
-  hasConstraintInStaticSegment,
-  hasFusedConstraintSuffix,
+  findSegmentGrammarError,
   INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
-  PARAM_NAME_PATTERN,
 } from "path-matcher";
 
 import type { RouteTree } from "../types";
+import type { SegmentErrorCode } from "path-matcher";
 
 /**
  * Creates a TypeError with consistent router error message format.
@@ -121,53 +120,6 @@ function validateQueryParamDeclarations(
 }
 
 /**
- * Matches a `:`/`*` marker NOT followed by a valid param-name char — a name-less
- * marker (`:`, `*`, `:?`, `:<\d+>`). Derived from the single `PARAM_NAME_PATTERN`
- * grammar (#738) so this validation gate can never drift from the matcher's own
- * grammar: `[:*]` then a negative lookahead for the name class. path-matcher
- * rejects name-less markers at `registerTree` (#858); this catches them earlier,
- * at the validation layer, with a route-contextual error (#863).
- */
-const EMPTY_PARAM_MARKER_RGX = new RegExp(`[:*](?!${PARAM_NAME_PATTERN})`);
-
-/**
- * Reports whether a path fuses a `:`/`*` marker to a static prefix WITHIN a
- * segment (`/a:b`, `/users/x:id`, `/a*b`). build/meta's unanchored param regex
- * extracts such a marker as a param, but the trie honors a marker only at
- * segment start and compiles the whole segment as a static literal — so the
- * route's build and match shapes drift and `buildPath` emits a URL its own
- * `match` rejects (#1050). The sibling of the name-less rejection (#858/#863):
- * an ambiguous marker placement the three parsers cannot agree on.
- *
- * A single linear scan, NOT a regex on a `<...>`-stripped string (the strip is
- * the incomplete-tag-sanitizer pattern CodeQL flags — see `isConstraintBalanced`
- * for the same reasoning). A marker counts as fused only when its segment did
- * NOT start with a marker: a marker-led segment's name and `<...>` constraint may
- * themselves contain `:`/`*` (`/:a:b` is the param `a:b`; `/:id<\d*>` a valid
- * quantifier), whereas a `<...>` in a static-led segment is malformed and a
- * marker inside it still drifts build-vs-trie, so it is (correctly) flagged —
- * matching the path-matcher backstop, which tests the raw static segment. Runs
- * AFTER the name-less check, so any marker reaching here is name-bearing.
- */
-function hasFusedMidSegmentMarker(path: string): boolean {
-  let atSegmentStart = true;
-  let segmentStartedWithMarker = false;
-
-  for (const char of path) {
-    if (char === "/") {
-      atSegmentStart = true;
-    } else if (atSegmentStart) {
-      segmentStartedWithMarker = char === ":" || char === "*";
-      atSegmentStart = false;
-    } else if ((char === ":" || char === "*") && !segmentStartedWithMarker) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
  * Reports whether a path has a raw non-ASCII code point (≥ U+0080) in a STATIC
  * segment (`/café`, `/меню`, #1154). match rejects any non-ASCII input byte
  * (`#scanPath`) and compares static trie keys raw, so such a route registers but
@@ -216,41 +168,6 @@ function hasNonAsciiStatic(path: string): boolean {
 }
 
 /**
- * Reports whether a path contains an optional splat `*name?` — a segment that
- * both starts with `*` (splat) and carries the optional `?`. `buildParamMeta`/
- * build classify it as a splat (multi-segment, `/`-preserving encoder) but the
- * trie's optional fork compiles a single-segment plain param, so `buildPath`
- * emits multi-segment URLs its own `match` rejects. Rejected (product decision,
- * #1149); path-matcher backstops at `registerTree`.
- *
- * A linear scan, not a regex — matches the `hasFusedMidSegmentMarker` /
- * `isConstraintBalanced` convention (and dodges a `sonarjs/super-linear-regex`
- * false positive on the char-class-then-`?` form). Runs on the query-stripped
- * `pathPattern`, so a required splat followed by a query (`*path?download`) is
- * NOT flagged. A splat name cannot contain `?` (`PARAM_NAME_PATTERN` excludes
- * it), so a `?` anywhere in a `*`-led segment is unambiguously the optional
- * marker. Sibling of the fused (#1050) / name-less (#863) marker rejections.
- */
-function hasOptionalSplat(path: string): boolean {
-  let atSegmentStart = true;
-  let splatSegment = false;
-
-  for (const char of path) {
-    if (char === "/") {
-      atSegmentStart = true;
-      splatSegment = false;
-    } else if (atSegmentStart) {
-      splatSegment = char === "*";
-      atSegmentStart = false;
-    } else if (char === "?" && splatSegment) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
  * Reports whether a path has an UNCONSTRAINED optional param directly before a
  * splat (`/:v?/*rest`, #1264). Without a constraint there is no validity signal to
  * disambiguate "take the optional" from "let the splat capture" — every
@@ -259,7 +176,7 @@ function hasOptionalSplat(path: string): boolean {
  * optional→splat (`/:v<c>?/*rest`) IS supported. path-matcher backstops at
  * `registerTree`; this gate adds the route-contextual message.
  *
- * A linear scan (same convention as `hasOptionalSplat`; constraints may contain
+ * A linear scan (constraints may contain
  * `/`, so no split/regex): an optional marker `?` whose preceding char is NOT `>`
  * (a constrained optional ends `<…>?`) and which is immediately followed by `/*`.
  * A `?` inside a constraint (`<\d?>`) is followed by `>`, not `/*`, so it is not
@@ -278,6 +195,43 @@ function hasUnconstrainedOptionalBeforeSplat(path: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * Maps a per-segment grammar error code (from `findSegmentGrammarError`) to the
+ * gate's route-contextual message. The messages are the ones the removed per-check
+ * scans threw, verbatim (#1324). `trailing-marker` reuses the name-less message —
+ * the gate previously lumped `:y*` there via `EMPTY_PARAM_MARKER_RGX`.
+ */
+function gateGrammarMessage(
+  code: SegmentErrorCode,
+  routeName: string,
+  path: string,
+): string {
+  switch (code) {
+    case "name-less":
+    case "trailing-marker": {
+      return `Invalid path for route "${routeName}": parameter marker (':' or '*') without a name in "${path}"`;
+    }
+    case "fused-marker": {
+      return `Invalid path for route "${routeName}": parameter marker (':' or '*') must begin a segment, but "${path}" fuses one to a static prefix (use a boundary marker like "/a/:b")`;
+    }
+    case "fused-constraint-suffix": {
+      return `Invalid path for route "${routeName}": text fused to a constraint '>' in "${path}" (a '<...>' must end its segment or be followed by '/' or an optional '?' — use "/:id<...>/rest", not "/:id<...>rest")`;
+    }
+    case "constraint-in-static": {
+      return `Invalid path for route "${routeName}": constraint '<...>' in a static segment in "${path}" (a '<...>' must follow a parameter marker ':' or '*' — attach it to a param like "/:id<...>", or drop it)`;
+    }
+    case "optional-splat": {
+      return `Invalid path for route "${routeName}": optional splat ('*name?') is not supported in "${path}" — a splat cannot be optional (use a required splat '*name')`;
+    }
+    /* v8 ignore start -- unbalanced/empty `<>` are pre-rejected by validateConstraintSyntax above; unreachable here */
+    case "unbalanced-constraint":
+    case "empty-constraint": {
+      return `Invalid path for route "${routeName}": invalid constraint in "${path}"`;
+    }
+    /* v8 ignore stop */
+  }
 }
 
 /**
@@ -318,7 +272,7 @@ function hasUnconstrainedOptionalBeforeSplat(path: string): boolean {
 // whitespace, format, double-slash, constraint syntax, name-less / fused /
 // optional-splat / unconstrained-opt-before-splat markers, absolute-under-param).
 // Each is a simple early throw; extracting them would only scatter one checklist.
-// eslint-disable-next-line sonarjs/cognitive-complexity -- linear guard sequence (see above)
+
 export function validateRoutePath(
   path: unknown,
   routeName: string,
@@ -397,59 +351,19 @@ export function validateRoutePath(
     path,
   );
 
-  // Name-less parameter marker. A `:`/`*` with no following name passes every
-  // format check above, but path-matcher rejects it at `registerTree` (#858) with
-  // a non-route-contextual error. Reject it here at the gate too (#863).
-  if (EMPTY_PARAM_MARKER_RGX.test(pathPattern)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": parameter marker (':' or '*') without a name in "${path}"`,
-    );
-  }
+  // Per-segment grammar rejections via the canonical `parseSegment` tokenizer
+  // (#1324): `findSegmentGrammarError` runs the same split+parse the matcher uses,
+  // so the gate cannot drift. Replaces the five per-check scans (name-less
+  // #858/#863, fused-marker #1050, fused-constraint-suffix #1150,
+  // constraint-in-static #1311, optional-splat #1149) and adds the trailing-marker
+  // case (`:y*`, previously mis-diagnosed as name-less). Unbalanced/empty `<>` are
+  // pre-rejected by validateConstraintSyntax above, so those codes never reach here.
+  const grammarError = findSegmentGrammarError(pathPattern);
 
-  // Fused mid-segment marker. A `:`/`*` after a static prefix WITHIN a segment
-  // passes the name-less check above (it HAS a name), but build/meta extract it
-  // as a param while the trie compiles the segment as a literal — so `buildPath`
-  // emits a URL its own `match` rejects. Reject it here at the gate (path-matcher
-  // backstops at `registerTree`), the sibling of #863 (#1050).
-  if (hasFusedMidSegmentMarker(pathPattern)) {
+  if (grammarError !== undefined) {
     throw createRouterError(
       methodName,
-      `Invalid path for route "${routeName}": parameter marker (':' or '*') must begin a segment, but "${path}" fuses one to a static prefix (use a boundary marker like "/a/:b")`,
-    );
-  }
-
-  // Static text fused to a constraint's closing '>' (`/:year<\d+>-archive`, #1150).
-  // Meta ends the name at '<' but build strips '<…>' and re-extracts the name
-  // greedily, fusing the suffix — build name ≠ meta name ⇒ a silent dead route.
-  // Reject at the gate (path-matcher backstops at `registerTree`), the mirror of
-  // #1050 on the other side of the param.
-  if (hasFusedConstraintSuffix(pathPattern)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": text fused to a constraint '>' in "${path}" (a '<...>' must end its segment or be followed by '/' or an optional '?' — use "/:id<...>/rest", not "/:id<...>rest")`,
-    );
-  }
-
-  // A `<...>` constraint in a STATIC segment (no ':'/'*' marker) — `/foo<bar>` — is
-  // silently stripped by path-matcher, reshaping the route with no signal. #1150
-  // catches only a constraint fused with trailing text; one cleanly ending a static
-  // segment slips through. The sibling of #1050/#1150 on the static-segment axis (#1311).
-  if (hasConstraintInStaticSegment(pathPattern)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": constraint '<...>' in a static segment in "${path}" (a '<...>' must follow a parameter marker ':' or '*' — attach it to a param like "/:id<...>", or drop it)`,
-    );
-  }
-
-  // Optional splat `*name?`. build treats it as a multi-segment splat but the
-  // trie's optional fork compiles a single-segment plain param — so `buildPath`
-  // emits a URL its own `match` rejects. Reject at the gate (path-matcher
-  // backstops at `registerTree`), the sibling of #1050/#863 (#1149).
-  if (hasOptionalSplat(pathPattern)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": optional splat ('*name?') is not supported in "${path}" — a splat cannot be optional (use a required splat '*name')`,
+      gateGrammarMessage(grammarError, routeName, path),
     );
   }
 
