@@ -679,6 +679,40 @@ describe("SegmentMatcher", () => {
     });
   });
 
+  // A `:`/`*` marker fused to the END of a param name (`/:y*`, `/:y:`) — the
+  // build/meta name class `[^/?<]+` greedily swallows the trailing marker into
+  // the name (`y*`) while the route-tree gate reads it as name-less and rejects.
+  // parseSegment ends the name before a trailing marker (#1324), so this backstop
+  // now agrees with the gate — the former excluded gate↔backstop divergence is
+  // closed. The trie L3 flip: bare core previously registered this dead route.
+  describe("registerTree — trailing parameter marker rejection (#1324)", () => {
+    it("throws on a param name ending in a bare '*' (/:y*)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/:y*" }]);
+      }).toThrow(/Trailing parameter marker/);
+    });
+
+    it("throws on a param name ending in a bare ':' (/:y:)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/:y:" }]);
+      }).toThrow(/Trailing parameter marker/);
+    });
+
+    it("throws on a splat name ending in a bare marker (/*y:)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/*y:" }]);
+      }).toThrow(/Trailing parameter marker/);
+    });
+
+    // A `?`-suffixed non-marker segment routed through the optional fork tokenizes
+    // as `static`, not a param — a static segment cannot be optional (#1241).
+    it("throws on a '?'-suffixed static segment (/faq? — not optional, #1241)", () => {
+      expect(() => {
+        createMatcher([{ name: "r", path: "/faq?" }]);
+      }).toThrow(/Empty parameter name/);
+    });
+  });
+
   // Static text fused AFTER a constraint (`/:year<\d+>-archive`, `/:id<\d+>.html`):
   // meta terminates the name at `<` (name `year`), but build strips `<…>` then
   // re-extracts greedily (name `year-archive`) — build name ≠ meta name, so the

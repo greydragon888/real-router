@@ -7,6 +7,7 @@ import {
   isConstraintBalanced,
 } from "./constraint-grammar";
 import { encodeParam, ENCODING_METHODS } from "./encoding";
+import { parseSegment } from "./parseSegment";
 import {
   buildFullPath,
   createSegmentNode,
@@ -402,6 +403,25 @@ function throwFusedMarker(segment: string): never {
 }
 
 /**
+ * Rejects a param name ending in a bare marker (`:y*`, `:y:`, #1324): the
+ * build/meta name class (`[^/?<]+`) greedily swallows the trailing `:`/`*` into
+ * the name (`y*`) while the route-tree gate reads it as a name-less marker and
+ * rejects — a real gate↔backstop divergence (formerly excluded from the parity
+ * property, gate-masked in production). `parseSegment` ends the name before a
+ * trailing marker, so this backstop now agrees with the gate. The sibling of
+ * {@link throwEmptyParamName} (#858) / {@link throwFusedMarker} (#1050) on the
+ * trailing-marker axis.
+ */
+function throwTrailingMarker(segment: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Trailing parameter marker in segment "${segment}": ` +
+      `a param name cannot end in a bare ':' or '*' (e.g. ':y*' — the name is 'y' plus a ` +
+      `stray marker). build/meta would capture the marker into the name while the gate ` +
+      `rejects it as name-less — the two disagree, so it is rejected.`,
+  );
+}
+
+/**
  * #1154: whether a STATIC segment carries a code point outside ASCII (≥ U+0080).
  * A raw non-ASCII static (`café`) registers but never matches — match rejects
  * non-ASCII input and compares static keys raw. A per-code-point scan (`for…of`
@@ -635,13 +655,6 @@ function throwDuplicateRoutePath(existingName: string, newName: string): never {
 }
 
 /**
- * The param name is the run of grammar chars right after the marker, up to a
- * `<…>` constraint or a trailing optional `?`. `PARAM_NAME_PATTERN` (`[^/?<]+`)
- * already excludes `/`, `?`, and `<`, so one positive match captures the name.
- */
-const PARAM_NAME_RGX = new RegExp(`^[:*](${PARAM_NAME_PATTERN})`);
-
-/**
  * A `:`/`*` marker followed by a name. Detects a fused marker in a static-led
  * segment (#1050 backstop): reuses `PARAM_NAME_PATTERN` so it matches exactly
  * what the build/meta regexes would extract — a marker with NO name is left to
@@ -650,25 +663,39 @@ const PARAM_NAME_RGX = new RegExp(`^[:*](${PARAM_NAME_PATTERN})`);
 const FUSED_MARKER_RGX = new RegExp(`[:*]${PARAM_NAME_PATTERN}`);
 
 /**
- * Extracts the param name from a `:name` / `:name?` / `:name<…>` segment,
- * rejecting a name-less `:` (#858). Single source for the param branch in
- * `processSegment` and the optional fork in `insertIntoTrieFrom`, so the two
- * can't diverge.
- *
- * Matches the name **positively** against the grammar rather than stripping the
- * `<…>` constraint with a global replace: the strip form leaves a dangling `<`
- * on a malformed/unterminated constraint (`:id<…` with no `>`) — which CodeQL
- * flags as incomplete multi-character sanitization — whereas the positive match
- * stops at the first `<`/`?` and never lets constraint text leak into the name.
+ * Extracts the param name from a marker-led segment (`:name` / `:name?` /
+ * `*name`), delegating the boundary to the canonical `parseSegment` tokenizer
+ * (#1324) so the trie backstop, the route-tree gate, and `buildParamMeta` share
+ * ONE grammar and cannot drift. Rejects a name-less marker (#858), the #1324
+ * trailing marker (`:y*`/`:y:`), and a `?`-suffixed non-marker segment the
+ * optional fork routes here (`faq?` → static → not an optional param, #1241).
+ * Single source for the param branch in `processSegment` and the optional fork
+ * in `insertIntoTrieFrom`. Called on the constraint-stripped segment, so
+ * parseSegment sees only the name + optional marker.
  */
 function extractParamName(segment: string): string {
-  const paramName = PARAM_NAME_RGX.exec(segment)?.[1] ?? "";
+  const token = parseSegment(segment);
 
-  if (paramName === "") {
+  if ("error" in token) {
+    // #1324: `:y*`/`:y:` — a name ending in a bare marker. parseSegment is the
+    // single owner of this boundary, so the backstop now agrees with the gate
+    // (was the one excluded divergence in gate-backstop-parity).
+    if (token.error === "trailing-marker") {
+      throwTrailingMarker(segment);
+    }
+
+    // Name-less `:`/`*`/`:?`/`:<…>` (#858).
     throwEmptyParamName();
   }
 
-  return paramName;
+  // A static segment reaching here is a `?`-suffixed non-marker segment the
+  // optional fork routed in (`faq?`): a static cannot be an optional param, so
+  // it is the same name-less rejection (#1241).
+  if (token.kind === "static") {
+    throwEmptyParamName();
+  }
+
+  return token.name;
 }
 
 /**
@@ -1069,12 +1096,10 @@ function processSegment(
   ownNodes: Set<SegmentNode>,
 ): SegmentNode {
   if (segment.startsWith("*")) {
-    const splatName = segment.slice(1);
-
-    if (splatName === "") {
-      throwEmptyParamName();
-    }
-
+    // extractParamName (via parseSegment) rejects a name-less `*` (#858) AND a
+    // trailing marker (`*y:`, #1324) — the splat name shares one boundary with
+    // the param branch, the optional fork, and the route-tree gate.
+    const splatName = extractParamName(segment);
     const child = ensureSplatChild(node, splatName, ownNodes);
 
     // Stryker disable next-line BooleanLiteral: equivalent — sets hasChildren on the node ACQUIRING a splat child; only a splat NODE's own hasChildren is read (in #matchSplat), and splat-of-splat is unreachable (splat is terminal-greedy). Proven by injection.
