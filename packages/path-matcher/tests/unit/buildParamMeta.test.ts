@@ -362,4 +362,31 @@ describe("buildParamMeta", () => {
       );
     });
   });
+
+  describe("invalid constraint body rejected (robustness)", () => {
+    it.each(["/:id<*x>", "/:id<(>", "/:id<[>", "/:a<+>"])(
+      "%s → clean error, not a raw RegExp SyntaxError",
+      (path) => {
+        // An invalid regex body would otherwise crash `new RegExp("^(*x)$")` with a
+        // raw V8 SyntaxError deep in tree-building (`computeCaches`) OR the
+        // validation gate — both call `buildParamMeta`. It is rejected cleanly at
+        // the single compile site instead.
+        let err: unknown;
+
+        try {
+          buildParamMeta(path);
+        } catch (error) {
+          err = error;
+        }
+
+        expect(err).toBeInstanceOf(Error);
+        expect((err as Error).constructor.name).not.toBe("SyntaxError");
+        expect((err as Error).message).toContain("Invalid constraint");
+      },
+    );
+
+    it("a valid constraint body still compiles", () => {
+      expect(() => buildParamMeta(String.raw`/:id<\d+>`)).not.toThrow();
+    });
+  });
 });
