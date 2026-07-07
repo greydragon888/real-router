@@ -7,6 +7,173 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-07]
 
+### @real-router/core@0.72.0
+
+### Minor Changes
+
+- [#1332](https://github.com/greydragon888/real-router/pull/1332) [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject two optional params directly before a splat in the validation gate too ([#1287](https://github.com/greydragon888/real-router/issues/1287))
+
+  path-matcher's `registerTree` already rejected a path with ≥2 optional params directly before a splat (`/:a<c>?/:b<c>?/*rest`) — a single trie slot carries one optional→splat fork, so the omit-outer/take-inner form silently reshapes into the splat. But route-tree's validation gate (`validateRoutePath`, used by `@real-router/validation-plugin`) did not, so a validation-plugin user got a raw `registerTree` throw instead of the gate's route-contextual error — the last cross-segment gate↔backstop drift. The gate now rejects it with a route-contextual message. The `hasMultipleOptionalsBeforeSplat` predicate is single-sourced in path-matcher and imported by both layers, so — like `isConstraintBalanced` — the two can no longer drift.
+
+- [#1332](https://github.com/greydragon888/real-router/pull/1332) [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject a trailing parameter marker (`/:y*`, `/:y:`, `/*y:`) at route registration ([#1324](https://github.com/greydragon888/real-router/issues/1324))
+
+  A param or splat name ending in a bare `:`/`*` marker was silently registered as a dead route by bare core — `buildPath` then threw `Missing required param 'y'` — while the validation plugin's gate rejected it: a gate↔backstop grammar divergence. The route-path grammar is now single-sourced through one `parseSegment` tokenizer, so the trie backstop and the gate agree — such a path is rejected at registration with a clear `Trailing parameter marker …` error instead of compiling an unmatchable route. A mid-name marker (`/:a:b` → param `a:b`) is unaffected.
+
+  Two further validation-plugin gate edge cases now match bare core's backstop (they previously diverged, in both directions): a marker-less segment with a trailing `?` (`/faq?` — an optional modifier with no param name) is now rejected by the gate too, matching the registration error it always produced; and a static segment ending in a lone bare marker (`/a:`, `/a*` — a valid literal segment) is now accepted by the gate, matching the route bare core always registered.
+
+- [#1332](https://github.com/greydragon888/real-router/pull/1332) [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33) Thanks [@greydragon888](https://github.com/greydragon888)! - Route registration decides every per-segment grammar rejection through the shared `parseSegment` tokenizer ([#1324](https://github.com/greydragon888/real-router/issues/1324))
+
+  `registerTree`'s bare-core backstop previously spread its grammar rejections across separate char-scans: three whole-path constraint guards (`hasFusedConstraintSuffix`, `hasConstraintInStaticSegment`, and an `<>` literal check), a `FUSED_MARKER_RGX` in the trie's static branch, and per-branch throws in `extractParamName` / the optional fork. These collapse into a single `parseSegment` pass in `registerNode` — the SAME tokenizer the validation-plugin gate reads — so the backstop and the gate can no longer drift on any per-segment grammar form (name-less, fused marker, trailing marker, optional splat, empty / fused-suffix / constraint-in-static). The one whole-path check a per-segment scan cannot make — an unbalanced or stray `<`/`>` — stays as `isConstraintBalanced`.
+
+  The set of accepted vs rejected route paths is unchanged (verified path-by-path across the grammar), and every accepted route's params / match / buildPath is byte-identical. What changes is the error MESSAGE on some malformed paths: because the tokenizer decides per segment left-to-right, an empty constraint filling a static segment (`/foo<>`) now reports `Constraint '<...>' in a static segment` instead of `Empty constraint`, and a path with multiple grammar errors reports the first by left-to-right scan rather than the old guard order. Only code that registers a malformed route and asserts the exact rejection message is affected.
+
+### Patch Changes
+
+- [#1332](https://github.com/greydragon888/real-router/pull/1332) [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33) Thanks [@greydragon888](https://github.com/greydragon888)! - Surface an invalid-regex constraint body through the validation gate's route-contextual error ([#1324](https://github.com/greydragon888/real-router/issues/1324))
+
+  The invalid-constraint-body fix made `buildParamMeta` reject a body that is not a valid regular expression (`/:id<*x>`, `/:id<(>`, `/:id<[>`) with a plain `Error` instead of a raw V8 `SyntaxError`. But route-tree's validation gate (`validateRoutePath`, used by `@real-router/validation-plugin`) calls `buildParamMeta` early, so that plain `Error` leaked straight through the gate — the one malformed-path class that escaped the gate's contract, where every other reject throws a route-contextual `TypeError` (`[router.add] Invalid path for route "x": …`). The gate now wraps the `buildParamMeta` call, so an invalid-regex constraint body surfaces as the same route-contextual `TypeError` as every other malformed path, carrying the route name and method. A valid body (`<\d+>`, `<[a-z]+>`) is unaffected.
+
+- [#1332](https://github.com/greydragon888/real-router/pull/1332) [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject an invalid `<...>` constraint body with a clear error instead of a raw RegExp crash ([#1324](https://github.com/greydragon888/real-router/issues/1324))
+
+  A route whose constraint body is not a valid regular expression — `/:id<*x>`, `/:id<(>`, `/:id<[>` — previously crashed with a raw V8 `SyntaxError` ("Invalid regular expression: /^(*x)$/: Nothing to repeat") thrown deep inside route-tree building or the validation gate (both compile the constraint through `buildParamMeta`). It now fails fast at the single compile site with a clear `[buildParamMeta] Invalid constraint '<*x>' on parameter 'id': the body between '<' and '>' must be a valid regular expression …` message. A valid body (`<\d+>`, `<[a-z]+>`) is unaffected. Pre-existing, independent of the parse-segment tokenizer work.
+
+- [#1332](https://github.com/greydragon888/real-router/pull/1332) [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33) Thanks [@greydragon888](https://github.com/greydragon888)! - Route build-path compilation now derives its param slots from the shared `parseSegment` tokenizer ([#1324](https://github.com/greydragon888/real-router/issues/1324))
+
+  `compileBuildParts` (the L2 build layer) previously ran its own `paramRgx` to pull param names and optional markers out of a route path — the last layer still parsing the path grammar in parallel with the trie (L3), `buildParamMeta` (L1), and the validation gate (L4). It now walks the path through the same `parseSegment` tokenizer those layers use, so build's param name can no longer drift from the trie's: the `build ≠ match` class ([#1050](https://github.com/greydragon888/real-router/issues/1050)/[#1150](https://github.com/greydragon888/real-router/issues/1150)) is closed structurally, not merely caught after the fact by the inverse-pair round-trip property. Behavior-preserving — `buildPath` output is byte-identical for every accepted route, with one benign exception: the degenerate `/:a??` (an optional param immediately followed by an empty query separator) now builds `/v0` instead of `/v0?`, dropping a spurious trailing `?`. Both forms round-trip (the empty query is stripped on match), so matching is unaffected and `/v0` is the cleaner output. Malformed paths remain rejected downstream at `registerTree` exactly as before.
+
+### @real-router/angular@0.13.10
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+  - @real-router/sources@0.10.11
+
+### @real-router/browser-plugin@0.18.11
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/hash-plugin@0.8.11
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/lifecycle-plugin@0.6.14
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/logger-plugin@0.5.26
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/memory-plugin@0.4.22
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/navigation-plugin@0.7.23
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/persistent-params-plugin@0.2.26
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/preact@0.16.11
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+  - @real-router/sources@0.10.11
+
+### @real-router/preload-plugin@0.6.16
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/react@0.28.14
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+  - @real-router/sources@0.10.11
+
+### @real-router/rx@0.3.27
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/search-schema-plugin@0.4.14
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/solid@0.16.10
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+  - @real-router/sources@0.10.11
+
+### @real-router/sources@0.10.11
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/svelte@0.15.9
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+  - @real-router/sources@0.10.11
+
+### @real-router/validation-plugin@0.10.3
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+
+### @real-router/vue@0.16.11
+
+### Patch Changes
+
+- Updated dependencies [[`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33), [`a3f60ce`](https://github.com/greydragon888/real-router/commit/a3f60cef1f4034430230133aeb21bac970979f33)]:
+  - @real-router/core@0.72.0
+  - @real-router/sources@0.10.11
+
+
 ### @real-router/core@0.71.0
 
 ### Minor Changes
