@@ -22,18 +22,17 @@ export { findSegmentGrammarError } from "./parseSegment";
 export type { SegmentErrorCode } from "./parseSegment";
 
 // `CONSTRAINT_BODY_PATTERN` + `isConstraintBalanced` are the constraint-`<...>`
-// axis counterpart of `PARAM_NAME_PATTERN` (#804). `isConstraintBalanced` (the
-// balance predicate) is the one route-tree's validation gate consumes — replacing
-// route-tree's former local `hasBalancedConstraints`. `CONSTRAINT_BODY_PATTERN` (the
-// atom every *internal* match/strip/build regex here derives from) is exported as a
-// reserved/future constraint-grammar atom: it currently has NO external consumer
-// (route-tree consumes `isConstraintBalanced`, `hasConstraintInStaticSegment`,
-// `hasFusedConstraintSuffix` + `INVALID_QUERY_NAME_RGX`), kept exported so the
-// `<...>` grammar stays single-sourced from this package.
+// axis counterpart of `PARAM_NAME_PATTERN` (#804). route-tree's validation gate
+// consumes `isConstraintBalanced` (the balance predicate, replacing its former
+// local `hasBalancedConstraints`) + `INVALID_QUERY_NAME_RGX`. `CONSTRAINT_BODY_PATTERN`
+// (the atom every *internal* match/strip/build regex here derives from) has NO
+// external consumer — kept exported as a reserved constraint-grammar atom so the
+// `<...>` grammar stays single-sourced. (`hasConstraintInStaticSegment` /
+// `hasFusedConstraintSuffix` were route-tree gate imports until #1324 Phase 3 routed
+// the gate through `findSegmentGrammarError`; they now have only the internal
+// `registerNode` backstop consumer and are no longer re-exported here.)
 export {
   CONSTRAINT_BODY_PATTERN,
-  hasConstraintInStaticSegment,
-  hasFusedConstraintSuffix,
   INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
 } from "./constraint-grammar";
