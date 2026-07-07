@@ -1,5 +1,19 @@
 # @real-router/core
 
+## 0.71.0
+
+### Minor Changes
+
+- [#1329](https://github.com/greydragon888/real-router/pull/1329) [`4416900`](https://github.com/greydragon888/real-router/commit/4416900d1dde1d6e7948a1ea3b3fdede8db256d2) Thanks [@greydragon888](https://github.com/greydragon888)! - search-params: fail fast on an unknown query-params format ([#1318](https://github.com/greydragon888/real-router/issues/1318)).
+
+  A JS consumer passing a typo'd `queryParams` format (`arrayFormat: "bracket"` instead of `"brackets"`, `booleanFormat: "empty_true"` instead of `"empty-true"`, …) previously indexed the strategy map to `undefined`, deferring a cryptic `TypeError` to first encode/decode — which the router's `SegmentMatcher.#mergeQueryParams` catch-all then masked as `UNKNOWN_ROUTE` for **every** query URL, with zero diagnostics. `resolveStrategies` now throws a named `TypeError` at options-resolution time, naming the bad field, its value, and the allowed set. TS consumers are unaffected (the union types already forbid the typo).
+
+### Patch Changes
+
+- [#1329](https://github.com/greydragon888/real-router/pull/1329) [`4416900`](https://github.com/greydragon888/real-router/commit/4416900d1dde1d6e7948a1ea3b3fdede8db256d2) Thanks [@greydragon888](https://github.com/greydragon888)! - search-params: type-doc sync and an index-scalar behavior lock ([#1319](https://github.com/greydragon888/real-router/issues/1319)).
+
+  No runtime change. The `numberFormat: "auto"` JSDoc on `NumberFormat` (shipped in the `.d.ts`) now notes that `-0` is rejected — the grammar regex matches it, but an `Object.is` guard keeps it a string so `parse(build(x)) === x` holds ([#898](https://github.com/greydragon888/real-router/issues/898)). Internal docs corrected alongside: ARCHITECTURE cited `parse()` where `route-tree` injects `parseQuery` ([#1292](https://github.com/greydragon888/real-router/issues/1292)), and INVARIANT [#17](https://github.com/greydragon888/real-router/issues/17) + a functional test now lock that an indexed group displaces a bare scalar for the same key (`parse("a=1&a[0]=x", { arrayFormat: "index" })` → `{ a: ["x"] }`).
+
 ## 0.70.2
 
 ### Patch Changes
