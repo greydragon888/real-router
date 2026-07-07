@@ -58,9 +58,48 @@ export interface SegmentError {
 const COLON = 58; // :
 const STAR = 42; // *
 const LT = 60; // <
+const GT = 62; // >
 const QUESTION = 63; // ?
+const SLASH = 47; // /
 
 const isMarker = (code: number): boolean => code === COLON || code === STAR;
+
+/**
+ * Splits a path into its `/`-delimited segments — but NOT on a `/` inside a
+ * `<...>` constraint, whose body may legally contain `/` (e.g. `:id<a/b>`, which
+ * the current whole-path `buildParamMeta` scan tolerates). First-`>` semantics,
+ * matching the constraint grammar (`<[^>]*>`). This is the **segmentation** half
+ * of the path-grammar unification: `parseSegment` owns the per-segment grammar,
+ * `splitPathSegments` owns where a segment begins and ends. Reused by every layer
+ * that must go from a path string to per-segment tokens (L1 now; L3 in a later
+ * phase), so segmentation itself can never drift.
+ *
+ * @param path - a route path (query already stripped by the caller)
+ * @returns the segments in order, including empty leading/trailing/`//` segments
+ *   (the caller skips empties, matching the current behaviour)
+ */
+export function splitPathSegments(path: string): string[] {
+  const segments: string[] = [];
+  let start = 0;
+  let inConstraint = false;
+
+  for (let i = 0; i < path.length; i += 1) {
+    const code = path.charCodeAt(i);
+
+    if (code === LT) {
+      inConstraint = true;
+    } else if (code === GT) {
+      inConstraint = false;
+    } else if (code === SLASH && !inConstraint) {
+      segments.push(path.slice(start, i));
+      start = i + 1;
+    }
+  }
+
+  segments.push(path.slice(start));
+
+  return segments;
+}
 
 /**
  * Tokenizes a single path segment (already split on `/`).

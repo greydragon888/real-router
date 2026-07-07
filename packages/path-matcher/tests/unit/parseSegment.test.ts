@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseSegment } from "../../src/parseSegment";
+import { parseSegment, splitPathSegments } from "../../src/parseSegment";
 
 /**
  * Unit contract for the canonical segment tokenizer (RFC §4). Every token form,
@@ -196,5 +196,43 @@ describe("parseSegment", () => {
         error: "empty-constraint",
       });
     });
+  });
+});
+
+describe("splitPathSegments (constraint-aware segmentation)", () => {
+  it("splits on `/` outside constraints", () => {
+    expect(splitPathSegments("/users/:id/posts")).toStrictEqual([
+      "",
+      "users",
+      ":id",
+      "posts",
+    ]);
+  });
+
+  it("does NOT split on `/` inside a `<...>` constraint (body may hold `/`)", () => {
+    expect(splitPathSegments("/x/:id<a/b>/y")).toStrictEqual([
+      "",
+      "x",
+      ":id<a/b>",
+      "y",
+    ]);
+    expect(splitPathSegments("/:v<a|b/c>/w")).toStrictEqual([
+      "",
+      ":v<a|b/c>",
+      "w",
+    ]);
+  });
+
+  it("keeps empty segments (leading / trailing / `//`)", () => {
+    expect(splitPathSegments("/a//b/")).toStrictEqual(["", "a", "", "b", ""]);
+    expect(splitPathSegments("")).toStrictEqual([""]);
+  });
+
+  it("first-`>` semantics — `/` splits again after the constraint closes", () => {
+    expect(splitPathSegments(String.raw`/:id<\d+>/y`)).toStrictEqual([
+      "",
+      String.raw`:id<\d+>`,
+      "y",
+    ]);
   });
 });

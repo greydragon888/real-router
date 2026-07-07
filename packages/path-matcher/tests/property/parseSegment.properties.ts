@@ -95,16 +95,15 @@ describe("parseSegment ≡ current parsers (gate 2, #1320 parity re-pointed)", (
     .map(([name, lead, trail]) => `${lead}${name}${trail}`);
 
   test.prop([arbTrailing], { numRuns: 500 })(
-    "B — trailing bare marker: parseSegment REJECTS while the backstop accepts (the §8 flip)",
+    "B — trailing bare marker: parseSegment rejects it, and the migrated backstop now AGREES (drift closed)",
     (seg) => {
       // parseSegment adopts the gate's verdict: reject.
       expect(parseSegment(seg)).toStrictEqual({ error: "trailing-marker" });
 
-      // the current backstop drifts — it swallows the trailing marker into the name.
-      const meta = buildParamMeta(`/${seg}`);
-      const swallowed = meta.urlParams[0];
-
-      expect(swallowed.endsWith(":") || swallowed.endsWith("*")).toBe(true);
+      // Post-Phase-2 buildParamMeta consumes parseSegment, so it no longer swallows
+      // the trailing marker into a param name — the #1324 drift is closed at L1
+      // (the enumerated §8 flip; the route was a dead route either way).
+      expect(buildParamMeta(`/${seg}`).urlParams).toStrictEqual([]);
     },
   );
 
@@ -161,4 +160,56 @@ describe("parseSegment ≡ current parsers (gate 2, #1320 parity re-pointed)", (
       expect("kind" in r || "error" in r).toBe(true);
     },
   );
+
+  // ---- Phase 2 parity-lock: migrated buildParamMeta ≡ the legacy whole-path scan
+  const LEGACY_RGX = /([:*])([^/?<]+)(<[^>]*>)?(\?)?/g;
+
+  const legacyExtract = (path: string) => {
+    const url: string[] = [];
+    const spat: string[] = [];
+    const constr = new Map<string, string>();
+
+    for (const [, marker, name, constraint] of path.matchAll(LEGACY_RGX)) {
+      url.push(name);
+      if (marker === "*") {
+        spat.push(name);
+      } else if (constraint) {
+        // Map = last-wins by name, exactly like buildParamMeta's constraintPatterns.
+        constr.set(name, constraint);
+      }
+    }
+
+    return { url, spat, constr: [...constr] };
+  };
+  const metaTriple = (path: string) => {
+    const meta = buildParamMeta(path);
+
+    return {
+      url: [...meta.urlParams],
+      spat: [...meta.spatParams],
+      constr: [...meta.constraintPatterns].map(
+        ([k, v]) => [k, v.constraint] as [string, string],
+      ),
+    };
+  };
+  const arbValidPath = fc
+    .array(arbValidSeg, { minLength: 1, maxLength: 5 })
+    .map((segs) => `/${segs.join("/")}`);
+
+  test.prop([arbValidPath], { numRuns: 2000 })(
+    "E — parity: migrated buildParamMeta ≡ legacy URL_PARAM_RGX on a valid path",
+    (path) => {
+      expect(metaTriple(path)).toStrictEqual(legacyExtract(path));
+    },
+  );
+
+  it("E2 — parity holds for a constraint containing `/` (the splitter's whole purpose)", () => {
+    for (const p of [
+      "/x/:id<a/b>/y",
+      "/:v<a|b/c>/w",
+      String.raw`/users/:id<\d+>/:pid`,
+    ]) {
+      expect(metaTriple(p)).toStrictEqual(legacyExtract(p));
+    }
+  });
 });

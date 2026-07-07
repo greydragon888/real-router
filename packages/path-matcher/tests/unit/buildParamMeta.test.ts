@@ -326,33 +326,29 @@ describe("buildParamMeta", () => {
     // `<[^>]*>` (STAR); they disagreed only on the empty `<>`. Now every regex
     // derives from CONSTRAINT_BODY_PATTERN (`*`), so all phases agree.
 
-    it("recognizes the empty `<>` as a constraint on the match side (was dropped under PLUS)", () => {
+    it("rejects the empty `<>` at the meta layer, aligned with the trie's #804 rejection (post-tokenizer)", () => {
+      // Since buildParamMeta consumes `parseSegment` (RFC Phase 2), it recognizes
+      // the empty `<>` (finds the `>`) but classifies it as an EMPTY constraint
+      // and rejects the segment — so it contributes no param. This closes the old
+      // L1 leniency drift: `buildParamMeta` now agrees with the trie/gate that
+      // reject `<>` (a never-matching `^()$`, #804). The route is rejected
+      // downstream either way, so the old lenient `["id"]` extraction was moot.
       const meta = buildParamMeta("/x/:id<>");
 
-      expect(meta.urlParams).toStrictEqual(["id"]);
-      // The empty body now compiles to a constraint — grammatically consistent
-      // with strip/build. (This produces a never-matching `^()$` pattern, which
-      // is exactly why the gate/backstop reject `<>` — see #804 §3.3.)
-      expect(meta.constraintPatterns.has("id")).toBe(true);
-
-      const entry = meta.constraintPatterns.get("id")!;
-
-      expect(entry.constraint).toBe("<>");
-      expect(entry.pattern.source).toBe("^()$");
-      // `^()$` matches only the empty string — a never-matching required param.
-      expect(entry.pattern.test("")).toBe(true);
-      expect(entry.pattern.test("5")).toBe(false);
+      expect(meta.urlParams).toStrictEqual([]);
+      expect(meta.constraintPatterns.has("id")).toBe(false);
     });
 
-    it("no longer mis-splits `/x/:id<>?/y` into a bogus query param (P3 divergence gone)", () => {
+    it("keeps the query-mask seeing `<>` — no bogus query from `/x/:id<>?/y` (P3 divergence gone)", () => {
       const meta = buildParamMeta("/x/:id<>?/y");
 
-      // Under the old PLUS match/mask, `<>` was invisible to the optional-marker
-      // mask, so the `?` was mistaken for the query separator → queryParams:["/y"]
-      // and a truncated pathPattern. With the `*` atom the mask sees `<>`, the
-      // `?` is the optional marker, and no bogus query is produced.
+      // The `*` constraint atom in the WHOLE-PATH query-mask still sees `<>`
+      // (that mask stays — it is orthogonal to the per-segment tokenizer), so the
+      // `?` is the optional marker, not the query separator, and no bogus query is
+      // produced. The param itself is rejected at the meta layer (empty
+      // constraint, above), so urlParams is now empty.
       expect(meta.queryParams).toStrictEqual([]);
-      expect(meta.urlParams).toStrictEqual(["id"]);
+      expect(meta.urlParams).toStrictEqual([]);
       expect(meta.pathPattern).toBe("/x/:id<>?/y");
     });
 
