@@ -215,9 +215,13 @@ function processParamChunk(
   end: number,
   params: Record<string, unknown>,
   strategies: ResolvedStrategies,
+  eqPos: number,
   indexedGroups?: Map<string, [number, unknown][]>,
 ): void {
-  const eqPos = searchPart.indexOf("=", start);
+  // `eqPos` is the position of the next `=` at or after `start`, resolved once by
+  // the caller's monotonic cursor (#1316) — never re-scanned here. `eqPos < end`
+  // means it falls inside THIS chunk (so the chunk has a value); otherwise the
+  // chunk is key-only.
   const hasValue = eqPos !== -1 && eqPos < end;
 
   const nameSourceEnd = hasValue ? eqPos : end;
@@ -344,6 +348,13 @@ function parseIntoInternal(
   let start = 0;
   const length = searchPart.length;
 
+  // Monotonic cursor for the next `=`. Its position only ever moves forward with
+  // `start`, so the whole parse does a single amortised O(n) scan for `=` —
+  // replacing `processParamChunk`'s former per-chunk `indexOf("=", start)`, which
+  // scanned to the end of the string on every key-only chunk and made `parse`
+  // O(n²) on `"a&a&…"` (#1316). `-2` = not yet searched; `-1` = no `=` remains.
+  let eqCache = -2;
+
   while (start < length) {
     let end = searchPart.indexOf("&", start);
 
@@ -358,12 +369,19 @@ function parseIntoInternal(
     // intentional empty-key chunk always carries an `=` (`"=1"` → `end > start`),
     // so it is unaffected.
     if (end > start) {
+      // Advance the cursor only when the cached `=` is behind the current chunk;
+      // once it reports `-1` (no `=` left in the string) it is final.
+      if (eqCache !== -1 && eqCache < start) {
+        eqCache = searchPart.indexOf("=", start);
+      }
+
       processParamChunk(
         searchPart,
         start,
         end,
         params,
         strategies,
+        eqCache,
         indexedGroups,
       );
     }

@@ -14,6 +14,7 @@ import {
   resolveStrategies,
   type ResolvedStrategies,
 } from "./strategies";
+import { safeEncode } from "./utils";
 
 import type { FinalOptions, Options } from "./types";
 
@@ -94,7 +95,7 @@ export const makeOptions = (opts?: Options): OptionsWithStrategies => {
  * Encodes a value for use in a URL query string.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-export const encodeValue = (value: any): string => encodeURIComponent(value);
+export const encodeValue = (value: any): string => safeEncode(value);
 
 // =============================================================================
 // Main Encode
