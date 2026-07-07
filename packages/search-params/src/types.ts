@@ -58,7 +58,9 @@ export type NullFormat = "default" | "hidden";
  * - `auto` - decode canonical decimal numbers (`/^-?(0|[1-9]\d*)(\.\d+)?$/`) to
  *   `Number()`. Recognizes negatives so the parsed type matches what
  *   `build`/`navigate` produce; rejects leading zeros (`"007"`), exponent
- *   notation, and unsafe integers — those keep their exact text as strings.
+ *   notation, unsafe integers, and negative zero (`"-0"` — the grammar matches
+ *   it, but an `Object.is` guard rejects it since `build(-0)` emits `"0"`, #898)
+ *   — those keep their exact text as strings.
  */
 export type NumberFormat = "none" | "auto";
 

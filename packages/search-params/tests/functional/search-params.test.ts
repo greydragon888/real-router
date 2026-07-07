@@ -126,6 +126,18 @@ describe("search-params", () => {
       ).toStrictEqual({ a: "v" });
     });
 
+    it("index format: an indexed group displaces a bare scalar for the same key (#1319)", () => {
+      // A scalar chunk (`a=1`) sharing a key with an indexed group is dropped —
+      // the indexed group wins, regardless of chunk order (INVARIANTS #17).
+      const o = {
+        arrayFormat: "index" as const,
+        numberFormat: "none" as const,
+      };
+
+      expect(parse("a=1&a[0]=x", o)).toStrictEqual({ a: ["x"] });
+      expect(parse("a[0]=x&a=1", o)).toStrictEqual({ a: ["x"] });
+    });
+
     it("handles comma-separated arrays", () => {
       expect(parse("items=a,b,c", { arrayFormat: "comma" })).toStrictEqual({
         items: ["a", "b", "c"],
