@@ -39,8 +39,8 @@ core/
 │   │   └── DependenciesNamespace/   — DI store
 │   │
 │   ├── wiring/
-│   │   ├── RouterWiringBuilder.ts   — Builder: namespace cross-references
-│   │   └── wireRouter.ts           — Director: correct wiring order
+│   │   ├── wireNamespaces.ts        — wire* functions: namespace cross-references
+│   │   └── types.ts                — NamespaceBag (shared wiring input)
 │   │
 │   ├── api/
 │   │   ├── getRoutesApi.ts          — Route CRUD (add/remove/update/replace/clear)
@@ -137,27 +137,25 @@ export function getRoutesApi(router: Router): RoutesApi {
 
 **Why WeakMap?** No public exposure of private state. GC-safe. Tree-shakeable.
 
-### Wiring System (Builder + Director)
+### Wiring System
 
-Namespaces have linear dependencies. Constructed independently, then wired via **setter injection** in a fixed order:
+Namespaces are constructed independently, then wired via **dependency-bundle injection** — plain `wire*` functions over a shared `NamespaceBag`:
 
 ```typescript
-// wireRouter.ts — Director
-function wireRouter(builder: RouterWiringBuilder) {
-  builder.wireLimits(); // 1. All namespaces get limits first
-  builder.wireRouteLifecycleDeps(); // 2. Guard registry gets router + getDependency
-  builder.wireRoutesDeps(); // 3. Routes gets guards + state (registers pending handlers)
-  builder.wirePluginsDeps(); // 4. Plugins get addEventListener + canNavigate
-  builder.wireNavigationDeps(); // 5. Navigation gets state, routes, eventBus + canNavigate
-  builder.wireLifecycleDeps(); // 6. RouterLifecycle gets navigate, navigateToNotFound, matchPath
-  builder.wireStateDeps(); // 7. State gets defaultParams, buildPath, getUrlParams
+// wireNamespaces.ts
+function wireNamespaces(ns: NamespaceBag) {
+  const compileFactory = createCompileFactory(ns); // shared by guards + plugins
+  wireLimits(ns); // dependenciesStore + eventBus get limits
+  wireRouteLifecycle(ns, compileFactory); // guard registry gets compile + getValidator
+  wireRoutes(ns); // routes get guard registration + state accessors
+  wirePlugins(ns, compileFactory); // plugins get addEventListener + canNavigate
+  wireNavigation(ns); // navigation gets state, routes, eventBus, ...
+  wireRouterLifecycle(ns); // start/stop get navigate, matchPath, ...
+  wireState(ns); // state gets defaultParams, buildPath, getUrlParams
 }
 ```
 
-**Order matters:**
-
-- `wireRouteLifecycleDeps()` BEFORE `wireRoutesDeps()` — route registration triggers guard registration which requires `RouteLifecycleNamespace` to be ready
-- `wireNavigationDeps()` BEFORE `wireLifecycleDeps()` — lifecycle deps reference `NavigationNamespace.navigate()` which requires navigation deps to be set
+**Call order is arbitrary (#1331).** Each `wire*` function only stores deps-closures on its namespace — none runs user code or eagerly reads another namespace's deps, so there is no ordering constraint between them. The initial-route guard factories that once forced "RouteLifecycle before Routes" are now flushed separately, from the constructor's `flushPendingGuards()` call after all wiring completes. (Before #1334 this was a `RouterWiringBuilder` class + `wireRouter` director; a builder that built nothing for one call-site collapsed into these functions.)
 
 ## FSM → Event Bridge
 
@@ -280,7 +278,7 @@ Errors during navigation are routed through two different paths depending on FSM
 | **Via FSM**     | `sendFail()` → FSM FAIL | FSM is in READY or TRANSITION_STARTED                      | FSM transitions → action emits `$$error` |
 | **Direct emit** | `emitTransitionError()` | Error before FSM transition (ROUTE_NOT_FOUND, SAME_STATES) | Emits directly, FSM state unchanged      |
 
-The branching logic lives in `RouterWiringBuilder` (wiring layer). When an error occurs before `startTransition()`, the wiring checks `isReady()`: if READY — routes through FSM; if TRANSITION_STARTED — emits directly to avoid disturbing the ongoing transition.
+The branching logic lives in `EventBusNamespace.sendFailSafe()`. When an error occurs before `startTransition()`, `sendFailSafe()` checks `isReady()`: if READY — routes through FSM; if TRANSITION_STARTED — emits directly to avoid disturbing the ongoing transition. The wiring's `emitTransitionError` closure merely delegates to it.
 
 ### navigateToNotFound() — Pipeline Bypass
 
@@ -409,7 +407,7 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ### Namespace Rules
 
-- Namespaces **never** call each other directly at construction time — all cross-references are wired via setter injection in `wireRouter()`
+- Namespaces **never** call each other directly at construction time — all cross-references are wired via dependency-bundle injection in `wireNamespaces()`
 - `NavigationNamespace` is the **only** namespace that orchestrates multi-namespace operations (state + routes + eventBus + lifecycle)
 - `EventBusNamespace` is the **only** namespace that holds the FSM instance and EventEmitter
 - `DependenciesStore` is a plain data interface — no class, no methods that call other namespaces

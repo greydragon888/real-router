@@ -115,16 +115,18 @@ namespaces/DependenciesNamespace/
 
 ### Dependency Injection
 
-Namespaces receive cross-references via setter injection during wiring (after construction):
+Namespaces are constructed independently, then wired together by `wireNamespaces()` (`wiring/wireNamespaces.ts`) — plain `wire*` functions over a shared `NamespaceBag`. Each namespace receives a bundle of dependency closures via `setDependencies()` (a **pure assignment** — no side effects, #1331); cross-namespace references are set the same way:
 
 ```typescript
-// RouterWiringBuilder (called by wireRouter)
-this.routeLifecycle.setRouter(this.router);
-this.routes.setLifecycleNamespace(this.routeLifecycle);
-this.plugins.setRouter(this.router);
+// wireNamespaces.ts — one wire* function per namespace
+ns.routeLifecycle.setDependencies({ compileFactory, getValidator });
+ns.routes.setDependencies({ addActivateGuard, makeState, forwardState, ... });
+ns.routes.setLifecycleNamespace(ns.routeLifecycle);
 ```
 
-This allows namespaces to be constructed independently, then wired together by `RouterWiringBuilder`.
+The `wire*` call order is arbitrary (#1331): no `wire*` function runs user code or eagerly reads another namespace's deps.
+
+**Initial-route guard factories flush last (#1331).** `canActivate` / `canDeactivate` factories from the initial route definitions are compiled and executed by `flushPendingGuards()` — the **final step of the constructor**, after all wiring and method binding — so a factory sees a fully-built router (`buildPath()` / `isActiveRoute()` / `usePlugin()` all work). **Contract:** a guard factory must not make *side-effectful* `router.*` calls (`navigate`, `usePlugin`, mutating route-CRUD) during the factory phase — the router is ready, but the pending factories flush sequentially, so `canNavigateTo` would observe a partially-registered guard set. Read-only calls (`buildPath`, `isActiveRoute`, `getState`) are safe.
 
 ### Plugin Interception Points
 

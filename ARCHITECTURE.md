@@ -236,9 +236,9 @@ api/ (standalone functions — tree-shakeable, access router via WeakMap)
     ├── getPluginApi(router)      — plugin infrastructure, interception, router extension
     └── cloneRouter(router, deps) — SSR cloning
 
-wiring/ (construction-time, Builder+Director pattern)
-    ├── RouterWiringBuilder    — namespace dependency wiring
-    └── wireRouter             — calls wire methods in correct order
+wiring/ (construction-time)
+    ├── wireNamespaces         — wire* functions: namespace dependency wiring
+    └── types                  — NamespaceBag (shared wiring input)
 ```
 
 Router.ts is a thin facade — validates inputs and delegates to namespaces. All business logic lives in namespaces. Standalone API functions in `api/` access router internals via a `WeakMap<Router, RouterInternals>` registry — this enables tree-shaking.
