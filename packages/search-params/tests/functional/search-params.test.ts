@@ -13,6 +13,8 @@ import { decodeValue } from "../../src/decode";
 import { encode, encodeValue, makeOptions } from "../../src/encode";
 import { getSearch } from "../../src/utils";
 
+import type { Options } from "../../src";
+
 describe("search-params", () => {
   // ===========================================================================
   // parse
@@ -963,5 +965,37 @@ describe("mutation guards (observable-behavior kills)", () => {
         numberFormat: "none",
       }),
     ).toStrictEqual({ a: ["z"] });
+  });
+});
+
+describe("unknown format fails fast (#1318)", () => {
+  // A JS consumer (no TS to forbid the typo) can pass a bogus `queryParams` format.
+  // Without the guard the strategy map indexes to `undefined`, deferring a cryptic
+  // TypeError to first encode/decode — which the router's `#mergeQueryParams`
+  // catch-all then masks as UNKNOWN_ROUTE for EVERY query URL. `resolveStrategies`
+  // now throws a named TypeError at options-resolution time. One per format so a
+  // dropped guard on any single field is caught.
+  it("throws a named TypeError on an unknown arrayFormat", () => {
+    expect(() =>
+      parse("a=1", { arrayFormat: "bogus" } as unknown as Options),
+    ).toThrow(/\[search-params\] Unknown arrayFormat "bogus"/u);
+  });
+
+  it("throws a named TypeError on an unknown booleanFormat", () => {
+    expect(() =>
+      build({ a: 1 }, { booleanFormat: "bad" } as unknown as Options),
+    ).toThrow(/\[search-params\] Unknown booleanFormat "bad"/u);
+  });
+
+  it("throws a named TypeError on an unknown nullFormat", () => {
+    expect(() =>
+      parse("a=1", { nullFormat: "x" } as unknown as Options),
+    ).toThrow(/\[search-params\] Unknown nullFormat "x"/u);
+  });
+
+  it("throws a named TypeError on an unknown numberFormat", () => {
+    expect(() =>
+      parse("a=1", { numberFormat: "y" } as unknown as Options),
+    ).toThrow(/\[search-params\] Unknown numberFormat "y"/u);
   });
 });

@@ -53,16 +53,58 @@ export interface ResolvedStrategies {
  * @param numberFormat - Number format
  * @returns Resolved strategy implementations
  */
+/**
+ * Fail fast on an unknown format. A `queryParams` typo in a JS consumer (no TS to
+ * forbid it) otherwise indexes the strategy map to `undefined`, deferring a cryptic
+ * `TypeError` to first use — which the router's `SegmentMatcher.#mergeQueryParams`
+ * catch-all then masks as `UNKNOWN_ROUTE` for EVERY query URL, with zero diagnostics
+ * (#1318). TS consumers are unaffected (the union types already forbid the typo).
+ */
+const requireStrategy = <T>(
+  strategy: T | undefined,
+  field: string,
+  value: string,
+  allowed: string,
+): T => {
+  if (strategy === undefined) {
+    throw new TypeError(
+      `[search-params] Unknown ${field} "${value}" — expected ${allowed}`,
+    );
+  }
+
+  return strategy;
+};
+
 export const resolveStrategies = (
   arrayFormat: FinalOptions["arrayFormat"],
   booleanFormat: FinalOptions["booleanFormat"],
   nullFormat: FinalOptions["nullFormat"],
   numberFormat: FinalOptions["numberFormat"],
 ): ResolvedStrategies => ({
-  boolean: booleanStrategies[booleanFormat],
-  null: nullStrategies[nullFormat],
-  number: numberStrategies[numberFormat],
-  array: arrayStrategies[arrayFormat],
+  boolean: requireStrategy(
+    booleanStrategies[booleanFormat],
+    "booleanFormat",
+    booleanFormat,
+    '"none" | "auto" | "empty-true"',
+  ),
+  null: requireStrategy(
+    nullStrategies[nullFormat],
+    "nullFormat",
+    nullFormat,
+    '"default" | "hidden"',
+  ),
+  number: requireStrategy(
+    numberStrategies[numberFormat],
+    "numberFormat",
+    numberFormat,
+    '"none" | "auto"',
+  ),
+  array: requireStrategy(
+    arrayStrategies[arrayFormat],
+    "arrayFormat",
+    arrayFormat,
+    '"none" | "brackets" | "index" | "comma"',
+  ),
 });
 
 // =============================================================================
