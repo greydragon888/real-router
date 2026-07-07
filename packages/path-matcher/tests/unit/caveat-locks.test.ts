@@ -59,3 +59,25 @@ describe("INVARIANTS Roundtrip #2 — silent value corruption under uri/none (ca
     expect(m.match(url)).toBeUndefined();
   });
 });
+
+describe("L2 build (#1324) — trailing '?' on an optional param + empty query (caveat-lock)", () => {
+  it("buildPath drops the spurious trailing '?' of `/:a??`", () => {
+    // `/:a??` = optional param `a` followed by a lone `?` (an empty query
+    // separator). Migrating `compileBuildParts` off `paramRgx` onto the shared
+    // `parseSegment` tokenizer (#1324) reconstructs the build template from the
+    // tokenized segments and drops that spurious trailing `?` — so `buildPath`
+    // emits `/v0`, not the pre-migration `/v0?`. This is the ONLY whole-path shape
+    // whose `buildPath` differs from the old regex build (verified by enumeration).
+    // Benign — both forms round-trip (the empty `?` is stripped at match) and `/v0`
+    // is arguably the cleaner output. Pinned so the change stays intentional, not a
+    // latent off-by-one.
+    const m = createMatcher([{ name: "r", path: "/:a??" }]);
+
+    const url = m.buildPath("r", { a: "v0" });
+    expect(url).toBe("/v0"); // was "/v0?" under the old paramRgx build
+
+    // Both the new and the pre-migration URL round-trip to the same params.
+    expect(m.match("/v0")?.params).toStrictEqual({ a: "v0" });
+    expect(m.match("/v0?")?.params).toStrictEqual({ a: "v0" });
+  });
+});
