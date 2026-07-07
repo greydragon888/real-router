@@ -16,7 +16,8 @@
 path-matcher/
 ├── src/
 │   ├── SegmentMatcher.ts         — Main class: match(), buildPath(), registerTree()
-│   ├── registration.ts           — Route registration & trie building
+│   ├── registration/             — Route registration & trie building (split by concern:
+│   │                                index=entry+orchestration, context, errors, trieNodes, trie, buildParts)
 │   ├── buildParamMeta.ts         — Parameter metadata extraction from patterns
 │   ├── encoding.ts               — URL parameter encoding/decoding (4 strategies)
 │   ├── percentEncoding.ts        — Percent encoding validation (%XX)
@@ -446,7 +447,8 @@ types.ts (leaf — no imports)
     ├── encoding.ts → types
     ├── pathUtils.ts → types
     ├── buildParamMeta.ts → types  (exports PARAM_NAME_PATTERN — the single param-name grammar)
-    ├── registration.ts → types, pathUtils, encoding, buildParamMeta
+    ├── registration/ → types, pathUtils, encoding, parseSegment, constraint-grammar
+    │                    (internal order: context ← errors ← trieNodes ← trie ← buildParts ← index)
     └── SegmentMatcher.ts → types, encoding, pathUtils, registration,
                             percentEncoding
 ```
