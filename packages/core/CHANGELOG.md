@@ -1,5 +1,11 @@
 # @real-router/core
 
+## 0.70.1
+
+### Patch Changes
+
+- [#1322](https://github.com/greydragon888/real-router/pull/1322) [`744280a`](https://github.com/greydragon888/real-router/commit/744280a8850bd76246929131d750699d8d6cfd88) Thanks [@greydragon888](https://github.com/greydragon888)! - Single-source `hasFusedConstraintSuffix` + `INVALID_QUERY_NAME_RGX` in path-matcher's `constraint-grammar.ts` ([#1320](https://github.com/greydragon888/real-router/issues/1320) Tier 1). The route-tree `validateRoutePath` gate and the path-matcher `registerTree` backstop previously each carried a byte-identical copy of the fused-constraint-suffix char-scan (a jscpd clone) and the invalid-query-name regex; both now import the one definition (like `isConstraintBalanced` / `hasConstraintInStaticSegment`), so the gate and backstop can't drift. No behaviour change; each layer keeps its own throw/message.
+
 ## 0.70.0
 
 ### Minor Changes
