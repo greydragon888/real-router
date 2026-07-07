@@ -1,5 +1,12 @@
 # @real-router/validation-plugin
 
+## 0.10.2
+
+### Patch Changes
+
+- Updated dependencies [[`4416900`](https://github.com/greydragon888/real-router/commit/4416900d1dde1d6e7948a1ea3b3fdede8db256d2), [`4416900`](https://github.com/greydragon888/real-router/commit/4416900d1dde1d6e7948a1ea3b3fdede8db256d2)]:
+  - @real-router/core@0.71.0
+
 ## 0.10.1
 
 ### Patch Changes
