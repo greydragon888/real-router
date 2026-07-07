@@ -30,10 +30,12 @@ import { validateRoutePath } from "../../src/validation/routes";
  *
  * Deliberately EXCLUDED — documented single-layer behaviour, NOT parity bugs:
  * - gate-only string-format checks (`//`, whitespace, non-string, `~`): the
- *   backstop consumes an already-segmented, well-formed path;
- * - a `*` fused to the END of a param (`/:y*`): the gate reads the `*` as a
- *   name-less marker (reject), the backstop as the param name `y*` (accept) — a
- *   real grammar divergence, gate-masked in production, tracked separately.
+ *   backstop consumes an already-segmented, well-formed path.
+ *
+ * The trailing-marker `/:y*` divergence — gate rejected, backstop accepted — is
+ * now CLOSED (#1324): the backstop routes its param/splat name boundary through
+ * the same `parseSegment` tokenizer as the gate, so both reject it. It is a
+ * parity SCAN class below, no longer an exclusion.
  */
 
 // A route segment of safe lowercase letters — no markers, no constraints, ASCII.
@@ -84,6 +86,21 @@ const SCANS: readonly ScanClass[] = [
       .tuple(arbSafeSegment, fc.constantFrom(":", "*"), arbSafeSegment)
       .map(([s, m, n]) => `/${s}${m}${n}`),
     // a clean marker-led segment — /:id, /*rest
+    valid: fc
+      .tuple(fc.constantFrom(":", "*"), arbSafeSegment)
+      .map(([m, n]) => `/${m}${n}`),
+  },
+  {
+    name: "trailing parameter marker (#1324)",
+    // a param/splat name ending in a bare marker — /:y*, /:y:, /*y:
+    malformed: fc
+      .tuple(
+        fc.constantFrom(":", "*"),
+        arbSafeSegment,
+        fc.constantFrom(":", "*"),
+      )
+      .map(([m, n, t]) => `/${m}${n}${t}`),
+    // a clean marker-led name, no trailing marker — /:id, /*rest
     valid: fc
       .tuple(fc.constantFrom(":", "*"), arbSafeSegment)
       .map(([m, n]) => `/${m}${n}`),

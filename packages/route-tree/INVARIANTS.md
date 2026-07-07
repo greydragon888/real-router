@@ -104,8 +104,9 @@
 | GBP3 | Optional splat parity                         | An optional splat (`/*path?`) is rejected by both (VP10 ↔ backstop optional fork); a required splat (`/*rest`) by neither (#1149).                                                                                 |
 | GBP4 | Unconstrained optional-before-splat parity    | An unconstrained optional directly before a splat (`/:v?/*rest`) is rejected by both (VP11 ↔ backstop); a required param before a splat (`/:id/*rest`) by neither (#1264).                                          |
 | GBP5 | Duplicate param name parity                   | A same-name param repeated in one path (`/:id/:id`) is rejected by both (VP12 ↔ backstop cross-position dup); two distinct names (`/:a/:b`) by neither (#1151).                                                     |
+| GBP6 | Trailing parameter marker parity              | A marker fused to the END of a param/splat name (`/:y*`, `/:y:`, `/*y:`) is rejected by BOTH the gate (`findSegmentGrammarError` → trailing-marker) and the backstop (`extractParamName` → `parseSegment`); a clean marker-led name (`/:id`, `/*rest`) by neither (#1324).                                          |
 
-> **Excluded — documented single-layer behaviour, NOT parity bugs:** gate-only string-format checks (`//` double-slash VP4, whitespace VP3, non-string VP2) — the backstop consumes an already-segmented path; and a `*` fused to the END of a param (`/:y*`) — the gate reads the `*` as a name-less marker (reject, VP7), the backstop as the param name `y*` (accept), a grammar divergence that is gate-masked in production and tracked separately.
+> **Excluded — documented single-layer behaviour, NOT parity bugs:** gate-only string-format checks (`//` double-slash VP4, whitespace VP3, non-string VP2) — the backstop consumes an already-segmented path. (The trailing-marker `/:y*` case, formerly excluded, is CLOSED as of #1324 — the backstop now shares the gate's `parseSegment` name boundary via `extractParamName` — and is **GBP6** above.)
 
 ## Test Files
 
