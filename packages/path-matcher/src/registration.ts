@@ -7,7 +7,11 @@ import {
   isConstraintBalanced,
 } from "./constraint-grammar";
 import { encodeParam, ENCODING_METHODS } from "./encoding";
-import { parseSegment } from "./parseSegment";
+import {
+  parseSegment,
+  splitPathSegments,
+  type SegmentTokens,
+} from "./parseSegment";
 import {
   buildFullPath,
   createSegmentNode,
@@ -1155,6 +1159,28 @@ function processSegment(
 // Build Parts Compilation
 // =============================================================================
 
+/**
+ * Builds one `BuildParamSlot` from a param/splat token. The encoder is the single
+ * `encodeParam` implementation the encoding unit/property suites assert (the splat
+ * variant encodes each segment individually, preserving `/`), so prod and the
+ * oracle can't drift (#860).
+ */
+function makeBuildParamSlot(
+  token: Extract<SegmentTokens, { kind: "param" | "splat" }>,
+  allSplatParams: ReadonlySet<string>,
+  encoding: URLParamsEncodingType,
+): BuildParamSlot {
+  const isSplat = allSplatParams.has(token.name);
+
+  return {
+    paramName: token.name,
+    isOptional: token.kind === "param" ? token.optional : false,
+    encoder: isSplat
+      ? (value: string): string => encodeParam(value, encoding, true)
+      : ENCODING_METHODS[encoding],
+  };
+}
+
 function compileBuildParts(
   normalizedPath: string,
   segments: readonly MatcherInputNode[],
@@ -1186,37 +1212,38 @@ function compileBuildParts(
 
   const parts: string[] = [];
   const slots: BuildParamSlot[] = [];
+  let current = "";
 
-  // Name class derives from the single source of truth in buildParamMeta so the
-  // build-path grammar matches the match-path grammar exactly (#738) — e.g.
-  // `:my-param` builds under the same name it matched under.
-  const paramRgx = new RegExp(
-    String.raw`[:*](${PARAM_NAME_PATTERN})(?:<${CONSTRAINT_BODY_PATTERN}>)?(\?)?`,
-    "gu",
-  );
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+  // Build the static-parts / param-slots template through the SAME tokenizer the
+  // trie (L3) and `buildParamMeta` (L1) consume — `parseSegment`, not a parallel
+  // `paramRgx` — so build's param NAME can no longer drift from the trie's
+  // (#1050/#1150 build≠match closed structurally, not just by the round-trip
+  // property). The path is already constraint-stripped (`matchPath`), so
+  // `parseSegment` sees only name/optional; each `/` separator `splitPathSegments`
+  // split away is re-added to the running static part.
+  const pathSegments = splitPathSegments(normalizedPath);
 
-  while ((match = paramRgx.exec(normalizedPath)) !== null) {
-    const paramName = match[1];
-    const isOptional = match[2] === "?";
+  for (const [i, pathSegment] of pathSegments.entries()) {
+    if (i > 0) {
+      current += "/";
+    }
 
-    parts.push(normalizedPath.slice(lastIndex, match.index));
+    const token = parseSegment(pathSegment);
 
-    const isSplat = allSplatParams.has(paramName);
-    // Splat segments are encoded individually (preserving "/") by the single
-    // `encodeParam` implementation — the same one the encoding unit/property
-    // suites assert, so prod and the oracle can't drift (#860).
-    const encoder = isSplat
-      ? (value: string): string => encodeParam(value, encoding, true)
-      : ENCODING_METHODS[encoding];
+    if ("error" in token || token.kind === "static") {
+      // Static text — or a malformed segment, whose route is rejected at
+      // `registerTree` before these buildParts are ever read (output moot).
+      current += pathSegment;
+      continue;
+    }
 
-    slots.push({ paramName, isOptional, encoder });
-
-    lastIndex = match.index + match[0].length;
+    // param | splat: close the accumulated static part, emit a slot.
+    parts.push(current);
+    current = "";
+    slots.push(makeBuildParamSlot(token, allSplatParams, encoding));
   }
 
-  parts.push(normalizedPath.slice(lastIndex));
+  parts.push(current);
 
   return { buildStaticParts: parts, buildParamSlots: slots };
 }
