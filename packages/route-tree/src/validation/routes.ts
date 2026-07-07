@@ -265,6 +265,37 @@ function gateGrammarMessage(
 }
 
 /**
+ * Calls `buildParamMeta`, re-throwing ITS own errors as the gate's
+ * route-contextual `TypeError`. `buildParamMeta` compiles each constraint body to
+ * a `RegExp`, so an invalid body — `<*x>`, `<(>`, `<[>` (balanced and non-empty, so
+ * `validateConstraintSyntax` above lets it through, but not a valid regular
+ * expression, path-matcher #1324) — throws a plain `Error` (`[buildParamMeta] …`)
+ * there. Without this wrapper that single malformed class would escape the gate's
+ * `[router.<method>]` contract with no route context — the one input the gate
+ * rejected inconsistently with every other malformed path. path-matcher backstops
+ * the same body at `registerTree`; this keeps the gate's message shape uniform.
+ */
+function safeBuildParamMeta(
+  path: string,
+  routeName: string,
+  methodName: string,
+): ReturnType<typeof buildParamMeta> {
+  try {
+    return buildParamMeta(path);
+  } catch (error) {
+    /* v8 ignore start -- `buildParamMeta` always throws an `Error`; the `String()` arm is an unreachable defensive narrow for the `unknown` catch binding */
+    const raw = error instanceof Error ? error.message : String(error);
+    /* v8 ignore stop */
+    const detail = raw.replace(/^\[buildParamMeta] /, "");
+
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": ${detail} (in "${path}")`,
+    );
+  }
+}
+
+/**
  * Validates route path format.
  * Throws a descriptive error if validation fails.
  *
@@ -365,8 +396,14 @@ export function validateRoutePath(
 
   // Both marker checks below scan only the URL-path portion: `buildParamMeta`
   // strips the query the same way the trie does, so a `:`/`*` inside a query
-  // declaration is not falsely flagged.
-  const { pathPattern, urlParams, queryParams } = buildParamMeta(path);
+  // declaration is not falsely flagged. Wrapped so an invalid-regex constraint
+  // body (`<*x>`) — which `buildParamMeta`'s RegExp compile throws on — surfaces as
+  // this gate's route-contextual `TypeError`, not a bare `[buildParamMeta]` Error.
+  const { pathPattern, urlParams, queryParams } = safeBuildParamMeta(
+    path,
+    routeName,
+    methodName,
+  );
 
   // Duplicate param name within this route's own path (`/:id/:id`, `/:x/*x`, #1151).
   validateUniqueParamNames(urlParams, routeName, methodName, path);

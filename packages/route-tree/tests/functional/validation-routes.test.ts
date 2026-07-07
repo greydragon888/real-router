@@ -336,6 +336,29 @@ describe("validateRoutePath", () => {
           }).toThrow(/empty constraint/);
         });
       });
+
+      // A constraint body that is BALANCED and non-empty (so it clears the two
+      // checks above) but is NOT a valid regular expression — `<*x>`, `<(>`, `<[>`.
+      // `buildParamMeta` throws a plain `Error` compiling the body to a `RegExp`
+      // (path-matcher #1324); `validateRoutePath` wraps that call so it surfaces as
+      // the gate's route-contextual `TypeError`, not a bare `[buildParamMeta]` Error
+      // — the one malformed class that used to escape the gate contract (F1-residual).
+      it("should re-throw an invalid-regex constraint body as a route-contextual TypeError (#1324)", () => {
+        const paths = [
+          "/u/:id<*x>", // leading quantifier — "Nothing to repeat"
+          "/u/:id<(>", // unterminated group
+          "/u/:id<[>", // unterminated character class
+        ];
+
+        paths.forEach((path) => {
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(TypeError);
+          expect(() => {
+            validateRoutePath(path, routeName, methodName);
+          }).toThrow(/^\[router\./);
+        });
+      });
     });
 
     describe("Name-less parameter markers (#863)", () => {
