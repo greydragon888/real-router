@@ -843,6 +843,23 @@ describe("search-params", () => {
       expect(parse("a[0]&a[1]=x", ix)).toStrictEqual({ a: [null, "x"] });
       expect(build(parse("a[0]&a[1]=x", ix), ix)).toBe("a[0]&a[1]=x");
     });
+
+    it("sanitizes a lone surrogate to U+FFFD instead of throwing (safeEncode, #1314)", () => {
+      // `parse` accepts a literal lone surrogate (identity decode), so `build` must
+      // stay total on it. Both encode sites — scalar/key and array element — route
+      // through `safeEncode`.
+      expect(build({ a: "\uD800" })).toBe("a=%EF%BF%BD");
+      expect(build({ a: ["\uD800"] })).toBe("a=%EF%BF%BD");
+      expect(build(parse("a=\uD800"))).toBe("a=%EF%BF%BD");
+    });
+
+    it("rethrows a non-URIError (Symbol value) instead of masking it (safeEncode, #1314)", () => {
+      // safeEncode sanitizes ONLY a lone-surrogate URIError. A Symbol value throws
+      // `TypeError` in `encodeURIComponent`, and `String(symbol)` would silently
+      // coerce it to "Symbol(…)" — the catch must rethrow so core still rejects the
+      // navigation (core `edge-cases-input-validation` pins this).
+      expect(() => build({ a: Symbol("s") })).toThrow(TypeError);
+    });
   });
 });
 

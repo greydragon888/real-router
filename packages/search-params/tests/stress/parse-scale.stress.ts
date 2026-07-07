@@ -76,6 +76,36 @@ describe("parse: repeated-key array accumulation", () => {
   });
 });
 
+describe("parse: key-only chunks (no '=')", () => {
+  const N = 300_000;
+  const qs = "a&".repeat(N); // N repeats of the key-only chunk `a` (a&a&a&…)
+
+  it(`parses ${N} key-only chunks in O(n) — the missing-'=' scan does not go quadratic`, () => {
+    parse(qs); // warm up
+
+    const t0 = performance.now();
+    const parsed = parse(qs);
+    const ms = performance.now() - t0;
+
+    // Precise guard: a key-only chunk decodes to null (auto boolean), and the
+    // repeated key accumulates one null per chunk in order (#1155/#1156).
+    const a = parsed.a as unknown[];
+
+    expect(Array.isArray(a)).toBe(true);
+    expect(a).toHaveLength(N);
+    expect(a[0]).toBeNull();
+    expect(a[N - 1]).toBeNull();
+
+    // Catastrophe-guard for the O(n²) key-only regression (#1316): the former
+    // per-chunk `indexOf("=", start)` scanned to the end of the string on every
+    // chunk without an `=`, so `"a&"×N` was quadratic (~1.5 s at this N pre-fix).
+    // The monotonic `=`-cursor makes it O(n) (~12 ms healthy) — the 300 ms ceiling
+    // has ~25× margin below and ~5× above the quadratic. The length count above is
+    // the precise discriminating guard; this is the throughput backstop.
+    expect(ms).toBeLessThan(300);
+  });
+});
+
 describe("parse: comma array at scale (literal commas preserved)", () => {
   const N = 20_000;
   // Half the elements embed a literal comma → encoded as %2C by build and must

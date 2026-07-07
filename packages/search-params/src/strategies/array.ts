@@ -6,6 +6,8 @@
  * @module search-params/strategies/array
  */
 
+import { safeEncode } from "../utils";
+
 import type { NullStrategy } from "./null";
 import type { ArrayFormat } from "../types";
 
@@ -67,7 +69,7 @@ const encodeValue = (value: unknown): string => {
     );
   }
 
-  return encodeURIComponent(value as string | number | boolean);
+  return safeEncode(value as string | number | boolean);
 };
 
 // Repeats `${name}${suffix}` keys joined by `&`. Shared between `none` (suffix

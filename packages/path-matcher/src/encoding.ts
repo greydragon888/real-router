@@ -30,10 +30,13 @@ import type { URLParamsEncodingType } from "./types";
  * Performance: This regex skips alphanumeric characters entirely,
  * avoiding unnecessary encodeURIComponent calls that return the same value.
  *
- * IMPORTANT: The 'u' (Unicode) flag is required to handle emoji and other
- * characters outside the Basic Multilingual Plane (BMP). Without it, the regex
- * matches individual UTF-16 code units (surrogates), and encodeURIComponent
- * fails on lone surrogates with "URI malformed" error.
+ * IMPORTANT: The 'u' (Unicode) flag makes the regex iterate by code point, so a
+ * PAIRED surrogate (emoji, outside the BMP) coalesces into one code point that
+ * encodeURIComponent accepts. An UNPAIRED (lone) surrogate is itself a single code
+ * point that still matches the class and reaches encodeURIComponent, which throws
+ * "URI malformed" on it — `encodeURIComponentExcludingSubDelims`'s slow path
+ * catches that and sanitizes it to U+FFFD via a lone-surrogate regex, keeping
+ * buildPath total (#1315).
  */
 const NEEDS_ENCODING_REGEX = /[^\w!$'()*+,.:;|~-]/gu;
 
@@ -48,6 +51,43 @@ const NEEDS_ENCODING_TEST = /[^\w!$'()*+,.:;|~-]/u;
 // =============================================================================
 // Encoding Helper Functions
 // =============================================================================
+
+/**
+ * A lone (unpaired) surrogate — a high surrogate not followed by a low, or a low
+ * not preceded by a high. A manual, lib-target-agnostic `String.prototype.toWellFormed`
+ * (ES2024): consumers compile this `src` under their own `tsconfig` (whose `lib` may
+ * predate es2024 — e.g. `hash-plugin`), so a regex `replace` avoids a `toWellFormed`
+ * type error there while producing the identical result.
+ */
+const LONE_SURROGATE_RGX =
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/**
+ * Wraps an encoder so a lone (unpaired) surrogate — the only input
+ * `encodeURIComponent` / `encodeURI` reject (`URIError`) — is sanitized to U+FFFD
+ * and re-encoded instead of throwing, keeping `buildPath` total (#1315). The
+ * surrogate is already non-round-trippable garbage. `path-matcher` has zero deps, so
+ * this mirrors search-params' `safeEncode` rather than importing it (a deliberate
+ * twin, like the `getTypeDescription` copy in route-tree).
+ */
+const totalize =
+  (encoder: (s: string) => string) =>
+  (segment: string): string => {
+    try {
+      return encoder(segment);
+    } catch {
+      return encoder(segment.replaceAll(LONE_SURROGATE_RGX, "�"));
+    }
+  };
+
+// Only the slow path can throw a `URIError` — a lone surrogate always matches
+// `NEEDS_ENCODING_REGEX`, so it never reaches the all-safe fast path — hence the
+// try/catch sits here and the 29-57x fast path below pays nothing for it.
+const encodeSlowPath = totalize((segment: string): string =>
+  segment.replaceAll(NEEDS_ENCODING_REGEX, (match) =>
+    encodeURIComponent(match),
+  ),
+);
 
 /**
  * Encode a segment while preserving sub-delimiters.
@@ -66,9 +106,7 @@ export const encodeURIComponentExcludingSubDelims = (
     return segment;
   }
 
-  return segment.replaceAll(NEEDS_ENCODING_REGEX, (match) =>
-    encodeURIComponent(match),
-  );
+  return encodeSlowPath(segment);
 };
 
 // =============================================================================
@@ -89,8 +127,8 @@ export const ENCODING_METHODS: Record<
   (param: string) => string
 > = {
   default: encodeURIComponentExcludingSubDelims,
-  uri: encodeURI,
-  uriComponent: encodeURIComponent,
+  uri: totalize(encodeURI),
+  uriComponent: totalize(encodeURIComponent),
   none: (val) => val,
 };
 
