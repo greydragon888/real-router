@@ -27,10 +27,19 @@ import type { Options } from "../../src";
  * guards the throw at `SegmentMatcher.#mergeQueryParams` (a try/catch → the URL
  * resolves to UNKNOWN_ROUTE, never a crash — #737). It is therefore not part of
  * this `range(parse) ⊆ dom(build)` contract.
+ *
+ * Lone (unpaired) surrogates ARE in scope (#1314): `parse` accepts one verbatim
+ * (its non-percent decode is identity), and `build` must not throw on it — the
+ * former blind axis that made the whole suite pass while `build(parse("a=\uD800"))`
+ * threw `URIError`. `safeEncode` now sanitizes it to U+FFFD, so totality holds; the
+ * `LONE`/`PAIR` tokens below arm the generators for it, and the value-oracle block
+ * pins the (lossy but total) result.
  */
 
+const LONE_SURROGATE = "\uD800"; // unpaired high surrogate
+
 // Collision pool + prototype-name keys (the `Object.hasOwn` / `defineProperty`
-// accumulator path) + unicode / special / valid-percent keys.
+// accumulator path) + unicode / special / valid-percent / lone-surrogate keys.
 const arbBrutalKey = fc.oneof(
   fc.constantFrom("a", "b", ""),
   fc.constantFrom(
@@ -42,7 +51,17 @@ const arbBrutalKey = fc.oneof(
     "hasOwnProperty",
     "isPrototypeOf",
   ),
-  fc.constantFrom("a.b", "a-b", "café", "中", "🎉", "%20", "a%2Bb"),
+  fc.constantFrom(
+    "a.b",
+    "a-b",
+    "café",
+    "中",
+    "🎉",
+    "%20",
+    "a%2Bb",
+    LONE_SURROGATE,
+    `a${LONE_SURROGATE}b`,
+  ),
 );
 
 const arbBrutalValue = fc.oneof(
@@ -62,6 +81,9 @@ const arbBrutalValue = fc.oneof(
     "%2C",
     "%E2%9C%93",
     "a=b",
+    LONE_SURROGATE,
+    `x${LONE_SURROGATE}`,
+    "\uDC00",
   ),
 );
 
@@ -110,4 +132,43 @@ describe("inverse-pair BRUTAL (#1155/#1156, A7)", () => {
       expect(Object.keys(Object.prototype)).toHaveLength(protoKeysBefore);
     },
   );
+});
+
+describe("lone surrogate — total but lossy (#1314)", () => {
+  test("build sanitizes a lone surrogate to U+FFFD instead of throwing (scalar)", () => {
+    expect(build(parse(`a=${LONE_SURROGATE}`))).toBe("a=%EF%BF%BD");
+  });
+
+  test("build sanitizes a lone surrogate array element (Format Roundtrips #9)", () => {
+    expect(build({ a: [LONE_SURROGATE] })).toBe("a=%EF%BF%BD");
+  });
+
+  test("first round-trip mutates the garbage to U+FFFD, then stabilises", () => {
+    // \uD800 is non-round-trippable garbage; build → %EF%BF%BD → parse → U+FFFD.
+    const once = parse(build(parse(`a=${LONE_SURROGATE}`)));
+
+    expect(once).toStrictEqual({ a: "�" });
+    // Idempotent thereafter — no further drift (Format Roundtrips #20).
+    expect(parse(build(once))).toStrictEqual({ a: "�" });
+  });
+});
+
+describe("over-encoded coercion — locked as documented (#1317)", () => {
+  // Type coercion is asymmetric between number (reads the DECODED value) and the
+  // boolean word-match (reads the RAW value only). Over-encoding an unreserved char
+  // is legal per RFC 3986, so two wire spellings of one value can decode to
+  // different types. This is a deliberate, documented contract (INVARIANTS
+  // Parse/Build #11), NOT a fixed bug — the oracle pins the CURRENT behavior so a
+  // future coercion change is caught and the asymmetry cannot drift silently.
+  test("number coerces THROUGH percent-encoding (decoded value)", () => {
+    expect(parse("a=42")).toStrictEqual({ a: 42 });
+    expect(parse("a=4%32")).toStrictEqual({ a: 42 }); // %32 → "2" → 42
+    expect(parse("a=%2D5")).toStrictEqual({ a: -5 }); // %2D → "-"
+  });
+
+  test("boolean words match RAW only — an over-encoded 'true' stays a string", () => {
+    expect(parse("a=true")).toStrictEqual({ a: true });
+    expect(parse("a=%74rue")).toStrictEqual({ a: "true" }); // %74 → "t"; raw ≠ "true"
+    expect(parse("a=tru%65")).toStrictEqual({ a: "true" });
+  });
 });
