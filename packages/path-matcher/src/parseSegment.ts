@@ -211,3 +211,32 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
     ? { kind: "param", name, optional }
     : { kind: "param", name, constraint, optional };
 }
+
+/**
+ * Returns the first per-segment grammar error in a path, or `undefined` if every
+ * segment tokenizes cleanly.
+ *
+ * The **validation-facing** entry over the tokenizer: `route-tree`'s
+ * `validateRoutePath` calls this instead of re-running its own split+parse loop,
+ * so the gate and the matcher's own grammar cannot drift (#1324) and the loop
+ * stays single-sourced here — the tokenizer primitives (`parseSegment`,
+ * `splitPathSegments`) need not leak into the package's public surface. An empty
+ * segment tokenizes as `static` (never an error), so leading/trailing/`//`
+ * empties are skipped naturally.
+ *
+ * @param path - a route path (query already stripped by the caller)
+ * @returns the first `SegmentErrorCode` (scanned left to right), or `undefined`
+ */
+export function findSegmentGrammarError(
+  path: string,
+): SegmentErrorCode | undefined {
+  for (const segment of splitPathSegments(path)) {
+    const token = parseSegment(segment);
+
+    if ("error" in token) {
+      return token.error;
+    }
+  }
+
+  return undefined;
+}

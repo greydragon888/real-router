@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseSegment, splitPathSegments } from "../../src/parseSegment";
+import {
+  findSegmentGrammarError,
+  parseSegment,
+  splitPathSegments,
+} from "../../src/parseSegment";
 
 /**
  * Unit contract for the canonical segment tokenizer (RFC §4). Every token form,
@@ -234,5 +238,31 @@ describe("splitPathSegments (constraint-aware segmentation)", () => {
       String.raw`:id<\d+>`,
       "y",
     ]);
+  });
+});
+
+describe("findSegmentGrammarError (validation entry over the tokenizer)", () => {
+  it("returns undefined for a clean path (incl. constraint-with-`/`)", () => {
+    expect(
+      findSegmentGrammarError(String.raw`/users/:id<\d+>/posts/:pid?`),
+    ).toBeUndefined();
+    expect(findSegmentGrammarError("/x/:id<a/b>/y")).toBeUndefined();
+    expect(findSegmentGrammarError("/")).toBeUndefined();
+  });
+
+  it("returns the first per-segment grammar error — one per code", () => {
+    expect(findSegmentGrammarError("/x/:y*")).toBe("trailing-marker"); // #1324
+    expect(findSegmentGrammarError("/x/:")).toBe("name-less");
+    expect(findSegmentGrammarError("/a:b/y")).toBe("fused-marker");
+    expect(findSegmentGrammarError("/foo<bar>")).toBe("constraint-in-static");
+    expect(findSegmentGrammarError(String.raw`/:id<\d+>-x`)).toBe(
+      "fused-constraint-suffix",
+    );
+    expect(findSegmentGrammarError("/files/*path?")).toBe("optional-splat");
+  });
+
+  it("returns the FIRST error left-to-right across malformed segments", () => {
+    // "a:b" (fused-marker) precedes ":y*" (trailing-marker) → fused-marker wins.
+    expect(findSegmentGrammarError("/a:b/:y*")).toBe("fused-marker");
   });
 });
