@@ -6,7 +6,7 @@
 
 **Scope — `wouter` is deliberately excluded** (a scoping choice stated up front, not a result). It is a minimalist location-matcher (regexparam matching + a location hook) — a *different class*: no transition pipeline, guards, loaders, or validated search, and **no cross-framework analog** (React/Preact only), so it cannot appear in the Vue/Solid/Svelte/Angular cohorts these benchmarks expand to. Benchmarking it here compares apples to oranges — its low per-nav cost reflects doing less, not faster engineering — and dilutes a like-for-like comparison of full routers. (See `.claude/competitor-routers.md` for wouter's place in the landscape.)
 
-**Run:** runs 30 · warmup 5 · throttle off · 2026-07-05T05:35:04.045Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
+**Run:** runs 30 · warmup 5 · throttle off · 2026-07-06T21:38:10.536Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
 
 ⚠️ Preliminary local numbers — directional, not a published verdict. Reported metrics are the **stable signals only** — CPU (`script`), heap, FCP (all RME < 5%). Felt **latency was deliberately dropped** (its RME was 9–44% across every scenario — React render + display-frame cadence dominate, not router work; see *Why no latency* at the end). `nav-churn` throughput is frame-capped — read CPU/nav + heap. **Caveat — `script` is V8-only:** CDP `ScriptDuration` excludes Blink C++ — notably `history.pushState`'s `updateForSameDocumentNavigation` (~130 µs/nav, CDP-traced) and paint — which is ~identical across routers, so `script` *ratios* overstate the *total* per-nav gap (e.g. a ~4× `script` ratio is ≈ parity in total — Vue cohort all ~0.32 ms, CDP-traced + harness-reported).
 
@@ -16,8 +16,8 @@ App init + parse/exec to first route painted (small route table).
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| main-thread script (ms) | 12.28 | 14.38 | **11.38** |
-| JS heap (MB) | 3.22 | 3.46 | **3.10** |
+| main-thread script (ms) | 12.38 | 14.45 | **11.36** |
+| JS heap (MB) | 3.23 | 3.46 | **3.10** |
 | FCP (ms) | **32.00** | 36.00 | **32.00** |
 
 ## Navigation — per-nav total main-thread (script + history) — `nav-latency`
@@ -26,10 +26,10 @@ Per-navigation **total main-thread** (script + Blink history, both harness-measu
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.981** | 1.22 | 1.30 |
-| · script (V8 only) (ms) | **0.644** | 0.910 | 0.970 |
-| · Blink history (pushState) (ms) | 0.337 | **0.315** | 0.335 |
-| alloc / nav (GC pressure) (KB) | **0.281** | 1.52 | 0.317 |
+| ≈ total main-thread (ms) | **0.876** | 1.13 | 1.22 |
+| · script (V8 only) (ms) | **0.575** | 0.848 | 0.920 |
+| · Blink history (pushState) (ms) | 0.298 | **0.287** | 0.297 |
+| alloc / nav (GC pressure) (KB) | **0.291** | 1.53 | 0.321 |
 
 ## Param navigation — per-nav total (script + history) — `param-nav`
 
@@ -37,10 +37,10 @@ Per-nav total changing :id (steady-state sweep /users/1→2→3…). **real-rout
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.691** | 0.926 | 0.860 |
-| · script (V8 only) (ms) | **0.342** | 0.624 | 0.517 |
-| · Blink history (pushState) (ms) | 0.346 | **0.298** | 0.337 |
-| alloc / nav (GC pressure) (KB) | 0.620 | 2.05 | **0.400** |
+| ≈ total main-thread (ms) | **0.632** | 0.902 | 0.814 |
+| · script (V8 only) (ms) | **0.323** | 0.613 | 0.507 |
+| · Blink history (pushState) (ms) | 0.310 | **0.289** | 0.309 |
+| alloc / nav (GC pressure) (KB) | 0.622 | 2.05 | **0.397** |
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
@@ -48,12 +48,12 @@ Navigate into a flat 1000-route table; per size **total** (script + Blink) + **s
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| ≈ total @10 (ms) | **0.490** | 0.821 | 0.736 |
-| ≈ total @100 (ms) | **0.464** | 0.864 | 0.768 |
-| ≈ total @1000 (ms) | **0.464** | 0.822 | 1.45 |
-| · script (matcher) @10 (ms) | **0.433** | 0.763 | 0.672 |
-| · script (matcher) @100 (ms) | **0.405** | 0.803 | 0.702 |
-| · script (matcher) @1000 (ms) | **0.407** | 0.762 | 1.39 |
+| ≈ total @10 (ms) | **0.471** | 0.821 | 0.718 |
+| ≈ total @100 (ms) | **0.447** | 0.855 | 0.754 |
+| ≈ total @1000 (ms) | **0.478** | 0.815 | 1.45 |
+| · script (matcher) @10 (ms) | **0.414** | 0.766 | 0.653 |
+| · script (matcher) @100 (ms) | **0.390** | 0.796 | 0.693 |
+| · script (matcher) @1000 (ms) | **0.423** | 0.762 | 1.39 |
 
 ## Route-table memory — heap to hold N routes (sweep) — `table-heap`
 
@@ -61,9 +61,9 @@ Retained JS heap holding a table of 1 / 1000 / 10000 routes (forced GC; @1 ≈ t
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| heap @1 (floor) (MB) | 2.24 | 2.50 | **2.16** |
-| heap @1k (MB) | 3.17 | 3.51 | **2.95** |
-| heap @10k (MB) | **8.55** | 11.22 | 8.72 |
+| heap @1 (floor) (MB) | 2.25 | 2.50 | **2.16** |
+| heap @1k (MB) | 3.08 | 3.51 | **2.95** |
+| heap @10k (MB) | **8.58** | 11.22 | 8.72 |
 
 ## Deep config — nesting depth (sweep) — `deep-config`
 
@@ -71,14 +71,14 @@ Navigate into a 90-level nested chain (sweep 3 / 30 / 60 / 90). **real-router an
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| ≈ total @3 (ms) | **0.574** | 1.02 | 1.36 |
-| ≈ total @30 (ms) | **0.991** | 2.02 | 4.67 |
-| ≈ total @60 (ms) | **1.34** | 2.50 | 5.46 |
-| ≈ total @90 (ms) | **1.70** | 2.87 | 1.73 |
-| · script (matcher) @3 (ms) | **0.512** | 0.960 | 1.29 |
-| · script (matcher) @30 (ms) | **0.929** | 1.96 | 4.60 |
-| · script (matcher) @60 (ms) | **1.27** | 2.44 | 5.39 |
-| · script (matcher) @90 (ms) | **1.64** | 2.81 | 1.67 |
+| ≈ total @3 (ms) | **0.563** | 1.02 | 1.34 |
+| ≈ total @30 (ms) | **0.988** | 1.99 | 4.58 |
+| ≈ total @60 (ms) | **1.32** | 2.47 | 5.36 |
+| ≈ total @90 (ms) | **1.70** | 2.84 | 1.73 |
+| · script (matcher) @3 (ms) | **0.501** | 0.958 | 1.28 |
+| · script (matcher) @30 (ms) | **0.922** | 1.93 | 4.52 |
+| · script (matcher) @60 (ms) | **1.26** | 2.41 | 5.30 |
+| · script (matcher) @90 (ms) | **1.64** | 2.78 | 1.67 |
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
@@ -86,13 +86,13 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`) — the
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| ≈ total @1 (ms) | **0.527** | 1.42 | 0.704 |
-| ≈ total @10 (ms) | **0.521** | 1.51 | 0.672 |
-| ≈ total @50 (ms) | **0.577** | 2.33 | 0.701 |
-| · script (query-parse) @1 (ms) | **0.465** | 1.36 | 0.639 |
-| · script (query-parse) @10 (ms) | **0.458** | 1.46 | 0.615 |
-| · script (query-parse) @50 (ms) | **0.507** | 2.26 | 0.638 |
-| alloc / nav @50↔@1 (GC pressure) (KB) | **0.418** | 2.04 | 0.697 |
+| ≈ total @1 (ms) | **0.509** | 1.41 | 0.669 |
+| ≈ total @10 (ms) | **0.505** | 1.52 | 0.659 |
+| ≈ total @50 (ms) | **0.571** | 2.28 | 0.674 |
+| · script (query-parse) @1 (ms) | **0.445** | 1.35 | 0.608 |
+| · script (query-parse) @10 (ms) | **0.445** | 1.46 | 0.599 |
+| · script (query-parse) @50 (ms) | **0.509** | 2.22 | 0.613 |
+| alloc / nav @50↔@1 (GC pressure) (KB) | **0.419** | 2.01 | 0.718 |
 
 ## Nav churn (stress) — `nav-churn`
 
@@ -100,9 +100,9 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`) — the
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| ≈ total / nav (ms) | **1.05** | 1.25 | 1.39 |
-| · script / nav (V8) (ms) | **0.706** | 0.950 | 1.06 |
-| · Blink / nav (pushState) (ms) | 0.340 | **0.306** | 0.327 |
+| ≈ total / nav (ms) | **0.929** | 1.15 | 1.28 |
+| · script / nav (V8) (ms) | **0.624** | 0.869 | 0.984 |
+| · Blink / nav (pushState) (ms) | 0.305 | **0.278** | 0.297 |
 | heap retained (200 navs) (KB) | **704** | 1214 | 883 |
 | throughput (frame-capped) (/s) | 121 | **121** | 120 |
 
@@ -112,9 +112,9 @@ Per-nav total recompute across 100 links (steady-state toggle). **real-router li
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.858** | 1.48 | 1.77 |
-| · script (V8 only) (ms) | **0.504** | 1.23 | 1.43 |
-| · Blink history (pushState) (ms) | 0.352 | **0.254** | 0.340 |
+| ≈ total main-thread (ms) | **0.811** | 1.44 | 1.72 |
+| · script (V8 only) (ms) | **0.499** | 1.21 | 1.41 |
+| · Blink history (pushState) (ms) | 0.309 | **0.233** | 0.312 |
 
 ## Link build — mount 1000 links (href construction) — `link-build`
 
@@ -122,7 +122,7 @@ CPU to mount 1000 `<Link>`s at once — each builds its href via the router's re
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| script (1000 links) (ms) | **7.58** | 14.47 | 9.78 |
+| script (1000 links) (ms) | **7.50** | 14.32 | 9.70 |
 
 ## Nested switch (reuse) — per-nav total (script + history) — `nested-switch`
 
@@ -130,9 +130,9 @@ Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. 
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.672** | 0.887 | 0.875 |
-| · script (V8 only) (ms) | **0.336** | 0.590 | 0.544 |
-| · Blink history (pushState) (ms) | 0.340 | **0.300** | 0.335 |
+| ≈ total main-thread (ms) | **0.624** | 0.857 | 0.818 |
+| · script (V8 only) (ms) | **0.326** | 0.577 | 0.514 |
+| · Blink history (pushState) (ms) | 0.296 | **0.282** | 0.306 |
 
 ## Feature support — capability, NOT a perf race
 
@@ -160,10 +160,10 @@ Even among full routers, first-class API coverage differs. `✓` = built-in API,
 
 | metric | bare React | real-router | tanstack | react-router |
 |---|---|---|---|---|
-| cold-start script (ms) | 7.68 | 12.28 (+4.6) | 14.38 (+6.7) | 11.38 (+3.7) |
-| cold-start heap (MB) | 2.75 | 3.22 (+0.5) | 3.46 (+0.7) | 3.10 (+0.3) |
-| nav script (ms) | 0.477 | 0.644 (+0.2) | 0.910 (+0.4) | 0.970 (+0.5) |
-| link-build script (ms) | 4.07 | 7.58 (+3.5) | 14.47 (+10.4) | 9.78 (+5.7) |
+| cold-start script (ms) | 7.64 | 12.38 (+4.7) | 14.45 (+6.8) | 11.36 (+3.7) |
+| cold-start heap (MB) | 2.75 | 3.23 (+0.5) | 3.46 (+0.7) | 3.10 (+0.3) |
+| nav script (ms) | 0.422 | 0.575 (+0.2) | 0.848 (+0.4) | 0.920 (+0.5) |
+| link-build script (ms) | 4.05 | 7.50 (+3.5) | 14.32 (+10.3) | 9.70 (+5.7) |
 
 **Reading:** the `(+Δ)` is the router's marginal cost over bare React. On the **per-navigation hot path real-router adds the least** — its transition pipeline is the lightest marginal cost over bare React, well under react-router's and roughly half tanstack's. It is near-lowest on link overhead too; **tanstack pays ~2× the router overhead** on startup and links. real-router's cold-start overhead sits a little above react-router's — partly the `browser-plugin` (real History API) it carries by contract — but both are far below tanstack. Net: subtract React, and real-router's router cost is smallest where it matters most (navigation).
 
