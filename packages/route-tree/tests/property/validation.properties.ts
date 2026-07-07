@@ -172,6 +172,89 @@ const arbFusedMarkerPath = fc
   .tuple(arbSafeSegment, fc.constantFrom(":", "*"), arbSafeSegment)
   .map(([prefix, marker, name]) => `/${prefix}${marker}${name}`);
 
+/**
+ * Param paths with static text FUSED to a constraint's closing `>` within a
+ * segment (`/:id<abc>xyz`, `/:year<abc>-archive`). build strips `<…>` then
+ * re-extracts the name greedily and fuses the suffix, so build name ≠ meta name — a
+ * silent dead route; `validateRoute` must reject at the gate (path-matcher backstops
+ * at `registerTree`, #1150). Body and suffix are non-empty so the `>` is always
+ * mid-segment. The mirror of the fused mid-segment marker on the OTHER side (#1150).
+ */
+const arbFusedConstraintSuffixPath = fc
+  .tuple(arbSafeSegment, arbSafeSegment, arbSafeSegment)
+  .map(([name, body, suffix]) => `/:${name}<${body}>${suffix}`);
+
+/**
+ * Paths with an optional splat `*name?` (`/*path?`). build treats it as a
+ * multi-segment splat while the trie's optional fork compiles a single-segment
+ * plain param, so the build/match shapes drift; `validateRoute` must reject it
+ * (path-matcher backstops at `registerTree`, #1149).
+ */
+const arbOptionalSplatPath = fc
+  .stringMatching(/^[a-z]{1,8}$/)
+  .map((name) => `/*${name}?`);
+
+/**
+ * Paths with an UNCONSTRAINED optional param directly before a splat
+ * (`/:v?/*rest`). With no constraint there is no validity signal to disambiguate
+ * take-the-optional from let-the-splat-capture, so every multi-segment value has two
+ * readings; `validateRoute` must reject it (path-matcher backstops at `registerTree`,
+ * #1264). A CONSTRAINED optional→splat is supported and NOT generated here.
+ */
+const arbUnconstrainedOptBeforeSplatPath = fc
+  .tuple(arbSafeSegment, arbSafeSegment)
+  .map(([opt, rest]) => `/:${opt}?/*${rest}`);
+
+/**
+ * Paths that repeat one param name within a single route (`/:id/:id`). The trie
+ * would bind both positions under one name, so `match`'s later capture overwrites
+ * the earlier and rewrites the user's URL; `validateRoute` must reject it (#1151).
+ */
+const arbDuplicateParamPath = fc
+  .stringMatching(/^[a-z]{1,8}$/)
+  .map((name) => `/:${name}/:${name}`);
+
+/**
+ * A raw non-ASCII code point (≥ U+0080) in a STATIC segment (`/café`, `/меню`).
+ * `match` compares static trie keys raw and rejects non-ASCII input, so the route
+ * would register but never match; `validateRoute` must reject it (path-matcher
+ * backstops at `registerTree`, #1154). The non-ASCII char is embedded BETWEEN two
+ * ASCII runs so the segment is unambiguously static, not a marker-led name.
+ */
+const arbNonAsciiChar = fc.constantFrom("é", "ü", "ñ", "ö", "ç", "中", "я");
+const arbNonAsciiStaticPath = fc
+  .tuple(arbSafeSegment, arbNonAsciiChar, arbSafeSegment)
+  .map(([before, ch, after]) => `/${before}${ch}${after}`);
+
+/**
+ * A malformed query-param declaration — either a query-param name containing
+ * `<`/`>` (a constraint leaked in via a reverse-order modifier typo, `/a/:b?<abc>`,
+ * #1242 §5.1) or a query name colliding with a path-param name (`/a/:tab?tab`,
+ * where buildPath would emit the value twice, #1242 §5.3). Both must be rejected by
+ * `validateRoute` (path-matcher backstops at `registerTree`).
+ */
+const arbMalformedQueryDeclarationPath = fc.oneof(
+  // §5.1: reverse-order typo leaks a constraint into the query name
+  fc
+    .tuple(arbSafeSegment, arbSafeSegment, arbSafeSegment)
+    .map(([seg, param, body]) => `/${seg}/:${param}?<${body}>`),
+  // §5.3: query name collides with a path-param name
+  fc
+    .tuple(arbSafeSegment, arbSafeSegment)
+    .map(([seg, name]) => `/${seg}/:${name}?${name}`),
+);
+
+/**
+ * A `<...>` constraint filling a STATIC segment — no `:`/`*` marker (`/foo<abc>`,
+ * `/a<b>`). path-matcher's marker-agnostic strip silently removes it (`/foo<abc>` →
+ * `/foo`), reshaping the route; `validateRoute` must reject it (path-matcher backstops
+ * at `registerTree`, #1311). The constraint cleanly ENDS its segment, so the
+ * fused-suffix check (#1150) does not catch it — this is the residual axis.
+ */
+const arbConstraintInStaticPath = fc
+  .tuple(arbSafeSegment, arbSafeSegment)
+  .map(([seg, body]) => `/${seg}<${body}>`);
+
 // =============================================================================
 // Route Name Validation
 // =============================================================================
@@ -333,6 +416,83 @@ describe("Route Path Validation", () => {
         expect(() => {
           validateRoutePath(path, "test", "add");
         }).toThrow(/must begin a segment/u);
+      },
+    );
+  });
+
+  describe("9: fused constraint suffix rejection — text fused after a constraint '>' throws (high)", () => {
+    test.prop([arbFusedConstraintSuffixPath], { numRuns: NUM_RUNS.fast })(
+      "static text fused to a constraint's '>' throws (gate-level, consistent with path-matcher #1150)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/text fused to a constraint/u);
+      },
+    );
+  });
+
+  describe("10: optional splat rejection — '*name?' throws (high)", () => {
+    test.prop([arbOptionalSplatPath], { numRuns: NUM_RUNS.fast })(
+      "an optional splat throws (gate-level, consistent with path-matcher #1149)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/optional splat/u);
+      },
+    );
+  });
+
+  describe("11: unconstrained optional-before-splat rejection — '/:v?/*rest' throws (high)", () => {
+    test.prop([arbUnconstrainedOptBeforeSplatPath], { numRuns: NUM_RUNS.fast })(
+      "an unconstrained optional directly before a splat throws (gate-level, consistent with path-matcher #1264)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/unconstrained optional param before a splat/u);
+      },
+    );
+  });
+
+  describe("12: duplicate param name rejection — a repeated name in one path throws (high)", () => {
+    test.prop([arbDuplicateParamPath], { numRuns: NUM_RUNS.fast })(
+      "a param name repeated within one route throws (gate-level, consistent with path-matcher #1151)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/duplicate parameter name/u);
+      },
+    );
+  });
+
+  describe("13: non-ASCII static segment rejection — a raw code point ≥ U+0080 in static text throws (high)", () => {
+    test.prop([arbNonAsciiStaticPath], { numRuns: NUM_RUNS.fast })(
+      "a non-ASCII code point in a static segment throws (gate-level, consistent with path-matcher #1154)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/non-ASCII static segment/u);
+      },
+    );
+  });
+
+  describe("14: malformed query-param declaration rejection — '<>' in a query name or a path/query name collision throws (high)", () => {
+    test.prop([arbMalformedQueryDeclarationPath], { numRuns: NUM_RUNS.fast })(
+      "a query name carrying '<>' or colliding with a path param throws (gate-level, consistent with path-matcher #1242)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/query.?param/u);
+      },
+    );
+  });
+
+  describe("15: constraint in a static segment rejection — '<...>' with no marker throws (high)", () => {
+    test.prop([arbConstraintInStaticPath], { numRuns: NUM_RUNS.fast })(
+      "a '<...>' constraint filling a static segment throws (gate-level, consistent with path-matcher #1311)",
+      (path: string) => {
+        expect(() => {
+          validateRoutePath(path, "test", "add");
+        }).toThrow(/constraint.*in a static segment/u);
       },
     );
   });

@@ -115,5 +115,5 @@
 | `tests/property/tree.properties.ts`        | N1–N4, CC1–CC4, ND1     | createRouteTree normalization + caches + nodeToDef (generative via `arbRouteForest`) |
 | `tests/property/segments.properties.ts`    | S1–S3                   | getSegmentsByName correctness (generative via `arbRouteForest`)                      |
 | `tests/property/queryParams.properties.ts` | Q1–Q2                   | Query param extraction and separation              |
-| `tests/property/validation.properties.ts`  | VN1–VN4, VP1–VP8, VD1–VD5 | Route name/path validation + duplicate detection   |
+| `tests/property/validation.properties.ts`  | VN1–VN4, VP1–VP15, VD1–VD5 | Route name/path validation + duplicate detection   |
 | `tests/property/gate-backstop-parity.properties.ts` | GBP1–GBP5 | Gate ↔ backstop reject-parity for the parallel scans (#1320 Tier 2) |
