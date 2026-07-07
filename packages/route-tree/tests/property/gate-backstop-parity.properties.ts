@@ -106,6 +106,16 @@ const SCANS: readonly ScanClass[] = [
       .map(([m, n]) => `/${m}${n}`),
   },
   {
+    name: "optional modifier on a marker-less segment (#1241 / #1324 §4)",
+    // a marker-less segment with a trailing `?` — `/faq?` — is an optional with no
+    // param name. The backstop rejects it via its `endsWith("?")` optional fork and
+    // the gate via `findSegmentGrammarError`; both now consume parseSegment's SAME
+    // name-less verdict, so they agree (this was the F1 gate↔backstop drift).
+    malformed: arbSafeSegment.map((s) => `/${s}?`),
+    // the same static without the trailing `?`
+    valid: arbSafeSegment.map((s) => `/${s}`),
+  },
+  {
     name: "non-ASCII static (#1154)",
     // a non-ASCII code point in a STATIC segment — /café, /меню
     malformed: fc

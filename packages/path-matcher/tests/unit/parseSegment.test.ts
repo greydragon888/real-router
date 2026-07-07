@@ -154,6 +154,15 @@ describe("parseSegment", () => {
       });
     });
 
+    it("a trailing `?` on a marker-less segment is name-less (#1241, `/faq?`)", () => {
+      // The `?` is the optional modifier; a static has no param name to make
+      // optional. The backstop rejects it by the SAME rule (its `endsWith("?")`
+      // optional fork → this tokenizer), so gate and backstop agree (#1324 §4).
+      expect(parseSegment("faq?")).toStrictEqual({ error: "name-less" });
+      expect(parseSegment("a-b?")).toStrictEqual({ error: "name-less" });
+      expect(parseSegment("?")).toStrictEqual({ error: "name-less" });
+    });
+
     it("trailing marker fused to a param name (#1324)", () => {
       expect(parseSegment(":y*")).toStrictEqual({ error: "trailing-marker" });
       expect(parseSegment(":y:")).toStrictEqual({ error: "trailing-marker" });

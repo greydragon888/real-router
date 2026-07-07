@@ -14,7 +14,8 @@
  * typed error. Grammar (RFC §4):
  * 1. Leading `:`/`*` → param/splat; otherwise `static` (a marker glued *after* a
  *    static prefix ⇒ `fused-marker`; a `<...>` in a marker-less segment ⇒
- *    `constraint-in-static`).
+ *    `constraint-in-static`; a trailing `?` on a marker-less segment ⇒ `name-less`
+ *    — the optional modifier has no param name, #1241 / `/faq?`).
  * 2. name = any char except `<`/`?` (no `/` remains inside a segment); a name
  *    ending in a bare `:`/`*` ⇒ `trailing-marker` (#1324). A *mid* marker stays
  *    a name char — `:a:b` → name `a:b`, preserved.
@@ -126,7 +127,9 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
 
       // A marker glued after a static prefix is extracted as a param by
       // build/meta but compiled as a static literal by the trie (#1050). A bare
-      // marker (no following name char) is the name-less path, not fused.
+      // marker with NO following name char — a static ENDING in `:`/`*` (`/a:`,
+      // `/a*`) — is NOT fused; it stays a valid static literal, matching the trie
+      // backstop (F2: this alignment closed a former gate-too-strict divergence).
       if (isMarker(code) && i + 1 < length) {
         const next = segment.charCodeAt(i + 1);
 
@@ -134,6 +137,16 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
           return { error: "fused-marker" };
         }
       }
+    }
+
+    // A trailing `?` is the optional modifier; on a marker-less segment (no param
+    // name) it is an optional-with-no-name — name-less (#858/#1241, `/faq?`). The
+    // backstop rejects it by the SAME rule: its `endsWith("?")` optional fork routes
+    // the segment to `extractParamName` → this tokenizer. Owning the `?` modifier
+    // here (not just in the marker branches) is what lets the gate and backstop
+    // agree on it — otherwise the gate reads `faq?` as a valid static (#1324 §4).
+    if (segment.charCodeAt(length - 1) === QUESTION) {
+      return { error: "name-less" };
     }
 
     return { kind: "static", text: segment };

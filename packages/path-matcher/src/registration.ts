@@ -684,16 +684,21 @@ function extractParamName(segment: string): string {
       throwTrailingMarker(segment);
     }
 
-    // Name-less `:`/`*`/`:?`/`:<…>` (#858).
+    // Name-less `:`/`*`/`:?`/`:<…>` (#858), AND a `?`-suffixed non-marker segment
+    // the optional fork routed in (`faq?`, #1241): parseSegment now yields name-less
+    // for that too (an optional `?` with no param name), so the gate — reading the
+    // SAME tokenizer — rejects it identically (closes the last gate↔backstop drift,
+    // #1324 §4).
     throwEmptyParamName();
   }
 
-  // A static segment reaching here is a `?`-suffixed non-marker segment the
-  // optional fork routed in (`faq?`): a static cannot be an optional param, so
-  // it is the same name-less rejection (#1241).
+  // A `:`/`*`-led segment tokenizes as param|splat, and a `?`-suffixed static is
+  // name-less above, so `static` is unreachable here — narrowed for the type only.
+  /* v8 ignore start -- unreachable: no input reaching here tokenizes as static */
   if (token.kind === "static") {
     throwEmptyParamName();
   }
+  /* v8 ignore stop */
 
   return token.name;
 }
