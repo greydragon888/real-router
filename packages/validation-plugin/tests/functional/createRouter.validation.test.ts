@@ -22,6 +22,17 @@ describe("createRouter — validation (with validationPlugin)", () => {
       expect(() => router.usePlugin(validationPlugin())).toThrow();
     });
 
+    it("should throw for a flat dotted route name — constructor symmetry with add()/replace() (#1194)", () => {
+      // add()/replace() reject a dotted route name; the constructor's initial
+      // routes must be rejected on plugin registration too, else a validation-ON
+      // app still gets the name-vs-URL split-brain via createRouter([...]).
+      router = createRouter([{ name: "users.view", path: "/:id" }]);
+
+      expect(() => router.usePlugin(validationPlugin())).toThrow(
+        /cannot contain dots/,
+      );
+    });
+
     it("should not throw for valid unique routes", () => {
       router = createRouter([
         { name: "home", path: "/home" },
