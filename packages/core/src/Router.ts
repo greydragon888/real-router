@@ -805,10 +805,25 @@ export class Router<
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- isActive() guarantees state exists
-    const resolvedPath = path ?? this.#state.get()!.path;
+    if (path !== undefined) {
+      return this.#navigation.navigateToNotFound(path);
+    }
 
-    return this.#navigation.navigateToNotFound(resolvedPath);
+    // #1172: a path-less call derives the default path from the committed state.
+    // During the two-phase start window the router is active (`isActive()` true)
+    // while `getState()` is still undefined, so throw an actionable RouterError
+    // instead of a cryptic `TypeError` from dereferencing the absent state —
+    // same class as the #939 always-on invariant guards.
+    const current = this.#state.get();
+
+    if (current === undefined) {
+      throw new RouterError(errorCodes.ROUTER_NOT_STARTED, {
+        message:
+          "[router.navigateToNotFound] cannot derive the path before the start navigation commits — pass an explicit path",
+      });
+    }
+
+    return this.#navigation.navigateToNotFound(current.path);
   }
 
   /**

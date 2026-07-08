@@ -257,6 +257,58 @@ describe("router.navigateToNotFound()", () => {
 
       expect(() => router.navigateToNotFound()).toThrow();
     });
+
+    it("should throw ROUTER_NOT_STARTED (not a cryptic TypeError) when called without a path during the STARTING window (#1172)", async () => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      router = createRouter(
+        [
+          {
+            name: "a",
+            path: "/a",
+            canActivate: () => async () => {
+              await gate;
+
+              return true;
+            },
+          },
+        ],
+        { allowNotFound: true },
+      );
+
+      // start() parks on the async activation guard: the FSM is STARTING, so
+      // isActive() is true while getState() is still undefined (two-phase start).
+      const startPromise = router.start("/a");
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      expect(router.isActive()).toBe(true);
+      expect(router.getState()).toBeUndefined();
+
+      // A path-less call cannot derive the default path yet — it must fail with
+      // an actionable RouterError, not a cryptic `TypeError` from dereferencing
+      // the absent committed state.
+      let caught: unknown;
+
+      try {
+        router.navigateToNotFound();
+      } catch (error: unknown) {
+        caught = error;
+      }
+
+      expect(caught).not.toBeInstanceOf(TypeError);
+      expect((caught as { code?: string }).code).toBe(
+        errorCodes.ROUTER_NOT_STARTED,
+      );
+
+      release();
+      await startPromise.catch(() => {});
+    });
   });
 
   describe("concurrent transition cancellation", () => {
