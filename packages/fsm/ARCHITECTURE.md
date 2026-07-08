@@ -66,7 +66,6 @@ class FSM<
     action: ActionFn<E>,
   ): () => void;
   onTransition(listener: (info: TransitionInfo) => void): () => void;
-  forceState(state: TStates): void;
 }
 ```
 
@@ -242,11 +241,10 @@ This **intentionally differs** from the sibling `@real-router/event-emitter`, wh
 | Lazy `#actions` (`null`)    | No Map allocation when `on()` not used                               |
 | Null-slot listener array    | Reuses slots from unsubscribed listeners                             |
 | Early exit on no-op         | Returns immediately if transition undefined                          |
-| `forceState()` bypass       | ~30ns saved per call — no actions, no listeners, no TransitionInfo   |
 
-## forceState() — Direct State Bypass
+## Declared-state guard
 
-`forceState(state)` updates `#state` and `#currentTransitions` directly — no actions fire, no listeners notified. It shares the `requireDeclared` guard with the constructor (`initial`) and `on` (`from`): an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) `forceState`; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`).
+The constructor (`initial`) and `on` (`from`) share a `requireDeclared` guard: an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) originally the `forceState` guard; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`).
 
 ```typescript
 // shared guard — single source of truth for "the state is declared"
@@ -257,17 +255,9 @@ function requireDeclared(transitions, state, where) {
   }
   return t;
 }
-
-forceState(state) {
-  const transitions = requireDeclared(this.#transitions, state, "forceState");
-  this.#state = state;
-  this.#currentTransitions = transitions;
-}
 ```
 
-**Why it exists:** Router's navigate hot path uses `forceState()` for NAVIGATE and COMPLETE transitions to bypass `send()` overhead (~30ns saved per call). The router already handles event emission separately via `EventBusNamespace` — running it through FSM actions would be redundant.
-
-**Contract:** Caller is responsible for ordering and side effects. The target state must be declared in `config.transitions` — an undeclared state throws and leaves the FSM unchanged. No listeners, no reentrancy handling.
+> **Historical:** `forceState(state)` — a direct `#state`/`#currentTransitions` write that bypassed actions/listeners — was the engine's hot-path escape hatch, added for core's navigate path (NAVIGATE/COMPLETE, ~30ns saved per call). Core dropped it in the #1169 commit-gate refactor (the FSM table is now the sole authority over state, no bypass), leaving zero consumers, so the method was removed. See CHANGELOG.
 
 ## Reentrancy
 

@@ -164,7 +164,7 @@ export const arbFSMConfigWithInitialTransition: fc.Arbitrary<GeneratedFSMConfigW
       }));
     });
 
-// --- Two-step chain support (reentrancy + forceState interaction) ---
+// --- Two-step chain support (reentrancy) ---
 
 export interface GeneratedFSMConfigWithTwoStepChain extends GeneratedFSMConfigWithInitialTransition {
   /** An event with a transition out of `knownTo`. */
