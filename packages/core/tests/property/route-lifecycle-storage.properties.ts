@@ -58,7 +58,7 @@ describe("RouteLifecycleNamespace storage invariants (public API)", () => {
   );
 
   test.prop([arbTarget], { numRuns: NUM_RUNS.fast })(
-    "EXTERNAL_SURVIVES_REPLACE (def-after-ext): a definition guard added AFTER an external one leaves no zombie after replace() (#1192)",
+    "EXTERNAL_SURVIVES_REPLACE (def-after-ext): a definition guard added AFTER an external one never becomes effective (external-wins) and leaves no zombie after replace() (#1192 #1174)",
     async (target) => {
       const router = createFixtureRouter();
       const lifecycle = getLifecycleApi(router);
@@ -66,18 +66,21 @@ describe("RouteLifecycleNamespace storage invariants (public API)", () => {
 
       await router.start("/");
 
-      // external BLOCKS; then a definition guard (via update) ALLOWS the same
-      // slot — registration is last-add-wins, so the compiled function is now
-      // the definition (allowing) guard.
+      // external BLOCKS; then a definition guard (via update) tries to ALLOW the
+      // same slot. Resolution is external-wins (#1174), so the compiled function
+      // stays the external (blocking) guard regardless of registration order —
+      // the definition is stored (for a later clearDefinitionGuards) but never
+      // becomes the effective guard while the external is live.
       lifecycle.addActivateGuard(target, () => () => false);
       routes.update(target, { canActivate: () => () => true });
 
-      expect(router.canNavigateTo(target)).toBe(true);
+      expect(router.canNavigateTo(target)).toBe(false);
 
       routes.replace(freshRoutes()); // strips definition guards
 
-      // The surviving external (blocking) guard must be recompiled into the
-      // slot — not left as the erased definition (allowing) zombie.
+      // The external (blocking) guard was the compiled slot all along, so it
+      // survives replace() with no zombie — clearDefinitionGuards' recompile is
+      // idempotent under external-wins (the slot is already external).
       expect(router.canNavigateTo(target)).toBe(false);
 
       router.stop();
