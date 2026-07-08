@@ -106,6 +106,9 @@ export interface NavigationDependencies {
   /** Check if any leave listeners are registered */
   hasLeaveListeners: () => boolean;
 
+  /** Check if any TRANSITION_START listeners are registered (#1169 gate P2) */
+  hasStartListeners: () => boolean;
+
   /** Call all leave listeners — returns Promise if any are async, undefined otherwise */
   awaitLeaveListeners: (
     toState: State,

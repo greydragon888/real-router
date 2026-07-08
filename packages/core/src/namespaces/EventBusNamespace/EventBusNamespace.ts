@@ -39,8 +39,21 @@ function settleLeavePromises(
   signal: AbortSignal,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    // #1197 — canonicalize the abort outcome: reject with a
+    // `RouterError(TRANSITION_CANCELLED)` carrying the external reason, so the
+    // no-guards leave path classifies identically to the guard path (no raw
+    // reject, no spurious TRANSITION_ERROR). Internal sources
+    // (supersede/stop/dispose) already abort with such a RouterError — thread it
+    // through unchanged so the #943 reason is preserved.
     const onAbort = (): void => {
-      reject(ensureError(signal.reason));
+      const reason: unknown = signal.reason;
+
+      reject(
+        reason instanceof RouterError &&
+          reason.code === errorCodes.TRANSITION_CANCELLED
+          ? reason
+          : new RouterError(errorCodes.TRANSITION_CANCELLED, { reason }),
+      );
     };
 
     if (signal.aborted) {
@@ -286,9 +299,10 @@ export class EventBusNamespace {
 
   sendNavigate(toState: State, fromState?: State): void {
     this.#currentToState = toState;
-    // Bypass FSM dispatch — forceState + direct emit (no action lookup, no rest params)
-    this.#fsm.forceState(routerStates.TRANSITION_STARTED);
-    this.emitTransitionStart(toState, fromState);
+    // Table-driven: the FSM action emits TRANSITION_START (#1169 D-full). A
+    // NAVIGATE that the table rejects is a no-op — the FSM never leaves an
+    // invalid state and no event fires.
+    this.#fsm.send(routerEvents.NAVIGATE, { toState, fromState });
   }
 
   sendComplete(
@@ -296,9 +310,10 @@ export class EventBusNamespace {
     fromState?: State,
     opts: NavigationOptions = {},
   ): void {
-    // Bypass FSM dispatch — forceState + direct emit
-    this.#fsm.forceState(routerStates.READY);
-    this.emitTransitionSuccess(state, fromState, opts);
+    // Table-driven: the FSM action emits TRANSITION_SUCCESS (#1169 D-full).
+    // COMPLETE from IDLE/DISPOSED (a listener stopped/disposed mid-transition)
+    // is a table no-op — no resurrection, no phantom success emit.
+    this.#fsm.send(routerEvents.COMPLETE, { toState: state, fromState, opts });
 
     // Nav committed — clear so a later stop()/dispose() cannot cancel a finished
     // navigation. Unconditional now that synchronous reentrant navigate is banned
@@ -308,9 +323,9 @@ export class EventBusNamespace {
   }
 
   sendLeaveApprove(toState: State, fromState?: State): void {
-    // Bypass FSM dispatch — forceState + direct emit (no action lookup, no rest params)
-    this.#fsm.forceState(routerStates.LEAVE_APPROVED);
-    this.emitTransitionLeaveApprove(toState, fromState);
+    // Table-driven: the FSM action emits TRANSITION_LEAVE_APPROVE (#1169 D-full).
+    // LEAVE_APPROVE from IDLE/DISPOSED is a table no-op — no resurrection.
+    this.#fsm.send(routerEvents.LEAVE_APPROVE, { toState, fromState });
   }
 
   sendFail(toState?: State, fromState?: State, error?: unknown): void {
@@ -549,6 +564,16 @@ export class EventBusNamespace {
     return this.#leaveListeners.length > 0;
   }
 
+  /**
+   * True when a `TRANSITION_START` listener (plugin `onTransitionStart` or a
+   * raw `addEventListener`) is registered — the third listener window where a
+   * synchronous `stop()`/`dispose()` can supersede an in-flight navigation
+   * (#1169). Read into the pre-`startTransition` liveness snapshot.
+   */
+  hasStartListeners(): boolean {
+    return this.#emitter.listenerCount(events.TRANSITION_START) > 0;
+  }
+
   awaitLeaveListeners(
     toState: State,
     fromState: State | undefined,
@@ -669,9 +694,40 @@ export class EventBusNamespace {
       this.emitRouterStop();
     });
 
-    // NAVIGATE, LEAVE_APPROVE and COMPLETE actions bypassed —
-    // sendNavigate/sendLeaveApprove/sendComplete use fsm.forceState() + direct
-    // emit for the zero-allocation hot path.
+    // NAVIGATE / LEAVE_APPROVE / COMPLETE emit their transition event as the FSM
+    // action (payload = the transition states), so `send()` from an invalid
+    // state (e.g. COMPLETE from IDLE after a listener's stop()/dispose()) is a
+    // table no-op that emits nothing — the FSM table is the sole authority over
+    // state, no `forceState` resurrection (#1169 D-full). NAVIGATE fires from
+    // READY plus the TRANSITION_STARTED / LEAVE_APPROVED self-loops (supersede).
+    const emitNavigate = (payload: RouterPayloads["NAVIGATE"]): void => {
+      this.emitTransitionStart(payload.toState, payload.fromState);
+    };
+
+    fsm.on(routerStates.READY, routerEvents.NAVIGATE, emitNavigate);
+    fsm.on(
+      routerStates.TRANSITION_STARTED,
+      routerEvents.NAVIGATE,
+      emitNavigate,
+    );
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.NAVIGATE, emitNavigate);
+
+    fsm.on(
+      routerStates.TRANSITION_STARTED,
+      routerEvents.LEAVE_APPROVE,
+      (payload) => {
+        this.emitTransitionLeaveApprove(payload.toState, payload.fromState);
+      },
+    );
+
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.COMPLETE, (payload) => {
+      this.emitTransitionSuccess(
+        payload.toState,
+        payload.fromState,
+        payload.opts,
+      );
+    });
+
     const handleCancel = () => {
       const toState = this.#pendingToState;
       const reason = this.#pendingCancelReason;

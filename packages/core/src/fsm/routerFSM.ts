@@ -3,6 +3,7 @@
 import { FSM } from "@real-router/fsm";
 
 import type { FSMConfig } from "@real-router/fsm";
+import type { NavigationOptions, State } from "@real-router/types";
 
 /**
  * Router FSM states.
@@ -56,8 +57,23 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  *
  * Events without entries have no payload.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- payloads stored in EventBusNamespace fields (N8+N9 optimization)
-export interface RouterPayloads {}
+
+/**
+ * Per-event payloads for the router FSM (#1169 commit-gate). The three hot
+ * navigation transitions carry their transition states so the FSM action
+ * dispatched by `send()` emits the matching transition event — i.e. events are
+ * literal consequences of FSM transitions (no `forceState` + manual emit). See
+ * `EventBusNamespace.#setupFSMActions`.
+ */
+export interface RouterPayloads {
+  NAVIGATE: { toState: State; fromState?: State | undefined };
+  LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
+  COMPLETE: {
+    toState: State;
+    fromState?: State | undefined;
+    opts?: NavigationOptions | undefined;
+  };
+}
 
 /**
  * Router FSM configuration.
