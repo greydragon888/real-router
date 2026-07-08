@@ -106,6 +106,9 @@ export interface NavigationDependencies {
   /** Check if any leave listeners are registered */
   hasLeaveListeners: () => boolean;
 
+  /** Any pre-commit transition listener (onTransitionStart / onTransitionLeaveApprove) — #1169 gate */
+  hasPreCommitListeners: () => boolean;
+
   /** Call all leave listeners — returns Promise if any are async, undefined otherwise */
   awaitLeaveListeners: (
     toState: State,

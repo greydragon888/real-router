@@ -39,7 +39,7 @@ utils/ (SSR/SSG/hydration helpers — separate subpath export)
 
 **RouterFSM states**: `IDLE → STARTING → READY ⇄ TRANSITION_STARTED → LEAVE_APPROVED → READY | DISPOSED`
 
-`DISPOSE` is wired from every non-DISPOSED state so the FSM always settles at `DISPOSED` when `router.dispose()` runs. For healthy flows the facade routes through `IDLE` first (`STOP → IDLE → DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` (e.g. `dispose()` mid-`STARTING` when the start pipeline threw before `STARTED`/`FAIL`). See `routerFSM.ts` transition table.
+`DISPOSE` is wired from every non-DISPOSED state so the FSM always settles at `DISPOSED` when `router.dispose()` runs. For healthy flows the facade routes through `IDLE` first (`STOP → IDLE → DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` (e.g. `dispose()` mid-`STARTING` when the start pipeline threw before `STARTED`/`FAIL`). `STARTING` also accepts `STOP → IDLE` (#1185): a `stop()` while `start()` is parked in an async start-interceptor cancels the start (facade `stop()` sends `STOP`; `RouterLifecycleNamespace.start` re-checks `isIdle()` after the interceptor chain and rejects `TRANSITION_CANCELLED`), so the "`stop()` cancels the transition" contract holds in the interceptor window as it already did in the guard phase. See `routerFSM.ts` transition table.
 
 All router events are consequences of FSM transitions (via `fsm.on(from, event, action)`), not manual calls.
 No boolean flags (`#started`, `#active`, `#navigating` removed).
@@ -83,7 +83,7 @@ Structural guards remain in namespace folders (`OptionsNamespace/validators.ts`,
 Core contains four invariant guards that run regardless of whether validation-plugin is installed:
 
 - **`subscribe(listener)`** — validates `typeof listener === "function"`. Prevents deferred crash (non-function stored in EventEmitter, crash on next navigation). Includes actionable hint: "For Observable pattern use observable(router) from @real-router/rx". (`subscribeLeave` validates the same way but **without** the rx hint — `@real-router/rx` exposes the Observable pattern for success transitions (`observable(router)`, `state$`, `events$`), not for leave events.)
-- **`navigateToNotFound(path)`** — validates `typeof path === "string"` when path is provided. Prevents silent state corruption (`state.path = 42`).
+- **`navigateToNotFound(path)`** — validates `typeof path === "string"` when path is provided (prevents silent state corruption `state.path = 42`). A **path-less** call derives the default path from the committed state; during the two-phase start window (`isActive()` true while `getState()` is `undefined`) it throws `ROUTER_NOT_STARTED` with an actionable message instead of a cryptic `TypeError` from dereferencing the absent state (#1172 — same deferred-crash class as the `start(path)` guard below).
 - **`start(path)`** (in `RouterLifecycleNamespace.start`, #939) — validates `typeof path === "string"`. Runs **after** the start interceptor chain, so a browser-plugin's location injection (`next(path ?? getLocation())`) still wins; it only fires when nothing supplied a path. Without it, `start(undefined)` with no browser-plugin reached `matchPath(undefined)` and threw a cryptic, code-less `TypeError: …codePointAt` deep in path-matcher. Symmetric with `navigateToNotFound`'s type guard. (The facade-level `validateStartArgs` validator deliberately permits `undefined` for the browser-plugin-override case — this guard is the post-override backstop.)
 - **`claimContextNamespace(namespace)`** (on `PluginApi`, `getPluginApi.ts`) — throws `CONTEXT_NAMESPACE_ALREADY_CLAIMED` when a namespace is already claimed by another plugin. Prevents silent corruption: without it two plugins writing the same `state.context.<namespace>` would clobber each other's data.
 
@@ -283,18 +283,20 @@ router.navigate(name, params, opts)
   │
   ├── Build target state (buildNavigateState)
   ├── Same-state check (path comparison)
-  ├── FSM forceState(TRANSITION_STARTED) + emitTransitionStart()
+  ├── liveness snapshot (suspendable? — external signal / leave / start listeners; #1169)
+  ├── FSM send(NAVIGATE) → action emits TRANSITION_START
   │
   ├── Guard pipeline (executeGuardPipeline)
   │   ├── Deactivation guards (innermost → outermost)
-  │   ├── LEAVE_APPROVE phase: FSM forceState(LEAVE_APPROVED) + emitTransitionLeaveApprove()
+  │   ├── LEAVE_APPROVE phase: FSM send(LEAVE_APPROVE) → action emits TRANSITION_LEAVE_APPROVE
   │   │   └── subscribeLeave() callbacks fire here (approved/tentative departure, before activation — activation can still reject)
   │   └── Activation guards (outermost → innermost)
   │   Returns: undefined (all sync) | Promise<void> (async detected)
   │
   ├── SYNC PATH (no async guards):
-  │   └── completeTransition() → setState + FSM forceState(READY)
-  │       → emitTransitionSuccess → return Promise.resolve(state)
+  │   └── commit-gate (if suspendable && cancelled/terminated → reject; #1169)
+  │       → completeTransition() → setState + FSM send(COMPLETE) → action emits TRANSITION_SUCCESS
+  │       → return Promise.resolve(state)
   │
   └── ASYNC PATH (async guard detected):
       └── #finishAsyncNavigation(guardCompletion, ...)
@@ -690,7 +692,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 ### Navigate hot path (#307)
 
 - **Optimistic sync execution** — guards run synchronously, async path deferred. No AbortController/Promise on sync path
-- **FSM `forceState()`** — bypasses `send()` dispatch (no Map lookups, no action calls) for NAVIGATE/COMPLETE/LEAVE_APPROVE. `sendLeaveApprove()` is the third hot-path transition alongside NAVIGATE and COMPLETE — O(1) overhead
+- **FSM `send()` (table-driven, #1169)** — the NAVIGATE/LEAVE_APPROVE/COMPLETE transitions dispatch through the FSM table via `send()`, which fires the registered emit action; **`forceState()` is no longer called anywhere in core** — the bypass primitive was removed from `@real-router/fsm` outright, and `tests/functional/fsm-state-authority.test.ts` locks the invariant in two layers (the FSM engine exposes no `forceState`; a static scan of core `src` finds zero `.forceState` accesses). An invalid transition (e.g. `COMPLETE` after a listener's `stop()`/`dispose()`) is a table no-op, so the FSM is the sole authority over state and cannot be resurrected out of IDLE/DISPOSED. Deliberate trade-off (owner decision): ~+15–20% on `navigate/*` + one transition-payload allocation per navigation, bought for structural determinism (cancellation enforced by the state machine, not scattered re-checks). The pre-`setState` **commit-gate** in `NavigationNamespace` (active only when a listener window is reachable) rejects a navigation cancelled/terminated mid-flight before it commits
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` instead of `...args` to avoid V8 rest-param array allocation
 - **Cached error rejections** — pre-allocated `Promise.reject()` for SAME_STATES, ROUTER_NOT_STARTED, ROUTE_NOT_FOUND (zero alloc per rejection)
 - **`getFunctions()` cached tuple** — `RouteLifecycleNamespace` returns pre-allocated `[deactivate, activate]` array (no alloc per navigate)

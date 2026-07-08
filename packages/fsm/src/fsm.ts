@@ -3,7 +3,7 @@ import type { FSMConfig, TransitionInfo, TransitionListener } from "./types";
 /**
  * Shared guard for the engine-wide invariant "the state is declared in
  * `config.transitions`". Applied at every state-entry-point (constructor
- * `initial`, `forceState`, `on`'s `from`) so an undeclared state fails loud with
+ * `initial` and `on`'s `from`) so an undeclared state fails loud with
  * an explicit error instead of bricking the FSM or dead-registering an action
  * (#885). Returns the state's transition map for the caller to reuse.
  */
@@ -114,21 +114,6 @@ export class FSM<
 
   canSend(event: TEvents): boolean {
     return this.#currentTransitions[event] !== undefined;
-  }
-
-  /**
-   * Directly sets FSM state without triggering actions or listeners.
-   * Use for hot-path optimizations where the caller handles side effects.
-   *
-   * Throws if `state` is not declared in `config.transitions`: an undeclared
-   * state would leave `#currentTransitions` undefined and brick the next
-   * `canSend`/`send`. The state is left unchanged when the guard rejects.
-   */
-  forceState(state: TStates): void {
-    const transitions = requireDeclared(this.#transitions, state, "forceState");
-
-    this.#state = state;
-    this.#currentTransitions = transitions;
   }
 
   getState(): TStates {

@@ -41,6 +41,20 @@ export class RouterLifecycleNamespace {
    */
   async start(startPath: string): Promise<State> {
     const deps = this.#deps;
+
+    // #1185: this method is the start-interceptor target — it runs AFTER the
+    // whole interceptor chain. A stop() during that window sent STOP
+    // (STARTING → IDLE via the FSM table), so if the router is back at IDLE the
+    // start was cancelled mid-window; reject instead of committing a state on a
+    // stopped router (mirrors the guard phase, which cancels from
+    // TRANSITION_STARTED). `isIdle()` is deliberate — a dispose() mid-window
+    // leaves the FSM DISPOSED, which the navigateToState / navigateToNotFound
+    // liveness gate rejects as ROUTER_DISPOSED (#1186), not conflated with a
+    // cancel.
+    if (deps.isIdle()) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    }
+
     const options = deps.getOptions();
 
     // Invariant guard (#939): core is platform-agnostic, so the caller must
@@ -87,7 +101,10 @@ export class RouterLifecycleNamespace {
   /**
    * Stops the router and resets state.
    *
-   * Called only for READY/TRANSITION_STARTED states (facade handles STARTING/IDLE/DISPOSED).
+   * Called for READY / TRANSITION_STARTED and, since #1185, STARTING (a stop()
+   * that cancels a parked start — state is still `undefined` there, so
+   * `clearState()` is a no-op that keeps the reset symmetric). The facade
+   * handles IDLE / DISPOSED.
    */
   stop(): void {
     this.#deps.clearState();

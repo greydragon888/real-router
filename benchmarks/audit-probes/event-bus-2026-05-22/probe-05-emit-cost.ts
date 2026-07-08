@@ -2,8 +2,9 @@
  * Probe-05: emit cost overview at the EventBus level.
  *
  *   A. navigate with N=0 listeners (any kind) — baseline emit overhead.
- *   B. forceState vs send paths — comparison via direct router navigate cycles
- *      (sendNavigate/sendComplete use forceState; sendCancel/sendFail use send).
+ *   B. FSM dispatch cost — comparison via direct router navigate cycles
+ *      (all send* helpers dispatch through FSM `send()` since #1169; the former
+ *      forceState bypass was removed).
  *
  * Cross-reference: subscribe-audit probe-01 reports 542 ns baseline.
  * This probe is intentionally simple — main use is verdict on overhead at

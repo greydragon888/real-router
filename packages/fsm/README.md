@@ -42,7 +42,6 @@ fsm.getContext();         // { count: 0 }
 | `getContext()` | Context object (same reference as config) |
 | `onTransition(listener)` | Subscribe to transitions, returns unsubscribe |
 | `on(from, event, action)` | Register action for specific `(from, event)` pair |
-| `forceState(state)` | Direct state update — no actions, no listeners; throws on an undeclared state |
 
 ### Type-Safe Payloads
 
@@ -64,7 +63,6 @@ fsm.send("FETCH");                   // TS error
 - **Zero-alloc hot path** — skips `TransitionInfo` allocation when no listeners
 - **Null-slot listener array** — reuses slots from unsubscribed listeners
 - **Reentrancy-safe** — state updated before listeners fire; callers responsible for preventing loops
-- **`forceState()`** — bypasses `send()` overhead (~30ns saved per call) for router's navigate hot path
 
 ## Dependencies
 

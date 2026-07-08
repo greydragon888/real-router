@@ -1,7 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { constants, errorCodes } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -103,6 +103,38 @@ describe("router.start() - edge cases", () => {
         expect(error).toBeDefined();
         expect(error.code).toBe(errorCodes.TRANSITION_CANCELLED);
       }
+    });
+  });
+
+  describe("Interceptor window + stop() (#1185)", () => {
+    it("should cancel the start when stop() is called during a parked start-interceptor", async () => {
+      let release!: () => void;
+      const parked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      getPluginApi(router).addInterceptor("start", async (next, path) => {
+        await parked; // park the pipeline in the STARTING window (before next())
+
+        return next(path);
+      });
+
+      const startPromise = router.start("/users/list");
+
+      // FSM is STARTING here; the documented contract says stop() cancels the
+      // transition — it must not be a silent no-op that proceeds to READY.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      router.stop();
+      release();
+
+      const outcome = await startPromise.then(
+        () => "resolved",
+        (error: unknown) => (error as { code?: string }).code ?? "unknown",
+      );
+
+      expect(outcome).toBe(errorCodes.TRANSITION_CANCELLED);
+      expect(router.isActive()).toBe(false);
+      expect(router.getState()).toBeUndefined();
     });
   });
 

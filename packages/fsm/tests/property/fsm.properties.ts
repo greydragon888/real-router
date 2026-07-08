@@ -389,75 +389,6 @@ describe("FSM Action Properties", () => {
   });
 });
 
-describe("FSM forceState Properties", () => {
-  test.prop([arbFSMConfig], { numRuns: NUM_RUNS.standard })(
-    "forceState then getState returns the forced state",
-    (gen) => {
-      const fsm = createFSM(gen);
-
-      for (const state of gen.states) {
-        fsm.forceState(state);
-
-        expect(fsm.getState()).toBe(state);
-      }
-    },
-  );
-
-  test.prop(
-    [
-      arbFSMConfig.chain((gen) =>
-        fc.tuple(
-          fc.constant(gen),
-          fc.constantFrom(...(gen.states as [string, ...string[]])),
-          arbEventSequence(gen.events),
-        ),
-      ),
-    ],
-    { numRuns: NUM_RUNS.lifecycle },
-  )(
-    "forceState updates canSend to reflect the forced state transitions",
-    ([gen, forcedState, events]) => {
-      const fsm = createFSM(gen);
-
-      fsm.forceState(forcedState);
-
-      // canSend should reflect the forced state transitions
-      const transitions = gen.config.transitions[forcedState];
-
-      for (const event of events) {
-        const expected = transitions[event] !== undefined;
-
-        expect(fsm.canSend(event)).toBe(expected);
-      }
-    },
-  );
-
-  test.prop(
-    [
-      arbFSMConfig.chain((gen) =>
-        fc.tuple(
-          fc.constant(gen),
-          fc
-            .string({ minLength: 1, maxLength: 5 })
-            .filter((s) => !gen.states.includes(s)),
-        ),
-      ),
-    ],
-    { numRuns: NUM_RUNS.standard },
-  )(
-    "forceState throws on an undeclared state and leaves the state unchanged",
-    ([gen, undeclaredState]) => {
-      const fsm = createFSM(gen);
-      const stateBefore = fsm.getState();
-
-      expect(() => {
-        fsm.forceState(undeclaredState);
-      }).toThrow();
-      expect(fsm.getState()).toStrictEqual(stateBefore);
-    },
-  );
-});
-
 describe("FSM Action Exception Properties", () => {
   test.prop([arbFSMConfigWithInitialTransition], {
     numRuns: NUM_RUNS.lifecycle,
@@ -586,8 +517,8 @@ describe("FSM Edge Case Properties", () => {
   );
 });
 
-// --- Hardening properties: payload delivery (#753), forceState guard (#754),
-// --- and reentrancy / live iteration (#755). ---
+// --- Hardening properties: payload delivery (#753), declared-state guard
+// --- (#885), and reentrancy / live iteration (#755). ---
 
 describe("FSM Payload Delivery Properties", () => {
   test.prop(
@@ -842,82 +773,35 @@ describe("FSM Listener Exception Properties", () => {
   );
 });
 
-describe("FSM forceState Interaction Properties", () => {
-  test.prop([arbFSMConfigWithTwoStepChain], { numRuns: NUM_RUNS.lifecycle })(
-    "after forceState(X), the next send dispatches X's action and transition",
-    (gen) => {
-      const fsm = createFSM(gen);
-      let actionCalled = false;
-      let listenerTo: string | undefined;
-
-      fsm.forceState(gen.knownTo);
-      fsm.on(gen.knownTo, gen.secondEvent, () => {
-        actionCalled = true;
-      });
-      fsm.onTransition((info) => {
-        listenerTo = info.to;
-      });
-
-      const result = fsm.send(gen.secondEvent);
-
-      expect(actionCalled).toBe(true);
-      expect(result).toBe(gen.secondTo);
-      expect(listenerTo).toBe(gen.secondTo);
-    },
-  );
-});
-
 describe("FSM Robustness Properties", () => {
   test.prop(
     [
       arbFSMConfig.chain((gen) =>
         fc.tuple(
           fc.constant(gen),
-          fc.array(
-            fc.oneof(
-              fc
-                .constantFrom(...(gen.events as [string, ...string[]]))
-                .map((event) => ({ kind: "send" as const, value: event })),
-              fc
-                .constantFrom(...(gen.states as [string, ...string[]]))
-                .map((state) => ({ kind: "force" as const, value: state })),
-              fc
-                .string({ minLength: 1, maxLength: 5 })
-                .filter((s) => !gen.states.includes(s))
-                .map((state) => ({ kind: "forceBad" as const, value: state })),
-            ),
-            { minLength: 1, maxLength: 30 },
-          ),
+          fc.array(fc.constantFrom(...(gen.events as [string, ...string[]])), {
+            minLength: 1,
+            maxLength: 30,
+          }),
         ),
       ),
     ],
     { numRuns: NUM_RUNS.lifecycle },
-  )(
-    "no sequence of send / valid forceState / rejected forceState ever bricks the FSM",
-    ([gen, ops]) => {
-      const fsm = createFSM(gen);
+  )("no sequence of send ever bricks the FSM", ([gen, events]) => {
+    const fsm = createFSM(gen);
 
-      for (const op of ops) {
-        if (op.kind === "send") {
-          fsm.send(op.value);
-        } else if (op.kind === "force") {
-          fsm.forceState(op.value);
-        } else {
-          expect(() => {
-            fsm.forceState(op.value);
-          }).toThrow();
-        }
+    for (const event of events) {
+      fsm.send(event);
 
-        // After every op the FSM stays consistent: the state is declared and
-        // canSend never throws (i.e. #currentTransitions is never undefined).
-        expect(gen.states).toContain(fsm.getState());
+      // After every send the FSM stays consistent: the state is declared and
+      // canSend never throws (i.e. #currentTransitions is never undefined).
+      expect(gen.states).toContain(fsm.getState());
 
-        for (const event of gen.events) {
-          expect(typeof fsm.canSend(event)).toBe("boolean");
-        }
+      for (const evt of gen.events) {
+        expect(typeof fsm.canSend(evt)).toBe("boolean");
       }
-    },
-  );
+    }
+  });
 });
 
 describe("FSM Declared-State Guard Properties", () => {
@@ -934,7 +818,7 @@ describe("FSM Declared-State Guard Properties", () => {
     ],
     { numRuns: NUM_RUNS.standard },
   )(
-    "constructor, forceState, and on all reject an undeclared state (#885)",
+    "constructor and on both reject an undeclared state (#885)",
     ([gen, undeclaredState]) => {
       // constructor's `initial`
       expect(
@@ -942,11 +826,6 @@ describe("FSM Declared-State Guard Properties", () => {
       ).toThrow("is not declared in config.transitions");
 
       const fsm = createFSM(gen);
-
-      // forceState's `state`
-      expect(() => {
-        fsm.forceState(undeclaredState);
-      }).toThrow("is not declared in config.transitions");
 
       // on's `from`
       expect(() => {

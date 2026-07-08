@@ -240,6 +240,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       ns.routeLifecycle.clearCanDeactivate(name);
     },
     hasLeaveListeners: () => ns.eventBus.hasLeaveListeners(),
+    hasPreCommitListeners: () => ns.eventBus.hasPreCommitListeners(),
     awaitLeaveListeners: (toState, fromState, signal) =>
       ns.eventBus.awaitLeaveListeners(toState, fromState, signal),
   };
@@ -262,6 +263,7 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
     completeStart: () => {
       ns.eventBus.sendStarted();
     },
+    isIdle: () => ns.eventBus.isIdle(),
     emitTransitionError: (toState, fromState, error) => {
       ns.eventBus.sendFail(toState, fromState, error);
     },

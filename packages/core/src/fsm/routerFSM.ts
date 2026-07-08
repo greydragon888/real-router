@@ -3,6 +3,7 @@
 import { FSM } from "@real-router/fsm";
 
 import type { FSMConfig } from "@real-router/fsm";
+import type { NavigationOptions, State } from "@real-router/types";
 
 /**
  * Router FSM states.
@@ -52,19 +53,28 @@ export const routerEvents = {
 export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
 
 /**
- * Typed payloads for router FSM events.
- *
- * Events without entries have no payload.
+ * Per-event payloads for the router FSM (#1169 commit-gate). The three hot
+ * navigation transitions carry their transition states so the FSM action
+ * dispatched by `send()` emits the matching transition event — i.e. events are
+ * literal consequences of FSM transitions (no `forceState` + manual emit). See
+ * `EventBusNamespace.#setupFSMActions`.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- payloads stored in EventBusNamespace fields (N8+N9 optimization)
-export interface RouterPayloads {}
+export interface RouterPayloads {
+  NAVIGATE: { toState: State; fromState?: State | undefined };
+  LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
+  COMPLETE: {
+    toState: State;
+    fromState?: State | undefined;
+    opts?: NavigationOptions | undefined;
+  };
+}
 
 /**
  * Router FSM configuration.
  *
  * Transitions:
  * - IDLE → STARTING (START), DISPOSED (DISPOSE)
- * - STARTING → READY (STARTED), IDLE (FAIL), DISPOSED (DISPOSE)
+ * - STARTING → READY (STARTED), IDLE (FAIL, STOP), DISPOSED (DISPOSE)
  * - READY → TRANSITION_STARTED (NAVIGATE), READY (FAIL, self-loop for early validation errors), IDLE (STOP), DISPOSED (DISPOSE)
  * - TRANSITION_STARTED → LEAVE_APPROVED (LEAVE_APPROVE), TRANSITION_STARTED (NAVIGATE, self-loop), READY (CANCEL, FAIL), DISPOSED (DISPOSE)
  * - LEAVE_APPROVED → READY (COMPLETE, CANCEL, FAIL), TRANSITION_STARTED (NAVIGATE), DISPOSED (DISPOSE)
@@ -87,6 +97,7 @@ const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
     [routerStates.STARTING]: {
       [routerEvents.STARTED]: routerStates.READY,
       [routerEvents.FAIL]: routerStates.IDLE,
+      [routerEvents.STOP]: routerStates.IDLE,
       [routerEvents.DISPOSE]: routerStates.DISPOSED,
     },
     [routerStates.READY]: {

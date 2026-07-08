@@ -242,6 +242,21 @@ export class NavigationNamespace {
   }
 
   navigateToNotFound(path: string): State {
+    // #1186 — liveness gate. This internal commit primitive has no FSM
+    // transition of its own, so without this check a `dispose()` that lands
+    // while a start-interceptor is parked (FSM already DISPOSED) would let the
+    // resuming pipeline commit an UNKNOWN_ROUTE state on the disposed router and
+    // `start()` resolve. Symmetric with `navigateToState`'s `canNavigate()` gate
+    // (the matched-route branch is already protected). `!isActive()` also covers
+    // a merely-stopped (IDLE) router: the only reachable path to that is a direct
+    // `router.navigateToNotFound()` on a stopped instance (internal callers run
+    // during STARTING, which is active), so the ROUTER_DISPOSED code is slightly
+    // broad there — fail-closed is deliberate (committing on a stopped router is
+    // out of contract), and the disposed race is the case that matters.
+    if (!this.#deps.isActive()) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
     this.#abortPreviousNavigation();
 
     const fromState = this.#deps.getState();
@@ -325,14 +340,29 @@ export class NavigationNamespace {
       // Stryker disable next-line UpdateOperator: equivalent — `#navigationId` is only ever compared by identity (`!== myId`) to detect supersession; uniqueness per navigation is all that matters, so `--` (decreasing ids) is indistinguishable from `++`.
       const myId = ++this.#navigationId;
 
+      // #1169 commit-gate — liveness snapshot captured BEFORE the pre-commit
+      // listener windows. A listener's `stop()`/`dispose()` runs `clearAll()`,
+      // which empties the listener lists, so the marker must be read now, not at
+      // the commit site (that self-destruct was the QB/QE hole, RFC §5-bis).
+      // `suspendable` is true only when a synchronous supersede is reachable — an
+      // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit
+      // plugin listener (`onTransitionStart` / `onTransitionLeaveApprove`); the
+      // pure synchronous navigate (none of these) is uncancellable and skips the
+      // gate, keeping the #307 hot path perf-neutral.
+      const suspendable =
+        opts.signal !== undefined ||
+        deps.hasLeaveListeners() ||
+        deps.hasPreCommitListeners();
+
       deps.startTransition(toState, fromState);
       transitionStarted = true;
 
-      // (No post-startTransition supersession check: the only thing that could
-      // bump #navigationId during the synchronous TRANSITION_START emit is a
-      // reentrant navigate() from a START listener, which is now banned —
-      // REENTRANT_NAVIGATION, RFC §4. Real async supersession is caught in
-      // #finishAsyncNavigation / the guard pipeline's isCurrentNav checks.)
+      // Post-`startTransition` supersession is now caught at the commit-gate
+      // below (before `completeTransition`'s setState): a `stop()`/`dispose()`/
+      // external-abort from the TRANSITION_START listener leaves the FSM in
+      // IDLE/DISPOSED, which `!deps.isActive()` detects. (Async supersession is
+      // additionally caught in `#finishAsyncNavigation` / the guard pipeline's
+      // `isCurrentNav`; a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
 
       const [canDeactivateFunctions, canActivateFunctions] =
         deps.getLifecycleFunctions();
@@ -424,6 +454,21 @@ export class NavigationNamespace {
         }
 
         this.#cleanupController(controller, false);
+      }
+
+      // #1169 commit-gate — refuse to commit a navigation cancelled or
+      // terminated during a listener window, BEFORE `completeTransition`'s
+      // setState. The FSM table (D-full) already prevents the forceState
+      // resurrection; this prevents the state commit that precedes the emit.
+      // Gated on `suspendable` so the pure sync hot path pays nothing. A
+      // `stop()`/`dispose()` from the listener lands the FSM in IDLE/DISPOSED
+      // (caught by `!isActive()`); an external `opts.signal` abort is caught
+      // directly. No `#navigationId` check: a reentrant navigate() (the only
+      // thing that could bump it synchronously) is banned (REENTRANT_NAVIGATION,
+      // §4), so on this sync path `#navigationId === myId` always holds — async
+      // supersede is caught in `#finishAsyncNavigation`'s `isCurrentNav`.
+      if (suspendable && (!deps.isActive() || opts.signal?.aborted === true)) {
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
       }
 
       const finalState = completeTransition(deps, {

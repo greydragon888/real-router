@@ -494,7 +494,9 @@ describe("FSM", () => {
       fsm.on("red", "TIMER", onTimer);
       fsm.on("red", "RESET", onReset);
 
-      fsm.forceState("red");
+      // Reach "red" through the transition table (green→yellow→red).
+      fsm.send("TIMER"); // green → yellow
+      fsm.send("TIMER"); // yellow → red
       fsm.send("TIMER"); // red --TIMER--> green, must still fire the first action
 
       expect(onTimer).toHaveBeenCalledTimes(1);
@@ -713,61 +715,10 @@ describe("FSM", () => {
     });
   });
 
-  describe("forceState() edge cases", () => {
-    it("should handle forceState with a state that has empty transitions", () => {
-      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
-        payloadConfig,
-      );
-
-      fsm.forceState("done");
-
-      expect(fsm.getState()).toBe("done");
-      expect(fsm.canSend("FETCH")).toBe(false);
-      expect(fsm.canSend("RESOLVE")).toBe(false);
-
-      // send() should be a no-op
-      const result = fsm.send("FETCH", { url: "/api" });
-
-      expect(result).toBe("done");
-      expect(fsm.getState()).toBe("done");
-    });
-
-    it("should throw an explicit error when forced to an undeclared state", () => {
-      const fsm = new FSM(lightConfig);
-
-      // The type forbids this; only a JS / cast caller can reach it. forceState
-      // must reject the undeclared state loudly, not brick the FSM for a later
-      // cryptic TypeError in canSend/send.
-      expect(() => {
-        // @ts-expect-error — "GHOST" is not a declared state
-        fsm.forceState("GHOST");
-        // The `[FSM.forceState]` prefix names the offending entry-point — part
-        // of the #754 "fail loud" contract, so assert it, not just the suffix.
-      }).toThrow(
-        '[FSM.forceState] state "GHOST" is not declared in config.transitions',
-      );
-    });
-
-    it("should leave the FSM usable after rejecting an undeclared state", () => {
-      const fsm = new FSM(lightConfig);
-
-      expect(() => {
-        // @ts-expect-error — "GHOST" is not a declared state
-        fsm.forceState("GHOST");
-      }).toThrow();
-
-      // The guard throws before mutating state, so the FSM is untouched and
-      // still transitions normally.
-      expect(fsm.getState()).toBe("green");
-      expect(fsm.canSend("TIMER")).toBe(true);
-      expect(fsm.send("TIMER")).toBe("yellow");
-    });
-  });
-
   describe("Declared-state guard (#885)", () => {
-    // `forceState` rejects an undeclared state (#754); the same engine invariant
-    // must hold at the two other state-entry-points — the constructor's `initial`
-    // and `on`'s `from`. Reachable with string-typed states / JS / cast callers.
+    // The declared-state invariant must hold at every state-entry-point — the
+    // constructor's `initial` and `on`'s `from` (#885). Reachable with
+    // string-typed states / JS / cast callers.
     it("should throw when constructed with an undeclared initial state", () => {
       expect(
         () =>
@@ -793,33 +744,6 @@ describe("FSM", () => {
       }).toThrow(
         '[FSM.on] state "GHOST" is not declared in config.transitions',
       );
-    });
-  });
-
-  describe("forceState()", () => {
-    it("should set state without triggering actions or listeners", () => {
-      const fsm = new FSM(lightConfig);
-      const actionSpy = vi.fn();
-      const listenerSpy = vi.fn();
-
-      fsm.on("green", "TIMER", actionSpy);
-      fsm.onTransition(listenerSpy);
-
-      fsm.forceState("yellow");
-
-      expect(fsm.getState()).toBe("yellow");
-      expect(actionSpy).not.toHaveBeenCalled();
-      expect(listenerSpy).not.toHaveBeenCalled();
-    });
-
-    it("should update currentTransitions for subsequent canSend", () => {
-      const fsm = new FSM(lightConfig);
-
-      expect(fsm.canSend("RESET")).toBe(false); // green has no RESET
-
-      fsm.forceState("red");
-
-      expect(fsm.canSend("RESET")).toBe(true); // red has RESET
     });
   });
 });
