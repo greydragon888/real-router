@@ -58,6 +58,33 @@ describe("RouteLifecycleNamespace storage invariants (public API)", () => {
   );
 
   test.prop([arbTarget], { numRuns: NUM_RUNS.fast })(
+    "EXTERNAL_SURVIVES_REPLACE (def-after-ext): a definition guard added AFTER an external one leaves no zombie after replace() (#1192)",
+    async (target) => {
+      const router = createFixtureRouter();
+      const lifecycle = getLifecycleApi(router);
+      const routes = getRoutesApi(router);
+
+      await router.start("/");
+
+      // external BLOCKS; then a definition guard (via update) ALLOWS the same
+      // slot — registration is last-add-wins, so the compiled function is now
+      // the definition (allowing) guard.
+      lifecycle.addActivateGuard(target, () => () => false);
+      routes.update(target, { canActivate: () => () => true });
+
+      expect(router.canNavigateTo(target)).toBe(true);
+
+      routes.replace(freshRoutes()); // strips definition guards
+
+      // The surviving external (blocking) guard must be recompiled into the
+      // slot — not left as the erased definition (allowing) zombie.
+      expect(router.canNavigateTo(target)).toBe(false);
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbTarget], { numRuns: NUM_RUNS.fast })(
     "EXTERNAL_SURVIVES_REPLACE (deactivate): an external canDeactivate guard still blocks leaving after replace()",
     async (target) => {
       const router = createFixtureRouter();

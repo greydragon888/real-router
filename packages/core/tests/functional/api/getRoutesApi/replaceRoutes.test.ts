@@ -1146,3 +1146,34 @@ describe("core/routes/replaceRoutes — surviving route keeps plugin context (#1
     r.dispose();
   });
 });
+
+describe("core/routes/replaceRoutes — no zombie guard for both-slot names (#1192)", () => {
+  it("replace() recompiles the surviving external guard (def-after-ext order)", async () => {
+    const routes = [
+      { name: "home", path: "/" },
+      { name: "admin", path: "/admin" },
+    ];
+    const r = createRouter(routes);
+
+    await r.start("/");
+
+    // external guard BLOCKS; then a definition guard ALLOWS the same slot —
+    // registration is last-add-wins, so the compiled function is now the
+    // definition (allowing) guard.
+    getLifecycleApi(r).addActivateGuard("admin", () => () => false);
+    getRoutesApi(r).update("admin", { canActivate: () => () => true });
+
+    // replace() strips definition guards. The surviving external guard must win
+    // again — the compiled slot is recompiled from it, not left as the erased
+    // definition guard (#1192 zombie).
+    getRoutesApi(r).replace(routes);
+
+    await expect(r.navigate("admin")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+    expect(r.getState()?.name).toBe("home");
+    expect(r.canNavigateTo("admin")).toBe(false);
+
+    r.dispose();
+  });
+});
