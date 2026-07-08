@@ -259,3 +259,44 @@ describe("navigateToState", () => {
     });
   });
 });
+
+describe("navigateToState preserves route-meta (#1170)", () => {
+  it("consecutive popstate navigations do not re-run ancestor guards", async () => {
+    let calls = 0;
+    const r = createRouter([
+      {
+        name: "users",
+        path: "/users",
+        canActivate: () => () => {
+          calls++;
+
+          return true;
+        },
+        children: [
+          { name: "list", path: "/list" },
+          { name: "profile", path: "/profile" },
+        ],
+      },
+    ]);
+    const api = getPluginApi(r);
+
+    await r.start("/users/list"); // calls=1 (initial full activation)
+    await r.navigate("users.profile"); // calls=1 (STANDARD PATH trims ancestor)
+
+    // Two consecutive popstate-style navigations (browser back/forward drives
+    // navigateToState under every URL plugin).
+    const s1 = api.matchPath("/users/list");
+    const s2 = api.matchPath("/users/profile");
+
+    await api.navigateToState(s1!); // popstate #1
+    await api.navigateToState(s2!); // popstate #2
+
+    // Parity with navigate(): the shared ancestor `users` stays mounted, so its
+    // canActivate is NOT re-run on popstate #2 (#1170). Before the fix,
+    // navigateToState dropped the route-meta binding, so getTransitionPath fell
+    // into FAST PATH 3 (full chains) and re-activated the ancestor.
+    expect(calls).toBe(1);
+
+    r.dispose();
+  });
+});

@@ -12,6 +12,7 @@ import { routeTransitionError } from "./transition/errorHandling";
 import { executeGuardPipeline } from "./transition/guardPhase";
 import { EMPTY_PARAMS, errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
+import { getStateMetaParams, setStateMetaParams } from "../../stateMetaStore";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
 import type { NavigationContext, NavigationDependencies } from "./types";
@@ -183,6 +184,19 @@ export class NavigationNamespace {
       path: state.path,
       context: { ...state.context },
     } as State;
+
+    // Carry the route-meta binding (#1170). `matchPath` / `makeState` attach it
+    // to the frozen source `state` via a WeakMap keyed by object reference, so
+    // the fresh writable shell would otherwise be meta-less. Without it, two
+    // consecutive popstate navigations make both `toState` AND `fromState`
+    // meta-less, dropping `getTransitionPath` to FAST PATH 3 (full chains):
+    // ancestor guards re-run and browser-back can block where `navigate()`
+    // succeeds.
+    const meta = getStateMetaParams(state);
+
+    if (meta !== undefined) {
+      setStateMetaParams(writableState, meta);
+    }
 
     return this.#executeNavigation(writableState, opts);
   }

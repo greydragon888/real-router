@@ -348,11 +348,13 @@ function computeTransitionPath(
     // result order-INSENSITIVELY, so the from-chain is returned as-is
     // (root→leaf, no reverse needed):
     //   • `shouldUpdateNode` reads `toDeactivate` by MEMBERSHIP (`.includes`).
-    //   • States committed via `navigateToState` (start() and every popstate
-    //     under a URL plugin) and via `replace()` revalidation are meta-less
-    //     today (the writable-shell copy drops the WeakMap binding) — two such
-    //     states in a row land here and (de)activate the WHOLE chain incl.
-    //     shared ancestors: over-broad vs navigate, tracked as #1170.
+    //   • Externally-supplied meta-less states (e.g. a plugin passing a raw
+    //     `{name, params, path}` to `navigateToState`) land here. Since #1170,
+    //     `navigateToState` carries the source's WeakMap meta across its writable
+    //     shell, so start()/popstate states are NOT meta-less. A `replace()`
+    //     survivor stays meta-less but is benign: the next transition's `toState`
+    //     always carries meta (buildNavigateState), so this both-meta-less path
+    //     is not reached from it.
     // (`canNavigateTo` no longer reaches this path — since #970 it builds its
     // toState WITH meta, mirroring buildNavigateState.)
     // The navigate pipeline always carries meta (buildNavigateState) → STANDARD
