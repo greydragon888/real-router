@@ -507,9 +507,15 @@ function replaceRoutes<
         // performed, so re-checking guards here would evict them on a stateful
         // or async guard (parity with `update()`, which never revalidates the
         // active state). Preserve the prior transition meta and emit so
-        // subscribers see the revalidated state (#1201).
+        // subscribers see the revalidated state (#1201). Carry the prior
+        // `context` (#1236): the route name and path are unchanged, so the
+        // plugin data written into `state.context.<namespace>` (SSR data, rsc,
+        // navigation, …) is still valid — the matchPath-rebuilt state would
+        // otherwise wipe it, and revalidation re-runs neither the loader nor the
+        // start interceptor to bring it back.
         const nextState: State = {
           ...revalidated,
+          context: currentState.context,
           transition: currentState.transition,
         };
 

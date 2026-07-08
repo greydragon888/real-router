@@ -1114,3 +1114,35 @@ describe("core/routes/replaceRoutes — revalidation consults guards (#1201)", (
     r.dispose();
   });
 });
+
+describe("core/routes/replaceRoutes — surviving route keeps plugin context (#1236)", () => {
+  it("a route that survives replace() keeps its state.context", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    await r.start("/a");
+
+    // A plugin writes per-route data into state.context (the write channel
+    // behind claimContextNamespace / the direct escape hatch).
+    (
+      r.getState() as unknown as { context: Record<string, unknown> }
+    ).context.data = { id: 1 };
+
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    // The route survived (same name + path) — its plugin context must survive
+    // too (#1236), not be wiped by the matchPath-rebuilt empty context.
+    expect(r.getState()?.name).toBe("a");
+    expect(
+      (r.getState() as unknown as { context: Record<string, unknown> }).context
+        .data,
+    ).toStrictEqual({ id: 1 });
+
+    r.dispose();
+  });
+});
