@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-08]
 
+### @real-router/core@0.72.2
+
+### Patch Changes
+
+- [#1338](https://github.com/greydragon888/real-router/pull/1338) [`785dd91`](https://github.com/greydragon888/real-router/commit/785dd91db7fbab08cd3188ee87817cd014c4979c) Thanks [@greydragon888](https://github.com/greydragon888)! - `clearDefinitionGuards()` recompiles the surviving external guard for both-slot routes ([#1192](https://github.com/greydragon888/real-router/issues/1192))
+
+  When a route held **both** a definition and an external guard, `replace()`'s `clearDefinitionGuards()` skipped the compiled-function slot on the false premise "external already won at registration." Registration is **last-add-wins**, so if the definition guard was registered AFTER the external one (`addActivateGuard()` then `update(name, { canActivate })`, or an `add()` batch landing after an external), the compiled function WAS the definition guard — and clearing the definition factory left it running: `navigate()` / `canNavigateTo()` executed a guard present in no factory store (a zombie), silently shadowing the surviving external guard, with introspection (`get(name).canActivate`) disagreeing with behavior. The slot is now recompiled from the surviving external factory. The two now-false comments (the class-level "external wins at compile time" and the `clearDefinitionGuards` premise) are corrected, and a property test locks arbitrary def-after-ext interleavings.
+
+- [#1338](https://github.com/greydragon888/real-router/pull/1338) [`785dd91`](https://github.com/greydragon888/real-router/commit/785dd91db7fbab08cd3188ee87817cd014c4979c) Thanks [@greydragon888](https://github.com/greydragon888)! - `navigateToState()` preserves route-meta so popstate does not re-run ancestor guards ([#1170](https://github.com/greydragon888/real-router/issues/1170))
+
+  Route-meta lives in a `WeakMap` keyed by state-object reference. `navigateToState()` — which backs `start()` and **every popstate under a URL plugin** — built a fresh writable shell of the `matchPath` state without carrying the binding over. So once two consecutive `navigateToState` commits happened, both `toState` and `fromState` were meta-less and `getTransitionPath` fell into its full-reload fallback: shared ancestor guards **re-ran** and browser-back could **reject** a transition that `navigate()` resolves (e.g. an ancestor guard that flips to `false` while inside its subtree). The meta binding is now carried across the writable-shell copy, restoring `navigate()` parity — ancestor guards stay mounted and popstate `transition.segments` become deltas again.
+
+- [#1338](https://github.com/greydragon888/real-router/pull/1338) [`785dd91`](https://github.com/greydragon888/real-router/commit/785dd91db7fbab08cd3188ee87817cd014c4979c) Thanks [@greydragon888](https://github.com/greydragon888)! - A failed `replace()` no longer erases the old definition guards ([#1193](https://github.com/greydragon888/real-router/issues/1193))
+
+  `replace()` ran `clearDefinitionGuards()` **before** the [#956](https://github.com/greydragon888/real-router/issues/956) pre-swap guard compile (which lived inside `adoptRouteArtifacts`). So a new batch carrying a guard factory that throws on compile (or returns a non-function) aborted the swap with the tree intact — **but the old definition guards were already cleared**: a route-config `canActivate` that blocked before the failed `replace()` silently _allowed_ after it, a security-flavored fail-open. The window was also untested (the [#956](https://github.com/greydragon888/real-router/issues/956) tests cover the `add` path only). The compile is now hoisted into `replace()`'s PREPARE phase, before `clearDefinitionGuards`, so a malformed batch aborts with **both** the tree AND the old definition guards intact (mirroring [#1046](https://github.com/greydragon888/real-router/issues/1046)'s handler-limit hoist). `add()` is unaffected — it has no clear step and still compiles inside `adoptRouteArtifacts`.
+
+- [#1338](https://github.com/greydragon888/real-router/pull/1338) [`785dd91`](https://github.com/greydragon888/real-router/commit/785dd91db7fbab08cd3188ee87817cd014c4979c) Thanks [@greydragon888](https://github.com/greydragon888)! - `replace()` revalidation preserves a surviving route's `state.context` ([#1236](https://github.com/greydragon888/real-router/issues/1236))
+
+  When `getRoutesApi(router).replace(...)` revalidates the active state and the route **survives** (same name + path), it rebuilt the state from `matchPath` with a fresh, empty `context` — silently dropping every value plugins wrote into `state.context.<namespace>` (SSR data, rsc, navigation, any `claimContextNamespace` consumer). Revalidation runs neither the loader nor the `start` interceptor, so the data did not come back on its own. The surviving route's prior `context` is now carried over, symmetric with the `transition` carry-over already in place.
+
+- [#1338](https://github.com/greydragon888/real-router/pull/1338) [`785dd91`](https://github.com/greydragon888/real-router/commit/785dd91db7fbab08cd3188ee87817cd014c4979c) Thanks [@greydragon888](https://github.com/greydragon888)! - `replace()` revalidation consults guards on a route-identity change ([#1201](https://github.com/greydragon888/real-router/issues/1201))
+
+  `getRoutesApi(router).replace(...)` revalidates the active state against the new tree ([#950](https://github.com/greydragon888/real-router/issues/950)). It committed whatever `matchPath(currentPath)` returned **without consulting guards** — so after a role-based `replace()` a user sitting on a URL that the new set maps to a different, `canActivate`-blocked route (or a `forwardTo` target) had that route silently activated with its guard skipped.
+
+  Revalidation is now hybrid:
+
+  - A **surviving** route (the URL still maps to the same route name) is kept without re-running guards — the user reached it via a real navigation, and `replace()` is not a navigation they performed (parity with `update()`, which never revalidates the active state).
+  - A **route-identity change** (an ownership reshuffle, or a newly-added `forwardTo` that teleports the state) runs the new route's activation guards exactly as `navigate` would: it commits on pass and routes to `navigateToNotFound(currentPath)` on a block — or on an async guard that cannot be evaluated synchronously.
+
+  The revalidation `TRANSITION_SUCCESS` now carries a distinguishable `revalidate: true` marker so a plugin's `onTransitionSuccess` can special-case a revalidation vs a real navigation (both otherwise carry only `replace: true`).
+
+- Updated dependencies [[`785dd91`](https://github.com/greydragon888/real-router/commit/785dd91db7fbab08cd3188ee87817cd014c4979c)]:
+  - @real-router/types@0.39.2
+
+### @real-router/types@0.39.2
+
+### Patch Changes
+
+- [#1338](https://github.com/greydragon888/real-router/pull/1338) [`785dd91`](https://github.com/greydragon888/real-router/commit/785dd91db7fbab08cd3188ee87817cd014c4979c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add the `NavigationOptions.revalidate` marker ([#1201](https://github.com/greydragon888/real-router/issues/1201))
+
+  Core sets `revalidate: true` on the `TRANSITION_SUCCESS` that `getRoutesApi(router).replace(...)` emits when it revalidates the active state ([#950](https://github.com/greydragon888/real-router/issues/950)), so a plugin's `onTransitionSuccess(toState, fromState, opts)` can distinguish a `replace()` revalidation from a real navigation — both otherwise carry only `replace: true`. It is a core-set observability signal, not a user-facing navigation option.
+
+
 ### @real-router/core@0.72.1
 
 ### Patch Changes
