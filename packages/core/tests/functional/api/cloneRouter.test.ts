@@ -112,6 +112,35 @@ describe("cloneRouter()", () => {
     expect(cloneAllowed).toBe(baseAllowed);
   });
 
+  it("re-runs plugin factories against the fully-copied config on the clone (#1176)", () => {
+    const base = createRouter([
+      { name: "user", path: "/users/:id", defaultParams: { page: "1" } },
+    ]);
+
+    // The factory snapshots what it can observe about the config at execution
+    // time (defaultParams surface through buildPath). It runs once on the base
+    // and re-runs when cloneRouter re-registers it — both snapshots must match,
+    // i.e. the clone's factory must NOT observe an empty-config window (#1176:
+    // cloneRouter copies config BEFORE re-running plugin factories, fixed by
+    // #1338). A regression here would silently blind init-scanning plugins on
+    // every clone (empty defaultParams/decoders/forwardMap).
+    const snapshots: string[] = [];
+
+    base.usePlugin((router) => {
+      snapshots.push(router.buildPath("user", { id: "1" }));
+
+      return {};
+    });
+
+    // Base factory sees the defaultParams (page=1 folded into the query).
+    expect(snapshots).toStrictEqual(["/users/1?page=1"]);
+
+    cloneRouter(base);
+
+    // The clone re-ran the factory against the SAME full config — not "/users/1".
+    expect(snapshots).toStrictEqual(["/users/1?page=1", "/users/1?page=1"]);
+  });
+
   // cloneRouter re-registers DEFINITION guards (from route config) with
   // `isFromDefinition: true`, so they retain the same origin as on the original
   // and are cleared by the clone's own `replace()` (external guards survive). The
