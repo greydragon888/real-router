@@ -4,6 +4,7 @@ import { createRouter } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
+  getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
 
@@ -58,6 +59,22 @@ describe("cloneRouter()", () => {
     const clone = cloneRouter(router);
 
     expect(getRoutesApi(clone).has("home")).toBe(true);
+  });
+
+  it("carries the source rootPath to the clone (#1175)", async () => {
+    const base = createRouter([{ name: "user", path: "/users/:id" }]);
+
+    getPluginApi(base).setRootPath("/app");
+
+    const clone = cloneRouter(base);
+
+    // The clone must build and match under the same sub-path as the base —
+    // an SSR sub-path deployment (one clone per request) otherwise 404s.
+    expect(clone.buildPath("user", { id: "1" })).toBe("/app/users/1");
+
+    await clone.start("/app/users/1");
+
+    expect(clone.getState()?.name).toBe("user");
   });
 
   // cloneRouter re-registers DEFINITION guards (from route config) with

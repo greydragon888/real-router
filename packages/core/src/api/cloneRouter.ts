@@ -136,6 +136,17 @@ export function cloneRouter<
   Object.assign(newStore.resolvedForwardMap, resolvedForwardMap);
   Object.assign(newStore.routeCustomFields, routeCustomFields);
 
+  // #1175: carry the source rootPath. It lives in the store (not options/config),
+  // and neither routeTreeToDefinitions nor getCloneState include it — so a clone
+  // of a base configured with `setRootPath("/app")` would otherwise build/match
+  // under "" and 404 every request of a sub-path SSR deployment. setRootPath
+  // rebuilds the tree in place with the just-copied config; the rebuild is only
+  // paid when a rootPath is actually set, and it runs before the definition-guard
+  // factories below so they observe the fully-built clone (rootPath included).
+  if (sourceStore.rootPath !== "") {
+    newCtx.setRootPath(sourceStore.rootPath);
+  }
+
   const [definitionDeactivate, definitionActivate] = definitionFactories;
   const [externalDeactivate, externalActivate] = externalFactories;
 
