@@ -283,18 +283,20 @@ router.navigate(name, params, opts)
   │
   ├── Build target state (buildNavigateState)
   ├── Same-state check (path comparison)
-  ├── FSM forceState(TRANSITION_STARTED) + emitTransitionStart()
+  ├── liveness snapshot (suspendable? — external signal / leave / start listeners; #1169)
+  ├── FSM send(NAVIGATE) → action emits TRANSITION_START
   │
   ├── Guard pipeline (executeGuardPipeline)
   │   ├── Deactivation guards (innermost → outermost)
-  │   ├── LEAVE_APPROVE phase: FSM forceState(LEAVE_APPROVED) + emitTransitionLeaveApprove()
+  │   ├── LEAVE_APPROVE phase: FSM send(LEAVE_APPROVE) → action emits TRANSITION_LEAVE_APPROVE
   │   │   └── subscribeLeave() callbacks fire here (approved/tentative departure, before activation — activation can still reject)
   │   └── Activation guards (outermost → innermost)
   │   Returns: undefined (all sync) | Promise<void> (async detected)
   │
   ├── SYNC PATH (no async guards):
-  │   └── completeTransition() → setState + FSM forceState(READY)
-  │       → emitTransitionSuccess → return Promise.resolve(state)
+  │   └── commit-gate (if suspendable && cancelled/terminated → reject; #1169)
+  │       → completeTransition() → setState + FSM send(COMPLETE) → action emits TRANSITION_SUCCESS
+  │       → return Promise.resolve(state)
   │
   └── ASYNC PATH (async guard detected):
       └── #finishAsyncNavigation(guardCompletion, ...)
@@ -690,7 +692,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 ### Navigate hot path (#307)
 
 - **Optimistic sync execution** — guards run synchronously, async path deferred. No AbortController/Promise on sync path
-- **FSM `forceState()`** — bypasses `send()` dispatch (no Map lookups, no action calls) for NAVIGATE/COMPLETE/LEAVE_APPROVE. `sendLeaveApprove()` is the third hot-path transition alongside NAVIGATE and COMPLETE — O(1) overhead
+- **FSM `send()` (table-driven, #1169)** — the NAVIGATE/LEAVE_APPROVE/COMPLETE transitions dispatch through the FSM table via `send()`, which fires the registered emit action; **`forceState()` is no longer called anywhere in core** (a bundle-invariant to preserve). An invalid transition (e.g. `COMPLETE` after a listener's `stop()`/`dispose()`) is a table no-op, so the FSM is the sole authority over state and cannot be resurrected out of IDLE/DISPOSED. Deliberate trade-off (owner decision): ~+15–20% on `navigate/*` + one transition-payload allocation per navigation, bought for structural determinism (cancellation enforced by the state machine, not scattered re-checks). The pre-`setState` **commit-gate** in `NavigationNamespace` (active only when a listener window is reachable) rejects a navigation cancelled/terminated mid-flight before it commits
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` instead of `...args` to avoid V8 rest-param array allocation
 - **Cached error rejections** — pre-allocated `Promise.reject()` for SAME_STATES, ROUTER_NOT_STARTED, ROUTE_NOT_FOUND (zero alloc per rejection)
 - **`getFunctions()` cached tuple** — `RouteLifecycleNamespace` returns pre-allocated `[deactivate, activate]` array (no alloc per navigate)

@@ -297,11 +297,13 @@ FSM events trigger observable emissions through two paths:
 - `CANCEL` (from `TRANSITION_STARTED` or `LEAVE_APPROVED`) → `emitTransitionCancel()`
 - `FAIL` (from any state) → `emitTransitionError()`
 
-**Via direct `forceState()` + emit** — hot-path navigation transitions bypass FSM dispatch for performance (no Map lookup, no action call); the emit follows the state transition in `EventBusNamespace.send*()` helpers:
+**Via the FSM table `send()` + emit action (#1169)** — the three hot navigation transitions dispatch through the FSM table via `send()`, which fires a registered action that emits; `forceState()` is **not** used in core (a bundle-invariant). An invalid transition (e.g. `COMPLETE` from IDLE/DISPOSED after a listener's `stop()`/`dispose()`) is a table no-op that emits nothing, so the table is the sole authority over state — the FSM cannot be resurrected out of a terminal state:
 
-- `NAVIGATE` (`sendNavigate`) → `forceState(TRANSITION_STARTED)` + `emitTransitionStart()`
-- `LEAVE_APPROVE` (`sendLeaveApprove`) → `forceState(LEAVE_APPROVED)` + `emitTransitionLeaveApprove()`
-- `COMPLETE` (`sendComplete`) → `forceState(READY)` + `emitTransitionSuccess()`
+- `NAVIGATE` (`sendNavigate`) → `send(NAVIGATE, {toState, fromState})` → action `emitTransitionStart()`
+- `LEAVE_APPROVE` (`sendLeaveApprove`) → `send(LEAVE_APPROVE, {…})` → action `emitTransitionLeaveApprove()`
+- `COMPLETE` (`sendComplete`) → `send(COMPLETE, {…})` → action `emitTransitionSuccess()`
+
+Cost: routing these through the table is ~+15–20% on `navigate/*` + one transition-payload allocation per navigation — a deliberate determinism-over-micro-optimization trade (owner decision). Correctness is now enforced by the state machine, not by scattered re-checks.
 
 ### Route-tree mutation channel — `TREE_CHANGED` (orthogonal to the FSM)
 
@@ -416,9 +418,9 @@ These are deliberately designed constraints. Violating them will break the syste
 
 ### FSM & Events
 
-- **All transition events are consequences of FSM transitions** — never manual calls. No boolean flags (`#started`, `#active`, `#navigating` — all removed). (The `TREE_CHANGED` channel is the one deliberate exception — it is orthogonal to the FSM, emitted by `getRoutesApi` mutations, not by state changes.)
+- **All transition events are consequences of FSM transitions** — never manual calls. Literal since #1169: the NAVIGATE/LEAVE_APPROVE/COMPLETE emits are FSM **actions** fired by `send()`, and `forceState()` is gone from core — so an event can only fire when the table actually took the transition. No boolean flags (`#started`, `#active`, `#navigating` — all removed). (The `TREE_CHANGED` channel is the one deliberate exception — it is orthogonal to the FSM, emitted by `getRoutesApi` mutations, not by state changes.)
+- **`dispose()` is terminal — structurally, not by convention (#1169)** — DISPOSED has no outbound table transitions, and core reaches every transition through `send()` (never `forceState()`), so a post-dispose `send(COMPLETE)`/`send(LEAVE_APPROVE)` is a table no-op: the FSM cannot be resurrected. All mutating methods throw `RouterError(ROUTER_DISPOSED)` after disposal.
 - **`TREE_CHANGED` is internal-only and wrapper-emitted** — never in the public `EventName` union, and emitted strictly from the five `getRoutesApi` CRUD wrappers, never from shared internals (`adoptRouteArtifacts`/`commitTreeChanges`/`resetStore`). This keeps `dispose()`, `cloneRouter()`, and `setRootPath()` from emitting it.
-- **`dispose()` is terminal** — DISPOSED state has no outbound transitions. All mutating methods throw `RouterError(ROUTER_DISPOSED)` after disposal.
 
 ### Guards & Plugins
 
@@ -505,7 +507,7 @@ pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsd
 The navigate path is heavily optimized:
 
 - **Optimistic sync execution** — no `await`/microtask on the sync path; AbortController allocated only when guards or `subscribeLeave` listeners exist (none on the pure hot path)
-- **FSM `forceState()`** — bypasses `send()` dispatch for NAVIGATE/COMPLETE transitions
+- **FSM `send()` (table-driven, #1169)** — NAVIGATE/LEAVE_APPROVE/COMPLETE dispatch through the table (emit is the action); `forceState()` removed from core. ~+15–20% vs the old `forceState` bypass, traded for structural determinism
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` avoids V8 rest-param array allocation
 - **Cached error rejections** — pre-allocated for common error codes
 - **Single-pass freeze** — `freezeStateInPlace` in one recursive traversal
