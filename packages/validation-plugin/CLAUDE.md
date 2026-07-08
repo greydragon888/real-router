@@ -47,7 +47,7 @@ Value inspection is **own-property only** (mirrors `isParams`) and runs before t
 
 ### Retrospective rollback on failure
 
-If the retrospective pass throws (e.g., duplicate route name in existing routes), `ctx.validator` is set back to `null` before the error propagates. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
+If the retrospective pass throws (e.g., duplicate route name, or a **dotted route name** in the constructor's initial routes — `validateExistingRoutes` rejects a flat dotted `name` symmetric with `add()`/`replace()`, #1194), `ctx.validator` is set back to `null` before the error propagates. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
 
 ### Teardown disables validation
 

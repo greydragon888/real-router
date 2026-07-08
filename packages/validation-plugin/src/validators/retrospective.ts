@@ -210,6 +210,20 @@ export function validateExistingRoutes(store: unknown): void {
       );
     }
 
+    // #1194: reject a flat dotted name on the constructor's initial routes too.
+    // add()/replace() already reject a dotted route name (route-batch
+    // validateRouteName), but the retrospective pass previously validated only
+    // string/path/duplicates — so `createRouter([{ name: "a.c" }])` + this plugin
+    // slipped a dotted name past validation into a name-vs-URL split-brain. The
+    // raw `def.name` (not the nesting-derived fullName) is checked, so nested
+    // children (simple names) pass; the message mirrors add()/replace().
+    if (def.name.includes(".")) {
+      throw new TypeError(
+        `[router.constructor] Route name "${def.name}" cannot contain dots. ` +
+          `Use children array or { parent } option in addRoute() instead.`,
+      );
+    }
+
     if (typeof def.path !== "string") {
       throw new TypeError(
         `[validation-plugin] validateExistingRoutes: route "${fullName}" has non-string path (${typeof def.path})`,

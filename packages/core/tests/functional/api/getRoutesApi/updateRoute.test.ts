@@ -1503,19 +1503,36 @@ describe("core/routes/routeTree/updateRoute", () => {
   });
 
   describe("core contract without validation-plugin", () => {
-    it("update(nonexistent) is a silent no-op (existence check is plugin-only)", () => {
-      // Without @real-router/validation-plugin, core trusts its input and does
-      // not verify the route exists — update throws nothing and creates no route
-      // (the orphan config write is unreachable). The plugin throws here instead.
+    it("update(nonexistent) is a TRUE no-op — no phantom config/guard, no lying event, no inheritance by a later add() (#1205)", () => {
+      // Without @real-router/validation-plugin core trusts its input and does not
+      // throw (validation is opt-in). But it must NOT silently seed config or a
+      // guard for a route that does not exist: update() previously wrote
+      // config.defaultParams + compiled/registered the guard + emitted a lying
+      // TREE_CHANGED "update" event, and a later add() of that name inherited the
+      // phantom (defaultParams + a blocking guard). It is now a genuine no-op.
+      // (With the validation-plugin, update() throws a ReferenceError instead.)
+      const events: string[] = [];
+      const unsub = routesApi.subscribeChanges((event) =>
+        events.push(event.op),
+      );
+
       expect(() => {
-        routesApi.update("nonexistent", { defaultParams: { x: "1" } });
+        routesApi.update("nonexistent", {
+          defaultParams: { seeded: "yes" },
+          canActivate: () => () => false,
+        });
       }).not.toThrow();
 
       expect(routesApi.has("nonexistent")).toBe(false);
       expect(routesApi.get("nonexistent")).toBeUndefined();
-      expect(
-        getPluginApi(router).getRouteConfig("nonexistent"),
-      ).toBeUndefined();
+      expect(events).toStrictEqual([]); // no lying "update" event
+
+      // A later add() of that name must arrive clean — no inherited phantom.
+      routesApi.add({ name: "nonexistent", path: "/nonexistent" });
+      unsub();
+
+      expect(routesApi.get("nonexistent")?.defaultParams).toBeUndefined();
+      expect(router.canNavigateTo("nonexistent")).toBe(true);
     });
 
     it("update(encodeParams) on the active route leaves state.path stale (NO_TREE_REBUILD)", async () => {
