@@ -262,6 +262,32 @@ describe("dispose", () => {
       expect(teardownSpy).toHaveBeenCalledTimes(1);
     });
 
+    it("dispose() clears ctx.interceptors so a leaked interceptor no longer runs (#1199)", () => {
+      const api = getPluginApi(router);
+      let ran = false;
+
+      // A short-circuit interceptor (returns without calling next), never
+      // unsubscribed — the third per-plugin channel, previously without a
+      // dispose safety-net (unlike routerExtensions / contextClaimRecords).
+      api.addInterceptor("buildPath", () => {
+        ran = true;
+
+        return "/zombie-path";
+      });
+
+      router.dispose();
+
+      // buildPath is NOT method-swapped by dispose and reads the interceptor Map;
+      // after the fix the Map is cleared, so the leaked interceptor must not run.
+      try {
+        router.buildPath("home");
+      } catch {
+        // The real buildPath on the cleared tree may throw — irrelevant here.
+      }
+
+      expect(ran).toBe(false);
+    });
+
     it("dispose() calls teardown for multiple plugins", async () => {
       const teardown1 = vi.fn();
       const teardown2 = vi.fn();
@@ -476,7 +502,7 @@ describe("dispose", () => {
         boundUsePlugin(() => {
           factoryRan = true;
 
-          return { teardown() {} };
+          return {};
         }),
       ).toThrow();
 

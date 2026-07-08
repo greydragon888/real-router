@@ -599,6 +599,13 @@ export class Router<
     // Safety net: release context namespace claims plugins failed to release in teardown
     ctx.contextClaimRecords.clear();
 
+    // Safety net: drop interceptors plugins failed to remove in teardown (#1199).
+    // The third per-plugin registration channel — symmetric with routerExtensions
+    // / contextClaimRecords above. `buildPath` is not method-swapped by dispose
+    // and reads this Map live, so a leaked interceptor would otherwise still run
+    // on the disposed router.
+    ctx.interceptors.clear();
+
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
     this.#state.reset();

@@ -198,7 +198,7 @@ router.dispose(); // Idempotent — safe to call multiple times
 ```
 
 **Lifecycle**: healthy flows route through IDLE (`STOP → IDLE → DISPOSE`). The FSM also accepts `DISPOSE` directly from `STARTING`, `READY`, `TRANSITION_STARTED`, and `LEAVE_APPROVED` as a safety net (#660) — required when the orchestrated path cannot reach `IDLE`, e.g. `dispose()` called mid-`STARTING` after a start-pipeline throw left the FSM stuck.
-**Cleanup order**: abort navigation → cancel transition → stop (if ready/transitioning) → FSM DISPOSE → clearAll (events) → plugins → router extensions (safety net) → context claims (safety net) → routes → lifecycle → state → deps → markDisposed
+**Cleanup order**: abort navigation → cancel transition → stop (if ready/transitioning) → FSM DISPOSE → clearAll (events) → plugins → router extensions (safety net) → context claims (safety net) → interceptors (safety net, #1199) → routes → lifecycle → state → deps → markDisposed
 **After dispose**: All mutating methods throw `RouterError(ROUTER_DISPOSED)`
 **Idempotency**: Second call is a no-op (FSM state check)
 

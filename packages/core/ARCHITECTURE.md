@@ -382,7 +382,7 @@ After successful navigation, a deactivated segment's **external** (component-man
 4. FSM → DISPOSED (terminal state)
 5. Clear event listeners
 6. Dispose plugins (remove listeners + call `teardown()`)
-7. Clean up remaining router extensions (safety net)
+7. Clean up remaining router extensions, context claims, and interceptors (per-plugin safety nets — #1199)
 8. Clear routes + lifecycle guards
 9. Reset state
 10. Clear dependencies
