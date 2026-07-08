@@ -1,5 +1,25 @@
 # @real-router/core
 
+## 0.73.0
+
+### Minor Changes
+
+- [#1342](https://github.com/greydragon888/real-router/pull/1342) [`67ac26a`](https://github.com/greydragon888/real-router/commit/67ac26a943389fa85c888e21699c164aaa43a7ab) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): guard resolution is now external-wins, fixing cloneRouter guard divergence ([#1174](https://github.com/greydragon888/real-router/issues/1174))
+
+  When a route holds both a definition guard (route-config `canActivate`/`canDeactivate`) and an external guard (`addActivateGuard`/`addDeactivateGuard`), the compiled guard is now the **external** one regardless of registration order. Previously registration was last-add-wins, which `cloneRouter` inverted: it re-registers guards in a fixed definition→external order, so a clone of a base whose effective guard was a definition (added after an external) silently ran the _external_ guard instead — a security divergence in SSR multi-tenancy, where the per-request clone is the authorization boundary.
+
+  Committing to external-wins in `#registerHandler` (matching `#recompileSlot` / `clearDefinitionGuards`, external-wins since [#1192](https://github.com/greydragon888/real-router/issues/1192)) resolves the latent register↔recompile policy split, makes the clone's fixed replay yield the source's effective guard with no extra tracking, and keeps app-added guards authoritative over config defaults.
+
+  **Breaking:** a definition guard registered while an external guard is live on the same route no longer overrides it (registration order is now irrelevant — external always wins).
+
+### Patch Changes
+
+- [#1342](https://github.com/greydragon888/real-router/pull/1342) [`67ac26a`](https://github.com/greydragon888/real-router/commit/67ac26a943389fa85c888e21699c164aaa43a7ab) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): cloneRouter carries the source rootPath ([#1175](https://github.com/greydragon888/real-router/issues/1175))
+
+  `rootPath` lives in the routes store (not options/config), and neither `routeTreeToDefinitions` nor `getCloneState()` include it — so `cloneRouter` constructed every clone with `rootPath = ""`. A base configured via `setRootPath("/app")` matched `/app/...`, while its clones silently built and matched `/...`, resolving every `/app/...` URL to `UNKNOWN_ROUTE`. In SSR (one clone per request), a sub-path deployment 404'd on every request.
+
+  cloneRouter now carries `sourceStore.rootPath` onto the clone (when non-empty) right after the config copy, so the clone's tree rebuilds under the same sub-path. The rebuild is only paid when a rootPath is actually set.
+
 ## 0.72.3
 
 ### Patch Changes
