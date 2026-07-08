@@ -30,8 +30,9 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
  *
  * Storage is split by origin into four factory Maps (definition vs external,
  * each ×activate/deactivate); a single compiled-function Map per kind backs
- * navigation ("last add wins" — the compiled guard reflects the most recent
- * registration regardless of origin). `getFunctions()` returns a cached
+ * navigation ("external wins" — when a route holds both a definition and an
+ * external guard, the compiled guard is the external one, regardless of
+ * registration order; #1174). `getFunctions()` returns a cached
  * `[deactivate, activate]` tuple for the hot path (stable reference, no
  * per-navigate allocation).
  *
@@ -47,12 +48,13 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 export class RouteLifecycleNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  // Storage split by origin: definition vs external. Registration is
-  // LAST-ADD-WINS regardless of origin (`#registerHandler`), so the compiled
-  // slot reflects the most recent add — NOT "external wins". External wins only
-  // where the code recompiles from it explicitly: `clearDefinitionGuards`
-  // (#1192) and `#recompileSlot` after a definition-only clear. Both semantics
-  // are expressed in terms of these primary Maps.
+  // Storage split by origin: definition vs external. Resolution is
+  // EXTERNAL-WINS regardless of registration order (#1174): the compiled slot
+  // reflects the external factory whenever one exists, else the definition. One
+  // policy across every path — `#registerHandler` (keeps external over a later
+  // definition), `#recompileSlot`, and `clearDefinitionGuards` (#1192) — so a
+  // clone's fixed definition→external replay yields the source's effective guard
+  // with no extra tracking. Both semantics are expressed over these primary Maps.
   readonly #definitionActivateFactories = new Map<
     string,
     GuardFnFactory<Dependencies>
@@ -70,9 +72,9 @@ export class RouteLifecycleNamespace<
     GuardFnFactory<Dependencies>
   >();
   // Compiled-function view. Single Map per kind because navigation does not
-  // distinguish origin — it just runs the effective guard. Set on add (last
-  // add wins) and recompiled on clear from whichever origin Map still holds
-  // the slot.
+  // distinguish origin — it just runs the effective guard. Set on add
+  // (external-wins — a definition does not overwrite a live external, #1174)
+  // and recompiled on clear from whichever origin Map still holds the slot.
   readonly #canDeactivateFunctions = new Map<string, GuardFn>();
   readonly #canActivateFunctions = new Map<string, GuardFn>();
   // Cached tuple — Maps never change reference, so this is stable
@@ -201,8 +203,9 @@ export class RouteLifecycleNamespace<
    *   False (default) when added via `getLifecycleApi().addActivateGuard(...)`
    *   (lands in the external Map; survives `replace()`).
    *
-   * Last add wins at runtime: the compiled function reflects the factory
-   * passed to the most recent call, regardless of origin. Origin only
+   * External wins at runtime (#1174): when a route holds both a definition and
+   * an external guard, the compiled function is the external one, regardless of
+   * registration order. Within one origin the most recent add overwrites. Origin
    * determines which Map the factory is filed under (relevant for
    * `clearDefinitionGuards()` and `cloneRouter` re-registration).
    */
@@ -303,11 +306,12 @@ export class RouteLifecycleNamespace<
    * touching externally-added guards.
    *
    * For a slot where BOTH a definition and an external guard exist, the external
-   * factory survives — and the compiled function is RECOMPILED from it (#1192),
-   * not left as-is: registration is last-add-wins, so the compiled slot may
-   * currently be the definition guard being cleared, and leaving it would run a
-   * guard erased from every factory store (a zombie). For a definition-only
-   * slot, the compiled function is dropped.
+   * factory survives — and the compiled function is RECOMPILED from it (#1192).
+   * Under external-wins (#1174) the compiled slot is already the external guard,
+   * so this recompile is idempotent — it re-derives the surviving external factory
+   * through the same choke point that keeps clearing correct (and stays robust if
+   * the compiled slot were ever out of sync). For a definition-only slot, the
+   * compiled function is dropped.
    */
   clearDefinitionGuards(): void {
     for (const name of this.#definitionActivateFactories.keys()) {
@@ -486,8 +490,12 @@ export class RouteLifecycleNamespace<
   // =========================================================================
 
   /**
-   * Routes a registration into the origin-specific factory Map and compiles
-   * the just-added factory (last add wins for the compiled function).
+   * Routes a registration into the origin-specific factory Map and updates the
+   * compiled function under EXTERNAL-WINS (#1174): the just-added factory becomes
+   * the compiled guard unless it is a definition registered while an external
+   * guard is already live (then external stays effective; the definition is still
+   * stored for a later `clearDefinitionGuards()`). Within one origin the most
+   * recent add overwrites.
    * Emits overwrite / threshold warnings symmetric with the pre-refactor
    * single-Map behaviour: any prior entry for the slot — same origin or
    * cross-origin — counts as an overwrite for the warning surface; only a
@@ -549,13 +557,27 @@ export class RouteLifecycleNamespace<
 
     targetMap.set(name, factory);
 
+    // External-wins (#1174): the compiled slot reflects the external guard
+    // whenever one exists, regardless of registration order. A definition
+    // registered while an external guard is live is still stored (so a later
+    // replace()-clear can recompile from it via `#recompileSlot`) but does NOT
+    // overwrite the compiled function — external stays effective. This makes
+    // `#registerHandler` consistent with `#recompileSlot` / `clearDefinitionGuards`
+    // (both external-wins, #1192), so the whole namespace has ONE policy, and
+    // cloneRouter's fixed definition→external replay yields the same effective
+    // guard as the source with no extra origin tracking. (The factory is still
+    // compiled below to validate it and to keep the rollback path symmetric.)
+    const externalWins = isFromDefinition && otherMap.has(name);
+
     try {
       // A pre-validated function (from the #956 add/replace pre-compile) is
       // installed directly — no re-compile; otherwise compile + non-function
       // check here (`compileGuardFactory` throws on a bad factory).
       const fn = precompiledFn ?? this.compileGuardFactory(factory, methodName);
 
-      functions.set(name, fn);
+      if (!externalWins) {
+        functions.set(name, fn);
+      }
     } catch (error) {
       // Roll the slot back to its pre-call state: restore the previous factory
       // on an overwrite (#963), else clear the slot. `#recompileSlot` then
