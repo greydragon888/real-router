@@ -1030,12 +1030,12 @@ function commitGuardUpdate<Dependencies extends DefaultDependencies>(
 
   if (kind === "activate") {
     if (value === null) {
-      lifecycle.clearCanActivate(name, true);
+      lifecycle.clearCanActivate(name, "definition");
     } else {
       lifecycle.addCanActivate(name, value, true, precompiledFn);
     }
   } else if (value === null) {
-    lifecycle.clearCanDeactivate(name, true);
+    lifecycle.clearCanDeactivate(name, "definition");
   } else {
     lifecycle.addCanDeactivate(name, value, true, precompiledFn);
   }

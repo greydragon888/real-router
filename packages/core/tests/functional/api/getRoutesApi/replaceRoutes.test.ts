@@ -518,17 +518,16 @@ describe("core/routes/replaceRoutes", () => {
     });
 
     it("should have no stale entries after removeActivateGuard + replace", async () => {
-      // Add route with definition guard
-      routesApi.add({
-        name: "removable",
-        path: "/removable",
-        canActivate: () => () => false,
-      });
+      // Route with an EXTERNAL activate guard — `addActivateGuard` registers the
+      // external slot, which is exactly what `removeActivateGuard` clears
+      // (external-only, #1171).
+      routesApi.add({ name: "removable", path: "/removable" });
+      lifecycle.addActivateGuard("removable", () => () => false);
 
-      // Remove the guard externally — clears the entry from #definitionActivateFactories
+      // Remove the external guard — clears the entry from #externalActivateFactories.
       lifecycle.removeActivateGuard("removable");
 
-      // Navigation works now (guard removed)
+      // Navigation works now (external guard removed)
       await router.navigate("removable");
 
       expect(router.getState()?.name).toBe("removable");
@@ -539,7 +538,7 @@ describe("core/routes/replaceRoutes", () => {
         { name: "removable", path: "/removable" }, // no guard
       ]);
 
-      // Navigation still works — no stale definition guard entry
+      // Navigation still works — no stale guard entry
       await router.navigate("home");
       await router.navigate("removable");
 

@@ -236,8 +236,10 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     getLifecycleFunctions: () => ns.routeLifecycle.getFunctions(),
     isActive: () => ns.router.isActive(),
     isTransitioning: () => ns.eventBus.isTransitioning(),
+    // Post-leave auto-cleanup unregisters only the EXTERNAL (component-managed)
+    // guard; a route-config (definition) guard survives for re-entry (#1171).
     clearCanDeactivate: (name: string) => {
-      ns.routeLifecycle.clearCanDeactivate(name);
+      ns.routeLifecycle.clearCanDeactivate(name, "external");
     },
     hasLeaveListeners: () => ns.eventBus.hasLeaveListeners(),
     hasPreCommitListeners: () => ns.eventBus.hasPreCommitListeners(),

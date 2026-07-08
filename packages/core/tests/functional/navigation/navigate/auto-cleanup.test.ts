@@ -211,4 +211,35 @@ describe("router.navigate() - auto cleanup", () => {
       expect(router.getState()?.name).toBe("orders");
     });
   });
+
+  /**
+   * A route-config (definition) `canDeactivate` is registered once at
+   * construction and nothing re-registers it on re-entry — so auto-cleanup must
+   * NOT erase it. It lives as long as the route is in the tree, symmetric with
+   * definition `canActivate` (#1171). Only external, component-managed guards
+   * (`addDeactivateGuard`) are auto-cleaned on leave.
+   */
+  describe("route-config (definition) canDeactivate is retained (#1171)", () => {
+    it("fires again on re-entry — a config guard is not one-shot", async () => {
+      const guard = vi.fn(() => true);
+      const local = createRouter([
+        { name: "a", path: "/a" },
+        { name: "form", path: "/form", canDeactivate: () => guard },
+      ]);
+
+      await local.start("/a");
+
+      await local.navigate("form");
+      await local.navigate("a"); // leave #1 — permitted, guard fires
+
+      expect(guard).toHaveBeenCalledTimes(1);
+
+      await local.navigate("form"); // re-enter
+      await local.navigate("a"); // leave #2 — guard must fire again
+
+      expect(guard).toHaveBeenCalledTimes(2);
+
+      local.stop();
+    });
+  });
 });

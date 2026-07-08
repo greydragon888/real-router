@@ -13,7 +13,7 @@ import { createFixtureRouter, ROUTES, NUM_RUNS } from "./helpers";
 //   - external  → getLifecycleApi(router).addActivateGuard / addDeactivateGuard
 //   - definition→ getRoutesApi(router).update(name, { canActivate })  (true)
 //   - clear definition-only → getRoutesApi(router).replace(routes)
-//   - clear both slots      → getLifecycleApi(router).removeActivateGuard
+//   - clear external-only   → getLifecycleApi(router).removeActivateGuard (#1171)
 // Effect is observed via router.canNavigateTo(name).
 // =============================================================================
 
@@ -159,7 +159,7 @@ describe("RouteLifecycleNamespace storage invariants (public API)", () => {
   test.prop([arbTarget, fc.boolean(), fc.boolean()], {
     numRuns: NUM_RUNS.standard,
   })(
-    "REMOVE_CLEARS_REGARDLESS_OF_ORIGIN: removeActivateGuard drops the guard whether definition, external, or both",
+    "REMOVE_CLEARS_EXTERNAL_ONLY: removeActivateGuard drops the external guard but preserves a definition (config) one (#1171)",
     async (target, useDefinition, useExternal) => {
       fc.pre(useDefinition || useExternal);
 
@@ -179,9 +179,14 @@ describe("RouteLifecycleNamespace storage invariants (public API)", () => {
       // Whatever the origin mix, the route is blocked before removal.
       expect(router.canNavigateTo(target)).toBe(false);
 
-      lifecycle.removeActivateGuard(target); // origin-blind: clears both slots
+      // removeActivateGuard is the inverse of addActivateGuard: it clears only
+      // the EXTERNAL slot. A definition (config) guard survives — removing it is
+      // update(name, { canActivate: null })'s job, not the external-guard API's.
+      lifecycle.removeActivateGuard(target);
 
-      expect(router.canNavigateTo(target)).toBe(true);
+      // Blocked afterwards iff a definition guard was set (it survived); a purely
+      // external guard is gone, so canNavigateTo is allowed (true) only then.
+      expect(router.canNavigateTo(target)).toBe(!useDefinition);
 
       router.stop();
     },

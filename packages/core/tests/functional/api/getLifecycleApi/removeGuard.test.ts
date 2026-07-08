@@ -181,4 +181,44 @@ describe("core/route-lifecycle/removeGuard", () => {
       lifecycle.removeActivateGuard("admin");
     }).not.toThrow();
   });
+
+  /**
+   * `removeActivateGuard` / `removeDeactivateGuard` are the inverse of
+   * `addActivateGuard` / `addDeactivateGuard`, which register EXTERNAL
+   * (component-managed) guards. They must clear only the external slot: a
+   * DEFINITION guard from route config survives, exactly as it does through
+   * auto-cleanup (#1171). Removing a route-config guard is the job of
+   * `getRoutesApi().update(name, { canX: null })`, not the external-guard API.
+   */
+  describe("route-config (definition) guard survives removeXGuard (external-only)", () => {
+    it("removeDeactivateGuard leaves a route-config canDeactivate intact", async () => {
+      const guard = () => () => false;
+
+      routesApi.add({ name: "cfg-d", path: "/cfg-d", canDeactivate: guard });
+      await router.navigate("cfg-d");
+
+      // The config guard blocks leaving cfg-d.
+      expect(router.canNavigateTo("home")).toBe(false);
+
+      lifecycle.removeDeactivateGuard("cfg-d"); // external-guard API — no external here
+
+      // The config guard was never external — it must still block, and remain readable.
+      expect(router.canNavigateTo("home")).toBe(false);
+      expect(routesApi.get("cfg-d")?.canDeactivate).toBe(guard);
+    });
+
+    it("removeActivateGuard leaves a route-config canActivate intact", () => {
+      const guard = () => () => false;
+
+      routesApi.add({ name: "cfg-a", path: "/cfg-a", canActivate: guard });
+
+      // The config guard blocks activating cfg-a.
+      expect(router.canNavigateTo("cfg-a")).toBe(false);
+
+      lifecycle.removeActivateGuard("cfg-a"); // external-guard API — no external here
+
+      expect(router.canNavigateTo("cfg-a")).toBe(false);
+      expect(routesApi.get("cfg-a")?.canActivate).toBe(guard);
+    });
+  });
 });
