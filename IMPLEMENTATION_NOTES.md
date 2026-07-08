@@ -2479,9 +2479,8 @@ src/
 │   ├── getStaticPaths.ts     — static path enumeration for SSG
 │   └── index.ts
 ├── wiring/
-│   ├── RouterWiringBuilder.ts — Builder: namespace dependency wiring
-│   ├── wireRouter.ts          — Director: calls wire methods in correct order
-│   ├── types.ts               — WiringOptions<Dependencies> interface
+│   ├── wireNamespaces.ts      — wire* functions: namespace dependency wiring
+│   ├── types.ts               — NamespaceBag<Dependencies> interface
 │   └── index.ts
 └── namespaces/
     ├── RoutesNamespace/
@@ -3273,7 +3272,7 @@ The original RFC proposed adding `wrapWrite?: (write: () => void) => void` to `c
 URL plugins (`browser-plugin`, `hash-plugin`, `navigation-plugin`) handle every browser-initiated navigation by:
 
 1. `api.matchPath(url)` — produces a fully-resolved `State` (includes `forwardState`, decoders, source-URL trailing-slash via `matchSourceTrailingSlash`).
-2. `router.navigate(matchedState.name, matchedState.params, opts)` — re-runs `buildNavigateState` (`RouterWiringBuilder.ts:135-156`), which calls `ctx.forwardState` *and* `ctx.buildPath` again inside the navigation pipeline.
+2. `router.navigate(matchedState.name, matchedState.params, opts)` — re-runs `buildNavigateState` (`wireNamespaces.ts`), which calls `ctx.forwardState` *and* `ctx.buildPath` again inside the navigation pipeline.
 
 The second pass had two costs documented in #525:
 

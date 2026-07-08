@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
+
+import type { Router } from "@real-router/types";
 
 describe("core/crash guards (always enforced, no plugin required)", () => {
   describe("guardDependencies", () => {
@@ -245,5 +247,122 @@ describe("boolean-shorthand guard factory caching (#962)", () => {
     );
 
     router.stop();
+  });
+});
+
+describe("initial-route guard factories see a fully-built router (#1331)", () => {
+  it("does not throw from router.* calls made inside a canActivate factory", () => {
+    // Regression for D1: guard factories from initial route definitions used to
+    // run mid-construction on a half-assembled router — buildPath /
+    // isActiveRoute / usePlugin threw a misleading "Invalid router instance —
+    // not found in internals registry". Deferring the flush to the last line of
+    // the constructor (#1331) makes the factory see a fully wired, registered,
+    // and bound instance.
+    const calls: Record<string, string> = {};
+
+    const record = (label: string, fn: () => unknown): void => {
+      try {
+        fn();
+        calls[label] = "ok";
+      } catch (error) {
+        calls[label] = error instanceof Error ? error.message : String(error);
+      }
+    };
+
+    let factoryRan = false;
+
+    const router = createRouter([
+      {
+        name: "a",
+        path: "/a",
+        canActivate: (r) => {
+          factoryRan = true;
+          record("getState", () => r.getState());
+          record("buildPath", () => r.buildPath("a"));
+          record("isActiveRoute", () => r.isActiveRoute("a"));
+          // Mechanically works (no half-assembled TypeError), but side-effectful
+          // calls are OUT OF CONTRACT for factories: they re-execute on
+          // cloneRouter / guard-slot recompilation, duplicating the side effect.
+          // See "guard factories on the clone (#1331 review)" in clone.test.ts.
+          record("usePlugin", () => r.usePlugin(() => ({})));
+
+          return () => true;
+        },
+      },
+    ]);
+
+    // The factory ran during construction (flushPendingGuards), before here.
+    expect(factoryRan).toBe(true);
+    expect(calls).toStrictEqual({
+      getState: "ok",
+      buildPath: "ok",
+      isActiveRoute: "ok",
+      usePlugin: "ok",
+    });
+
+    // The guard is genuinely registered and enforced afterwards.
+    const routes = getRoutesApi(router);
+
+    expect(routes.get("a")?.canActivate).toBeDefined();
+
+    router.stop();
+  });
+
+  it("disposes the router when a factory throws mid-flush — a leaked reference is fail-closed", () => {
+    // Without dispose-on-throw, a reference leaked from an earlier factory
+    // would be a live, fully-operational router with route c's guard silently
+    // unregistered (fail-open guard bypass) — pre-#1331 such a reference was
+    // inert because getInternals threw on every method. dispose() + rethrow
+    // restores fail-closed semantics with a meaningful error.
+    let leaked: Router | undefined;
+
+    expect(() =>
+      createRouter([
+        {
+          name: "a",
+          path: "/a",
+          canActivate: (r) => {
+            leaked = r;
+
+            return () => true;
+          },
+        },
+        {
+          name: "b",
+          path: "/b",
+          canActivate: () => {
+            throw new Error("factory boom");
+          },
+        },
+        { name: "c", path: "/c", canActivate: () => () => false },
+      ]),
+    ).toThrow("factory boom");
+
+    expect(leaked).toBeDefined();
+    expect(leaked?.isActive()).toBe(false);
+
+    // Every navigation entry point on the leaked instance throws
+    // ROUTER_DISPOSED instead of silently skipping route c's guard.
+    // (#markDisposed replaces the methods with a synchronous thrower, so no
+    // promise is ever created — `void` marks the typed-as-Promise call.)
+    try {
+      void leaked?.navigate("c");
+
+      expect.fail("Should have thrown");
+    } catch (error) {
+      expect((error as { code?: string }).code).toBe(
+        errorCodes.ROUTER_DISPOSED,
+      );
+    }
+
+    try {
+      void leaked?.start("/a");
+
+      expect.fail("Should have thrown");
+    } catch (error) {
+      expect((error as { code?: string }).code).toBe(
+        errorCodes.ROUTER_DISPOSED,
+      );
+    }
   });
 });

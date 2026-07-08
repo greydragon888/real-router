@@ -235,8 +235,9 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   }
 
   // Guards are collected here and registered into the lifecycle later — by
-  // `adoptRouteArtifacts` (add/replace) or `setDependencies` (initial routes) —
-  // so the build stays a pure, side-effect-free preparation step.
+  // `adoptRouteArtifacts` (add/replace) or `RoutesNamespace.flushPendingGuards`
+  // (initial routes, the final step of the Router constructor — #1331) — so
+  // the build stays a pure, side-effect-free preparation step.
   if (route.canActivate) {
     pendingCanActivate.set(fullName, route.canActivate);
   }
@@ -1019,8 +1020,9 @@ export function createRoutesStore<
   matcherOptions?: CreateMatcherOptions,
 ): RoutesStore<Dependencies> {
   // Initial routes are a standalone set at rootPath "" — same build the
-  // prepare-then-commit `replace` path uses. Guards land in the pending maps
-  // (depsStore is wired later via setDependencies, which flushes them).
+  // prepare-then-commit `replace` path uses. Guards land in the pending maps,
+  // flushed by `flushPendingGuards()` at the end of the Router constructor
+  // (#1331); `setDependencies` itself is a pure assignment.
   const artifacts = buildReplaceArtifacts(routes, "", matcherOptions);
 
   return {

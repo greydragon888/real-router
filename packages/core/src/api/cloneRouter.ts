@@ -124,6 +124,18 @@ export function cloneRouter<
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
   const newLifecycleNamespace = newStore.lifecycleNamespace!;
 
+  // Copy the source config + store-level maps BEFORE re-registering guards
+  // (#1331 review): the definition-guard factories re-executed below must
+  // observe the fully-built clone (encoders/decoders/defaultParams/custom
+  // fields), mirroring the constructor where flushPendingGuards runs after the
+  // store is complete. The five RouteConfig sub-maps go through a single
+  // enumeration so a newly added config field is carried over automatically
+  // (#965); resolvedForwardMap and routeCustomFields are store-level (not part
+  // of RouteConfig) and stay explicit.
+  assignConfigEntries(newStore.config, routeConfig);
+  Object.assign(newStore.resolvedForwardMap, resolvedForwardMap);
+  Object.assign(newStore.routeCustomFields, routeCustomFields);
+
   const [definitionDeactivate, definitionActivate] = definitionFactories;
   const [externalDeactivate, externalActivate] = externalFactories;
 
@@ -145,18 +157,19 @@ export function cloneRouter<
     lifecycle.addActivateGuard(name, handler);
   }
 
-  // Stryker disable next-line EqualityOperator: equivalent — `>= 0` is always true, but `usePlugin(...[])` with an empty spread is a no-op, so entering the block on an empty list behaves identically to skipping it. (ConditionalExpression stays live: `→false` skips a real plugin list and is killable.)
-  if (pluginFactories.length > 0) {
-    newRouter.usePlugin(...pluginFactories);
-  }
+  // Plugin replay runs last and skips factories that a (contract-violating)
+  // definition-guard factory already registered on the clone during the
+  // re-compilation above — without the filter every clone would double-apply
+  // such a plugin: once via the factory, once via this replay (#1331 review).
+  const alreadyRegistered = new Set(newCtx.getCloneState().pluginFactories);
+  const pluginsToReplay = pluginFactories.filter(
+    (factory) => !alreadyRegistered.has(factory),
+  );
 
-  // Copy the source config + store-level maps onto the new store. The five
-  // RouteConfig sub-maps go through a single enumeration so a newly added config
-  // field is carried over automatically (#965); resolvedForwardMap and
-  // routeCustomFields are store-level (not part of RouteConfig) and stay explicit.
-  assignConfigEntries(newStore.config, routeConfig);
-  Object.assign(newStore.resolvedForwardMap, resolvedForwardMap);
-  Object.assign(newStore.routeCustomFields, routeCustomFields);
+  // Stryker disable next-line EqualityOperator: equivalent — `>= 0` is always true, but `usePlugin(...[])` with an empty spread is a no-op, so entering the block on an empty list behaves identically to skipping it. (ConditionalExpression stays live: `→false` skips a real plugin list and is killable.)
+  if (pluginsToReplay.length > 0) {
+    newRouter.usePlugin(...pluginsToReplay);
+  }
 
   return newRouter;
 }

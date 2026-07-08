@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
@@ -841,6 +841,77 @@ describe("cloneRouter()", () => {
       await navPromise;
 
       router.stop();
+    });
+  });
+
+  describe("guard factories on the clone (#1331 review)", () => {
+    it("re-executes definition guard factories against a fully-built clone (config copied before compilation)", () => {
+      const seenPaths: string[] = [];
+
+      const base = createRouter([
+        {
+          name: "a",
+          path: "/a/:id",
+          defaultParams: { id: "1" },
+          canActivate: (r) => {
+            // The blessed read-only pattern from #1331 — must work on the
+            // clone too, so the config copy has to precede the definition-guard
+            // re-compilation in cloneRouter.
+            seenPaths.push(r.buildPath("a"));
+
+            return () => true;
+          },
+        },
+      ]);
+
+      const clone = cloneRouter(base);
+
+      // Both executions — base construction flush and clone re-compilation —
+      // observe the same fully-built config (defaultParams applied).
+      expect(seenPaths).toStrictEqual(["/a/1", "/a/1"]);
+      expect(clone.buildPath("a")).toBe("/a/1");
+    });
+
+    it("does not double-apply a plugin registered from a guard factory", async () => {
+      let instantiations = 0;
+      let onStartCalls = 0;
+
+      const plugin = () => {
+        instantiations++;
+
+        return {
+          onStart() {
+            onStartCalls++;
+          },
+        };
+      };
+
+      const base = createRouter([
+        {
+          name: "a",
+          path: "/a",
+          canActivate: (r) => {
+            // Out-of-contract pattern (side-effectful factory) — the clone-path
+            // replay filter keeps it at one application per instance instead of
+            // two (factory re-execution + pluginFactories replay).
+            r.usePlugin(plugin);
+
+            return () => true;
+          },
+        },
+      ]);
+
+      expect(instantiations).toBe(1);
+
+      const clone = cloneRouter(base);
+
+      // Factory re-execution on the clone registered the plugin once; the
+      // pluginFactories replay skipped it instead of double-applying.
+      expect(instantiations).toBe(2);
+
+      await clone.start("/a");
+
+      expect(onStartCalls).toBe(1);
     });
   });
 });

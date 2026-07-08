@@ -118,9 +118,7 @@ const arbBrutalChunk: fc.Arbitrary<string> = fc.oneof(
   // the literal key `a[]` (a scalar), NOT an array — the encoded-bracket edge.
   // Same audit gap: only raw `[]` was generated.
   arbBrutalKey.map((k) => `${k}%5B%5D`),
-  fc
-    .tuple(arbBrutalKey, arbBrutalValue)
-    .map(([k, v]) => `${k}%5B%5D=${v}`),
+  fc.tuple(arbBrutalKey, arbBrutalValue).map(([k, v]) => `${k}%5B%5D=${v}`),
 );
 
 const arbBrutalQs: fc.Arbitrary<string> = fc

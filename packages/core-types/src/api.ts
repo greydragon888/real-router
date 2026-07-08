@@ -30,7 +30,9 @@ import type { TreeChangedEvent } from "./tree-changed";
  *
  * To add a new interceptable method:
  * 1. Add its signature here
- * 2. Wrap it with `createInterceptable()` in `RouterWiringBuilder`
+ * 2. Wrap it with `createInterceptable()` / `createBinaryInterceptable()` in
+ *    the `registerInternals` block of the Router constructor
+ *    (`packages/core/src/Router.ts`)
  */
 export interface InterceptableMethodMap {
   start: (path?: string) => Promise<State>;

@@ -39,8 +39,8 @@ core/
 │   │   └── DependenciesNamespace/   — DI store
 │   │
 │   ├── wiring/
-│   │   ├── RouterWiringBuilder.ts   — Builder: namespace cross-references
-│   │   └── wireRouter.ts           — Director: correct wiring order
+│   │   ├── wireNamespaces.ts        — wire* functions: namespace cross-references
+│   │   └── types.ts                — NamespaceBag (shared wiring input)
 │   │
 │   ├── api/
 │   │   ├── getRoutesApi.ts          — Route CRUD (add/remove/update/replace/clear)
@@ -137,27 +137,26 @@ export function getRoutesApi(router: Router): RoutesApi {
 
 **Why WeakMap?** No public exposure of private state. GC-safe. Tree-shakeable.
 
-### Wiring System (Builder + Director)
+### Wiring System
 
-Namespaces have linear dependencies. Constructed independently, then wired via **setter injection** in a fixed order:
+Namespaces are constructed independently, then wired via **dependency-bundle injection** — plain `wire*` functions over a shared `NamespaceBag`:
 
 ```typescript
-// wireRouter.ts — Director
-function wireRouter(builder: RouterWiringBuilder) {
-  builder.wireLimits(); // 1. All namespaces get limits first
-  builder.wireRouteLifecycleDeps(); // 2. Guard registry gets router + getDependency
-  builder.wireRoutesDeps(); // 3. Routes gets guards + state (registers pending handlers)
-  builder.wirePluginsDeps(); // 4. Plugins get addEventListener + canNavigate
-  builder.wireNavigationDeps(); // 5. Navigation gets state, routes, eventBus + canNavigate
-  builder.wireLifecycleDeps(); // 6. RouterLifecycle gets navigate, navigateToNotFound, matchPath
-  builder.wireStateDeps(); // 7. State gets defaultParams, buildPath, getUrlParams
+// wireNamespaces.ts
+function wireNamespaces(ns: NamespaceBag) {
+  const compileFactory = createCompileFactory(ns); // shared by guards + plugins
+  const getValidator = () => getInternals(ns.router).validator; // shared, never throws (#1331)
+  wireLimits(ns); // dependenciesStore + eventBus get limits
+  wireRouteLifecycle(ns, compileFactory, getValidator); // guard registry
+  wireRoutes(ns); // routes get guard registration + state accessors
+  wirePlugins(ns, compileFactory, getValidator); // plugins get addEventListener + canNavigate
+  wireNavigation(ns); // navigation gets state, routes, eventBus, ...
+  wireRouterLifecycle(ns); // start/stop get navigate, matchPath, ...
+  wireState(ns); // state gets defaultParams, buildPath, getUrlParams
 }
 ```
 
-**Order matters:**
-
-- `wireRouteLifecycleDeps()` BEFORE `wireRoutesDeps()` — route registration triggers guard registration which requires `RouteLifecycleNamespace` to be ready
-- `wireNavigationDeps()` BEFORE `wireLifecycleDeps()` — lifecycle deps reference `NavigationNamespace.navigate()` which requires navigation deps to be set
+**Call order is arbitrary (#1331).** No `wire*` function runs user code or eagerly reads another namespace's deps, so there is no ordering constraint between them. (`wireLimits` is the one eager _write_ — it hands the frozen limits object to dependenciesStore/eventBus; the rest only store deps-closures.) The initial-route guard factories that once forced "RouteLifecycle before Routes" are now flushed separately, from the constructor's `flushPendingGuards()` call after all wiring completes. (Before #1334 this was a `RouterWiringBuilder` class + `wireRouter` director; a builder that built nothing for one call-site collapsed into these functions.)
 
 ## FSM → Event Bridge
 
@@ -280,7 +279,7 @@ Errors during navigation are routed through two different paths depending on FSM
 | **Via FSM**     | `sendFail()` → FSM FAIL | FSM is in READY or TRANSITION_STARTED                      | FSM transitions → action emits `$$error` |
 | **Direct emit** | `emitTransitionError()` | Error before FSM transition (ROUTE_NOT_FOUND, SAME_STATES) | Emits directly, FSM state unchanged      |
 
-The branching logic lives in `RouterWiringBuilder` (wiring layer). When an error occurs before `startTransition()`, the wiring checks `isReady()`: if READY — routes through FSM; if TRANSITION_STARTED — emits directly to avoid disturbing the ongoing transition.
+The branching logic lives in `EventBusNamespace.sendFailSafe()`. When an error occurs before `startTransition()`, `sendFailSafe()` checks `isReady()`: if READY — routes through FSM; if TRANSITION_STARTED — emits directly to avoid disturbing the ongoing transition. The wiring's `emitTransitionError` closure merely delegates to it.
 
 ### navigateToNotFound() — Pipeline Bypass
 
@@ -409,7 +408,7 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ### Namespace Rules
 
-- Namespaces **never** call each other directly at construction time — all cross-references are wired via setter injection in `wireRouter()`
+- Namespaces **never** call each other directly at construction time — all cross-references are wired via dependency-bundle injection in `wireNamespaces()`
 - `NavigationNamespace` is the **only** namespace that orchestrates multi-namespace operations (state + routes + eventBus + lifecycle)
 - `EventBusNamespace` is the **only** namespace that holds the FSM instance and EventEmitter
 - `DependenciesStore` is a plain data interface — no class, no methods that call other namespaces
@@ -429,21 +428,21 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Performance Characteristics
 
-| Optimization                            | Purpose                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------- |
-| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths                           |
-| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                    |
-| validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production) |
-| `static #onSuppressed{Navigate,Start}Error` | One allocation per class, not per `navigate()`/`start()` call        |
-| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects                         |
-| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements                                |
-| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                                     |
-| `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors                  |
-| Lazy event listeners                    | No allocation until first subscription                                  |
-| Cached error rejections                 | Pre-allocated `Promise.reject()` for common errors                      |
-| Async leave: no-abort on sync path      | AbortController.abort() skipped when all leave listeners are sync       |
-| Async leave: deferred NavigationContext | `{nav}` object created only in async branch, not on every navigate      |
-| Async leave: `isCurrentNav` scoped      | Closure moved to guards block — not allocated on no-guards path         |
+| Optimization                                | Purpose                                                                 |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| `nameToIDs()` fast paths (0-4 segments)     | Avoids `split()` for most common route depths                           |
+| Single-entry transition path cache          | N-1 redundant computations eliminated per navigation                    |
+| validation-plugin opt-in                    | DX validation via `@real-router/validation-plugin` (skip in production) |
+| `static #onSuppressed{Navigate,Start}Error` | One allocation per class, not per `navigate()`/`start()` call           |
+| Deep freeze with WeakSet cache              | Avoids re-freezing already frozen state objects                         |
+| `Array.includes()` for segment cleanup      | Faster than `new Set()` for 1-5 elements                                |
+| FSM `canSend()` — O(1)                      | Cached `#currentTransitions` lookup                                     |
+| `createInterceptable()` fast path           | Empty-array check skips iteration when no interceptors                  |
+| Lazy event listeners                        | No allocation until first subscription                                  |
+| Cached error rejections                     | Pre-allocated `Promise.reject()` for common errors                      |
+| Async leave: no-abort on sync path          | AbortController.abort() skipped when all leave listeners are sync       |
+| Async leave: deferred NavigationContext     | `{nav}` object created only in async branch, not on every navigate      |
+| Async leave: `isCurrentNav` scoped          | Closure moved to guards block — not allocated on no-guards path         |
 
 ## Stress Test Coverage
 

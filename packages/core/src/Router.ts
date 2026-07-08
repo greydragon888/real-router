@@ -34,7 +34,7 @@ import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamesp
 import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
 import { assertLoggerConfig } from "./typeGuards";
-import { RouterWiringBuilder, wireRouter } from "./wiring";
+import { wireNamespaces } from "./wiring";
 
 import type { RouterInternals } from "./internals";
 import type { DependenciesStore } from "./namespaces";
@@ -204,28 +204,12 @@ export class Router<
     });
 
     // =========================================================================
-    // Wire Dependencies
-    // =========================================================================
-
-    wireRouter(
-      new RouterWiringBuilder<Dependencies>({
-        router: this,
-        options: this.#options,
-        limits: this.#limits,
-        dependenciesStore: this.#dependenciesStore,
-        state: this.#state,
-        routes: this.#routes,
-        routeLifecycle: this.#routeLifecycle,
-        plugins: this.#plugins,
-        navigation: this.#navigation,
-        lifecycle: this.#lifecycle,
-        eventBus: this.#eventBus,
-      }),
-    );
-
-    // =========================================================================
     // Register Internals (WeakMap for plugin/infrastructure access)
     // =========================================================================
+    // Registered BEFORE wiring (#1331) so every namespace's deps-closure sees a
+    // router already present in the internals registry — `getInternals(router)`
+    // never throws during wiring, and guard factories flushed at the end of the
+    // constructor see a fully-registered instance.
 
     const interceptorsMap: RouterInternals["interceptors"] = new Map();
 
@@ -336,6 +320,24 @@ export class Router<
     });
 
     // =========================================================================
+    // Wire Dependencies
+    // =========================================================================
+
+    wireNamespaces<Dependencies>({
+      router: this,
+      options: this.#options,
+      limits: this.#limits,
+      dependenciesStore: this.#dependenciesStore,
+      state: this.#state,
+      routes: this.#routes,
+      routeLifecycle: this.#routeLifecycle,
+      plugins: this.#plugins,
+      navigation: this.#navigation,
+      lifecycle: this.#lifecycle,
+      eventBus: this.#eventBus,
+    });
+
+    // =========================================================================
     // Bind Public Methods
     // =========================================================================
     // All public methods that access private fields must be bound to preserve
@@ -374,6 +376,34 @@ export class Router<
     this.subscribe = this.subscribe.bind(this);
     this.subscribeLeave = this.subscribeLeave.bind(this);
     this.isLeaveApproved = this.isLeaveApproved.bind(this);
+
+    // =========================================================================
+    // Flush initial-route guard factories
+    // =========================================================================
+    // Deferred out of wiring (#1331): the pending canActivate/canDeactivate
+    // factories from initial route definitions are compiled and executed HERE,
+    // on the fully-built and bound router — a factory calling read-only methods
+    // (`buildPath()`, `isActiveRoute()`, `getState()`) no longer hits a
+    // half-assembled instance. Side-effectful calls (`navigate`, `usePlugin`,
+    // route-CRUD) stay OUT OF CONTRACT: factories re-execute outside the
+    // constructor (cloneRouter re-compiles definition guards per clone;
+    // #recompileSlot re-runs a factory after a definition-only clear), so any
+    // side effect would duplicate per re-execution — see CLAUDE.md. Runtime
+    // add()/replace() compile guards in their own PREPARE phase and never touch
+    // these pending maps.
+    //
+    // Fail-closed on a factory throw: by this point a router reference leaked
+    // from an earlier factory is fully operational, while later guards would
+    // stay silently unregistered — a fail-open guard bypass. Disposing before
+    // the rethrow turns any leaked reference into a ROUTER_DISPOSED-throwing
+    // husk (pre-#1331 such a reference was inert because getInternals threw).
+    try {
+      this.#routes.flushPendingGuards();
+    } catch (error) {
+      this.dispose();
+
+      throw error;
+    }
   }
 
   // ============================================================================
