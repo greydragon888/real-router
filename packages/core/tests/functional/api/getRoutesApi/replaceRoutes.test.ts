@@ -1177,3 +1177,42 @@ describe("core/routes/replaceRoutes — no zombie guard for both-slot names (#11
     r.dispose();
   });
 });
+
+describe("core/routes/replaceRoutes — failed replace() preserves old definition guards (#1193)", () => {
+  it("a compile-throwing factory in the new batch aborts before erasing old definition guards", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "admin", path: "/admin", canActivate: () => () => false }, // config guard BLOCKS
+    ]);
+
+    await r.start("/");
+    await r.navigate("admin").catch(() => {}); // rejects CANNOT_ACTIVATE
+
+    // The new batch carries a guard factory that throws on compile — replace()
+    // must abort with BOTH the tree AND the old definition guards intact (#1193,
+    // mirror of #1046).
+    expect(() => {
+      getRoutesApi(r).replace([
+        { name: "home", path: "/" },
+        { name: "admin", path: "/admin" },
+        {
+          name: "x",
+          path: "/x",
+          canActivate: () => {
+            throw new Error("boom");
+          },
+        },
+      ]);
+    }).toThrow(/boom/);
+
+    // The tree is unchanged (old routes still resolve) AND admin's config guard
+    // still blocks — it was NOT silently erased by a pre-compile clear.
+    expect(getRoutesApi(r).has("admin")).toBe(true);
+    await expect(r.navigate("admin")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+    expect(r.getState()?.name).toBe("home");
+
+    r.dispose();
+  });
+});

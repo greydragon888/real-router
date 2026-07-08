@@ -23,6 +23,7 @@ import {
   buildReplaceArtifacts,
   commitRouteUpdate,
   commitTreeChanges,
+  compileArtifactGuards,
   resetStore,
 } from "../namespaces/RoutesNamespace/routesStore";
 import { getTransitionPath } from "../transitionPath";
@@ -481,10 +482,18 @@ function replaceRoutes<
     true,
   );
 
+  // Pre-compile the new batch's guard factories in the PREPARE phase — BEFORE
+  // clearDefinitionGuards — so a compile-throwing factory (or a non-function)
+  // aborts here with BOTH the tree AND the old definition guards intact (#1193,
+  // mirror of the #1046 handler-limit hoist). adoptRouteArtifacts then installs
+  // these pre-compiled functions without re-running the factories.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  const compiledGuards = compileArtifactGuards(artifacts, store.depsStore!);
+
   // Clear definition lifecycle handlers (preserve external guards), then swap.
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
   store.lifecycleNamespace!.clearDefinitionGuards();
-  adoptRouteArtifacts(store, artifacts);
+  adoptRouteArtifacts(store, artifacts, compiledGuards);
 
   // TREE_CHANGED fires here (О-5): the new tree is committed but state is not
   // yet revalidated, so the handler sees the new tree and the still-old state.
