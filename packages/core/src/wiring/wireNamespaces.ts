@@ -11,6 +11,7 @@ import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNam
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
 import type { Router } from "../Router";
+import type { RouterValidator } from "../types/RouterValidator";
 import type { DefaultDependencies, Params } from "@real-router/types";
 
 /**
@@ -33,10 +34,11 @@ type CompileFactory<Dependencies extends DefaultDependencies> = <T>(
  * pack of procedures over a shared bag, not a builder — plain functions over a
  * `NamespaceBag` drop the triple-repeated field list and the builder instance.
  *
- * Call order is arbitrary (#1331): each `wire*` function only stores
- * deps-closures on its namespace — none runs user code or eagerly reads another
- * namespace's deps. Initial-route guard factories are flushed afterwards, from
- * the constructor's `flushPendingGuards()` call.
+ * Call order is arbitrary (#1331): no `wire*` function runs user code or
+ * eagerly reads another namespace's deps. (`wireLimits` is the one eager
+ * *write* — it hands the frozen limits object to dependenciesStore/eventBus;
+ * the rest only store deps-closures.) Initial-route guard factories are
+ * flushed afterwards, from the constructor's `flushPendingGuards()` call.
  */
 export function wireNamespaces<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
@@ -45,10 +47,16 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   // `getDependency` closure is allocated once here, not per compile call.
   const compileFactory = createCompileFactory(ns);
 
+  // Shared by RouteLifecycle and Plugins — one allocation. Internals are
+  // registered before wiring (#1331), so this never throws; returns null until
+  // validation-plugin installs the validator.
+  const getValidator = (): RouterValidator | null =>
+    getInternals(ns.router).validator;
+
   wireLimits(ns);
-  wireRouteLifecycle(ns, compileFactory);
+  wireRouteLifecycle(ns, compileFactory, getValidator);
   wireRoutes(ns);
-  wirePlugins(ns, compileFactory);
+  wirePlugins(ns, compileFactory, getValidator);
   wireNavigation(ns);
   wireRouterLifecycle(ns);
   wireState(ns);
@@ -84,12 +92,11 @@ function wireLimits<Dependencies extends DefaultDependencies>(
 function wireRouteLifecycle<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
   compileFactory: CompileFactory<Dependencies>,
+  getValidator: () => RouterValidator | null,
 ): void {
   const deps: RouteLifecycleDependencies<Dependencies> = {
     compileFactory,
-    // Internals are registered before wiring (#1331), so this never throws —
-    // returns null until validation-plugin installs the validator.
-    getValidator: () => getInternals(ns.router).validator,
+    getValidator,
   };
 
   ns.routeLifecycle.setDependencies(deps);
@@ -134,15 +141,14 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
 function wirePlugins<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
   compileFactory: CompileFactory<Dependencies>,
+  getValidator: () => RouterValidator | null,
 ): void {
   const deps: PluginsDependencies<Dependencies> = {
     addEventListener: (eventName, cb) =>
       ns.eventBus.addEventListener(eventName, cb),
     canNavigate: () => ns.eventBus.canBeginTransition(),
     compileFactory,
-    // Internals are registered before wiring (#1331), so this never throws —
-    // returns null until validation-plugin installs the validator.
-    getValidator: () => getInternals(ns.router).validator,
+    getValidator,
   };
 
   ns.plugins.setDependencies(deps);

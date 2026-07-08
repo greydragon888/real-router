@@ -11,15 +11,16 @@ import type { Params } from "@real-router/core";
  * Findings (verified by the assertions below):
  *
  * - **`forwardState` interceptors → applied.** `matchPath` calls
- *   `this.#deps.forwardState(...)` (`RoutesNamespace.ts:261`), which is wired
- *   through `ctx.forwardState` (`wireNamespaces.ts`), which goes
- *   through `createInterceptable2("forwardState", …)` in `Router.ts:195`.
+ *   `this.#deps.forwardState(...)` (`RoutesNamespace.matchPath`), which is
+ *   wired through `ctx.forwardState` (`wireNamespaces.ts`), which goes through
+ *   `createBinaryInterceptable("forwardState", …)` in the Router constructor's
+ *   `registerInternals` block.
  *
  * - **`buildPath` interceptors → NOT applied.** `matchPath` calls
- *   `this.#store.matcher.buildPath(...)` directly (`RoutesNamespace.ts:278`)
- *   to rewrite the path. This is the low-level matcher API, **not** the
- *   `ctx.buildPath` exposed via `Router.ts:208`. So registered `buildPath`
- *   interceptors do not run here.
+ *   `this.#store.matcher.buildPath(...)` directly (`RoutesNamespace.matchPath`,
+ *   low-level matcher API) to rewrite the path — **not** the `ctx.buildPath`
+ *   interceptable from the same `registerInternals` block. So registered
+ *   `buildPath` interceptors do not run here.
  *
  * Implication for issue #525:
  *

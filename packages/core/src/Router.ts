@@ -382,11 +382,28 @@ export class Router<
     // =========================================================================
     // Deferred out of wiring (#1331): the pending canActivate/canDeactivate
     // factories from initial route definitions are compiled and executed HERE,
-    // on the fully-built and bound router — so a factory that calls
-    // `router.buildPath()` / `isActiveRoute()` / `usePlugin()` no longer hits a
-    // half-assembled instance. Runtime add()/replace() compile guards in their
-    // own PREPARE phase and never touch these pending maps.
-    this.#routes.flushPendingGuards();
+    // on the fully-built and bound router — a factory calling read-only methods
+    // (`buildPath()`, `isActiveRoute()`, `getState()`) no longer hits a
+    // half-assembled instance. Side-effectful calls (`navigate`, `usePlugin`,
+    // route-CRUD) stay OUT OF CONTRACT: factories re-execute outside the
+    // constructor (cloneRouter re-compiles definition guards per clone;
+    // #recompileSlot re-runs a factory after a definition-only clear), so any
+    // side effect would duplicate per re-execution — see CLAUDE.md. Runtime
+    // add()/replace() compile guards in their own PREPARE phase and never touch
+    // these pending maps.
+    //
+    // Fail-closed on a factory throw: by this point a router reference leaked
+    // from an earlier factory is fully operational, while later guards would
+    // stay silently unregistered — a fail-open guard bypass. Disposing before
+    // the rethrow turns any leaked reference into a ROUTER_DISPOSED-throwing
+    // husk (pre-#1331 such a reference was inert because getInternals threw).
+    try {
+      this.#routes.flushPendingGuards();
+    } catch (error) {
+      this.dispose();
+
+      throw error;
+    }
   }
 
   // ============================================================================

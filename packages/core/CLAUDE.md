@@ -41,7 +41,7 @@ utils/ (SSR/SSG/hydration helpers — separate subpath export)
 
 `DISPOSE` is wired from every non-DISPOSED state so the FSM always settles at `DISPOSED` when `router.dispose()` runs. For healthy flows the facade routes through `IDLE` first (`STOP → IDLE → DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` (e.g. `dispose()` mid-`STARTING` when the start pipeline threw before `STARTED`/`FAIL`). See `routerFSM.ts` transition table.
 
-All router events are consequences of FSM transitions (via `fsm.on(from, event, action)`), not manual calls. 
+All router events are consequences of FSM transitions (via `fsm.on(from, event, action)`), not manual calls.
 No boolean flags (`#started`, `#active`, `#navigating` removed).
 
 ### Validation Pattern
@@ -69,6 +69,7 @@ add(routes) {
 The `validator` object is namespaced by concern (`routes`, `navigation`, `state`, `lifecycle`, `dependencies`, `plugins`, `options`, `eventBus`). Each namespace maps to a group of validator functions.
 
 **Plugin lifecycle:**
+
 - `validationPlugin()` is registered before `router.start()` — throws `VALIDATION_PLUGIN_AFTER_START` otherwise
 - On registration: installs validator + runs retrospective validation on existing routes/deps/options
 - On teardown (`unsubscribe()`): sets `ctx.validator = null` — validation silently disabled
@@ -88,7 +89,7 @@ Core contains four invariant guards that run regardless of whether validation-pl
 
 **Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.
 
-**Param-value type validation stays opt-in (validator), NOT a core guard.** Bare core tolerantly accepts param values that cannot round-trip through a URL path — a `Symbol` path-param keeps its raw identity in `state.params` (path stringifies to `/items/Symbol(x)`, never matching back), a `BigInt` coerces lossily, and a NUL/control char percent-encodes into `state.path` (`%00`). These are exotic programmer errors, so `@real-router/validation-plugin` rejects them with actionable messages (#934/#942) rather than core paying a per-navigate value-scan on the hot path. Symmetry note: a Symbol *query* value already throws a raw `TypeError` from `String(symbol)` in bare core; the plugin aligns the path-param case to a clear error too.
+**Param-value type validation stays opt-in (validator), NOT a core guard.** Bare core tolerantly accepts param values that cannot round-trip through a URL path — a `Symbol` path-param keeps its raw identity in `state.params` (path stringifies to `/items/Symbol(x)`, never matching back), a `BigInt` coerces lossily, and a NUL/control char percent-encodes into `state.path` (`%00`). These are exotic programmer errors, so `@real-router/validation-plugin` rejects them with actionable messages (#934/#942) rather than core paying a per-navigate value-scan on the hot path. Symmetry note: a Symbol _query_ value already throws a raw `TypeError` from `String(symbol)` in bare core; the plugin aligns the path-param case to a clear error too.
 
 ### Namespace Folder Structure
 
@@ -126,7 +127,7 @@ ns.routes.setLifecycleNamespace(ns.routeLifecycle);
 
 The `wire*` call order is arbitrary (#1331): no `wire*` function runs user code or eagerly reads another namespace's deps.
 
-**Initial-route guard factories flush last (#1331).** `canActivate` / `canDeactivate` factories from the initial route definitions are compiled and executed by `flushPendingGuards()` — the **final step of the constructor**, after all wiring and method binding — so a factory sees a fully-built router (`buildPath()` / `isActiveRoute()` / `usePlugin()` all work). **Contract:** a guard factory must not make *side-effectful* `router.*` calls (`navigate`, `usePlugin`, mutating route-CRUD) during the factory phase — the router is ready, but the pending factories flush sequentially, so `canNavigateTo` would observe a partially-registered guard set. Read-only calls (`buildPath`, `isActiveRoute`, `getState`) are safe.
+**Initial-route guard factories flush last (#1331).** `canActivate` / `canDeactivate` factories from the initial route definitions are compiled and executed by `flushPendingGuards()` — the **final step of the constructor**, after all wiring and method binding — so a factory sees a fully-built router: read-only calls (`buildPath()`, `isActiveRoute()`, `getState()`) are safe. **Contract: a guard factory must be side-effect-free with respect to the router** (`navigate`, `usePlugin`, mutating route-CRUD are out of contract). Factories re-execute outside the constructor — `cloneRouter` re-compiles every definition guard on each clone, and `#recompileSlot` re-runs a factory after a definition-only clear — so any side effect duplicates per re-execution. (`cloneRouter` defensively skips replaying a plugin that a contract-violating factory already registered on the clone, but the contract stands: register plugins outside factories.) The pending factories also flush sequentially, so `canNavigateTo` called from a factory would observe a partially-registered guard set. **A factory throw disposes the instance**: the constructor calls `dispose()` before rethrowing, so a router reference leaked from an earlier factory is fail-closed (`ROUTER_DISPOSED`) rather than a live router with later guards silently missing.
 
 ### Plugin Interception Points
 
@@ -142,7 +143,9 @@ api.addInterceptor("forwardState", (next, routeName, routeParams) => {
 });
 
 // Wrap start to make path optional (browser-plugin)
-api.addInterceptor("start", (next, path) => next(path ?? browser.getLocation()));
+api.addInterceptor("start", (next, path) =>
+  next(path ?? browser.getLocation()),
+);
 ```
 
 **`InterceptableMethodMap`** defines interceptable methods: `start`, `buildPath`, `forwardState`. Consumers: `browser-plugin` (start), `persistent-params-plugin` (buildPath, forwardState), `ssr-data-plugin` (start).
@@ -151,7 +154,7 @@ Multiple interceptors per method execute in LIFO (reverse registration) order �
 
 Internally, `createInterceptable()` in `internals.ts` wraps methods at wiring time via `RouterInternals` WeakMap, ensuring all call paths (facade, wiring, plugins) are intercepted.
 
-**Validation runs on the RAW argument, before interceptors.** `Router.start()` calls `validator?.navigation.validateStartArgs(startPath)` (and `sendStart()`) *before* `getInternals(this).start(path)` dispatches the interceptor chain. So `validateStartArgs` sees the **caller's** `startPath`, not the value a browser-plugin interceptor substitutes (`path ?? browser.getLocation()`) — the validator deliberately permits `undefined` for exactly this reason (browser-plugin fills it in downstream). A plugin that needs to validate the *post-override* path must do so inside its own interceptor.
+**Validation runs on the RAW argument, before interceptors.** `Router.start()` calls `validator?.navigation.validateStartArgs(startPath)` (and `sendStart()`) _before_ `getInternals(this).start(path)` dispatches the interceptor chain. So `validateStartArgs` sees the **caller's** `startPath`, not the value a browser-plugin interceptor substitutes (`path ?? browser.getLocation()`) — the validator deliberately permits `undefined` for exactly this reason (browser-plugin fills it in downstream). A plugin that needs to validate the _post-override_ path must do so inside its own interceptor.
 
 ### Router Extension via `extendRouter()`
 
@@ -184,7 +187,7 @@ removeExtensions();
 
 States are **deeply frozen** via `Object.freeze()`. Never mutate, always create new.
 
-**Exception — `state.context`:** the `context` object is **intentionally not frozen** (`helpers.ts:24`). Plugins write per-route data into it via `claimContextNamespace()` + `claim.write(state, value)` (or the direct `state.context.<ns> = …` escape hatch) after state creation. The `context` *slot* on the state is frozen (cannot be reassigned — `state.context = {}` throws), but the object it points to stays mutable. So "deeply frozen" holds for `name` / `params` / `path` / `transition` (+ nested), with `context` the documented carve-out that the whole `claimContextNamespace` mechanism depends on.
+**Exception — `state.context`:** the `context` object is **intentionally not frozen** (`helpers.ts:24`). Plugins write per-route data into it via `claimContextNamespace()` + `claim.write(state, value)` (or the direct `state.context.<ns> = …` escape hatch) after state creation. The `context` _slot_ on the state is frozen (cannot be reassigned — `state.context = {}` throws), but the object it points to stays mutable. So "deeply frozen" holds for `name` / `params` / `path` / `transition` (+ nested), with `context` the documented carve-out that the whole `claimContextNamespace` mechanism depends on.
 
 ### Router Lifecycle: dispose()
 
@@ -203,15 +206,15 @@ router.dispose(); // Idempotent — safe to call multiple times
 
 `cloneRouter(router, deps?)` (standalone API, `api/cloneRouter.ts`) builds an independent router for **SSR per-request isolation** — one base router per process, one clone per request. The clone is always constructed fresh (FSM `IDLE`, no committed state) regardless of the source's lifecycle state; cloning a disposed router throws `ROUTER_DISPOSED`.
 
-| Subsystem | Clone behavior |
-| --- | --- |
-| Route tree | **Rebuilt** from serialized definitions (`routeTreeToDefinitions` → constructor) — not shared |
-| Options | Shallow spread; deep-frozen, so ref-sharing is safe |
-| Dependencies | **Shallow merge** `{ ...sourceDeps, ...deps }` — top-level keys fresh, **values shared by reference** |
-| Config (decoders / encoders / forwardMap / `defaultParams` / custom fields) | `Object.assign` shallow — per-route objects **shared by reference** |
-| Lifecycle guards | Re-registered **preserving origin** (definition stays definition, external stays external — #676) |
-| Plugins | Factories re-run on the clone — **fresh instances**, fresh `state.context` claims |
-| State / FSM / EventEmitter / interceptors / `hydrationState` / `contextClaimRecords` | **Reset** (fresh per clone) |
+| Subsystem                                                                            | Clone behavior                                                                                        |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Route tree                                                                           | **Rebuilt** from serialized definitions (`routeTreeToDefinitions` → constructor) — not shared         |
+| Options                                                                              | Shallow spread; deep-frozen, so ref-sharing is safe                                                   |
+| Dependencies                                                                         | **Shallow merge** `{ ...sourceDeps, ...deps }` — top-level keys fresh, **values shared by reference** |
+| Config (decoders / encoders / forwardMap / `defaultParams` / custom fields)          | `Object.assign` shallow — per-route objects **shared by reference**                                   |
+| Lifecycle guards                                                                     | Re-registered **preserving origin** (definition stays definition, external stays external — #676)     |
+| Plugins                                                                              | Factories re-run on the clone — **fresh instances**, fresh `state.context` claims                     |
+| State / FSM / EventEmitter / interceptors / `hydrationState` / `contextClaimRecords` | **Reset** (fresh per clone)                                                                           |
 
 **Shared-by-reference is intentional (#664).** A `Map`, `Set`, class instance, or nested object in `base.dependencies` (or a per-route `defaultParams` / custom-field object) is the **same instance** in every clone — mutating it from one clone is visible in the base and all siblings. `structuredClone` is deliberately not applied (it breaks class instances, functions, singleton pools, circular refs). Rule: **singletons / shared services → `base.dependencies`; per-request mutable state → the `deps` override** (or `createRequestScope`), which is applied last and wins over base keys. Cross-request leaks happen only when per-request state is wrongly placed in the base.
 
@@ -252,20 +255,20 @@ Transition timing is available via `@real-router/logger-plugin`.
 
 The two fields **complement** each other — they measure different things from different sources, so they coexist (no deprecation):
 
-| Layer  | Field                                                   | Source                                                                                                                                              | Availability                                          |
-| ------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Core   | `state.transition.{replace, reload, redirected}`        | `NavigationOptions` passed to `router.navigate(...)` (or auto-modified by `forceReplaceFromUnknown` / `navigateToNotFound`)                          | Always, under any URL plugin (or no plugin)           |
-| Plugin | `state.context.navigation.navigationType`               | Platform Navigation API event (`event.navigationType`) or History-stack derivation — how the **browser** classified the navigation                  | Only under `@real-router/navigation-plugin`           |
+| Layer  | Field                                            | Source                                                                                                                             | Availability                                |
+| ------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Core   | `state.transition.{replace, reload, redirected}` | `NavigationOptions` passed to `router.navigate(...)` (or auto-modified by `forceReplaceFromUnknown` / `navigateToNotFound`)        | Always, under any URL plugin (or no plugin) |
+| Plugin | `state.context.navigation.navigationType`        | Platform Navigation API event (`event.navigationType`) or History-stack derivation — how the **browser** classified the navigation | Only under `@real-router/navigation-plugin` |
 
 Semantic coverage at a glance:
 
-| Question                                | Core portable signal                                | Plugin signal (navigation-plugin only)              |
-| --------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
-| Was this a replace transition?          | `state.transition.replace === true`                 | `state.context.navigation.navigationType === "replace"` |
-| Was this a reload transition?           | `state.transition.reload === true`                  | `state.context.navigation.navigationType === "reload"`  |
-| Was this a redirect transition?         | `state.transition.redirected === true`              | (no plugin signal — core-level concept)             |
+| Question                                | Core portable signal                                      | Plugin signal (navigation-plugin only)                   |
+| --------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| Was this a replace transition?          | `state.transition.replace === true`                       | `state.context.navigation.navigationType === "replace"`  |
+| Was this a reload transition?           | `state.transition.reload === true`                        | `state.context.navigation.navigationType === "reload"`   |
+| Was this a redirect transition?         | `state.transition.redirected === true`                    | (no plugin signal — core-level concept)                  |
 | Was this a traverse (browser back/fwd)? | **Not covered** — traverse has no `opts.replace`/`reload` | `state.context.navigation.navigationType === "traverse"` |
-| Was this a push?                        | By elimination — none of the above flags            | `state.context.navigation.navigationType === "push"`    |
+| Was this a push?                        | By elimination — none of the above flags                  | `state.context.navigation.navigationType === "push"`     |
 
 Rule of thumb: read `transition.replace` (and `reload`/`redirected`) when you want to know **what the caller asked for** (or what core auto-modified) — portable across URL plugins. Read `state.context.navigation.navigationType` when you need to know **how the Navigation API classified** the transition, including browser-driven `traverse`/`reload` events that don't flow through `router.navigate` options.
 
@@ -330,19 +333,20 @@ namespaces/NavigationNamespace/
 
 ### Guards vs Plugins
 
-|                     | Guards              | Plugins            | subscribeLeave          |
-| ------------------- | ------------------- | ------------------ | ----------------------- |
+|                     | Guards              | Plugins            | subscribeLeave                                                    |
+| ------------------- | ------------------- | ------------------ | ----------------------------------------------------------------- |
 | When                | Before state change | After state change | Between deactivation and activation guards (LEAVE_APPROVED phase) |
-| Can block           | Yes                 | No                 | No                      |
-| Can redirect        | No                  | No                 | No                      |
-| Can transform state | No                  | No                 | No                      |
-| Scope               | Per-route           | Global             | Global                  |
+| Can block           | Yes                 | No                 | No                                                                |
+| Can redirect        | No                  | No                 | No                                                                |
+| Can transform state | No                  | No                 | No                                                                |
+| Scope               | Per-route           | Global             | Global                                                            |
 
 **`subscribeLeave(listener)`** — subscribe to approved route departures. Fires after all deactivation guards pass (**departure is approved, not yet committed**) but before activation guards run — an activation guard can still reject, leaving state unchanged, so treat the leave as tentative (verify the outcome for non-idempotent side-effects). Returns an unsubscribe function.
 
 **Listener signature:** `(payload: LeaveState) => void | Promise<void>` where `LeaveState = { route: fromState, nextRoute: toState, signal: AbortSignal }`.
 
 **Async semantics (important):** `subscribeLeave` listeners are **awaited** — the activation phase does not start until all listeners' returned Promises settle (`Promise.allSettled`). This is the only subscription in the router that blocks the navigation pipeline. Use it for:
+
 - Animation hooks that must snapshot DOM before commit (e.g., `document.startViewTransition`)
 - Async cleanup that must complete before activation
 - Data prefetch coordinated with leave event
@@ -384,10 +388,11 @@ When navigating FROM `UNKNOWN_ROUTE` state, `navigate()` auto-forces `replace: t
 `getRoutesApi(router).replace(routes)` atomically replaces all routes in one operation.
 
 **Semantics** (prepare-then-commit / build-then-swap, #698):
+
 1. **Blocking** — `throwIfDisposed()`; logged no-op during active navigation (`validateClearRoutes` → `logger.error`, returns `false`)
 2. **Validation** — fail-fast structural guards, tree unchanged on error (atomicity)
 3. **Build artifacts into locals** — `buildReplaceArtifacts()` builds the whole new `definitions`/`config`/`tree`/`matcher`/`forwardMap` in temporary structures; a circular/async `forwardTo` or invalid path **throws here**, before the store is touched — so atomicity holds even without validation-plugin
-   - **Handler-limit pre-flight (#1046)** — with validation-plugin installed, the per-type lifecycle-handler limit (#961) is projected against the **surviving external guards** (the post-clear state) and throws here too if the new batch's guard slots would exceed `maxLifecycleHandlers` — so an at-limit batch aborts before `clearDefinitionGuards()`/swap, not after (`#956` had hoisted only the guard-*compile* throw, leaving the *limit* throw live on the post-swap install path). The same pre-flight runs for `add` (against the live union count) and `update` (a single new slot).
+   - **Handler-limit pre-flight (#1046)** — with validation-plugin installed, the per-type lifecycle-handler limit (#961) is projected against the **surviving external guards** (the post-clear state) and throws here too if the new batch's guard slots would exceed `maxLifecycleHandlers` — so an at-limit batch aborts before `clearDefinitionGuards()`/swap, not after (`#956` had hoisted only the guard-_compile_ throw, leaving the _limit_ throw live on the post-swap install path). The same pre-flight runs for `add` (against the live union count) and `update` (a single new slot).
 4. **Clear definition guards** — `clearDefinitionGuards()` preserves external guards
 5. **Atomic swap** — `adoptRouteArtifacts()` assigns the prepared artifacts into the store in one pass (pure assignment, never throws) and registers the collected guards
 6. **State revalidation + notify (#950)** — `matchPath(currentPath)`: if the path still matches, `setState()` the revalidated state and **emit `TRANSITION_SUCCESS`**; if it no longer matches, route through `navigateToNotFound(currentPath)` (commits `UNKNOWN_ROUTE`, emits `TRANSITION_SUCCESS`) instead of a silent `clearState()`. Either way `router.subscribe` / `useSyncExternalStore` adapters are notified, so they re-render instead of showing the pre-replace state. **This is the one structural mutation that emits a transition event** — `clear()` stays a silent reset (emits only `TREE_CHANGED`); the asymmetry is deliberate (replace produces a concrete next state — the revalidated route or `UNKNOWN_ROUTE` — that adapters must render; clear has none). A consequence: plugins' `onTransitionSuccess` fires for a `replace()` revalidation, and after a drop `getState()` is `UNKNOWN_ROUTE` (not `undefined`).
@@ -400,19 +405,19 @@ When navigating FROM `UNKNOWN_ROUTE` state, `navigate()` auto-forces `replace: t
 
 The five mutating route-CRUD ops react differently to an in-flight navigation (`isTransitioning()`):
 
-| Op        | During navigation                                                                                    |
-| --------- | ---------------------------------------------------------------------------------------------------- |
-| `add`     | no check — proceeds silently                                                                          |
-| `update`  | `logger.error` warning, then **proceeds** (an in-flight navigate may read the new config)             |
-| `remove`  | non-active route: `logger.warn`, proceeds; active route: `logger.warn`, **no-op** (always blocked)   |
-| `clear`   | `logger.error`, **no-op** (blocked)                                                                   |
-| `replace` | `logger.error`, **no-op** (blocked — shares `validateClearRoutes`)                                    |
+| Op        | During navigation                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------- |
+| `add`     | no check — proceeds silently                                                                       |
+| `update`  | `logger.error` warning, then **proceeds** (an in-flight navigate may read the new config)          |
+| `remove`  | non-active route: `logger.warn`, proceeds; active route: `logger.warn`, **no-op** (always blocked) |
+| `clear`   | `logger.error`, **no-op** (blocked)                                                                |
+| `replace` | `logger.error`, **no-op** (blocked — shares `validateClearRoutes`)                                 |
 
 The asymmetry is intentional: `clear`/`replace` are destructive whole-tree swaps (blocked mid-navigation), while `add`/`update` are incremental and benign (the in-flight transition already resolved its target). `add` has no guard at all — the contract "add is allowed during navigation" is verified benign (no corruption of the in-flight nav).
 
 ### `update()` does not revalidate the active state
 
-`getRoutesApi(router).update(name, ...)` mutates config in place and **does not rebuild the tree or recompute the current state** (NO_TREE_REBUILD). So when you update the **currently-active** route's `encodeParams` / `decodeParams` / `defaultParams` / `forwardTo`, the committed `getState().path` keeps the value built by the *old* config — it can disagree with a fresh `buildPath(name, params)` until the next navigation. This is by-design (update is O(1), not a re-navigation); call `router.navigate(name, params, { reload: true })` if you need the active path rebuilt with the new config.
+`getRoutesApi(router).update(name, ...)` mutates config in place and **does not rebuild the tree or recompute the current state** (NO_TREE_REBUILD). So when you update the **currently-active** route's `encodeParams` / `decodeParams` / `defaultParams` / `forwardTo`, the committed `getState().path` keeps the value built by the _old_ config — it can disagree with a fresh `buildPath(name, params)` until the next navigation. This is by-design (update is O(1), not a re-navigation); call `router.navigate(name, params, { reload: true })` if you need the active path rebuilt with the new config.
 
 ### Plugin System
 
@@ -454,7 +459,7 @@ const unsubscribe = router.usePlugin(myPlugin);
 ```typescript
 router.usePlugin(
   browserPluginFactory(),
-  __DEV__ && validationPlugin(),   // false when __DEV__ is false — skipped
+  __DEV__ && validationPlugin(), // false when __DEV__ is false — skipped
 );
 ```
 
@@ -464,7 +469,9 @@ Plugins can extend the router instance with new methods via `extendRouter()`:
 const myPlugin: PluginFactory = (router, getDependency) => {
   const api = getPluginApi(router);
   const removeExtensions = api.extendRouter({
-    customMethod: () => { /* ... */ },
+    customMethod: () => {
+      /* ... */
+    },
   });
 
   return {
@@ -483,27 +490,37 @@ const myPlugin: PluginFactory = (router, getDependency) => {
 const routes = getRoutesApi(router);
 const unsubscribe = routes.subscribeChanges((event) => {
   switch (event.op) {
-    case "add":     event.added.forEach(register); break;          // FLAT, full dotted names
-    case "remove":  event.removedSubtree.forEach(drop); break;     // route + descendants, FLAT
-    case "update":  if (event.patch.defaultParams) revalidate(event.name); break;
-    case "replace": reconcile(event.removed, event.added); break;  // FLAT diff by name
-    case "clear":   clearAll(); break;
+    case "add":
+      event.added.forEach(register);
+      break; // FLAT, full dotted names
+    case "remove":
+      event.removedSubtree.forEach(drop);
+      break; // route + descendants, FLAT
+    case "update":
+      if (event.patch.defaultParams) revalidate(event.name);
+      break;
+    case "replace":
+      reconcile(event.removed, event.added);
+      break; // FLAT diff by name
+    case "clear":
+      clearAll();
+      break;
   }
 });
 ```
 
-| Property | Behavior |
-| --- | --- |
-| **Payload** | `TreeChangedEvent` discriminated union (from `@real-router/types`), keyed by `op`. Routes are FLAT (full dotted `name`, descendants included), frozen per node. |
-| **Immutability is shallow** | The payload route object (and `update`'s `patch` envelope) is `Object.freeze`d, but **nested config is by reference and aliases the live store** — `event.added[0].defaultParams` is the same object the router reads on every navigation (same aliasing as `get()`), and it is NOT frozen. **Treat payloads as read-only**: mutating a nested field (`event.added[0].defaultParams.x = …`, a `patch.defaultParams`, an `encodeParams`/guard closure) corrupts router config. Core does not deep-freeze (that would freeze the caller's own input, see H-1) or deep-clone (circular refs / class instances). |
-| **Timing** | Post-commit — the handler sees the new tree via `get()`/`has()`. For `replace`, fires after the tree swap but before state revalidation (new tree, still-old state). |
-| **`update` filter** | Emits only when the patch has a structural field (`forwardTo` / `defaultParams` / `encodeParams` / `decodeParams`). Guard-only and empty patches are silent. |
-| **Fire-and-forget** | The handler cannot cancel the mutation; returned promises are ignored. |
-| **Reentrant CRUD is banned (#1032)** | A route-CRUD op (`add`/`remove`/`update`/`clear`/`replace`) called **from inside a `subscribeChanges` handler** (while a `TREE_CHANGED` emit is on the stack) throws `RouterError(REENTRANT_TREE_MUTATION)` synchronously, **before mutating** — the tree stays atomic. The throw surfaces via `onListenerError` (visible, non-fatal); the outer op completes. Defer instead (`queueMicrotask`/`await`). Mirrors the reentrant-`navigate` ban (§4). CRUD from a *transition* listener (`subscribe`, not a TREE_CHANGED dispatch) is unaffected. |
-| **Errors** | A throwing handler is isolated via `onListenerError`; other handlers still run and the CRUD caller does not see a re-throw. A runaway listener-driven nested same-event emit — e.g. a `router.subscribe` listener that calls `replace()` unconditionally, whose revalidation would re-emit `TRANSITION_SUCCESS` (#950) and re-enter the listener — is harmlessly **coalesced** at the emitter (#1033): the re-entrant emit is a no-op (depth ≤ 1), so the listener runs once and the mutation still commits. (This replaced the former `maxEventDepth` depth bound + `RecursionDepthError`.) |
-| **Duplicates** | Lenient (mirrors `router.subscribe`) — each call is an independent subscription with its own unsubscribe. |
-| **Clone isolation** | A cloned router has an independent emitter; mutations never cross the clone boundary. |
-| **Scope** | Internal-only channel: `TREE_CHANGED` is not in the public `EventName` union / `events.*` registry / `Plugin` interface. There is no `router.subscribeTree()` and no `addEventListener` path — by design (tree mutations are infrastructural, not app-level). |
+| Property                             | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Payload**                          | `TreeChangedEvent` discriminated union (from `@real-router/types`), keyed by `op`. Routes are FLAT (full dotted `name`, descendants included), frozen per node.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Immutability is shallow**          | The payload route object (and `update`'s `patch` envelope) is `Object.freeze`d, but **nested config is by reference and aliases the live store** — `event.added[0].defaultParams` is the same object the router reads on every navigation (same aliasing as `get()`), and it is NOT frozen. **Treat payloads as read-only**: mutating a nested field (`event.added[0].defaultParams.x = …`, a `patch.defaultParams`, an `encodeParams`/guard closure) corrupts router config. Core does not deep-freeze (that would freeze the caller's own input, see H-1) or deep-clone (circular refs / class instances). |
+| **Timing**                           | Post-commit — the handler sees the new tree via `get()`/`has()`. For `replace`, fires after the tree swap but before state revalidation (new tree, still-old state).                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **`update` filter**                  | Emits only when the patch has a structural field (`forwardTo` / `defaultParams` / `encodeParams` / `decodeParams`). Guard-only and empty patches are silent.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Fire-and-forget**                  | The handler cannot cancel the mutation; returned promises are ignored.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Reentrant CRUD is banned (#1032)** | A route-CRUD op (`add`/`remove`/`update`/`clear`/`replace`) called **from inside a `subscribeChanges` handler** (while a `TREE_CHANGED` emit is on the stack) throws `RouterError(REENTRANT_TREE_MUTATION)` synchronously, **before mutating** — the tree stays atomic. The throw surfaces via `onListenerError` (visible, non-fatal); the outer op completes. Defer instead (`queueMicrotask`/`await`). Mirrors the reentrant-`navigate` ban (§4). CRUD from a _transition_ listener (`subscribe`, not a TREE_CHANGED dispatch) is unaffected.                                                              |
+| **Errors**                           | A throwing handler is isolated via `onListenerError`; other handlers still run and the CRUD caller does not see a re-throw. A runaway listener-driven nested same-event emit — e.g. a `router.subscribe` listener that calls `replace()` unconditionally, whose revalidation would re-emit `TRANSITION_SUCCESS` (#950) and re-enter the listener — is harmlessly **coalesced** at the emitter (#1033): the re-entrant emit is a no-op (depth ≤ 1), so the listener runs once and the mutation still commits. (This replaced the former `maxEventDepth` depth bound + `RecursionDepthError`.)                 |
+| **Duplicates**                       | Lenient (mirrors `router.subscribe`) — each call is an independent subscription with its own unsubscribe.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Clone isolation**                  | A cloned router has an independent emitter; mutations never cross the clone boundary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Scope**                            | Internal-only channel: `TREE_CHANGED` is not in the public `EventName` union / `events.*` registry / `Plugin` interface. There is no `router.subscribeTree()` and no `addEventListener` path — by design (tree mutations are infrastructural, not app-level).                                                                                                                                                                                                                                                                                                                                                |
 
 `dispose()` releases all `subscribeChanges` listeners (during the `clearAll` events step) before the route teardown, so no event fires during disposal. After disposal, `subscribeChanges` throws `RouterError(ROUTER_DISPOSED)` — including via a reference bound before `dispose()` (`const s = routes.subscribeChanges.bind(routes)`) — rather than silently re-registering a listener that can never fire (#982). This mirrors the `router.subscribe` / `subscribeLeave` guard (#946) and the sibling `getRoutesApi` mutators (`add` / `remove` / `update` / `clear`), which all throw `ROUTER_DISPOSED` after `dispose()`.
 
@@ -513,11 +530,11 @@ When a plugin (or infrastructure consumer) maintains a cache derived from route 
 
 This is the **recommended approach** for any cache whose contents are keyed by route name or depend on tree shape. It replaces three legacy patterns that solved partial overlapping problems before TREE_CHANGED existed:
 
-| Legacy pattern | Problem |
-|---|---|
-| **Imperative-on-read** (lazy revalidation on access) | Reasoning is global — to predict cache state you must trace every access site |
-| **Per-op interceptor** (e.g., `addInterceptor("addRoutes")`) | Asymmetric coverage — catches `add` only, silent on `update`/`remove`/`replace`/`clear` |
-| **Init snapshot** (capture tree state at plugin init, never sync) | Diverges from live tree silently — invariants only hold at startup |
+| Legacy pattern                                                    | Problem                                                                                 |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Imperative-on-read** (lazy revalidation on access)              | Reasoning is global — to predict cache state you must trace every access site           |
+| **Per-op interceptor** (e.g., `addInterceptor("addRoutes")`)      | Asymmetric coverage — catches `add` only, silent on `update`/`remove`/`replace`/`clear` |
+| **Init snapshot** (capture tree state at plugin init, never sync) | Diverges from live tree silently — invariants only hold at startup                      |
 
 #### Recommended (declarative reactive)
 
@@ -579,15 +596,15 @@ import { getNavigator } from "@real-router/core";
 const nav = getNavigator(router);
 ```
 
-| Method              | Description                                                  |
-| ------------------- | ------------------------------------------------------------ |
-| `navigate`          | Navigate to a route                                          |
-| `getState`          | Get current router state                                     |
-| `isActiveRoute`     | Check if a route is active                                   |
-| `canNavigateTo`     | Check whether a route's guards would allow navigation — **synchronous, returns `boolean`** (never a Promise). **Parity with `navigate`:** evaluates exactly the guard set `navigate` would run — `toState` is built with route-meta (like `buildNavigateState`), so guards on ancestors **shared with the current route are not re-checked** (they stay mounted), no over-checking (#970). An async guard on the path can't be evaluated synchronously, so it resolves to `false` (core stays silent — DX diagnostics are opt-in; `@real-router/validation-plugin` logs a warning, #958). A guard that **throws** also resolves to `false`, but core logs it via `logger.warn` directly (an operational fault, never silent — #959). Guards are invoked with `signal === undefined` (no AbortController — unlike `navigate`). Returns `true` for the current route (same-state is a no-op, not a guard rejection); before `start()` it runs the target's **activation** guards only (nothing to deactivate, so a blocking *deactivate* guard is not consulted). Throws `ROUTER_DISPOSED` after `dispose()` |
-| `subscribe`         | Subscribe to successful transitions. Fire-and-forget: returned Promises ignored (async rejections isolated, #944), `navigate()` does not wait for async listener bodies. Throws `TypeError` when `listener` is not a function; throws `ROUTER_DISPOSED` after `dispose()` — including via a reference bound before disposal (#946) |
-| `subscribeLeave`    | Subscribe to **approved** route departures (LEAVE_APPROVED phase) — tentative, not committed: an activation guard can still reject. Listener receives `{ route: fromState, nextRoute: toState, signal: AbortSignal }` (the signal aborts with the failure reason if the navigation does not commit). Async listeners are awaited — the activation phase blocks until all Promises settle. Throws `TypeError` when `listener` is not a function; throws `ROUTER_DISPOSED` after `dispose()` — including via a pre-bound reference (#946) |
-| `isLeaveApproved`   | Returns `true` when FSM is in LEAVE_APPROVED state (deactivation done, activation pending) |
+| Method            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `navigate`        | Navigate to a route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `getState`        | Get current router state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `isActiveRoute`   | Check if a route is active                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `canNavigateTo`   | Check whether a route's guards would allow navigation — **synchronous, returns `boolean`** (never a Promise). **Parity with `navigate`:** evaluates exactly the guard set `navigate` would run — `toState` is built with route-meta (like `buildNavigateState`), so guards on ancestors **shared with the current route are not re-checked** (they stay mounted), no over-checking (#970). An async guard on the path can't be evaluated synchronously, so it resolves to `false` (core stays silent — DX diagnostics are opt-in; `@real-router/validation-plugin` logs a warning, #958). A guard that **throws** also resolves to `false`, but core logs it via `logger.warn` directly (an operational fault, never silent — #959). Guards are invoked with `signal === undefined` (no AbortController — unlike `navigate`). Returns `true` for the current route (same-state is a no-op, not a guard rejection); before `start()` it runs the target's **activation** guards only (nothing to deactivate, so a blocking _deactivate_ guard is not consulted). Throws `ROUTER_DISPOSED` after `dispose()` |
+| `subscribe`       | Subscribe to successful transitions. Fire-and-forget: returned Promises ignored (async rejections isolated, #944), `navigate()` does not wait for async listener bodies. Throws `TypeError` when `listener` is not a function; throws `ROUTER_DISPOSED` after `dispose()` — including via a reference bound before disposal (#946)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `subscribeLeave`  | Subscribe to **approved** route departures (LEAVE_APPROVED phase) — tentative, not committed: an activation guard can still reject. Listener receives `{ route: fromState, nextRoute: toState, signal: AbortSignal }` (the signal aborts with the failure reason if the navigation does not commit). Async listeners are awaited — the activation phase blocks until all Promises settle. Throws `TypeError` when `listener` is not a function; throws `ROUTER_DISPOSED` after `dispose()` — including via a pre-bound reference (#946)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `isLeaveApproved` | Returns `true` when FSM is in LEAVE_APPROVED state (deactivation done, activation pending)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 **Transition-in-flight signal.** `isLeaveApproved()` (public, on router and navigator) returns `true` only in the LEAVE_APPROVED phase (deactivation done, activation pending). There is **no public `isTransitioning()` method on the Router class today** — `isTransitioning()` exists only internally (`RouterInternals`, spanning TRANSITION_STARTED + LEAVE_APPROVED) for cross-namespace plumbing. Whether to promote it to the public surface is an open research question (ROI vs. `isLeaveApproved()` + `getState()` already covering the observable cases) — see issue #924.
 
@@ -609,9 +626,12 @@ import { getLifecycleApi } from "@real-router/core/api";
 const lifecycle = getLifecycleApi(router);
 
 // WRONG - GuardFn can only return boolean
-lifecycle.addActivateGuard("admin", (router, getDep) => (toState, fromState) => {
-  return router.makeState("login"); // TypeError! GuardFn returns boolean only
-});
+lifecycle.addActivateGuard(
+  "admin",
+  (router, getDep) => (toState, fromState) => {
+    return router.makeState("login"); // TypeError! GuardFn returns boolean only
+  },
+);
 
 // CORRECT - return boolean, use getDependency for DI
 lifecycle.addActivateGuard("admin", (router, getDep) => (toState) => {
@@ -663,6 +683,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 ## Performance Notes
 
 ### Navigate hot path (#307)
+
 - **Optimistic sync execution** — guards run synchronously, async path deferred. No AbortController/Promise on sync path
 - **FSM `forceState()`** — bypasses `send()` dispatch (no Map lookups, no action calls) for NAVIGATE/COMPLETE/LEAVE_APPROVE. `sendLeaveApprove()` is the third hot-path transition alongside NAVIGATE and COMPLETE — O(1) overhead
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` instead of `...args` to avoid V8 rest-param array allocation
@@ -674,6 +695,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - **Single-pass freeze** — `freezeStateInPlace` consolidated into one recursive traversal
 
 ### General
+
 - States cached to avoid repeated freezing
 - URL params cached per route name
 - Lifecycle functions pre-compiled at registration
@@ -689,6 +711,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - `buildPath` options cached per router instance (`#cachedBuildPathOpts`) — the cache ignores its `options` argument after the first call, valid because router options are immutable per instance (see above); a dev-build `logger.warn` asserts against a future caller passing a varying `options` reference (`#cachedOptionsSource`, #957)
 
 ### Async subscribeLeave overhead
+
 - **0 listeners (hot path):** on the no-guards path `#handleNoGuardsLeave` runs only `sendLeaveApprove` + a `hasLeaveListeners()` check + a `navigationId` check — no `{nav}` context, no `LeaveState`, no `AbortController` (all allocated only when listeners exist)
 - **N sync listeners:** AbortController created + released (not aborted on success, #722; ~5µs total with cleanup), frozen `LeaveState` object, N try/catch (V8 zero-cost on happy path), N×2 thenable checks
 - **Lazy closures:** `isCurrentNav` / `emitLeaveApproveCallback` closures and the `{nav}` context are created inside the `if (hasGuards)` branch (or the async tail) only — not on the no-guards hot path
@@ -699,18 +722,21 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 ### Adding New Methods
 
 **Facade methods** (on Router class):
+
 1. Add **validator** to `namespaces/XxxNamespace/validators.ts` (if new validation needed)
 2. Add **instance method** to namespace (business logic)
 3. Add **facade method** to Router.ts (`ctx.validator?.ns.fn()` → delegate)
 4. Bind method in Router constructor if it accesses private fields
 
 **Standalone API methods** (on `get*Api()` return objects):
+
 1. Add **validator** to `namespaces/XxxNamespace/validators.ts`
 2. Add **CRUD logic** as module-private function in `api/get*Api.ts`
 3. Add **method** to the returned API object (`ctx.validator?.ns.fn()` → CRUD)
 4. Access internals via `getInternals(router)` WeakMap
 
 **Adding validation to a new method:**
+
 - Call `ctx.validator?.ns.validateXxxArgs(...)` — optional chaining means no-op when plugin is absent
 - Add the corresponding method to `RouterValidator` in `src/types/RouterValidator.ts`
 - Implement the validator function in `namespaces/XxxNamespace/validators.ts`
@@ -740,6 +766,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - Transpiler artifacts (__awaiter detection)
 
 **`@preserve` annotation convention:**
+
 - Means "intentionally kept after v8 ignore audit — do not remove without re-auditing"
 - Do NOT use for defensive guards against TypeScript-enforced invariants
 - All `@preserve` blocks must have clear explanatory comments
@@ -748,13 +775,13 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 
 Mutation score sits at ~90 % (`/mutation-score` skill; full record in `.claude/mutation-audit-2026-06-22.md`). **Do NOT chase 100 % by silencing survivors** — the honest ceiling is ~90–92 %. The remainder is structurally not worth disabling:
 
-- **Entangled** — the same mutator has a *killed* AND a *survived* variant on one line (`CE→true` killed, `CE→false` survived). `// Stryker disable <Mutator>` would drop the kill. Un-silenceable by design.
+- **Entangled** — the same mutator has a _killed_ AND a _survived_ variant on one line (`CE→true` killed, `CE→false` survived). `// Stryker disable <Mutator>` would drop the kill. Un-silenceable by design.
 - **Equivalents** — no test can kill them: cache short-circuit (recompute is identical), `>0→>=0` on an empty collection, `++→--` on identity-only ids, `{once}` listener redundancy, defensive-redundancy cancel-checks.
 - **Validator-opt-in** — `ctx.validator?.…` branches are dead in core (validator is `null`), covered in `@real-router/validation-plugin`. Left documented (the comment says where they're tested), not disabled.
 
 Rules:
 
-- **`survived ≠ equivalent`.** Disable ONLY after proving equivalence empirically (manual mutation + full suite green). Multiple survivors here *looked* equivalent but were killable — the `finally` controller-cleanup, cache *conditions* (a stale-hit returns the wrong cached value), the `isActive` fast-path. Silencing an unproven survivor hides a real coverage gap — the exact anti-pattern mutation testing exists to catch.
+- **`survived ≠ equivalent`.** Disable ONLY after proving equivalence empirically (manual mutation + full suite green). Multiple survivors here _looked_ equivalent but were killable — the `finally` controller-cleanup, cache _conditions_ (a stale-hit returns the wrong cached value), the `isActive` fast-path. Silencing an unproven survivor hides a real coverage gap — the exact anti-pattern mutation testing exists to catch.
 - A **killable** survivor → close it with a **test** (that strengthens the suite), never a `disable`.
 - A **proven** equivalent → `// Stryker disable next-line <Mutator>: reason`, listing only mutators with no killed sibling on that line. If un-targetable — entangled, or a `finally` body whose catch-`}` and `finally-{` share one line — document with a plain comment and leave it survived.
 - Score is a proxy for test strength, not a target. Inflating it by silencing is net-negative.
@@ -767,7 +794,8 @@ All navigation methods (`navigate`, `navigateToDefault`, `start`) return `Promis
 
 **`start(path)` requires a path string.** Core is platform-agnostic — the caller always provides the path. Browser-plugin overrides `start(path?)` to make path optional (injects browser location). When `allowNotFound: true` and path doesn't match, `start()` calls `navigateToNotFound(path)` (returns synchronous `State` wrapped in resolved Promise).
 
-**`start()` rejection vs. committed state (#763).** `start()` commits via `navigateToState` *inside* the interceptable `start` chain (`RouterLifecycleNamespace.start`), and plugin `start` interceptors (`ssr-data-plugin`, `rsc-server-plugin`) run their loader **after** `await next(path)` — i.e. after the commit emitted `TRANSITION_SUCCESS`. The facade's `.catch` therefore distinguishes two failure shapes by whether a state was committed (`this.#state.get()`):
+**`start()` rejection vs. committed state (#763).** `start()` commits via `navigateToState` _inside_ the interceptable `start` chain (`RouterLifecycleNamespace.start`), and plugin `start` interceptors (`ssr-data-plugin`, `rsc-server-plugin`) run their loader **after** `await next(path)` — i.e. after the commit emitted `TRANSITION_SUCCESS`. The facade's `.catch` therefore distinguishes two failure shapes by whether a state was committed (`this.#state.get()`):
+
 - **Pre-commit failure** (route not found, an activation guard blocked the start navigation, a sync interceptor throw before `next()`): no `TRANSITION_SUCCESS` was emitted, so the half-started FSM unwinds back to IDLE (two-phase start) — `getState()` is `undefined`, `isActive()` is `false`.
 - **Post-commit interceptor failure** (a loader throws after `next()` committed): subscribers already observed `TRANSITION_SUCCESS`, so core does **not** roll back — the committed state stands, `isActive()` stays `true`, and the loader error surfaces **only** via the rejected `start()` promise. Rolling back here would retract an observed success ("phantom success"). Plugins must not swallow the loader error (that violates "Loader errors propagate"); core owns the state-consistency half by keeping the commit.
 
@@ -776,14 +804,15 @@ All navigation methods (`navigate`, `navigateToDefault`, `start`) return `Promis
 **`UNKNOWN_ROUTE` export:** Available as standalone `import { UNKNOWN_ROUTE } from "@real-router/core"` and via `constants.UNKNOWN_ROUTE`.
 
 Key types:
+
 - **`GuardFn`**: `(toState, fromState, signal?) => boolean | Promise<boolean>` — guard type (boolean only, receives AbortSignal)
 - **Removed types**: `ActivationFn`, `DoneFn`, `CancelFn`, `StrictDoneFn`, `MiddlewareFn`
 - **Removed functions**: `safeCallback`, `parseNavigateArgs`, `parseNavigateToDefaultArgs`, `getStartRouterArguments`
 - **Removed constants**: `CACHED_NO_START_PATH_ERROR`
 
-Cancellation: Pass `{ signal }` via `NavigationOptions` for external `AbortController` cancellation. `router.stop()`, `router.dispose()`, and concurrent navigation cancel the in-flight navigation automatically. **The FSM is the single owner of cancellation.** Every source routes through FSM `CANCEL` (`stop`/`dispose` → `sendCancelIfPossible`; supersede / external `opts.signal` → `cancelNavigation`), and the `CANCEL` action (`handleCancel`) aborts the in-flight controller via the injected `abortController` effect — so the invariant **"FSM `CANCEL` ⟹ controller aborted (pipeline woken) + `TRANSITION_CANCEL` emitted"** holds atomically in one place. No source aborts the controller by hand. Aborting `#currentController` sets `signal.aborted`, which the async pipeline's post-race `isActive()` (`navigationId === myId && !signal.aborted && deps.isActive()`) detects regardless of the resulting FSM state (`READY` for external, `IDLE`/`DISPOSED` for stop/dispose, the superseding nav's `TRANSITION_STARTED` for supersede). The external `opts.signal` reason is threaded through `cancelNavigation(reason)` → the controller's `signal.reason` (#943). Before this unification the external-signal path only aborted the controller and left the FSM stuck in `TRANSITION_STARTED`/`LEAVE_APPROVED` (#1030) — `isTransitioning()` stayed true (route-CRUD silently blocked) and `isLeaveApproved()` was falsely true until the next navigation; the cross-source invariant property test (`tests/property/cancellation.properties.ts`) now locks recovery for every source × suspension point. 
-Guards receive `signal` as optional 3rd parameter for cooperative cancellation (e.g., `fetch(url, { signal })`). 
-**Non-cooperative guards are also bounded (#1018):** `#finishAsyncNavigation` races the guard completion against the controller's abort — `await Promise.race([guardCompletion, abortRace])`, where `abortRace` resolves on abort and the existing post-race `isActive()` check then rejects with `TRANSITION_CANCELLED`. So an async guard whose Promise **never settles** and ignores `signal` no longer wedges `navigate()` forever: `stop()`/`dispose()`/supersede abort the controller and the navigation rejects instead of hanging. Mirrors the leave-path protection `settleLeavePromises` (#663/#673). Consequence: when an abort precedes a slow guard's own verdict, cancellation wins — the navigation rejects `TRANSITION_CANCELLED` rather than waiting for the guard's `CANNOT_ACTIVATE`. 
+Cancellation: Pass `{ signal }` via `NavigationOptions` for external `AbortController` cancellation. `router.stop()`, `router.dispose()`, and concurrent navigation cancel the in-flight navigation automatically. **The FSM is the single owner of cancellation.** Every source routes through FSM `CANCEL` (`stop`/`dispose` → `sendCancelIfPossible`; supersede / external `opts.signal` → `cancelNavigation`), and the `CANCEL` action (`handleCancel`) aborts the in-flight controller via the injected `abortController` effect — so the invariant **"FSM `CANCEL` ⟹ controller aborted (pipeline woken) + `TRANSITION_CANCEL` emitted"** holds atomically in one place. No source aborts the controller by hand. Aborting `#currentController` sets `signal.aborted`, which the async pipeline's post-race `isActive()` (`navigationId === myId && !signal.aborted && deps.isActive()`) detects regardless of the resulting FSM state (`READY` for external, `IDLE`/`DISPOSED` for stop/dispose, the superseding nav's `TRANSITION_STARTED` for supersede). The external `opts.signal` reason is threaded through `cancelNavigation(reason)` → the controller's `signal.reason` (#943). Before this unification the external-signal path only aborted the controller and left the FSM stuck in `TRANSITION_STARTED`/`LEAVE_APPROVED` (#1030) — `isTransitioning()` stayed true (route-CRUD silently blocked) and `isLeaveApproved()` was falsely true until the next navigation; the cross-source invariant property test (`tests/property/cancellation.properties.ts`) now locks recovery for every source × suspension point.
+Guards receive `signal` as optional 3rd parameter for cooperative cancellation (e.g., `fetch(url, { signal })`).
+**Non-cooperative guards are also bounded (#1018):** `#finishAsyncNavigation` races the guard completion against the controller's abort — `await Promise.race([guardCompletion, abortRace])`, where `abortRace` resolves on abort and the existing post-race `isActive()` check then rejects with `TRANSITION_CANCELLED`. So an async guard whose Promise **never settles** and ignores `signal` no longer wedges `navigate()` forever: `stop()`/`dispose()`/supersede abort the controller and the navigation rejects instead of hanging. Mirrors the leave-path protection `settleLeavePromises` (#663/#673). Consequence: when an abort precedes a slow guard's own verdict, cancellation wins — the navigation rejects `TRANSITION_CANCELLED` rather than waiting for the guard's `CANNOT_ACTIVATE`.
 `AbortError` thrown in guards is auto-converted to `TRANSITION_CANCELLED`. A guard may also throw `RouterError(TRANSITION_CANCELLED)` directly to signal a quiet cancel — it is **preserved** (not re-coded to `CANNOT_ACTIVATE`/`CANNOT_DEACTIVATE`), so the navigation rejects with `TRANSITION_CANCELLED` and `onTransitionError` does **not** fire (#933). Any other thrown `RouterError` is still re-coded to the guard's `CANNOT_ACTIVATE`/`CANNOT_DEACTIVATE`.
 
 ## See Also

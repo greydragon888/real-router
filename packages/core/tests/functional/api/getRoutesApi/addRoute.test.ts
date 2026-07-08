@@ -1396,7 +1396,9 @@ describe("core/routes/addRoute", () => {
         },
       ]);
 
-      // Start router - this flushes pendingCanDeactivate
+      // Guards from constructor routes were already flushed at construction
+      // (flushPendingGuards, the constructor's final step — #1331); start()
+      // just activates the initial route.
       await testRouter.start("/");
 
       // Navigate to document

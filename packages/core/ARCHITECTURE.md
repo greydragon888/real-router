@@ -145,17 +145,18 @@ Namespaces are constructed independently, then wired via **dependency-bundle inj
 // wireNamespaces.ts
 function wireNamespaces(ns: NamespaceBag) {
   const compileFactory = createCompileFactory(ns); // shared by guards + plugins
+  const getValidator = () => getInternals(ns.router).validator; // shared, never throws (#1331)
   wireLimits(ns); // dependenciesStore + eventBus get limits
-  wireRouteLifecycle(ns, compileFactory); // guard registry gets compile + getValidator
+  wireRouteLifecycle(ns, compileFactory, getValidator); // guard registry
   wireRoutes(ns); // routes get guard registration + state accessors
-  wirePlugins(ns, compileFactory); // plugins get addEventListener + canNavigate
+  wirePlugins(ns, compileFactory, getValidator); // plugins get addEventListener + canNavigate
   wireNavigation(ns); // navigation gets state, routes, eventBus, ...
   wireRouterLifecycle(ns); // start/stop get navigate, matchPath, ...
   wireState(ns); // state gets defaultParams, buildPath, getUrlParams
 }
 ```
 
-**Call order is arbitrary (#1331).** Each `wire*` function only stores deps-closures on its namespace — none runs user code or eagerly reads another namespace's deps, so there is no ordering constraint between them. The initial-route guard factories that once forced "RouteLifecycle before Routes" are now flushed separately, from the constructor's `flushPendingGuards()` call after all wiring completes. (Before #1334 this was a `RouterWiringBuilder` class + `wireRouter` director; a builder that built nothing for one call-site collapsed into these functions.)
+**Call order is arbitrary (#1331).** No `wire*` function runs user code or eagerly reads another namespace's deps, so there is no ordering constraint between them. (`wireLimits` is the one eager _write_ — it hands the frozen limits object to dependenciesStore/eventBus; the rest only store deps-closures.) The initial-route guard factories that once forced "RouteLifecycle before Routes" are now flushed separately, from the constructor's `flushPendingGuards()` call after all wiring completes. (Before #1334 this was a `RouterWiringBuilder` class + `wireRouter` director; a builder that built nothing for one call-site collapsed into these functions.)
 
 ## FSM → Event Bridge
 
@@ -427,21 +428,21 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Performance Characteristics
 
-| Optimization                            | Purpose                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------- |
-| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths                           |
-| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                    |
-| validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production) |
-| `static #onSuppressed{Navigate,Start}Error` | One allocation per class, not per `navigate()`/`start()` call        |
-| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects                         |
-| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements                                |
-| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                                     |
-| `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors                  |
-| Lazy event listeners                    | No allocation until first subscription                                  |
-| Cached error rejections                 | Pre-allocated `Promise.reject()` for common errors                      |
-| Async leave: no-abort on sync path      | AbortController.abort() skipped when all leave listeners are sync       |
-| Async leave: deferred NavigationContext | `{nav}` object created only in async branch, not on every navigate      |
-| Async leave: `isCurrentNav` scoped      | Closure moved to guards block — not allocated on no-guards path         |
+| Optimization                                | Purpose                                                                 |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| `nameToIDs()` fast paths (0-4 segments)     | Avoids `split()` for most common route depths                           |
+| Single-entry transition path cache          | N-1 redundant computations eliminated per navigation                    |
+| validation-plugin opt-in                    | DX validation via `@real-router/validation-plugin` (skip in production) |
+| `static #onSuppressed{Navigate,Start}Error` | One allocation per class, not per `navigate()`/`start()` call           |
+| Deep freeze with WeakSet cache              | Avoids re-freezing already frozen state objects                         |
+| `Array.includes()` for segment cleanup      | Faster than `new Set()` for 1-5 elements                                |
+| FSM `canSend()` — O(1)                      | Cached `#currentTransitions` lookup                                     |
+| `createInterceptable()` fast path           | Empty-array check skips iteration when no interceptors                  |
+| Lazy event listeners                        | No allocation until first subscription                                  |
+| Cached error rejections                     | Pre-allocated `Promise.reject()` for common errors                      |
+| Async leave: no-abort on sync path          | AbortController.abort() skipped when all leave listeners are sync       |
+| Async leave: deferred NavigationContext     | `{nav}` object created only in async branch, not on every navigate      |
+| Async leave: `isCurrentNav` scoped          | Closure moved to guards block — not allocated on no-guards path         |
 
 ## Stress Test Coverage
 
