@@ -53,12 +53,6 @@ export const routerEvents = {
 export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
 
 /**
- * Typed payloads for router FSM events.
- *
- * Events without entries have no payload.
- */
-
-/**
  * Per-event payloads for the router FSM (#1169 commit-gate). The three hot
  * navigation transitions carry their transition states so the FSM action
  * dispatched by `send()` emits the matching transition event — i.e. events are

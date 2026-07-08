@@ -247,7 +247,12 @@ export class NavigationNamespace {
     // while a start-interceptor is parked (FSM already DISPOSED) would let the
     // resuming pipeline commit an UNKNOWN_ROUTE state on the disposed router and
     // `start()` resolve. Symmetric with `navigateToState`'s `canNavigate()` gate
-    // (the matched-route branch is already protected).
+    // (the matched-route branch is already protected). `!isActive()` also covers
+    // a merely-stopped (IDLE) router: the only reachable path to that is a direct
+    // `router.navigateToNotFound()` on a stopped instance (internal callers run
+    // during STARTING, which is active), so the ROUTER_DISPOSED code is slightly
+    // broad there — fail-closed is deliberate (committing on a stopped router is
+    // out of contract), and the disposed race is the case that matters.
     if (!this.#deps.isActive()) {
       throw new RouterError(errorCodes.ROUTER_DISPOSED);
     }
@@ -335,18 +340,19 @@ export class NavigationNamespace {
       // Stryker disable next-line UpdateOperator: equivalent — `#navigationId` is only ever compared by identity (`!== myId`) to detect supersession; uniqueness per navigation is all that matters, so `--` (decreasing ids) is indistinguishable from `++`.
       const myId = ++this.#navigationId;
 
-      // #1169 commit-gate — liveness snapshot captured BEFORE the START/leave
+      // #1169 commit-gate — liveness snapshot captured BEFORE the pre-commit
       // listener windows. A listener's `stop()`/`dispose()` runs `clearAll()`,
       // which empties the listener lists, so the marker must be read now, not at
       // the commit site (that self-destruct was the QB/QE hole, RFC §5-bis).
       // `suspendable` is true only when a synchronous supersede is reachable — an
-      // external `opts.signal`, `subscribeLeave` listeners, or a TRANSITION_START
-      // listener; the pure synchronous navigate (none of these) is uncancellable
-      // and skips the gate, keeping the #307 hot path perf-neutral.
+      // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit
+      // plugin listener (`onTransitionStart` / `onTransitionLeaveApprove`); the
+      // pure synchronous navigate (none of these) is uncancellable and skips the
+      // gate, keeping the #307 hot path perf-neutral.
       const suspendable =
         opts.signal !== undefined ||
         deps.hasLeaveListeners() ||
-        deps.hasStartListeners();
+        deps.hasPreCommitListeners();
 
       deps.startTransition(toState, fromState);
       transitionStarted = true;

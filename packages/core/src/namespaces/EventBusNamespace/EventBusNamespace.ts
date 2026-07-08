@@ -565,13 +565,19 @@ export class EventBusNamespace {
   }
 
   /**
-   * True when a `TRANSITION_START` listener (plugin `onTransitionStart` or a
-   * raw `addEventListener`) is registered — the third listener window where a
-   * synchronous `stop()`/`dispose()` can supersede an in-flight navigation
-   * (#1169). Read into the pre-`startTransition` liveness snapshot.
+   * True when a plugin listener runs in a PRE-COMMIT transition window where a
+   * synchronous `stop()`/`dispose()` can supersede the in-flight navigation
+   * before it commits — i.e. `onTransitionStart` (TRANSITION_START) or
+   * `onTransitionLeaveApprove` (TRANSITION_LEAVE_APPROVE). (`subscribeLeave` is
+   * tracked separately via `hasLeaveListeners`; `onTransitionSuccess` fires
+   * post-commit and cannot cancel.) Read into the pre-`startTransition` liveness
+   * snapshot so the commit-gate (#1169) fires for these windows too.
    */
-  hasStartListeners(): boolean {
-    return this.#emitter.listenerCount(events.TRANSITION_START) > 0;
+  hasPreCommitListeners(): boolean {
+    return (
+      this.#emitter.listenerCount(events.TRANSITION_START) > 0 ||
+      this.#emitter.listenerCount(events.TRANSITION_LEAVE_APPROVE) > 0
+    );
   }
 
   awaitLeaveListeners(

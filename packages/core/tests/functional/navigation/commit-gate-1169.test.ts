@@ -117,6 +117,29 @@ describe("commit-gate #1169 — stop/dispose/abort from a transition listener", 
     expect(router.isActive()).toBe(false);
   });
 
+  it("QG: stop() from a plugin onTransitionLeaveApprove cancels (pre-commit window)", async () => {
+    const router = createTestRouter();
+
+    await router.start("/home");
+
+    // onTransitionLeaveApprove is a pre-commit window too — the suspendable
+    // snapshot must cover it (not just onTransitionStart / subscribeLeave),
+    // else the cancel misclassifies (NOT_STARTED instead of CANCELLED).
+    router.usePlugin(() => ({
+      onTransitionLeaveApprove: () => {
+        router.stop();
+      },
+    }));
+
+    const code = await router.navigate("items", { id: "1" }).then(
+      () => undefined,
+      (error: unknown) => codeOf(error),
+    );
+
+    expect(code).toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(router.isActive()).toBe(false);
+  });
+
   it("emits no TRANSITION_SUCCESS after TRANSITION_CANCEL (clean event stream)", async () => {
     const router = createTestRouter();
 
@@ -164,14 +187,12 @@ describe("#1197 — external abort during async subscribeLeave canonicalizes", (
     await new Promise((r) => setTimeout(r, 5));
     controller.abort(new Error("user-cancelled"));
 
-    const err = await nav.then(
+    const code = await nav.then(
       () => undefined,
-      (error: unknown) => error,
+      (error: unknown) => codeOf(error),
     );
 
-    expect((err as { code?: string })?.code).toBe(
-      errorCodes.TRANSITION_CANCELLED,
-    );
+    expect(code).toBe(errorCodes.TRANSITION_CANCELLED);
     // No spurious TRANSITION_ERROR after the cancel (guard-path parity).
     expect(onError).not.toHaveBeenCalled();
   });
