@@ -526,24 +526,18 @@ export class EventBusNamespace {
    *
    * @remarks
    *
-   * **Duplicate-registration semantics — independent (with internal quirk).**
-   * Each call pushes `listener` onto the internal array; `router.subscribeLeave(fn)`
-   * twice produces two array entries. `fn` fires **once** per leave when
-   * iteration snapshots the array (a snapshot is taken on entry to
-   * `awaitLeaveListeners`), but the function reference is invoked once per
-   * array slot — so in practice the wrapper fires twice through the same
-   * closure (no observable difference for stateless `fn`).
-   *
-   * The returned `Unsubscribe` removes the **first** array entry matching the
-   * function reference (`indexOf` semantic), not the most recently added one.
-   * Net effect of N subscribes + M unsubscribes is correct (N - M entries
-   * remain), but the specific physical entry that survives is reverse of the
-   * unsubscribe-call order. Irrelevant in practice — the function reference
-   * is the same; observable behaviour is identical regardless of which
-   * physical entry is removed.
+   * **Duplicate-registration semantics — independent.** Each call pushes
+   * `listener` onto the internal array; `router.subscribeLeave(fn)` twice
+   * produces two entries and `fn` fires twice per leave. Each returned
+   * `Unsubscribe` is **idempotent** (a `removed` flag, #1349) and removes
+   * exactly ONE entry — the first still matching the reference (`indexOf`
+   * semantic). So a repeated call of one unsubscribe is a true no-op and does
+   * **not** touch the other registration; N subscribes + M *distinct*
+   * unsubscribes leave N − M entries. Which physical entry survives is
+   * irrelevant — the reference is the same.
    *
    * Contract differs from {@link addEventListener} (throws on duplicate).
-   * For idempotent registration, gate at the call site.
+   * For idempotent *registration* (one active subscription), gate at the call site.
    */
   subscribeLeave(listener: LeaveFn): Unsubscribe {
     // Same disposed-state enforcement as subscribe() (#946): a pre-bound
@@ -555,7 +549,23 @@ export class EventBusNamespace {
 
     this.#leaveListeners.push(listener);
 
+    // Idempotency flag (#1349), mirroring extendRouter / addInterceptor (#1198).
+    // Without it, a double call would `indexOf(listener)` again and splice a
+    // DUPLICATE registration of the same fn — silently deactivating another
+    // subscriber whose own unsubscribe was never called. The `Unsubscribe`
+    // contract names subscribeLeave as idempotent. (Unlike addInterceptor, the
+    // `idx !== -1` guard stays: `dispose()` empties `#leaveListeners` via
+    // `clearAll`, so an unsubscribe called after dispose reaches this with
+    // idx === -1.)
+    let removed = false;
+
     return () => {
+      if (removed) {
+        return;
+      }
+
+      removed = true;
+
       const idx = this.#leaveListeners.indexOf(listener);
 
       if (idx !== -1) {
