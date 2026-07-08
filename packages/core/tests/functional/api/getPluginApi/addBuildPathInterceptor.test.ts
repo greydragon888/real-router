@@ -105,6 +105,31 @@ describe("addInterceptor('buildPath')", () => {
 
       expect(path).toBe("/users/view/original");
     });
+
+    it("double unsubscribe does NOT remove a duplicate registration of the same fn (#1198)", () => {
+      // The same fn registered twice (e.g. a shared module-level interceptor
+      // helper used by two plugin instances). The `Unsubscribe` contract is
+      // idempotent — calling the FIRST unsubscribe twice must not touch the
+      // SECOND registration, whose own unsubscribe was never called.
+      let hits = 0;
+      const shared = (next: any, route: string, params: any) => {
+        hits++;
+
+        return next(route, params);
+      };
+
+      const unsub1 = api.addInterceptor("buildPath", shared);
+
+      api.addInterceptor("buildPath", shared); // 2nd registration — unsubscribe never called
+
+      unsub1();
+      unsub1(); // documented as safe — must be a true no-op after the first call
+
+      router.buildPath("home");
+
+      // The surviving 2nd registration must still fire.
+      expect(hits).toBe(1);
+    });
   });
 
   describe("empty pipeline", () => {
