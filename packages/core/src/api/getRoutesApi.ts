@@ -25,6 +25,7 @@ import {
   commitTreeChanges,
   resetStore,
 } from "../namespaces/RoutesNamespace/routesStore";
+import { getTransitionPath } from "../transitionPath";
 
 import type { RoutesApi } from "./types";
 import type { RouterInternals } from "../internals";
@@ -53,7 +54,10 @@ import type { RouteDefinition, RouteTree } from "route-tree";
  * is a replace-type success — matching `navigateToNotFound`'s opts for the
  * dropped-route branch.
  */
-const REVALIDATE_OPTS: NavigationOptions = Object.freeze({ replace: true });
+const REVALIDATE_OPTS: NavigationOptions = Object.freeze({
+  replace: true,
+  revalidate: true,
+});
 
 /**
  * Clears all config entries and lifecycle handlers for a removed route
@@ -417,6 +421,24 @@ function addRoutes<
 }
 
 /**
+ * Commits a revalidated state after `replace()` and emits `TRANSITION_SUCCESS`
+ * so `router.subscribe` / adapters re-render (#950). The emit carries
+ * `REVALIDATE_OPTS` — the single distinguishable marker (`revalidate: true`) a
+ * plugin's `onTransitionSuccess` can read to special-case a revalidation vs a
+ * real navigation (#1201).
+ */
+function commitRevalidated<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  ctx: RouterInternals<Dependencies>,
+  nextState: State,
+  fromState: State,
+): void {
+  ctx.setState(nextState);
+  ctx.emitTransitionSuccess(nextState, fromState, REVALIDATE_OPTS);
+}
+
+/**
  * Atomically replaces all routes with a new set (HMR / code-splitting).
  * Prepare-then-commit (issue #698): the new set is fully built into locals
  * first — a circular/async forwardTo or invalid path throws here, leaving the
@@ -478,15 +500,53 @@ function replaceRoutes<
     const revalidated = ctx.matchPath(currentState.path, ctx.getOptions());
 
     if (revalidated) {
-      // Path still matches — commit the revalidated state (preserving the prior
-      // transition meta) and emit so subscribers see it.
-      const nextState: State = {
-        ...revalidated,
-        transition: currentState.transition,
-      };
+      if (revalidated.name === currentState.name) {
+        // Survivor — the URL still maps to the route the user was already on.
+        // Keep it WITHOUT re-running guards: the user legitimately reached this
+        // route via a real navigation, and `replace()` is not a navigation they
+        // performed, so re-checking guards here would evict them on a stateful
+        // or async guard (parity with `update()`, which never revalidates the
+        // active state). Preserve the prior transition meta and emit so
+        // subscribers see the revalidated state (#1201).
+        const nextState: State = {
+          ...revalidated,
+          transition: currentState.transition,
+        };
 
-      ctx.setState(nextState);
-      ctx.emitTransitionSuccess(nextState, currentState, REVALIDATE_OPTS);
+        commitRevalidated(ctx, nextState, currentState);
+      } else {
+        // Route-identity change — the URL is now owned by a DIFFERENT route (an
+        // ownership reshuffle, or a newly-added `forwardTo` that teleports the
+        // state). That is effectively a navigation the user never performed, so
+        // consult the new route's guards exactly as `navigate` would (#1201).
+        // Commit on pass; on a block — or an async guard that cannot be
+        // evaluated synchronously (mirrors `canNavigateTo`) — route to
+        // not-found rather than silently activating a guarded route.
+        const { toDeactivate, toActivate } = getTransitionPath(
+          revalidated,
+          currentState,
+        );
+
+        const allowed =
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+          store.lifecycleNamespace!.canNavigateTo(
+            toDeactivate,
+            toActivate,
+            revalidated,
+            currentState,
+          );
+
+        if (allowed) {
+          const nextState: State = {
+            ...revalidated,
+            transition: currentState.transition,
+          };
+
+          commitRevalidated(ctx, nextState, currentState);
+        } else {
+          ctx.navigateToNotFound(currentState.path);
+        }
+      }
     } else {
       // The active route no longer exists in the new tree — surface it as
       // not-found (commits UNKNOWN_ROUTE + emits TRANSITION_SUCCESS) so the

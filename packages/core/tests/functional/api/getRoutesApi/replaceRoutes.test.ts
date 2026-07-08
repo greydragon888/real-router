@@ -15,7 +15,7 @@ import {
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { NavigationOptions, Router } from "@real-router/core";
 import type { LifecycleApi, RoutesApi } from "@real-router/core/api";
 
 let router: Router;
@@ -989,5 +989,128 @@ describe("core/routes/replaceRoutes", () => {
       expect(getPluginApi(router).matchPath("/home")?.name).toBe("home");
       expect(routesApi.has("x")).toBe(false);
     });
+  });
+});
+
+describe("core/routes/replaceRoutes — revalidation consults guards (#1201)", () => {
+  it("URL-ownership reshuffle to a blocked route → not-found, not silently active", async () => {
+    const r = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "open", path: "/x" },
+      ],
+      { allowNotFound: false },
+    );
+
+    await r.start("/x");
+
+    expect(r.getState()?.name).toBe("open");
+
+    // The new set maps the current URL /x to a DIFFERENT, guarded route.
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "locked", path: "/x", canActivate: () => () => false },
+    ]);
+
+    // Hybrid (#1201): a route-identity change runs the new route's activation
+    // guards; a block routes to not-found instead of silently committing
+    // `locked` with its canActivate skipped.
+    expect(r.getState()?.name).toBe(UNKNOWN_ROUTE);
+
+    r.dispose();
+  });
+
+  it("URL-ownership reshuffle to an allowed route → commits the new route", async () => {
+    const r = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "open", path: "/x" },
+      ],
+      { allowNotFound: false },
+    );
+
+    await r.start("/x");
+
+    // The URL /x is now owned by a different, UNGUARDED route — guards pass, so
+    // the reshuffle is committed (not dropped).
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "allowed", path: "/x" },
+    ]);
+
+    expect(r.getState()?.name).toBe("allowed");
+
+    r.dispose();
+  });
+
+  it("new forwardTo on the active route consults the target's guards (blocked → not-found)", async () => {
+    const r = createRouter(
+      [
+        { name: "cur", path: "/c" },
+        { name: "tgt", path: "/t" },
+      ],
+      { allowNotFound: false },
+    );
+
+    await r.start("/c");
+
+    // Adding forwardTo teleports /c → tgt (identity change); tgt's guard blocks.
+    getRoutesApi(r).replace([
+      { name: "cur", path: "/c", forwardTo: "tgt" },
+      { name: "tgt", path: "/t", canActivate: () => () => false },
+    ]);
+
+    expect(r.getState()?.name).toBe(UNKNOWN_ROUTE);
+
+    r.dispose();
+  });
+
+  it("survivor (same route name) is kept without re-running guards", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    await r.start("/a");
+
+    // Same URL still owned by the same route name, but the new set guards it to
+    // block. The survivor is kept — the user was already legitimately here, so
+    // guards are NOT re-run (they would wrongly evict).
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a", canActivate: () => () => false },
+    ]);
+
+    expect(r.getState()?.name).toBe("a");
+
+    r.dispose();
+  });
+
+  it("revalidation emit carries the distinguishable `revalidate` marker (#1201 hook-dispatch)", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    await r.start("/a");
+
+    let seenOpts: NavigationOptions | undefined;
+
+    r.usePlugin(() => ({
+      onTransitionSuccess: (_toState, _fromState, opts) => {
+        seenOpts = opts;
+      },
+    }));
+
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    // A plugin can special-case a replace()-revalidation vs a real navigation:
+    // both carry `replace: true`, only revalidation carries `revalidate: true`.
+    expect(seenOpts?.revalidate).toBe(true);
+
+    r.dispose();
   });
 });
