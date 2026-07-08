@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.39.1
+
+### Patch Changes
+
+- [#1336](https://github.com/greydragon888/real-router/pull/1336) [`4c348d1`](https://github.com/greydragon888/real-router/commit/4c348d1f752c277d1eef8a581b72ad9428fd96ea) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix stale `RouterWiringBuilder` pointer in the `InterceptableMethodMap` checklist comment ([#1334](https://github.com/greydragon888/real-router/issues/1334))
+
+  The "To add a new interceptable method" doc comment pointed at the deleted `RouterWiringBuilder`; the `createInterceptable()` wrapping lives in the `registerInternals` block of the Router constructor.
+
 ## 0.39.0
 
 ### Minor Changes
