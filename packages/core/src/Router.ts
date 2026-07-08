@@ -546,7 +546,17 @@ export class Router<
     // aborts the in-flight controller (waking the pipeline). No separate abort.
     this.#eventBus.sendCancelIfPossible(this.#state.get());
 
-    if (!this.#eventBus.isReady() && !this.#eventBus.isTransitioning()) {
+    // `isStarting()` is included (#1185): a stop() while `start()` is parked in
+    // an async start-interceptor (FSM STARTING, before `next()`) must cancel the
+    // start, not silently no-op. `sendStop()` takes STARTING → IDLE (FSM table),
+    // and `RouterLifecycleNamespace.start` re-checks `isIdle()` after the
+    // interceptor chain and rejects with TRANSITION_CANCELLED — mirroring the
+    // guard-phase behavior (which already cancels from TRANSITION_STARTED).
+    if (
+      !this.#eventBus.isReady() &&
+      !this.#eventBus.isTransitioning() &&
+      !this.#eventBus.isStarting()
+    ) {
       return this;
     }
 

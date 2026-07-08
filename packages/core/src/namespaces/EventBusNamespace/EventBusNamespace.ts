@@ -420,6 +420,10 @@ export class EventBusNamespace {
     return this.#fsm.getState() === routerStates.STARTING;
   }
 
+  isIdle(): boolean {
+    return this.#fsm.getState() === routerStates.IDLE;
+  }
+
   /**
    * Plugin-author API for subscribing to internal router events.
    *

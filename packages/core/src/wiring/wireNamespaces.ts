@@ -263,6 +263,7 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
     completeStart: () => {
       ns.eventBus.sendStarted();
     },
+    isIdle: () => ns.eventBus.isIdle(),
     emitTransitionError: (toState, fromState, error) => {
       ns.eventBus.sendFail(toState, fromState, error);
     },

@@ -39,7 +39,7 @@ utils/ (SSR/SSG/hydration helpers — separate subpath export)
 
 **RouterFSM states**: `IDLE → STARTING → READY ⇄ TRANSITION_STARTED → LEAVE_APPROVED → READY | DISPOSED`
 
-`DISPOSE` is wired from every non-DISPOSED state so the FSM always settles at `DISPOSED` when `router.dispose()` runs. For healthy flows the facade routes through `IDLE` first (`STOP → IDLE → DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` (e.g. `dispose()` mid-`STARTING` when the start pipeline threw before `STARTED`/`FAIL`). See `routerFSM.ts` transition table.
+`DISPOSE` is wired from every non-DISPOSED state so the FSM always settles at `DISPOSED` when `router.dispose()` runs. For healthy flows the facade routes through `IDLE` first (`STOP → IDLE → DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` (e.g. `dispose()` mid-`STARTING` when the start pipeline threw before `STARTED`/`FAIL`). `STARTING` also accepts `STOP → IDLE` (#1185): a `stop()` while `start()` is parked in an async start-interceptor cancels the start (facade `stop()` sends `STOP`; `RouterLifecycleNamespace.start` re-checks `isIdle()` after the interceptor chain and rejects `TRANSITION_CANCELLED`), so the "`stop()` cancels the transition" contract holds in the interceptor window as it already did in the guard phase. See `routerFSM.ts` transition table.
 
 All router events are consequences of FSM transitions (via `fsm.on(from, event, action)`), not manual calls.
 No boolean flags (`#started`, `#active`, `#navigating` removed).
