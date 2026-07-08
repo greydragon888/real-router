@@ -1,5 +1,25 @@
 # @real-router/core
 
+## 0.74.1
+
+### Patch Changes
+
+- [#1348](https://github.com/greydragon888/real-router/pull/1348) [`a875256`](https://github.com/greydragon888/real-router/commit/a875256d38517817c3eecdb1177819cecfe73041) Thanks [@greydragon888](https://github.com/greydragon888)! - Clear interceptors on `dispose()` so a leaked interceptor no longer runs ([#1199](https://github.com/greydragon888/real-router/issues/1199))
+
+  `dispose()` had dispose safety-nets for `routerExtensions` and `contextClaimRecords` but never cleared `ctx.interceptors` — the third per-plugin registration channel. Since `buildPath` is not method-swapped by `dispose()` and reads the interceptor Map live, an interceptor a plugin failed to remove in `teardown` still ran on the disposed router. `dispose()` now clears the interceptor Map alongside the other two safety-nets.
+
+- [#1348](https://github.com/greydragon888/real-router/pull/1348) [`a875256`](https://github.com/greydragon888/real-router/commit/a875256d38517817c3eecdb1177819cecfe73041) Thanks [@greydragon888](https://github.com/greydragon888)! - Make `subscribeLeave`'s unsubscribe idempotent ([#1349](https://github.com/greydragon888/real-router/issues/1349))
+
+  `subscribeLeave` stored the listener directly in `#leaveListeners` and spliced by `indexOf(listener)` with no `removed` flag — the exact sibling of [#1198](https://github.com/greydragon888/real-router/issues/1198) (`addInterceptor`), in a channel the `Unsubscribe` contract explicitly names as idempotent. With the same `fn` registered twice, calling the first unsubscribe twice removed a second registration, silently deactivating another subscriber's leave handler. A `removed` flag now short-circuits repeat calls (mirroring `addInterceptor` / `extendRouter`). Unlike `subscribe` / `subscribeChanges`, `subscribeLeave` does not wrap the listener in a fresh closure, so it needed the explicit guard. The misleading "irrelevant in practice" note in the JSDoc is corrected.
+
+- [#1348](https://github.com/greydragon888/real-router/pull/1348) [`a875256`](https://github.com/greydragon888/real-router/commit/a875256d38517817c3eecdb1177819cecfe73041) Thanks [@greydragon888](https://github.com/greydragon888)! - Make `addInterceptor`'s unsubscribe idempotent ([#1198](https://github.com/greydragon888/real-router/issues/1198))
+
+  `addInterceptor`'s unsubscribe spliced by `list.indexOf(fn)` with no guard, so calling the first unsubscribe twice — documented as safe by the `Unsubscribe` contract — removed a SECOND registration of the same `fn` (e.g. a shared module-level interceptor helper used by two plugin instances), silently deactivating another plugin's interceptor. A `removed` flag now short-circuits repeat calls, mirroring `extendRouter`.
+
+- [#1348](https://github.com/greydragon888/real-router/pull/1348) [`a875256`](https://github.com/greydragon888/real-router/commit/a875256d38517817c3eecdb1177819cecfe73041) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix a pre-bound `usePlugin` reference registering a zombie plugin after `dispose()` ([#1196](https://github.com/greydragon888/real-router/issues/1196))
+
+  A `usePlugin` reference captured before `dispose()` (`const up = router.usePlugin`) bypassed the post-dispose method swap and reached the real implementation, so the factory ran on the disposed router (real side effects), listeners landed in the cleared emitter, and `teardown` never fired. It now throws `ROUTER_DISPOSED` like every other mutating method — mirroring the [#946](https://github.com/greydragon888/real-router/issues/946) guard for `subscribe` / `subscribeLeave`.
+
 ## 0.74.0
 
 ### Minor Changes
