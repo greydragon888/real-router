@@ -750,6 +750,18 @@ export function getRoutesApi<
 
       ctx.validator?.routes.validateUpdateRoute(name, updates, store);
 
+      // #1205: bare-core existence backstop as a TRUE no-op — NOT a throw
+      // (validation is opt-in). update() of a route that does not exist used to
+      // seed config.defaultParams + compile/register the guard (commitRouteUpdate
+      // below) and emit a lying TREE_CHANGED "update" event for a route get()/
+      // has() cannot see; a future add() of that name then inherited the phantom
+      // config + a blocking guard. Skip the commit and the emit entirely when the
+      // route is absent. (With the validation-plugin, validateUpdateRoute above
+      // already threw a ReferenceError, so this is only reached in bare core.)
+      if (!store.matcher.hasRoute(name)) {
+        return;
+      }
+
       // Field-patch commit core (NO_TREE_REBUILD) — co-located in routesStore.ts
       // beside the add/replace (adoptRouteArtifacts) / remove (commitTreeChanges)
       // / clear (resetStore) cores. Returns the structural fields for the
