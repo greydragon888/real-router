@@ -47,9 +47,12 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 export class RouteLifecycleNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  // Storage split by origin: definition vs external. External wins at compile
-  // time for the same slot; clearDefinitionGuards / removeXGuard semantics are
-  // expressed in terms of these primary Maps.
+  // Storage split by origin: definition vs external. Registration is
+  // LAST-ADD-WINS regardless of origin (`#registerHandler`), so the compiled
+  // slot reflects the most recent add — NOT "external wins". External wins only
+  // where the code recompiles from it explicitly: `clearDefinitionGuards`
+  // (#1192) and `#recompileSlot` after a definition-only clear. Both semantics
+  // are expressed in terms of these primary Maps.
   readonly #definitionActivateFactories = new Map<
     string,
     GuardFnFactory<Dependencies>
@@ -299,20 +302,26 @@ export class RouteLifecycleNamespace<
    * Used by HMR `replace()` to remove definition-sourced guards without
    * touching externally-added guards.
    *
-   * For slots where both definition and external exist, the external factory
-   * stays and the compiled function is unchanged (external already won at
-   * registration time). For definition-only slots, the compiled function is
-   * dropped.
+   * For a slot where BOTH a definition and an external guard exist, the external
+   * factory survives — and the compiled function is RECOMPILED from it (#1192),
+   * not left as-is: registration is last-add-wins, so the compiled slot may
+   * currently be the definition guard being cleared, and leaving it would run a
+   * guard erased from every factory store (a zombie). For a definition-only
+   * slot, the compiled function is dropped.
    */
   clearDefinitionGuards(): void {
     for (const name of this.#definitionActivateFactories.keys()) {
-      if (!this.#externalActivateFactories.has(name)) {
+      if (this.#externalActivateFactories.has(name)) {
+        this.#recompileSlot("activate", name);
+      } else {
         this.#canActivateFunctions.delete(name);
       }
     }
 
     for (const name of this.#definitionDeactivateFactories.keys()) {
-      if (!this.#externalDeactivateFactories.has(name)) {
+      if (this.#externalDeactivateFactories.has(name)) {
+        this.#recompileSlot("deactivate", name);
+      } else {
         this.#canDeactivateFunctions.delete(name);
       }
     }

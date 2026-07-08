@@ -15,7 +15,7 @@ import {
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { NavigationOptions, Router } from "@real-router/core";
 import type { LifecycleApi, RoutesApi } from "@real-router/core/api";
 
 let router: Router;
@@ -989,5 +989,230 @@ describe("core/routes/replaceRoutes", () => {
       expect(getPluginApi(router).matchPath("/home")?.name).toBe("home");
       expect(routesApi.has("x")).toBe(false);
     });
+  });
+});
+
+describe("core/routes/replaceRoutes — revalidation consults guards (#1201)", () => {
+  it("URL-ownership reshuffle to a blocked route → not-found, not silently active", async () => {
+    const r = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "open", path: "/x" },
+      ],
+      { allowNotFound: false },
+    );
+
+    await r.start("/x");
+
+    expect(r.getState()?.name).toBe("open");
+
+    // The new set maps the current URL /x to a DIFFERENT, guarded route.
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "locked", path: "/x", canActivate: () => () => false },
+    ]);
+
+    // Hybrid (#1201): a route-identity change runs the new route's activation
+    // guards; a block routes to not-found instead of silently committing
+    // `locked` with its canActivate skipped.
+    expect(r.getState()?.name).toBe(UNKNOWN_ROUTE);
+
+    r.dispose();
+  });
+
+  it("URL-ownership reshuffle to an allowed route → commits the new route", async () => {
+    const r = createRouter(
+      [
+        { name: "home", path: "/" },
+        { name: "open", path: "/x" },
+      ],
+      { allowNotFound: false },
+    );
+
+    await r.start("/x");
+
+    // The URL /x is now owned by a different, UNGUARDED route — guards pass, so
+    // the reshuffle is committed (not dropped).
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "allowed", path: "/x" },
+    ]);
+
+    expect(r.getState()?.name).toBe("allowed");
+
+    r.dispose();
+  });
+
+  it("new forwardTo on the active route consults the target's guards (blocked → not-found)", async () => {
+    const r = createRouter(
+      [
+        { name: "cur", path: "/c" },
+        { name: "tgt", path: "/t" },
+      ],
+      { allowNotFound: false },
+    );
+
+    await r.start("/c");
+
+    // Adding forwardTo teleports /c → tgt (identity change); tgt's guard blocks.
+    getRoutesApi(r).replace([
+      { name: "cur", path: "/c", forwardTo: "tgt" },
+      { name: "tgt", path: "/t", canActivate: () => () => false },
+    ]);
+
+    expect(r.getState()?.name).toBe(UNKNOWN_ROUTE);
+
+    r.dispose();
+  });
+
+  it("survivor (same route name) is kept without re-running guards", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    await r.start("/a");
+
+    // Same URL still owned by the same route name, but the new set guards it to
+    // block. The survivor is kept — the user was already legitimately here, so
+    // guards are NOT re-run (they would wrongly evict).
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a", canActivate: () => () => false },
+    ]);
+
+    expect(r.getState()?.name).toBe("a");
+
+    r.dispose();
+  });
+
+  it("revalidation emit carries the distinguishable `revalidate` marker (#1201 hook-dispatch)", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    await r.start("/a");
+
+    let seenOpts: NavigationOptions | undefined;
+
+    r.usePlugin(() => ({
+      onTransitionSuccess: (_toState, _fromState, opts) => {
+        seenOpts = opts;
+      },
+    }));
+
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    // A plugin can special-case a replace()-revalidation vs a real navigation:
+    // both carry `replace: true`, only revalidation carries `revalidate: true`.
+    expect(seenOpts?.revalidate).toBe(true);
+
+    r.dispose();
+  });
+});
+
+describe("core/routes/replaceRoutes — surviving route keeps plugin context (#1236)", () => {
+  it("a route that survives replace() keeps its state.context", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    await r.start("/a");
+
+    // A plugin writes per-route data into state.context (the write channel
+    // behind claimContextNamespace / the direct escape hatch).
+    (
+      r.getState() as unknown as { context: Record<string, unknown> }
+    ).context.data = { id: 1 };
+
+    getRoutesApi(r).replace([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    // The route survived (same name + path) — its plugin context must survive
+    // too (#1236), not be wiped by the matchPath-rebuilt empty context.
+    expect(r.getState()?.name).toBe("a");
+    expect(
+      (r.getState() as unknown as { context: Record<string, unknown> }).context
+        .data,
+    ).toStrictEqual({ id: 1 });
+
+    r.dispose();
+  });
+});
+
+describe("core/routes/replaceRoutes — no zombie guard for both-slot names (#1192)", () => {
+  it("replace() recompiles the surviving external guard (def-after-ext order)", async () => {
+    const routes = [
+      { name: "home", path: "/" },
+      { name: "admin", path: "/admin" },
+    ];
+    const r = createRouter(routes);
+
+    await r.start("/");
+
+    // external guard BLOCKS; then a definition guard ALLOWS the same slot —
+    // registration is last-add-wins, so the compiled function is now the
+    // definition (allowing) guard.
+    getLifecycleApi(r).addActivateGuard("admin", () => () => false);
+    getRoutesApi(r).update("admin", { canActivate: () => () => true });
+
+    // replace() strips definition guards. The surviving external guard must win
+    // again — the compiled slot is recompiled from it, not left as the erased
+    // definition guard (#1192 zombie).
+    getRoutesApi(r).replace(routes);
+
+    await expect(r.navigate("admin")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+    expect(r.getState()?.name).toBe("home");
+    expect(r.canNavigateTo("admin")).toBe(false);
+
+    r.dispose();
+  });
+});
+
+describe("core/routes/replaceRoutes — failed replace() preserves old definition guards (#1193)", () => {
+  it("a compile-throwing factory in the new batch aborts before erasing old definition guards", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "admin", path: "/admin", canActivate: () => () => false }, // config guard BLOCKS
+    ]);
+
+    await r.start("/");
+    await r.navigate("admin").catch(() => {}); // rejects CANNOT_ACTIVATE
+
+    // The new batch carries a guard factory that throws on compile — replace()
+    // must abort with BOTH the tree AND the old definition guards intact (#1193,
+    // mirror of #1046).
+    expect(() => {
+      getRoutesApi(r).replace([
+        { name: "home", path: "/" },
+        { name: "admin", path: "/admin" },
+        {
+          name: "x",
+          path: "/x",
+          canActivate: () => {
+            throw new Error("boom");
+          },
+        },
+      ]);
+    }).toThrow(/boom/);
+
+    // The tree is unchanged (old routes still resolve) AND admin's config guard
+    // still blocks — it was NOT silently erased by a pre-compile clear.
+    expect(getRoutesApi(r).has("admin")).toBe(true);
+    await expect(r.navigate("admin")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+    expect(r.getState()?.name).toBe("home");
+
+    r.dispose();
   });
 });

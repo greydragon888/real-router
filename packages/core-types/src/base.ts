@@ -146,6 +146,22 @@ export interface NavigationOptions {
   replace?: boolean | undefined;
 
   /**
+   * Marks a `replace()` state-revalidation emit — a core-set signal, NOT a
+   * user-facing navigation option.
+   *
+   * @description
+   * `getRoutesApi(router).replace(...)` revalidates the active state against the
+   * new tree and emits `TRANSITION_SUCCESS` (#950). Core sets `revalidate: true`
+   * on that emit so a plugin's `onTransitionSuccess(toState, fromState, opts)`
+   * can distinguish a revalidation from a real navigation — both otherwise carry
+   * `replace: true` and are indistinguishable (#1201). Passing it to
+   * `router.navigate(...)` has no effect on the navigation itself.
+   *
+   * @default undefined
+   */
+  revalidate?: boolean | undefined;
+
+  /**
    * Force reload of the current route even if states are equal.
    *
    * @description

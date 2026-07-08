@@ -657,6 +657,42 @@ function compilePendingGuards<Dependencies extends DefaultDependencies>(
   return compiled;
 }
 
+/** Pre-compiled guard triples for {@link adoptRouteArtifacts} install. */
+export interface CompiledArtifactGuards<
+  Dependencies extends DefaultDependencies,
+> {
+  activate: [string, GuardFnFactory<Dependencies>, GuardFn][];
+  deactivate: [string, GuardFnFactory<Dependencies>, GuardFn][];
+}
+
+/**
+ * Compiles an artifacts' pending guard factories up front (#956), THROWING on
+ * the first factory that throws on compile or returns a non-function.
+ *
+ * `replaceRoutes` calls this in its PREPARE phase — **before**
+ * `clearDefinitionGuards()` — and hands the result to `adoptRouteArtifacts`, so
+ * a compile-throw aborts with BOTH the tree AND the old definition guards intact
+ * (#1193, mirroring #1046's handler-limit hoist). `add` has no clear step, so
+ * `adoptRouteArtifacts` compiles inline for it.
+ */
+export function compileArtifactGuards<Dependencies extends DefaultDependencies>(
+  artifacts: RouteArtifacts<Dependencies>,
+  deps: RoutesDependencies<Dependencies>,
+): CompiledArtifactGuards<Dependencies> {
+  return {
+    activate: compilePendingGuards(
+      artifacts.pendingCanActivate,
+      deps.compileGuard,
+      "canActivate",
+    ),
+    deactivate: compilePendingGuards(
+      artifacts.pendingCanDeactivate,
+      deps.compileGuard,
+      "canDeactivate",
+    ),
+  };
+}
+
 /**
  * Commits prepared artifacts into the store in place. Every pending guard
  * factory is compiled BEFORE the tree/config swap (#956): a factory that throws
@@ -670,21 +706,17 @@ function compilePendingGuards<Dependencies extends DefaultDependencies>(
 export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   artifacts: RouteArtifacts<Dependencies>,
+  precompiled?: CompiledArtifactGuards<Dependencies>,
 ): void {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- depsStore is set once the router is wired; add/replace only run on a wired router (constructor-time registration uses createRoutesStore)
   const deps = store.depsStore!;
 
   // Pre-swap compile: surfaces a malformed guard factory before any mutation.
-  const compiledActivate = compilePendingGuards(
-    artifacts.pendingCanActivate,
-    deps.compileGuard,
-    "canActivate",
-  );
-  const compiledDeactivate = compilePendingGuards(
-    artifacts.pendingCanDeactivate,
-    deps.compileGuard,
-    "canDeactivate",
-  );
+  // `replace()` pre-compiles in its PREPARE phase (BEFORE clearDefinitionGuards)
+  // and passes the result here, so a compile-throw never erases the old
+  // definition guards (#1193); `add` has no clear step and compiles inline.
+  const { activate: compiledActivate, deactivate: compiledDeactivate } =
+    precompiled ?? compileArtifactGuards(artifacts, deps);
 
   // Atomic swap — pure assignments, cannot throw.
   store.definitions.length = 0;
