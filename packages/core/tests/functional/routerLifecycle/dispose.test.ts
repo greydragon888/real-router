@@ -460,6 +460,34 @@ describe("dispose", () => {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
     });
+
+    it("a pre-bound usePlugin() reference throws instead of registering a zombie (#1196)", async () => {
+      await router.start("/home");
+      const boundUsePlugin = router.usePlugin.bind(router);
+
+      router.dispose();
+
+      let factoryRan = false;
+
+      // Before the fix this silently registered a zombie plugin: the factory ran
+      // on the disposed router (real side effects), listeners landed in the
+      // cleared emitter, and teardown never fired.
+      expect(() =>
+        boundUsePlugin(() => {
+          factoryRan = true;
+
+          return { teardown() {} };
+        }),
+      ).toThrow();
+
+      expect(factoryRan).toBe(false);
+
+      try {
+        boundUsePlugin(() => ({}));
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
+      }
+    });
   });
 
   describe("guardAgainstDisposed — mutating methods throw after dispose()", () => {

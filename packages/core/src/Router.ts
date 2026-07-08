@@ -681,6 +681,16 @@ export class Router<
   usePlugin(
     ...plugins: (PluginFactory<Dependencies> | false | null | undefined)[]
   ): Unsubscribe {
+    // Post-dispose guard, mirroring #946 for subscribe/subscribeLeave. A
+    // reference captured before dispose() (`const up = router.usePlugin`)
+    // bypasses the #markDisposed method swap, so the swap alone is not enough:
+    // without this, the factory would run on a disposed router (real side
+    // effects), listeners would land in the cleared emitter, and teardown would
+    // never fire — a silent zombie plugin (#1196).
+    if (this.#eventBus.isDisposed()) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
     const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
 
     if (filtered.length === 0) {
