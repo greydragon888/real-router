@@ -599,6 +599,13 @@ export class Router<
     // Safety net: release context namespace claims plugins failed to release in teardown
     ctx.contextClaimRecords.clear();
 
+    // Safety net: drop interceptors plugins failed to remove in teardown (#1199).
+    // The third per-plugin registration channel — symmetric with routerExtensions
+    // / contextClaimRecords above. `buildPath` is not method-swapped by dispose
+    // and reads this Map live, so a leaked interceptor would otherwise still run
+    // on the disposed router.
+    ctx.interceptors.clear();
+
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
     this.#state.reset();
@@ -681,6 +688,16 @@ export class Router<
   usePlugin(
     ...plugins: (PluginFactory<Dependencies> | false | null | undefined)[]
   ): Unsubscribe {
+    // Post-dispose guard, mirroring #946 for subscribe/subscribeLeave. A
+    // reference captured before dispose() (`const up = router.usePlugin`)
+    // bypasses the #markDisposed method swap, so the swap alone is not enough:
+    // without this, the factory would run on a disposed router (real side
+    // effects), listeners would land in the cleared emitter, and teardown would
+    // never fire — a silent zombie plugin (#1196).
+    if (this.#eventBus.isDisposed()) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
     const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
 
     if (filtered.length === 0) {

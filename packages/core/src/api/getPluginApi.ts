@@ -137,12 +137,21 @@ export function getPluginApi<
 
       list.push(fn);
 
-      return () => {
-        const index = list.indexOf(fn);
+      // Idempotency flag (#1198). Without it, a double call would `indexOf(fn)`
+      // again and splice a DUPLICATE registration of the same fn — silently
+      // deactivating another plugin's interceptor whose own unsubscribe was never
+      // called. The `Unsubscribe` contract is documented idempotent. The flag
+      // guarantees exactly one splice of a still-present `fn`, so no `index !== -1`
+      // guard is needed (it would be dead — the second call returns above).
+      let removed = false;
 
-        if (index !== -1) {
-          list.splice(index, 1);
+      return () => {
+        if (removed) {
+          return;
         }
+
+        removed = true;
+        list.splice(list.indexOf(fn), 1);
       };
     },
     getRouteConfig: (name) => {

@@ -262,6 +262,32 @@ describe("dispose", () => {
       expect(teardownSpy).toHaveBeenCalledTimes(1);
     });
 
+    it("dispose() clears ctx.interceptors so a leaked interceptor no longer runs (#1199)", () => {
+      const api = getPluginApi(router);
+      let ran = false;
+
+      // A short-circuit interceptor (returns without calling next), never
+      // unsubscribed — the third per-plugin channel, previously without a
+      // dispose safety-net (unlike routerExtensions / contextClaimRecords).
+      api.addInterceptor("buildPath", () => {
+        ran = true;
+
+        return "/zombie-path";
+      });
+
+      router.dispose();
+
+      // buildPath is NOT method-swapped by dispose and reads the interceptor Map;
+      // after the fix the Map is cleared, so the leaked interceptor must not run.
+      try {
+        router.buildPath("home");
+      } catch {
+        // The real buildPath on the cleared tree may throw — irrelevant here.
+      }
+
+      expect(ran).toBe(false);
+    });
+
     it("dispose() calls teardown for multiple plugins", async () => {
       const teardown1 = vi.fn();
       const teardown2 = vi.fn();
@@ -456,6 +482,34 @@ describe("dispose", () => {
 
       try {
         boundSubscribeLeave(() => undefined);
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
+      }
+    });
+
+    it("a pre-bound usePlugin() reference throws instead of registering a zombie (#1196)", async () => {
+      await router.start("/home");
+      const boundUsePlugin = router.usePlugin.bind(router);
+
+      router.dispose();
+
+      let factoryRan = false;
+
+      // Before the fix this silently registered a zombie plugin: the factory ran
+      // on the disposed router (real side effects), listeners landed in the
+      // cleared emitter, and teardown never fired.
+      expect(() =>
+        boundUsePlugin(() => {
+          factoryRan = true;
+
+          return {};
+        }),
+      ).toThrow();
+
+      expect(factoryRan).toBe(false);
+
+      try {
+        boundUsePlugin(() => ({}));
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
