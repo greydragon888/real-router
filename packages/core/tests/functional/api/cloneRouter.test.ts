@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import {
@@ -193,6 +193,34 @@ describe("cloneRouter()", () => {
 
     expect(clone.getState()?.name).toBe("away");
 
+    clone.dispose();
+  });
+
+  it("preserves a definition canDeactivate on a clone created AFTER the source left the route (#1171)", async () => {
+    const guard = vi.fn(() => true); // permits, so the source leave completes
+    const router = createRouter([
+      { name: "home", path: "/home", canDeactivate: () => guard },
+      { name: "away", path: "/away" },
+    ]);
+
+    await router.start("/home");
+
+    // Source PERMITS the leave before the clone is taken. On the buggy path this
+    // permitted leave auto-erased the config guard from the source Maps, so the
+    // clone (which replays from those Maps) would never receive it — breaking
+    // cloneRouter invariant #6 (guards preserved in the clone).
+    await router.navigate("away");
+
+    const clone = cloneRouter(router);
+
+    guard.mockClear(); // isolate the clone's own invocation from the source's
+
+    await clone.start("/home");
+    await clone.navigate("away"); // clone leaves home — its config guard must fire
+
+    expect(guard).toHaveBeenCalledTimes(1);
+
+    router.dispose();
     clone.dispose();
   });
 });

@@ -370,7 +370,7 @@ Multiple interceptors per method execute in **LIFO** order (last-registered wrap
 
 ### Segment Cleanup After Deactivation
 
-After successful navigation, deactivated segments with `canDeactivate` guards are automatically cleaned up. Only clears guards for segments that are fully deactivated (not re-activated). Uses `Array.includes()` instead of `Set` — faster for 1-5 elements.
+After successful navigation, a deactivated segment's **external** (component-managed) `canDeactivate` guard is automatically cleaned up — the router5 mount/unmount contract, where a guard added via `getLifecycleApi().addDeactivateGuard()` is dropped once its component leaves. Only segments that are fully deactivated (not re-activated) are cleared, and only the **external** slot: a **definition** guard from route config survives the leave, so re-entry stays guarded — symmetric with definition `canActivate`, which lives as long as the route is in the tree (#1171). Uses `Array.includes()` instead of `Set` — faster for 1-5 elements.
 
 ## Dispose Lifecycle
 

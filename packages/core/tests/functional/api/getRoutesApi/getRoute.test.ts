@@ -173,6 +173,24 @@ describe("core/routes/routeTree/getRoute", () => {
       expect(route?.canActivate).toBe(guardFactory);
     });
 
+    it("retains canDeactivate after the route has been left (#1171)", async () => {
+      const guardFactory: GuardFnFactory = () => () => true;
+
+      routesApi.add({
+        name: "gr-form",
+        path: "/gr-form",
+        canDeactivate: guardFactory,
+      });
+
+      // Enter then leave the route (a permitted leave that would auto-clean it).
+      await router.navigate("gr-form");
+      await router.navigate("home");
+
+      // The route-config guard must survive the leave — like canActivate, it
+      // lives as long as the route is in the tree, not one cycle.
+      expect(routesApi.get("gr-form")?.canDeactivate).toBe(guardFactory);
+    });
+
     it("should return route with all properties", () => {
       const decoder = (params: Params): Params => ({
         ...params,

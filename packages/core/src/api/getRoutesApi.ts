@@ -93,13 +93,14 @@ function clearRouteConfigurations<
 
   for (const name of Object.keys(canActivateFactories)) {
     if (shouldClear(name)) {
-      lifecycleNamespace.clearCanActivate(name);
+      // Route removed from the tree — both origin slots go (route no longer exists).
+      lifecycleNamespace.clearCanActivate(name, "both");
     }
   }
 
   for (const name of Object.keys(canDeactivateFactories)) {
     if (shouldClear(name)) {
-      lifecycleNamespace.clearCanDeactivate(name);
+      lifecycleNamespace.clearCanDeactivate(name, "both");
     }
   }
 }

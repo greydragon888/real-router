@@ -38,7 +38,9 @@ export function getLifecycleApi<
 
       ctx.validator?.routes.validateRouteName(name, "removeActivateGuard");
 
-      lifecycleNamespace.clearCanActivate(name);
+      // Inverse of addActivateGuard (external): clears only the external guard;
+      // a route-config (definition) canActivate survives (#1171).
+      lifecycleNamespace.clearCanActivate(name, "external");
     },
 
     removeDeactivateGuard(name) {
@@ -46,7 +48,9 @@ export function getLifecycleApi<
 
       ctx.validator?.routes.validateRouteName(name, "removeDeactivateGuard");
 
-      lifecycleNamespace.clearCanDeactivate(name);
+      // Inverse of addDeactivateGuard (external): clears only the external guard;
+      // a route-config (definition) canDeactivate survives (#1171).
+      lifecycleNamespace.clearCanDeactivate(name, "external");
     },
   };
 }

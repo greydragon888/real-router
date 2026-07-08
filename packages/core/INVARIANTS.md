@@ -186,6 +186,7 @@ These invariants cover the FSM-driven lifecycle of the router. Each state transi
 | 13  | update canActivate null                          | After `update(name, { canActivate: null })`, any previously set definition guard is removed and navigation is allowed again.                                                  |
 | 14  | replace during navigation                        | `replace()` called during an active navigation returns silently without modifying routes. It is a silent no-op.                                                               |
 | 15  | replace preserves external                       | `replace()` clears definition guards (from route config) but preserves external guards (from `getLifecycleApi`).                                                              |
+| 16  | removeXGuard clears external only                | After `removeActivateGuard(name)` / `removeDeactivateGuard(name)`, an EXTERNAL guard (from `getLifecycleApi`) is removed but a DEFINITION guard (from route config) survives — the inverse of `addXGuard`; removing a config guard is `update(name, { canX: null })`'s job (#1171).                |
 
 ## Guards + navigate Interaction
 

@@ -26,6 +26,18 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 }
 
 /**
+ * Origin lane for a guard clear. Every `clearCanActivate` / `clearCanDeactivate`
+ * caller names its lane — there is no origin-blind default — so a new call site
+ * cannot silently wipe both the route-config and the external guard (#1171):
+ *
+ * - `"definition"` — clear only the route-config guard (`update(name, {…: null})`, #952).
+ * - `"external"` — clear only the external, component-managed guard
+ *   (`removeXGuard()` and post-leave auto-cleanup — the inverse of `addXGuard()`).
+ * - `"both"` — clear both (route removal / router teardown; the route is gone).
+ */
+export type GuardClearScope = "definition" | "external" | "both";
+
+/**
  * Source of truth for `canActivate` / `canDeactivate` guards.
  *
  * Storage is split by origin into four factory Maps (definition vs external,
@@ -247,44 +259,37 @@ export class RouteLifecycleNamespace<
   }
 
   /**
-   * Removes a canActivate guard for a route. By default clears BOTH the
-   * definition and external slots (route removal / `clearAll` cleanup). With
-   * `definitionOnly = true` it clears ONLY the definition slot, leaving an
-   * external guard intact — `update(name, { canActivate: null })` passes this so
-   * clearing a route-config guard does not also wipe a guard registered
-   * independently via `getLifecycleApi().addActivateGuard()` (#952). When the
-   * definition is cleared but an external survives, `#recompileSlot` recompiles
-   * the slot from the external factory (external wins).
+   * Removes a canActivate guard for a route. `scope` names the origin lane
+   * (see {@link GuardClearScope}) — there is no origin-blind default, so every
+   * caller commits to a lane and a new call site cannot silently clear both.
+   * Delegates to {@link #clearGuard} (mirrors the add side's `#registerHandler`).
    *
    * @param name - Route name (already validated by facade)
-   * @param definitionOnly - When true, leave the external slot intact (#952)
+   * @param scope - Which origin(s) to clear: `"definition"` / `"external"` / `"both"`
    */
-  clearCanActivate(name: string, definitionOnly = false): void {
-    const clearedDefinition = this.#definitionActivateFactories.delete(name);
-    const clearedExternal = definitionOnly
-      ? false
-      : this.#externalActivateFactories.delete(name);
-
-    if (clearedDefinition || clearedExternal) {
-      this.#recompileSlot("activate", name);
-    }
+  clearCanActivate(name: string, scope: GuardClearScope): void {
+    this.#clearGuard("activate", name, scope);
   }
 
   /**
-   * Removes a canDeactivate guard for a route.
+   * Removes a canDeactivate guard for a route. Symmetric counterpart to
+   * {@link clearCanActivate}.
    *
-   * Symmetric counterpart to {@link clearCanActivate} — `definitionOnly = true`
-   * clears only the definition slot, preserving an external guard (#952).
+   * The `"external"` lane is what makes a route-config `canDeactivate` durable:
+   * post-leave auto-cleanup (`completeTransition`) and `removeDeactivateGuard()`
+   * unregister only the external, component-managed guard (router5 mount/unmount
+   * heritage), while a definition guard survives for re-entry — symmetric with
+   * definition `canActivate`, which lives as long as the route is in the tree
+   * (#1171). Clearing both by default made a config guard one-shot: the first
+   * permitted leave erased it, so re-entry was unguarded, `getRoutesApi().get()`
+   * lost the field, and a clone taken after the leave never received it
+   * (clone invariant #6).
+   *
+   * @param name - Route name (already validated by facade)
+   * @param scope - Which origin(s) to clear: `"definition"` / `"external"` / `"both"`
    */
-  clearCanDeactivate(name: string, definitionOnly = false): void {
-    const clearedDefinition = this.#definitionDeactivateFactories.delete(name);
-    const clearedExternal = definitionOnly
-      ? false
-      : this.#externalDeactivateFactories.delete(name);
-
-    if (clearedDefinition || clearedExternal) {
-      this.#recompileSlot("deactivate", name);
-    }
+  clearCanDeactivate(name: string, scope: GuardClearScope): void {
+    this.#clearGuard("deactivate", name, scope);
   }
 
   /**
@@ -593,6 +598,29 @@ export class RouteLifecycleNamespace<
       this.#recompileSlot(type, name);
 
       throw error;
+    }
+  }
+
+  /**
+   * Shared implementation for {@link clearCanActivate} / {@link clearCanDeactivate}
+   * — the clear-side counterpart to {@link #registerHandler}. `scope` selects the
+   * origin lane (no origin-blind default, #1171); when one origin is cleared and
+   * the other survives, `#recompileSlot` recompiles the compiled function from
+   * the survivor (external wins, #1174).
+   */
+  #clearGuard(
+    type: "activate" | "deactivate",
+    name: string,
+    scope: GuardClearScope,
+  ): void {
+    const { definition, external } = this.#getFactoryMaps(type);
+    const clearedDefinition =
+      scope === "external" ? false : definition.delete(name);
+    const clearedExternal =
+      scope === "definition" ? false : external.delete(name);
+
+    if (clearedDefinition || clearedExternal) {
+      this.#recompileSlot(type, name);
     }
   }
 
