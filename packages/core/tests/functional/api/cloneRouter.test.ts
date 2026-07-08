@@ -4,6 +4,7 @@ import { createRouter } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
+  getLifecycleApi,
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
@@ -75,6 +76,40 @@ describe("cloneRouter()", () => {
     await clone.start("/app/users/1");
 
     expect(clone.getState()?.name).toBe("user");
+  });
+
+  it("clone runs the same effective guard as the base — external wins over definition (#1174)", async () => {
+    const base = createRouter([
+      { name: "home", path: "/" },
+      { name: "admin", path: "/admin" },
+    ]);
+
+    // External guard BLOCKS, registered first; a definition guard that ALLOWS is
+    // then added via update() (temporal order external → definition). Under the
+    // external-wins policy (#1174) the EXTERNAL guard is effective on BOTH the
+    // base and the clone — regardless of registration order — so the clone can
+    // never run the other guard than the base (an SSR auth divergence otherwise).
+    getLifecycleApi(base).addActivateGuard("admin", () => () => false);
+    getRoutesApi(base).update("admin", { canActivate: () => () => true });
+
+    await base.start("/");
+
+    const clone = cloneRouter(base);
+
+    await clone.start("/");
+
+    const baseAllowed = await base.navigate("admin").then(
+      () => true,
+      () => false,
+    );
+    const cloneAllowed = await clone.navigate("admin").then(
+      () => true,
+      () => false,
+    );
+
+    // External wins → both block. The clone must not diverge from the base.
+    expect(baseAllowed).toBe(false);
+    expect(cloneAllowed).toBe(baseAllowed);
   });
 
   // cloneRouter re-registers DEFINITION guards (from route config) with

@@ -428,7 +428,7 @@ describe("core/routes/replaceRoutes", () => {
       await expect(router.navigate("home")).rejects.toThrow();
     });
 
-    it("should overwrite external guard with definition guard on replace (definition wins)", async () => {
+    it("keeps the external guard effective after replace() adds a definition guard (external wins, #1174)", async () => {
       routesApi.add({ name: "contested", path: "/contested" });
       // External guard that allows navigation
       lifecycle.addActivateGuard("contested", () => () => true);
@@ -438,22 +438,25 @@ describe("core/routes/replaceRoutes", () => {
 
       expect(router.getState()?.name).toBe("contested");
 
-      // Replace with blocking definition guard — overwrites external
+      // Replace with a blocking definition guard. Under external-wins (#1174) the
+      // external guard added above — preserved across replace() by #1192 — stays
+      // effective; the definition does NOT override it (registration order is now
+      // irrelevant, external always wins).
       routesApi.replace([
         { name: "home", path: "/home" },
         {
           name: "contested",
           path: "/contested",
-          canActivate: () => () => false, // definition guard blocks
+          canActivate: () => () => false, // definition blocks — but external wins
         },
       ]);
 
       await router.navigate("home");
 
-      // Definition guard now blocks navigation
-      await expect(router.navigate("contested")).rejects.toMatchObject({
-        code: errorCodes.CANNOT_ACTIVATE,
-      });
+      // Surviving external guard (allow) still wins → navigation succeeds.
+      await router.navigate("contested");
+
+      expect(router.getState()?.name).toBe("contested");
     });
 
     it("replace() clears the definition slot but preserves a co-existing external guard's compiled function (cross-origin)", async () => {
