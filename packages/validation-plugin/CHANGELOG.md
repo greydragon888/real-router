@@ -1,5 +1,16 @@
 # @real-router/validation-plugin
 
+## 0.10.5
+
+### Patch Changes
+
+- [#1344](https://github.com/greydragon888/real-router/pull/1344) [`55057b2`](https://github.com/greydragon888/real-router/commit/55057b26980674205bccf44d0bb59c8d492461e0) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(validation-plugin): reject flat dotted route names on the constructor's initial routes ([#1194](https://github.com/greydragon888/real-router/issues/1194))
+
+  `add()`/`replace()` already reject a dotted route name (e.g. `{ name: "users.view" }`), but the plugin's retrospective pass (`validateExistingRoutes`, run on `usePlugin(validationPlugin())`) validated only name-is-string / path / duplicates — not the dot rule. So a validation-enabled app that declared a dotted name in `createRouter([...])` still slipped it past validation into a name-vs-URL split-brain (buildPath/matchPath disagree; the route mounts at the wrong URL). The retrospective pass now rejects a dotted `name` on the initial routes too, symmetric with `add()`/`replace()` — use a nested `children` array or the `{ parent }` option instead.
+
+- Updated dependencies [[`55057b2`](https://github.com/greydragon888/real-router/commit/55057b26980674205bccf44d0bb59c8d492461e0)]:
+  - @real-router/core@0.73.1
+
 ## 0.10.4
 
 ### Patch Changes

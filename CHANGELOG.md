@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-08]
 
+### @real-router/core@0.73.1
+
+### Patch Changes
+
+- [#1344](https://github.com/greydragon888/real-router/pull/1344) [`55057b2`](https://github.com/greydragon888/real-router/commit/55057b26980674205bccf44d0bb59c8d492461e0) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): update() of a nonexistent route is a true no-op in bare core ([#1205](https://github.com/greydragon888/real-router/issues/1205))
+
+  Without `@real-router/validation-plugin`, `update("ghost", …)` for a route that does not exist used to silently seed `config.defaultParams` + compile/register the guard factory and emit a lying `TREE_CHANGED` `"update"` event for a route `get()`/`has()` cannot see — and a later `add({ name: "ghost" })` inherited the phantom config + a blocking guard (`navigate` rejected `CANNOT_ACTIVATE` out of the box). It is now a genuine no-op: the commit and the emit are skipped when the route is absent. No throw is added (validation stays opt-in — the validation-plugin already throws a `ReferenceError` here).
+
+### @real-router/validation-plugin@0.10.5
+
+### Patch Changes
+
+- [#1344](https://github.com/greydragon888/real-router/pull/1344) [`55057b2`](https://github.com/greydragon888/real-router/commit/55057b26980674205bccf44d0bb59c8d492461e0) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(validation-plugin): reject flat dotted route names on the constructor's initial routes ([#1194](https://github.com/greydragon888/real-router/issues/1194))
+
+  `add()`/`replace()` already reject a dotted route name (e.g. `{ name: "users.view" }`), but the plugin's retrospective pass (`validateExistingRoutes`, run on `usePlugin(validationPlugin())`) validated only name-is-string / path / duplicates — not the dot rule. So a validation-enabled app that declared a dotted name in `createRouter([...])` still slipped it past validation into a name-vs-URL split-brain (buildPath/matchPath disagree; the route mounts at the wrong URL). The retrospective pass now rejects a dotted `name` on the initial routes too, symmetric with `add()`/`replace()` — use a nested `children` array or the `{ parent }` option instead.
+
+- Updated dependencies [[`55057b2`](https://github.com/greydragon888/real-router/commit/55057b26980674205bccf44d0bb59c8d492461e0)]:
+  - @real-router/core@0.73.1
+
+
 ### @real-router/core@0.73.0
 
 ### Minor Changes
