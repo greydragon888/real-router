@@ -1,5 +1,17 @@
 # @real-router/fsm
 
+## 0.6.0
+
+### Minor Changes
+
+- [#1340](https://github.com/greydragon888/real-router/pull/1340) [`feac3b5`](https://github.com/greydragon888/real-router/commit/feac3b5c0e7316ccdd9d74c40ac4595a4ab5624e) Thanks [@greydragon888](https://github.com/greydragon888)! - remove(fsm): drop the forceState() escape hatch ([#1169](https://github.com/greydragon888/real-router/issues/1169))
+
+  `FSM.forceState(state)` — the direct `#state`/`#currentTransitions` write that bypassed actions and listeners — existed solely as core's navigate hot-path optimization. The [#1169](https://github.com/greydragon888/real-router/issues/1169) commit-gate refactor routed the three hot transitions (NAVIGATE/LEAVE_APPROVE/COMPLETE) through the FSM transition table via `send()`, making the table the sole authority over state; `forceState` was left with zero consumers.
+
+  Removing it makes "the FSM table cannot be bypassed" a compiler-enforced guarantee rather than a convention — the exact resurrection vector behind [#1169](https://github.com/greydragon888/real-router/issues/1169) no longer exists in the engine. The shared `requireDeclared` declared-state guard stays (still used by the constructor's `initial` and `on`'s `from`, [#885](https://github.com/greydragon888/real-router/issues/885)).
+
+  Breaking (a public method is removed) — `minor` per the pre-1.0 policy.
+
 ## 0.5.0
 
 ### Minor Changes

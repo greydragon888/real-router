@@ -1,5 +1,44 @@
 # @real-router/core
 
+## 0.72.3
+
+### Patch Changes
+
+- [#1340](https://github.com/greydragon888/real-router/pull/1340) [`feac3b5`](https://github.com/greydragon888/real-router/commit/feac3b5c0e7316ccdd9d74c40ac4595a4ab5624e) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): canonicalize the cancellation outcome of an external abort during an async subscribeLeave ([#1197](https://github.com/greydragon888/real-router/issues/1197))
+
+  When a navigation carrying an external `opts.signal` was parked on an async `subscribeLeave` listener and the signal aborted, the no-guards pipeline misclassified the cancellation: `navigate()` rejected with the **raw** abort reason (a plain `Error`/`DOMException`, so `err.code !== TRANSITION_CANCELLED`) and a spurious `TRANSITION_ERROR` was emitted after `TRANSITION_CANCEL` — two mutually exclusive outcomes for one navigation, plus an error-level "Unexpected navigation error" log for a routine user cancel.
+
+  The abort now rejects with `RouterError(TRANSITION_CANCELLED)` carrying the external reason, matching the guard path exactly (no raw reject, no spurious error). Internal cancel sources (supersede / `stop()` / `dispose()`), whose reason is already a `RouterError(TRANSITION_CANCELLED)`, are threaded through unchanged so the leave signal's `reason` ([#943](https://github.com/greydragon888/real-router/issues/943)) is preserved.
+
+- [#1340](https://github.com/greydragon888/real-router/pull/1340) [`feac3b5`](https://github.com/greydragon888/real-router/commit/feac3b5c0e7316ccdd9d74c40ac4595a4ab5624e) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): liveness-gate the internal navigateToNotFound commit primitive ([#1186](https://github.com/greydragon888/real-router/issues/1186))
+
+  `dispose()` called while a `start()` interceptor was parked (FSM already `DISPOSED`) could still commit an `UNKNOWN_ROUTE` state on the disposed router: when the interceptor resumed, `matchPath` missed the cleared route tree and the default `allowNotFound: true` path routed into the internal `navigateToNotFound` primitive, which had no liveness gate — so `start()` resolved successfully with a phantom state on a disposed instance.
+
+  `navigateToNotFound` now throws `RouterError(ROUTER_DISPOSED)` when the router is no longer active, so the disposed-router branch rejects like the matched-route branch (which was already protected by the `canNavigate()` gate). No state is committed after `dispose()`.
+
+- [#1340](https://github.com/greydragon888/real-router/pull/1340) [`feac3b5`](https://github.com/greydragon888/real-router/commit/feac3b5c0e7316ccdd9d74c40ac4595a4ab5624e) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): actionable error for a path-less navigateToNotFound() during the STARTING window ([#1172](https://github.com/greydragon888/real-router/issues/1172))
+
+  `router.navigateToNotFound()` with no explicit path derived the default path from the committed state via a non-null assertion (`state.get()!.path`), justified by "isActive() guarantees state exists". That assumption is false during the router's two-phase start: while a start navigation is pending (async guard / start interceptor), `isActive()` is `true` but `getState()` is still `undefined`, so a path-less call crashed with a cryptic, code-less `TypeError: Cannot read properties of undefined (reading 'path')`.
+
+  It now throws `RouterError(ROUTER_NOT_STARTED)` with an actionable message ("cannot derive the path before the start navigation commits — pass an explicit path") — the same always-on invariant-guard class as the `start(path)` type guard ([#939](https://github.com/greydragon888/real-router/issues/939)). The misleading non-null assertion is removed; a provided path is used directly.
+
+- [#1340](https://github.com/greydragon888/real-router/pull/1340) [`feac3b5`](https://github.com/greydragon888/real-router/commit/feac3b5c0e7316ccdd9d74c40ac4595a4ab5624e) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): cancel in-flight navigation on stop()/dispose()/abort from a transition listener ([#1169](https://github.com/greydragon888/real-router/issues/1169))
+
+  A synchronous `stop()`, `dispose()`, or external `opts.signal` abort issued from inside a transition listener (`subscribeLeave`, or a plugin's `onTransitionStart`) no longer commits the superseded navigation. Previously such a navigation could resolve with `TRANSITION_SUCCESS` — and, after `dispose()`, resurrect the FSM out of its terminal `DISPOSED` state into a zombie router (`isActive() === true` on a disposed instance).
+
+  The fix has two structural parts: the three hot navigation transitions (`NAVIGATE`/`LEAVE_APPROVE`/`COMPLETE`) now go through the FSM transition table (`send()`) instead of the `forceState()` bypass, so a transition from an invalid state is a table no-op that emits nothing — the FSM table is the sole authority over state and cannot be resurrected. A pre-commit liveness gate (active only when a listener window is reachable) then refuses the `setState` that precedes it, so the navigation rejects with `RouterError(TRANSITION_CANCELLED)` and the router stays stopped/disposed. `forceState()` is no longer called anywhere in core.
+
+  Performance note: this trades a hot-path micro-optimization for a structural determinism guarantee — routing the three transitions through the table costs roughly +15–20% on the `navigate/*` benchmarks (still sub-microsecond) and one small transition-payload allocation per navigation. The router's cancellation correctness is now enforced by the state machine rather than by scattered re-checks.
+
+- [#1340](https://github.com/greydragon888/real-router/pull/1340) [`feac3b5`](https://github.com/greydragon888/real-router/commit/feac3b5c0e7316ccdd9d74c40ac4595a4ab5624e) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): stop() during the STARTING window now cancels the start ([#1185](https://github.com/greydragon888/real-router/issues/1185))
+
+  `router.stop()` called while `start()` is parked in an async start-interceptor (before it calls `next()`, FSM = STARTING) was a silent no-op: the facade's early return fired (STARTING is neither ready nor transitioning), `STARTING` accepted neither STOP nor CANCEL, and when the interceptor resumed the pipeline completed normally — the router ended up READY with a committed state, breaking the documented "stop() during start cancels the transition" contract (wiki/start.md) and the "after stop(), isActive() === false" invariant.
+
+  The FSM table now accepts `STARTING --STOP--> IDLE`; the facade's `stop()` sends STOP when the router is starting; and `RouterLifecycleNamespace.start` (the start-interceptor target) re-checks `isIdle()` after the interceptor chain, rejecting with `TRANSITION_CANCELLED` when a stop() cancelled the start mid-window — mirroring the guard phase, which already cancels from TRANSITION_STARTED. A `dispose()` in the same window is unaffected: it leaves the FSM DISPOSED, which the commit primitives' liveness gate still rejects as `ROUTER_DISPOSED` ([#1186](https://github.com/greydragon888/real-router/issues/1186)), so a stop and a dispose stay distinguishable.
+
+- Updated dependencies [[`feac3b5`](https://github.com/greydragon888/real-router/commit/feac3b5c0e7316ccdd9d74c40ac4595a4ab5624e)]:
+  - @real-router/fsm@0.6.0
+
 ## 0.72.2
 
 ### Patch Changes
