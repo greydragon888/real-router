@@ -1,5 +1,21 @@
 # router-benchmarks
 
+## 0.3.89
+
+### Patch Changes
+
+- Updated dependencies [[`2e5bb3d`](https://github.com/greydragon888/real-router/commit/2e5bb3d6e26524745fd1539b56b64ed708a23910)]:
+  - @real-router/core@0.74.0
+  - @real-router/angular@0.13.12
+  - @real-router/browser-plugin@0.18.13
+  - @real-router/lifecycle-plugin@0.6.16
+  - @real-router/memory-plugin@0.4.24
+  - @real-router/react@0.28.16
+  - @real-router/search-schema-plugin@0.4.16
+  - @real-router/solid@0.16.12
+  - @real-router/svelte@0.15.11
+  - @real-router/vue@0.16.13
+
 ## 0.3.88
 
 ### Patch Changes
