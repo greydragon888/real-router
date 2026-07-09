@@ -62,6 +62,28 @@ export class FSM<
       config.initial,
       "constructor",
     );
+
+    // #1159: validate table closure — every declared transition target must
+    // itself be a declared state. `send()` applies table values
+    // (`this.#transitions[nextState]`) without re-checking, so a dangling
+    // target would silently enter an undeclared state (violating Validity #1)
+    // and brick `canSend()` (violating No-bricking #10). One cold-path
+    // O(states×events) pass at construction fails loud instead — the fourth
+    // state-entry-point, mirroring the `initial` / `on` guards. Explicit
+    // `undefined` values are the declared "no transition" no-op (send() returns
+    // the current state) and are skipped. Post-construction mutation of the
+    // shared table stays a documented GIGO boundary (Edge #5).
+    for (const state of Object.keys(config.transitions)) {
+      const stateTransitions = config.transitions[state as TStates];
+
+      for (const event of Object.keys(stateTransitions)) {
+        const target = stateTransitions[event as TEvents];
+
+        if (target !== undefined) {
+          requireDeclared(config.transitions, target, "constructor");
+        }
+      }
+    }
   }
 
   send<E extends TEvents>(

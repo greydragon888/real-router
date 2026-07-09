@@ -244,7 +244,7 @@ This **intentionally differs** from the sibling `@real-router/event-emitter`, wh
 
 ## Declared-state guard
 
-The constructor (`initial`) and `on` (`from`) share a `requireDeclared` guard: an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) originally the `forceState` guard; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`).
+The constructor (`initial`), `on` (`from`), and every transition **target** in the table (validated for closure at construction, [#1159](https://github.com/greydragon888/real-router/issues/1159)) share a `requireDeclared` guard: an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) originally the `forceState` guard; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`; [#1159](https://github.com/greydragon888/real-router/issues/1159) table targets). The closure check runs once at construction (cold path) and skips explicit `undefined` targets (the "no transition" no-op); post-construction mutation of the shared table stays a documented GIGO boundary.
 
 ```typescript
 // shared guard — single source of truth for "the state is declared"

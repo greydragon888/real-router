@@ -833,4 +833,38 @@ describe("FSM Declared-State Guard Properties", () => {
       }).toThrow("is not declared in config.transitions");
     },
   );
+
+  test.prop(
+    [
+      arbFSMConfigWithInitialTransition.chain((gen) =>
+        fc.tuple(
+          fc.constant(gen),
+          fc
+            .string({ minLength: 1, maxLength: 5 })
+            .filter((s) => !gen.states.includes(s)),
+        ),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "constructor rejects a dangling transition target (#1159)",
+    ([gen, danglingTarget]) => {
+      // The 4th state-entry-point. Replace one declared target with a string
+      // outside the state universe — the exact input `arbFSMConfig` cannot
+      // generate (its targets are state indices), so this closes the generator
+      // blindness that let the brick stay green while the code contradicted
+      // Validity #1 / No-bricking #10.
+      const brokenTransitions = {
+        ...gen.config.transitions,
+        [gen.config.initial]: {
+          ...gen.config.transitions[gen.config.initial],
+          [gen.knownEvent]: danglingTarget,
+        },
+      };
+
+      expect(
+        () => new FSM({ ...gen.config, transitions: brokenTransitions }),
+      ).toThrow("is not declared in config.transitions");
+    },
+  );
 });

@@ -715,10 +715,11 @@ describe("FSM", () => {
     });
   });
 
-  describe("Declared-state guard (#885)", () => {
+  describe("Declared-state guard (#885 / #1159)", () => {
     // The declared-state invariant must hold at every state-entry-point — the
-    // constructor's `initial` and `on`'s `from` (#885). Reachable with
-    // string-typed states / JS / cast callers.
+    // constructor's `initial`, `on`'s `from` (#885), and every transition
+    // target in the table (#1159). Reachable with string-typed states / JS /
+    // cast callers.
     it("should throw when constructed with an undeclared initial state", () => {
       expect(
         () =>
@@ -744,6 +745,35 @@ describe("FSM", () => {
       }).toThrow(
         '[FSM.on] state "GHOST" is not declared in config.transitions',
       );
+    });
+
+    it("should throw when a transition target is an undeclared state (#1159)", () => {
+      // The 4th state-entry-point: a table value (target) applied by send()
+      // without re-checking. A dangling target must fail loud at construction
+      // instead of bricking the FSM on the first send() into it.
+      expect(
+        () =>
+          new FSM<string, string, null>({
+            initial: "a",
+            context: null,
+            transitions: { a: { go: "GHOST" }, b: {} },
+          }),
+      ).toThrow(
+        '[FSM.constructor] state "GHOST" is not declared in config.transitions',
+      );
+    });
+
+    it("allows an explicit undefined target — preserves send()'s no-op semantics (#1159)", () => {
+      // An explicit `undefined` value is a declared no-op (send() returns the
+      // current state), NOT a dangling target — closure validation must skip it.
+      expect(
+        () =>
+          new FSM<string, string, null>({
+            initial: "a",
+            context: null,
+            transitions: { a: { go: undefined }, b: {} },
+          }),
+      ).not.toThrow();
     });
   });
 });
