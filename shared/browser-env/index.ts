@@ -21,6 +21,7 @@ export {
   getRouteFromEvent,
   updateBrowserState,
   createUpdateBrowserState,
+  canSkipPopstateHistoryWrite,
 } from "./popstate-utils.js";
 
 export {

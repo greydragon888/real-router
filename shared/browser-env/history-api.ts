@@ -29,3 +29,6 @@ export const addHashChangeListener: HistoryBrowser["addHashChangeListener"] = (
 };
 
 export const getHash = (): string => globalThis.location.hash;
+
+export const getState: NonNullable<HistoryBrowser["getState"]> = () =>
+  globalThis.history.state;

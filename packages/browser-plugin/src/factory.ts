@@ -2,6 +2,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import {
   buildUrl,
+  canSkipPopstateHistoryWrite,
   createPluginBuildUrl,
   createPopstateHandler,
   createPopstateLifecycle,
@@ -256,9 +257,22 @@ function createBrowserPlugin(
       const url = buildUrl(toState.path, options.base);
       const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
 
-      updateState(toState, finalUrl, replaceHistory, browser);
-
       const isPopstate = navOptions.source === POPSTATE_SOURCE;
+
+      // On back/forward the browser has already restored the target entry's
+      // {name,params,path} + URL, so the plugin's replaceState re-writes the
+      // same values — a value-level no-op that still fires a second
+      // updateForSameDocumentNavigation Blink event. Skip it when provably a
+      // no-op; every load-bearing case (redirect, normalization, corrupted
+      // history.state) keeps the write. (#1353)
+      const skipHistoryWrite =
+        isPopstate &&
+        replaceHistory &&
+        canSkipPopstateHistoryWrite(toState, browser, router.areStatesEqual);
+
+      if (!skipHistoryWrite) {
+        updateState(toState, finalUrl, replaceHistory, browser);
+      }
 
       claim.write(toState, isPopstate ? FROZEN_POPSTATE : FROZEN_NAVIGATE);
     },

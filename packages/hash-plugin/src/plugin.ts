@@ -1,4 +1,5 @@
 import {
+  canSkipPopstateHistoryWrite,
   createPopstateHandler,
   createHashSyncLifecycle,
   createStartInterceptor,
@@ -6,7 +7,7 @@ import {
   shouldReplaceHistory,
   updateBrowserState,
 } from "./browser-env";
-import { LOGGER_CONTEXT } from "./constants";
+import { LOGGER_CONTEXT, source as POPSTATE_SOURCE } from "./constants";
 import { hashUrlToPath } from "./hash-utils";
 
 import type { Browser, SharedFactoryState } from "./browser-env";
@@ -136,9 +137,28 @@ export class HashPlugin {
           fromState,
         );
 
-        const url = this.#router.buildUrl(toState.name, toState.params);
+        const isPopstate = navOptions.source === POPSTATE_SOURCE;
 
-        updateBrowserState(toState, url, replaceHistory, this.#browser);
+        // On back/forward the browser has already restored the target entry's
+        // {name,params,path} + URL, so hash-plugin's replaceState re-writes the
+        // same values — a value-level no-op that still fires a second
+        // updateForSameDocumentNavigation Blink event. Skip it when provably a
+        // no-op; every load-bearing case (redirect, normalization, corrupted
+        // history.state) keeps the write. (#1353)
+        const skipHistoryWrite =
+          isPopstate &&
+          replaceHistory &&
+          canSkipPopstateHistoryWrite(
+            toState,
+            this.#browser,
+            this.#router.areStatesEqual,
+          );
+
+        if (!skipHistoryWrite) {
+          const url = this.#router.buildUrl(toState.name, toState.params);
+
+          updateBrowserState(toState, url, replaceHistory, this.#browser);
+        }
       },
     };
   }

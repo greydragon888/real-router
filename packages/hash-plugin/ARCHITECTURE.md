@@ -300,7 +300,11 @@ router.navigate(name, params, opts)
         ├── shouldReplaceHistory(navOptions, toState, fromState)
         │     (from browser-env: replace ?? !fromState || reload && path match)
         │
-        ├── url = router.buildUrl(toState.name, toState.params)
+        ├── skip? popstate + shouldReplace + canSkipPopstateHistoryWrite
+        │     (browser already restored the identical entry — #1353)
+        │     └── yes → no write (avoids a redundant Blink history event)
+        │
+        ├── url = router.buildUrl(toState.name, toState.params)   [only when writing]
         │         └── pre-computed urlPrefix + router.buildPath()
         │
         └── updateBrowserState(toState, url, shouldReplace, browser)
