@@ -1,5 +1,16 @@
 # @real-router/validation-plugin
 
+## 0.10.7
+
+### Patch Changes
+
+- [#1359](https://github.com/greydragon888/real-router/pull/1359) [`88008ce`](https://github.com/greydragon888/real-router/commit/88008ce6118faee4e3b1c446e5fbdb9035633c1e) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the unreachable retrospective duplicate-name check ([#1226](https://github.com/greydragon888/real-router/issues/1226))
+
+  `validateExistingRoutes` (the retrospective pass run at `usePlugin()` time) carried a duplicate-name detection branch that became dead once bare core rejected duplicate names on every route-population entry point — `createRouter([...])` initial routes ([#1351](https://github.com/greydragon888/real-router/issues/1351)), `add()` (within-batch [#953](https://github.com/greydragon888/real-router/issues/953) plus the "already exists" guard for cross-batch collisions), and `replace()` ([#968](https://github.com/greydragon888/real-router/issues/968)). A built route store can no longer carry a duplicate for the retrospective pass to catch, so the branch was reachable only from white-box unit tests. Removed the branch and its two (identical) tests; core is now the sole authority for the name-uniqueness invariant. No observable behavior change.
+
+- Updated dependencies [[`88008ce`](https://github.com/greydragon888/real-router/commit/88008ce6118faee4e3b1c446e5fbdb9035633c1e)]:
+  - @real-router/core@0.74.2
+
 ## 0.10.6
 
 ### Patch Changes
