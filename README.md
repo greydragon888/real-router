@@ -254,7 +254,7 @@ The Segment Trie matcher traverses in O(segments), not O(routes).
 - **Observable state** — RxJS and TC39 Observable compatible
 - **Immutable state** — deeply frozen, predictable state management
 - **Scroll restoration** — opt-in via `RouterProvider.scrollRestoration` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)); restores on back/forward, scrolls to top / `#hash` on push; `restore` / `top` / `manual` modes; custom scroll containers
-- **Scroll spy** — opt-in via `RouterProvider.scrollSpy` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Spy)); router-coordinated `IntersectionObserver` — URL hash tracks the topmost visible anchor as the user scrolls; three anti-flicker gates (`isTransitioning` / `coolingDown` cleared on `scrollend` or 500 ms fallback / `selfEmitting`); self-healing on stale hash; no major router ships this first-class (userland landscape ~2M downloads/month on packages with median last release > 5 years)
+- **Scroll spy** — opt-in via `RouterProvider.scrollSpy` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Spy)); router-coordinated `IntersectionObserver` syncs the URL hash to the topmost visible anchor as you scroll
 
 ## Quick Start
 

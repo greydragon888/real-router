@@ -72,6 +72,15 @@ updates:
       # Lift this when the project moves to a newer Node major.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # typescript is pinned to the current major (6.x) until the type-tooling
+      # ecosystem supports the next one. typescript-eslint and ts-morph lag each
+      # TS major (TS 7 is unsupported by them today), so bumping TS ahead of them
+      # breaks `pnpm lint` + type-tooling repo-wide — at most a split toolchain is
+      # viable. Block the major only; 6.x patch/minor keep flowing. Lift this when
+      # typescript-eslint + ts-morph declare support for the next TS major, then
+      # bump TS manually.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
       # nanostores state-lib set — benchmark-only (benchmarks/package.json), used to
       # compare state libraries. The @nanostores/* adapters are version-COUPLED to
       # `nanostores` via strict peer ranges (@nanostores/react@0.8.x peers nanostores
