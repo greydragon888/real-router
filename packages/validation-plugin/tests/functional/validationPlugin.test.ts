@@ -62,20 +62,26 @@ describe("validationPlugin", () => {
   });
 
   describe("retrospective validation on registration", () => {
-    it("throws when router has duplicate route names", () => {
-      router = createRouter([
-        { name: "home", path: "/home" },
-        { name: "home", path: "/duplicate" },
-      ]);
+    it("duplicate route names are rejected at construction — core pre-empts the retrospective pass (#1351)", () => {
+      // Bare core rejects a duplicate sibling name at createRouter() time
+      // (#1351), so a duplicate-name router can no longer be built for the
+      // plugin to catch retrospectively — the concern is core's now.
+      router = createRouter([{ name: "home", path: "/home" }]);
 
-      expect(() => router.usePlugin(validationPlugin())).toThrow();
+      expect(() =>
+        createRouter([
+          { name: "home", path: "/home" },
+          { name: "home", path: "/duplicate" },
+        ]),
+      ).toThrow(/Duplicate route "home" in batch/);
     });
 
     it("rolls back validator on retrospective error", () => {
-      router = createRouter([
-        { name: "home", path: "/home" },
-        { name: "home", path: "/duplicate" },
-      ]);
+      // Trigger repointed from a duplicate name (now rejected by bare core at
+      // construction, #1351) to a dotted name — still a retrospective-only
+      // rejection (#1194) that bare core accepts, so usePlugin() is reached and
+      // the rollback path exercised.
+      router = createRouter([{ name: "users.view", path: "/:id" }]);
 
       expect(() => router.usePlugin(validationPlugin())).toThrow();
 

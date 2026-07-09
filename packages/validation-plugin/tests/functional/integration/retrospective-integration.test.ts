@@ -36,37 +36,41 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
     expect(() => router.usePlugin(validationPlugin())).not.toThrow();
   });
 
-  it("duplicate route names caught at usePlugin — throws with duplicate message", () => {
-    router = createRouter([
-      { name: "home", path: "/home" },
-      { name: "home", path: "/home2" },
-    ]);
+  it("duplicate route names rejected at construction — core parity, pre-plugin (#1351)", () => {
+    router = createRouter([{ name: "home", path: "/home" }]);
 
-    expect(() => router.usePlugin(validationPlugin())).toThrow(/duplicate/i);
+    expect(() =>
+      createRouter([
+        { name: "home", path: "/home" },
+        { name: "home", path: "/home2" },
+      ]),
+    ).toThrow(/Duplicate route "home" in batch/);
   });
 
-  it("nested duplicate route names caught at usePlugin", () => {
-    router = createRouter([
-      {
-        name: "section",
-        path: "/section",
-        children: [{ name: "item", path: "/item" }],
-      },
-      {
-        name: "section",
-        path: "/section2",
-        children: [{ name: "item", path: "/item2" }],
-      },
-    ]);
+  it("nested duplicate route names rejected at construction — core parity (#1351)", () => {
+    router = createRouter([{ name: "home", path: "/home" }]);
 
-    expect(() => router.usePlugin(validationPlugin())).toThrow(/duplicate/i);
+    expect(() =>
+      createRouter([
+        {
+          name: "section",
+          path: "/section",
+          children: [{ name: "item", path: "/item" }],
+        },
+        {
+          name: "section",
+          path: "/section2",
+          children: [{ name: "item", path: "/item2" }],
+        },
+      ]),
+    ).toThrow(/Duplicate route "section" in batch/);
   });
 
   it("rollback confirmed — after retrospective failure ctx.validator is null", () => {
-    router = createRouter([
-      { name: "home", path: "/home" },
-      { name: "home", path: "/dup" },
-    ]);
+    // Vehicle repointed dup-name → dotted-name (#1194): bare core accepts it at
+    // construction (#1351 only rejects duplicates), the plugin rejects it
+    // retrospectively, so the rollback path is still exercised.
+    router = createRouter([{ name: "users.view", path: "/:id" }]);
     const ctx = getInternals(router);
 
     expect(() => router.usePlugin(validationPlugin())).toThrow();

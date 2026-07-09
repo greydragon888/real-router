@@ -1055,6 +1055,19 @@ export function createRoutesStore<
   // prepare-then-commit `replace` path uses. Guards land in the pending maps,
   // flushed by `flushPendingGuards()` at the end of the Router constructor
   // (#1331); `setDependencies` itself is a pure assignment.
+  //
+  // Reject the silent-corruption cases BEFORE building, giving the constructor
+  // parity with `add()` / `replace()` — the third and last route-population
+  // entry point (#1351): within-batch duplicate names (#953/#968) and reserved
+  // "@@" names (#954). Without these the constructor silently last-wins a
+  // duplicate-name sibling (the first route is dropped → its deep-link 404s)
+  // while add/replace throw. `methodName` is "addRoute" so all three entry
+  // points surface the identical bare-core error. (Duplicate PATHS are already
+  // rejected downstream by the path-matcher backstop #1153, so they are not
+  // re-checked here.)
+  assertNoInternalNamesInBatch(routes, "addRoute");
+  assertNoDuplicateNamesInBatch(routes, "", "addRoute");
+
   const artifacts = buildReplaceArtifacts(routes, "", matcherOptions);
 
   return {

@@ -517,6 +517,40 @@ describe("core/without validation plugin", () => {
     });
   });
 
+  describe("batch name dedup — constructor / initial routes (#1351)", () => {
+    it("throws on duplicate sibling route names in createRouter([...])", () => {
+      expect(() =>
+        createRouter([
+          { name: "a", path: "/x" },
+          { name: "a", path: "/y" },
+        ]),
+      ).toThrow('[router.addRoute] Duplicate route "a" in batch');
+    });
+
+    it("throws on duplicate nested child names in createRouter([...])", () => {
+      expect(() =>
+        createRouter([
+          {
+            name: "p",
+            path: "/p",
+            children: [
+              { name: "c", path: "/x" },
+              { name: "c", path: "/y" },
+            ],
+          },
+        ]),
+      ).toThrow('[router.addRoute] Duplicate route "p.c" in batch');
+    });
+  });
+
+  describe("reserved @@ route names — constructor / initial routes (#1351)", () => {
+    it("rejects a reserved @@ route name in createRouter([...])", () => {
+      expect(() => createRouter([{ name: "@@evil", path: "/x" }])).toThrow(
+        '[router.addRoute] Route name "@@evil" uses the reserved "@@" prefix. Routes with this prefix are internal and cannot be modified through the public API.',
+      );
+    });
+  });
+
   describe("reserved @@ route names — add() (#954)", () => {
     it("rejects a reserved @@ route name without the validation plugin", () => {
       const router = createTestRouter();

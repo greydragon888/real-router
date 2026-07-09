@@ -94,11 +94,11 @@ describe("validationPlugin — lifecycle integration", () => {
     expect(() => rawAfter.navigate(123)).not.toThrow();
   });
 
-  it("retrospective rollback — duplicate routes cause ctx.validator to be null after throw", () => {
-    router = createRouter([
-      { name: "home", path: "/home" },
-      { name: "home", path: "/home-dup" },
-    ]);
+  it("retrospective rollback — a retrospective failure leaves ctx.validator null (#1351 repoint)", () => {
+    // Was triggered by a duplicate name; #1351 now rejects those at construction
+    // (bare core), so this uses a dotted name (#1194) — a retrospective-only
+    // rejection that still drives the rollback path.
+    router = createRouter([{ name: "users.view", path: "/:id" }]);
     const ctx = getInternals(router);
 
     expect(() => router.usePlugin(validationPlugin())).toThrow();
