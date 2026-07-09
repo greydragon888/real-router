@@ -159,19 +159,6 @@ describe("validateExistingRoutes", () => {
     }).toThrow(TypeError);
   });
 
-  it("throws when duplicate route names detected", () => {
-    expect(() => {
-      validateExistingRoutes(
-        makeStore({
-          definitions: [
-            { name: "home", path: "/home" },
-            { name: "home", path: "/home2" },
-          ],
-        }),
-      );
-    }).toThrow(/duplicate/i);
-  });
-
   it("validates nested definitions recursively", () => {
     expect(() => {
       validateExistingRoutes(
@@ -186,19 +173,6 @@ describe("validateExistingRoutes", () => {
         }),
       );
     }).not.toThrow();
-  });
-
-  it("detects duplicate top-level name in definitions", () => {
-    expect(() => {
-      validateExistingRoutes(
-        makeStore({
-          definitions: [
-            { name: "home", path: "/home" },
-            { name: "home", path: "/home2" },
-          ],
-        }),
-      );
-    }).toThrow(/duplicate/i);
   });
 });
 

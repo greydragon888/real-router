@@ -192,16 +192,22 @@ function assertNotAsync(fn: Function, label: string, routeName: string): void {
 
 /**
  * Validates the existing route tree/definitions for structural integrity.
- * Walks all route definitions, checks for duplicate names and invalid structure.
+ * Walks all route definitions, checking each name and path shape.
  * Adapted from: validateRoutes() in RoutesNamespace/validators.ts
+ *
+ * Duplicate route names are intentionally NOT checked here. Bare core rejects a
+ * duplicate name on every route-population entry point — `createRouter([...])`
+ * initial routes (#1351), `add()` (within-batch #953 + the "already exists"
+ * guard for cross-batch collisions), and `replace()` (#968) — so a built store
+ * can never carry a duplicate for the retrospective pass to catch. Core is the
+ * sole authority for the name-uniqueness invariant; mirroring it here was dead
+ * code kept alive only by white-box unit tests (#1226).
  *
  * @param store - RoutesStore instance (typed as unknown to avoid core coupling)
  * @throws {TypeError} If store shape is invalid or definitions have structural issues
- * @throws {Error} If duplicate route names are detected
  */
 export function validateExistingRoutes(store: unknown): void {
   const routesStore = assertRoutesStore(store, "validateExistingRoutes");
-  const seenNames = new Set<string>();
 
   walkDefinitions(routesStore.definitions, (def, fullName) => {
     if (typeof def.name !== "string" || !def.name) {
@@ -212,10 +218,10 @@ export function validateExistingRoutes(store: unknown): void {
 
     // #1194: reject a flat dotted name on the constructor's initial routes too.
     // add()/replace() already reject a dotted route name (route-batch
-    // validateRouteName), but the retrospective pass previously validated only
-    // string/path/duplicates — so `createRouter([{ name: "a.c" }])` + this plugin
-    // slipped a dotted name past validation into a name-vs-URL split-brain. The
-    // raw `def.name` (not the nesting-derived fullName) is checked, so nested
+    // validateRouteName), but the retrospective pass validated only the name and
+    // path shape — so `createRouter([{ name: "a.c" }])` + this plugin slipped a
+    // dotted name past validation into a name-vs-URL split-brain. The raw
+    // `def.name` (not the nesting-derived fullName) is checked, so nested
     // children (simple names) pass; the message mirrors add()/replace().
     if (def.name.includes(".")) {
       throw new TypeError(
@@ -229,14 +235,6 @@ export function validateExistingRoutes(store: unknown): void {
         `[validation-plugin] validateExistingRoutes: route "${fullName}" has non-string path (${typeof def.path})`,
       );
     }
-
-    if (seenNames.has(fullName)) {
-      throw new Error(
-        `[validation-plugin] validateExistingRoutes: duplicate route name detected: "${fullName}"`,
-      );
-    }
-
-    seenNames.add(fullName);
   });
 }
 
