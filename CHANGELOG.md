@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-09]
+
+### @real-router/browser-plugin@0.18.14
+
+### Patch Changes
+
+- [#1354](https://github.com/greydragon888/real-router/pull/1354) [`bd26591`](https://github.com/greydragon888/real-router/commit/bd26591a68905dc7267db9c68160e17ec93992f8) Thanks [@greydragon888](https://github.com/greydragon888)! - Skip the redundant popstate-success `replaceState` on back/forward when it is provably a no-op ([#1353](https://github.com/greydragon888/real-router/issues/1353))
+
+  On a browser back/forward the engine has already restored the target entry's `{name, params, path}` and URL before firing `popstate`, so re-writing them via `replaceState` was a value-level no-op that still fired a second `updateForSameDocumentNavigation` Blink event per navigation. The plugin now skips the write when the resolved target deep-equals the live `history.state` (same path + `areStatesEqual`). Every load-bearing case keeps the write: redirect/normalization (path or params differ), corrupted or missing `history.state`, and custom `Browser` implementations without a state reader. The optional `Browser.getState` reader added for this is non-breaking (absent → the write is preserved).
+
+### @real-router/hash-plugin@0.8.14
+
+### Patch Changes
+
+- [#1354](https://github.com/greydragon888/real-router/pull/1354) [`bd26591`](https://github.com/greydragon888/real-router/commit/bd26591a68905dc7267db9c68160e17ec93992f8) Thanks [@greydragon888](https://github.com/greydragon888)! - Skip the redundant popstate-success `replaceState` on back/forward when it is provably a no-op ([#1353](https://github.com/greydragon888/real-router/issues/1353))
+
+  On a browser back/forward the engine has already restored the target entry's `{name, params, path}` and URL before firing `popstate`, so re-writing them via `replaceState` was a value-level no-op that still fired a second `updateForSameDocumentNavigation` Blink event per navigation. The plugin now skips the write when the resolved target deep-equals the live `history.state` (same path + `areStatesEqual`). Every load-bearing case keeps the write: redirect/normalization (path or params differ), corrupted or missing `history.state`, and custom `Browser` implementations without a state reader.
+
 ## [2026-07-08]
 
 ### @real-router/core@0.74.1
