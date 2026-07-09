@@ -13,13 +13,18 @@ describe("createRouter — validation (with validationPlugin)", () => {
   });
 
   describe("with routes", () => {
-    it("should throw if route names are duplicated", () => {
-      router = createRouter([
-        { name: "home", path: "/home" },
-        { name: "home", path: "/duplicate" },
-      ]);
+    it("rejects duplicate route names at construction — core parity, plugin-independent (#1351)", () => {
+      // #1351 closed the constructor gap: bare core now rejects a duplicate
+      // sibling name at createRouter() time (parity with add()/replace()), so
+      // the plugin's retrospective pass never sees it — the throw is core's.
+      router = createRouter([{ name: "home", path: "/home" }]);
 
-      expect(() => router.usePlugin(validationPlugin())).toThrow();
+      expect(() =>
+        createRouter([
+          { name: "home", path: "/home" },
+          { name: "home", path: "/duplicate" },
+        ]),
+      ).toThrow(/Duplicate route "home" in batch/);
     });
 
     it("should throw for a flat dotted route name — constructor symmetry with add()/replace() (#1194)", () => {

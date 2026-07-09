@@ -309,9 +309,10 @@ describe("RouterProvider — announceNavigation", () => {
 // the same-text dedupe gate, etc. Pin them as functional regressions so
 // Vue does not silently drift from React/Preact behaviour.
 describe("RouterProvider — announceNavigation edge cases", () => {
-  // We need a dedicated router for the @@-prefix test (the default test
-  // router does not include a `@@notfound` route). Other tests reuse the
-  // default router via a setup wrapper.
+  // The @@-prefix test uses a dedicated router with allowNotFound so
+  // navigateToNotFound() lands on core's internal `@@router/UNKNOWN_ROUTE`
+  // without disturbing the shared baseRouter. Other tests reuse the default
+  // router via a setup wrapper.
   let baseRouter: Router;
 
   beforeEach(async () => {
@@ -352,15 +353,16 @@ describe("RouterProvider — announceNavigation edge cases", () => {
   }
 
   it("`@@`-prefixed route name (internal marker) is skipped — announcement falls back to document.title", async () => {
-    // Build a custom router with a `@@notfound` route so we can navigate
-    // into a route whose name starts with the internal-prefix marker; the
-    // announcer's resolveText must drop the route name and fall through to
-    // the next link in the chain (h1 → document.title → pathname).
+    // A not-found navigation lands on core's reserved internal name
+    // `@@router/UNKNOWN_ROUTE`; the announcer's resolveText must drop the route
+    // name and fall through the chain (no <h1>, empty title) to document.title.
+    // #1351 rejects a user-defined `@@` route at construction, so this drives
+    // the genuine internal route via navigateToNotFound() rather than a
+    // fabricated `@@notfound` route — parity with the React adapter's test.
     const internalRouter = createRouter(
       [
         { name: "test", path: "/" },
         { name: "other", path: "/other" },
-        { name: "@@notfound", path: "/notfound" },
       ],
       { defaultRoute: "test", allowNotFound: true },
     );
@@ -376,9 +378,11 @@ describe("RouterProvider — announceNavigation edge cases", () => {
 
     // Primer: skipped by isInitialNavigation flag.
     await internalRouter.navigate("other");
-    // Target: @@-prefixed name → routeName branch resolves to "" → next
-    // candidate in the chain is document.title.
-    await internalRouter.navigate("@@notfound");
+    // Target: a not-found navigation lands on `@@router/UNKNOWN_ROUTE` → the
+    // internal-route guard blanks the route name → resolution falls through to
+    // document.title.
+    internalRouter.navigateToNotFound("/does-not-exist");
+    vi.advanceTimersByTime(10);
 
     const text = document.querySelector(ANNOUNCER_SEL)?.textContent;
 
