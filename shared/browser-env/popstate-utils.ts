@@ -115,3 +115,48 @@ export function createUpdateBrowserState(): (
     }
   };
 }
+
+/**
+ * True when a popstate-success `replaceState` would be a value-level no-op and
+ * can be skipped to avoid a redundant `updateForSameDocumentNavigation` Blink
+ * event on back/forward (#1353).
+ *
+ * On a back/forward to an entry the plugin itself recorded, the browser has
+ * ALREADY restored the identical `{name, params, path}` into `history.state`
+ * and the matching URL before firing popstate — re-writing them costs a full
+ * Blink history event for zero value change.
+ *
+ * Returns `false` (→ keep the write) for every divergence that makes the write
+ * load-bearing, so the correctness cases stay covered:
+ *   - redirect            → resolved name/params differ from the restored entry
+ *   - path normalization  → resolved path differs (e.g. trailing slash)
+ *   - corrupted / missing `history.state` → fails `isState`
+ *   - custom `Browser` without a state reader → `getState` absent (opt-in)
+ *
+ * URL equality is not re-checked: the resolved path is compared directly, and
+ * the popstate fragment is sampled FROM the live location, so the committed URL
+ * already matches by construction. The deferred-popstate replay (#757) is
+ * unaffected too — it reads the event's own snapshotted state/location, never
+ * the live entry this write would commit.
+ */
+export function canSkipPopstateHistoryWrite(
+  toState: State,
+  browser: Browser,
+  areStatesEqual: (
+    state1: State,
+    state2: State,
+    ignoreQueryParams: boolean,
+  ) => boolean,
+): boolean {
+  if (!browser.getState) {
+    return false;
+  }
+
+  const live = browser.getState();
+
+  return (
+    isState(live) &&
+    live.path === toState.path &&
+    areStatesEqual(toState, live as unknown as State, false)
+  );
+}

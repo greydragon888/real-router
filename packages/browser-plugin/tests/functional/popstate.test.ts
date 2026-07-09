@@ -632,4 +632,200 @@ describe("Browser Plugin — Popstate", () => {
       expect(currentState?.path).toBe("/home");
     });
   });
+
+  describe("Popstate history-write skip (#1353)", () => {
+    beforeEach(async () => {
+      router.usePlugin(browserPluginFactory({}, mockedBrowser));
+      await router.start();
+    });
+
+    it("does NOT re-replaceState when the restored entry already equals the resolved target", async () => {
+      await router.navigate("users.view", { id: "1" });
+
+      // Real browsers set history.state + location for the restored entry,
+      // THEN fire popstate. Emulate a back to the index entry ("/").
+      const restored = { name: "index", params: {}, path: "/" };
+
+      globalThis.history.replaceState(restored, "", "/");
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: restored }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("index");
+      // The browser already restored the identical {name,params,path} + URL,
+      // so the plugin's replaceState would be a value-level no-op firing a
+      // redundant updateForSameDocumentNavigation Blink event (#1353). Skip it.
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("KEEPS replaceState when the recorded history.state has a valid shape but a stale path (external edit)", async () => {
+      await router.navigate("users.view", { id: "1" });
+      await router.navigate("users.list");
+
+      // The recorded history.state was externally edited to a valid-shape but
+      // stale path (path drift). getState() returns the stale entry, while the
+      // event carries the canonical entry the browser navigated back to.
+      const staleLive = {
+        name: "users.view",
+        params: { id: "1" },
+        path: "/stale",
+      };
+
+      globalThis.history.replaceState(staleLive, "", "/users/view/1");
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: {
+            name: "users.view",
+            params: { id: "1" },
+            path: "/users/view/1",
+          },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("users.view");
+      // Resolved path /users/view/1 ≠ recorded stale path → guard cannot prove
+      // a no-op → write re-canonicalizes the recorded history.state.
+      expect(replaceSpy).toHaveBeenCalled();
+    });
+
+    it("KEEPS replaceState when history.state is corrupted (invalid shape)", async () => {
+      await router.navigate("users.view", { id: "1" });
+
+      // External code corrupts history.state; the browser restores a /home
+      // entry whose recorded state is garbage but whose URL still matches.
+      globalThis.history.replaceState({ garbage: true }, "", "/home");
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: { garbage: true } }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("home");
+      // Live history.state fails isState → guard cannot prove a no-op → the
+      // write restores the canonical { name, params, path } shape.
+      expect(replaceSpy).toHaveBeenCalled();
+    });
+
+    it("KEEPS replaceState when restored params differ from resolved (defaultParams injected, same path)", async () => {
+      router.stop();
+      const dpRouter = createRouter(
+        [
+          ...routerConfig,
+          { name: "def", path: "/def", defaultParams: { tab: "home" } },
+        ],
+        { defaultRoute: "home", queryParamsMode: "default" },
+      );
+
+      dpRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
+      await dpRouter.start();
+      await dpRouter.navigate("users.view", { id: "1" });
+
+      // Restored entry lacks the default param (e.g. recorded before it
+      // existed); the resolved target injects { tab: "home" }. Same path,
+      // different params — path check passes but areStatesEqual fails.
+      const restored = { name: "def", params: {}, path: "/def" };
+
+      globalThis.history.replaceState(restored, "", "/def");
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: restored }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(dpRouter.getState()?.name).toBe("def");
+      expect(dpRouter.getState()?.params).toStrictEqual({ tab: "home" });
+      // Params drifted from the restored entry → write re-canonicalizes.
+      expect(replaceSpy).toHaveBeenCalled();
+
+      dpRouter.stop();
+    });
+
+    it("KEEPS replaceState when the Browser exposes no getState (custom/legacy browser)", async () => {
+      router.stop();
+      const legacyBrowser = createMockedBrowser(noop);
+
+      // Custom Browser predating getState — the opt-in reader is absent.
+      delete (legacyBrowser as { getState?: unknown }).getState;
+
+      const legacyRouter = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+
+      legacyRouter.usePlugin(browserPluginFactory({}, legacyBrowser));
+      await legacyRouter.start();
+      await legacyRouter.navigate("users.view", { id: "1" });
+
+      const restored = { name: "index", params: {}, path: "/" };
+
+      globalThis.history.replaceState(restored, "", "/");
+
+      const replaceSpy = vi.spyOn(legacyBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: restored }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(legacyRouter.getState()?.name).toBe("index");
+      // No state reader → guard cannot prove a no-op → legacy write preserved.
+      expect(replaceSpy).toHaveBeenCalled();
+
+      legacyRouter.stop();
+    });
+
+    it("does not skip a forward navigation (pushState still fires)", async () => {
+      const pushSpy = vi.spyOn(mockedBrowser, "pushState");
+
+      await router.navigate("users.view", { id: "1" });
+
+      // Forward navigation is a push, not a popstate replace — untouched by the
+      // skip guard.
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("replays a deferred popstate correctly even when the first write is skipped (#757 unaffected)", async () => {
+      await router.navigate("users.view", { id: "1" });
+      await router.navigate("users.list");
+
+      // First back → users.view/1 (a skippable no-op write). Fire it, then
+      // synchronously fire a second back → home while the first is in flight,
+      // so the second is deferred and replayed from its own snapshot.
+      const entryA = {
+        name: "users.view",
+        params: { id: "1" },
+        path: "/users/view/1",
+      };
+
+      globalThis.history.replaceState(entryA, "", "/users/view/1");
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: entryA }),
+      );
+
+      const entryB = { name: "home", params: {}, path: "/home" };
+
+      globalThis.history.replaceState(entryB, "", "/home");
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: entryB }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      // The deferred B replays from its snapshot regardless of A's skipped
+      // write — final state is home, proving #757 is unaffected.
+      expect(router.getState()?.name).toBe("home");
+    });
+  });
 });

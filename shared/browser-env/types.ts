@@ -14,6 +14,18 @@ export interface HistoryBrowser {
    */
   addHashChangeListener: (fn: (evt: HashChangeEvent) => void) => () => void;
   getHash: () => string;
+  /**
+   * Reads the current `history.state`. Used on popstate success to detect when
+   * the browser has already restored the exact `{name, params, path}` the
+   * transition resolved to — in which case the plugin's own `replaceState` is a
+   * value-level no-op and can be skipped, avoiding a redundant
+   * `updateForSameDocumentNavigation` Blink event on back/forward (#1353).
+   *
+   * Optional so a custom `Browser` predating this method still type-checks; when
+   * absent the plugin keeps the unconditional write (no skip, legacy behavior).
+   * The default browser (`createSafeBrowser`) always provides it.
+   */
+  getState?: () => unknown;
 }
 
 export interface Browser extends HistoryBrowser {

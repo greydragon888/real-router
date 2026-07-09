@@ -623,4 +623,54 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       addEventSpy.mockRestore();
     });
   });
+
+  describe("Popstate history-write skip (#1353)", () => {
+    beforeEach(async () => {
+      router.usePlugin(hashPluginFactory({}, mockedBrowser));
+      await router.start();
+    });
+
+    it("does NOT re-replaceState when the restored entry already equals the resolved target", async () => {
+      await router.navigate("users.view", { id: "1" });
+
+      // Browser restores the users.list entry on back: sets history.state +
+      // hash location, THEN fires popstate.
+      const restored = { name: "users.list", params: {}, path: "/users/list" };
+
+      globalThis.history.replaceState(restored, "", "/#/users/list");
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: restored }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("users.list");
+      // The browser already restored the identical {name,params,path} + URL, so
+      // the plugin's replaceState is a value-level no-op firing a redundant
+      // updateForSameDocumentNavigation Blink event (#1353). Skip it.
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("KEEPS replaceState when history.state is corrupted (invalid shape)", async () => {
+      await router.navigate("users.view", { id: "1" });
+
+      // Browser restores a /home entry whose recorded state is garbage but
+      // whose hash URL still resolves.
+      globalThis.history.replaceState({ garbage: true }, "", "/#/home");
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: { garbage: true } }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("home");
+      // Live history.state fails isState → guard cannot prove a no-op → the
+      // write restores the canonical shape.
+      expect(replaceSpy).toHaveBeenCalled();
+    });
+  });
 });

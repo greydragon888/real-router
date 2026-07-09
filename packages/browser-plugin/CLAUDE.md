@@ -76,6 +76,9 @@ See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragme
 ### State Validation
 External code can corrupt `history.state`. Plugin validates structure via `isStateStrict` (from browser-env) and ignores invalid states gracefully.
 
+### Popstate history-write skip (#1353)
+On back/forward the browser has **already** restored the target entry's `{name, params, path}` and URL before firing `popstate`, so `onTransitionSuccess`'s `replaceState` re-writes identical values — a value-level no-op that still fires a **second** `updateForSameDocumentNavigation` Blink event per nav (lean native routers emit one; real-router emitted two). The write is skipped when `canSkipPopstateHistoryWrite` (browser-env) proves it a no-op: `source === "popstate"`, `replace` is true, and the resolved target deep-equals the live `history.state` (`Browser.getState` reader + same `path` + `router.areStatesEqual` with query params compared). Every **load-bearing** write is kept — redirect/normalization (path or params differ), corrupted/missing `history.state` (fails `isStateStrict`), or a custom `Browser` without `getState` (opt-in, non-breaking). The guard runs **after** `claim.write`/`urlClaim.write`, so subscribers still receive the transition; only the redundant native write is elided. `getState` is a rare popstate-path read (not the per-nav hot path — cf. #1019). The deferred-popstate replay (#757) is unaffected: it reads the event's own snapshot, not the live entry this write would commit. Shared via `browser-env`, so hash-plugin gets the same skip.
+
 ### SSR Safety
 ```typescript
 // createSafeBrowser() from browser-env detects environment:

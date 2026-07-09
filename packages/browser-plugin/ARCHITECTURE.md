@@ -130,7 +130,7 @@ The `Browser` interface, `createSafeBrowser()`, `createHistoryFallbackBrowser()`
 - `shared/browser-env/safe-browser.ts` — `createSafeBrowser` (real History API binding)
 - `shared/browser-env/ssr-fallback.ts` — `createHistoryFallbackBrowser` (no-op fallback for SSR/Node)
 - `shared/browser-env/detect.ts` — `isBrowserEnvironment()`
-- `shared/browser-env/history-api.ts` — `pushState`, `replaceState`, `addPopstateListener`, `getHash`
+- `shared/browser-env/history-api.ts` — `pushState`, `replaceState`, `addPopstateListener`, `getHash`, `getState` (`getState` reads `history.state` so `onTransitionSuccess` can skip a no-op popstate `replaceState`, #1353)
 
 **Key points for browser-plugin:**
 

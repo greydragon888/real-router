@@ -33,6 +33,13 @@ declare module "@real-router/types" {
     hash?: string;
     /** @internal — not used by hash-plugin. */
     hashChange?: boolean;
+    /**
+     * @internal — transition origin tag. Set to `"popstate"` by the popstate
+     * handler so `onTransitionSuccess` can gate the back/forward history-write
+     * skip (#1353). Identical optional shape to browser-plugin's augmentation,
+     * so the two merge cleanly when both are imported for typing.
+     */
+    source?: string;
   }
 }
 
