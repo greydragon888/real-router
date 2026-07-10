@@ -4,6 +4,6 @@
   "private": true,
   "dependencies": {
     "@real-router/preact": "workspace:^",
-    "preact": "10.29.7"
+    "preact": "~10.29.7"
   }
 }

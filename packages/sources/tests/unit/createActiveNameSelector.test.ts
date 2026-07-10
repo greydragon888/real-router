@@ -276,6 +276,37 @@ describe("createActiveNameSelector", () => {
     expect(selector.isActive("home")).toBe(false);
   });
 
+  it("stale-generation unsubscribe does not delete the live listener set of a re-created name (#1206)", async () => {
+    const selector = createActiveNameSelector(router);
+
+    // Duplicate (name, callback): the SAME callback subscribed twice to "users"
+    // produces ONE Set entry (Set-dedup) but TWO unsubscribe closures, both
+    // capturing the same generation-1 Set by reference.
+    const dup = vi.fn();
+    const unsub1 = selector.subscribe("users", dup);
+    const unsub2 = selector.subscribe("users", dup);
+
+    // unsub1 tears down "users" entirely: deleting `dup` empties the deduped Set,
+    // so the name is removed from the map and the router subscription is dropped.
+    // unsub2 is now a STALE closure over the orphaned generation-1 Set.
+    unsub1();
+
+    // A fresh subscriber re-creates "users" — a NEW generation-2 Set.
+    const live = vi.fn();
+
+    selector.subscribe("users", live);
+
+    // The stale unsub2 runs. Without the generation guard it sees its captured
+    // (now-empty) Set, hits `listeners.size === 0`, and deletes the CURRENT
+    // "users" entry (generation-2) from the map + disconnects — orphaning `live`.
+    unsub2();
+
+    // Flip "users" active (home → users.list). `live` MUST still be notified.
+    await router.navigate("users.list");
+
+    expect(live).toHaveBeenCalled();
+  });
+
   describe("root semantics (audit §5.F — symmetry with createRouteNodeSource(''))", () => {
     it("isActive('') returns true when a route is current (root is always-active)", () => {
       const selector = createActiveNameSelector(router);

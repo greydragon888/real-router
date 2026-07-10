@@ -12,7 +12,6 @@ peerDependencyRules:
     typescript: '6'
 overrides:
   '@types/node': $@types/node
-  '@angular/router': 22.0.5
   # Bound to <8: vite-plugin-solid (solid adapter) breaks on @babel/core 8 / vite 8
   # (both released 2026-06). The previous open upper bounds let `pnpm dedupe` (the
   # pre-commit hook auto-dedupes) pull 8 and kill the solid bundle. Lift both when

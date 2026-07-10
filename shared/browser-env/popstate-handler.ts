@@ -210,30 +210,38 @@ export interface PopstateLifecycleDeps {
 export function createPopstateLifecycle(
   deps: PopstateLifecycleDeps,
 ): Pick<Plugin, "onStart" | "onStop" | "teardown"> {
+  // Captured at onStart so onStop/teardown clear the shared slot ONLY while we
+  // still own it. In a factory pool a later router's onStart replaces the slot
+  // (last-wins, #758); clearing it unconditionally on the earlier router's
+  // stop/dispose would disconnect the LIVE router (#1213).
+  let myRemover: (() => void) | undefined;
+
   return {
     onStart: () => {
       if (deps.shared.removePopStateListener) {
         deps.shared.removePopStateListener();
       }
 
-      deps.shared.removePopStateListener = deps.browser.addPopstateListener(
-        deps.handler,
-      );
+      myRemover = deps.browser.addPopstateListener(deps.handler);
+      deps.shared.removePopStateListener = myRemover;
     },
 
     onStop: () => {
-      if (deps.shared.removePopStateListener) {
+      if (myRemover && deps.shared.removePopStateListener === myRemover) {
         deps.shared.removePopStateListener();
         deps.shared.removePopStateListener = undefined;
       }
+
+      myRemover = undefined;
     },
 
     teardown: () => {
-      if (deps.shared.removePopStateListener) {
+      if (myRemover && deps.shared.removePopStateListener === myRemover) {
         deps.shared.removePopStateListener();
         deps.shared.removePopStateListener = undefined;
       }
 
+      myRemover = undefined;
       deps.cleanup();
     },
   };
@@ -302,30 +310,43 @@ export function createHashSyncLifecycle(
     deps.handler(evt);
   };
 
-  const removeListeners = (): void => {
-    if (deps.shared.removePopStateListener) {
+  // Captured at onStart so onStop/teardown clear the shared slot ONLY while we
+  // still own the combined remover — a later router's onStart replaces it
+  // (last-wins, #758); clearing it unconditionally on the earlier router's
+  // stop/dispose disconnects the LIVE router (#1213).
+  let myRemover: (() => void) | undefined;
+
+  const removeOwnListeners = (): void => {
+    if (myRemover && deps.shared.removePopStateListener === myRemover) {
       deps.shared.removePopStateListener();
       deps.shared.removePopStateListener = undefined;
     }
+
+    myRemover = undefined;
   };
 
   return {
     onStart: () => {
-      removeListeners();
+      // Unconditional last-wins removal of whatever's installed (#758) — onStart
+      // must displace the previous router regardless of ownership.
+      if (deps.shared.removePopStateListener) {
+        deps.shared.removePopStateListener();
+      }
 
       const removePopstate = deps.browser.addPopstateListener(onPopstate);
       const removeHashchange = deps.browser.addHashChangeListener(onHashchange);
 
-      deps.shared.removePopStateListener = () => {
+      myRemover = () => {
         removePopstate();
         removeHashchange();
       };
+      deps.shared.removePopStateListener = myRemover;
     },
 
-    onStop: removeListeners,
+    onStop: removeOwnListeners,
 
     teardown: () => {
-      removeListeners();
+      removeOwnListeners();
       deps.cleanup();
     },
   };

@@ -16,7 +16,7 @@
     "@real-router/lifecycle-plugin": "workspace:^",
     "@real-router/preload-plugin": "workspace:^",
     "@real-router/preact": "workspace:^",
-    "preact": "10.29.7"
+    "preact": "~10.29.7"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",

@@ -173,6 +173,40 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       removeEventSpy.mockRestore();
     });
+
+    it("factory pool: r1.stop() does not remove the last-wins router's navigate listener (#1213)", async () => {
+      // Capture each router's navigate remover so we can assert the live one is
+      // left intact when the earlier router stops.
+      const navRemovers: ReturnType<typeof vi.fn>[] = [];
+
+      vi.spyOn(browser, "addNavigateListener").mockImplementation(() => {
+        const remove = vi.fn();
+
+        navRemovers.push(remove);
+
+        return remove;
+      });
+
+      const sharedFactory = navigationPluginFactory({}, browser);
+
+      const router1 = createRouter(routerConfig, { defaultRoute: "home" });
+      const unsub1 = router1.usePlugin(sharedFactory);
+
+      await router1.start(); // navRemovers[0] = r1's
+
+      const router2 = createRouter(routerConfig, { defaultRoute: "home" });
+
+      router2.usePlugin(sharedFactory);
+      await router2.start(); // last-wins: removes r1's, navRemovers[1] = r2's
+      const r2Remover = navRemovers[1];
+
+      router1.stop(); // earlier router stops — must leave r2's listener intact
+
+      expect(r2Remover).not.toHaveBeenCalled();
+
+      router2.stop();
+      unsub1();
+    });
   });
 
   describe("Configuration Validation", () => {

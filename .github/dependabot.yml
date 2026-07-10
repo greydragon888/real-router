@@ -106,6 +106,52 @@ updates:
       # vite major manually + together across the ecosystem.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
+      # --- Patch-float set: UI frameworks, 3rd-party routers, testing libs ------
+      # Dev/test/example-only deps (never shipped — published adapters expose them
+      # as peerDependency ranges). Declared with `~` patch-float ranges in every
+      # manifest + a syncpack semverGroup (syncpack.config.mjs). `pnpm update`
+      # pulls the latest patch; Dependabot stays quiet on PATCH so it stops the
+      # per-patch PR churn these spread across ~150 example/adapter/benchmark
+      # manifests (e.g. the @angular/ssr #1368 / @angular/router #1371 noise).
+      # MINOR/major still flow as PRs (reviewed). Add new UI-framework/router/
+      # testing deps here (and to the syncpack group) when introduced.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "preact"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "preact-render-to-string"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "solid-js"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "svelte"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "vue"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "react-router"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "vue-router"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "wouter"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "sv-router"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "@mateothegreat/svelte5-router"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "@testing-library/*"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "@tanstack/*"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "@solidjs/*"
+        update-types: ["version-update:semver-patch"]
+      # @angular/* — EXACT cross-peer coupling (router@x requires core@x exactly),
+      # so ANY single-package bump (patch/minor/major) breaks strictPeerDependencies
+      # and can halt the whole npm job (same coupled-peer class as nanostores/vite
+      # above). The framework only moves via a manual, coordinated `pnpm update`
+      # across all @angular/* at once; the `~22.0.x` ranges then absorb the patch.
+      # Ignore the namespace entirely (this replaced the `@angular/router` override).
+      - dependency-name: "@angular/*"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"

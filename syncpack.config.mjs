@@ -51,6 +51,42 @@ export default {
       range: ">=",
     },
     {
+      // UI frameworks, third-party routers, and testing libraries are dev/test/
+      // example-only — they never ship to consumers (published adapters expose
+      // them via peerDependency ranges, governed by the ">= ranges" group above).
+      // Float the PATCH (`~`, not `^` — a minor can carry behavioural change and
+      // stays reviewed) so `pnpm update` pulls the latest patch and Dependabot can
+      // stay quiet on patch bumps (see .github/dependabot.yml "float-set" ignores).
+      // @angular/* is included so the whole framework floats in lockstep: its
+      // packages have EXACT cross-peer requirements (router@x needs core@x
+      // exactly), so a single-package bump breaks strictPeerDependencies — hence
+      // Dependabot ignores @angular/* entirely and the set moves together via
+      // `pnpm update` (this replaced the old `@angular/router` pnpm override).
+      label: "UI frameworks, routers, testing libs float latest patch (~)",
+      packages: ["**"],
+      dependencies: [
+        "react",
+        "react-dom",
+        "preact",
+        "preact-render-to-string",
+        "solid-js",
+        "svelte",
+        "vue",
+        "@angular/*",
+        "@testing-library/*",
+        "@tanstack/*",
+        "@solidjs/*",
+        "react-router",
+        "react-router-dom",
+        "vue-router",
+        "wouter",
+        "sv-router",
+        "@mateothegreat/svelte5-router",
+      ],
+      dependencyTypes: ["prod", "dev"],
+      range: "~",
+    },
+    {
       label: "Pinned versions (save-exact)",
       packages: ["**"],
       dependencyTypes: ["prod", "dev"],
