@@ -35,6 +35,17 @@ export const EMPTY_PARAMS: Readonly<Record<string, unknown>> = Object.freeze(
   {},
 );
 
+// Shared frozen sentinel for a route whose every segment has an empty
+// paramTypeMap (all-static chain): `buildMeta` returns this instead of a fresh
+// per-route `{ [fullName]: {} }` record — with N distinct route names those
+// records degrade into N dictionary-mode objects (route-unique keys) while
+// carrying zero information. Consumers do keyed lookups (`meta[name]`) and
+// treat a missing entry as "no params", so empty-entry ≡ missing-entry; the
+// sentinel stays truthy for the route-found check in core's buildNavigateState.
+export const EMPTY_ROUTE_META: Readonly<
+  Record<string, Record<string, "url" | "query">>
+> = Object.freeze({});
+
 export interface RegistrationState {
   readonly root: SegmentNode;
   readonly options: ResolvedMatcherOptions;

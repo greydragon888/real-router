@@ -326,6 +326,22 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         expect(router.isActiveRoute("twoQ", {}, false, true)).toBe(true);
       });
 
+      it("keeps defaults untouched when none are query-typed (url-only meta)", async () => {
+        // Route meta is non-empty (`:slot` is url-typed) but defaultParams
+        // carry no query-typed key — the strip probe scans them all, finds
+        // nothing to strip, and the defaults are compared as-is.
+        routesApi.add({
+          name: "urlOnly",
+          path: "/urlOnly/:slot",
+          defaultParams: { slot: "a" },
+          children: [{ name: "leaf", path: "/leaf" }],
+        });
+
+        await router.navigate("urlOnly.leaf", { slot: "a" });
+
+        expect(router.isActiveRoute("urlOnly", {}, false, true)).toBe(true);
+      });
+
       it("preserves URL-typed defaults during the strip (query key first)", async () => {
         // Query key first in iteration order — `filtered` is allocated on
         // the first iteration and the subsequent URL key flows into the

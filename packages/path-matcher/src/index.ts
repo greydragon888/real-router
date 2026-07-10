@@ -8,7 +8,14 @@
 // `PARAM_NAME_PATTERN` is the single source of truth for the param-name grammar
 // (#738); route-tree's `validateRoutePath` derives its name-less-marker gate from
 // it (#863) so the validation layer cannot drift from the matcher's own grammar.
-export { buildParamMeta, PARAM_NAME_PATTERN } from "./buildParamMeta";
+// `EMPTY_PARAM_META` is the whole-meta shared sentinel for fully-static nodes:
+// route-tree's `computeCaches` (the retaining consumer) swaps a fresh all-empty
+// result for this instance so a 10k-route static table holds ONE wrapper, not 10k.
+export {
+  buildParamMeta,
+  EMPTY_PARAM_META,
+  PARAM_NAME_PATTERN,
+} from "./buildParamMeta";
 
 // The validation-facing entry over the segment tokenizer (#1324): route-tree's
 // `validateRoutePath` calls `findSegmentGrammarError` to detect the per-segment
