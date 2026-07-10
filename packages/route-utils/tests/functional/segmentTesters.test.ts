@@ -543,6 +543,20 @@ describe("segmentTesters", () => {
       },
     );
 
+    // The curried guard (`if (invalidName) return false`) must SHORT-CIRCUIT —
+    // without it the body falls through to `buildRegex(segment).test(name)`, and
+    // RegExp.test string-coerces the broken name, so a segment equal to that
+    // coercion (`"undefined"` for name `undefined`, `"42"` for name `42`) would
+    // match. This reds the mutant the #769 shape-only assertions above survive:
+    // `curried("users")` never matches `"undefined"`/`"42"` either way (#1209).
+    it.each(testers)(
+      "%s: curried tester never matches the string-coerced invalid name",
+      (_name, tester) => {
+        expect(tester({} as unknown as State)("undefined")).toBe(false);
+        expect(tester({ name: 42 } as unknown as State)("42")).toBe(false);
+      },
+    );
+
     it("preserves the direct-form 'all false' semantics for an empty name", () => {
       expect(startsWithSegment("", "users")).toBe(false);
       expect(endsWithSegment("", "users")).toBe(false);

@@ -249,20 +249,23 @@ describe("routeUtils property-based tests", () => {
   // ===================================================================
 
   describe("multi-segment includesSegment", () => {
-    test.prop([fc.array(arbSegment, { minLength: 3, maxLength: 6 })], {
-      numRuns: NUM_RUNS.standard,
-    })(
+    test.prop(
+      [
+        fc.array(arbSegment, { minLength: 3, maxLength: 6 }),
+        fc.nat(),
+        fc.nat(),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
       "includesSegment detects contiguous multi-segment subsequences",
-      (segs) => {
+      (segs, startRaw, spanRaw) => {
         const name = segs.join(".");
-        const start = fc.sample(
-          fc.integer({ min: 0, max: segs.length - 2 }),
-          1,
-        )[0];
-        const end = fc.sample(
-          fc.integer({ min: start + 2, max: segs.length }),
-          1,
-        )[0];
+        // Derive start ∈ [0, len-2] and end ∈ [start+2, len] deterministically
+        // from the run seed (modulo-mapped fc.nat args) so a counterexample
+        // shrinks and reproduces under --seed. The former in-body fc.sample()
+        // did neither — start/end were outside the property's arguments (#1209).
+        const start = startRaw % (segs.length - 1);
+        const end = start + 2 + (spanRaw % (segs.length - start - 1));
         const subseq = segs.slice(start, end).join(".");
 
         expect(includesSegment(name, subseq)).toStrictEqual(true);
@@ -432,16 +435,13 @@ describe("routeUtils property-based tests", () => {
     test.prop(
       [fc.constantFrom(...(KNOWN_ROUTES as unknown as [string, ...string[]]))],
       { numRuns: NUM_RUNS.standard },
-    )(
-      "chain.length === depth + 1 (number of dot-separated segments)",
-      (name) => {
-        const chain = utils.getChain(name);
-        const depth = name.split(".").length;
+    )("chain.length === depth (number of dot-separated segments)", (name) => {
+      const chain = utils.getChain(name);
+      const depth = name.split(".").length;
 
-        expect(chain).toBeDefined();
-        expect(chain!).toHaveLength(depth);
-      },
-    );
+      expect(chain).toBeDefined();
+      expect(chain!).toHaveLength(depth);
+    });
   });
 
   // ===================================================================

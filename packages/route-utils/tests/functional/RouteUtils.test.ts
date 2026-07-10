@@ -11,7 +11,11 @@ import { RouteUtils, getRouteUtils } from "@real-router/route-utils";
 //           detail
 //             extra   <- 5 segments deep (4 dots)
 //     admin
-//     modal  <- absolute: true
+//     modal  <- absolute: true (parent == root)
+//     shop
+//       cart
+//       wishlist
+//       quickview  <- absolute: true (parent == shop, NOT root)
 const makeRoot = () =>
   createRouteTree("", "", [
     {
@@ -39,6 +43,18 @@ const makeRoot = () =>
     },
     { name: "admin", path: "/admin" },
     { name: "modal", path: "~/modal" },
+    {
+      // A nested subtree whose absolute child ("shop.quickview", path ~/quickview)
+      // has a NON-ROOT name-parent ("shop"). The top-level `modal` above has
+      // parent == root, which hid the parent-vs-root distinction (#1209 item 2).
+      name: "shop",
+      path: "/shop",
+      children: [
+        { name: "cart", path: "/cart" },
+        { name: "wishlist", path: "/wishlist" },
+        { name: "quickview", path: "~/quickview" },
+      ],
+    },
   ]);
 
 describe("RouteUtils", () => {
@@ -99,6 +115,17 @@ describe("RouteUtils", () => {
       expect(utils.getChain("modal")).toStrictEqual(["modal"]);
     });
 
+    it("returns chain for a NESTED absolute route (parent is not root)", () => {
+      // "shop.quickview" is absolute (path ~/quickview) but its name-parent is
+      // "shop", not root — so the chain still walks the name hierarchy up to the
+      // non-root parent. The top-level `modal` case (parent == root) can't
+      // distinguish this from a single-segment chain (#1209 item 2).
+      expect(utils.getChain("shop.quickview")).toStrictEqual([
+        "shop",
+        "shop.quickview",
+      ]);
+    });
+
     it("returns cached result on second call (referential equality)", () => {
       const c1 = utils.getChain("users.profile");
       const c2 = utils.getChain("users.profile");
@@ -155,6 +182,24 @@ describe("RouteUtils", () => {
       expect(siblings).toContain("users");
       expect(siblings).toContain("admin");
       expect(siblings).not.toContain("modal");
+    });
+
+    it("returns the PARENT's non-absolute children for a NESTED absolute route", () => {
+      // Siblings of the nested absolute "shop.quickview" are the non-absolute
+      // children of its name-parent "shop" — NOT the root's children. The
+      // top-level `modal` case resolves the parent to root, so this parent-scoped
+      // (non-root) branch was previously unexercised (#1209 item 2).
+      expect(utils.getSiblings("shop.quickview")).toStrictEqual([
+        "shop.cart",
+        "shop.wishlist",
+      ]);
+    });
+
+    it("excludes a nested absolute route from its non-absolute siblings", () => {
+      // "shop.cart" is non-absolute; its sibling set must EXCLUDE the absolute
+      // "shop.quickview" under the same parent (the exclusion applies at a
+      // non-root parent, not only at root as the `users`/`modal` case shows).
+      expect(utils.getSiblings("shop.cart")).toStrictEqual(["shop.wishlist"]);
     });
   });
 
