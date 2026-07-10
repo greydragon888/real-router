@@ -5091,3 +5091,61 @@ Caveats baked into `REPORT.md`: latency is paint-noisy (CPU `script` + heap are 
 - Preserved the one durable finding: `vs-tanstack/TANSTACK_STACK_OVERFLOW.md` (a real TanStack `commitLocation` unbounded-closure-chain stack overflow, found by the jsdom nav loop) lives in git history; the whole removal is git-recoverable.
 
 **Why.** cross-router is strictly the better competitive artifact — real browser > jsdom, current full-router competitors > dead lineage. The one axis `vs-tanstack` uniquely measured, **shipped bundle bytes**, is orthogonal to runtime and cheaply substitutable (bundlephobia, or a small standalone build+gzip) if the competitive-bytes story is needed again. Hoisting the audit-probe repository out of the deleted `core/` keeps `/deep-audit`'s committed regression set untouched while removing the benchmark suite it was tangled with.
+
+## Ownership identity-token discipline for shared lifecycle resources (#1357) (2026-07-10)
+
+### Problem
+
+Three confirmed bugs across three packages shared one abstract mechanism: **a shared mutable lifecycle resource is overwritten last-wins (or re-created per generation), and teardown acts on the shared slot _unconditionally_** — without checking "is this still mine / the current generation?" — so one instance's teardown corrupts another's live state.
+
+| Issue | Package | Shared resource | Corruption |
+| --- | --- | --- | --- |
+| #1206 | sources | per-name listener `Set` (re-created after teardown) | a stale unsubscribe closure empties the OLD Set, then `listenersByName.delete(name)` removes the NEW generation's entry → the live subscriber goes deaf, the count goes negative |
+| #1217 | dom-utils | announcer `refCount` + element (re-created) | a surviving old-generation instance's `destroy()` removes the NEW element (deleted by selector) / drives the count negative |
+| #1213 | browser / hash / navigation | `SharedFactoryState.removeXListener` slot (last-wins across routers in a factory pool) | the earlier router's `onStop`/`teardown` removes the LATER (active) router's listener → the winner goes deaf |
+
+Prior research settled the class as **point-bugs, not an RFC**: #1038 ruled the sources subscription-lifecycle class point-fix; #758 ruled the factory-pool low/documented. The three resources are heterogeneous (a `Set`; a DOM element + counter; a remover closure) in three packages — there is nothing to unify in code.
+
+### Solution
+
+**Point-fix each instance with one shape, and record the shape as a convention.** All three fixes are identical in shape: **capture identity at setup; on teardown, act on the shared resource only if it is still mine / the current generation.**
+
+- #1206 (`createActiveNameSelector.ts`): the unsubscribe closure captures its `Set`; it bails when `listenersByName.get(name) !== listeners`.
+- #1217 (`route-announcer.ts`): a module `announcerGeneration` token, bumped on fresh-element creation; each instance captures its generation and touches the shared count / element only while current; `removeAnnouncer` takes the captured element ref, not a selector query.
+- #1213 (`popstate-handler.ts` `createPopstateLifecycle` / `createHashSyncLifecycle`; `browser-plugin/factory.ts`; `navigation-plugin/plugin.ts` `createNavigateLifecycle`): each lifecycle captures `myRemover` at `onStart`; `onStop`/`teardown` clear the shared slot only if `deps.shared.removeX === myRemover`. `onStart` stays unconditional (last-wins displacement).
+
+**The convention (for any new shared-lifecycle resource):** a shared mutable resource that outlives a single lifecycle instance — a re-createable collection (`Set`/`Map`), a last-wins slot, a ref-counted singleton — MUST carry an identity/generation token. Every instance captures it at setup; teardown mutates the shared resource **only** when the token still matches (still mine / still the current generation). Removal targets the **captured reference**, never a re-query (selector, `get(key)`) that may resolve a newer owner's resource.
+
+Each surface carries a regression that fails without the guard: selector duplicate-subscription no-orphan (#1206 property), announcer multi-provider (PK regression, #1217), factory-pool concurrent-live cross-kill (five regressions strengthening B7.5, #1213).
+
+### Why a discipline, not a refactor
+
+The three resources are genuinely heterogeneous across three packages — a `CacheManager`-style unification would be a knowledge-leak anti-pattern (each resource owns its own teardown, as the sources cache-invalidation note already argues). #1038 and #758 already ruled the underlying classes point-fix. So the remedy is the convention above plus the per-surface invariants — not new coordinating code.
+
+**Sweep-2 (2026-07-10, read-only) confirmed no residual sites:** the only `SharedFactoryState` consumers are browser/hash/navigation (all fixed in #1213); `scroll-restore` / `view-transitions` hold per-instance closure state (no module-shared resource); `rx` has no generation/shared-slot pattern. The class is closed by construction, not by hope.
+
+## Reactive-source-lifecycle sync contract — one guarantee, three axes (#1356) (2026-07-10)
+
+### Problem
+
+Three findings (#1215, #1216, #1217) read as independent bugs but shared one structural root: **a derived reactive view (a source's snapshot; a dom-utility's resolved target) fails to re-synchronize with authoritative state across a lifecycle transition** — creation-with-preexisting-state, container remount, element regeneration. There was no uniform contract, so the guarantee drifted per source: `createRouteSource` reconciles (#765), its sibling `createErrorSource` did not.
+
+| Axis | Failure | Instance |
+| --- | --- | --- |
+| **reconcile-from-state** | source starts from a frozen default and observes only future events; never reads authoritative state on (re)creation / first-subscribe | #1215 |
+| **reconcile-trigger-scope** | `reconcile()` exists but its trigger can't observe the event that matters (an MO pointed at a container can't see the container's own removal) | #1216 |
+| **generation-identity** | lifecycle-shared state (a module counter + element) is not scoped to a generation | #1217 |
+
+### Solution — the contract each source / utility obeys
+
+1. **Reconcile-from-state on (re)creation and first-subscribe.** A source initializes its snapshot from authoritative state and catches up when the first listener re-attaches — the `createRouteSource` / #765 pattern.
+2. **Reconcile triggers observe the authoritative source's full change surface.** #1216: the router-`subscribe` callback re-resolves + re-observes when the tracked container has detached (navigation is exactly when route-tied containers mount / die) — Option A, keeping #780's container-scoped MO.
+3. **Lifecycle-shared state is generation-scoped.** #1217: a generation token; instances act only while current (this is _also_ the #1357 discipline — one fix, two classes).
+
+**By-design exception (reconcile-from-state).** Not every source reconciles — some are **event streams**, not state mirrors, and correctly observe only future events: `createErrorSource` / `createTransitionSource` / rx `events$`. #1215 was resolved **WONTFIX by-design** (D2): an error is a transient event, not persistent state; the router retains no "last error" to replay, and an error before the first subscriber surfaces on the navigation promise, not the source. Adding a `getLastError()` retention to reconcile it would be a false symmetry with `getState()`. The contract is: **state mirrors reconcile; event streams do not** — the split is deliberate and documented (sources README, PR-B / #1208 fold).
+
+### Enforcement + why not "unify all sources × 6 adapters"
+
+The **framework-agnostic** guarantee is enforced at the sources layer, where it belongs: `createRouteSource` / `createRouteNodeSource` / `createActiveRouteSource` reconnect-reconcile (#765/#766) and `createDismissableError` catch-up (#765.2) each carry property invariants (sources INVARIANTS.md); rx `state$` replays current state on subscribe. The adapter-level manifestations (React `<Activity>` hide/show) are locked in the measuring owner's integration suite (react `reactive-lifecycle.test.tsx` P1/P2/PC2). `<Activity>` is a React-19 API with no uniform cross-framework analogue, so a literal "same test × 6 adapters" is not the right shape — the framework-agnostic reconcile those tests exercise is already source-level-tested for every consumer.
+
+**Sweep-2 (2026-07-10, read-only) confirmed the contract holds across every source:** all lazy sources reconcile; eager sources (transition / error) and rx `events$` are event streams by-design; `scroll-restore` / `view-transitions` are transition-driven, not stale-able derived views. No residual reconcile gap.
