@@ -86,8 +86,10 @@ export class PreloadPlugin {
     // Drop compiled-preload entries for routes removed from the tree. Without
     // this, `#resolvePreload` can never reach them again (matchUrl returns
     // undefined for a removed route), so the entry would be dead memory until
-    // teardown. `add`/`update` need no handling — `#resolvePreload` already
-    // revalidates lazily via the cached `factory` reference.
+    // teardown. `add`/`update` need no `#compiledPreloads` handling —
+    // `#resolvePreload` revalidates it lazily via the cached `factory` reference.
+    // (`#stateCache` IS invalidated for them in `#onTreeChanged`'s `default`
+    // branch — it has no lazy path; see #805.)
     this.#removeChangesSubscription = getRoutesApi(router).subscribeChanges(
       (event) => {
         this.#onTreeChanged(event);
