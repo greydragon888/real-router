@@ -618,9 +618,7 @@ export class EventBusNamespace {
     // Snapshot before iteration — a listener that reentrantly calls
     // `subscribeLeave(newFn)` or its own `unsubscribe()` must not affect the
     // current emit cycle. Symmetric with the EventEmitter snapshot invariant
-    // (PR #666 / #659). Use `Array.from` rather than `[...array]` to keep the
-    // intent explicit (some lint rules treat spread-of-own-array as
-    // redundant and silently revert it).
+    // (PR #666 / #659).
     const snapshot = [...this.#leaveListeners];
 
     // Elevated across the SYNC leave-listener dispatch: `isProcessing()` reads
