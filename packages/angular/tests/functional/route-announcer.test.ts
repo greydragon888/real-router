@@ -651,4 +651,56 @@ describe("createRouteAnnouncer", () => {
     document.title = originalTitle;
     announcer.destroy();
   });
+
+  it("#1217: a stale instance's destroy() does not remove a re-created (newer-generation) element", async () => {
+    const r1 = createRouter(routes);
+    const r2 = createRouter(routes);
+
+    await r1.start("/");
+    await r2.start("/");
+
+    const ann1 = createRouteAnnouncer(r1);
+    const ann2 = createRouteAnnouncer(r2);
+
+    const original = document.querySelector(`[${ANNOUNCER_ATTR}]`);
+
+    expect(original).not.toBeNull();
+
+    // Host wipes the shared element WITHOUT calling either instance's destroy()
+    // — a subtree clear, an HMR swap, a test teardown that resets the DOM.
+    original?.remove();
+
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
+
+    // A fresh provider re-creates the element — a NEW generation.
+    const r3 = createRouter(routes);
+
+    await r3.start("/");
+
+    const ann3 = createRouteAnnouncer(r3);
+
+    const recreated = document.querySelector(`[${ANNOUNCER_ATTR}]`);
+
+    expect(recreated).not.toBeNull();
+    expect(recreated).not.toBe(original);
+
+    // The stale ann1/ann2 (old generation) tear down. Before #1217 their
+    // destroy() removed the element by selector — deleting `recreated` (the LIVE
+    // generation's element) and driving the ref-count negative. The generation
+    // guard makes them no-ops.
+    ann1.destroy();
+    ann2.destroy();
+
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBe(recreated);
+    expect(recreated?.isConnected).toBe(true);
+
+    // The live holder still owns teardown: its destroy removes exactly its element.
+    ann3.destroy();
+
+    expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
+
+    r1.stop();
+    r2.stop();
+    r3.stop();
+  });
 });

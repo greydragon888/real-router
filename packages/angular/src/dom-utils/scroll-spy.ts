@@ -349,6 +349,10 @@ const createDebouncer = (
 
 interface ObserverPair {
   readonly pending: Map<Element, IntersectionObserverEntry>;
+  /** True when a resolved container has since detached from the DOM (#1216). */
+  isContainerDetached: () => boolean;
+  /** Re-resolve the container + re-observe matches (rebuilds the pair on change). */
+  reconcile: () => void;
   destroy: () => void;
 }
 
@@ -526,6 +530,17 @@ const createObserverPair = (
 
   return {
     pending,
+    // #1216: the MutationObserver is pointed at the container's OWN subtree, so
+    // the container's removal (a mutation of its PARENT) is invisible — reconcile
+    // never fires on it and a remounted container is never re-observed. Expose a
+    // detach check + reconcile so the router.subscribe callback can re-resolve on
+    // navigation (exactly when route-tied containers mount/die). When
+    // `observerContainer` is null the MO already watches `document.body`, which
+    // sees container mounts directly — so only a resolved-then-detached container
+    // needs this nav-time nudge.
+    isContainerDetached: (): boolean =>
+      observerContainer !== null && !observerContainer.isConnected,
+    reconcile,
     destroy(): void {
       io.disconnect();
       mo.disconnect();
@@ -721,6 +736,14 @@ export function createScrollSpy(
   const unsubscribeRouter = router.subscribe(({ route }) => {
     if (selfEmitting) {
       return;
+    }
+
+    // #1216: a route-tied scroll container may have unmounted since the last
+    // navigation. The container-scoped MutationObserver can't observe its own
+    // removal (a mutation of its parent), so re-resolve + re-observe here —
+    // navigation is exactly when such containers mount / die.
+    if (observers.isContainerDetached()) {
+      observers.reconcile();
     }
 
     if (getUrlContext(route)?.hashChanged) {
