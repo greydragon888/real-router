@@ -6,7 +6,7 @@
 
 **Scope — three full routers, like-for-like** (SvelteKit + hash/minimalist routers excluded). The honest split has **two axes plus a capability axis**. **Matcher scale** (`wide-config`): **real-router wins** — its segment trie stays flat @1000 (0.37) while sv-router degrades O(N) (0.77) and mateo-router floors high (0.83); the structural trie win holds in Svelte (as in React/Vue). **Per-nav render + memory** (cold-start, nav-latency, param-nav, nav-churn, table-heap, nested-switch, link-build): **sv-router wins** — a remarkably lean router (heap @10k 2.26 MB vs real-router 8.43; link-build 3.2 ms vs 12.1). **Capability**: **real-router is the ONLY full-pipeline router** (guards + validated search + data + scroll); sv-router covers data + guard, mateo-router guard only. real-router's adapter soft-spots: deep-nesting `RouteView` O(depth) (#1094) and a heavy `<Link>` (link-build 12.1 ms — `buildPath` + per-component instantiation, the residual after #1101's shared-selector fix). mateo-router renders depth 90 (no error boundary, unlike `@tanstack/solid-router`).
 
-**Run:** runs 30 · warmup 5 · throttle off · 2026-07-06T22:57:21.214Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
+**Run:** runs 50 · warmup 5 · throttle off · 2026-07-09T17:46:03.317Z · Apple M3 Pro · numbers are **median** (winner per row **bold**).
 
 ⚠️ Preliminary local numbers — directional, not a published verdict. Reported metrics are the stable signals — CPU (`script`), heap, FCP. Felt latency was dropped (render/frame-bound). `nav-churn` navsPerSec is frame-capped here (read CPU/nav + heap). **Caveat — `script` is V8-only:** CDP `ScriptDuration` excludes Blink C++ (`history.pushState` ~identical across routers), so `script` ratios overstate the `total` per-nav gap.
 
@@ -16,8 +16,8 @@ App init + parse/exec to first route painted. **sv-router is the lightest to boo
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| main-thread script (ms) | 5.02 | **3.56** | 3.93 |
-| JS heap (MB) | 2.99 | **2.54** | 2.60 |
+| main-thread script (ms) | 5.10 | **3.57** | 3.91 |
+| JS heap (MB) | 3.01 | **2.54** | 2.60 |
 | FCP (ms) | 24.00 | **16.00** | **16.00** |
 
 ## Navigation — per-nav total main-thread (script + history) — `nav-latency`
@@ -26,10 +26,10 @@ Per-navigation total (script + Blink history), steady-state. **sv-router is the 
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | 0.794 | **0.490** | 0.740 |
-| · script (V8 only) (ms) | 0.503 | **0.228** | 0.450 |
-| · Blink history (pushState) (ms) | 0.296 | **0.262** | 0.289 |
-| alloc / nav (GC pressure) (KB) | 0.126 | **0.072** | 0.162 |
+| ≈ total main-thread (ms) | 0.842 | **0.514** | 0.780 |
+| · script (V8 only) (ms) | 0.526 | **0.238** | 0.471 |
+| · Blink history (pushState) (ms) | 0.316 | **0.275** | 0.310 |
+| alloc / nav (GC pressure) (KB) | 0.118 | **0.071** | 0.153 |
 
 ## Param navigation — per-nav total (script + history) — `param-nav`
 
@@ -37,10 +37,10 @@ Per-nav total changing :id (steady-state). **sv-router leanest; real-router seco
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | 0.584 | **0.394** | 0.629 |
-| · script (V8 only) (ms) | 0.287 | **0.122** | 0.333 |
-| · Blink history (pushState) (ms) | 0.302 | **0.276** | 0.295 |
-| alloc / nav (GC pressure) (KB) | 0.116 | **0.074** | 0.242 |
+| ≈ total main-thread (ms) | 0.620 | **0.418** | 0.660 |
+| · script (V8 only) (ms) | 0.296 | **0.128** | 0.340 |
+| · Blink history (pushState) (ms) | 0.324 | **0.287** | 0.320 |
+| alloc / nav (GC pressure) (KB) | 0.113 | **0.080** | 0.231 |
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
@@ -48,12 +48,12 @@ Navigate into a flat 1000-route table — **the matcher crossover, and real-rout
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total @10 (ms) | 0.406 | **0.293** | 0.833 |
-| ≈ total @100 (ms) | 0.365 | **0.339** | 0.791 |
-| ≈ total @1000 (ms) | **0.370** | 0.767 | 0.831 |
-| · script (matcher) @10 (ms) | 0.350 | **0.243** | 0.771 |
-| · script (matcher) @100 (ms) | 0.311 | **0.288** | 0.730 |
-| · script (matcher) @1000 (ms) | **0.314** | 0.714 | 0.777 |
+| ≈ total @10 (ms) | 0.430 | **0.299** | 0.862 |
+| ≈ total @100 (ms) | 0.394 | **0.347** | 0.816 |
+| ≈ total @1000 (ms) | **0.402** | 0.784 | 0.869 |
+| · script (matcher) @10 (ms) | 0.369 | **0.244** | 0.796 |
+| · script (matcher) @100 (ms) | 0.337 | **0.295** | 0.752 |
+| · script (matcher) @1000 (ms) | **0.343** | 0.727 | 0.807 |
 
 ## Route-table memory — heap to hold N routes (sweep) — `table-heap`
 
@@ -61,9 +61,9 @@ Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **sv-router wins d
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| heap @1 (floor) (MB) | 2.04 | **1.82** | 1.87 |
-| heap @1k (MB) | 2.89 | **1.97** | 2.70 |
-| heap @10k (MB) | 8.43 | **2.26** | 9.20 |
+| heap @1 (floor) (MB) | 2.06 | **1.82** | 1.87 |
+| heap @1k (MB) | 2.92 | **1.97** | 2.70 |
+| heap @10k (MB) | 8.45 | **2.26** | 9.20 |
 
 ## Deep config — nesting depth (sweep) — `deep-config`
 
@@ -71,14 +71,14 @@ Navigate into a 90-level nested chain. **All three rise O(depth)** — real-rout
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total @3 (ms) | 0.624 | **0.374** | 0.658 |
-| ≈ total @30 (ms) | 1.68 | **1.00** | 2.10 |
-| ≈ total @60 (ms) | 3.00 | **1.60** | 2.99 |
-| ≈ total @90 (ms) | 4.53 | **2.68** | 3.87 |
-| · script (matcher) @3 (ms) | 0.567 | **0.318** | 0.597 |
-| · script (matcher) @30 (ms) | 1.61 | **0.945** | 2.04 |
-| · script (matcher) @60 (ms) | 2.94 | **1.55** | 2.92 |
-| · script (matcher) @90 (ms) | 4.46 | **2.61** | 3.80 |
+| ≈ total @3 (ms) | 0.648 | **0.382** | 0.677 |
+| ≈ total @30 (ms) | 1.74 | **1.01** | 2.13 |
+| ≈ total @60 (ms) | 3.04 | **1.61** | 2.98 |
+| ≈ total @90 (ms) | 4.61 | **2.73** | 3.92 |
+| · script (matcher) @3 (ms) | 0.587 | **0.325** | 0.615 |
+| · script (matcher) @30 (ms) | 1.67 | **0.952** | 2.07 |
+| · script (matcher) @60 (ms) | 2.98 | **1.55** | 2.92 |
+| · script (matcher) @90 (ms) | 4.54 | **2.67** | 3.85 |
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
@@ -86,13 +86,13 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total @1 (ms) | 0.452 | **0.423** | 0.504 |
-| ≈ total @10 (ms) | 0.428 | **0.424** | 0.535 |
-| ≈ total @50 (ms) | **0.465** | 0.474 | 0.698 |
-| · script (query-parse) @1 (ms) | 0.388 | **0.369** | 0.439 |
-| · script (query-parse) @10 (ms) | **0.369** | **0.369** | 0.481 |
-| · script (query-parse) @50 (ms) | **0.401** | 0.412 | 0.634 |
-| alloc / nav @50↔@1 (GC pressure) (KB) | 0.219 | **0.115** | 0.254 |
+| ≈ total @1 (ms) | 0.480 | **0.439** | 0.501 |
+| ≈ total @10 (ms) | 0.447 | **0.434** | 0.536 |
+| ≈ total @50 (ms) | **0.472** | 0.488 | 0.710 |
+| · script (query-parse) @1 (ms) | 0.413 | **0.382** | 0.438 |
+| · script (query-parse) @10 (ms) | 0.385 | **0.375** | 0.476 |
+| · script (query-parse) @50 (ms) | **0.406** | 0.424 | 0.645 |
+| alloc / nav @50↔@1 (GC pressure) (KB) | 0.225 | **0.108** | 0.253 |
 
 ## Nav churn (stress) — `nav-churn`
 
@@ -100,11 +100,11 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total / nav (ms) | 0.817 | **0.515** | 0.779 |
-| · script / nav (V8) (ms) | 0.522 | **0.254** | 0.490 |
-| · Blink / nav (pushState) (ms) | 0.296 | **0.260** | 0.288 |
-| heap retained (200 navs) (KB) | 380 | **243** | 295 |
-| throughput (frame-capped) (/s) | 121 | 121 | **121** |
+| ≈ total / nav (ms) | 0.876 | **0.519** | 0.812 |
+| · script / nav (V8) (ms) | 0.552 | **0.262** | 0.509 |
+| · Blink / nav (pushState) (ms) | 0.320 | **0.244** | 0.303 |
+| heap retained (200 navs) (KB) | 387 | **243** | 295 |
+| throughput (frame-capped) (/s) | 121 | **121** | 121 |
 
 ## Active links (100) — per-nav total (script + history) — `active-links`
 
@@ -112,9 +112,20 @@ Per-nav total recompute across 100 links (steady-state toggle). **real-router WI
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | **0.542** | 0.640 | 0.729 |
-| · script (V8 only) (ms) | **0.240** | 0.304 | 0.431 |
-| · Blink history (pushState) (ms) | 0.302 | 0.338 | **0.295** |
+| ≈ total main-thread (ms) | **0.575** | 0.672 | 0.757 |
+| · script (V8 only) (ms) | **0.247** | 0.310 | 0.436 |
+| · Blink history (pushState) (ms) | 0.328 | 0.367 | **0.321** |
+
+## Back / forward — per-nav total, browser history traversal (popstate) — `back-forward`
+
+Browser **back/forward** (popstate) steady-state. **Near 3-way tie (~3% spread) after #1353** — sv-router ~1.37, mateo-router ~1.41, real-router ~1.41 (tied with mateo, +2.9% over sv-router). The skip-no-op-`replaceState` fix cut real-router's back/forward from a **~53% loss to a dead heat** with the two minimal Svelte routers. #2 on allocation (~0.10; sv-router 0.07 leanest). *(n=15.)*
+
+| metric | real-router | sv-router | mateo-router |
+|---|---|---|---|
+| ≈ total main-thread (ms) | 1.41 | **1.37** | 1.41 |
+| · script (V8 only) (ms) | 0.394 | **0.263** | 0.305 |
+| · Blink history (popstate) (ms) | **1.02** | 1.14 | 1.09 |
+| alloc / nav (GC pressure) (KB) | 0.101 | **0.068** | 0.159 |
 
 ## Link build — mount 1000 links (href construction) — `link-build`
 
@@ -122,7 +133,7 @@ CPU to mount 1000 links, each building its href. **sv-router leanest (3.25 ms �
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| script (1000 links) (ms) | 12.06 | **3.25** | 7.19 |
+| script (1000 links) (ms) | 12.02 | **3.27** | 7.07 |
 
 ## Nested switch (reuse) — per-nav total (script + history) — `nested-switch`
 
@@ -130,9 +141,9 @@ Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. 
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
-| ≈ total main-thread (ms) | 0.597 | **0.419** | 0.532 |
-| · script (V8 only) (ms) | 0.296 | **0.148** | 0.232 |
-| · Blink history (pushState) (ms) | 0.300 | **0.272** | 0.296 |
+| ≈ total main-thread (ms) | 0.633 | **0.443** | 0.557 |
+| · script (V8 only) (ms) | 0.311 | **0.153** | 0.241 |
+| · Blink history (pushState) (ms) | 0.326 | **0.288** | 0.317 |
 
 ## Feature support — capability, NOT a perf race
 
@@ -160,9 +171,9 @@ Among three full routers, first-class API coverage differs sharply. `✓` = buil
 
 | metric | bare Svelte | real-router | sv-router | mateo-router |
 |---|---|---|---|---|
-| cold-start script (ms) | 2.01 | 5.02 (+3.0) | 3.56 (+1.6) | 3.93 (+1.9) |
-| cold-start heap (MB) | 2.39 | 2.99 (+0.6) | 2.54 (+0.1) | 2.60 (+0.2) |
-| link-build script (ms) | 3.01 | 12.06 (+9.0) | 3.25 (+0.2) | 7.19 (+4.2) |
+| cold-start script (ms) | 1.98 | 5.10 (+3.1) | 3.57 (+1.6) | 3.91 (+1.9) |
+| cold-start heap (MB) | 2.39 | 3.01 (+0.6) | 2.54 (+0.1) | 2.60 (+0.2) |
+| link-build script (ms) | 2.99 | 12.02 (+9.0) | 3.27 (+0.3) | 7.07 (+4.1) |
 
 **Reading:** over bare Svelte, sv-router's plain `<a href>` link-build sits ~at the floor; real-router adds the most on boot and on links (its `<Link>` reverse-matcher). real-router's separation is the matcher-scale win (wide @1000) + the full capability set, not the simple hot path. (Per-nav is ranked router-vs-router in the tables above.)
 
