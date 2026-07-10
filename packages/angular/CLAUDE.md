@@ -249,6 +249,30 @@ class FormComponent {
 Same applies to `injectRouteEnter`. This contrasts with React/Preact, where
 `useRouteExit` keeps a `handlerRef` that's updated on every render.
 
+### Synchronous `router.navigate()` inside an `injectRouteExit` handler throws `REENTRANT_NAVIGATION`
+
+An `injectRouteExit` exit handler runs as a transition-event listener — it is
+forwarded into `router.subscribeLeave` with no isolation. Core bans a
+**synchronous** `router.navigate()` (and `navigateToDefault` / `navigateToState`
+/ `navigateToNotFound`) called from inside such a listener: it throws
+`RouterError(REENTRANT_NAVIGATION)` at the facade (#1030–#1035), so a redirect
+written straight into the handler body tears the exit down instead of navigating.
+**Defer it** out of the listener call stack — wrap in `queueMicrotask(...)`, or
+`await` anything first (any `await` / `.then` moves the call off the listener
+stack, where navigation is allowed):
+
+```ts
+injectRouteExit(({ nextRoute }) => {
+  if (nextRoute.name === "checkout" && !isAuthed()) {
+    // WRONG — throws REENTRANT_NAVIGATION (synchronous, inside the listener):
+    //   router.navigate("login");
+    queueMicrotask(() => router.navigate("login")); // CORRECT — deferred
+  }
+});
+```
+
+The same ban applies to `injectRouteEnter` handlers.
+
 ### injectRoute throws when route is undefined
 
 `injectRoute()` returns `{ navigator, routeState: Signal<{route: State<P>; previousRoute?: State}> }` —
@@ -316,9 +340,9 @@ Effect cleanup is bound automatically to the host directive's injection-context 
 
 **Consequence for tests**: full reactive-input verification (e.g., changing `[realLink]="signal()"` and asserting `.active` class re-binds) requires AOT compilation — JIT mode rejects signal-input template bindings with `NG0303`. Use `@analogjs/vite-plugin-angular` or e2e via Playwright against a production-mode example app. The content-stabilization is unit-tested via the JIT-safe toy pattern (`tests/functional/createStableParams.test.ts`) — a plain `signal<Params>()` drives the same `createStableParams` helper the directives feed their input signal into (the effect-re-run mechanism is identical for `input()` and `signal()`).
 
-**Caveat — distinct `[routeParams]` / `[realLink]` keys on a reused node accumulate eternal sources (#766).** Each effect rebuild creates a `createActiveRouteSource` for the new `(name | params | hash)` key, and those sources are **cached eagerly and never released** in `@real-router/sources` (their `destroy()` is a no-op; `onCleanup` only tears down the _bridge subscription_, not the cached source). Content-stabilization (#988, above) already collapses inline-literal churn when the param _content_ is unchanged — but a node that genuinely cycles through many **distinct** keys still leaves one permanent router listener per unique key. The textbook trigger is a long virtual list / `@for` with **track-identity** reuse, where a single `<a realLink [routeParams]="item().params">` is re-bound to thousands of different param values as the user scrolls: it walks monotonically toward the `EventEmitter` `Listener limit (10000)` crash. This is the **lowest-threshold path to #766 in the adapter series** — no thousands of `RealLink` instances (React/Preact/Vue) and no remount workaround (Svelte `{#key}`) are needed; one reused directive suffices.
+**Historical — distinct `[routeParams]` / `[realLink]` keys on a reused node once accumulated eternal sources (#766, fixed in sources 0.9.0).** Each effect rebuild creates a `createActiveRouteSource` for the new `(name | params | hash)` key. Before the lazy-connection fix these sources subscribed to the router eagerly and never disconnected (`destroy()` is a no-op; `onCleanup` only tears down the _bridge subscription_), so a node that genuinely cycled through many **distinct** keys — the textbook case a long virtual list / `@for` with **track-identity** reuse, where a single `<a realLink [routeParams]="item().params">` is re-bound to thousands of param values as the user scrolls — left one permanent router listener per unique key and walked monotonically toward the `EventEmitter` `Listener limit (10000)` crash. It was the lowest-threshold path to #766 in the adapter series: one reused directive, no thousands of `RealLink` instances (React/Preact/Vue), no remount workaround (Svelte `{#key}`).
 
-Until the sources fix lands ([#766](https://github.com/greydragon888/real-router/issues/766) — lazy / bounded active-route source), prefer **value reuse** over re-binding one node across an unbounded key space: bind a bounded set of param objects, or `track` by a value whose distinct count stays small. A short-lived router (a per-page clone disposed on teardown) also sidesteps the accumulation — its whole sources cache is released when the router is GC'd.
+**Fixed in sources 0.9.0 (lazy connect / disconnect).** The active-route source now connects on its first listener and disconnects when its last one unsubscribes — the bridge's `onCleanup` **is** that last unsubscribe, so re-binding across an unbounded key space no longer accumulates. The cache **entry** (a closure) still lives with the router, but it holds **no** router subscription without a live listener — "never released" was only ever true of the closure, never of the subscription (the accumulation source). Simultaneously-live consumers still cost **one** router subscription each: expected cost, not a leak, released when the last listener unsubscribes or the router is GC'd. The P3 regression test (`tests/functional/reactive-lifecycle.test.ts:103`) pins it — one directive cycling 200 distinct `[routeParams]` holds `active ≤ 1` router subscription, not 200. (Content-stabilization, #988 above, remains an orthogonal optimization that collapses inline-literal churn when the param _content_ is unchanged.)
 
 ### No RxJS
 
