@@ -17,30 +17,19 @@
  * `src/index.ts` of any adapter imports from this directory.
  */
 
-const PERCENT_ESCAPE_PROBE = /%[\dA-Fa-f]{2}/;
-
 /**
  * Compute the expected fragment portion of an href for a given raw hash input.
  *
- * Mirrors the contract of `encodeFragmentInline`:
- *  1. If input contains `%XX`, try `decodeURIComponent` → `encodeURI` (idempotent
- *     re-encoding so consumers can copy-paste `location.hash` back in without
- *     `%20` becoming `%2520`).
- *  2. If `decodeURIComponent` throws (malformed `%XX`), fall through to plain
- *     `encodeURI` on the original input.
- *  3. Defensive `#` → `%23` (encodeURI does not encode `#`).
+ * Mirrors the #1211 strictly-decoded contract of `encodeFragmentInline`: the
+ * `hash` value is a DECODED fragment, encoded verbatim by
+ * `encodeURI(s).replaceAll("#", "%23")`. There is NO `decodeURIComponent`
+ * probe / round-trip — a literal `%` in the input is escaped to `%25` (so a
+ * wire fragment fed back in double-encodes; that is the contract, not a bug).
+ * This overturns the earlier Mini-sprint E.1 idempotency tolerance
+ * (audit-2026-05-17 §5); the mirror re-derives the trivial formula so any
+ * drift in `encodeFragmentInline` (or `encodeHashFragment`) still surfaces
+ * here as a `buildHref` mismatch.
  */
 export function computeExpectedFragment(rawHash: string): string {
-  let roundtrip = rawHash;
-
-  if (PERCENT_ESCAPE_PROBE.test(rawHash)) {
-    try {
-      roundtrip = decodeURIComponent(rawHash);
-    } catch {
-      // Malformed %XX — encodeFragmentInline falls through to plain
-      // encodeURI on the original input, so do the same here.
-    }
-  }
-
-  return encodeURI(roundtrip).replaceAll("#", "%23");
+  return encodeURI(rawHash).replaceAll("#", "%23");
 }
