@@ -217,11 +217,18 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   }
 
   /**
-   * Removes all listeners and resets dispatch state.
+   * Removes all listeners and resets the warn latch.
+   *
+   * Does NOT touch `#dispatching`: the in-flight coalesce guard is owned by the
+   * active `emit` frame (added when dispatch starts, self-released in that
+   * frame's `finally`). Clearing it here would lift the guard for a live frame
+   * when `clearAll()` runs from inside a listener, so a re-entrant same-event
+   * emit would no longer coalesce and would re-enter — violating the depth-≤-1
+   * contract (#1164). The guard self-releases; `clearAll()` has no business
+   * sweeping state owned by active emit frames.
    */
   clearAll(): void {
     this.#callbacks.clear();
-    this.#dispatching.clear();
     this.#warnedEvents = null;
   }
 

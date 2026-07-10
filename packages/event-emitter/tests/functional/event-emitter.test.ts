@@ -277,6 +277,68 @@ describe("EventEmitter", () => {
       expect(emitter.listenerCount("reset")).toBe(1);
     });
 
+    it("releases the in-flight guard even when onListenerError itself throws — abnormal emit exit (#1165)", () => {
+      const emitter = createEmitter({
+        onListenerError: () => {
+          throw new Error("reporter boom"); // the error reporter itself throws
+        },
+      });
+
+      const boom = (): void => {
+        throw new Error("listener boom");
+      };
+
+      emitter.on("reset", boom);
+
+      // emit exits abnormally (onListenerError re-throws from the catch), but the
+      // `finally` must still release the in-flight guard — otherwise "reset"
+      // sticks in #dispatching forever and every future emit is silently
+      // coalesced (a permanently-dead event). Green now; the move-mutant (delete
+      // out of `finally`) turns this red.
+      expect(() => {
+        emitter.emit("reset");
+      }).toThrow("reporter boom");
+
+      expect(emitter.isDispatching("reset")).toBe(false); // released by finally
+
+      // Not permanently dead — with the failing listener removed, a fresh emit
+      // still dispatches (it would be coalesced to a no-op if the guard leaked).
+      emitter.off("reset", boom);
+      const healthy = vi.fn();
+
+      emitter.on("reset", healthy);
+      emitter.emit("reset");
+
+      expect(healthy).toHaveBeenCalledTimes(1);
+    });
+
+    it("a throw from onListenerError aborts the remaining snapshot — multi-listener (#1165)", () => {
+      const emitter = createEmitter({
+        onListenerError: () => {
+          throw new Error("reporter boom");
+        },
+      });
+
+      const first = vi.fn(() => {
+        throw new Error("first boom"); // triggers onListenerError, which throws
+      });
+      const second = vi.fn();
+
+      emitter.on("reset", first);
+      emitter.on("reset", second);
+
+      // The reporter's throw propagates out of the snapshot loop before it
+      // reaches `second` — an intentional abort, NOT per-listener isolation
+      // (which holds only while onListenerError itself does not throw). Pins the
+      // otherwise-undocumented behaviour; INVARIANTS carve-out lands in #1166.
+      expect(() => {
+        emitter.emit("reset");
+      }).toThrow("reporter boom");
+
+      expect(first).toHaveBeenCalledTimes(1); // ran, threw → reporter threw
+      expect(second).not.toHaveBeenCalled(); // never reached
+    });
+
     it("should call a zero-arg listener with EXACTLY zero arguments (switch case 0)", () => {
       const emitter = createEmitter();
       const cb = vi.fn();
@@ -630,6 +692,38 @@ describe("EventEmitter", () => {
       }).not.toThrow();
 
       expect(order).toStrictEqual(["click", "hover"]);
+    });
+
+    it("clearAll() from a listener does NOT lift the in-flight guard — re-entrant same-event emit stays coalesced (depth ≤ 1, #1164)", () => {
+      const emitter = createEmitter();
+      let depth = 0;
+      let maxDepth = 0;
+
+      // A listener that clears everything, re-registers itself, and re-emits
+      // the SAME event — all while its own emit frame is still on the stack.
+      // The re-emit must be coalesced by the in-flight guard (#1033 depth ≤ 1);
+      // if clearAll() lifts that guard (#1164), the re-emit re-enters and depth
+      // climbs. The `depth < 5` cap keeps the buggy path bounded (no overflow).
+      const handler = (): void => {
+        depth += 1;
+        maxDepth = Math.max(maxDepth, depth);
+
+        if (depth < 5) {
+          emitter.clearAll();
+          emitter.on("reset", handler);
+          emitter.emit("reset"); // in-flight → must coalesce to a no-op
+        }
+
+        depth -= 1;
+      };
+
+      emitter.on("reset", handler);
+      emitter.emit("reset");
+
+      // clearAll()'s stray `this.#dispatching.clear()` lifts the guard held by
+      // the live emit frame, so the re-emit re-enters — reaching depth 5. The
+      // guard is owned by active emit frames; clearAll() must not sweep it.
+      expect(maxDepth).toBe(1);
     });
 
     it("calls a listener with 3 args", () => {

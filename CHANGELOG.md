@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-10]
 
+### @real-router/core@0.74.6
+
+### Patch Changes
+
+- [#1400](https://github.com/greydragon888/real-router/pull/1400) [`f668898`](https://github.com/greydragon888/real-router/commit/f668898188e19b5ce7eae5987c259ea37320ef36) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `EventEmitter.clearAll()` lifting the in-flight re-entrancy guard ([#1164](https://github.com/greydragon888/real-router/issues/1164))
+
+  `clearAll()` called from inside a listener cleared the per-event `#dispatching`
+  guard held by the live `emit` frame, so a re-entrant same-event `emit()` was no
+  longer coalesced and re-entered — violating the [#1033](https://github.com/greydragon888/real-router/issues/1033) depth-≤-1 contract
+  (empirically reached depth 5). The guard is owned by the active emit frame and
+  self-releases in its `finally`; `clearAll()` no longer touches it.
+
+
+### @real-router/core@0.74.5
+
+### Patch Changes
+
+- [#1397](https://github.com/greydragon888/real-router/pull/1397) [`01017d0`](https://github.com/greydragon888/real-router/commit/01017d02d6deaf0822fe58cff0aaf2ac7c6d81d8) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the unreachable non-splat branch of the splat param encoder ([#860](https://github.com/greydragon888/real-router/issues/860))
+
+  `encodeParam` is now splat-only: `registration/buildParts.ts` routes only SPLAT param
+  slots through it (a non-splat param is encoded by `ENCODING_METHODS[encoding]` directly),
+  so its former `!isSpatParam` fast path was unreachable dead code — surfaced when the
+  path-matcher encoding unit tests were migrated to exercise the public `buildPath` / `match`
+  surface, and dropped. Behaviour is unchanged (that branch never ran): the encoding /
+  splat property suites and the build∘match inverse round-trip stay green. `DECODING_METHODS.none`
+  is likewise never reached through `match` (the matcher special-cases `urlParamsEncoding
+=== "none"` to skip decoding entirely), so it is kept only for the map's type completeness
+  (asserted by the exempt encoding property test) and marked unreachable.
+
+- [#1397](https://github.com/greydragon888/real-router/pull/1397) [`01017d0`](https://github.com/greydragon888/real-router/commit/01017d02d6deaf0822fe58cff0aaf2ac7c6d81d8) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop an unreachable `?`-after-marker branch in the parse-segment tokenizer ([#1324](https://github.com/greydragon888/real-router/issues/1324))
+
+  `parseSegment` no longer special-cases a `?` immediately following a bare marker
+  inside a static segment (`a:?`). That shape never reaches the tokenizer through a
+  real route path — a `?` after a bare marker is not a valid `:name?` optional, so the
+  query mask strips it before `/`-segmentation — so the arm was unreachable dead code,
+  surfaced by migrating the path-matcher unit tests to exercise the public API.
+  Behaviour is unchanged on every real route: the `parseSegment ≡ parsers` equivalence
+  property and the route-tree gate↔backstop parity both still hold. Only a direct
+  `findSegmentGrammarError("/a:?b")` call — which no consumer makes — now reports
+  `fused-marker` instead of `undefined`.
+
+
 ### @real-router/core@0.74.4
 
 ### Patch Changes
