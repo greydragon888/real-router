@@ -52,6 +52,30 @@ describe("router.navigate() - edge cases input validation", () => {
       // Router should still be operational
       expect(router.isActive()).toBe(true);
     });
+
+    // #1180: a nullish route NAME rejects GRACEFULLY with ROUTE_NOT_FOUND on bare
+    // core — no crash, no cryptic deep TypeError (the class of #939's
+    // start(undefined) → codePointAt throw in path-matcher). Pinned so a refactor
+    // of buildNavigateState / forwardState cannot regress this input class into a
+    // deep throw and ship green. `.rejects` also guards the crash-regression: a
+    // synchronous throw from navigate(null) would fail this assertion too.
+    it("rejects navigate(null) with ROUTE_NOT_FOUND (graceful, not a cryptic throw)", async () => {
+      // @ts-expect-error — null is not a valid route name; bare-core hardening pin
+      await expect(router.navigate(null)).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+
+      expect(router.isActive()).toBe(true);
+    });
+
+    it("rejects navigate(undefined) with ROUTE_NOT_FOUND (graceful, not a cryptic throw)", async () => {
+      // @ts-expect-error — undefined is not a valid route name; bare-core pin
+      await expect(router.navigate(undefined)).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+
+      expect(router.isActive()).toBe(true);
+    });
   });
 
   // ============================================================================
@@ -83,6 +107,39 @@ describe("router.navigate() - edge cases input validation", () => {
       );
 
       expect(router.isActive()).toBe(true);
+    });
+
+    // #1182: NaN / Infinity as a PATH-param value flow through the full navigate
+    // pipeline untouched — bare core does NOT validate param values (that is
+    // opt-in via @real-router/validation-plugin; CLAUDE.md "Param-value type
+    // validation stays opt-in"). Previously exercised only through buildPath()
+    // unit tests — the committed state.params / state.path was unpinned.
+    it("accepts NaN as a path-param value — params keep raw NaN, path stringifies to /items/NaN", async () => {
+      const state = await router.navigate("items", { id: Number.NaN });
+
+      expect(state.name).toBe("items");
+      // Raw NaN preserved in params (typeof number) — not coerced, not dropped.
+      expect(Number.isNaN(state.params.id)).toBe(true);
+      // String(NaN) folded into the URL segment.
+      expect(state.path).toBe("/items/NaN");
+
+      expect(router.isActive()).toBe(true);
+    });
+
+    it("accepts Infinity / -Infinity as a path-param value — params keep raw value, path stringifies", async () => {
+      const inf = await router.navigate("items", {
+        id: Number.POSITIVE_INFINITY,
+      });
+
+      expect(inf.params.id).toBe(Number.POSITIVE_INFINITY);
+      expect(inf.path).toBe("/items/Infinity");
+
+      const negInf = await router.navigate("items", {
+        id: Number.NEGATIVE_INFINITY,
+      });
+
+      expect(negInf.params.id).toBe(Number.NEGATIVE_INFINITY);
+      expect(negInf.path).toBe("/items/-Infinity");
     });
 
     it("rejects a Symbol param VALUE with a TypeError (Symbol→string is illegal)", async () => {
