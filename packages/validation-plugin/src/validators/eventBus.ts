@@ -16,8 +16,8 @@ export interface EventMethodMap {
 
 export type EventName = keyof EventMethodMap;
 
-// Local set — mirrors validEventNames from @real-router/core/constants
-// (not exported from @real-router/core public API)
+// Single source of truth (plugin-owned): core has no `validEventNames` constant
+// and does not enforce event-name validity — this set is the sole owner.
 const validEventNames = new Set<EventName>([
   "$start",
   "$stop",

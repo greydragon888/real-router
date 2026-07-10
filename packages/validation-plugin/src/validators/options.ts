@@ -46,8 +46,8 @@ interface LimitsConfig {
   maxLifecycleHandlers: number;
 }
 
-// Local constant - mirrors LIMIT_BOUNDS from @real-router/core/constants
-// (not exported from @real-router/core public API)
+// Single source of truth (plugin-owned): core has no `LIMIT_BOUNDS` constant and
+// does not enforce these bounds — this constant is the sole owner.
 const LIMIT_BOUNDS = {
   maxDependencies: { min: 0, max: 10_000 },
   maxPlugins: { min: 0, max: 1000 },
