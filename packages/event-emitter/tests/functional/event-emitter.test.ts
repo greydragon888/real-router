@@ -601,6 +601,38 @@ describe("EventEmitter", () => {
       expect(order).toStrictEqual(["click", "hover"]);
     });
 
+    it("clearAll() from a listener does NOT lift the in-flight guard — re-entrant same-event emit stays coalesced (depth ≤ 1, #1164)", () => {
+      const emitter = createEmitter();
+      let depth = 0;
+      let maxDepth = 0;
+
+      // A listener that clears everything, re-registers itself, and re-emits
+      // the SAME event — all while its own emit frame is still on the stack.
+      // The re-emit must be coalesced by the in-flight guard (#1033 depth ≤ 1);
+      // if clearAll() lifts that guard (#1164), the re-emit re-enters and depth
+      // climbs. The `depth < 5` cap keeps the buggy path bounded (no overflow).
+      const handler = (): void => {
+        depth += 1;
+        maxDepth = Math.max(maxDepth, depth);
+
+        if (depth < 5) {
+          emitter.clearAll();
+          emitter.on("reset", handler);
+          emitter.emit("reset"); // in-flight → must coalesce to a no-op
+        }
+
+        depth -= 1;
+      };
+
+      emitter.on("reset", handler);
+      emitter.emit("reset");
+
+      // clearAll()'s stray `this.#dispatching.clear()` lifts the guard held by
+      // the live emit frame, so the re-emit re-enters — reaching depth 5. The
+      // guard is owned by active emit frames; clearAll() must not sweep it.
+      expect(maxDepth).toBe(1);
+    });
+
     it("calls a listener with 3 args", () => {
       const emitter = createEmitter();
       const cb = vi.fn();
