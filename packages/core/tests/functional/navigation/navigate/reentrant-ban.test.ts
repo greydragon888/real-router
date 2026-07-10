@@ -194,6 +194,7 @@ describe("§4 ban: synchronous reentrant navigation throws REENTRANT_NAVIGATION"
     await router.start("/home");
 
     const parked = router.navigate("orders");
+
     parked.catch(() => {
       /* expected TRANSITION_CANCELLED */
     });

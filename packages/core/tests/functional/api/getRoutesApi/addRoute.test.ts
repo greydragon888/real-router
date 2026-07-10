@@ -1580,6 +1580,7 @@ describe("core/routes/addRoute", () => {
 
       getPluginApi(lazyRouter).addInterceptor("start", async (next, path) => {
         lazyApi.add({ name: "lazy", path: "/lazy" }); // FSM is STARTING here
+
         return next(path);
       });
 

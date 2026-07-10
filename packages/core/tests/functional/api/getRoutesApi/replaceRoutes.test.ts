@@ -706,6 +706,7 @@ describe("core/routes/replaceRoutes", () => {
           { name: "home", path: "/" },
           { name: "lazy", path: "/lazy" },
         ]); // FSM is STARTING → validateClearRoutes does not block
+
         return next(path);
       });
 

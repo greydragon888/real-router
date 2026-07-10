@@ -47,17 +47,27 @@ const ROUTES: Route[] = [
 type Outcome = "success" | "reject" | "cancel";
 
 describe("#1178 dispatch-depth resets after every navigate outcome", () => {
-  test.prop([fc.array(fc.constantFrom<Outcome>("success", "reject", "cancel"), { minLength: 1, maxLength: 8 })], {
-    numRuns: NUM_RUNS.fast,
-  })(
+  test.prop(
+    [
+      fc.array(fc.constantFrom<Outcome>("success", "reject", "cancel"), {
+        minLength: 1,
+        maxLength: 8,
+      }),
+    ],
+    {
+      numRuns: NUM_RUNS.fast,
+    },
+  )(
     "after any outcome sequence, the next top-level navigate() is never a false REENTRANT_NAVIGATION",
     async (outcomes) => {
       const router: Router = createRouter(ROUTES, { defaultRoute: "home" });
+
       await router.start("/home");
 
       let toggle = false;
       const openTarget = (): string => {
         toggle = !toggle;
+
         return toggle ? "a" : "b";
       };
 
@@ -70,6 +80,7 @@ describe("#1178 dispatch-depth resets after every navigate outcome", () => {
         } else {
           // park then supersede → the parked nav is cancelled (TRANSITION_CANCEL).
           const parked = router.navigate("parked");
+
           parked.catch(() => {});
           await router.navigate(openTarget());
         }
@@ -79,6 +90,7 @@ describe("#1178 dispatch-depth resets after every navigate outcome", () => {
       // SYNCHRONOUSLY (the ban throws at the facade, before returning the promise).
       // A leaked `finally` decrement makes this throw → the property fails.
       let syncThrow: unknown;
+
       try {
         void router.navigate(openTarget()).catch(() => {
           /* async outcome is irrelevant — we only assert no SYNC reentrant throw */
@@ -86,6 +98,7 @@ describe("#1178 dispatch-depth resets after every navigate outcome", () => {
       } catch (error) {
         syncThrow = error;
       }
+
       expect(syncThrow).toBeUndefined();
 
       router.dispose();
