@@ -33,13 +33,17 @@ export const RouterProviderCore: FC<RouterProviderCoreProps> = ({
   // subscribe connects to router on first listener, unsubscribes on last.
   // This is Strict Mode safe — no useEffect cleanup needed.
   //
-  // Caveat (#765): that same first-listener/last-listener contract opens a
-  // stale window if THIS Provider is mounted under a React <Activity> /
-  // keepAlive boundary — hiding detaches the subscription, a navigation while
-  // hidden is missed, and re-show replays createRouteSource's stale snapshot
-  // (createRouteSource does not reconcile on re-subscribe). Keep RouterProvider
-  // ABOVE any Activity boundary — see the "Keep RouterProvider above any
-  // <Activity> / keepAlive boundary" gotcha in CLAUDE.md.
+  // Activity note (#765): that same first-listener/last-listener contract means
+  // a Provider mounted UNDER a React <Activity> / keepAlive boundary drops its
+  // subscription while hidden, so a navigation that lands during the hidden
+  // window is not observed live. createRouteSource RECONCILES on re-subscribe —
+  // when the first listener re-attaches on re-show it re-reads router.getState()
+  // — so the re-shown Provider renders the CURRENT route, not a stale snapshot.
+  // Mounting RouterProvider at the app root (above any Activity boundary) stays
+  // the recommended composition: it keeps the subscription live throughout
+  // instead of relying on the reconnect catch-up. See the "RouterProvider under
+  // <Activity>" gotcha in CLAUDE.md and the P1 regression in
+  // tests/integration/reactive-lifecycle.test.tsx.
   const store = useMemo(() => createRouteSource(router), [router]);
 
   // #778 P2: eagerly create the per-router error source so a navigation error
