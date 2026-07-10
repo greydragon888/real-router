@@ -598,6 +598,20 @@ describe("validateRoutePath", () => {
         });
       });
 
+      it("reports the #1287 reason (not #1264) for TWO UNCONSTRAINED optionals before a splat — aligned with the registerTree backstop", () => {
+        // `/:a?/:b?/*rest` triggers BOTH #1264 (an unconstrained optional before the
+        // splat) and #1287 (two optionals before the splat). The path-matcher backstop
+        // reports #1287 first (registerNode runs before markOptionalFork's #1264 throw);
+        // the gate must too, so the two layers give the SAME reject reason. The
+        // gate↔backstop parity property only checks the reject BOOLEAN, so this reason
+        // divergence was invisible to it. #1287's "split / drop the '?'" is the correct
+        // fix — the #1264 "add a constraint" hint is a dead end (`/:a<c>?/:b<c>?/*rest`
+        // is still rejected by #1287).
+        expect(() => {
+          validateRoutePath("/:a?/:b?/*rest", routeName, methodName);
+        }).toThrow(/two optional params directly before a splat/u);
+      });
+
       it("should NOT flag a single constrained optional before a splat (#1287)", () => {
         const paths = [
           "/:v<[a-z]+>?/*rest", // one constrained optional → supported (#1264 A1)

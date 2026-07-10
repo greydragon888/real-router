@@ -199,12 +199,23 @@ function hasUnconstrainedOptionalBeforeSplat(path: string): boolean {
 }
 
 /**
- * Rejects an optional param placed directly before a splat, in both shapes: a
+ * Rejects an optional param placed directly before a splat, in both shapes: TWO
+ * optionals (`/:a?/:b?/*rest`, #1287 — one trie slot carries a single fork) and a
  * single UNCONSTRAINED optional (`/:v?/*rest`, #1264 — no validity signal to
- * disambiguate take-vs-skip) and TWO optionals (`/:a<c>?/:b<c>?/*rest`, #1287 —
- * one trie slot carries a single fork). Both silently reshape multi-segment input.
- * Both predicates are shared with path-matcher's `registerTree` backstop, so the
- * gate and the backstop can't drift; this adds the route-contextual message.
+ * disambiguate take-vs-skip). Both silently reshape multi-segment input.
+ *
+ * #1287 is checked FIRST — matching the backstop, which runs
+ * `hasMultipleOptionalsBeforeSplat` in `registerNode` BEFORE `markOptionalFork`'s
+ * unconstrained-splat throw. A path that triggers BOTH (`/:a?/:b?/*rest`: two
+ * optionals, the inner one unconstrained before the splat) therefore reports the
+ * #1287 reason on the gate AND the backstop — not #1264 on the gate and #1287 on the
+ * backstop (a reject-reason divergence the parity property, which checks only the
+ * boolean, would miss). #1287's "split / drop the '?'" is the actionable fix; the
+ * #1264 "add a constraint" hint is a dead end here — `/:a<c>?/:b<c>?/*rest` is still
+ * rejected by #1287. Only `hasMultipleOptionalsBeforeSplat` is single-sourced from
+ * `parseSegment.ts` (shared with the backstop, can't drift by construction);
+ * `hasUnconstrainedOptionalBeforeSplat` is a gate-local char-scan backstopped
+ * separately by `throwUnconstrainedOptionalSplat`. This adds the route-contextual message.
  */
 function validateOptionalBeforeSplat(
   pathPattern: string,
@@ -212,17 +223,17 @@ function validateOptionalBeforeSplat(
   path: string,
   methodName: string,
 ): void {
-  if (hasUnconstrainedOptionalBeforeSplat(pathPattern)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": an unconstrained optional param before a splat is not supported in "${path}" — it is ambiguous (every multi-segment value has two readings). Add a constraint (e.g. ':lang<[a-z]+>?') or model it as two routes`,
-    );
-  }
-
   if (hasMultipleOptionalsBeforeSplat(pathPattern)) {
     throw createRouterError(
       methodName,
       `Invalid path for route "${routeName}": two optional params directly before a splat are not supported in "${path}" — a single trie slot carries one optional→splat fork, so the omit-outer/take-inner form would silently reshape into the splat. Split into two routes, or drop the '?' on one`,
+    );
+  }
+
+  if (hasUnconstrainedOptionalBeforeSplat(pathPattern)) {
+    throw createRouterError(
+      methodName,
+      `Invalid path for route "${routeName}": an unconstrained optional param before a splat is not supported in "${path}" — it is ambiguous (every multi-segment value has two readings). Add a constraint (e.g. ':lang<[a-z]+>?') or model it as two routes`,
     );
   }
 }
