@@ -74,14 +74,16 @@ describe("core/route-lifecycle/addActivateGuard", () => {
         lifecycle.addActivateGuard("", true);
       }).not.toThrow();
 
-      // Verify guard is active by testing navigation behavior
-      // Empty string guard affects all routes (root level)
+      // The root ("") guard is NOT re-evaluated for a navigation that keeps the
+      // root mounted — shared-ancestor guards are not re-checked (#970), and the
+      // root is always mounted after start() — so a post-start navigate("admin")
+      // still resolves. (The old masking try/catch asserted a block that never
+      // fired, hiding that the "affects all routes" belief does not hold here.)
       lifecycle.addActivateGuard("", false);
-      try {
-        await router.navigate("admin");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      }
+
+      await expect(router.navigate("admin")).resolves.toMatchObject({
+        name: "admin",
+      });
     });
 
     it("should throw TypeError for invalid handler types", async () => {
@@ -290,16 +292,12 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       }).toThrow();
 
       // Verify valid guards still work correctly
-      try {
-        await router.navigate("admin");
-      } catch (error: any) {
-        expect(error?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
-      }
-      try {
-        await router.navigate("index");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      }
+      await expect(router.navigate("admin")).resolves.toMatchObject({
+        name: "admin",
+      });
+      await expect(router.navigate("index")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
 
       // Verify failed guard can be re-registered (was rolled back)
       expect(() => {
@@ -343,16 +341,12 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(route2Registered).toBe(true);
 
       // Verify both guards work via navigation behavior
-      try {
-        await router.navigate("admin");
-      } catch (error: any) {
-        expect(error?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
-      }
-      try {
-        await router.navigate("index");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      }
+      await expect(router.navigate("admin")).resolves.toMatchObject({
+        name: "admin",
+      });
+      await expect(router.navigate("index")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
     });
 
     it("should roll back the slot and allow re-registration when the factory throws", async () => {
@@ -393,22 +387,19 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       lifecycle.addActivateGuard("admin", true);
 
       // First guard allows navigation
-      try {
-        await router.navigate("admin");
-      } catch (error: any) {
-        expect(error).toBeUndefined();
-      }
+      await expect(router.navigate("admin")).resolves.toMatchObject({
+        name: "admin",
+      });
+
       lifecycle.addActivateGuard("admin", false);
 
       // Navigate away first to test re-entering
       await router.navigate("index");
 
       // New guard blocks navigation
-      try {
-        await router.navigate("admin");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      }
+      await expect(router.navigate("admin")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
     });
   });
 
@@ -553,7 +544,9 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     it("should allow nested factory registration (factory within factory)", async () => {
       lifecycle.addActivateGuard("admin", (r) => {
         getLifecycleApi(r).addActivateGuard("index", (r2) => {
-          getLifecycleApi(r2).addActivateGuard("home", false); // blocking guard
+          // Innermost nested registration: block a NAVIGABLE route so the
+          // navigation below actually exercises the guard it created.
+          getLifecycleApi(r2).addActivateGuard("users", false);
 
           return () => true;
         });
@@ -561,12 +554,13 @@ describe("core/route-lifecycle/addActivateGuard", () => {
         return () => true;
       });
 
-      // Verify home guard works via navigation
-      try {
-        await router.navigate("index");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      }
+      // The factory-within-factory registered a blocking guard on "users":
+      // navigating there must reject, proving the innermost registration produced
+      // a live guard. (The old masking try/catch navigated to an unblocked route
+      // and asserted a block that never fired — green over broken registration.)
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
     });
   });
 });

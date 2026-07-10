@@ -2,7 +2,7 @@ import { logger } from "@real-router/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { errorCodes } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { events } from "./setup";
 import { createTestRouter } from "../../helpers";
@@ -90,25 +90,35 @@ describe("core/observable/addEventListener", () => {
       );
     });
 
-    it("should trigger TRANSITION_CANCEL listener when navigation is cancelled", async () => {
+    it("should trigger TRANSITION_CANCEL listener when a navigation is superseded", async () => {
       const cb = vi.fn();
+
+      // Force the first navigation IN-FLIGHT with a never-settling async activate
+      // guard, so the second navigate() supersedes (cancels) it. Without this the
+      // guard-less "users" nav commits synchronously before "orders" starts and
+      // nothing is cancelled — which is why this assertion was a dead TODO before.
+      getLifecycleApi(router).addActivateGuard(
+        "users",
+        () => () => new Promise<boolean>(() => {}),
+      );
 
       getPluginApi(router).addEventListener(events.TRANSITION_CANCEL, cb);
       await router.start("/");
 
-      // Start first navigation
-      router.navigate("users").catch(() => {});
+      const fromName = router.getState()?.name;
 
-      // Cancel by starting second navigation
+      // Start the first navigation (parked in the async guard), then supersede it.
+      router.navigate("users").catch(() => {});
       await router.navigate("orders");
 
       expect(router.getState()?.name).toBe("orders");
 
-      // TODO: Fix TRANSITION_CANCEL event triggering
-      // expect(cb).toHaveBeenCalledWith(
-      //   expect.objectContaining({ name: "users" }),
-      //   expect.objectContaining({ name: "index" }),
-      // );
+      // TRANSITION_CANCEL fires for the superseded "users" navigation, carrying
+      // (toState, fromState) = (users, the pre-navigation route).
+      expect(cb).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "users" }),
+        expect.objectContaining({ name: fromName }),
+      );
     });
   });
 
