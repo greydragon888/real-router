@@ -1,4 +1,4 @@
-import { watch } from "vue";
+import { onActivated, onDeactivated, watch } from "vue";
 
 import { useRoute } from "./useRoute";
 
@@ -46,6 +46,10 @@ export interface UseRouteEnterOptions {
  * `setup()`; `handler` is captured in closure at the call site. To vary
  * behavior over time, read refs/computeds inside the handler body.
  *
+ * **Under `<KeepAlive>` (#1221):** a deactivated (sleeping) page does not fire
+ * the handler on unrelated navigations, and waking it does not re-fire —
+ * reactivation is not a mount (use Vue's native `onActivated` to re-run on show).
+ *
  * @example Direction-aware entry animation
  * ```ts
  * useRouteEnter(({ route }) => {
@@ -83,7 +87,28 @@ export function useRouteEnter(
   const skipSameRoute = options?.skipSameRoute ?? true;
   let lastHandledRoute: State | null = null;
 
+  // #1221 — under <KeepAlive> a deactivated component keeps its effect scope
+  // (and this watcher) alive, so a sleeping page would otherwise fire `handler`
+  // on every unrelated app navigation. Gate on deactivated state. `onActivated` /
+  // `onDeactivated` only fire under KeepAlive; without it the flag stays `false`
+  // and the watcher runs exactly as before. Reactivating a kept-alive page does
+  // NOT re-fire enter (strict-mount): this watcher flushes before `onActivated`,
+  // so the flag is still `true` when the reactivating navigation lands — waking a
+  // never-unmounted page is not a mount.
+  let isDeactivated = false;
+
+  onActivated(() => {
+    isDeactivated = false;
+  });
+  onDeactivated(() => {
+    isDeactivated = true;
+  });
+
   watch(route, (newRoute) => {
+    if (isDeactivated) {
+      return;
+    }
+
     const prev = previousRoute.value;
 
     // Early-exit guards, top-down:

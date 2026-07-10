@@ -461,9 +461,21 @@ reconcile.
 Contrast: React `<Activity>` detaches effects on hide and so _opens_ the stale
 window ([#765](https://github.com/greydragon888/real-router/issues/765)); Solid
 and Svelte have no keepAlive analogue. This is a real, guaranteed advantage of
-the Vue adapter — with one cost worth knowing: subscriptions of sleeping subtrees
-keep firing (bounded by the number of `<KeepAlive>`d nodes), so kept-alive
-components are not "paused" with respect to router updates.
+the Vue adapter — with one cost worth knowing: the **bridge-ref** subscriptions of
+sleeping subtrees keep firing (bounded by the number of `<KeepAlive>`d nodes), so
+kept-alive components are not "paused" with respect to router **state** updates —
+that is exactly what keeps the sleeping subtree fresh.
+
+**User lifecycle handlers ARE gated (#1221).** `useRouteEnter` / `useRouteExit`
+gate on `onDeactivated` / `onActivated`: a **deactivated** (sleeping) page does NOT
+run its enter/exit handlers on unrelated navigations — a sleeping page's analytics
+won't fire on foreign navs, and (critically) a sleeping page's **async** exit
+handler is no longer spliced into every navigation's leave cycle, where it would
+otherwise block the whole app. This is distinct from the bridge-ref subscriptions
+above (which stay live on purpose, to keep the sleeping subtree's *state* fresh).
+Waking a kept-alive page does NOT re-fire `useRouteEnter` — it was never
+unmounted, so reactivation is not a mount (use Vue's native `onActivated` for a
+"re-run on show" hook).
 
 ### Match `fallback` Prop (Suspense)
 
