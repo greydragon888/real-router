@@ -816,6 +816,58 @@ describe("createScrollSpy", () => {
     });
   });
 
+  describe("container-detach reconcile on navigation (#1216)", () => {
+    it("re-observes a remounted scroll container after a navigation — the container-scoped MO can't see the container's own removal", async () => {
+      const router = await createTestRouter();
+
+      // Container A with an anchor inside.
+      let container = document.createElement("div");
+      const a1 = document.createElement("section");
+
+      a1.id = "a1";
+      container.append(a1);
+      document.body.append(container);
+
+      track(
+        createScrollSpy(router, {
+          selector: "[id]",
+          scrollContainer: () => container,
+        }),
+      );
+
+      // Initial: IO rooted at A observes a1.
+      expect(ioInstances[0]?.options?.root).toBe(container);
+      expect(ioInstances[0]?.observed.has(a1)).toBe(true);
+
+      const ioCountBefore = ioInstances.length;
+
+      // Container A unmounts; a fresh B (same getter) remounts. The
+      // container-scoped MutationObserver cannot observe A's OWN removal (a
+      // mutation of A's parent), so no reconcile fires from the MO.
+      container.remove();
+      const containerB = document.createElement("div");
+      const b1 = document.createElement("section");
+
+      b1.id = "b1";
+      containerB.append(b1);
+      document.body.append(containerB);
+      container = containerB;
+
+      // A navigation fires the router.subscribe callback → isContainerDetached →
+      // reconcile → the IO is rebuilt under B and observes b1.
+      await router.navigate("home");
+
+      expect(ioInstances.length).toBeGreaterThan(ioCountBefore);
+
+      const latest = ioInstances[ioInstances.length - 1];
+
+      expect(latest.options?.root).toBe(containerB);
+      expect(latest.observed.has(b1)).toBe(true);
+
+      router.stop();
+    });
+  });
+
   describe("MutationObserver reconciliation", () => {
     it("re-observes newly added matching elements", async () => {
       const router = await createTestRouter();

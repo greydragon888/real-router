@@ -26,6 +26,13 @@ const NOOP_INSTANCE: { destroy: () => void } = Object.freeze({
 // frontends — the same multi-provider scenario `scroll-restore`'s `storageKey`
 // exists for) keep writing to the now-orphaned node → silent screen reader (#783).
 let announcerRefCount = 0;
+// Generation token (#1217): bumped each time a FRESH shared element is created.
+// Each instance captures the generation live at construction; on destroy it
+// touches the shared refcount / element ONLY if its generation is still current.
+// A stale instance — whose element a host wiped without calling destroy() — must
+// not decrement the new generation's refcount (→ negative) or remove its live
+// element (removeAnnouncer used to query by selector = whoever is in the DOM).
+let announcerGeneration = 0;
 
 export function createRouteAnnouncer(
   router: Router,
@@ -54,7 +61,8 @@ export function createRouteAnnouncer(
   let pendingText: string | null = null;
   let clearTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
-  const announcer = getOrCreateAnnouncer();
+  const { element: announcer, generation: myGeneration } =
+    getOrCreateAnnouncer();
 
   announcerRefCount += 1;
 
@@ -137,21 +145,34 @@ export function createRouteAnnouncer(
       clearTimeout(clearTimeoutId);
       clearTimeout(safariTimeoutId);
 
+      // Ownership guard (#1217): if a host wiped the shared element out from
+      // under us, the next getOrCreateAnnouncer bumped the generation for the
+      // fresh element. A stale instance must NOT decrement the new generation's
+      // refcount (→ negative) or remove its live element — bail if not current.
+      if (myGeneration !== announcerGeneration) {
+        return;
+      }
+
       announcerRefCount -= 1;
 
-      // Only the last holder tears down the shared element.
+      // Only the last holder tears down the shared element — via our captured
+      // ref, not a selector query (which would delete whoever's element is
+      // currently in the DOM, i.e. a newer generation's).
       if (announcerRefCount === 0) {
-        removeAnnouncer();
+        removeAnnouncer(announcer);
       }
     },
   };
 }
 
-function getOrCreateAnnouncer(): HTMLElement {
+function getOrCreateAnnouncer(): {
+  element: HTMLElement;
+  generation: number;
+} {
   const existing = document.querySelector<HTMLElement>(`[${ANNOUNCER_ATTR}]`);
 
   if (existing) {
-    return existing;
+    return { element: existing, generation: announcerGeneration };
   }
 
   // Creating a FRESH element means no live instance is validly sharing one, so
@@ -160,7 +181,10 @@ function getOrCreateAnnouncer(): HTMLElement {
   // wiping the subtree, or a consumer test whose teardown clears the DOM
   // without calling every instance's destroy() — would leave a stale positive
   // count that prevents the new element from ever being torn down (#783).
+  // The generation bump (#1217) lets the wiped element's instances recognize
+  // themselves as stale so their destroy() does not touch this fresh element.
   announcerRefCount = 0;
+  announcerGeneration += 1;
 
   const element = document.createElement("div");
 
@@ -185,11 +209,11 @@ function getOrCreateAnnouncer(): HTMLElement {
     element,
   );
 
-  return element;
+  return { element, generation: announcerGeneration };
 }
 
-function removeAnnouncer(): void {
-  document.querySelector(`[${ANNOUNCER_ATTR}]`)?.remove();
+function removeAnnouncer(element: HTMLElement): void {
+  element.remove();
 }
 
 function resolveText(
