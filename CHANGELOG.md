@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-10]
 
+### @real-router/core@0.74.6
+
+### Patch Changes
+
+- [#1400](https://github.com/greydragon888/real-router/pull/1400) [`f668898`](https://github.com/greydragon888/real-router/commit/f668898188e19b5ce7eae5987c259ea37320ef36) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `EventEmitter.clearAll()` lifting the in-flight re-entrancy guard ([#1164](https://github.com/greydragon888/real-router/issues/1164))
+
+  `clearAll()` called from inside a listener cleared the per-event `#dispatching`
+  guard held by the live `emit` frame, so a re-entrant same-event `emit()` was no
+  longer coalesced and re-entered — violating the [#1033](https://github.com/greydragon888/real-router/issues/1033) depth-≤-1 contract
+  (empirically reached depth 5). The guard is owned by the active emit frame and
+  self-releases in its `finally`; `clearAll()` no longer touches it.
+
+
 ### @real-router/core@0.74.5
 
 ### Patch Changes
