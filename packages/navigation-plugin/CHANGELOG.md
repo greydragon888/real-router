@@ -1,5 +1,13 @@
 # @real-router/navigation-plugin
 
+## 0.7.26
+
+### Patch Changes
+
+- [#1382](https://github.com/greydragon888/real-router/pull/1382) [`3cfa3e8`](https://github.com/greydragon888/real-router/commit/3cfa3e8514799f4f70c6323d7a4d5157baf0ed22) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: factory-pool `stop()`/`dispose()` of an earlier router no longer disconnects the live router's navigate listener ([#1213](https://github.com/greydragon888/real-router/issues/1213))
+
+  When one plugin factory is shared across multiple routers (a pool), the last router to `start()` owns the shared navigate-event listener slot (last-wins, [#758](https://github.com/greydragon888/real-router/issues/758)). But `createNavigateLifecycle`'s `onStop`/`teardown` cleared that slot **unconditionally**, so stopping or disposing an _earlier_ router removed the _active_ router's listener — the live router went deaf to browser navigate events. The lifecycle now captures its own remover at `onStart` and clears the shared slot only while it still owns it. (Confirmed as the third env-plugin instance of the same shared-slot ownership pattern, alongside browser-plugin and hash-plugin.)
+
 ## 0.7.25
 
 ### Patch Changes
