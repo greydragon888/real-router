@@ -37,7 +37,7 @@ Most factories return a cached instance keyed by router and, where applicable, b
 | `createActiveNameSelector` | `WeakMap<Router, selector>` | until router GC |
 | `createTransitionSource` / `createErrorSource` | none (advanced-use) | owner-driven; `destroy()` tears down |
 
-**Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${strict}|${ignoreQueryParams}` ``. Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry.
+**Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${strict}|${ignoreQueryParams}|${hashKey}` `` — 5-component since #532, where `hashKey` is `hash === undefined ? "" : `#${hash}``, isolating hash-aware tab-link variants (`createActiveRouteSource.ts:50,66`). Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry.
 
 **Non-serializable fallback:** if `canonicalJson(params)` throws, `createActiveRouteSource` bypasses the cache and returns a fresh non-cached source for that specific call. Throw-triggers include `BigInt` (native `JSON.stringify`), `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp` (eager `TypeError` — these would otherwise collapse to `"{}"` and cause cache-key collisions), and circular references (path-based detector in `canonicalize()`). `Symbol`-valued fields are silently dropped (standard JSON semantics) — they do not bypass the cache.
 
@@ -51,7 +51,7 @@ The `BaseSource` invokes `onFirstSubscribe` when the first listener attaches and
 
 Because the subscription is driven by listener count, a mount/unmount/remount cycle doesn't leave a dangling subscription. Compatible with React's `useSyncExternalStore` and Strict Mode.
 
-`createRouteNodeSource` reconciles its snapshot with the current router state on each reconnection. This handles Activity hide/show cycles where the source was disconnected and missed navigation events.
+All three lazy sources (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`) reconcile their snapshot with the current router state on each reconnection (#765/#766) — this handles Activity hide/show cycles where the source was disconnected and missed navigation events. The eager `createDismissableError` wrapper likewise catches up on first subscribe (#765.2), so an error that fired before the wrapper's first subscriber is still surfaced.
 
 ### 2. Eager-Connection (`createTransitionSource` / `getTransitionSource`, `createErrorSource` / `getErrorSource`)
 

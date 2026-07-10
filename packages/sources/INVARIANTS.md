@@ -32,6 +32,7 @@
 | --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | First listener is registered BEFORE `onFirstSubscribe` runs                              | Synchronous `updateSnapshot` triggered from inside `onFirstSubscribe` reaches the just-added listener — verified via post-prime snapshot identity. |
 | 2   | `subscribe → navigate → unsubscribe → subscribe` reconnects without missing navigations  | The re-subscribed listener observes a subsequent navigation exactly once, confirming the reconnect path re-arms the listener set.        |
+| 3   | Navigation while disconnected (zero subscribers) is reconciled on re-subscribe (#765)    | After a full unsubscribe, a navigation that lands with zero subscribers, then re-subscribe: `getSnapshot().route` reflects the navigation that happened while disconnected — not the stale pre-disconnect snapshot. Kills the "stale snapshot survives reconnect" mutant. |
 
 ## createRouteSource — Destroy
 
@@ -112,6 +113,14 @@
 | 2   | Different routers are isolated under the same `(name, params, options)` key                | WeakMap keying prevents cross-router cache collisions.                                                                            |
 | 3   | Hash-aware monotonicity under no-url-plugin fixture                                        | When `opts.hash` is a **non-empty** string and the router has no URL-publishing plugin, the snapshot is `false` across every navigation — `readContextHash` returns `""`, which never equals a non-empty fragment. Exception: `opts.hash === ""` matches the empty fragment, so an active route returns `true` even with no plugin (#532). |
 | 4   | Hash-aware variants are cache-isolated from hash-less variants                             | The same `(name, params, options-without-hash)` and `(name, params, options-with-hash)` calls return different instances.         |
+
+## createActiveRouteSource — Lazy-Connection and Reconnection (#766)
+
+| #   | Invariant                                                                   | Description                                                                                                                                                                                                          |
+| --- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | No router subscription before first subscribe                               | Creating an active-route source does not subscribe to the router until the first listener is added.                                                                                                                 |
+| 2   | Connects on first listener, disconnects on last, reconnects on re-subscribe | The router subscription is established on the first listener, torn down when the last detaches, and re-established when a new listener attaches after a full unsubscribe — verified by spy call count.                |
+| 3   | Active state changed while disconnected is reconciled on re-subscribe        | After a full unsubscribe, a navigation that flips the tracked route's active status while the source has zero listeners, then re-subscribe: `getSnapshot()` reflects the current boolean — `onFirstSubscribe` reconciles, not the stale pre-disconnect value. |
 
 ## createActiveRouteSource — Destroy
 
@@ -257,6 +266,7 @@
 | 4   | Subscribers fire only on state-relevant actions                                 | Listener call count is at least the number of (error events + first reset after each error) — purely cosmetic operations don't notify.   |
 | 5   | `createDismissableError(router)` is per-router cached                           | Repeated calls return the same instance for the same router.                                                                              |
 | 6   | `resetError()` no-op-guard: extra resets after dismissal do not notify          | When `currentVersion <= dismissedVersion`, `resetError()` short-circuits without bumping listener notifications — only the first reset after each fresh error fires the listener. |
+| 7   | Error before first subscribe is caught up on subscribe (#765.2)                 | An error event that fires while the wrapper has zero subscribers is surfaced on first subscribe: `getSnapshot()` returns the error (not `{ error: null, version: 0 }`) and the listener added before `onFirstSubscribe` receives the reconcile — closing the reconnect-staleness gap. |
 
 ---
 
@@ -304,15 +314,15 @@
 
 | File                                                       | Invariants | Category                                                                                                     |
 | ---------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
-| `tests/property/routeSource.properties.ts`                 | 21         | `createRouteSource` snapshot tracking, lazy-connection, subscribe-order (BaseSource pre-onFirstSubscribe), destroy |
+| `tests/property/routeSource.properties.ts`                 | 22         | `createRouteSource` snapshot tracking, lazy-connection, subscribe-order (BaseSource pre-onFirstSubscribe), reconnect reconcile (#765), destroy |
 | `tests/property/routeNodeSource.properties.ts`             | 23         | `createRouteNodeSource` node scoping, lazy-connection + reconnection, cache identity (per-router × nodeName), destroy |
-| `tests/property/activeRouteSource.properties.ts`           | 16         | `createActiveRouteSource` boolean tracking (hash-aware via `arbActiveOptions`), filter, cache identity (canonicalJson + hash isolation), destroy |
+| `tests/property/activeRouteSource.properties.ts`           | 19         | `createActiveRouteSource` boolean tracking (hash-aware via `arbActiveOptions`), filter, cache identity (canonicalJson + hash isolation), lazy-connection + reconnection (#766), destroy |
 | `tests/property/transitionSource.properties.ts`            | 20         | `createTransitionSource` state machine, isLeaveApproved monotonicity, concurrent navigation (async-guard cancellation), destroy |
 | `tests/property/errorSource.properties.ts`                 | 9          | `createErrorSource` error tracking, version monotonicity (incl. long-run + SUCCESS-doesn't-advance), CANCEL no-op, destroy |
 | `tests/property/stabilizeState.properties.ts`              | 20         | `stabilizeState` reflexivity, path/hash/reload-aware path-equivalence, idempotency, nullish-handling, transitivity, hash×reload interaction, defensive read |
 | `tests/property/computeSnapshot.properties.ts`             | 15         | `computeSnapshot` reference stability, idempotency, root dominance, subtree containment, unrelated-route, containment monotonicity, `.`-boundary prefix-match |
 | `tests/property/canonicalJson.properties.ts`               | 14         | `canonicalJson` key-order invariance, determinism, idempotency, structural collisions, deep-recursion, throw-contract (Map/Set/Weak\*/RegExp/BigInt), DAG vs cycle, `__proto__` preservation, locale-independence (1000 runs/test) |
 | `tests/property/normalizeActiveOptions.properties.ts`      | 7          | `normalizeActiveOptions` idempotency, default-fill, defaults immutability, explicit pass-through, input non-mutation, output totality (1000 runs/test) |
-| `tests/property/createDismissableError.properties.ts`      | 6          | `createDismissableError` version monotonicity, reset semantics, idempotency, listener fidelity, cache identity, `resetError` no-op-guard |
+| `tests/property/createDismissableError.properties.ts`      | 7          | `createDismissableError` version monotonicity, reset semantics, idempotency, listener fidelity, cache identity, `resetError` no-op-guard, catch-up on first subscribe (#765.2) |
 | `tests/property/createActiveNameSelector.properties.ts`    | 13         | `createActiveNameSelector` cache identity, oracle alignment, per-name listener isolation, reconnection, destroy, `.`-boundary prefix-match, subscription sharing (one router.subscribe for N names), last-unsubscribe disconnect, pre-subscribe fallback path |
 | `tests/property/baseSource.properties.ts`                  | 3          | `BaseSource` subscribe-order (listener added BEFORE `onFirstSubscribe`), `onFirstSubscribe` once-per-cycle, listener exception isolation in `notify()` (1000 runs/test) |

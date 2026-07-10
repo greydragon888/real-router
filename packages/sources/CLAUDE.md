@@ -203,7 +203,7 @@ Use `createTransitionSource` / `createErrorSource` (non-cached) if you need work
 
 `createActiveRouteSource` accepts `opts.hash`; the canonical cache key includes it, so tab-link sources are isolated per-hash variant. The subscribe path re-evaluates active status when `state.context.url.hashChanged === true` — without this signal, route-level comparison alone misses same-path hash flips.
 
-Hash-plugin runtime does not claim the `"url"` namespace → `state.context.url === undefined`. A hash-aware source with `opts.hash !== undefined` consequently returns `false` for every snapshot under hash-plugin — consistent with the documented hash-plugin limitation. Sources without `opts.hash` are unaffected.
+Hash-plugin runtime does not claim the `"url"` namespace → `state.context.url === undefined`. The source collapses the missing namespace to `""` (`readContextHash(...) ?? ""`), so under hash-plugin a **non-empty** `opts.hash` always returns `false`, while `opts.hash === ""` still matches an active route ("no namespace" reads as "no fragment", #532). Sources without `opts.hash` are unaffected.
 
 ### BaseSource subscribe order
 
