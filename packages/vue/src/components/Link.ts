@@ -1,4 +1,3 @@
-import { createActiveRouteSource } from "@real-router/sources";
 import { defineComponent, h, computed, shallowRef, watch } from "vue";
 
 import { useRouter } from "../composables/useRouter";
@@ -10,6 +9,7 @@ import {
   navigateWithHash,
   shallowEqual,
 } from "../dom-utils";
+import { createActiveSource } from "../internal/createActiveSource";
 
 import type { Params, NavigationOptions } from "@real-router/core";
 import type { PropType } from "vue";
@@ -163,13 +163,13 @@ export const Link = defineComponent({
       ) => {
         // Hash-aware active (#532): pass hash through so tab links with the
         // same routeName but different `hash` props don't all light up.
-        const source = createActiveRouteSource(
+        const source = createActiveSource(
           router,
           routeName,
           routeParams,
-          hash === undefined
-            ? { strict: activeStrict, ignoreQueryParams }
-            : { strict: activeStrict, ignoreQueryParams, hash },
+          activeStrict,
+          ignoreQueryParams,
+          hash,
         );
 
         isActive.value = source.getSnapshot();
