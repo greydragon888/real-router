@@ -16,7 +16,7 @@
     "@real-router/lifecycle-plugin": "workspace:^",
     "@real-router/preload-plugin": "workspace:^",
     "@real-router/svelte": "workspace:^",
-    "svelte": "5.56.4"
+    "svelte": "~5.56.4"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",

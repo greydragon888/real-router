@@ -13,8 +13,8 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@real-router/react": "workspace:^",
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react": "~19.2.7",
+    "react-dom": "~19.2.7"
   },
   "devDependencies": {
     "@types/react": "19.2.17",

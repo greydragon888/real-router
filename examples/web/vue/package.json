@@ -4,6 +4,6 @@
   "private": true,
   "dependencies": {
     "@real-router/vue": "workspace:^",
-    "vue": "3.5.39"
+    "vue": "~3.5.39"
   }
 }

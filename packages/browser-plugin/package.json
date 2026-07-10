@@ -56,7 +56,7 @@
     "@real-router/types": "workspace:^"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/jest-dom": "~6.9.1",
     "jsdom": "29.1.1",
     "type-guards": "workspace:^"
   }

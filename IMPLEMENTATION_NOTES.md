@@ -890,6 +890,63 @@ on the new head SHA; re-evaluation is handled at merge time. `resolve:dependabot
 the tool for **conflicting** PRs (rebase onto `master`) and if a token elevation is ever
 refused — this workflow only removes the dedupe-only chore.
 
+#### UI frameworks / third-party routers / testing libs float latest patch (`~`)
+
+**Problem:** every UI-framework, competitor-router, and testing-library dependency
+is a `devDependency` of an adapter or a `dependency` of a benchmark/example — none
+of them ship to consumers (published adapters expose these via **peerDependency
+ranges**). Yet each was pinned to an **exact** patch (`save-exact`), so Dependabot
+opened a per-patch PR for every one of them across **~150** example/adapter/benchmark
+manifests — a constant manual-review chore (each needs `resolve:dependabot` if it
+conflicts or leaves a dedupe split). Worse for `@angular/*`: its packages have
+**exact cross-peer requirements** (`@angular/router@x` peers `@angular/core@x`
+*exactly*), so when Dependabot bumped one in isolation (#1371 `@angular/router`
+22.0.5→22.0.6) the repo papered over it with a pnpm `overrides` entry pinning
+`@angular/router` back to the framework version — which made the bump **cosmetic and
+lying**: the manifest declared `22.0.6`, the override forced `22.0.5` installed, and
+`pnpm install` never reconciled → a manifest/lockfile/`node_modules` mismatch (WebStorm
+"installed `@angular/router@22.0.5` doesn't match the version range `22.0.6`").
+
+**Solution:** float the **patch** for this dependency set instead of pinning it.
+Three coordinated levers:
+
+1. **Manifests** — the 36-dep float-set uses `~x.y.z` (patch-float) everywhere it is
+   a `prod`/`dev` dep: `react`, `react-dom`, `preact`, `preact-render-to-string`,
+   `solid-js`, `svelte`, `vue`, `@angular/*`, `@testing-library/*`, `@tanstack/*`,
+   `@solidjs/*`, `react-router`, `vue-router`, `wouter`, `sv-router`,
+   `@mateothegreat/svelte5-router`. `peerDependencies` are untouched (already `>=`
+   ranges).
+2. **`syncpack.config.mjs`** — a `range: "~"` semverGroup for the set, placed **before**
+   the catch-all "Pinned (save-exact)" (`range: ""`) group, else `lint:deps` demands an
+   exact pin and fails. syncpack's `source` is `packages/*` + `benchmarks` only, so this
+   governs the adapters + benchmarks; examples are outside syncpack's scope (the manifest
+   `~` edits still apply to them, they're just not lint-enforced).
+3. **`.github/dependabot.yml`** — the non-Angular set is `ignore`d for
+   `version-update:semver-patch` (the `~` range absorbs patches; **minor/major still open
+   PRs** and stay reviewed), and `@angular/*` is `ignore`d **entirely**.
+
+The `@angular/router` pnpm `override` was **removed** — ranges + the Dependabot ignore
+replace it.
+
+**Why `~` not `^`:** a minor bump of these frameworks can carry behavioural change, so it
+should be reviewed; only the patch floats silently.
+
+**Why `@angular/*` is ignored entirely (not just patch):** the exact cross-peer coupling
+means **any** single-package bump (patch/minor/major) breaks `strictPeerDependencies` and
+can halt the whole npm job — the same coupled-peer class as `nanostores`/`vite` already in
+the `ignore` list. The framework moves only via a **manual, coordinated `pnpm update`**
+across all `@angular/*` at once; the `~22.0.x` ranges then absorb the resulting patch. All
+`@angular/*` resolve to a single version because Angular publishes the whole framework in
+lockstep.
+
+**Determinism is preserved:** `pnpm-lock.yaml` still records **exact** resolved versions,
+so `--frozen-lockfile` (CI) is fully deterministic. The float only materialises on
+`pnpm update` / lockfile regeneration — it is not a per-CI-run moving target.
+
+**Maintenance rule:** when a new UI-framework / router / testing dependency is introduced,
+add it to **both** the syncpack `~` semverGroup and the dependabot `ignore` list (and use a
+`~` range in its manifest), or it falls back to exact-pin + per-patch Dependabot PRs.
+
 ### Danger JS
 
 `.github/workflows/danger.yml` runs automated PR review checks via `dangerfile.ts`:
