@@ -3,7 +3,10 @@ import type { DefaultDependencies, Router } from "@real-router/types";
 
 /**
  * Lifecycle hook callback for route transitions.
- * Fire-and-forget: return values are ignored, errors propagate to EventEmitter (logged to stderr).
+ * Fire-and-forget: return values are ignored. A throwing hook is caught and
+ * re-thrown asynchronously via `queueMicrotask` (#798), so it surfaces as an
+ * uncaught error to global handlers — it never aborts the transition and is NOT
+ * routed through the router's EventEmitter.
  */
 export type LifecycleHook = (
   toState: State,

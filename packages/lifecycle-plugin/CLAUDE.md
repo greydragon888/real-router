@@ -24,7 +24,7 @@ Hook lookup: `api.getRouteConfig(routeName)?.[hookName]` — reads hook factory 
 | Hook         | Fires when                                  | Event                        | Route checked    |
 | ------------ | ------------------------------------------- | ---------------------------- | ---------------- |
 | `onLeave`    | Navigating away from a route                | `onTransitionLeaveApprove`   | `fromState.name` |
-| `onStay`     | Same route, params changed                  | `onTransitionSuccess`        | `toState.name`   |
+| `onStay`     | Same route name (params may be unchanged: `reload:true` / revalidation) | `onTransitionSuccess` | `toState.name`   |
 | `onEnter`    | Navigating to a new route                   | `onTransitionSuccess`        | `toState.name`   |
 | `onNavigate` | Any successful navigation to the route      | `onTransitionSuccess`        | `toState.name`   |
 
@@ -53,6 +53,31 @@ Return values are ignored. Each hook is invoked with **per-hook exception isolat
 ### onLeave fires at leave-approve, not success
 
 `onLeave` uses `onTransitionLeaveApprove` — it fires after deactivation guards pass but before activation guards run. This means `onLeave` fires even if the transition later fails at activation. `onEnter` and `onStay` only fire on `onTransitionSuccess`.
+
+### Redirect from a hook
+
+A **synchronous** `router.navigate()` from inside a hook (the intuitive "redirect on `onEnter`") is **banned**: the hook runs inside a transition-event dispatch, so a reentrant navigate throws `RouterError(REENTRANT_NAVIGATION)` (RFC navigation-cancellation-unification §4, #1035). The redirect does **not** happen, and the per-hook isolation (#798) re-throws that error on a microtask — surfacing it as an uncaught exception (process-fatal under Node's default handler). Defer instead: `queueMicrotask(() => router.navigate(...))` (or an `await`ed async flow) runs after the transition has settled (FSM `READY` again) and is allowed:
+
+```typescript
+onEnter: (router) => (toState) => {
+  if (!isAuthed()) {
+    // deferred — OK; a *synchronous* navigate here throws REENTRANT_NAVIGATION
+    queueMicrotask(() => {
+      void router.navigate("login");
+    });
+  }
+},
+```
+
+### `onLeave` is not a guaranteed cleanup across tree mutations
+
+`onLeave` fires on `onTransitionLeaveApprove`, emitted only by the guarded `navigate()` pipeline. Structural route-tree mutations that tear out the active route do **not** run that phase:
+
+- `getRoutesApi(router).replace()` revalidation (#950/#1201) that **drops** the active route commits `UNKNOWN_ROUTE` via `navigateToNotFound()`, which emits only `TRANSITION_SUCCESS` — so the dropped route's `onLeave` is **skipped** (the "Cleanup on leave" `webSocket.disconnect()` silently does not run).
+- `replace()` revalidation where the active route **survives** (same name) emits `TRANSITION_SUCCESS` with `revalidate: true`; the plugin does not inspect `navOptions`, so it fires `onStay` **and** `onNavigate` with **no navigation and no param change**.
+- `clear()` is a silent reset (emits only `TREE_CHANGED`) — no lifecycle hook fires for the torn-out route.
+
+Do **not** rely on `onLeave` as a guaranteed cleanup across `replace()` / `clear()` / `navigateToNotFound()`. For teardown that must survive tree mutations, tie cleanup to an external lifecycle (component unmount, `subscribeChanges`). Core root tracked in #1201.
 
 ### No configuration
 

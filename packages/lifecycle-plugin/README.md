@@ -73,7 +73,7 @@ await router.start("/");
 | ------------ | --------------------------------------- | ------------------------------------------- |
 | `onNavigate` | Any successful navigation to the route  | Data loading, analytics, UI reset (default) |
 | `onEnter`    | Route is entered                        | Entry-only setup (open socket, scroll top)  |
-| `onStay`     | Same route, params changed              | Stay-only logic (incremental updates)       |
+| `onStay`     | Same route name (params may be unchanged)  | Stay-only logic (incremental updates)       |
 | `onLeave`    | Route is left                           | Cleanup timers, save state                  |
 
 **Orthogonal dispatch:** `onEnter` / `onStay` / `onNavigate` fire independently based on their own conditions. On entry, `onEnter` **and** `onNavigate` fire. On param-change, `onStay` **and** `onNavigate` fire. Each hook is composable — declaring one never silences another.
@@ -94,6 +94,10 @@ onEnter: (router, getDependency) => (toState) => {
 ### Execution order
 
 `onLeave` fires first (at leave-approve phase), then `onEnter` or `onStay` (at transition success).
+
+### Redirect from a hook
+
+Redirecting with a **synchronous** `router.navigate()` inside a hook throws `REENTRANT_NAVIGATION` (a reentrant navigate from a transition listener is banned) and, via the #798 isolation, surfaces as an uncaught error — the redirect never happens. Defer it: `queueMicrotask(() => router.navigate("login"))` runs after the transition settles and works.
 
 ## Use Cases
 
@@ -134,6 +138,8 @@ onEnter: (router, getDependency) => (toState) => {
   },
 }
 ```
+
+> **Caveat:** `onLeave` fires only on a guarded `navigate()` (via `onTransitionLeaveApprove`). It does **not** fire for a route torn out by a tree mutation — `getRoutesApi(router).replace()` / `clear()` / a `navigateToNotFound()` commit skip the leave phase, so cleanup here is not guaranteed across tree mutations (#1201).
 
 ### React to param changes
 
