@@ -8,7 +8,12 @@ import {
   expectTypeOf,
 } from "vitest";
 
-import { getDependenciesApi } from "@real-router/core/api";
+import { createRouter } from "@real-router/core";
+import {
+  cloneRouter,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
 
@@ -343,6 +348,118 @@ describe("core/plugins", () => {
         );
 
         warnSpy.mockRestore();
+      });
+
+      // #1202: bare core tolerates registering the SAME factory reference twice
+      // (validator-gated misuse), but `#plugins` is a Set while listener
+      // registrations are a multiset — so the Set bookkeeping diverges from the
+      // live listeners, and a clone silently loses the still-active plugin. Pin
+      // the current (acceptable) semantics so a refactor can't change them unseen.
+      it("same factory twice: 2 listeners fire, unsub1 leaves 1, but the clone loses the plugin (#1202)", async () => {
+        let hits = 0;
+        const factory: PluginFactory = () => ({
+          onTransitionSuccess() {
+            hits++;
+          },
+        });
+
+        router.stop();
+        const unsub1 = router.usePlugin(factory);
+
+        router.usePlugin(factory); // SAME ref — Set dedups to 1, listeners ×2
+        await router.start("/home");
+
+        hits = 0;
+        await router.navigate("users");
+
+        expect(hits).toBe(2); // both registrations' listeners fire
+
+        unsub1();
+        hits = 0;
+        await router.navigate("home");
+
+        expect(hits).toBe(1); // reg-2 survives (its listeners still live)
+
+        // unsub1's `#plugins.delete(factory)` emptied the Set, so the clone —
+        // built from getCloneState().pluginFactories — silently loses the plugin.
+        const clone = cloneRouter(router);
+
+        await clone.start("/home");
+        hits = 0;
+        await clone.navigate("users");
+
+        expect(hits).toBe(0); // clone did NOT re-run the still-active factory
+
+        clone.dispose();
+      });
+    });
+
+    // #1202: registering a plugin mid-lifecycle (from inside an async start
+    // interceptor / async guard) succeeds; the late plugin observes events from
+    // the emit that follows its registration onward — including the in-flight
+    // start / transition's own success, which has not fired yet at that point.
+    describe("registration during an active FSM window (#1202)", () => {
+      it("mid-STARTING (async start interceptor, before next()) — sees onStart + the start's success", async () => {
+        const seen: string[] = [];
+        const r = createRouter([
+          { name: "a", path: "/a" },
+          { name: "b", path: "/b" },
+        ]);
+
+        getPluginApi(r).addInterceptor("start", async (next, path) => {
+          r.usePlugin(() => ({
+            onStart() {
+              seen.push("onStart");
+            },
+            onTransitionSuccess(s) {
+              seen.push(`success:${s.name}`);
+            },
+          }));
+
+          return next(path);
+        });
+
+        await r.start("/a");
+
+        expect(seen).toStrictEqual(["onStart", "success:a"]);
+
+        await r.navigate("b");
+
+        expect(seen).toStrictEqual(["onStart", "success:a", "success:b"]);
+
+        r.dispose();
+      });
+
+      it("mid-TRANSITION (async activation guard) — sees the in-flight transition's success", async () => {
+        const seen: string[] = [];
+        const r = createRouter([
+          { name: "a", path: "/a" },
+          {
+            name: "b",
+            path: "/b",
+            canActivate: () => async () => {
+              r.usePlugin(() => ({
+                onTransitionSuccess(s) {
+                  seen.push(`success:${s.name}`);
+                },
+              }));
+
+              return true;
+            },
+          },
+          { name: "c", path: "/c" },
+        ]);
+
+        await r.start("/a");
+        await r.navigate("b"); // guard registers the plugin mid-transition
+
+        expect(seen).toStrictEqual(["success:b"]);
+
+        await r.navigate("c");
+
+        expect(seen).toStrictEqual(["success:b", "success:c"]);
+
+        r.dispose();
       });
     });
 

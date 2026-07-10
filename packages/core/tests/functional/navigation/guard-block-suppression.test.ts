@@ -89,11 +89,14 @@ describe("fire-and-forget guard-block suppression (#721)", () => {
     const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
     void router.navigate("users");
-    await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(errorSpy).toHaveBeenCalledWith(
-      ...UNEXPECTED_ERROR_LOG,
-      expect.objectContaining({ message: "leave boom" }),
-    );
+    // #1200 item 10: poll for the fire-and-forget rejection to be logged rather
+    // than a fixed real-timer wait (was `setTimeout 20` — a flaky race on slow CI).
+    await vi.waitFor(() => {
+      expect(errorSpy).toHaveBeenCalledWith(
+        ...UNEXPECTED_ERROR_LOG,
+        expect.objectContaining({ message: "leave boom" }),
+      );
+    });
   });
 });

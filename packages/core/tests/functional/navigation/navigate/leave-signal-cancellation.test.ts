@@ -145,6 +145,11 @@ describe("subscribeLeave signal — cancellation contract (#722)", () => {
       const second = router.navigate("orders");
 
       expect(signals[0]?.aborted).toBe(true);
+      // #1200 item 1: the aborted leave signal carries a meaningful default reason
+      // on the cancel path — RouterError(TRANSITION_CANCELLED), not a bare abort.
+      expect(signals[0]?.reason).toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       await vi.runAllTimersAsync();
 
@@ -176,6 +181,11 @@ describe("subscribeLeave signal — cancellation contract (#722)", () => {
       const second = router.navigate("orders");
 
       expect(signals[0]?.aborted).toBe(true);
+      // #1200 item 1: the aborted leave signal carries a meaningful default reason
+      // on the cancel path — RouterError(TRANSITION_CANCELLED), not a bare abort.
+      expect(signals[0]?.reason).toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       await vi.runAllTimersAsync();
 
@@ -206,6 +216,12 @@ describe("subscribeLeave signal — cancellation contract (#722)", () => {
       await router.navigate("users").catch(() => undefined);
 
       expect(signals[0]?.aborted).toBe(true);
+      // #1200 item 1: this reentrant path aborts with the BANNED reentrant navigate
+      // as the reason — RouterError(REENTRANT_NAVIGATION), NOT TRANSITION_CANCELLED
+      // (the sync leave throw is the abort reason; contrast the supersede path above).
+      expect(signals[0]?.reason).toMatchObject({
+        code: errorCodes.REENTRANT_NAVIGATION,
+      });
     });
   });
 

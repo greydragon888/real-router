@@ -70,16 +70,13 @@ describe("router.navigate() - events transition leave approve (RFC §9.2)", () =
         onLeaveApprove,
       );
 
-      try {
-        await router.navigate("users");
-
-        expect.fail("Should have thrown error");
-      } catch (error) {
-        expect((error as { code?: string }).code).toBe(
-          errorCodes.CANNOT_DEACTIVATE,
-        );
-        expect(onLeaveApprove).not.toHaveBeenCalled();
-      }
+      // #1200 item 11: `.rejects` instead of a try/catch with `expect.fail` inside
+      // the try — the old form could mask a non-throw if the expected code were
+      // ever undefined (the swallowed AssertionError's absent code would match).
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
+      });
+      expect(onLeaveApprove).not.toHaveBeenCalled();
 
       unsubLeave();
     });
@@ -162,14 +159,11 @@ describe("router.navigate() - events transition leave approve (RFC §9.2)", () =
         onLeaveApprove,
       );
 
-      try {
-        await router.navigate("users");
-
-        expect.fail("Should have thrown SAME_STATES error");
-      } catch (error) {
-        expect((error as { code?: string }).code).toBe(errorCodes.SAME_STATES);
-        expect(onLeaveApprove).not.toHaveBeenCalled();
-      }
+      // #1200 item 11: `.rejects` instead of a try/catch with `expect.fail`.
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.SAME_STATES,
+      });
+      expect(onLeaveApprove).not.toHaveBeenCalled();
 
       unsubLeave();
     });
