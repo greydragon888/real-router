@@ -81,7 +81,7 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/preact": "3.2.4",
     "@testing-library/user-event": "14.6.1",
-    "preact": "10.29.4",
+    "preact": "10.29.7",
     "preact-render-to-string": "6.7.0"
   },
   "peerDependencies": {
