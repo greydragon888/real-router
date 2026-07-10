@@ -121,6 +121,91 @@ describe("Link component", () => {
     });
   });
 
+  describe("throwing @click handler is isolated (#1352)", () => {
+    it("a throwing single onClick does NOT prevent the Link's navigation", async () => {
+      const navigateSpy = vi
+        .spyOn(router, "navigate")
+        .mockResolvedValue({} as never);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+        onClick: () => {
+          throw new Error("boom");
+        },
+      });
+
+      // Pre-fix the throw propagates out of `handleClick`, skipping navigate;
+      // swallow it so the discriminating assertion still runs.
+      try {
+        await wrapper.find("a").trigger("click");
+      } catch {
+        /* pre-fix: unisolated throw */
+      }
+
+      expect(navigateSpy).toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
+
+      navigateSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it("array-form @click — a throwing first handler swallows neither its siblings nor navigation", async () => {
+      const navigateSpy = vi
+        .spyOn(router, "navigate")
+        .mockResolvedValue({} as never);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      let secondRan = false;
+
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+        onClick: [
+          () => {
+            throw new Error("boom");
+          },
+          () => {
+            secondRan = true;
+          },
+        ],
+      });
+
+      try {
+        await wrapper.find("a").trigger("click");
+      } catch {
+        /* pre-fix: unisolated throw aborts the loop */
+      }
+
+      // Pre-fix: the throw aborts the array loop (sibling swallowed) AND
+      // propagates out of handleClick (navigate skipped). Both must survive.
+      expect(secondRan).toBe(true);
+      expect(navigateSpy).toHaveBeenCalled();
+
+      navigateSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it("a non-throwing onClick that calls preventDefault still blocks navigation", async () => {
+      // Isolation must not weaken the `defaultPrevented` contract: a handler
+      // that deliberately prevents default still stops the Link navigating.
+      const navigateSpy = vi
+        .spyOn(router, "navigate")
+        .mockResolvedValue({} as never);
+
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+        onClick: (evt: MouseEvent) => {
+          evt.preventDefault();
+        },
+      });
+
+      await wrapper.find("a").trigger("click");
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+
+      navigateSpy.mockRestore();
+    });
+  });
+
   describe("activeClassName", () => {
     it("should set active class when route matches", async () => {
       const wrapper = mountLink(router, {

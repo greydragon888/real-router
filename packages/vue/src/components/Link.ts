@@ -17,8 +17,30 @@ import type { PropType } from "vue";
 type OnClickHandler = (evt: MouseEvent) => void;
 
 /**
+ * Invoke ONE user `@click` handler in isolation (#1352). A throwing handler must
+ * NOT skip the Link's own navigation (which `handleClick` runs after this
+ * returns) or — in the array form — abort the remaining sibling handlers. Native
+ * `<a>` logs a throwing click listener and still performs the default action;
+ * this matches the codebase's adapter-callback isolation norm
+ * (`RouterErrorBoundary.onError`, `EventEmitter.emit`). The user's own
+ * `preventDefault()` still takes effect (it runs before any throw), so the
+ * `defaultPrevented` contract below is unchanged.
+ */
+function invokeUserOnClick(fn: OnClickHandler, evt: MouseEvent): void {
+  try {
+    fn(evt);
+  } catch (error) {
+    console.error(
+      "[real-router] A <Link> @click handler threw; navigation is unaffected.",
+      error,
+    );
+  }
+}
+
+/**
  * Vue's compiled template binds multiple `@click` handlers as an array.
- * Single render-function `onClick` is a function. Both must be invoked.
+ * Single render-function `onClick` is a function. Both must be invoked, each
+ * isolated via `invokeUserOnClick` (#1352).
  *
  * The function-branch deliberately omits a `defaultPrevented` check: the
  * single call short-circuits naturally and control returns to the caller
@@ -29,7 +51,7 @@ type OnClickHandler = (evt: MouseEvent) => void;
  */
 function invokeAttributesOnClick(value: unknown, evt: MouseEvent): void {
   if (typeof value === "function") {
-    (value as OnClickHandler)(evt);
+    invokeUserOnClick(value as OnClickHandler, evt);
 
     return;
   }
@@ -41,7 +63,7 @@ function invokeAttributesOnClick(value: unknown, evt: MouseEvent): void {
         continue;
       }
 
-      fn(evt);
+      invokeUserOnClick(fn, evt);
 
       if (evt.defaultPrevented) {
         return;
