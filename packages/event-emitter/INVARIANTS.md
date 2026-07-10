@@ -13,10 +13,13 @@
 
 ## Unsubscribe
 
-| #   | Invariant   | Description                                                                                                                                                                               |
-| --- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Unsubscribe | After calling the unsubscribe function returned by `on()`, or after calling `off(event, cb)`, the listener is not invoked on any subsequent emit. `listenerCount` decrements accordingly. |
-| 2   | Idempotency | Calling unsubscribe multiple times, or calling `off()` for a listener that was never registered, is a no-op. No error is thrown and the emitter state is unaffected.                      |
+| #   | Invariant               | Description                                                                                                                                                                               |
+| --- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Unsubscribe             | After calling the unsubscribe function returned by `on()`, the listener is not invoked on any subsequent emit and `listenerCount` decrements accordingly.                                 |
+| 2   | off() removal           | After `off(event, cb)`, the listener is removed, `listenerCount` decrements, and it is not invoked on subsequent emits — the direct-removal counterpart of the returned unsubscribe closure. |
+| 3   | Idempotent unsubscribe  | Calling the returned unsubscribe function multiple times is a no-op. No error is thrown and the emitter state is unaffected.                                                              |
+| 4   | Idempotent off()        | Calling `off(event, cb)` for a listener that was never registered (or already removed) is a no-op. No error is thrown and the emitter state is unaffected.                                |
+| 5   | Re-registration after off() | After `off(event, cb)` followed by `on(event, cb)` of the same reference, the listener fires again on subsequent emits. Removal fully releases the reference, so re-registration is not a duplicate. |
 
 ## Bulk Operations
 
@@ -41,29 +44,36 @@
 
 ## Registration
 
-| #   | Invariant           | Description                                                                                                                                                                                  |
-| --- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Duplicate rejection | Registering the same function reference twice on the same event via `on()` throws a "Duplicate listener" error. The same function on different events does not throw and registers normally. |
-| 2   | Atomic rejection    | A rejected duplicate `on()` does not mutate state: `listenerCount` is unchanged and every previously-registered listener still fires exactly once. The failed registration is a no-op beyond the throw. |
+| #   | Invariant                | Description                                                                                                                                                                                  |
+| --- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Duplicate rejection      | Registering the same function reference twice on the same event via `on()` throws a "Duplicate listener" error.                                                                             |
+| 2   | Cross-event registration | The same function reference registers independently on different events — `on(eventB, fn)` after `on(eventA, fn)` does not throw. Duplicate detection is per-event.                          |
+| 3   | Atomic rejection         | A rejected duplicate `on()` does not mutate state: `listenerCount` is unchanged and every previously-registered listener still fires exactly once. Validate-before-mutate means the rejected registration allocates **no orphan record** and is a no-op beyond the throw (#1167). |
 
 ## Error Handling
 
 | #   | Invariant       | Description                                                                                                                                                                                      |
 | --- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Error isolation | A listener that throws does not prevent subsequent listeners from executing. The error is captured and forwarded to `onListenerError`. All non-throwing listeners receive the correct emit data. |
-| 2   | RecursionDepthError propagation | A listener that throws `RecursionDepthError` causes `emit` to re-throw it (never routed to `onListenerError`) and halts iteration — on **both** emit paths (fast `maxEventDepth = 0` and depth-tracking `> 0`). |
-| 3   | Error forwarding order | When several listeners throw, every error is forwarded to `onListenerError` in registration order, and all non-throwing listeners still run. |
+| 1   | Error isolation | A listener that throws does not prevent subsequent listeners from executing. The error is captured and forwarded to `onListenerError` — there is **no re-thrown sentinel**. All non-throwing listeners receive the correct emit data. |
+| 2   | Error forwarding order | When several listeners throw, every error is forwarded to `onListenerError` in registration order, and all non-throwing listeners still run. |
 
 ## Listener Limits
 
 | #   | Invariant                | Description                                                                                                                                                                                                  |
 | --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | maxListeners enforcement | When `maxListeners > 0`, attempting to register more listeners than the limit throws `"Listener limit"`. Exactly `maxListeners` registrations succeed; the (N+1)th throws.                                   |
-| 2   | warnListeners threshold  | When `warnListeners > 0`, the first **successful** registration of the (W+1)th listener (W = warnListeners) invokes `onListenerWarn` once with the event name and threshold value. The hard limit is checked first, so a registration that throws `"Listener limit"` (e.g. `warnListeners === maxListeners`) never warns. Earlier registrations do not trigger it. |
+| 2   | warnListeners threshold  | When `warnListeners > 0`, the first **successful** registration of the (W+1)th listener (W = warnListeners) invokes `onListenerWarn` once with the event name and threshold value. The hard limit is checked first, so a registration that throws `"Listener limit"` (e.g. `warnListeners === maxListeners`) never warns. Earlier registrations do not trigger it. The advisory hook runs **before** the latch is set and before the listener is added, so a hook that throws aborts `on()` without burning the latch or leaving an orphan record (#1168). |
 | 3   | warn latch (exactly once) | The warning fires **exactly once per emitter+event** for the lifetime of the listener set — even when off/on churn re-crosses the threshold (`set.size === warnListeners` is re-met). The latch is released when the event's last listener is removed (off → empty Set) or on `clearAll()`, so a fresh accumulation past the threshold warns again. |
-| 4   | Atomic limit rejection | An `on()` that hits `maxListeners` throws `"Listener limit"` atomically: `listenerCount` stays at the limit, every accepted listener still fires, the rejected one never runs, and `onListenerWarn` does not fire for it (even when `warnListeners === maxListeners`). |
-| 5   | maxEventDepth boundary | When `maxEventDepth = D > 0`, a self-recursive emit nests exactly `D` levels successfully; the `(D+1)`th nested emit throws `RecursionDepthError`. |
-| 6   | warn latch reset | After the warning has fired, removing the event's last listener (off → empty Set) or calling `clearAll()` resets the latch, so a fresh accumulation past the threshold warns again. |
+| 4   | Atomic limit rejection | An `on()` that hits `maxListeners` throws `"Listener limit"` atomically: `listenerCount` stays at the limit, **no orphan record is created** (#1167), every accepted listener still fires, the rejected one never runs, and `onListenerWarn` does not fire for it (even when `warnListeners === maxListeners`). |
+| 5   | warn latch reset | After the warning has fired, removing the event's last listener (off → empty Set) or calling `clearAll()` resets the latch, so a fresh accumulation past the threshold warns again. |
+
+## Re-entrancy Coalescing
+
+| #   | Invariant                    | Description                                                                                                                                                                                                                                                                                       |
+| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Coalesce (re-entrant no-op)  | A listener that synchronously re-emits the event **currently being dispatched** is coalesced to a no-op — the emit never re-enters its own dispatch (**depth ≤ 1**), no matter how many times it re-emits. The original dispatch still runs every co-registered listener exactly once. No depth bound, no `RecursionDepthError` (#1033). |
+| 2   | Coalesce is per-event        | While event `A` is being dispatched, emitting a **different** event `B` from `A`'s listener still dispatches all of `B`'s listeners — the `#dispatching` guard is keyed per event name, so only same-event re-entry is suppressed.                                                                 |
+| 3   | In-flight guard release      | The `#dispatching` entry is released after the dispatch (in `emit`'s `finally`) on **normal AND abnormal exit** — even an `onListenerError` that itself throws still triggers the release (#1165) — so a later `emit` of the same event fires again. `isDispatching(event)` reports whether the event is currently in-flight. |
 
 ## Callback Validation
 
@@ -81,5 +91,5 @@
 
 | File                                        | Invariants | Category                                                                                                                                                          |
 | ------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/property/eventEmitter.properties.ts` | 30         | Delivery, ordering, isolation, argument arity, unsubscribe, snapshot semantics, listener count, registration + atomicity, error handling + recursion-depth propagation, limits + depth boundary, warn latch, validation, stateful sequence consistency |
+| `tests/property/eventEmitter.properties.ts` | 30         | Delivery, ordering, isolation, argument arity, unsubscribe + idempotency + re-registration, snapshot semantics, listener count, registration + atomicity, error isolation + forwarding, listener limits + warn latch, re-entrancy coalescing + in-flight guard release, validation, stateful sequence consistency |
 | `tests/property/helpers.ts`                 | —          | Shared arbitraries and emitter factory helpers                                                                                                                   |

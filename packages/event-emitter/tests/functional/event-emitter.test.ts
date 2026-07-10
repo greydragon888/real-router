@@ -782,7 +782,7 @@ describe("EventEmitter", () => {
       expect(emitter.listenerCount("hover")).toBe(0);
     });
 
-    it("should reset depth map", () => {
+    it("should allow re-registration and emit after clearAll (no lingering dispatch state)", () => {
       const emitter = createEmitter({
         limits: { maxListeners: 0, warnListeners: 0 },
       });
@@ -797,7 +797,9 @@ describe("EventEmitter", () => {
 
       emitter.clearAll();
 
-      // Re-register and emit — should work (depth map reset)
+      // Re-register and emit — clearAll cleared the listeners, so the fresh
+      // registration fires. (There is no depth map; the coalesce guard is
+      // owned by the emit frame and self-releases in its finally.)
       emitter.on("reset", () => {
         count++;
       });
@@ -912,7 +914,7 @@ describe("EventEmitter", () => {
         throw new Error("listener boom");
       });
 
-      // Single listener uses fast path (#emitFast with set.size === 1)
+      // Single listener uses the fast path (set.size === 1 → direct call)
       expect(emitter.listenerCount("reset")).toBe(1);
       expect(() => {
         emitter.emit("reset");

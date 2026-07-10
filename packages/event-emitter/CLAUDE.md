@@ -18,8 +18,9 @@ Internal package providing a generic typed event emitter for Real-Router. Not pu
 | `on(event, cb)` | Subscribe; returns `Unsubscribe`. Throws on duplicate listener or limit exceeded |
 | `off(event, cb)` | Remove a listener |
 | `emit(event, ...args)` | Fire event to all listeners (snapshot iteration); re-entrant same-event emit is coalesced |
-| `clearAll()` | Remove all listeners and reset dispatch state |
+| `clearAll()` | Remove all listeners and reset the warn latch (the in-flight `#dispatching` guard is not cleared here — it self-releases per emit) |
 | `listenerCount(event)` | Number of listeners for an event |
+| `isDispatching(event)` | Whether the event is currently in-flight (its `emit` is on the stack) — the re-entrancy coalesce guard (#1033) |
 | `setLimits(limits)` | Replace current limits at runtime |
 | `EventEmitter.validateCallback(cb, event)` | Static assertion that cb is a function |
 
@@ -45,7 +46,7 @@ src/
 - **Snapshot iteration** -- `emit()` snapshots the listener set before iteration; listeners added/removed during emit do not affect the current invocation
 - **Per-listener error isolation** -- listener exceptions are caught and forwarded to the `onListenerError` callback (if provided); other listeners still execute. All listener throws are isolated — there is no re-thrown sentinel
 - **Explicit args, not rest params** -- `emit()` takes up to 4 explicit args to avoid V8 array materialization overhead; extra `undefined` args are harmless (JS ignores extra function arguments)
-- **Fast path for single listener** -- when a set has exactly one listener, `emit` skips the `[...set]` array spread (direct call). Single-subscriber events (the common router case) get the shortcut (measured ~10% faster for one listener)
+- **Fast path for single listener** -- when a set has exactly one listener, `emit` skips the `[...set]` array spread (direct call). Single-subscriber events (the common router case) get the shortcut, avoiding the snapshot allocation
 - **No dependencies** -- zero runtime dependencies; fully self-contained
 - **Property-based tests** -- `tests/property/` contains fast-check generative tests for emitter invariants
 - **Heap-stress tests** -- `tests/stress/` (`pnpm -F event-emitter test:stress`, runs with `--expose-gc`) guards against the dynamic-event-name heap leak in `#callbacks` (#750); thresholds are anchored to measured healthy vs leak deltas
