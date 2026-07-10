@@ -3,6 +3,7 @@
 // insertion, plus the route-meta / query-and-constraint collection helpers.
 // Concerns split into ./context ./errors ./trieNodes ./trie ./buildParts.
 
+import { EMPTY_PARAM_META } from "../buildParamMeta";
 import {
   INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
@@ -55,7 +56,13 @@ export function registerNode(
   }
 
   const isAbsolute = node.absolute;
-  const pathPattern = node.paramMeta.pathPattern;
+  // The EMPTY_PARAM_META sentinel (fully-static node) carries pathPattern "";
+  // its real pattern is the node's own path (sentinel is only installed when
+  // the two were reference-equal).
+  const pathPattern =
+    node.paramMeta === EMPTY_PARAM_META
+      ? node.path
+      : node.paramMeta.pathPattern;
   const strippedPattern =
     isAbsolute && pathPattern.startsWith("~")
       ? pathPattern.slice(1)
