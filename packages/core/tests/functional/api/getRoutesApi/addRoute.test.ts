@@ -1563,6 +1563,36 @@ describe("core/routes/addRoute", () => {
 
       navRouter.stop();
     });
+
+    // #1204: add() during the STARTING window — inside an async start
+    // interceptor, before next(). isTransitioning() spans only
+    // TRANSITION_STARTED/LEAVE_APPROVED, so the STARTING phase has NO route-CRUD
+    // gate: add() proceeds (as it does everywhere — add is ungated) and the
+    // in-flight start(path) resolves into the just-registered route. This pins
+    // browser-plugin-style lazy registration: a plugin can add a route in its
+    // own start interceptor and have the initial start(path) land on it.
+    it("proceeds mid-STARTING (async start interceptor) — start() lands in the lazily-added route", async () => {
+      const lazyRouter = createRouter([{ name: "home", path: "/home" }], {
+        allowNotFound: false, // a miss REJECTS, so resolving to 'lazy' is load-bearing
+      });
+      const lazyApi = getRoutesApi(lazyRouter);
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+      getPluginApi(lazyRouter).addInterceptor("start", async (next, path) => {
+        lazyApi.add({ name: "lazy", path: "/lazy" }); // FSM is STARTING here
+        return next(path);
+      });
+
+      const state = await lazyRouter.start("/lazy");
+
+      expect(state.name).toBe("lazy"); // start resolved into the just-added route
+      expect(lazyApi.has("lazy")).toBe(true);
+      // add mid-STARTING is NOT a logged no-op (unlike clear/replace mid-navigation)
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      errorSpy.mockRestore();
+      lazyRouter.dispose();
+    });
   });
 
   // A guard factory that throws on compile now surfaces during the PRE-SWAP
