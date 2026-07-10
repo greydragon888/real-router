@@ -136,4 +136,41 @@ describe("event-emitter heap leak for dynamic event names (#750, #1033)", () => 
     expect(emitter.listenerCount("ev0")).toBe(0);
     expect(delta).toBeLessThan(THRESHOLD);
   });
+
+  it("S4: on() retains no orphan record when a rejection throws — 200k FAILED on() on unique names stays bounded (#1167)", () => {
+    // maxListeners < 0 makes the limit check `size >= maxListeners` true at
+    // size 0, so the FIRST on() of every new name throws. A rejected registration
+    // must be atomic — it must NOT leave a record behind. Pre-#1358(b) `on()`
+    // created + stored the Set (#getCallbackSet) BEFORE the checks, so each throw
+    // stranded an empty Set: an unbounded heap-only leak (listenerCount stays 0).
+    // Anchored to THRESHOLD and mutation-validated like S1–S3 (reverting the fix —
+    // create-before-check — pushes the delta into the leak column).
+    const emitter = new EventEmitter<Record<string, unknown[]>>({
+      limits: { maxListeners: -1, warnListeners: 0 },
+    });
+
+    // Warm-up: amortize JIT / lazy allocations before the baseline snapshot.
+    for (let i = 0; i < 1000; i++) {
+      try {
+        emitter.on(`warm${i}`, noise);
+      } catch {
+        // expected — a negative limit rejects every registration
+      }
+    }
+
+    const delta = measureHeapDelta(() => {
+      for (let i = 0; i < NAMES; i++) {
+        try {
+          emitter.on(`ev${i}`, noise);
+        } catch {
+          // expected
+        }
+      }
+    });
+
+    // listenerCount() reports 0 whether the orphan record is retained or not —
+    // only the heap delta can reveal the leak.
+    expect(emitter.listenerCount("ev0")).toBe(0);
+    expect(delta).toBeLessThan(THRESHOLD);
+  });
 });
