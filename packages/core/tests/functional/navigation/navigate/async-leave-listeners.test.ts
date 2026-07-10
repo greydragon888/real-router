@@ -377,6 +377,51 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
       expect(calls).toStrictEqual([1, 2, 3]);
     });
 
+    // #1200 item 4: first-error-WINS, not first-listener. The previous test throws
+    // from the FIRST listener, so "first error" and "first listener" coincide.
+    // Here the MIDDLE (2nd of 3) is the sole thrower — the navigation must reject
+    // with ITS error, and all three still run.
+    it("sync throw from the MIDDLE of three listeners wins (first-error-wins)", async () => {
+      const calls: number[] = [];
+
+      router.subscribeLeave(() => {
+        calls.push(1);
+      });
+      router.subscribeLeave(() => {
+        calls.push(2);
+
+        throw new Error("middle");
+      });
+      router.subscribeLeave(() => {
+        calls.push(3);
+      });
+
+      await expect(router.navigate("users")).rejects.toThrow("middle");
+
+      expect(calls).toStrictEqual([1, 2, 3]);
+    });
+
+    // #1200 item 5: the non-thenable arm of `typeof result.then === "function"`.
+    // A listener that returns a non-void, NON-thenable value (e.g. 42) is neither
+    // awaited nor treated as an error — it is ignored and the navigation completes
+    // normally. (The thenable arm is covered elsewhere in this suite.)
+    it("a non-thenable non-void return (42) is ignored — navigation completes", async () => {
+      let fired = false;
+
+      router.subscribeLeave((): void => {
+        fired = true;
+
+        // Return a non-void, non-thenable value — the `result.then` branch is not
+        // taken, so it is neither awaited nor treated as an error.
+        return 42 as unknown as void;
+      });
+
+      const state = await router.navigate("users");
+
+      expect(fired).toBe(true);
+      expect(state.name).toBe("users");
+    });
+
     it("mixed sync error + async error → sync error priority", async () => {
       router.subscribeLeave(() => {
         throw new Error("sync error");
@@ -601,6 +646,45 @@ describe("router.navigate() — async subscribeLeave listeners", () => {
       expect(spy).toHaveBeenCalledTimes(3); // exactly one entry survived
 
       unsubA();
+    });
+  });
+
+  // #1200 item 3: awaitLeaveListeners iterates a SNAPSHOT of #leaveListeners, so
+  // registering / unsubscribing from inside a firing leave listener does not
+  // affect the CURRENT emit cycle.
+  describe("snapshot under mutation (#1200 item 3)", () => {
+    it("a listener registered mid-emit is NOT called this cycle, only next", async () => {
+      const calls: string[] = [];
+
+      router.subscribeLeave(() => {
+        calls.push("A");
+        router.subscribeLeave(() => {
+          calls.push("B");
+        });
+      });
+
+      await router.navigate("users");
+
+      expect(calls).toStrictEqual(["A"]); // B added mid-emit — not in the snapshot
+
+      calls.length = 0;
+      await router.navigate("orders");
+
+      expect(calls).toStrictEqual(["A", "B"]); // next cycle: both fire
+    });
+
+    it("a self-unsubscribing leave listener fires exactly once", async () => {
+      const calls: string[] = [];
+
+      const unsub = router.subscribeLeave(() => {
+        calls.push("once");
+        unsub();
+      });
+
+      await router.navigate("users");
+      await router.navigate("orders");
+
+      expect(calls).toStrictEqual(["once"]); // fired once, then removed itself
     });
   });
 });

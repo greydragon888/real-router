@@ -1,9 +1,27 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
-import { createStartedRouter, arbNavigableRoute, NUM_RUNS } from "./helpers";
+import {
+  arbNavigableRoute,
+  createFixtureRouter,
+  createStartedRouter,
+  NUM_RUNS,
+} from "./helpers";
 
 import type { State } from "@real-router/core";
+
+/**
+ * Property-based coverage for `router.subscribeLeave()`.
+ *
+ * Example-based suites pin a handful of fixed listener counts / routes; these
+ * properties exercise the registration / invocation / unsubscribe machinery
+ * across a generated range of N (and the full non-function input space), plus
+ * the payload / signal contract over every navigable target.
+ *
+ * Merged from the former `subscribe-leave.properties.ts` + this file (#1200
+ * item 12): they differed only by hyphenation and duplicated the non-function
+ * `TypeError` guard.
+ */
 
 interface LeavePayload {
   route: State;
@@ -23,78 +41,149 @@ function getParamsForRoute(name: string): Record<string, string> {
   return {};
 }
 
-describe("subscribeLeave() Properties", () => {
-  // TYPEOF_GUARD — parity with subscribe(): subscribeLeave is an always-on
-  // invariant guard (no plugin required). Any non-function listener throws
-  // TypeError synchronously, before it can be pushed onto the leave-listener
-  // array and crash on a later navigation. Previously covered only by hardcoded
-  // null/undefined/string cases (navigator.test.ts) — `fc.anything()` covers the
-  // full corruption surface; `typeof x !== "function"` keeps only the rejected set.
-  test.prop([fc.anything().filter((x) => typeof x !== "function")], {
-    numRuns: NUM_RUNS.standard,
-  })("non-function listener throws TypeError", async (notAFunction) => {
-    const router = await createStartedRouter("/");
+describe("subscribeLeave() properties", () => {
+  describe("validation invariant", () => {
+    // TYPEOF_GUARD — parity with subscribe(): subscribeLeave is an always-on
+    // invariant guard (no plugin required). Any non-function listener throws
+    // TypeError synchronously, before it can be pushed onto the leave-listener
+    // array and crash on a later navigation. `fc.anything()` covers the full
+    // corruption surface; `typeof x !== "function"` keeps only the rejected set.
+    // The router is never mutated (every call throws before registration), so a
+    // single fixture instance is reused across all runs.
+    const router = createFixtureRouter();
 
-    expect(() => {
-      router.subscribeLeave(notAFunction as any);
-    }).toThrow(TypeError);
-
-    router.stop();
+    test.prop([fc.anything().filter((v) => typeof v !== "function")], {
+      numRuns: NUM_RUNS.standard,
+    })("throws TypeError for any non-function listener", (notAFunction) => {
+      expect(() => router.subscribeLeave(notAFunction as never)).toThrow(
+        TypeError,
+      );
+    });
   });
 
-  // LEAVE_PAYLOAD — for an arbitrary confirmed departure, the listener fires
-  // exactly once with `{ route: fromState, nextRoute: toState, signal }`. The
-  // shape is generalized over every navigable target (the functional suite pins
-  // it only for fixed routes).
-  test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.standard })(
-    "fires once with {route, nextRoute, signal} on confirmed departure",
-    async (targetRoute) => {
-      fc.pre(targetRoute !== "home");
+  describe("invocation invariants", () => {
+    test.prop([fc.integer({ min: 1, max: 20 })], { numRuns: NUM_RUNS.fast })(
+      "N registered listeners each fire exactly once per leave",
+      async (n) => {
+        const router = await createStartedRouter("/");
+        const spies = Array.from({ length: n }, () => vi.fn());
 
-      const router = await createStartedRouter("/");
-      const fromState = router.getState();
-      const listener = vi.fn();
+        spies.forEach((s) => router.subscribeLeave(s));
 
-      router.subscribeLeave(listener);
+        await router.navigate("admin.settings");
 
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+        spies.forEach((s) => {
+          expect(s).toHaveBeenCalledTimes(1);
+        });
 
-      expect(listener).toHaveBeenCalledTimes(1);
+        router.stop();
+      },
+    );
 
-      const payload = listener.mock.calls[0][0] as LeavePayload;
+    test.prop([fc.integer({ min: 2, max: 12 })], { numRuns: NUM_RUNS.fast })(
+      "listeners fire in registration order",
+      async (n) => {
+        const router = await createStartedRouter("/");
+        const order: number[] = [];
 
-      // Departure is from the previously committed state, arrival is the target.
-      expect(payload.route.name).toBe(fromState?.name);
-      expect(payload.nextRoute.name).toBe(targetRoute);
-      expect(payload.nextRoute).toBe(router.getState());
-      expect(payload.signal).toBeInstanceOf(AbortSignal);
+        for (let i = 0; i < n; i++) {
+          const idx = i;
 
-      router.stop();
-    },
-  );
+          router.subscribeLeave(() => {
+            order.push(idx);
+          });
+        }
 
-  // SIGNAL_UNABORTED_ON_SUCCESS — the leave signal aborts ONLY on cancellation,
-  // never on success (#722). A listener that captures the signal observes
-  // `aborted === false` after the navigation commits. Generalizes the fixed-route
-  // assertion in async-leave-listeners.test.ts over arbitrary navigable targets.
-  test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.standard })(
-    "captured signal stays unaborted after a successful navigation",
-    async (targetRoute) => {
-      fc.pre(targetRoute !== "home");
+        await router.navigate("admin.settings");
 
-      const router = await createStartedRouter("/");
-      let captured: AbortSignal | undefined;
+        expect(order).toStrictEqual(Array.from({ length: n }, (_, i) => i));
 
-      router.subscribeLeave(({ signal }) => {
-        captured = signal;
-      });
+        router.stop();
+      },
+    );
 
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+    test.prop(
+      [fc.integer({ min: 1, max: 10 }), fc.integer({ min: 0, max: 10 })],
+      {
+        numRuns: NUM_RUNS.fast,
+      },
+    )(
+      "after unsubscribing K of N listeners, exactly the remaining N-K fire",
+      async (n, kRaw) => {
+        const k = Math.min(kRaw, n);
+        const router = await createStartedRouter("/");
+        const spies = Array.from({ length: n }, () => vi.fn());
+        const unsubs = spies.map((s) => router.subscribeLeave(s));
 
-      expect(captured).toBeInstanceOf(AbortSignal);
-      expect(captured?.aborted).toBe(false);
+        for (let i = 0; i < k; i++) {
+          unsubs[i]();
+        }
 
-      router.stop();
-    },
-  );
+        await router.navigate("admin.settings");
+
+        spies.forEach((s, i) => {
+          expect(s).toHaveBeenCalledTimes(i < k ? 0 : 1);
+        });
+
+        router.stop();
+      },
+    );
+  });
+
+  describe("payload & signal", () => {
+    // LEAVE_PAYLOAD — for an arbitrary confirmed departure, the listener fires
+    // exactly once with `{ route: fromState, nextRoute: toState, signal }`. The
+    // shape is generalized over every navigable target (the functional suite pins
+    // it only for fixed routes).
+    test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.standard })(
+      "fires once with {route, nextRoute, signal} on confirmed departure",
+      async (targetRoute) => {
+        fc.pre(targetRoute !== "home");
+
+        const router = await createStartedRouter("/");
+        const fromState = router.getState();
+        const listener = vi.fn();
+
+        router.subscribeLeave(listener);
+
+        await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+
+        expect(listener).toHaveBeenCalledTimes(1);
+
+        const payload = listener.mock.calls[0][0] as LeavePayload;
+
+        // Departure is from the previously committed state, arrival is the target.
+        expect(payload.route.name).toBe(fromState?.name);
+        expect(payload.nextRoute.name).toBe(targetRoute);
+        expect(payload.nextRoute).toBe(router.getState());
+        expect(payload.signal).toBeInstanceOf(AbortSignal);
+
+        router.stop();
+      },
+    );
+
+    // SIGNAL_UNABORTED_ON_SUCCESS — the leave signal aborts ONLY on cancellation,
+    // never on success (#722). A listener that captures the signal observes
+    // `aborted === false` after the navigation commits.
+    test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.standard })(
+      "captured signal stays unaborted after a successful navigation",
+      async (targetRoute) => {
+        fc.pre(targetRoute !== "home");
+
+        const router = await createStartedRouter("/");
+        let captured: AbortSignal | undefined;
+
+        router.subscribeLeave(({ signal }) => {
+          captured = signal;
+        });
+
+        await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+
+        expect(captured).toBeInstanceOf(AbortSignal);
+        expect(captured?.aborted).toBe(false);
+
+        router.stop();
+      },
+    );
+  });
 });
