@@ -11,6 +11,7 @@ import { build, preview } from "vite";
 
 import { measure } from "./harness/measure.mjs";
 import { activeLinks } from "./scenarios/active-links.mjs";
+import { backForward } from "./scenarios/back-forward.mjs";
 import { coldStart } from "./scenarios/cold-start.mjs";
 import { deepConfig } from "./scenarios/deep-config.mjs";
 import { linkBuild } from "./scenarios/link-build.mjs";
@@ -32,6 +33,7 @@ const SCENARIOS = {
   "table-heap": tableHeap,
   "nav-churn": navChurn,
   "active-links": activeLinks,
+  "back-forward": backForward,
   "link-build": linkBuild,
   "nested-switch": nestedSwitch,
 };
