@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-10]
 
+### @real-router/react@0.28.18
+
+### Patch Changes
+
+- [#1377](https://github.com/greydragon888/real-router/pull/1377) [`08a5716`](https://github.com/greydragon888/real-router/commit/08a5716340c9036b5ab727070e94840311a69cff) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: duplicate `<RouteView.NotFound>` is now first-wins, symmetric with `<Self>` ([#1220](https://github.com/greydragon888/real-router/issues/1220))
+
+  `recordFallback` assigned `slots.notFoundChildren` unconditionally, so multiple `<RouteView.NotFound>` under one `<RouteView>` were **last-wins** — a later duplicate silently overwrote the earlier one. This contradicted the documented Self-symmetric first-wins contract (the `<Self>` slot has always been guarded by `selfFound`). Added a matching `notFoundFound` first-wins guard, so the **first** `<RouteView.NotFound>` now contributes and subsequent duplicates are ignored. Locked by a converted functional regression and a new duplicate-NotFound property invariant (both mutation-validated).
+
+
+### @real-router/sources@0.10.14
+
+### Patch Changes
+
+- [#1375](https://github.com/greydragon888/real-router/pull/1375) [`5afb563`](https://github.com/greydragon888/real-router/commit/5afb56364b0a943dbfc8e9b48f92bc466fc0ea62) Thanks [@greydragon888](https://github.com/greydragon888)! - Docs: correct `hash: ""` active-state semantics in `ActiveRouteSourceOptions` JSDoc + sync package docs ([#1208](https://github.com/greydragon888/real-router/issues/1208))
+
+  The `ActiveRouteSourceOptions.hash` JSDoc — which ships into `.d.ts` and IDE tooltips — mis-stated the no-URL-plugin case. Under hash-plugin / memory-plugin the source collapses the missing `context.url` namespace to `""`, so a **non-empty** `hash` is always `false` while `hash: ""` still matches an active route ("no namespace" reads as "no fragment", [#532](https://github.com/greydragon888/real-router/issues/532)). Corrected the tooltip JSDoc (and the CLAUDE.md / README.md twins). No behavior change — this aligns the docs with existing, probe-verified behavior.
+
+  Also synced the repo docs with the current suite: added the reconnect-reconcile / lazy-connection / catch-up invariants ([#765](https://github.com/greydragon888/real-router/issues/765)/[#766](https://github.com/greydragon888/real-router/issues/766)) to INVARIANTS.md with corrected Test Files counters (routeSource 22, activeRouteSource 19, createDismissableError 7), fixed the ARCHITECTURE.md reconnect-reconcile credit + 5-component cache key, and documented the public `primeErrorSource` export (with the "errors before the first subscriber surface on the promise, not the source" limitation, [#1215](https://github.com/greydragon888/real-router/issues/1215)) in README.
+
+
 ### @real-router/react@0.28.17
 
 ### Patch Changes
