@@ -18,6 +18,7 @@ import {
   CONSTRAINT_PATTERN_RGX,
   EMPTY_CONSTRAINTS,
   EMPTY_PARAMS,
+  EMPTY_ROUTE_META,
   EMPTY_STRINGS,
   EMPTY_STRING_SET,
   type RegistrationState,
@@ -230,13 +231,32 @@ function compileAndRegisterRoute(
 function buildMeta(
   segments: readonly MatcherInputNode[],
 ): Readonly<Record<string, Record<string, "url" | "query">>> {
-  const meta: Record<string, Record<string, "url" | "query">> = {};
+  let meta: Record<string, Record<string, "url" | "query">> | undefined;
 
   for (const segment of segments) {
+    if (!hasAnyParam(segment.paramTypeMap)) {
+      continue;
+    }
+
+    meta ??= {};
     meta[segment.fullName] = segment.paramTypeMap;
   }
 
-  return Object.freeze(meta);
+  return meta === undefined ? EMPTY_ROUTE_META : Object.freeze(meta);
+}
+
+// Allocation-free emptiness probe for a segment's paramTypeMap (Object.keys
+// would allocate a fresh array per segment during registration).
+function hasAnyParam(
+  paramTypeMap: Readonly<Record<string, "url" | "query">>,
+): boolean {
+  for (const key in paramTypeMap) {
+    if (Object.hasOwn(paramTypeMap, key)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function registerSlashChild(

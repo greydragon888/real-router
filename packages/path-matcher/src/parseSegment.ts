@@ -134,7 +134,11 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
       // (`a:?`): that shape never reaches the tokenizer through a real path (a `?`
       // after a bare marker is not a valid `:name?` optional, so the query mask strips
       // it before `/`-segmentation), so a direct call correctly reports fused-marker.
-      if (isMarker(code) && i + 1 < length && segment.charCodeAt(i + 1) !== LT) {
+      if (
+        isMarker(code) &&
+        i + 1 < length &&
+        segment.charCodeAt(i + 1) !== LT
+      ) {
         return { error: "fused-marker" };
       }
     }
