@@ -6,10 +6,10 @@ import {
   input,
   signal,
 } from "@angular/core";
+import { createActiveSource } from "@real-router/sources";
 
 import { applyLinkA11y } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
-import { createActiveSource } from "../internal/createActiveSource";
 import { createStableParams } from "../internal/createStableParams";
 import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 

@@ -1,3 +1,4 @@
+import { createActiveSource } from "@real-router/sources";
 import { defineComponent, h, computed, shallowRef, watch } from "vue";
 
 import { useRouter } from "../composables/useRouter";
@@ -9,7 +10,6 @@ import {
   navigateWithHash,
   shallowEqual,
 } from "../dom-utils";
-import { createActiveSource } from "../internal/createActiveSource";
 
 import type { Params, NavigationOptions } from "@real-router/core";
 import type { PropType } from "vue";

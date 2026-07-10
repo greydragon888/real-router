@@ -1,4 +1,5 @@
-import { createActiveSource } from "../internal/createActiveSource";
+import { createActiveSource } from "@real-router/sources";
+
 import { useRefFromSource } from "../useRefFromSource";
 import { useRouter } from "./useRouter";
 
