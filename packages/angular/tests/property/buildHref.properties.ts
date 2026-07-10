@@ -27,13 +27,19 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
 import { NUM_RUNS, arbDottedNameExtended, arbHash } from "./helpers";
-import { computeExpectedFragment } from "../../../../shared/dom-utils/__test-helpers/expected-fragment";
 import { buildHref } from "../../src/dom-utils";
 // Imported directly from `shared/` because Angular's `sync-dom-utils.mjs`
 // strips `__`-prefixed test-helper dirs from its `src/dom-utils/` copy
 // (ng-packagr would otherwise bundle them into the lib output).
 
 import type { Params, Router } from "@real-router/core";
+
+// Independent re-derivation of encodeFragmentInline's strict #1211 formula: the
+// drift sentinel asserts buildHref matches it WITHOUT importing the production
+// function (which would be a tautology). Local per adapter — the shared
+// `__test-helpers` mirror was retired once the encoder became a one-liner.
+const computeExpectedFragment = (rawHash: string): string =>
+  encodeURI(rawHash).replaceAll("#", "%23");
 
 function makeFakeRouter(
   buildUrl:

@@ -18,9 +18,15 @@ import { describe, expect } from "vitest";
 
 import { arbHash, NUM_RUNS } from "./helpers";
 import { buildActiveClassName, buildHref } from "../../src/dom-utils";
-import { computeExpectedFragment } from "../../src/dom-utils/__test-helpers";
 
 import type { Router } from "@real-router/core";
+
+// Independent re-derivation of encodeFragmentInline's strict #1211 formula: the
+// drift sentinel asserts buildHref matches it WITHOUT importing the production
+// function (which would be a tautology). Local per adapter — the shared
+// `__test-helpers` mirror was retired once the encoder became a one-liner.
+const computeExpectedFragment = (rawHash: string): string =>
+  encodeURI(rawHash).replaceAll("#", "%23");
 
 // =============================================================================
 // buildActiveClassName invariants

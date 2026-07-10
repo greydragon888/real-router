@@ -34,7 +34,7 @@
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "type-check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
-    "bundle": "svelte-package -i src -o dist && rimraf dist/dom-utils/__test-helpers dist/dom-utils/CLAUDE.md"
+    "bundle": "svelte-package -i src -o dist && rimraf dist/dom-utils/CLAUDE.md"
   },
   "keywords": [
     "router",
