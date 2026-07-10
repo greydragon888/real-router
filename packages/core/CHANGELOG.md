@@ -1,5 +1,26 @@
 # @real-router/core
 
+## 0.74.7
+
+### Patch Changes
+
+- [#1401](https://github.com/greydragon888/real-router/pull/1401) [`ad96c2e`](https://github.com/greydragon888/real-router/commit/ad96c2e3190873916a0a398c78407b7315ae1b16) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `EventEmitter.on()` leaving an orphan record when a rejection throws ([#1167](https://github.com/greydragon888/real-router/issues/1167))
+
+  `on()` created and stored the per-event record before its rejection checks, so a
+  negative `maxListeners` (the limit check is already met at size 0) threw on the
+  first registration of a new name while retaining an empty `Set` — an unbounded,
+  `listenerCount`-invisible heap leak. `on()` now validates before mutating: the
+  record is created only after every check passes, so a rejected registration
+  leaves nothing behind.
+
+- [#1401](https://github.com/greydragon888/real-router/pull/1401) [`ad96c2e`](https://github.com/greydragon888/real-router/commit/ad96c2e3190873916a0a398c78407b7315ae1b16) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix a throwing `onListenerWarn` burning the warn latch ([#1168](https://github.com/greydragon888/real-router/issues/1168))
+
+  In `EventEmitter.on()` the warn latch was set before the (user-supplied)
+  `onListenerWarn` hook ran, so a throwing hook failed the registration but left
+  the latch spent — the next successful (W+1)th registration then stayed silent.
+  The hook is now invoked before the latch is set, so a throw leaves the latch
+  unspent and the next registration warns as documented.
+
 ## 0.74.6
 
 ### Patch Changes
