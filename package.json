@@ -1,6 +1,6 @@
 {
   "name": "real-router",
-  "version": "0.74.6",
+  "version": "0.74.7",
   "type": "module",
   "description": "A real router. Just routing, nothing else.",
   "scripts": {

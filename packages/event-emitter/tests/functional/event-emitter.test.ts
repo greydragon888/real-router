@@ -586,6 +586,37 @@ describe("EventEmitter", () => {
 
       expect(onListenerWarn).toHaveBeenCalledTimes(2);
     });
+
+    it("a throwing onListenerWarn does NOT burn the latch — the next registration still warns (#1168)", () => {
+      const warned: string[] = [];
+      let throwOnWarn = true;
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 1 },
+        onListenerWarn: (eventName) => {
+          warned.push(eventName);
+
+          if (throwOnWarn) {
+            throw new Error("warn hook boom");
+          }
+        },
+      });
+
+      emitter.on("click", vi.fn()); // 1st — size 0, below the warn threshold
+
+      // 2nd registration hits the warn threshold (size 1 === warnListeners); the
+      // hook fires and throws, so the registration fails. The latch must NOT be
+      // burned by a rejected registration — pre-#1358(b) the latch was set BEFORE
+      // the throwing hook ran (#1168), so the next successful (W+1)th registration
+      // stayed silent.
+      expect(() => emitter.on("click", vi.fn())).toThrow("warn hook boom");
+      expect(warned).toStrictEqual(["click"]); // fired once, for the failed attempt
+
+      // Disarm the hook — the NEXT registration must still warn (latch not burnt).
+      throwOnWarn = false;
+      emitter.on("click", vi.fn()); // succeeds — the failed attempt did not spend the latch
+
+      expect(warned).toStrictEqual(["click", "click"]);
+    });
   });
 
   // ===========================================================================
