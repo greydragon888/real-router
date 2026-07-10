@@ -1,5 +1,20 @@
 # @real-router/angular
 
+## 0.13.15
+
+### Patch Changes
+
+- [#1424](https://github.com/greydragon888/real-router/pull/1424) [`de242f5`](https://github.com/greydragon888/real-router/commit/de242f5b0178a574c0d3edc8cb29769931bc3f85) Thanks [@greydragon888](https://github.com/greydragon888)! - refactor(angular): import `createActiveSource` from `@real-router/sources` ([#1416](https://github.com/greydragon888/real-router/issues/1416))
+
+  The fast/slow active-source builder moved to `@real-router/sources` (one shared
+  copy for all adapters). `RealLink` and `RealLinkActive` now import
+  `createActiveSource` from there; the local `internal/createActiveSource.ts` copy
+  (and its test) is removed. No behavior change — the builder's logic and signature
+  are unchanged (`buildActiveRouteOptions` stays for `injectIsActiveRoute`).
+
+- Updated dependencies [[`de242f5`](https://github.com/greydragon888/real-router/commit/de242f5b0178a574c0d3edc8cb29769931bc3f85)]:
+  - @real-router/sources@0.11.0
+
 ## 0.13.14
 
 ### Patch Changes

@@ -1,5 +1,56 @@
 # @real-router/vue
 
+## 0.16.16
+
+### Patch Changes
+
+- [#1424](https://github.com/greydragon888/real-router/pull/1424) [`de242f5`](https://github.com/greydragon888/real-router/commit/de242f5b0178a574c0d3edc8cb29769931bc3f85) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(vue): gate `useRouteEnter` / `useRouteExit` on `<KeepAlive>` deactivation ([#1221](https://github.com/greydragon888/real-router/issues/1221))
+
+  Under Vue's native `<KeepAlive>` a component is deactivated (not unmounted) when
+  navigated away from, and its effect scope stays alive. Neither `useRouteEnter` (a
+  `watch(route)`) nor `useRouteExit` (a `subscribeLeave`) gated on
+  activated/deactivated state, so a sleeping page's handlers kept running on
+  unrelated app navigations — a kept-alive page's analytics fired on foreign navs,
+  and worst, a sleeping page's **async** (Promise-returning) exit handler was
+  spliced into every navigation's leave cycle and blocked the whole app. Both
+  composables now track `onActivated` / `onDeactivated` (which only fire under
+  KeepAlive — inert otherwise) and skip the handler while deactivated. A deactivated
+  page fires neither enter nor exit; waking a kept-alive page does NOT re-fire enter
+  (it was never unmounted, so reactivation is not a mount — use Vue's native
+  `onActivated` for a "re-run on show" hook).
+
+- [#1424](https://github.com/greydragon888/real-router/pull/1424) [`de242f5`](https://github.com/greydragon888/real-router/commit/de242f5b0178a574c0d3edc8cb29769931bc3f85) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(vue): wire `<Link>` to the shared active-name selector fast path ([#1416](https://github.com/greydragon888/real-router/issues/1416))
+
+  `<Link>` built a per-link `createActiveRouteSource` for every link — the [#1250](https://github.com/greydragon888/real-router/issues/1250)
+  fast path landed only in the never-called `useIsActiveRoute` composable, so vue
+  was the one adapter where K default-options links held K `router.subscribe`
+  handles (a ~10k-link page hit the emitter's listener cap). The shared
+  `createActiveSource` fast/slow builder (promoted to `@real-router/sources`, where
+  it is now shared with the angular directives too) backs BOTH `<Link>`'s reactive
+  `watch` and `useIsActiveRoute`, so a default-options link resolves active state
+  through ONE per-router `createActiveNameSelector` subscription. Single source of truth for the fast/slow
+  decision, so the two callers can no longer drift (the drift that caused [#1416](https://github.com/greydragon888/real-router/issues/1416)).
+  Also adds the missing `routeName !== ""` guard the composable's copy lacked
+  (empty name stays on the slow path). A paramless `<Link>` to a param route is now
+  name-only active while a param instance is active — aligning vue with the react /
+  preact / solid / svelte / angular adapters.
+
+- [#1424](https://github.com/greydragon888/real-router/pull/1424) [`de242f5`](https://github.com/greydragon888/real-router/commit/de242f5b0178a574c0d3edc8cb29769931bc3f85) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(vue): isolate a throwing `<Link>` @click handler from navigation ([#1352](https://github.com/greydragon888/real-router/issues/1352))
+
+  `<Link>` invoked the user's `@click` handler(s) with no exception isolation and
+  before its own `preventDefault` + navigate, so a throwing handler propagated out
+  of `handleClick` and the navigation never ran — a throwing `onClick` silently
+  prevented the Link from navigating, and in the array form (Vue's compiled
+  multi-handler / `v-on` merge) it also aborted the remaining sibling handlers.
+  Each user handler now runs through `invokeUserOnClick` (try/catch →
+  `console.error` + continue), matching native `<a>` (logs a throwing click
+  listener, still performs the default action) and the codebase's adapter-callback
+  isolation norm. The handler's own `preventDefault()` still blocks navigation (it
+  runs before any throw), so the `defaultPrevented` contract is unchanged.
+
+- Updated dependencies [[`de242f5`](https://github.com/greydragon888/real-router/commit/de242f5b0178a574c0d3edc8cb29769931bc3f85)]:
+  - @real-router/sources@0.11.0
+
 ## 0.16.15
 
 ### Patch Changes
