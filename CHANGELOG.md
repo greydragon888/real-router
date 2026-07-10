@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-10]
+
+### @real-router/memory-plugin@0.4.25
+
+### Patch Changes
+
+- [#1372](https://github.com/greydragon888/real-router/pull/1372) [`2370788`](https://github.com/greydragon888/real-router/commit/237078894a4d9bbdaca383ed5b8e0abe4cce4de8) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix stack corruption when an async `canActivate` on the back()/go() target races a concurrent `navigate()` ([#1234](https://github.com/greydragon888/real-router/issues/1234))
+
+  [#807](https://github.com/greydragon888/real-router/issues/807) fixed the sync `back(); navigate()` race by consuming `#navigatingFromHistory` on the restore commit, but that consumption is by **timing** ("the first commit after the flag was set"), not **identity**. When the back()/go() target has an async `canActivate` guard, the restore `navigateToState` is in flight and a concurrent `navigate()` cancels it and commits first — its `onTransitionSuccess` steals the flag and records the forward navigate as a phantom history-restore (no push, `direction: "back"`, stale `historyIndex`), while the cancelled restore's `.catch` reverts `#index` past the array, corrupting the stack three ways.
+
+  The restore navigation is now tagged `source: MEMORY_RESTORE` — the same `source` convention the browser/hash URL plugins already use — and the flag is consumed only when the committing navigation carries that tag, attributing it by identity rather than timing. The cancelled `#go`'s `.catch` likewise reverts `#index` only when it is still the optimistic target (a concurrent push has otherwise already re-based it), keeping the stack in bounds for deep `go(-N)` races too. Companion stress `[#1235](https://github.com/greydragon888/real-router/issues/1235)` (async-guard interleave) now locks the invariant.
+
 ## [2026-07-09]
 
 ### @real-router/fsm@0.6.1
