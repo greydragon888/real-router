@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-10]
 
+### @real-router/react@0.28.18
+
+### Patch Changes
+
+- [#1377](https://github.com/greydragon888/real-router/pull/1377) [`08a5716`](https://github.com/greydragon888/real-router/commit/08a5716340c9036b5ab727070e94840311a69cff) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix: duplicate `<RouteView.NotFound>` is now first-wins, symmetric with `<Self>` ([#1220](https://github.com/greydragon888/real-router/issues/1220))
+
+  `recordFallback` assigned `slots.notFoundChildren` unconditionally, so multiple `<RouteView.NotFound>` under one `<RouteView>` were **last-wins** — a later duplicate silently overwrote the earlier one. This contradicted the documented Self-symmetric first-wins contract (the `<Self>` slot has always been guarded by `selfFound`). Added a matching `notFoundFound` first-wins guard, so the **first** `<RouteView.NotFound>` now contributes and subsequent duplicates are ignored. Locked by a converted functional regression and a new duplicate-NotFound property invariant (both mutation-validated).
+
+
 ### @real-router/sources@0.10.14
 
 ### Patch Changes
