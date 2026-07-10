@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { buildParamMeta } from "../../src/buildParamMeta";
+import { buildParamMeta } from "path-matcher";
+
 import { EMPTY_STATIC_CHILDREN } from "../../src/pathUtils";
 import { createSegmentNode } from "../../src/SegmentMatcher";
 import { createMatcher } from "../helpers/buildTree";
 import { createTestMatcher } from "../helpers/createTestMatcher";
 
-import type { SegmentMatcher } from "../../src/SegmentMatcher";
 import type {
   BuildParamSlot,
   CompiledRoute,
   MatcherInputNode,
   MatchResult,
+  SegmentMatcher,
   SegmentMatcherOptions,
-} from "../../src/types";
+} from "path-matcher";
 
 function createInputNode(
   overrides: Partial<MatcherInputNode> & { name: string; path: string },

@@ -125,17 +125,17 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
         return { error: "constraint-in-static" };
       }
 
-      // A marker glued after a static prefix is extracted as a param by
-      // build/meta but compiled as a static literal by the trie (#1050). A bare
-      // marker with NO following name char — a static ENDING in `:`/`*` (`/a:`,
-      // `/a*`) — is NOT fused; it stays a valid static literal, matching the trie
-      // backstop (F2: this alignment closed a former gate-too-strict divergence).
-      if (isMarker(code) && i + 1 < length) {
-        const next = segment.charCodeAt(i + 1);
-
-        if (next !== LT && next !== QUESTION) {
-          return { error: "fused-marker" };
-        }
+      // A marker glued after a static prefix is extracted as a param by build/meta
+      // but compiled as a static literal by the trie (#1050) — reject it as fused.
+      // Two placements are NOT fused: a marker ENDING the segment (a static ending in
+      // `:`/`*` — `/a:`, `/a*`, F2 — caught by `i + 1 < length` being false), and a
+      // marker followed by `<` (the constraint-in-static case `a<b>`, caught by the
+      // `<` branch above). Every OTHER following char is fused — including a `?`
+      // (`a:?`): that shape never reaches the tokenizer through a real path (a `?`
+      // after a bare marker is not a valid `:name?` optional, so the query mask strips
+      // it before `/`-segmentation), so a direct call correctly reports fused-marker.
+      if (isMarker(code) && i + 1 < length && segment.charCodeAt(i + 1) !== LT) {
+        return { error: "fused-marker" };
       }
     }
 
