@@ -90,7 +90,7 @@ RouteUtils.startsWithSegment("users.list", "users"); // true
 
 - **Max length**: 10,000 characters (`RangeError`)
 - **Allowed characters**: `a-z`, `A-Z`, `0-9`, `.`, `-`, `_` (`TypeError`)
-- **Empty / null segment**: returns `false` (no error)
+- **Empty / null segment**: a **direct** call (`f(name, segment)`) returns `false` (no error); a **curried** tester applied to `null` / `undefined` (`f(name)(null)`) throws `TypeError` — the two call forms differ (`segmentTesters.ts`; see ARCHITECTURE "Validation Pipeline")
 
 ## Performance
 

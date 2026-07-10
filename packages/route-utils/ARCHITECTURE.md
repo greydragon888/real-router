@@ -69,11 +69,24 @@ Constructor
 
 ### Absolute Route Semantics
 
-Absolute routes (e.g., `~/modal`) are hoisted to root level in the route tree. Their sibling semantics:
+An absolute **path** (e.g., `~/modal`) overrides the parent path at the URL level only — the node keeps its position in the route tree (route-tree ARCHITECTURE.md: "Override parent path"). Its `fullName` keeps the parent prefix (e.g. `users.modal`) and `getChain` still routes through the parent — the node is **not** hoisted to root. Sibling semantics:
 
 - Absolute routes are **excluded** from their parent's `nonAbsoluteChildren`
-- An absolute route's siblings are **all** `nonAbsoluteChildren` of the root
+- An absolute route's siblings are **all** `nonAbsoluteChildren` of its **parent** (which equals the root's `nonAbsoluteChildren` only when the absolute route is top-level — the common case the functional tests cover)
 - Non-absolute routes never see absolute routes as siblings
+
+**Example** — `users.modal` (absolute) nested under `users`:
+
+```
+""                                nonAbsoluteChildren = ["users", "admin"]
+  users   children=[list, modal, view]  nonAbsoluteChildren = ["users.list", "users.view"]
+    users.modal   [absolute]
+```
+
+- `getSiblings("users.modal")` → `["users.list", "users.view"]` — the **parent's** `nonAbsoluteChildren`, **not** the root's (`["users", "admin"]`)
+- `getChain("users.modal")` → `["users", "users.modal"]` — the chain goes through the parent
+
+The code (`RouteUtils.ts:133-141`: absolute children inherit the **parent** node's `nonAbsoluteChildren`) is correct; only this doc over-generalized the top-level special case (parent = root).
 
 ---
 
@@ -110,14 +123,22 @@ The curried form is useful for creating reusable predicates (e.g., in `filter()`
 
 ### Validation Pipeline
 
+The two entry forms (direct vs. curried) run the same checks in **different order** — the route-name check (`invalidName`) is deferred so the single-arg form always returns a tester function per its overload contract (#769):
+
 ```
-Input → Compute invalidName (route name non-string or empty) — no short-circuit
-  → Null check (segment) → Currying check
-  → invalidName → false  → Segment type/empty check
-  → Length check (≤ 10,000) → Character check (SAFE_SEGMENT_PATTERN) → Regex build + cache
+Direct form   f(route, segment):
+  segment === null → false
+    → invalidName → false            (BEFORE the segment-type guard)
+    → segment type check → segment empty → false
+    → buildRegex: length (≤ 10,000) → character (SAFE_SEGMENT_PATTERN) → compile + cache
+
+Curried form  f(route)(segment):
+  segment type check → segment empty → false
+    → invalidName → false            (AFTER the segment-type guard)
+    → buildRegex: length (≤ 10,000) → character (SAFE_SEGMENT_PATTERN) → compile + cache
 ```
 
-Validation is split: name/segment type-empty-null checks happen in the returned function, length/character checks happen in `buildRegex`. The route-name check is computed once as `invalidName` but is **deferred** — it never short-circuits before the currying branch, so the single-arg form always returns a tester function per its overload contract (#769). Each return path (curried body + direct form) applies `invalidName` after its own segment checks.
+Validation is split: name/segment type-empty-null checks happen in the returned function, length/character checks happen in `buildRegex`. The route-name check is computed once as `invalidName` but is **deferred** — it never short-circuits before the currying branch, so the single-arg form always returns a tester function (#769). The two forms check `invalidName` at **different points**: the **direct** form checks it *before* the segment-type guard (so `f("", 42)` returns `false`, never a `TypeError`), while the **curried** form checks it *after* (so `f("")(42)` throws `TypeError`). Deliberate consequence: with an invalid route name, **both** forms skip the length/character validation of a string segment, so direct/curried equivalence for **string** segments holds exactly (INVARIANTS Inv 5).
 
 ---
 

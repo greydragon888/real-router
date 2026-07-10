@@ -54,4 +54,4 @@
 
 | File                                      | Invariants | Category                                                    |
 | ----------------------------------------- | ---------- | ----------------------------------------------------------- |
-| `tests/property/routeUtils.properties.ts` | 23         | Segment testers, route relation, isDescendantOf, validation |
+| `tests/property/routeUtils.properties.ts` | 21         | Segment testers, route relation, isDescendantOf, validation |
