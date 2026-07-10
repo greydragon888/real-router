@@ -1,4 +1,4 @@
-// packages/logger/modules/Logger.ts
+// packages/logger/src/Logger.ts
 
 import { LOG_LEVELS, LEVEL_CONFIGS } from "./constants";
 
@@ -24,7 +24,7 @@ interface InternalLoggerConfig {
  *
  * Features:
  * - Three log levels: log, warn, error
- * - Configurable threshold filtering (all, warn, error, none)
+ * - Configurable threshold filtering (all, warn-error, error-only, none)
  * - Optional callback for custom log processing
  * - Callback can optionally ignore level threshold
  * - Context-based message formatting
@@ -34,7 +34,7 @@ interface InternalLoggerConfig {
  * import { logger } from './Logger';
  *
  * // Configure logger
- * logger.configure({ level: 'warn' });
+ * logger.configure({ level: 'warn-error' });
  *
  * // Use logger
  * logger.log('Router', 'Navigation started'); // Won't show (below threshold)
@@ -63,14 +63,14 @@ class Logger {
    * Configures the logger with new settings.
    *
    * @param config - Partial configuration to merge with existing config
-   * @param config.level - Minimum log level to output ('all' | 'warn' | 'error' | 'none')
+   * @param config.level - Minimum log level to output ('all' | 'warn-error' | 'error-only' | 'none')
    * @param config.callback - Optional callback function to receive log messages
    * @param config.callbackIgnoresLevel - If true, callback receives all messages regardless of level
    *
    * @example
    * ```ts
    * // Set minimum level to warnings
-   * logger.configure({ level: 'warn' });
+   * logger.configure({ level: 'warn-error' });
    *
    * // Add custom callback that ignores level
    * logger.configure({
@@ -144,7 +144,7 @@ class Logger {
    * Logs a warning message at 'warn' level.
    *
    * Use for deprecation notices, non-critical issues, or potential problems.
-   * Messages are shown when level is 'all' or 'warn'.
+   * Messages are shown when level is 'all' or 'warn-error'.
    *
    * @param context - Context identifier (e.g., 'Router', 'Plugin')
    * @param message - Warning message
@@ -164,7 +164,7 @@ class Logger {
    * Logs an error message at 'error' level.
    *
    * Use for critical errors, exceptions, or failures that require attention.
-   * Messages are shown when level is 'all', 'warn', or 'error'.
+   * Messages are shown when level is 'all', 'warn-error', or 'error-only'.
    *
    * @param context - Context identifier (e.g., 'Router', 'Plugin')
    * @param message - Error message
@@ -332,10 +332,10 @@ class Logger {
  *
  * @example
  * ```ts
- * import { logger } from '@core/logger';
+ * import { logger } from '@real-router/logger';
  *
  * // Configure once at application startup
- * logger.configure({ level: 'warn' });
+ * logger.configure({ level: 'warn-error' });
  *
  * // Use anywhere in your app
  * logger.log('MyModule', 'Operation completed');

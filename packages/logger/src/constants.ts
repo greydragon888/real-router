@@ -1,4 +1,4 @@
-// packages/logger/modules/constants.ts
+// packages/logger/src/constants.ts
 
 import type { LogLevel, LogLevelConfig } from "./types";
 

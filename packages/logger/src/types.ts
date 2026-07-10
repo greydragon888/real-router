@@ -1,4 +1,4 @@
-// packages/logger/modules/types.ts
+// packages/logger/src/types.ts
 
 /**
  * Log message severity level.

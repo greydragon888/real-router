@@ -1,4 +1,4 @@
-// packages/logger/modules/index.ts
+// packages/logger/src/index.ts
 
 export { logger } from "./Logger";
 
