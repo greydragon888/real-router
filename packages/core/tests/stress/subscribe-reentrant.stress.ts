@@ -17,12 +17,12 @@ const CHAIN = ["users", "orders", "admin.dashboard"] as const;
 // reentrant-ban.test.ts, so it is not stressed here.)
 //
 // Discriminating power (per stress README): the COUNT invariants are exact —
-// S30.1 (1000 listeners × 1000 navigates) drops one invocation and the 1,000,000
-// `===` count breaks; S30.3 is a THROUGHPUT guard (never-settling fire-and-forget
+// S32.1 (1000 listeners × 1000 navigates) drops one invocation and the 1,000,000
+// `===` count breaks; S32.3 is a THROUGHPUT guard (never-settling fire-and-forget
 // promises, no heap delta — a heap assert there would be theatre, per CLAUDE.md);
-// S30.4 is a snapshot-honoured mid-emit sub/unsub guard. None has a cleanup cycle
+// S32.4 is a snapshot-honoured mid-emit sub/unsub guard. None has a cleanup cycle
 // to skip, so no heap snapshot.
-describe("S30: reentrant + concurrent subscribe()", () => {
+describe("S32: reentrant + concurrent subscribe()", () => {
   let router: Router;
 
   beforeEach(async () => {
@@ -38,7 +38,7 @@ describe("S30: reentrant + concurrent subscribe()", () => {
     router.dispose();
   });
 
-  it("S30.1: 1000 listeners × 1000 navigates — every listener fires on every transition (exact 1,000,000)", async () => {
+  it("S32.1: 1000 listeners × 1000 navigates — every listener fires on every transition (exact 1,000,000)", async () => {
     const LISTENERS = 1000;
     const NAVIGATES = 1000;
 
@@ -95,7 +95,7 @@ describe("S30: reentrant + concurrent subscribe()", () => {
     router.dispose();
   });
 
-  it("S30.3: 1000 async subscribe listeners returning never-settling promises — fire-and-forget ignored, throughput intact", async () => {
+  it("S32.3: 1000 async subscribe listeners returning never-settling promises — fire-and-forget ignored, throughput intact", async () => {
     // `subscribe` is fire-and-forget: the returned promise is never awaited. A
     // listener that returns a Promise that NEVER settles must not stall, retain,
     // or break the pipeline — the promise is simply dropped on the floor. This
@@ -135,7 +135,7 @@ describe("S30: reentrant + concurrent subscribe()", () => {
     router.dispose();
   });
 
-  it("S30.4: mid-emit subscribe/unsubscribe × 1000 — snapshot honored, added listener never fires in its own emit (#1 fixed)", async () => {
+  it("S32.4: mid-emit subscribe/unsubscribe × 1000 — snapshot honored, added listener never fires in its own emit (#1 fixed)", async () => {
     // On every transition, the primary listener adds a fresh listener AND
     // removes the one it added in the previous transition. `EventEmitter.emit`
     // snapshots the listener set on entry, so the just-added listener must NOT

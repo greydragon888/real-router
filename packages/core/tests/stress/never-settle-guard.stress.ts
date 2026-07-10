@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, RouterError } from "@real-router/core";
+import { errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
@@ -124,7 +124,9 @@ describe("S31: never-settling canActivate guard does not wedge the pipeline", ()
     // analogue of the leave-path DoS fixed in #663/#673).
     router.dispose();
 
-    await expect(nav).rejects.toThrow(RouterError);
+    await expect(nav).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
     expect(router.isActive()).toBe(false);
   }, 30_000);
 

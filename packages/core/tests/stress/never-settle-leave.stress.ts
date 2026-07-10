@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, RouterError } from "@real-router/core";
+import { errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -121,7 +121,9 @@ describe("S30: never-settling subscribeLeave does not wedge the pipeline", () =>
     // probe-02 case C showed nav1 still pending after dispose, pre-#673).
     router.dispose();
 
-    await expect(nav).rejects.toThrow(RouterError);
+    await expect(nav).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
     expect(router.isActive()).toBe(false);
   }, 30_000);
 });
