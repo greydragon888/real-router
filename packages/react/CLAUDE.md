@@ -169,7 +169,7 @@ Three fallback slots compose with `<RouteView.Match>` inside a `<RouteView nodeN
 **Precedence rules** (`buildRenderList` + `appendFallback`):
 
 1. `<Match>` first-wins — duplicate segments short-circuit via `processMatch.alreadyActive`. Subsequent `<Match>` with the same segment are not rendered.
-2. `<Self>` first-wins — only the first `<RouteView.Self>` contributes; subsequent ones are ignored (symmetric with `<NotFound>`).
+2. `<Self>` and `<NotFound>` are both first-wins — only the first `<RouteView.Self>` (resp. first `<RouteView.NotFound>`) contributes; subsequent duplicates are ignored. `recordFallback` guards each with its own `selfFound` / `notFoundFound` flag. (#1220 restored the `<NotFound>` half of this symmetry — it was accidentally last-wins before.)
 3. An activating `<Match>` suppresses both `<Self>` and `<NotFound>` from the render output.
 4. When no `<Match>` activates: `<Self>` wins over `<NotFound>` if both would fire (occurs only when `nodeName === UNKNOWN_ROUTE`, narrow edge case).
 

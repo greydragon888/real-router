@@ -691,6 +691,50 @@ describe("RouteView pipeline — Property Tests", () => {
     );
   });
 
+  // =============================================================================
+  // Invariant 14 — buildRenderList: first-NotFound wins (symmetric with #4)
+  // =============================================================================
+
+  describe("Invariant 14: first <NotFound> wins when multiple present (#1220)", () => {
+    test.prop([fc.integer({ min: 2, max: 5 })], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "N copies of <NotFound> on UNKNOWN_ROUTE → exactly one render, carrying the FIRST NotFound's children",
+      (copies) => {
+        const elements = Array.from({ length: copies }, (_, index) =>
+          makeNotFound(`nf-copy-${index}`),
+        );
+
+        const { rendered } = buildRenderList(
+          elements,
+          UNKNOWN_ROUTE,
+          "",
+          new Set(),
+        );
+
+        // Exactly one NotFound entry (fixed key) — symmetric with first-Self (#4).
+        const notFoundEntries = rendered.filter(
+          (element) => element.key === "__route-view-not-found__",
+        );
+
+        expect(notFoundEntries).toHaveLength(1);
+        expect(rendered).toHaveLength(1);
+
+        // First-wins IDENTITY: the rendered children come from the FIRST
+        // <NotFound>, not the last. Count alone can't discriminate — last-wins
+        // also yields exactly one entry; the marker is what proves first-wins
+        // (#1220: recordFallback overwrote without a guard before the fix).
+        const child = (
+          notFoundEntries[0].props as { readonly children: ReactElement }
+        ).children;
+
+        expect(
+          (child.props as { readonly "data-marker": string })["data-marker"],
+        ).toBe("nf-copy-0");
+      },
+    );
+  });
+
   describe("Cross-check: NotFound appended ONLY on UNKNOWN_ROUTE", () => {
     test.prop([arbSegmentName], { numRuns: NUM_RUNS.standard })(
       "non-UNKNOWN_ROUTE + no Match → NotFound is NOT in rendered",

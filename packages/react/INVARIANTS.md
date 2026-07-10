@@ -90,6 +90,7 @@ trees of `<Match>` / `<Self>` / `<NotFound>` leaves (optionally
 | 11  | `processMatch` keepAlive monotonicity              | Across a sequence of `buildRenderList` passes with distinct route names targeting different `<Match keepAlive>` segments, the committed `hasBeenActivated` (grown by RouteView's effect from each pass's `activatedName`) grows monotonically — no entry is ever removed. |
 | 12  | Large element arrays                               | `buildRenderList` correctly resolves first-match-wins and NotFound conditional across 50..120 Match elements. Guards against an O(n²) regression in the linear walk.                                       |
 | 13  | keepAlive with falsy routeName                     | `<Match keepAlive segment="x">` against `routeName=""` does NOT activate and does NOT enter the keepAlive set. A segment previously activated (committed via the effect) stays in `hasBeenActivated` and renders hidden during a `routeName=""` transition. |
+| 14  | `buildRenderList` first-NotFound wins (#1220)      | N copies of `<NotFound>` on `routeName === UNKNOWN_ROUTE` produce exactly one rendered entry (key `__route-view-not-found__`) carrying the **first** NotFound's children — symmetric with first-Self (#4). Count alone can't discriminate (last-wins also yields one entry); the child marker proves first-wins. `recordFallback` guards the assignment with `notFoundFound` (before #1220 it was unconditional → last-wins). |
 
 Cross-check (not in #626, tightens fallback contract): `<NotFound>` is
 appended to the render list **only** when `routeName === UNKNOWN_ROUTE`
@@ -128,7 +129,7 @@ between passes.
 | `tests/property/navigateWithHash.properties.ts` | 7          | `navigateWithHash` (#532) — same-route same/different hash, cross-route, propagation, no-state, tandem, params determinism |
 | `tests/property/httpStatusSink.properties.ts`   | 2          | `createHttpStatusSink` — fresh code, distinct identity per call                                |
 | `tests/property/routeView.properties.ts`        | 8          | `isSegmentMatch` — exact, monotonicity, self-match, dot boundary, empty segment, multi-segment depth, empty routeName, deep names |
-| `tests/property/routeView.pipeline.properties.ts` | 13 + 1   | RouteView pipeline (#626) — `collectElements` (3: order, flatness, termination), `buildRenderList` (6: first-match, first-Self, Self priority, activeMatchFound, stability, large arrays), `processMatch` (4: sticky, alreadyActive, monotonicity, falsy routeName) + cross-check |
+| `tests/property/routeView.pipeline.properties.ts` | 14 + 1   | RouteView pipeline (#626, #1220) — `collectElements` (3: order, flatness, termination), `buildRenderList` (7: first-match, first-Self, first-NotFound, Self priority, activeMatchFound, stability, large arrays), `processMatch` (4: sticky, alreadyActive, monotonicity, falsy routeName) + cross-check |
 
 ## Reactive Lifecycle Regressions (integration, not property-based)
 
