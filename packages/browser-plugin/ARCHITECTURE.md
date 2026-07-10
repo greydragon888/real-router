@@ -107,7 +107,10 @@ export function browserPluginFactory(opts?, browser?): PluginFactory {
     source: POPSTATE_SOURCE,
     replace: true as const,
   };
-  const shared: SharedFactoryState = { removePopStateListener: undefined };
+  const shared: SharedFactoryState = {
+    removePopStateListener: undefined,
+    removeHashChangeListener: undefined,
+  };
 
   return function browserPlugin(routerBase) {
     return createBrowserPlugin(
@@ -225,11 +228,12 @@ const lifecycle = createPopstateLifecycle({
     removeStartInterceptor();
     removeExtensions(); // ← removes buildUrl, matchUrl, replaceHistoryState
     claim.release();
+    urlClaim.release(); // ← releases the shared "url" hash namespace (#532)
   },
 });
 ```
 
-`teardown` removes the popstate listener, then calls the `cleanup` callback which unregisters the start interceptor and router extensions.
+`teardown` removes the popstate listener (and the `hashchange` listener it owns, #759), then calls the `cleanup` callback which unregisters the start interceptor, router extensions, and both context-namespace claims.
 
 As a safety net, `router.dispose()` also cleans up any extensions that plugins failed to remove in their `teardown`.
 
@@ -263,6 +267,7 @@ Types shared between browser-plugin and hash-plugin (`Browser`, `SharedFactorySt
 ```typescript
 interface SharedFactoryState {
   removePopStateListener: (() => void) | undefined;
+  removeHashChangeListener: (() => void) | undefined;
 }
 ```
 
@@ -291,11 +296,13 @@ router.navigate(name, params, opts)
         ├── shouldReplaceHistory(navOptions, toState, fromState)
         │     (from browser-env: replace ?? !fromState || reload && path match)
         │
-        ├── url = router.buildUrl(toState.name, toState.params)
-        │         └── router.buildPath() + buildUrl(path, base)
+        ├── url = buildUrl(toState.path, options.base)
+        │         (toState.path is already final — no re-buildPath in onTransitionSuccess)
         │
-        ├── If paths match (hash preservation):
-        │     finalUrl = url + browser.getHash()
+        ├── Resolve hash (tri-state, #532): opts.hash===undefined → cached `currentHash`;
+        │     ""→clear; "value"→set. finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url
+        │
+        ├── urlClaim.write(toState, { hash, hashChanged })   ← shared "url" namespace (#532)
         │
         └── updateState(toState, finalUrl, shouldReplace, browser)   ← createUpdateBrowserState() closure
                   │
@@ -441,23 +448,26 @@ router.navigate() → success
         ▼
   Plugin.onTransitionSuccess()
         ├── shouldReplaceHistory(navOptions, toState, fromState)
-        ├── url = buildUrl(toState.path, base)
-        ├── hash = (same path or first nav) ? browser.getHash() : ""
-        ├── updateState(toState, finalUrl, replaceHistory, browser)  ← reuses buffer
+        ├── hash = navOptions.hash === undefined ? cached `currentHash` : normalizeHashInput(navOptions.hash)  (#532)
+        ├── urlClaim.write(toState, { hash, hashChanged: navOptions.hashChange ?? hash !== publishedPrevHash })
+        ├── url = buildUrl(toState.path, base); finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url
+        ├── updateState(toState, finalUrl, replaceHistory, browser)  ← reuses buffer (skipped when canSkipPopstateHistoryWrite, #1353)
         └── claim.write(toState, FROZEN_POPSTATE | FROZEN_NAVIGATE)
 
 router.stop()
         │
         ▼
   Plugin.onStop()
-        └── Removes popstate listener
+        ├── Removes popstate listener (lifecycle.onStop)
+        └── Removes the hashchange listener if still owned (#758 / #759)
 
 unsubscribe() or router.dispose()
         │
         ▼
   Plugin.teardown()
-        ├── Removes popstate listener
-        └── cleanup() — calls removeStartInterceptor(), removeExtensions(), claim.release()
+        ├── Removes the hashchange listener if still owned (#758 / #759)
+        ├── Removes popstate listener (lifecycle.teardown)
+        └── cleanup() — removeStartInterceptor(), removeExtensions(), claim.release(), urlClaim.release()
 ```
 
 ## History Mode
@@ -483,27 +493,34 @@ URL fragments are first-class state via the `state.context.url` namespace, writt
 
 ```typescript
 // factory.ts — onTransitionSuccess
-const prevHash = fromState
-  ? ((fromState.context as { url?: { hash?: string } }).url?.hash ?? "")
-  : getDecodedHash(browser);
+// "preserve" reads the cached `currentHash` (kept fresh by a hashchange listener
+// + the plugin's own nav-writes), NOT a per-nav location.hash read (#1019).
+const browserHash = currentHash;
+const publishedPrevHash =
+  (fromState?.context as { url?: { hash?: string } } | undefined)?.url?.hash ?? "";
 
-const hash = navOptions.hash !== undefined
-  ? normalizeHashInput(navOptions.hash)
-  : prevHash;
+const hash =
+  navOptions.hash === undefined
+    ? browserHash
+    : normalizeHashInput(navOptions.hash);
+
+currentHash = hash; // keep the cache in sync with the fragment we are committing
 
 urlClaim.write(toState, Object.freeze({
   hash,
-  hashChanged: navOptions.hashChange ?? (hash !== prevHash),
+  // hashChanged compares the chosen hash against the PUBLISHED previous hash
+  hashChanged: navOptions.hashChange ?? hash !== publishedPrevHash,
 }));
 
+const url = buildUrl(toState.path, options.base);
 const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
 ```
 
-- `opts.hash === undefined` (default): preserves previous hash from `fromState.context.url.hash` (or `getDecodedHash(browser)` on first transition — F5 / cold-load).
+- `opts.hash === undefined` (default): preserves the current fragment via the cached `currentHash` — seeded in `onStart` from `getDecodedHash(browser)` (F5 / cold-load), then kept fresh by the plugin's own nav-writes and the `hashchange` listener (external anchor clicks / `location.hash =`).
 - `opts.hash === ""`: clears the hash explicitly.
 - `opts.hash === "value"`: sets the hash; encoded via `encodeURI(s).replace(/#/g, "%23")` to preserve RFC-3986 sub-delims.
 
-`hashChange: true` is set by the popstate handler on browser-driven hash-only navigation (paired with `force: true` to bypass `SAME_STATES`). Recovery paths (`syncUrlToRouterState`, `rollbackUrlToCurrentState`) read `currentState.context.url.hash` to preserve the fragment after guard rejection. See [Wiki › Hash](https://github.com/greydragon888/real-router/wiki/Hash) for the full surface.
+`hashChange: true` is set by the popstate handler on browser-driven hash-only navigation (paired with `force: true` to bypass `SAME_STATES`); otherwise `hashChanged` falls back to `hash !== publishedPrevHash`, so it is `true` for **any** committed hash change (including programmatic `navigate({ hash })`). Recovery paths (`syncUrlToRouterState`, `rollbackUrlToCurrentState`) read `currentState.context.url.hash` to preserve the fragment after guard rejection. See [Wiki › Hash](https://github.com/greydragon888/real-router/wiki/Hash) for the full surface.
 
 ## Performance
 

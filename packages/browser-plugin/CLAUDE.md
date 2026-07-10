@@ -65,7 +65,7 @@ router.buildUrl("users", { id: 1 });   // "/app/users/1" (plugin, with base)
 
 URL fragments are first-class state, owned by the plugin. Stored decoded in `state.context.url` (shared namespace claimed by both URL plugins; mutually exclusive with `@real-router/hash-plugin` at runtime).
 
-- **State namespace**: `state.context.url = { hash: string; hashChanged: boolean }` — hash is decoded, no leading `#`. `hashChanged` flips `true` only on browser-driven hash-only navigation (popstate hashChange detection).
+- **State namespace**: `state.context.url = { hash: string; hashChanged: boolean }` — hash is decoded, no leading `#`. `hashChanged` is `true` when the committed hash differs from the previous transition's `state.context.url.hash` — any hash change, whether browser-driven (popstate hash-only nav) or programmatic (`navigate({ hash })`).
 - **Tri-state `opts.hash`** in `router.navigate(name, params, { hash })`: `undefined` preserves, `""` clears, non-empty value sets. Same widening on `router.buildUrl` and `router.replaceHistoryState`.
 - **Popstate hash detection**: `popstate` events do **not** carry the URL — the plugin samples `location.hash` post-update via `getDecodedHash(browser)`. `createPopstateHandler` receives new `getCurrentHash` and `getCurrentContextHash` deps; same-path-different-hash is forwarded as `{ force: true, hashChange: true, hash }` to bypass `SAME_STATES`.
 - **`rollbackUrlToCurrentState`** preserves the hash on guard rejection — reads `currentState.context.url.hash` and rebuilds the URL with the encoded fragment.
