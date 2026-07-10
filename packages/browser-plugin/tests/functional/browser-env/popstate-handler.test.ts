@@ -421,6 +421,65 @@ describe("popstate handler", () => {
 
       warnSpy.mockRestore();
     });
+
+    it("resolves a deferred event's fragment against the hash captured at defer time, not the overwritten live hash (#1210)", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router.stop();
+      router = createRouter([
+        { name: "home", path: "/" },
+        { name: "users", path: "/users/:id" },
+      ]);
+      await router.start("/");
+
+      const deps = makeDeps({ allowNotFound: true });
+
+      let liveLocation = "/users/1";
+      let liveHash = "";
+
+      deps.browser.getLocation = () => liveLocation;
+      // The fragment is a SEPARATE history coordinate from the path/query
+      // location — a real browser reads it via location.hash, not getLocation().
+      deps.getCurrentHash = () => liveHash;
+
+      let releaseFirst!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+
+      deps.api.navigateToState
+        .mockImplementationOnce(async () => {
+          await gate;
+
+          return router.getState()!;
+        })
+        .mockResolvedValue(router.getState()!);
+
+      const handler = createPopstateHandler(deps);
+
+      // Event #1: @ /users/1 → in-flight nav (gated).
+      handler(makePopStateEvent(null));
+      // Event #2: @ /users/2 with fragment "target" arrives mid-transition →
+      // deferred. Its fire-time snapshot captures hash "target".
+      liveLocation = "/users/2";
+      liveHash = "target";
+      handler(makePopStateEvent(null));
+
+      // The in-flight nav's onTransitionSuccess → replaceState overwrites the
+      // live hash before the deferred event is processed.
+      liveHash = "overwritten";
+      releaseFirst();
+      await flushAsync();
+
+      // The deferred event was captured with hash "target" — its fragment must
+      // resolve there, not against the overwritten live "overwritten" hash.
+      expect(deps.api.navigateToState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: "users", params: { id: "2" } }),
+        expect.objectContaining({ hash: "target" }),
+      );
+
+      warnSpy.mockRestore();
+    });
   });
 
   describe("createPopstateLifecycle", () => {
