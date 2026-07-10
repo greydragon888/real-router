@@ -49,3 +49,8 @@
 | ------------------------------------------- | ---------- | ------------------------------------------------ |
 | `tests/property/memoryPlugin.properties.ts` | 1–14       | Index bounds, history size, navigation, context  |
 | `tests/property/helpers.ts`                 | —          | Shared arbitraries and router factory            |
+
+> **Concurrency note.** Invariants #2 (valid bounds) and #12 (push direction) also hold under a **concurrent async-guard race** — a `back()` / `go(-N)` whose target has an async `canActivate` guard, cancelled by a concurrent `navigate()` that commits first. The synchronous property arbitraries cannot generate this interleaving (it is the residual of #807 that shipped, [#1234] — the flag/`#index` were consumed/reverted by timing, not identity); it is stress-verified in `tests/stress/async-guard-back-navigate-race.stress.ts` ([#1235]).
+
+[#1234]: https://github.com/greydragon888/real-router/issues/1234
+[#1235]: https://github.com/greydragon888/real-router/issues/1235
