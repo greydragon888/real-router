@@ -498,19 +498,48 @@ describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
   const routerWith = (path: string): Router =>
     ({ buildPath: vi.fn().mockReturnValue(path) }) as unknown as Router;
 
-  it("re-encodes an already-percent-encoded hash via the decode→encode roundtrip", () => {
-    // %E2%9C%93 = ✓ — probe matches, decodeURIComponent succeeds.
+  it("encodes an already-percent-encoded hash as a LITERAL fragment — strict, no roundtrip (#1211)", () => {
+    // D1=A: `<Link hash>` is a DECODED fragment. "%E2%9C%93" is the literal
+    // 9-character string, not an escape to decode — so each `%` is encoded
+    // (`%` → `%25`). Before #1211 the probe-roundtrip decoded it to ✓ and
+    // re-encoded to "%E2%9C%93" (the copy-from-location.hash tolerance, E.1,
+    // now removed so the adapter matches the strict plugin layer).
     const href = buildHref(routerWith("/p"), "r", {}, { hash: "%E2%9C%93" });
 
-    expect(href).toBe("/p#%E2%9C%93");
+    expect(href).toBe("/p#%25E2%259C%2593");
   });
 
-  it("falls through to plain encoding on a malformed percent-escape", () => {
-    // %C3%28 — probe matches but decodeURIComponent throws (bad UTF-8) → catch →
-    // plain encodeURI, which treats each literal `%` as a character (`%` → `%25`).
+  it("encodes a literal '%' verbatim — a malformed-looking percent triple is just text (#1211)", () => {
+    // "%C3%28" is a literal fragment; the strict encoder has no probe/catch —
+    // it always plain-encodes, so each `%` → `%25`. (Coincides with the old
+    // decode-throws → catch → plain-encode fallthrough, but is now the ONLY path.)
     const href = buildHref(routerWith("/p"), "r", {}, { hash: "%C3%28" });
 
     expect(href).toBe("/p#%25C3%2528");
+  });
+
+  it("fragment encoder is the canonical encodeURI+#→%23 — sync with browser-env encodeHashFragment (#1211)", () => {
+    // encodeFragmentInline is BYTE-duplicated from browser-env's
+    // encodeHashFragment (the dom-utils symlink graph can't reach browser-env).
+    // Both must be the trivial `encodeURI(x).replaceAll("#", "%23")`. This locks
+    // the adapter copy to that formula so it can't silently drift back to a
+    // probe-roundtrip (which would re-open the plugin↔adapter split, #1211 / E.1).
+    const canonical = (s: string): string =>
+      encodeURI(s).replaceAll("#", "%23");
+
+    for (const input of [
+      "a b",
+      "%20",
+      "%E2%9C%93",
+      "a#b",
+      "café",
+      "x=1&y=2",
+      "100%",
+    ]) {
+      const href = buildHref(routerWith("/p"), "r", {}, { hash: input });
+
+      expect(href).toBe(`/p#${canonical(input)}`);
+    }
   });
 
   it("encodes a plain (non-percent) hash directly", () => {

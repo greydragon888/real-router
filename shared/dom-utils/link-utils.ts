@@ -15,41 +15,24 @@ export function shouldNavigate(evt: MouseEvent): boolean {
   );
 }
 
-// Matches a single percent-escape triple (`%` + two hex digits). Used as
-// the "already-encoded" probe in `encodeFragmentInline` below — see the
-// idempotency rationale there.
-const PERCENT_ESCAPE_PROBE = /%[\dA-Fa-f]{2}/;
-
 /**
  * RFC 3986 fragment encoding: preserve sub-delims (`&`, `=`, `?`, `:`),
  * encode space, `%`, control chars, non-ASCII via encodeURI; defensively
- * escape `#` (encodeURI does not). Mirrors `encodeHashFragment` in
- * `shared/browser-env/url-context.ts` — duplicated here because the
- * shared/dom-utils symlink graph does not reach shared/browser-env.
+ * escape `#` (encodeURI does not). Kept BYTE-FOR-BYTE identical to
+ * `encodeHashFragment` in `shared/browser-env/url-context.ts` — duplicated
+ * because the shared/dom-utils symlink graph does not reach shared/browser-env;
+ * a sync test (`link-utils` functional suite) asserts the two stay identical.
  *
- * **Idempotency for pre-encoded input (audit-2026-05-17 §5 MEDIUM E.1).**
- * The doc-comment on `<Link hash>` says the value is a "decoded fragment
- * without leading #". But realistic consumers copy hashes out of
- * `location.hash` (which is percent-encoded) and pass them back, so the
- * naive `encodeURI("%20")` would double-encode into `"%2520"` and break
- * anchor lookup. We detect a percent-escape triple in the input and, if
- * present, decode + re-encode for idempotency. Malformed `%XX` (e.g.
- * `"%2"` or `"%ZZ"`) makes `decodeURIComponent` throw — in that case we
- * fall through to plain `encodeURI`, which never throws.
+ * **STRICTLY-DECODED contract (#1211 / D1=A).** The `<Link hash>` value is a
+ * DECODED fragment (no leading `#`) and is encoded verbatim. This OVERTURNS
+ * audit-2026-05-17 §5 E.1 — the earlier percent-escape probe (decode + re-encode
+ * for copy-from-`location.hash` tolerance) is REMOVED, so both the adapter and
+ * the plugin layer obey one contract: `<Link hash="a%20b">` renders `#a%2520b`
+ * (the literal fragment `a%20b`) under every runtime. Consumers who want the
+ * fragment `a b` pass `hash="a b"`; passing raw `location.hash` (percent-encoded)
+ * is no longer supported — it was the source of the plugin↔adapter divergence.
  */
 function encodeFragmentInline(decoded: string): string {
-  if (PERCENT_ESCAPE_PROBE.test(decoded)) {
-    try {
-      const roundtrip = decodeURIComponent(decoded);
-
-      return encodeURI(roundtrip).replaceAll("#", "%23");
-    } catch {
-      // Malformed `%XX` — fall through to the plain encoding path.
-      // encodeURI does not throw on malformed escapes; it treats the
-      // `%` as a literal and percent-encodes it (`%2` → `%252`).
-    }
-  }
-
   return encodeURI(decoded).replaceAll("#", "%23");
 }
 

@@ -23,9 +23,15 @@ import {
   arbParamsExtended,
 } from "./helpers";
 import { buildHref } from "../../src/dom-utils";
-import { computeExpectedFragment } from "../../src/dom-utils/__test-helpers";
 
 import type { Router } from "@real-router/core";
+
+// Independent re-derivation of encodeFragmentInline's strict #1211 formula: the
+// drift sentinel asserts buildHref matches it WITHOUT importing the production
+// function (which would be a tautology). Local per adapter — the shared
+// `__test-helpers` mirror was retired once the encoder became a one-liner.
+const computeExpectedFragment = (rawHash: string): string =>
+  encodeURI(rawHash).replaceAll("#", "%23");
 
 function makeFakeRouter(
   buildUrl:
@@ -620,12 +626,11 @@ describe("buildHref — Property Tests", () => {
   // asserting buildHref (which calls encodeFragmentInline) matches it.
   // Any drift in either implementation surfaces here as a buildHref bug.
   describe("Invariant 12: encodeFragmentInline matches the documented RFC 3986 + %23 formula", () => {
-    // Reference is the shared `computeExpectedFragment` mirror from
-    // `shared/dom-utils/__test-helpers/expected-fragment.ts` — it
-    // independently re-derives the encoder including the idempotency
-    // layer for pre-encoded `%XX` input (audit 2026-05-17 §5 MEDIUM
-    // E.1). Drift between this mirror and `encodeFragmentInline` is
-    // exactly what this property test is supposed to surface.
+    // Reference is the local `computeExpectedFragment` (top of file) — an
+    // independent re-derivation of the strict #1211 formula
+    // (`encodeURI(s).replaceAll("#", "%23")`, no idempotency probe). Drift
+    // between this derivation and `encodeFragmentInline` is exactly what this
+    // property test is supposed to surface.
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.thorough,
     })(

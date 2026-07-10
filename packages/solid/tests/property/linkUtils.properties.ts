@@ -26,9 +26,15 @@ import {
   buildHref,
   shouldNavigate,
 } from "../../src/dom-utils";
-import { computeExpectedFragment } from "../../src/dom-utils/__test-helpers";
 
 import type { Router } from "@real-router/core";
+
+// Independent re-derivation of encodeFragmentInline's strict #1211 formula: the
+// drift sentinel asserts buildHref matches it WITHOUT importing the production
+// function (which would be a tautology). Local per adapter — the shared
+// `__test-helpers` mirror was retired once the encoder became a one-liner.
+const computeExpectedFragment = (rawHash: string): string =>
+  encodeURI(rawHash).replaceAll("#", "%23");
 
 // =============================================================================
 // buildActiveClassName invariants
@@ -843,62 +849,61 @@ describe("buildHref — Property Tests (Solid)", () => {
     );
   });
 
-  describe("Invariant 12b: pre-encoded hash is NOT double-encoded (Mini-sprint E.1 — audit-5 MEDIUM)", () => {
-    // Consumers copy hashes out of `location.hash` (percent-encoded)
-    // and pass them back into `<Link hash>`. Pre-fix, this produced
-    // `"%20"` → `"%2520"` double-encoding → anchor lookup broken.
-    // Post-fix, encodeFragmentInline detects pre-encoded input via
-    // PERCENT_ESCAPE_PROBE regex and round-trips through
-    // decodeURIComponent → encodeURI for idempotency.
+  describe("Invariant 12b: hash is a DECODED fragment — encoded verbatim, NOT idempotent (#1211 strict contract, overturns Mini-sprint E.1)", () => {
+    // #1211 (decision D1 = strictly-decoded): the `hash` value is a
+    // DECODED fragment, encoded verbatim by `encodeFragmentInline` =
+    // `encodeURI(s).replaceAll("#", "%23")`. There is no pre-encoded
+    // "probe + round-trip" tolerance — a literal `%` in the input is a
+    // literal percent sign and is escaped to `%25`. Feeding a wire
+    // fragment back in therefore DOUBLE-encodes (`%20` → `%2520`); that
+    // is the correct, lossless consequence of the decoded-input contract,
+    // not a bug. Consumers who want the fragment `a b` pass `hash="a b"`,
+    // never `hash="a%20b"`. Symmetric with browser-env's
+    // `encodeHashFragment` and preact's `encodeFragmentInline` Invariant 5.
     test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.standard,
-    })("passing `%20foo` produces fragment with `%20`, NOT `%2520`", (path) => {
+    })("literal `%20foo` is encoded verbatim to `%2520foo`", (path) => {
       const router = makeFakeRouter(undefined, () => `/${path}`);
       const href = buildHref(router, "any", {}, { hash: "%20foo" });
 
       expect(href).toBeDefined();
-      expect(href!).toContain("%20foo");
-      expect(href!).not.toContain("%2520");
+      expect(href!).toContain("%2520foo");
     });
 
-    test("multi-token pre-encoded hash retains its encoding (RFC-canonical form)", () => {
+    test("multi-token literal fragment is encoded verbatim (every `%` → `%25`)", () => {
       const router = makeFakeRouter(undefined, () => "/x");
       const href = buildHref(router, "any", {}, { hash: "tab%20A%2Csection" });
 
-      // Idempotency through decodeURIComponent + encodeURI normalizes
-      // to RFC-canonical encoding: `%20` (space — must escape) stays,
-      // but `%2C` (comma) decodes to `,` and encodeURI leaves it as
-      // a literal because `,` is a sub-delim (RFC 3986 §3.5 allows it
-      // in fragments). This is correct and lossless — `,` and `%2C`
-      // resolve identically in any URL parser.
-      expect(href).toBe("/x#tab%20A,section");
+      // Decoded-input contract: `tab%20A%2Csection` is a literal string;
+      // `encodeURI` escapes each literal `%` to `%25` and leaves the rest
+      // (letters, digits) untouched — no decode, no round-trip.
+      expect(href).toBe("/x#tab%2520A%252Csection");
     });
 
-    test("idempotency: feeding helper output back yields same encoding", () => {
+    test("NOT idempotent: feeding helper output back double-encodes (decoded-input contract)", () => {
       const router = makeFakeRouter(undefined, () => "/x");
-      // Plain input → first encode adds percent-escapes.
+      // Plain (decoded) input → first encode adds percent-escapes.
       const first = buildHref(router, "any", {}, { hash: "a b" });
 
       expect(first).toBe("/x#a%20b");
 
-      // Feed the encoded fragment back — must NOT double-encode.
+      // Feed the WIRE fragment back in as if it were a decoded hash — the
+      // literal `%` is re-escaped to `%25`, so the second pass is strictly
+      // NOT equal to the first. This is the contract, not a regression.
       const fragment1 = first!.slice("/x#".length); // "a%20b"
       const second = buildHref(router, "any", {}, { hash: fragment1 });
 
-      // Idempotent — second pass produces the same string.
-      expect(second).toBe(first);
+      expect(second).toBe("/x#a%2520b");
+      expect(second).not.toBe(first);
     });
 
-    test("malformed %XX falls through to plain encoding (no throw)", () => {
-      // `%ZZ` and `%2` are NOT valid percent-escape triples
-      // (decodeURIComponent throws). The helper must catch and
-      // fall through to plain encodeURI, which percent-encodes the
-      // literal `%`.
+    test("malformed `%XX` is encoded verbatim like any other literal `%`", () => {
+      // Under the strict contract there is no `decodeURIComponent` probe;
+      // `encodeFragmentInline` always runs plain `encodeURI`, which never
+      // throws and encodes the literal `%` to `%25`.
       const router = makeFakeRouter(undefined, () => "/x");
       const href = buildHref(router, "any", {}, { hash: "bad%ZZ" });
 
-      // encodeURI does not throw on malformed `%`; it encodes the
-      // literal `%` itself to `%25`. Result: `/x#bad%25ZZ`.
       expect(href).toBe("/x#bad%25ZZ");
     });
   });

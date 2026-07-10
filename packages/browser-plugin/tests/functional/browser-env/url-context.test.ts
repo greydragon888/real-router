@@ -45,8 +45,13 @@ describe("normalizeHashInput", () => {
     expect(normalizeHashInput(normalizeHashInput("##section"))).toBe("section");
   });
 
-  it("decodes the stripped fragment", () => {
-    expect(normalizeHashInput("#sec%20one")).toBe("sec one");
+  it("does NOT decode the stripped fragment — strictly-decoded contract (#1211)", () => {
+    // D1=A: the input is already a DECODED fragment. A percent triple is a
+    // LITERAL part of the fragment, not an escape to decode — `"sec%20one"`
+    // stays `"sec%20one"`, so `buildUrl` renders `#sec%2520one`. (Before #1211
+    // the second decode corrupted this to `"sec one"`, splitting the
+    // plugin↔adapter policy.)
+    expect(normalizeHashInput("#sec%20one")).toBe("sec%20one");
   });
 });
 
