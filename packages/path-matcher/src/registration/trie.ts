@@ -314,6 +314,7 @@ function processSegment(
     if (node.staticChildren === EMPTY_STATIC_CHILDREN) {
       node.staticChildren = Object.create(null) as Record<string, SegmentNode>;
     }
+
     node.staticChildren[key] = createSegmentNode();
     node.hasChildren = true;
   }
