@@ -1524,7 +1524,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/about");
 
       expect(result).toBeDefined();
-      expect(result!.meta).toStrictEqual({ about: {} });
+      expect(result!.meta).toStrictEqual({});
     });
 
     it("should handle case-sensitive matching (default)", () => {
@@ -1720,10 +1720,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/about/settings");
 
       expect(result).toBeDefined();
-      expect(result!.meta).toStrictEqual({
-        about: {},
-        "about.settings": {},
-      });
+      expect(result!.meta).toStrictEqual({});
     });
   });
 
@@ -1927,7 +1924,7 @@ describe("SegmentMatcher", () => {
 
       const meta = matcher.getMetaByName("about");
 
-      expect(meta).toStrictEqual({ about: {} });
+      expect(meta).toStrictEqual({});
     });
 
     it("should return frozen meta object", () => {
@@ -2370,7 +2367,6 @@ describe("SegmentMatcher", () => {
 
       expect(result).toBeDefined();
       expect(result!.meta).toStrictEqual({
-        users: {},
         "users.profile": { id: "url" },
       });
     });
@@ -3231,10 +3227,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/users");
 
       expect(result).toBeDefined();
-      expect(result!.meta).toStrictEqual({
-        users: {},
-        "users.list": {},
-      });
+      expect(result!.meta).toStrictEqual({});
     });
 
     it("should not add slash-child to static cache", () => {
@@ -4526,10 +4519,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/dashboard");
 
       expect(result).toBeDefined();
-      expect(result!.meta).toStrictEqual({
-        admin: {},
-        "admin.dashboard": {},
-      });
+      expect(result!.meta).toStrictEqual({});
     });
 
     it("should handle absolute root path", () => {

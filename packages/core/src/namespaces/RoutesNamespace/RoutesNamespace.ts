@@ -490,9 +490,11 @@ export class RoutesNamespace<
     // (`:id`, `:role`, etc.) are still enforced.
     // `name` reaches this point only after the fast-path established a valid
     // hierarchical relation AND `defaultParams` is non-null — both imply the
-    // matcher has registered the route, so `getMetaByName(name)![name]` is
-    // always defined here. Non-null assertions trade a defensive guard for
-    // honest 100% coverage.
+    // matcher has registered the route. Since the #1414 skip-empty meta, a
+    // fully-static route resolves to the shared EMPTY_ROUTE_META with no own
+    // entry, so `getMetaByName(name)?.[name]` is undefined there — exactly the
+    // "nothing to strip" signal stripQueryDefaults short-circuits on (a static
+    // route cannot declare query params, hence cannot carry query defaults).
     const defaultsToCheck = ignoreQueryParams
       ? stripQueryDefaults(
           defaultParams,

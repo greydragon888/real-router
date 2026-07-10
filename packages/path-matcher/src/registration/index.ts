@@ -3,6 +3,7 @@
 // insertion, plus the route-meta / query-and-constraint collection helpers.
 // Concerns split into ./context ./errors ./trieNodes ./trie ./buildParts.
 
+import { EMPTY_PARAM_META } from "../buildParamMeta";
 import {
   INVALID_QUERY_NAME_RGX,
   isConstraintBalanced,
@@ -18,6 +19,7 @@ import {
   CONSTRAINT_PATTERN_RGX,
   EMPTY_CONSTRAINTS,
   EMPTY_PARAMS,
+  EMPTY_ROUTE_META,
   EMPTY_STRINGS,
   EMPTY_STRING_SET,
   type RegistrationState,
@@ -54,7 +56,13 @@ export function registerNode(
   }
 
   const isAbsolute = node.absolute;
-  const pathPattern = node.paramMeta.pathPattern;
+  // The EMPTY_PARAM_META sentinel (fully-static node) carries pathPattern "";
+  // its real pattern is the node's own path (sentinel is only installed when
+  // the two were reference-equal).
+  const pathPattern =
+    node.paramMeta === EMPTY_PARAM_META
+      ? node.path
+      : node.paramMeta.pathPattern;
   const strippedPattern =
     isAbsolute && pathPattern.startsWith("~")
       ? pathPattern.slice(1)
@@ -230,13 +238,32 @@ function compileAndRegisterRoute(
 function buildMeta(
   segments: readonly MatcherInputNode[],
 ): Readonly<Record<string, Record<string, "url" | "query">>> {
-  const meta: Record<string, Record<string, "url" | "query">> = {};
+  let meta: Record<string, Record<string, "url" | "query">> | undefined;
 
   for (const segment of segments) {
+    if (!hasAnyParam(segment.paramTypeMap)) {
+      continue;
+    }
+
+    meta ??= {};
     meta[segment.fullName] = segment.paramTypeMap;
   }
 
-  return Object.freeze(meta);
+  return meta === undefined ? EMPTY_ROUTE_META : Object.freeze(meta);
+}
+
+// Allocation-free emptiness probe for a segment's paramTypeMap (Object.keys
+// would allocate a fresh array per segment during registration).
+function hasAnyParam(
+  paramTypeMap: Readonly<Record<string, "url" | "query">>,
+): boolean {
+  for (const key in paramTypeMap) {
+    if (Object.hasOwn(paramTypeMap, key)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function registerSlashChild(
