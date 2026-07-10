@@ -444,22 +444,35 @@ function extractHashFromEntryUrl(entryUrl: string): string {
 }
 
 function createNavigateLifecycle(deps: NavigateLifecycleDeps): Plugin {
+  // Captured at onStart so onStop/teardown clear the shared slot ONLY while we
+  // still own it — a later router's onStart replaces it (last-wins, #758);
+  // clearing it unconditionally on the earlier router's stop/dispose
+  // disconnects the LIVE router (#1213).
+  let myRemover: (() => void) | undefined;
+
   return {
     onStart() {
       deps.shared.removeNavigateListener?.();
-      deps.shared.removeNavigateListener = deps.browser.addNavigateListener(
-        deps.handler,
-      );
+      myRemover = deps.browser.addNavigateListener(deps.handler);
+      deps.shared.removeNavigateListener = myRemover;
     },
 
     onStop() {
-      deps.shared.removeNavigateListener?.();
-      deps.shared.removeNavigateListener = undefined;
+      if (myRemover && deps.shared.removeNavigateListener === myRemover) {
+        deps.shared.removeNavigateListener();
+        deps.shared.removeNavigateListener = undefined;
+      }
+
+      myRemover = undefined;
     },
 
     teardown() {
-      deps.shared.removeNavigateListener?.();
-      deps.shared.removeNavigateListener = undefined;
+      if (myRemover && deps.shared.removeNavigateListener === myRemover) {
+        deps.shared.removeNavigateListener();
+        deps.shared.removeNavigateListener = undefined;
+      }
+
+      myRemover = undefined;
       deps.removeStartInterceptor();
       deps.removeExtensions();
       deps.releaseClaim();
