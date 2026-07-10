@@ -124,6 +124,16 @@ These invariants cover the FSM-driven lifecycle of the router. Each state transi
 | 11  | AbortSignal cancellation                   | Navigating with a pre-aborted `AbortSignal` rejects with `TRANSITION_CANCELLED`. External cancellation via `opts.signal` is respected.                                 |
 | 12  | Force replace from UNKNOWN_ROUTE           | When navigating FROM `UNKNOWN_ROUTE` state, `opts.replace` is auto-forced to `true`. This prevents browser history pollution with 404 entries.                         |
 
+## Reentrancy & dispatch
+
+The emit machinery re-entering itself from inside a transition listener (`subscribe` / `subscribeLeave` / a plugin `onTransition*` hook) is governed by three invariants (#1030-#1034, merged via #1035). Locked by `tests/functional/navigation/navigate/reentrant-ban.test.ts`.
+
+| #   | Invariant                        | Description                                                                                                                                                                                                                                                                             |
+| --- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Reentrant-navigation ban (#1035) | A **synchronous** `navigate` / `navigateToDefault` / `navigateToState` / `navigateToNotFound` from inside a transition-event listener throws `RouterError(REENTRANT_NAVIGATION)` at the facade. Deferred (microtask / `await` / `.then`) navigation from a listener is **allowed** — the transition has settled and the FSM is `READY` again. |
+| 2   | Emit coalescing (#1033)          | A re-entrant emit of an already-in-flight event is a **no-op** (`EventEmitter` `#dispatching` guard, depth ≤ 1): the listener runs once and the mutation still commits. No depth limit, no `RecursionDepthError` (replaced the former `maxEventDepth` model). Also stated for `subscribeChanges` (Routes-mutation-events section). |
+| 3   | Dispatch-depth tracking (#1034)  | `#dispatchDepth` is elevated across every transition emit and the synchronous `subscribeLeave` batch (`EventBusNamespace.ts`); `isProcessing()` reads it to drive the ban above. The depth returns to **0 after every navigate outcome** (success, error, or cancel) — a leaked depth would falsely ban every later top-level navigate. |
+
 ## navigateToNotFound
 
 `router.navigateToNotFound(path?)` is a synchronous method that sets the router to the `UNKNOWN_ROUTE` state, bypassing the transition pipeline entirely.
