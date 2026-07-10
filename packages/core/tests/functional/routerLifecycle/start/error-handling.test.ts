@@ -356,19 +356,25 @@ describe("router.start() - error handling", () => {
         await router.start("/home");
       });
 
-      it("should return transition error to callback instead of falling back silently", async () => {
-        // Add middleware that blocks the transition
+      it("returns the transition error (no silent defaultRoute fallback) when a guard blocks", async () => {
+        // A guard that throws blocks the transition. Use the route NAME
+        // "users.list" (not the path "/users/list", which would be an unknown
+        // route name → ROUTE_NOT_FOUND before the guard even runs) so the guard
+        // actually fires and the rejection is a genuine CANNOT_ACTIVATE.
         lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
-        try {
-          await router.navigate("/users/list");
+        // Issue #44: the guard block surfaces as a REJECTED navigate() — core
+        // must NOT silently fall back to defaultRoute. (The previous version was
+        // `try { … expect.fail() } catch { /* empty */ }` — the empty catch
+        // swallowed the AssertionError, so it passed regardless of behavior.)
+        await expect(router.navigate("users.list")).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+        });
 
-          expect.fail("Should have thrown");
-        } catch {
-          // Error should be reported
-        }
+        // State stayed at "home" (from beforeEach) — no fallback navigation ran.
+        expect(router.getState()?.name).toBe("home");
       });
 
       it("should emit TRANSITION_ERROR event when transition fails", async () => {

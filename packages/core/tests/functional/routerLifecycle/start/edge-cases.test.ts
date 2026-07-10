@@ -21,54 +21,49 @@ describe("router.start() - edge cases", () => {
     router.stop();
   });
 
-  describe("State with self-modifying getter", () => {
-    it("should handle state with getter that changes on each read", async () => {
-      // Start router first
-      await router.start("/users/list");
-
-      // Router handles gracefully - either starts or errors
-      expect(router.isActive()).toBe(true);
+  // Bare core does NOT validate param VALUES — value validation is opt-in via
+  // @real-router/validation-plugin (#934/#942). A function / class instance /
+  // plain object is ACCEPTED: it round-trips into the query string and is kept
+  // BY REFERENCE in state.params (no structuredClone). These pin the documented
+  // carve-out. (The previous tests here CLAIMED bare core rejects these values —
+  // via a self-catching `try { … expect.fail() } catch { expect(e).toBeDefined() }`
+  // that swallowed its own AssertionError on a FALSE premise; bare core accepts
+  // them, so the assertions never ran. See #1189.)
+  describe("param-value acceptance (validation is opt-in, #934/#942)", () => {
+    beforeEach(async () => {
+      await router.start("/home");
     });
-  });
 
-  describe("Proxy state objects", () => {
-    it("should accept Proxy state objects", async () => {
-      const state = await router.start("/users/list");
+    it("accepts a function param value — resolves, kept by reference (no structuredClone)", async () => {
+      const fn = (): void => {};
 
-      expect(state).toBeDefined();
-      expect(state?.name).toBe("users.list");
+      // @ts-expect-error — intentionally exotic param value; bare core tolerates it
+      const state = await router.navigate("users.list", { extra: fn });
+
+      expect(state.name).toBe("users.list");
+      expect(state.params.extra).toBe(fn); // same reference, not cloned/coerced
     });
-  });
 
-  describe("Circular reference in params", () => {
-    it("should reject state with circular reference in params", async () => {
-      router = createTestRouter({ allowNotFound: false });
-
-      try {
-        await router.navigate("users.view", { id: "123", self: {} });
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
+    it("accepts a class-instance param value — resolves, kept by reference", async () => {
+      class Custom {
+        value = 42;
       }
+      const instance = new Custom();
+
+      // @ts-expect-error — intentionally exotic param value
+      const state = await router.navigate("users.list", { extra: instance });
+
+      expect(state.name).toBe("users.list");
+      expect(state.params.extra).toBe(instance);
     });
-  });
 
-  describe("State with overridden valueOf/toString", () => {
-    it("should not call valueOf/toString during isState validation", async () => {
-      const state = await router.start("/users/list");
+    it("accepts a plain-object param value — resolves, kept by reference", async () => {
+      const obj = { nested: { a: 1 } };
 
-      expect(state).toBeDefined();
-      expect(state?.name).toBe("users.list");
-    });
-  });
+      const state = await router.navigate("users.list", { extra: obj });
 
-  describe("State with extra fields", () => {
-    it("should preserve extra fields in state object", async () => {
-      const state = await router.start("/users/list");
-
-      expect(state).toBeDefined();
-      expect(state?.name).toBe("users.list");
+      expect(state.name).toBe("users.list");
+      expect(state.params.extra).toBe(obj);
     });
   });
 
@@ -138,90 +133,26 @@ describe("router.start() - edge cases", () => {
     });
   });
 
-  describe("State with Symbol properties in params", () => {
-    it("should preserve Symbol properties in params (no structuredClone)", async () => {
-      const state = await router.start("/users/list");
-
-      expect(state).toBeDefined();
-      expect(state?.name).toBe("users.list");
-    });
-  });
-
-  describe("State validation with isState()", () => {
+  // Navigating to a route NAME that does not exist rejects with ROUTE_NOT_FOUND
+  // when allowNotFound is disabled; the router stays active on its current state.
+  // (Collapsed from two duplicate tests — "missing path field" and "missing
+  // params field" — that shared the identical body `navigate("invalid.route")`
+  // and neither constructed the field its title named. See #1189.)
+  describe("unknown route name (allowNotFound: false)", () => {
     beforeEach(async () => {
       // Disable fallback to UNKNOWN_ROUTE to get ROUTE_NOT_FOUND errors
       router = createTestRouter({ allowNotFound: false });
       await router.start("/home");
     });
 
-    it("should reject state with missing path field", async () => {
-      try {
-        await router.navigate("invalid.route");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
-
-      expect(router.isActive()).toBe(true);
-    });
-
-    it("should reject state with missing params field", async () => {
-      try {
-        await router.navigate("invalid.route");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
-
-      expect(router.isActive()).toBe(true);
-    });
-
-    it("should reject state with function in params", async () => {
-      try {
-        // @ts-expect-error - testing invalid params with function
-        await router.navigate("users.list", { fn: () => {} });
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-      }
-
-      expect(router.isActive()).toBe(true);
-    });
-
-    it("should reject state with class instance in params", async () => {
-      class CustomClass {
-        value = 42;
-      }
-
-      try {
-        // @ts-expect-error - testing invalid params with class instance
-        await router.navigate("users.list", { instance: new CustomClass() });
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-      }
+    it("rejects an unknown route NAME with ROUTE_NOT_FOUND (router stays active)", async () => {
+      await expect(router.navigate("invalid.route")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       expect(router.isActive()).toBe(true);
     });
   });
-
-  describe("Async callback returning Promise", () => {
-    it("should work with async callback (rejected promise not caught)", async () => {
-      // Should not throw synchronously
-      const state = await router.start("/users/list");
-
-      expect(state).toBeDefined();
-      expect(router.isActive()).toBe(true);
-    });
-  });
-
-  // "Empty string as path" test removed in Task 6 — start() now requires path
 
   describe("UNKNOWN_ROUTE special case", () => {
     it("should work normally for UNKNOWN_ROUTE with custom path", async () => {

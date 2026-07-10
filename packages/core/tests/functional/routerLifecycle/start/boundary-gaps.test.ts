@@ -1,0 +1,175 @@
+// #1190 — start() boundary gaps found by the start deep-audit (§5/§6): none of
+// these paths were exercised anywhere in the suite. Each pins a *documented but
+// untested* start-lifecycle contract. Two cells from the audit list are
+// intentionally NOT green-pinned here, because grounding reclassified them as
+// bugs (filed separately), not coverage gaps:
+//   • interceptor that never calls next() → Router.start() throws a raw
+//     synchronous TypeError (`internalStart.catch` on undefined), not a clean
+//     rejection (#1411).
+//   • async (rejected-promise) onStart → `Plugin.onStart` is typed `() => void`
+//     (sync-only), and an async rejection is NOT isolated (it leaks an
+//     unhandledRejection, unlike `subscribe`/#944) — there is no "async
+//     isolation" contract to pin (#1412). The real contract (sync throw is
+//     isolated) is already covered by error-handling.test.ts:70.
+
+import { describe, afterEach, it, expect } from "vitest";
+
+import { createRouter, errorCodes } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
+import { hydrateRouter } from "@real-router/core/utils";
+
+import { captureSyncThrow, createTestRouter } from "../../../helpers";
+
+import type { Router } from "@real-router/core";
+
+describe("router.start() - boundary gaps (#1190)", () => {
+  describe("path with a hash fragment", () => {
+    let router: Router;
+
+    afterEach(() => {
+      router.stop();
+    });
+
+    it("strips the #fragment and matches the bare path (segment route)", async () => {
+      router = createTestRouter();
+
+      const state = await router.start("/users#section");
+
+      expect(state.name).toBe("users");
+      expect(state.path).toBe("/users"); // fragment dropped, not carried into state
+    });
+
+    it("strips the #fragment and matches the bare path (nested route)", async () => {
+      router = createTestRouter();
+
+      const state = await router.start("/users/list#top");
+
+      expect(state.name).toBe("users.list");
+      expect(state.path).toBe("/users/list");
+    });
+  });
+
+  describe("onStart plugin hook", () => {
+    it("does NOT ban a sync navigate() from onStart; it is superseded by the start navigation", async () => {
+      const router = createRouter([
+        { name: "a", path: "/a" },
+        { name: "b", path: "/b" },
+      ]);
+
+      let navOutcome = "(not called)";
+
+      router.usePlugin(() => ({
+        onStart() {
+          // ROUTER_START does not raise dispatchDepth, so this is NOT a reentrant
+          // navigation (contrast the §4 ban from transition listeners, #1181).
+          // It is accepted, then silently superseded by the start navigation.
+          // (The superseded navigate('b') rejection is fire-and-forget-suppressed
+          // by core, #721 — no unhandled rejection.)
+          const thrown = captureSyncThrow(() => router.navigate("b"));
+
+          navOutcome =
+            thrown === undefined
+              ? "accepted"
+              : `banned:${(thrown as { code?: string }).code}`;
+        },
+      }));
+
+      const state = await router.start("/a");
+
+      // navigate('b') was accepted (not banned)...
+      expect(navOutcome).toBe("accepted");
+      // ...but the start navigation wins: final committed state is the start path.
+      expect(state.name).toBe("a");
+      expect(router.getState()?.name).toBe("a");
+
+      router.dispose();
+    });
+
+    it("rejects a recursive start() from onStart with ALREADY_STARTED; the original start wins", async () => {
+      const router = createRouter([
+        { name: "a", path: "/a" },
+        { name: "b", path: "/b" },
+      ]);
+
+      let recursiveCode = "(not settled)";
+
+      router.usePlugin(() => ({
+        onStart() {
+          router.start("/b").then(
+            () => {
+              recursiveCode = "resolved";
+            },
+            (error: unknown) => {
+              recursiveCode = (error as { code?: string }).code ?? "unknown";
+            },
+          );
+        },
+      }));
+
+      const state = await router.start("/a");
+
+      expect(state.name).toBe("a");
+
+      // Let the recursive start() settle.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(recursiveCode).toBe(errorCodes.ROUTER_ALREADY_STARTED);
+      expect(router.getState()?.name).toBe("a"); // original start committed
+
+      router.dispose();
+    });
+  });
+
+  describe("start interceptor", () => {
+    it("second next() call rejects SAME_STATES; the first next() already committed", async () => {
+      const router = createRouter([{ name: "home", path: "/home" }]);
+
+      getPluginApi(router).addInterceptor("start", async (next, path) => {
+        await next(path); // commits → TRANSITION_SUCCESS
+
+        return next(path); // same path again → SAME_STATES
+      });
+
+      // The doubled next() surfaces the second navigation's SAME_STATES rejection.
+      await expect(router.start("/home")).rejects.toMatchObject({
+        code: errorCodes.SAME_STATES,
+      });
+
+      // But the first next() committed — the router is started and on '/home'
+      // (post-commit failure keeps observed success, #763-shape).
+      expect(router.isActive()).toBe(true);
+      expect(router.getState()?.name).toBe("home");
+
+      router.dispose();
+    });
+  });
+
+  describe("concurrent hydrateRouter()", () => {
+    it("two concurrent hydrations — one starts, the other rejects ALREADY_STARTED", async () => {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "a", path: "/a" },
+      ]);
+      const serialized = JSON.stringify({ name: "a", params: {}, path: "/a" });
+
+      const [first, second] = await Promise.allSettled([
+        hydrateRouter(router, serialized),
+        hydrateRouter(router, serialized),
+      ]);
+
+      // Exactly one hydration wins; the other is rejected ALREADY_STARTED.
+      const fulfilled = [first, second].filter((r) => r.status === "fulfilled");
+      const rejected = [first, second].filter((r) => r.status === "rejected");
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0].reason as { code?: string }).code).toBe(
+        errorCodes.ROUTER_ALREADY_STARTED,
+      );
+      expect(router.getState()?.name).toBe("a");
+
+      router.dispose();
+    });
+  });
+});
