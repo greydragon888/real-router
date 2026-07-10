@@ -106,7 +106,7 @@ After updating the snapshot, `onTransitionSuccess` publishes it to `state.contex
 
 ### Composition order with `search-schema-plugin` decides whether persistent params are validated
 
-This plugin's `forwardState` interceptor **injects** persistent params into the target state (it wraps `next()` and merges the params on top). `@real-router/search-schema-plugin` also registers a `forwardState` interceptor, and it **validates** the result of its `next()`. Because core composes interceptors **LIFO** (last-registered = outermost), whichever plugin is registered **last** wraps the other — so registration order decides whether the injected persistent params pass through the schema:
+This plugin's `forwardState` interceptor **injects** persistent params into the target state (it wraps `next()` and **fills in absent keys** — incoming params win over the stored ones). `@real-router/search-schema-plugin` also registers a `forwardState` interceptor, and it **validates** the result of its `next()`. Because core composes interceptors **LIFO** (last-registered = outermost), whichever plugin is registered **last** wraps the other — so registration order decides whether the injected persistent params pass through the schema:
 
 ```typescript
 // RECOMMENDED — persistent-params first, search-schema second:
@@ -122,6 +122,11 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 ```
 
 Register this plugin **before** `search-schema-plugin` if you want persistent params validated by the schema (the safer default); register it after only when they must deliberately skip validation. This is a pure ordering choice — no code change, LIFO is working as documented. (`search-schema-plugin`'s CLAUDE.md and README carry the mirror note. #801)
+
+> **Caveat — the recommended order is not a full "last line of defense" for `state.path`.** (#1231)
+>
+> - **`state.path` is out of the schema's reach.** This plugin registers **two** interceptors — `forwardState` (injects into state) **and** `buildPath` (injects stored values into the path-build params); `search-schema-plugin` hooks **only** `forwardState`. So even in the recommended order (schema outermost) the schema validates the `forwardState` channel only — an invalid persisted value is stripped from `state.params` but still reaches `state.path` (persistent, reload-stable), and no registration order fixes it. **Mitigation:** give persisted keys a `defaultParams` entry on schema'd routes — core's merge overrides the injected value, so the path stays clean. (An exhibit for the #802 "injection channels below the validation seam" class; do **not** give the schema a `buildPath` hook — that breaks the documented standalone-`buildPath` bypass.)
+> - **The alternative-order leak only affects keys without a route default.** `mergeParams` fills persistent params **under** incoming params (`{ ...stored, ...incoming }`, fill-if-absent), so a key with a `defaultParams` value is supplied by core and wins over the injected persistent value — no leak even under the alternative order; only a persisted key **without** a route default leaks. Captured persistent values are clean by construction (taken from committed, schema-valid state).
 
 ## Module Structure
 

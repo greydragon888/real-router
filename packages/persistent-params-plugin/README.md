@@ -146,6 +146,8 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Register this plugin **before** `search-schema-plugin` to have persistent params validated (the safer default); after it only when they must deliberately skip validation.
 
+> **Caveat:** the recommended order validates `state.params`, not `state.path`. This plugin also registers a **`buildPath`** interceptor, which `search-schema-plugin` does not wrap — so an invalid persisted value is stripped from `state.params` but still reaches `state.path` (persistent, reload-stable). Give persisted keys a `defaultParams` on schema'd routes to close it (core's merge overrides the injected value). Also: the alternative-order leak only affects keys **without** a route default — stored params fill *under* incoming ones, so a key with a default is supplied by core and never leaks. (#1231)
+
 ## Documentation
 
 Full documentation: [Wiki — persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin)

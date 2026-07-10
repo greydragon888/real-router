@@ -157,6 +157,8 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Prefer the recommended order (schema outermost) so `state` is validated as a whole. Reach for the alternative only when persistent/infra params must deliberately skip the schema. Swapping the two `usePlugin` lines silently flips the guarantee.
 
+> **Caveat:** the recommended order validates `state.params`, not `state.path`. `persistent-params-plugin` also registers a **`buildPath`** interceptor, which this plugin does not wrap — so an invalid persisted value is stripped from `state.params` but still reaches `state.path` (persistent, reload-stable). Give persisted keys a `defaultParams` on schema'd routes to close it (core's merge overrides the injected value). Also: the alternative-order leak only affects keys **without** a route default — stored params fill *under* incoming ones, so a key with a default is supplied by core and never leaks. (#1231)
+
 ## Use Cases
 
 ### Form Validation — Pagination and Filters
