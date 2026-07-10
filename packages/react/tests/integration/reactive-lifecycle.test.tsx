@@ -7,6 +7,7 @@ import {
   RouterErrorBoundary,
   RouterProvider,
   useRoute,
+  useRouteEnter,
 } from "@real-router/react";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
@@ -72,6 +73,52 @@ describe("reactive lifecycle (#778)", () => {
     rerender(<Tree mode="visible" />);
 
     expect(screen.getByTestId("route-name").textContent).toBe("about");
+  });
+
+  // #1218 manifestation of the SAME hide → navigate → show reconcile: on
+  // re-show the reconciled snapshot carries previousRoute: undefined (the
+  // reconcile is a fresh read of router.getState() with no tracked predecessor).
+  // useRouteEnter's `!previousRoute` guard MUST skip the handler rather than
+  // invoke it with previousRoute: undefined, which RouteEnterContext.previousRoute
+  // (non-nullable State) forbids. Probe PC2 from the #1218 audit, ported as a
+  // permanent guard — discriminating: delete the guard and the handler fires
+  // once with an undefined previousRoute, failing the assertion below.
+  it("PC2 (#1218): useRouteEnter skips its handler after an <Activity> catch-up reconcile leaves previousRoute undefined", async () => {
+    const handler = vi.fn();
+
+    const Enter = (): React.JSX.Element => {
+      useRouteEnter(handler, { skipSameRoute: false });
+
+      return <div data-testid="enter-probe" />;
+    };
+
+    const Tree = ({
+      mode,
+    }: {
+      mode: "visible" | "hidden";
+    }): React.JSX.Element => (
+      <Activity mode={mode}>
+        <RouterProvider router={router}>
+          <Enter />
+        </RouterProvider>
+      </Activity>
+    );
+
+    const { rerender } = render(<Tree mode="visible" />);
+
+    // Hide → effects detach → source disconnects.
+    rerender(<Tree mode="hidden" />);
+
+    // Navigate while hidden.
+    await act(async () => {
+      await router.navigate("about");
+    });
+
+    // Show → reconcile → snapshot { route: about, previousRoute: undefined }.
+    // The enter handler must NOT fire with an undefined previousRoute.
+    rerender(<Tree mode="visible" />);
+
+    expect(handler).not.toHaveBeenCalled();
   });
 
   // #766 manifestation: per-item-params <Link> on a long-lived router. Before

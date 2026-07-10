@@ -56,6 +56,18 @@ export type RouteExitHandler = (
  * Promise resolves, navigation proceeds. If it rejects, the router emits
  * `TRANSITION_CANCELLED` (existing core behavior, no change here).
  *
+ * **Reentrancy — no synchronous `navigate()` from the handler.** The handler
+ * runs inside the transition's leave-dispatch window, so calling
+ * `router.navigate(...)` (or `navigateToDefault` / `navigateToState` /
+ * `navigateToNotFound`) **synchronously** in the handler body throws
+ * `REENTRANT_NAVIGATION` — core bans reentrant navigation from a transition
+ * listener (RFC navigation-cancellation-unification §4). To redirect on exit,
+ * defer past the sync dispatch: `await` your exit work first, or
+ * `queueMicrotask(() => router.navigate(...))`. A navigate issued after the
+ * handler's first `await` runs once the transition settles and is allowed.
+ * (Guards — `canDeactivate` — are the intended place to *block* or gate a
+ * departure; `useRouteExit` is for side effects, not redirection.)
+ *
  * @example Animation
  * ```tsx
  * const ref = useRef<HTMLDivElement>(null);

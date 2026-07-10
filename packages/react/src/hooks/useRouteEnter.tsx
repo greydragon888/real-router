@@ -127,20 +127,31 @@ export function useRouteEnter(
     //     `transition.from === route.name`. Opt-out via
     //     `skipSameRoute: false`.
     //   - **StrictMode dedupe**: same `route` ref between effect
-    //     cleanup + re-run in dev's strict pass. Not testable from
+    //     cleanup + re-run in dev's strict pass. Not reachable from
     //     vitest (`NODE_ENV === "test"` disables React's strict-mode
     //     double-run), so v8-ignored.
+    //   - **No previousRoute**: guards the non-nullable
+    //     `RouteEnterContext.previousRoute` contract — see below.
     if (!route.transition.from) {
       return;
     }
     if (skipSameRoute && route.transition.from === route.name) {
       return;
     }
-    /* v8 ignore start */
-    if (lastHandledRouteRef.current === route || !previousRoute) {
+    /* v8 ignore start -- StrictMode-only (dev double-run); NODE_ENV==="test" disables it */
+    if (lastHandledRouteRef.current === route) {
       return;
     }
     /* v8 ignore stop */
+    // `previousRoute` is `undefined` even when `transition.from` is truthy for the
+    // first post-start render — the Provider mounted AFTER a navigation, so the
+    // source's initial snapshot carries `previousRoute: undefined` (#1218 PC1) —
+    // and after an `<Activity>` catch-up reconcile (#765) resets it (PC2). This is
+    // the sole guard against invoking the handler with `previousRoute: undefined`,
+    // which `RouteEnterContext.previousRoute` (non-nullable `State`) forbids.
+    if (!previousRoute) {
+      return;
+    }
 
     lastHandledRouteRef.current = route;
     handlerRef.current({ route, previousRoute });

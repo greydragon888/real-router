@@ -129,3 +129,24 @@ between passes.
 | `tests/property/httpStatusSink.properties.ts`   | 2          | `createHttpStatusSink` — fresh code, distinct identity per call                                |
 | `tests/property/routeView.properties.ts`        | 8          | `isSegmentMatch` — exact, monotonicity, self-match, dot boundary, empty segment, multi-segment depth, empty routeName, deep names |
 | `tests/property/routeView.pipeline.properties.ts` | 13 + 1   | RouteView pipeline (#626) — `collectElements` (3: order, flatness, termination), `buildRenderList` (6: first-match, first-Self, Self priority, activeMatchFound, stability, large arrays), `processMatch` (4: sticky, alreadyActive, monotonicity, falsy routeName) + cross-check |
+
+## Reactive Lifecycle Regressions (integration, not property-based)
+
+Example-based integration guards in `tests/integration/reactive-lifecycle.test.tsx`
+lock the reactive-source lifecycle fixes from the #778 audit and the #1218
+enter-guard. These are distinct from the fast-check invariants above — they
+assert concrete mount / hide / show sequences under React 19's `<Activity>`,
+not generated inputs.
+
+| Probe | Locks                                                                                                              | Issue                                                                     |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| P1    | `RouterProvider` under `<Activity>` is fresh after hide → navigate → show (`createRouteSource` reconnect reconcile) | [#765](https://github.com/greydragon888/real-router/issues/765)           |
+| P2    | A `RouterErrorBoundary` mounted AFTER a navigation error still shows the fallback (eager error-source priming)      | [#765](https://github.com/greydragon888/real-router/issues/765) / [#778](https://github.com/greydragon888/real-router/issues/778) |
+| P3    | N unique-params `<Link>` release their router subscriptions on unmount (lazy source connection)                     | [#766](https://github.com/greydragon888/real-router/issues/766)           |
+| PC2   | `useRouteEnter` skips its handler after an `<Activity>` catch-up reconcile leaves `previousRoute` undefined         | [#1218](https://github.com/greydragon888/real-router/issues/1218)         |
+
+The `useRouteEnter` mount-side `!previousRoute` guard (#1218) is additionally
+covered by a functional regression (PC1) in
+`tests/functional/useRouteEnter.test.tsx` — the Provider mounted AFTER a
+navigation, where the source's initial snapshot carries `previousRoute:
+undefined` while `transition.from` is truthy.
