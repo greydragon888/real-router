@@ -28,9 +28,10 @@ export interface ActiveRouteSourceOptions {
    * - `""`: active only when the current URL has no fragment (or empty).
    * - `"value"`: active only when the current fragment equals `"value"`.
    *
-   * Hash-plugin runtimes leave `state.context.url` undefined, so any non-
-   * undefined `hash` option will produce `false` there — consistent with the
-   * documented limitation that hash-plugin doesn't support URL fragments.
+   * Hash-plugin runtimes leave `state.context.url` undefined — the source
+   * collapses the missing namespace to `""`. A **non-empty** `hash` is
+   * therefore always `false` there, while `hash: ""` still matches an active
+   * route ("no namespace" reads as "no fragment", #532).
    */
   hash?: string;
 }

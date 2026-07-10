@@ -47,6 +47,7 @@ const unsubscribe = source.subscribe(() => {
 | `getTransitionSource(router)`                           | same as above                                            | **per-router** — recommended for integrations |
 | `createErrorSource(router)`                             | `RouterSource<{ error, toRoute, fromRoute, version }>`   | not cached (advanced)                         |
 | `getErrorSource(router)`                                | same as above                                            | **per-router** — recommended for integrations |
+| `primeErrorSource(router)`                              | `void` (side-effect only)                                | eagerly create+subscribe `getErrorSource` if the router is registered, else a safe no-op — adapters call it at `RouterProvider` mount so a boundary mounting after an error still sees it (#778) |
 | `createDismissableError(router)`                        | `RouterSource<{ error, toRoute, fromRoute, version, resetError }>` | **per-router** — dismissal-aware error source for RouterErrorBoundary-style UIs |
 | `createActiveNameSelector(router)`                      | `ActiveNameSelector` (selector API — `subscribe(name, listener)` / `isActive(name)` / `destroy`; **not** a `RouterSource<T>` — no `getSnapshot()`) | **per-router** — O(1) active-name checker for Link fast-path |
 
@@ -99,7 +100,7 @@ const source = createActiveRouteSource(router, "users", undefined, {
 | ------------------- | ----------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `strict`            | `boolean`   | `false`       | When `false`, parent route is active when the current route is a descendant; when `true`, only an exact name match is active.                                                                                                                                  |
 | `ignoreQueryParams` | `boolean`   | `true`        | Whether to drop query-string params before comparing.                                                                                                                                                                                                          |
-| `hash`              | `string`    | `undefined`   | When set, source is active iff route matches **and** `state.context.url.hash` equals this value. Requires a URL-publishing plugin (browser/navigation); under hash-plugin or memory-plugin (no `context.url` namespace), a non-`undefined` hash is always `false`. |
+| `hash`              | `string`    | `undefined`   | When set, source is active iff route matches **and** `state.context.url.hash` equals this value. Requires a URL-publishing plugin (browser/navigation); under hash-plugin or memory-plugin (no `context.url` namespace), a **non-empty** hash is always `false`, while `hash: ""` still matches an active route (the missing namespace reads as "no fragment", #532). |
 
 Params are hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/circular refs fall back to a fresh non-cached source with a working `destroy()` — call it to release the router subscription.
 
@@ -169,6 +170,28 @@ source.subscribe(() => {
   }
 });
 ```
+
+**Priming for boundaries that mount late.** `getErrorSource` is eager (subscribes on creation), but a `RouterErrorBoundary` that creates its source lazily on mount can miss an error that fired _before_ it mounted (a lazy app shell, a failed boot navigation). Adapters call `primeErrorSource(router)` at `RouterProvider` mount so the per-router error source exists from that point and the boundary catches up on first subscribe (#778). It is a safe no-op on a router-like with no internals (test stub / `Object.create` clone):
+
+```typescript
+import { primeErrorSource } from "@real-router/sources";
+
+// At Provider mount — creates + subscribes getErrorSource if the router is
+// registered, else a no-op. Does not throw.
+primeErrorSource(router);
+```
+
+**Limitation — errors before the _first_ subscriber surface on the promise, not the source.** The error source tracks errors as transient _events_, not persistent state — core retains no "last error" to replay, so an error that fires before **any** subscriber (before `primeErrorSource` / the Provider mounts — e.g. an `await router.start()` that rejects during boot) is not reconstructable from the source afterward. Handle those on the navigation promise itself:
+
+```typescript
+try {
+  await router.start();
+} catch (err) {
+  // boot-time navigation errors surface here, not on a not-yet-mounted boundary
+}
+```
+
+This is by design (#1215): the source is a live event stream, symmetric with `createTransitionSource`, not a `getState()`-style snapshot of the last error.
 
 ## Documentation
 
