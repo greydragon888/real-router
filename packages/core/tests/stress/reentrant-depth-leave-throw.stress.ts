@@ -35,6 +35,7 @@ const N = 1000;
 describe("#1179 throwing sync subscribeLeave under load never leaks dispatch depth", () => {
   it(`survives ${N} throwing-leave navigations — depth stays restored`, async () => {
     const router: Router = createRouter(ROUTES, { defaultRoute: "home" });
+
     await router.start("/home");
 
     for (let i = 0; i < N; i++) {
@@ -43,6 +44,7 @@ describe("#1179 throwing sync subscribeLeave under load never leaks dispatch dep
       const unsub = router.subscribeLeave(() => {
         throw new Error("leave boom");
       });
+
       await router.navigate(i % 2 === 0 ? "a" : "b").catch(() => {
         /* expected: the sync leave throw rejects this navigation */
       });
@@ -50,16 +52,12 @@ describe("#1179 throwing sync subscribeLeave under load never leaks dispatch dep
 
       // Depth must be back to 0: a TOP-LEVEL navigate() must NOT throw
       // REENTRANT_NAVIGATION synchronously (the ban throws at the facade, before
-      // returning the promise). A leaked increment throws here.
-      let syncThrow: unknown;
-      try {
-        void router.navigate("home").catch(() => {
-          /* async SAME_STATES / success is irrelevant */
-        });
-      } catch (error) {
-        syncThrow = error;
-      }
-      expect(syncThrow).toBeUndefined();
+      // returning the promise). A leaked increment throws here. We assert only on
+      // the SYNCHRONOUS behavior — the async settle (SAME_STATES / success) is
+      // irrelevant, so swallow it with `.catch()` inside the callback.
+      expect(() => {
+        void router.navigate("home").catch(() => {});
+      }).not.toThrow();
     }
 
     // The router is still healthy after the load — a real navigation commits.
