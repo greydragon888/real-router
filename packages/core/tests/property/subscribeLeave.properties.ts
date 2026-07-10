@@ -1,6 +1,9 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
+import { createRouter, errorCodes } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
+
 import {
   arbNavigableRoute,
   createFixtureRouter,
@@ -8,7 +11,7 @@ import {
   NUM_RUNS,
 } from "./helpers";
 
-import type { State } from "@real-router/core";
+import type { Route, Router, State } from "@real-router/core";
 
 /**
  * Property-based coverage for `router.subscribeLeave()`.
@@ -183,6 +186,261 @@ describe("subscribeLeave() properties", () => {
         expect(captured?.aborted).toBe(false);
 
         router.stop();
+      },
+    );
+  });
+
+  // ===========================================================================
+  // #1200 items 6-9 — cancellation / ordering / no-fire invariants, generalized
+  // over generated inputs (the functional suite pins only fixed cases). Each is
+  // mutation-proven: an oracle independent of the leave machinery, a generator
+  // that reaches the discriminating class (cancel-source × N, thrower position,
+  // bypass scenario), and a src mutation that reds the property.
+  // ===========================================================================
+  describe("cancellation, ordering & no-fire (#1200 items 6-9)", () => {
+    // Param-free navigable targets (users.view/edit need :id — excluded here).
+    const arbGuardTarget = fc.constantFrom(
+      "users.list",
+      "admin.dashboard",
+      "admin.settings",
+      "search",
+    );
+
+    const ABC: Route[] = [
+      { name: "a", path: "/a" },
+      { name: "b", path: "/b" },
+      { name: "c", path: "/c" },
+    ];
+    const AB: Route[] = [
+      { name: "a", path: "/a" },
+      { name: "b", path: "/b" },
+    ];
+
+    // item 6 — TENTATIVE_DEPARTURE reject-half (#932/#943). For any target with a
+    // rejecting activation guard: the leave listener fires (departure approved),
+    // but activation rejects → state stays `fromState` AND the captured signal
+    // aborts with RouterError(CANNOT_ACTIVATE). Generalizes F2/F6 over targets.
+    test.prop([arbGuardTarget], { numRuns: NUM_RUNS.standard })(
+      "reject-half: leave fires, state stays fromState, signal aborts CANNOT_ACTIVATE",
+      async (target) => {
+        const router = await createStartedRouter("/"); // committed at home
+
+        getLifecycleApi(router).addActivateGuard(target, () => () => false);
+
+        let fired = false;
+        let signal: AbortSignal | undefined;
+
+        router.subscribeLeave((payload) => {
+          fired = true;
+          signal = payload.signal;
+        });
+
+        const error = await router.navigate(target).then(
+          () => undefined,
+          (error_: unknown) => error_,
+        );
+
+        expect(fired).toBe(true); // departure was approved (leave fired)
+        expect(router.getState()?.name).toBe("home"); // activation rejected → stay
+        expect(signal?.aborted).toBe(true);
+        expect((signal?.reason as { code?: string })?.code).toBe(
+          errorCodes.CANNOT_ACTIVATE,
+        );
+        expect((error as { code?: string })?.code).toBe(
+          errorCodes.CANNOT_ACTIVATE,
+        );
+
+        router.dispose();
+      },
+    );
+
+    // item 7 — SIGNAL_ABORT_PROPAGATES. N pending async leave listeners × every
+    // cancel source (supersede / stop / dispose / external opts.signal) → each of
+    // the PARKED navigation's captured signals aborts (read the listener's signal,
+    // not just the behavioral rejection).
+    test.prop(
+      [
+        fc.integer({ min: 1, max: 5 }),
+        fc.constantFrom("supersede", "stop", "dispose", "external"),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "every cancel source aborts each pending leave listener's captured signal",
+      async (n, action) => {
+        const router: Router = createRouter(ABC, { defaultRoute: "a" });
+
+        await router.start("/a");
+
+        const signals: AbortSignal[] = [];
+
+        for (let i = 0; i < n; i++) {
+          // Park in LEAVE_APPROVED — never settle — after capturing the signal.
+          router.subscribeLeave(
+            ({ signal }) =>
+              new Promise<void>(() => {
+                signals.push(signal);
+              }),
+          );
+        }
+
+        const controller = new AbortController();
+        const opts = action === "external" ? { signal: controller.signal } : {};
+        const parked = router.navigate("b", {}, opts);
+
+        parked.catch(() => {});
+        await Promise.resolve();
+        await Promise.resolve();
+
+        switch (action) {
+          case "supersede": {
+            router.navigate("c").catch(() => {});
+
+            break;
+          }
+          case "stop": {
+            router.stop();
+
+            break;
+          }
+          case "dispose": {
+            router.dispose();
+
+            break;
+          }
+          default: {
+            controller.abort(new Error("external cancel"));
+          }
+        }
+
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // A supersede re-fires the listeners for its own (uncancelled) nav, so
+        // assert only the PARKED navigation's first n signals.
+        expect(signals.length).toBeGreaterThanOrEqual(n);
+
+        signals.slice(0, n).forEach((s) => {
+          expect(s.aborted).toBe(true);
+        });
+
+        if (action !== "dispose") {
+          router.dispose();
+        }
+      },
+    );
+
+    // item 8 — AWAIT_BLOCKS_ACTIVATION (ordering only). Activation guards run only
+    // AFTER all N async leave listeners settle, for any N. No timing assertion —
+    // "≈ max not sum" is flaky under concurrency (#1423); the ordering is the
+    // invariant.
+    test.prop([fc.integer({ min: 1, max: 6 })], { numRuns: NUM_RUNS.standard })(
+      "activation runs after all N async leave listeners settle",
+      async (n) => {
+        const router: Router = createRouter(AB, { defaultRoute: "a" });
+
+        await router.start("/a");
+
+        const order: string[] = [];
+
+        for (let i = 0; i < n; i++) {
+          router.subscribeLeave(async () => {
+            await Promise.resolve();
+            order.push(`leave${i}`);
+          });
+        }
+
+        getLifecycleApi(router).addActivateGuard("b", () => () => {
+          order.push("activate");
+
+          return true;
+        });
+
+        await router.navigate("b");
+
+        expect(order).toHaveLength(n + 1);
+        // Activation is last; every leave listener recorded before it.
+        expect(order[order.length - 1]).toBe("activate");
+
+        for (let i = 0; i < n; i++) {
+          expect(order.indexOf(`leave${i}`)).toBeLessThan(
+            order.indexOf("activate"),
+          );
+        }
+
+        router.dispose();
+      },
+    );
+
+    // item 9a — SYNC_THROW_PRIORITY. Among N listeners (one sync-throwing at any
+    // position, the rest async-rejecting), navigate rejects with the SYNC error —
+    // a sync throw wins over every async rejection regardless of position.
+    test.prop(
+      [fc.integer({ min: 3, max: 6 }), fc.integer({ min: 0, max: 5 })],
+      {
+        numRuns: NUM_RUNS.standard,
+      },
+    )(
+      "a sync leave throw wins over async rejections (any position)",
+      async (n, posRaw) => {
+        const pos = posRaw % n;
+        const router: Router = createRouter(AB, { defaultRoute: "a" });
+
+        await router.start("/a");
+
+        for (let i = 0; i < n; i++) {
+          if (i === pos) {
+            router.subscribeLeave(() => {
+              throw new Error("SYNC_WINS");
+            });
+          } else {
+            router.subscribeLeave(async () => {
+              throw new Error(`async${i}`);
+            });
+          }
+        }
+
+        const error = await router.navigate("b").then(
+          () => undefined,
+          (error_: unknown) => error_,
+        );
+
+        expect((error as Error)?.message).toBe("SYNC_WINS");
+
+        router.dispose();
+      },
+    );
+
+    // item 9b — NO_FIRE_ON. The leave listener does NOT fire when there is no
+    // approved departure — a blocking deactivation guard, a same-state navigation,
+    // or navigateToNotFound (pipeline bypass).
+    test.prop([fc.constantFrom("deactivate", "same-state", "not-found")], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "leave does not fire on deactivate-block / same-state / notFound",
+      async (scenario) => {
+        const router: Router = createRouter(AB, { defaultRoute: "a" });
+
+        await router.start("/a");
+
+        if (scenario === "deactivate") {
+          getLifecycleApi(router).addDeactivateGuard("a", () => () => false);
+        }
+
+        const onLeave = vi.fn();
+
+        router.subscribeLeave(onLeave);
+
+        if (scenario === "not-found") {
+          router.navigateToNotFound("/nope");
+        } else if (scenario === "same-state") {
+          await router.navigate("a").catch(() => {});
+        } else {
+          await router.navigate("b").catch(() => {});
+        }
+
+        expect(onLeave).not.toHaveBeenCalled();
+
+        router.dispose();
       },
     );
   });
