@@ -248,6 +248,30 @@ useRouteExit(async ({ signal }) => {
 Same applies to `useRouteEnter`. This contrasts with React/Preact, where
 `useRouteExit` keeps a `handlerRef` that's updated on every render.
 
+### Synchronous `router.navigate()` inside a `useRouteExit` handler throws `REENTRANT_NAVIGATION`
+
+A `useRouteExit` exit handler runs as a transition-event listener — it is
+forwarded into `router.subscribeLeave` with no isolation. Core bans a
+**synchronous** `router.navigate()` (and `navigateToDefault` / `navigateToState`
+/ `navigateToNotFound`) called from inside such a listener: it throws
+`RouterError(REENTRANT_NAVIGATION)` at the facade (#1030–#1035), so a redirect
+written straight into the handler body tears the exit down instead of navigating.
+**Defer it** out of the listener call stack — wrap in `queueMicrotask(...)`, or
+`await` anything first (any `await` / `.then` moves the call off the listener
+stack, where navigation is allowed):
+
+```tsx
+useRouteExit(({ nextRoute }) => {
+  if (nextRoute.name === "checkout" && !isAuthed()) {
+    // WRONG — throws REENTRANT_NAVIGATION (synchronous, inside the listener):
+    //   router.navigate("login");
+    queueMicrotask(() => router.navigate("login")); // CORRECT — deferred
+  }
+});
+```
+
+The same ban applies to `useRouteEnter` handlers.
+
 ### Hooks Return Accessors, Not Values
 
 ```typescript
@@ -571,7 +595,7 @@ All source caches live inside `@real-router/sources` — no local WeakMaps in th
 > for a single shared store call `useRouteStore()` once high in the tree and pass
 > the store down through your own context.
 
-Routers are WeakMap keys in sources, so per-router state is automatically released when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes. On re-subscription **`createRouteNodeSource` reconciles** its snapshot (so node signals never observe stale values), but **`createRouteSource` does NOT** ([#765](https://github.com/greydragon888/real-router/issues/765)): a lifted `createRouteSource` bridged through `createSignalFromSource` and re-subscribed after a disconnect (e.g. the only reader behind a `<Show>` toggled off → navigate → on) replays the **stale** pre-disconnect snapshot. Keep the Provider's source mounted (don't gate the sole reader behind `<Show>`) until the sources fix lands.
+Routers are WeakMap keys in sources, so per-router state is automatically released when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes. On re-subscription **both lazy sources reconcile** their snapshot — `createRouteNodeSource` **and** `createRouteSource`, since sources 0.9.0 ([#765](https://github.com/greydragon888/real-router/issues/765)) — so signals never observe stale values: a lifted `createRouteSource` bridged through `createSignalFromSource` and re-subscribed after a disconnect (e.g. the only reader behind a `<Show>` toggled off → navigate → on) catches up the missed navigation in `onFirstSubscribe` (`stabilizeState` against the current router state) and reads the **current** route, not the stale pre-disconnect snapshot. Pinned by `tests/functional/reactive-lifecycle.test.tsx:32` (P1: "a lifted createRouteSource bridged inside `<Show>` is fresh after off → navigate → on"). No workaround needed — the sole reader may be gated behind `<Show>`.
 
 ## SSR
 
