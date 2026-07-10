@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
 import { captureUnhandledRejections, createTestRouter } from "../../helpers";
@@ -79,5 +80,79 @@ describe("#721 fire-and-forget — no unhandledRejection leaks", () => {
     });
 
     expect(leaked).toStrictEqual([]);
+  });
+});
+
+// #1184: the zero-allocation cached-rejection fast path
+// (CACHED_SAME_STATES_REJECTION / CACHED_NOT_STARTED_REJECTION /
+// CACHED_ROUTE_NOT_FOUND_REJECTION, NavigationNamespace/constants.ts) returns a
+// SHARED singleton promise + error per rejection class. Every other test compares
+// by VALUE (.rejects.toMatchObject({ code })), so silently replacing a singleton
+// with a per-call `Promise.reject(new RouterError(...))` — losing BOTH the
+// optimization AND the #721 pre-suppression contract (lastSyncRejected → the
+// facade skips its .catch()) — passes the whole suite. Pin IDENTITY through the
+// public API: two triggering navigations return the SAME promise + error ref.
+describe("cached-rejection identity (#1184 — zero-alloc fast path)", () => {
+  it("SAME_STATES: two same-state navigations return the SAME promise + error instance", async () => {
+    const router = createTestRouter();
+
+    await router.start("/home");
+
+    const r1 = router.navigate("home");
+    const r2 = router.navigate("home");
+
+    expect(r1).toBe(r2); // CACHED_SAME_STATES_REJECTION singleton
+
+    const [error1, error2] = await Promise.all([
+      r1.catch((error: unknown) => error),
+      r2.catch((error: unknown) => error),
+    ]);
+
+    expect(error1).toBe(error2); // CACHED_SAME_STATES_ERROR singleton
+    expect((error1 as { code?: string }).code).toBe(errorCodes.SAME_STATES);
+
+    router.stop();
+  });
+
+  it("ROUTER_NOT_STARTED: two pre-start navigations return the SAME promise + error instance", async () => {
+    const router = createTestRouter();
+
+    const r1 = router.navigate("users");
+    const r2 = router.navigate("users");
+
+    expect(r1).toBe(r2); // CACHED_NOT_STARTED_REJECTION singleton
+
+    const [error1, error2] = await Promise.all([
+      r1.catch((error: unknown) => error),
+      r2.catch((error: unknown) => error),
+    ]);
+
+    expect(error1).toBe(error2); // CACHED_NOT_STARTED_ERROR singleton
+    expect((error1 as { code?: string }).code).toBe(
+      errorCodes.ROUTER_NOT_STARTED,
+    );
+
+    router.dispose();
+  });
+
+  it("ROUTE_NOT_FOUND: two unknown-route navigations return the SAME promise + error instance", async () => {
+    const router = createTestRouter({ allowNotFound: false });
+
+    await router.start("/home");
+
+    const r1 = router.navigate("nonexistent.route");
+    const r2 = router.navigate("nonexistent.route");
+
+    expect(r1).toBe(r2); // CACHED_ROUTE_NOT_FOUND_REJECTION singleton
+
+    const [error1, error2] = await Promise.all([
+      r1.catch((error: unknown) => error),
+      r2.catch((error: unknown) => error),
+    ]);
+
+    expect(error1).toBe(error2); // CACHED_ROUTE_NOT_FOUND_ERROR singleton
+    expect((error1 as { code?: string }).code).toBe(errorCodes.ROUTE_NOT_FOUND);
+
+    router.stop();
   });
 });
