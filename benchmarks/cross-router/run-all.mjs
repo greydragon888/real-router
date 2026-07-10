@@ -31,6 +31,7 @@ const SCENARIOS = [
   "table-heap",
   "nav-churn",
   "active-links",
+  "back-forward",
   "link-build",
   "nested-switch",
 ];
