@@ -1,32 +1,30 @@
 import { createRouter } from "@real-router/core";
-import { createActiveRouteSource } from "@real-router/sources";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createActiveSource } from "../../src/internal/createActiveSource";
+import { createActiveRouteSource, createActiveSource } from "../../src";
 
 import type { Router } from "@real-router/core";
 
-// `createActiveSource` is the fast/slow active-source selector shared by
-// `RealLink` and `RealLinkActive` (#1103). It takes the router explicitly (no
-// injection context), so it is directly unit-testable — which matters because
-// JIT TestBed cannot bind non-default signal inputs to the directives, so the
-// fast path (non-empty routeName, default options) is otherwise unreachable in
-// unit tests (the documented ~97% JIT ceiling). These tests pin the path
-// decision + the fast-path reactive contract without AOT.
+// `createActiveSource` is the framework-agnostic fast/slow active-source builder
+// shared by every adapter's `<Link>` (#1416 promoted it here from the per-adapter
+// copies so the fast/slow decision cannot drift).
 //
 // Discriminator for "fast path was taken": a fast-path source is backed by the
 // shared `createActiveNameSelector` and never builds the per-link
 // `createActiveRouteSource`, so the canonical slow-path source for the same
 // arguments is still UNBUILT — asking for it is a cache MISS that runs
-// `router.isActiveRoute` once. A slow-path `createActiveSource` builds that
-// exact source, so the same later call is a cache HIT (no `isActiveRoute`).
+// `router.isActiveRoute` once. A slow-path `createActiveSource` builds that exact
+// source, so the same later call is a cache HIT (no `isActiveRoute`).
 describe("createActiveSource", () => {
   const routes = [
     { name: "home", path: "/" },
     {
       name: "users",
       path: "/users",
-      children: [{ name: "list", path: "/list" }],
+      children: [
+        { name: "list", path: "/list" },
+        { name: "view", path: "/:id" },
+      ],
     },
   ];
 
@@ -68,7 +66,7 @@ describe("createActiveSource", () => {
   });
 
   it("fast path is non-strict (descendant match) and name-only", () => {
-    // "users" is active as an ancestor of the current route once navigated.
+    // "users" is not active at "/" — the fast path reflects that by name.
     const source = createActiveSource(
       router,
       "users",
@@ -152,7 +150,7 @@ describe("createActiveSource", () => {
     // routeName="" is a misuse (no href, console.error). It must NOT take the
     // fast path — the selector reports root-active `true` for "", whereas the
     // slow path's isActiveRoute("") is false. Keeping "" on the slow path
-    // preserves that behaviour (and matches every JIT directive test).
+    // preserves that behaviour.
     createActiveSource(router, "", undefined, false, true, undefined);
 
     const spy = vi.spyOn(router, "isActiveRoute");
@@ -165,6 +163,25 @@ describe("createActiveSource", () => {
     expect(spy).not.toHaveBeenCalled();
 
     spy.mockRestore();
+  });
+
+  it("paramless link to a param route is name-only active while a param instance is active (#1416)", async () => {
+    // A paramless `createActiveSource(router, "users.view")` takes the FAST path
+    // (name-only). While `users.view` is active with a concrete `{ id }`, the
+    // selector reports `isActive("users.view") === true` by NAME — it ignores the
+    // params. Every adapter Link is name-only for a paramless link.
+    await router.navigate("users.view", { id: "5" });
+
+    const source = createActiveSource(
+      router,
+      "users.view",
+      undefined,
+      false,
+      true,
+      undefined,
+    );
+
+    expect(source.getSnapshot()).toBe(true);
   });
 
   it("fast-path source updates on navigation (reactive)", async () => {

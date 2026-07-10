@@ -36,7 +36,7 @@ src/
 │   ├── useNavigator.ts
 │   ├── useRoute.ts
 │   ├── useRouteNode.ts           # Uses cached createRouteNodeSource from @real-router/sources
-│   ├── useIsActiveRoute.ts       # Internal — used by Link (default opts → shared createActiveNameSelector fast path #1250; else cached createActiveRouteSource)
+│   ├── useIsActiveRoute.ts       # Internal ref form of the shared internal/createActiveSource fast/slow builder. NOT called by Link — Link calls createActiveSource directly in its watch (#1416)
 │   ├── useRouteUtils.ts
 │   ├── useRouterTransition.ts    # Uses cached getTransitionSource
 │   ├── useRouteExit.ts           # Wraps subscribeLeave with abort + same-route guards
@@ -461,9 +461,21 @@ reconcile.
 Contrast: React `<Activity>` detaches effects on hide and so _opens_ the stale
 window ([#765](https://github.com/greydragon888/real-router/issues/765)); Solid
 and Svelte have no keepAlive analogue. This is a real, guaranteed advantage of
-the Vue adapter — with one cost worth knowing: subscriptions of sleeping subtrees
-keep firing (bounded by the number of `<KeepAlive>`d nodes), so kept-alive
-components are not "paused" with respect to router updates.
+the Vue adapter — with one cost worth knowing: the **bridge-ref** subscriptions of
+sleeping subtrees keep firing (bounded by the number of `<KeepAlive>`d nodes), so
+kept-alive components are not "paused" with respect to router **state** updates —
+that is exactly what keeps the sleeping subtree fresh.
+
+**User lifecycle handlers ARE gated (#1221).** `useRouteEnter` / `useRouteExit`
+gate on `onDeactivated` / `onActivated`: a **deactivated** (sleeping) page does NOT
+run its enter/exit handlers on unrelated navigations — a sleeping page's analytics
+won't fire on foreign navs, and (critically) a sleeping page's **async** exit
+handler is no longer spliced into every navigation's leave cycle, where it would
+otherwise block the whole app. This is distinct from the bridge-ref subscriptions
+above (which stay live on purpose, to keep the sleeping subtree's *state* fresh).
+Waking a kept-alive page does NOT re-fire `useRouteEnter` — it was never
+unmounted, so reactivation is not a mount (use Vue's native `onActivated` for a
+"re-run on show" hook).
 
 ### Match `fallback` Prop (Suspense)
 
@@ -648,7 +660,7 @@ See also: [Vue Integration — Server-Side Rendering](https://github.com/greydra
 - `useRouteNode` uses cached `createRouteNodeSource` from `@real-router/sources` — N consumers of the same `nodeName` share one router subscription
 - `useRouterTransition` uses `getTransitionSource` — shared eager source per router
 - `RouterErrorBoundary` uses `createDismissableError` — shared error source with integrated dismissal state (no local `useRouterError` composable)
-- `useIsActiveRoute` resolves default-options active state through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links (#1250); custom params / strict / `ignoreQueryParams: false` / hash fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive). `useRefFromSource` consumes only `subscribe` + `getSnapshot`
+- `<Link>` resolves default-options active state through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links — via the `internal/createActiveSource` fast/slow builder called from its reactive `watch` (#1416; #1250 landed the fast path only in `useIsActiveRoute`, which `<Link>` never called — the drift #1416 fixed). Custom params / strict / `ignoreQueryParams: false` / hash fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive). `useIsActiveRoute` shares the same `createActiveSource` builder (its ref form), so the two cannot drift. `useRefFromSource` consumes only `subscribe` + `getSnapshot`
 - No `memo()` needed — Vue tracks ref dependencies automatically
 - `Link` content-stabilizes `routeParams` with `shallowEqual` (Object.is per key, order-insensitive — the same contract as the React adapter's `Link` `memo`), so an inline `:routeParams="{ id }"` literal from a re-rendering parent does **not** re-run `buildHref` or `canonicalJson` every navigation; `href` and active-class are `computed()` off the stabilized params + `useIsActiveRoute`. Same-shape navigations skip both derivations entirely (~18% faster on the Link-heavy `vs-tanstack` Vue bench)
 - All WeakMap caches live in `@real-router/sources` — auto-evicted on router GC, no local caches in this adapter

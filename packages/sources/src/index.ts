@@ -14,6 +14,8 @@ export { createRouteNodeSource } from "./createRouteNodeSource";
 
 export { createActiveRouteSource } from "./createActiveRouteSource";
 
+export { createActiveSource } from "./createActiveSource";
+
 export {
   createTransitionSource,
   getTransitionSource,

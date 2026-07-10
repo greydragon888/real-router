@@ -1,4 +1,4 @@
-import { onScopeDispose } from "vue";
+import { onActivated, onDeactivated, onScopeDispose } from "vue";
 
 import { useRouter } from "./useRouter";
 
@@ -55,6 +55,10 @@ export type RouteExitHandler = (
  * behavior over time, read refs/computeds inside the handler body — do
  * not rely on swapping the handler reference.
  *
+ * **Under `<KeepAlive>` (#1221):** a deactivated (sleeping) page does not run
+ * the handler on unrelated navigations — critically, its async exit is not
+ * spliced into every navigation's leave cycle (where it would block the app).
+ *
  * @example Animation
  * ```ts
  * const ref = useTemplateRef<HTMLDivElement>("box");
@@ -100,7 +104,29 @@ export function useRouteExit(
   const router = useRouter();
   const skipSameRoute = options?.skipSameRoute ?? true;
 
+  // #1221 — under <KeepAlive> a deactivated component keeps its effect scope
+  // (and this subscription) alive. Gate on deactivated state so a sleeping page
+  // does not run its exit handler on unrelated navigations — critically, a
+  // sleeping page's async (Promise-returning) exit would otherwise be spliced
+  // into every navigation's leave cycle and BLOCK it. `onActivated` /
+  // `onDeactivated` only fire under KeepAlive; without it the flag stays `false`
+  // and the subscription runs as before. The page being LEFT is still active
+  // when its own leave window runs (deactivation happens on the subsequent
+  // commit), so a genuine exit still fires.
+  let isDeactivated = false;
+
+  onActivated(() => {
+    isDeactivated = false;
+  });
+  onDeactivated(() => {
+    isDeactivated = true;
+  });
+
   const off = router.subscribeLeave(({ route, nextRoute, signal }) => {
+    if (isDeactivated) {
+      return;
+    }
+
     if (skipSameRoute && route.name === nextRoute.name) {
       return;
     }

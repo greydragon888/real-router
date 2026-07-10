@@ -71,6 +71,141 @@ describe("Link component", () => {
     expect(link.classes()).toContain("test-class");
   });
 
+  describe("no-params active state — fast path (#1416) vs slow-path dedup (#776)", () => {
+    it("a default no-params <Link> uses the shared name-selector fast path, NOT a per-link createActiveRouteSource (#1416)", () => {
+      // #1416 — a default-options no-params `<Link routeName="one-more-test">`
+      // must resolve active state through the per-router
+      // `createActiveNameSelector` (ONE shared `router.subscribe` for any number
+      // of distinct-name links), NOT a per-link `createActiveRouteSource` (a
+      // `BaseSource` + its own router subscription EACH). Pre-#1416 vue's `<Link>`
+      // built the per-link source unconditionally — the only adapter that never
+      // wired up the #1250 fast path (which landed only in the never-called
+      // `useIsActiveRoute` composable).
+      //
+      // Discriminator (mirror of svelte #1099 / react #1248): the canonical
+      // undefined-params slow-path source is UNBUILT after a fast-path Link
+      // mounts. Building it now is a cache MISS — `createActiveRouteSource`
+      // computes its initial value via `router.isActiveRoute`. (A slow-path Link
+      // builds this exact source, so the same call is a cache HIT and
+      // `isActiveRoute` is NOT re-run.)
+      mountLink(router, { routeName: "one-more-test" });
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      createActiveRouteSource(router, "one-more-test", undefined, {
+        strict: false,
+        ignoreQueryParams: true,
+      });
+
+      expect(isActiveRouteSpy).toHaveBeenCalled();
+    });
+
+    it("a slow-path no-params <Link> (activeStrict) still shares the canonical undefined-params source (#776)", () => {
+      // When a no-params Link falls to the slow path (here via `activeStrict`,
+      // which the fast path excludes), it must still pass `routeParams` straight
+      // through as `undefined` — keying the source "" (not "{}") — so a matching
+      // Link / `useIsActiveRoute` shares the SAME cached source (one router
+      // subscription, not two). Discriminator: after the Link mounts + builds the
+      // source (calling `isActiveRoute` before the spy), asking for the identical
+      // source is a cache HIT → `isActiveRoute` is NOT re-run.
+      mountLink(router, { routeName: "one-more-test", activeStrict: true });
+
+      const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
+
+      createActiveRouteSource(router, "one-more-test", undefined, {
+        strict: true,
+        ignoreQueryParams: true,
+      });
+
+      expect(isActiveRouteSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("throwing @click handler is isolated (#1352)", () => {
+    it("a throwing single onClick does NOT prevent the Link's navigation", async () => {
+      const navigateSpy = vi
+        .spyOn(router, "navigate")
+        .mockResolvedValue({} as never);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+        onClick: () => {
+          throw new Error("boom");
+        },
+      });
+
+      // Pre-fix the throw propagates out of `handleClick`, skipping navigate;
+      // swallow it so the discriminating assertion still runs.
+      try {
+        await wrapper.find("a").trigger("click");
+      } catch {
+        /* pre-fix: unisolated throw */
+      }
+
+      expect(navigateSpy).toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
+
+      navigateSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it("array-form @click — a throwing first handler swallows neither its siblings nor navigation", async () => {
+      const navigateSpy = vi
+        .spyOn(router, "navigate")
+        .mockResolvedValue({} as never);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      let secondRan = false;
+
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+        onClick: [
+          () => {
+            throw new Error("boom");
+          },
+          () => {
+            secondRan = true;
+          },
+        ],
+      });
+
+      try {
+        await wrapper.find("a").trigger("click");
+      } catch {
+        /* pre-fix: unisolated throw aborts the loop */
+      }
+
+      // Pre-fix: the throw aborts the array loop (sibling swallowed) AND
+      // propagates out of handleClick (navigate skipped). Both must survive.
+      expect(secondRan).toBe(true);
+      expect(navigateSpy).toHaveBeenCalled();
+
+      navigateSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it("a non-throwing onClick that calls preventDefault still blocks navigation", async () => {
+      // Isolation must not weaken the `defaultPrevented` contract: a handler
+      // that deliberately prevents default still stops the Link navigating.
+      const navigateSpy = vi
+        .spyOn(router, "navigate")
+        .mockResolvedValue({} as never);
+
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+        onClick: (evt: MouseEvent) => {
+          evt.preventDefault();
+        },
+      });
+
+      await wrapper.find("a").trigger("click");
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+
+      navigateSpy.mockRestore();
+    });
+  });
+
   describe("activeClassName", () => {
     it("should set active class when route matches", async () => {
       const wrapper = mountLink(router, {
