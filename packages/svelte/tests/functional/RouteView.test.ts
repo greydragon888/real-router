@@ -8,6 +8,7 @@ import RouteViewBasicTest from "../helpers/RouteViewBasicTest.svelte";
 import RouteViewNestedTest from "../helpers/RouteViewNestedTest.svelte";
 import RouteViewNoNotFoundTest from "../helpers/RouteViewNoNotFoundTest.svelte";
 import RouteViewSelfTest from "../helpers/RouteViewSelfTest.svelte";
+import RouteViewSubtreeTest from "../helpers/RouteViewSubtreeTest.svelte";
 
 import type { Router } from "@real-router/core";
 
@@ -198,6 +199,55 @@ describe("RouteView", () => {
 
     it("never returns 'self' for a child route under a 'self' parent", () => {
       expect(getActiveSegment("self.detail", "", { self: () => {} })).toBe("");
+    });
+  });
+
+  // #1252 — F3: RouteView must PRESERVE the winning segment's rendered subtree
+  // (and its component state) across an in-winner navigation (a route change
+  // where the same top-level segment stays active). Remounting would lose local
+  // state — the #1094 correctness bug the Solid adapter had. Mirrors
+  // `packages/solid/tests/functional/RouteView.subtree.test.tsx`.
+  describe("subtree preservation (F3, #1252)", () => {
+    it("preserves the active subtree across an in-winner navigation", async () => {
+      await router.start("/users/list");
+
+      const probe = { mounts: 0, destroys: 0 };
+
+      render(RouteViewSubtreeTest, { props: { router, probe } });
+      flushSync();
+
+      expect(screen.getByTestId("probe")).toBeInTheDocument();
+      expect(probe.mounts).toBe(1);
+
+      // users.list -> users.view: the winning "users" snippet stays active, so
+      // the probe child must NOT remount.
+      await router.navigate("users.view", { id: "42" });
+      flushSync();
+
+      expect(probe.mounts).toBe(1);
+      expect(probe.destroys).toBe(0);
+      expect(screen.getByTestId("probe")).toBeInTheDocument();
+    });
+
+    it("remounts when the winning segment changes (control)", async () => {
+      await router.start("/users/list");
+
+      const probe = { mounts: 0, destroys: 0 };
+
+      render(RouteViewSubtreeTest, { props: { router, probe } });
+      flushSync();
+
+      expect(probe.mounts).toBe(1);
+
+      // users.list -> about: the winner flips, so the probe subtree disposes and
+      // the about subtree mounts. Proves the preservation above is real, not a
+      // probe that never remounts.
+      await router.navigate("about");
+      flushSync();
+
+      expect(probe.destroys).toBe(1);
+      expect(screen.queryByTestId("probe")).toBeNull();
+      expect(screen.getByTestId("about")).toBeInTheDocument();
     });
   });
 });
