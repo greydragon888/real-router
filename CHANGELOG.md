@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-10]
 
+### @real-router/core@0.74.8
+
+### Patch Changes
+
+- [#1420](https://github.com/greydragon888/real-router/pull/1420) [`227fa83`](https://github.com/greydragon888/real-router/commit/227fa83f567afb1c124b7882ff7f9d2ecd94b110) Thanks [@greydragon888](https://github.com/greydragon888)! - Retain one shared frozen `EMPTY_PARAM_META` for fully-static route nodes ([#1415](https://github.com/greydragon888/real-router/issues/1415))
+
+  The route tree no longer keeps a fresh 6-field `ParamMeta` wrapper per fully-static node (all collections were already shared [#1009](https://github.com/greydragon888/real-router/issues/1009) sentinels; the wrapper carried no information). Browser CDP A/B on the 10k-route table: **−0.340 MB retained heap** on top of [#1414](https://github.com/greydragon888/real-router/issues/1414) — combined **−18.7 %** (7.725 → 6.279 MB @10k). Observable shape note: on fully-static nodes of the public `RouteTree`, `paramMeta` is identity-shared and its `pathPattern` is `""` (the node's own `path` is the pattern).
+
+- [#1420](https://github.com/greydragon888/real-router/pull/1420) [`227fa83`](https://github.com/greydragon888/real-router/commit/227fa83f567afb1c124b7882ff7f9d2ecd94b110) Thanks [@greydragon888](https://github.com/greydragon888)! - Skip empty per-route meta records — one shared frozen `EMPTY_ROUTE_META` sentinel ([#1414](https://github.com/greydragon888/real-router/issues/1414))
+
+  `buildMeta` no longer allocates a fresh `{ [routeName]: {} }` record per fully-static route — route-unique keys degrade into per-object hidden classes (first ~1k) and dictionary-mode objects (the rest) at scale. Browser CDP A/B on the 10k-route table: **−1.106 MB (−14.3 %) retained heap**. Observable shape note: empty entries no longer appear in the meta reachable via `PluginApi.buildState()` — a missing entry is equivalent to an empty one for every consumer.
+
+
 ### @real-router/core@0.74.7
 
 ### Patch Changes
