@@ -186,6 +186,12 @@ function createBrowserPlugin(
     },
   });
 
+  // Captured at onStart so onStop/teardown clear the shared hashchange slot ONLY
+  // while we still own it — a later router's onStart replaces it (last-wins,
+  // #758); clearing it unconditionally on the earlier router's stop/dispose
+  // disconnects the LIVE router (#1213). Mirrors the popstate lifecycle guard.
+  let myHashRemover: (() => void) | undefined;
+
   return {
     onStart: () => {
       lifecycle.onStart?.();
@@ -193,19 +199,28 @@ function createBrowserPlugin(
       // cache is fresh after stop/re-start, then track external changes.
       syncHashFromBrowser();
       shared.removeHashChangeListener?.();
-      shared.removeHashChangeListener =
-        browser.addHashChangeListener(syncHashFromBrowser);
+      myHashRemover = browser.addHashChangeListener(syncHashFromBrowser);
+      shared.removeHashChangeListener = myHashRemover;
     },
 
     onStop: () => {
       lifecycle.onStop?.();
-      shared.removeHashChangeListener?.();
-      shared.removeHashChangeListener = undefined;
+
+      if (myHashRemover && shared.removeHashChangeListener === myHashRemover) {
+        shared.removeHashChangeListener();
+        shared.removeHashChangeListener = undefined;
+      }
+
+      myHashRemover = undefined;
     },
 
     teardown: () => {
-      shared.removeHashChangeListener?.();
-      shared.removeHashChangeListener = undefined;
+      if (myHashRemover && shared.removeHashChangeListener === myHashRemover) {
+        shared.removeHashChangeListener();
+        shared.removeHashChangeListener = undefined;
+      }
+
+      myHashRemover = undefined;
       lifecycle.teardown?.();
     },
 

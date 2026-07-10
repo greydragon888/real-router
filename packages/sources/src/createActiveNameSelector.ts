@@ -159,6 +159,18 @@ export function createActiveNameSelector(router: Router): ActiveNameSelector {
       }
 
       unsubscribed = true;
+
+      // Stale-generation guard: if this name's registered Set is no longer the
+      // one this closure captured, its generation was already fully torn down
+      // (all listeners removed → Set deleted) and possibly re-created by a later
+      // subscribe. Deleting / disconnecting against the stale Set would delete
+      // the LIVE generation's map entry (the empty stale Set trips
+      // `size === 0`), orphaning its subscribers. Nothing left for us to clean
+      // up here — bail (#1206).
+      if (listenersByName.get(routeName) !== listeners) {
+        return;
+      }
+
       listeners.delete(listener);
 
       if (listeners.size === 0) {

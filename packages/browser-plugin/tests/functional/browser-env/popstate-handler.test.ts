@@ -502,6 +502,75 @@ describe("popstate handler", () => {
       expect(removeSpy).not.toHaveBeenCalled();
       expect(cleanup).toHaveBeenCalledTimes(1);
     });
+
+    // B7.5 (#1213): factory pool = two routers sharing ONE SharedFactoryState.
+    // The earlier router's stop()/dispose() must NOT clear the LIVE (last-wins)
+    // router's listener from the shared slot.
+    it("onStop of an earlier lifecycle does not disconnect the last-wins router (#1213)", () => {
+      const shared: SharedFactoryState = { removePopStateListener: undefined };
+      const remove1 = vi.fn();
+      const remove2 = vi.fn();
+      const lifecycle1 = createPopstateLifecycle({
+        browser: {
+          ...makeFakeBrowser(),
+          addPopstateListener: vi.fn(() => remove1),
+        },
+        shared,
+        handler: () => {},
+        cleanup: () => {},
+      });
+      const lifecycle2 = createPopstateLifecycle({
+        browser: {
+          ...makeFakeBrowser(),
+          addPopstateListener: vi.fn(() => remove2),
+        },
+        shared,
+        handler: () => {},
+        cleanup: () => {},
+      });
+
+      lifecycle1.onStart?.(); // shared → remove1
+      lifecycle2.onStart?.(); // last-wins: removes remove1, shared → remove2
+      const winner = shared.removePopStateListener;
+
+      lifecycle1.onStop?.(); // earlier router stops — must leave remove2 intact
+
+      expect(remove2).not.toHaveBeenCalled();
+      expect(shared.removePopStateListener).toBe(winner);
+    });
+
+    it("teardown of an earlier lifecycle does not disconnect the last-wins router (#1213)", () => {
+      const shared: SharedFactoryState = { removePopStateListener: undefined };
+      const remove1 = vi.fn();
+      const remove2 = vi.fn();
+      const lifecycle1 = createPopstateLifecycle({
+        browser: {
+          ...makeFakeBrowser(),
+          addPopstateListener: vi.fn(() => remove1),
+        },
+        shared,
+        handler: () => {},
+        cleanup: () => {},
+      });
+      const lifecycle2 = createPopstateLifecycle({
+        browser: {
+          ...makeFakeBrowser(),
+          addPopstateListener: vi.fn(() => remove2),
+        },
+        shared,
+        handler: () => {},
+        cleanup: () => {},
+      });
+
+      lifecycle1.onStart?.();
+      lifecycle2.onStart?.();
+      const winner = shared.removePopStateListener;
+
+      lifecycle1.teardown?.(); // earlier router disposes (HMR ordering)
+
+      expect(remove2).not.toHaveBeenCalled();
+      expect(shared.removePopStateListener).toBe(winner);
+    });
   });
 
   describe("createHashSyncLifecycle (#759)", () => {
@@ -619,6 +688,48 @@ describe("popstate handler", () => {
       expect(removeHashSpy).toHaveBeenCalledTimes(1);
       expect(shared.removePopStateListener).toBeUndefined();
       expect(cleanup).toHaveBeenCalledTimes(1);
+    });
+
+    // B7.5 (#1213): factory pool — the earlier router's stop must not disconnect
+    // the last-wins router's COMBINED popstate+hashchange remover.
+    it("onStop of an earlier lifecycle does not disconnect the last-wins router (#1213)", () => {
+      const shared: SharedFactoryState = { removePopStateListener: undefined };
+      const makeLc = (): {
+        removePop: ReturnType<typeof vi.fn>;
+        removeHash: ReturnType<typeof vi.fn>;
+        lifecycle: ReturnType<typeof createHashSyncLifecycle>;
+      } => {
+        const removePop = vi.fn();
+        const removeHash = vi.fn();
+        const browser: Browser = {
+          ...makeFakeBrowser(),
+          addPopstateListener: vi.fn(() => removePop),
+          addHashChangeListener: vi.fn(() => removeHash),
+        };
+
+        return {
+          removePop,
+          removeHash,
+          lifecycle: createHashSyncLifecycle({
+            browser,
+            shared,
+            handler: vi.fn(),
+            cleanup: vi.fn(),
+          }),
+        };
+      };
+      const lc1 = makeLc();
+      const lc2 = makeLc();
+
+      lc1.lifecycle.onStart?.(); // shared → lc1 combined remover
+      lc2.lifecycle.onStart?.(); // last-wins: removes lc1's, shared → lc2's
+      const winner = shared.removePopStateListener;
+
+      lc1.lifecycle.onStop?.(); // earlier router stops — must leave lc2 intact
+
+      expect(lc2.removePop).not.toHaveBeenCalled();
+      expect(lc2.removeHash).not.toHaveBeenCalled();
+      expect(shared.removePopStateListener).toBe(winner);
     });
 
     it("teardown still runs cleanup when no listeners are registered", () => {
