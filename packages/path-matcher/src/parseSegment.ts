@@ -28,7 +28,7 @@
  * @module parseSegment
  */
 
-/* eslint-disable unicorn/prefer-code-point, sonarjs/cognitive-complexity -- charCodeAt code-unit scan + a single inlined branchy pass are this RFC's char-scan perf basis (§9); the same deliberate choices as registration.ts hasNonAsciiSegment (#1285) and SegmentMatcher's inlined #traverseFrom (:550). Markers compared are ASCII (`:` `*` `<` `?`, < 0x80). */
+/* eslint-disable unicorn/prefer-code-point, sonarjs/cognitive-complexity -- charCodeAt code-unit scan + a single inlined branchy pass are this RFC's char-scan perf basis (§9); the same deliberate choices as registration/trie.ts hasNonAsciiSegment (#1285) and SegmentMatcher's inlined #traverseFrom (:550). Markers compared are ASCII (`:` `*` `<` `?`, < 0x80). */
 
 /** A successfully tokenized segment. */
 export type SegmentTokens =
