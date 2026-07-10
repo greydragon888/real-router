@@ -49,6 +49,29 @@ describe("useRouteEnter", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("does not fire when the Provider mounts AFTER a navigation — previousRoute is undefined although transition.from is truthy (#1218)", async () => {
+    const handler = vi.fn();
+
+    // Navigate BEFORE the Provider mounts: createRouteSource's initial snapshot
+    // then carries { route: about, previousRoute: undefined } while
+    // route.transition.from is truthy ("test"). Guard 1 (skip-initial) passes
+    // because from is truthy; guard 2 is disabled via skipSameRoute: false — so
+    // the `!previousRoute` guard is the *only* line standing between the effect
+    // and a handler call with previousRoute: undefined, which
+    // RouteEnterContext.previousRoute (non-nullable State) forbids.
+    await act(async () => {
+      await router.navigate("about");
+    });
+
+    render(
+      <RouterProvider router={router}>
+        <Probe handler={handler} options={{ skipSameRoute: false }} />
+      </RouterProvider>,
+    );
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it("fires once after a navigation when component is already mounted", async () => {
     const handler = vi.fn();
 

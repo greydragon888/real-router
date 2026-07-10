@@ -389,6 +389,8 @@ useRouteEnter(({ route, previousRoute }) => {
 
 `useRouteExit`'s handler can return a `Promise` — the router awaits it before committing the new state. Returning a long-running animation Promise gives router-coordinated exit timing. `useRouteEnter` is fire-and-forget (`void`) and fires after the new component mounts. Both default to `skipSameRoute: true` so query-only navigations (sort/filter) don't trigger.
 
+**No synchronous `navigate()` from a `useRouteExit` handler.** The handler runs inside the transition's leave-dispatch window, so a synchronous `router.navigate(...)` (or `navigateToDefault` / `navigateToState` / `navigateToNotFound`) in the handler body throws `REENTRANT_NAVIGATION` — core bans reentrant navigation from a transition listener (RFC navigation-cancellation-unification §4). To redirect on exit, defer past the sync dispatch: `await` the exit work first, or `queueMicrotask(() => router.navigate(...))`; a navigate issued after the handler's first `await` runs once the transition settles and is allowed. Reach for a `canDeactivate` guard, not `useRouteExit`, when the goal is to *block* or gate the departure.
+
 ### useRoute throws when route is undefined
 
 `useRoute()` returns `{ navigator, route: State<P>, previousRoute?: State }` —
@@ -512,30 +514,33 @@ const LazyUsers = lazy(() => import("./UsersPage"));
 </RouteView.Match>;
 ```
 
-### Keep `RouterProvider` above any `<Activity>` / keepAlive boundary
+### `RouterProvider` under `<Activity>` / keepAlive reconciles on re-show (#765)
 
 `RouterProvider` subscribes to the router via `useSyncExternalStore`
 (subscribe-on-first-listener, unsubscribe-on-last). React 19's `<Activity>` —
 the same API behind `RouteView`'s `keepAlive` — **detaches the effects of a
-hidden subtree**, which drops that subscription. If the Provider itself sits
+hidden subtree**, dropping that subscription. If the Provider itself sits
 _under_ an `<Activity>` (or keepAlive) boundary, a `hide → router.navigate(...)
-→ show` sequence renders the **stale** previous route: the navigation lands
-while the source is disconnected, and on re-show `createRouteSource` replays its
-last snapshot until the next navigation. `useMemo(() => createRouteSource(router),
-[router])` survives the hide/show, so the source is never recreated to pick up
-what it missed.
+→ show` sequence does not observe the navigation while hidden.
+
+`createRouteSource` **reconciles on re-subscribe**
+([#765](https://github.com/greydragon888/real-router/issues/765)): when the
+first listener re-attaches on re-show, the source re-reads `router.getState()`,
+so the re-shown Provider renders the **current** route, not the stale one. The
+`hide → navigate → show` path is locked by the P1 regression in
+`tests/integration/reactive-lifecycle.test.tsx`.
 
 ```tsx
-// WRONG — Provider under Activity: hide → navigate → show shows the stale route
+// Reconciles correctly, but mounting at the root is still the cleaner default:
 <Activity mode={mode}>
   <RouterProvider router={router}>
     <App />
   </RouterProvider>
 </Activity>
 
-// CORRECT — Provider above the boundary (the typical app already mounts it at
-// the root). keepAlive on an individual RouteView.Match stays fine — the
-// Provider remains mounted and subscribed the whole time.
+// RECOMMENDED — Provider at the root, above any boundary. The subscription
+// stays live the whole time (no reliance on the reconnect catch-up), and
+// keepAlive on an individual RouteView.Match is unaffected either way.
 <RouterProvider router={router}>
   <Activity mode={mode}>
     <App />
@@ -543,13 +548,13 @@ what it missed.
 </RouterProvider>
 ```
 
-Most apps mount `RouterProvider` at the root, so the real exposure is
-non-standard compositions and `keepAlive`-wrapped app-in-app layouts. The root
-cause is in `@real-router/sources` — `createRouteSource` does not reconcile its
-snapshot on re-subscribe ([#765](https://github.com/greydragon888/real-router/issues/765));
-once that lands, the window closes and this caveat can be softened.
-`useIsActiveRoute` / `Link` are **immune** — their source is eager and keeps its
-snapshot live even with zero subscribers.
+Most apps already mount `RouterProvider` at the root, so post-#765 this is a
+correctness-neutral style note rather than a footgun. (Before the reconnect
+reconcile the re-shown Provider replayed its stale snapshot until the next
+navigation — that window is now closed.) A related mount-side effect: on that
+same catch-up the reconciled snapshot carries `previousRoute: undefined`, and
+`useRouteEnter` deliberately **skips** its handler rather than fire it with an
+undefined `previousRoute` — see the PC2 regression in the same file (#1218).
 
 ### Ink entry constraints
 
