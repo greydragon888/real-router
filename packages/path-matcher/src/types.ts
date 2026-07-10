@@ -184,7 +184,13 @@ export interface ForkMeta {
 }
 
 export interface SegmentNode {
-  readonly staticChildren: Record<string, SegmentNode>;
+  /**
+   * Starts as the shared frozen `EMPTY_STATIC_CHILDREN` sentinel (pathUtils);
+   * `processSegment` copies-on-write to a fresh mutable null-proto object on the
+   * first static child — hence not `readonly`. Match reads (`key in …` / index)
+   * are correct on the empty sentinel (no key → miss).
+   */
+  staticChildren: Record<string, SegmentNode>;
   hasChildren: boolean;
   paramChild?:
     | { node: SegmentNode; name: string; fork?: ForkMeta | undefined }

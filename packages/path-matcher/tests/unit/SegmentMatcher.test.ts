@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildParamMeta } from "../../src/buildParamMeta";
 import { createSegmentNode } from "../../src/SegmentMatcher";
+import { EMPTY_STATIC_CHILDREN } from "../../src/pathUtils";
 import { createMatcher } from "../helpers/buildTree";
 import { createTestMatcher } from "../helpers/createTestMatcher";
 
@@ -133,19 +134,25 @@ describe("createSegmentNode", () => {
     expect(node.slashChildRoute).toBeUndefined();
   });
 
-  it("should use Object.create(null) for staticChildren", () => {
+  it("should initialize staticChildren to the shared frozen empty sentinel", () => {
     const node = createSegmentNode();
 
-    // Object.create(null) has no prototype
+    // Null-proto (Object.create(null)) empty map, frozen so a write that skips
+    // processSegment's copy-on-write fails loud instead of corrupting the shared shell.
     expect(Object.getPrototypeOf(node.staticChildren)).toBeNull();
+    expect(node.staticChildren).toBe(EMPTY_STATIC_CHILDREN);
+    expect(Object.isFrozen(node.staticChildren)).toBe(true);
   });
 
-  it("should create independent instances", () => {
+  it("should share the empty sentinel across fresh nodes (copy-on-write on first static child)", () => {
     const node1 = createSegmentNode();
     const node2 = createSegmentNode();
 
+    // Distinct node objects, but both point at the ONE shared staticChildren
+    // sentinel — until registration adds a static child, which copies-on-write.
     expect(node1).not.toBe(node2);
-    expect(node1.staticChildren).not.toBe(node2.staticChildren);
+    expect(node1.staticChildren).toBe(node2.staticChildren);
+    expect(node1.staticChildren).toBe(EMPTY_STATIC_CHILDREN);
   });
 
   it("should have uniform hidden class shape (all keys present)", () => {
