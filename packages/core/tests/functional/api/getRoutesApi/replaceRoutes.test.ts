@@ -686,6 +686,39 @@ describe("core/routes/replaceRoutes", () => {
       expect(caught).toBeInstanceOf(RouterError);
       expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
     });
+
+    // #1204: replace() during the STARTING window — inside an async start
+    // interceptor, before next(). validateClearRoutes gates only on
+    // isTransitioning(), which covers TRANSITION_STARTED/LEAVE_APPROVED but NOT
+    // STARTING, so replace() PROCEEDS here (unlike mid-navigation, where it is a
+    // logged no-op — see "blocking during navigation"). No committed state exists
+    // yet, so no revalidation runs; the in-flight start(path) resolves into the
+    // freshly-swapped tree. Pins browser-plugin-style lazy tree-swap.
+    it("proceeds mid-STARTING (async start interceptor) — start() lands in the swapped tree", async () => {
+      const lazyRouter = createRouter([{ name: "home", path: "/" }], {
+        allowNotFound: false, // a miss REJECTS, so resolving to 'lazy' is load-bearing
+      });
+      const lazyApi = getRoutesApi(lazyRouter);
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+      getPluginApi(lazyRouter).addInterceptor("start", async (next, path) => {
+        lazyApi.replace([
+          { name: "home", path: "/" },
+          { name: "lazy", path: "/lazy" },
+        ]); // FSM is STARTING → validateClearRoutes does not block
+        return next(path);
+      });
+
+      const state = await lazyRouter.start("/lazy");
+
+      expect(state.name).toBe("lazy"); // start resolved into the swapped tree
+      expect(lazyApi.has("lazy")).toBe(true);
+      // replace mid-STARTING is NOT a logged no-op (contrast: mid-navigation IS)
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      errorSpy.mockRestore();
+      lazyRouter.dispose();
+    });
   });
 
   // ============================================================================
