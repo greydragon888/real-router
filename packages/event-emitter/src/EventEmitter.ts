@@ -65,14 +65,22 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   /**
    * Adds an event listener and returns an unsubscribe function.
    * Throws on duplicate listeners or when maxListeners is reached.
+   *
+   * Registration is atomic (validate-before-mutate, #1358): every rejection
+   * check runs against the CURRENT record (read once, never created early), the
+   * advisory warn hook runs before any mutation, and the record is created +
+   * the listener added only after all checks pass. So a throw — a rejected
+   * limit, or a throwing `onListenerWarn` — leaves NO side-effect behind: no
+   * orphaned empty record (#1167) and no burnt warn latch (#1168).
    */
   on<E extends keyof TEventMap & string>(
     eventName: E,
     cb: (...args: TEventMap[E]) => void,
   ): Unsubscribe {
-    const set = this.#getCallbackSet(eventName);
+    const existing = this.#callbacks.get(eventName);
+    const size = existing?.size ?? 0;
 
-    if (set.has(cb)) {
+    if (existing?.has(cb)) {
       throw new Error(`Duplicate listener for "${eventName}"`);
     }
 
@@ -80,27 +88,38 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
     // Enforce the hard limit before warning, so onListenerWarn never fires for
     // a registration that then throws (the warnListeners === maxListeners case).
-    if (maxListeners !== 0 && set.size >= maxListeners) {
+    if (maxListeners !== 0 && size >= maxListeners) {
       throw new Error(
         `Listener limit (${maxListeners}) reached for "${eventName}"`,
       );
     }
 
-    // Warn at most once per emitter+event. `set.size === warnListeners` can be
-    // re-met by off/on churn around the threshold; the latch keeps the advisory
-    // hint "exactly once" rather than re-firing on every re-crossing. Reset by
-    // clearAll().
+    // Warn at most once per emitter+event, using the PRE-add size. The hook is
+    // invoked first and the latch set only after it returns without throwing, so
+    // a throwing hook fails the registration atomically and leaves the latch
+    // unspent — the next (W+1)th registration warns as documented (#1168). The
+    // latch keeps the advisory hint "exactly once" across off/on churn around
+    // the threshold; reset by clearAll() or by removing the last listener.
     if (
       warnListeners !== 0 &&
-      set.size === warnListeners &&
+      size === warnListeners &&
       this.#onListenerWarn !== null
     ) {
       this.#warnedEvents ??= new Set();
 
       if (!this.#warnedEvents.has(eventName)) {
-        this.#warnedEvents.add(eventName);
         this.#onListenerWarn(eventName, warnListeners);
+        this.#warnedEvents.add(eventName);
       }
+    }
+
+    // Mutate last — create the record only now, so a rejected registration
+    // above never strands an empty record (#1167).
+    let set = existing;
+
+    if (set === undefined) {
+      set = new Set();
+      this.#callbacks.set(eventName, set);
     }
 
     set.add(cb);
@@ -278,20 +297,6 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     }
   }
 
-  /**
-   * Gets or creates a Set for the given event name (lazy initialization).
-   */
-  #getCallbackSet(eventName: string): Set<AnyCallback> {
-    const existing = this.#callbacks.get(eventName);
-
-    if (existing) {
-      return existing;
-    }
-
-    const set = new Set<AnyCallback>();
-
-    this.#callbacks.set(eventName, set);
-
-    return set;
-  }
+  // (record creation is inlined into `on()` so a rejected registration never
+  // creates one — see the atomicity note there, #1167/#1358.)
 }
