@@ -2,7 +2,7 @@
 
 [![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Devent-emitter)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=event-emitter)
 
-> Typed event emitter with listener limits, recursion protection, and per-listener error isolation.
+> Typed event emitter with listener limits, re-entrancy coalescing, and per-listener error isolation.
 
 **Internal package** — consumed by `@real-router/core`. Not published to npm.
 
@@ -41,9 +41,10 @@ emitter.clearAll();
 |--------|-------------|
 | `on(event, callback)` | Add listener, returns unsubscribe. Throws on duplicate |
 | `off(event, callback)` | Remove listener by reference |
-| `emit(event, a?, b?, c?, d?)` | Emit event, up to 4 args |
-| `clearAll()` | Remove all listeners, reset depth tracking |
+| `emit(event, a?, b?, c?, d?)` | Emit event, up to 4 args. Re-entrant same-event emit is coalesced (no-op) |
+| `clearAll()` | Remove all listeners, reset the warn latch |
 | `listenerCount(event)` | Number of listeners for event |
+| `isDispatching(event)` | Whether the event is currently being dispatched (in-flight) |
 | `setLimits(limits)` | Replace limits config |
 
 ### Options
@@ -53,7 +54,6 @@ interface EventEmitterOptions {
   limits?: {
     maxListeners: number;   // 0 = unlimited
     warnListeners: number;  // 0 = no warning
-    maxEventDepth: number;  // 0 = no depth tracking
   };
   onListenerError?: (eventName: string, error: unknown) => void;
   onListenerWarn?: (eventName: string, count: number) => void;
@@ -64,9 +64,9 @@ interface EventEmitterOptions {
 
 - **Zero-alloc emit** — explicit params `(a?, b?, c?, d?)` instead of rest params to avoid V8 array materialization
 - **Single-listener fast path** — skips `[...set]` snapshot when only one listener
-- **Dual-path emit** — fast path without depth tracking when `maxEventDepth === 0`
+- **Re-entrancy coalescing** — a re-entrant emit of the event already being dispatched is a no-op (depth ≤ 1); no depth bound, no stack-overflow path
 - **Switch by argc** — direct calls for 0-4 args, no `Function.prototype.apply`
-- **Null-slot listener array** — reuses slots from unsubscribed listeners
+- **Set-based listeners** — each event's listeners live in a `Set` (O(1) add/remove/has, identity dedup); the empty `Set` is released when the last listener unsubscribes (#750)
 - **Snapshot iteration** — listeners added/removed during emit don't affect current invocation
 - **Per-listener error isolation** — one failing listener doesn't break others
 

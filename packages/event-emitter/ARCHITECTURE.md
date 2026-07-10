@@ -4,7 +4,7 @@
 
 ## Overview
 
-`event-emitter` is an **internal, zero-dependency** package that provides a generic typed event emitter with listener limits, duplicate detection, recursion depth protection, and per-listener error isolation.
+`event-emitter` is an **internal, zero-dependency** package that provides a generic typed event emitter with listener limits, duplicate detection, re-entrancy coalescing, and per-listener error isolation.
 
 **Key role:** All router events (start, stop, transition success/cancel/error) flow through this emitter. `@real-router/core` wraps it in `EventBusNamespace`.
 
@@ -13,7 +13,7 @@
 ```
 event-emitter/
 ├── src/
-│   ├── EventEmitter.ts    — Main class: emit, on, off, depth tracking, limits
+│   ├── EventEmitter.ts    — Main class: emit, on, off, re-entrancy coalescing, limits
 │   ├── types.ts           — EventEmitterLimits, EventEmitterOptions, Unsubscribe
 │   └── index.ts           — Public API exports
 ```
@@ -39,7 +39,7 @@ graph LR
 | --------------------- | -------------------- | ------------------------------------------------ |
 | **EventBusNamespace** | `EventEmitter` class | Router event dispatch (start, stop, transitions) |
 | **EventBusNamespace** | `Unsubscribe` type   | Return type for `addEventListener()`             |
-| **Router options**    | `EventEmitterLimits` | `maxListeners`, `warnListeners`, `maxEventDepth` |
+| **Router options**    | `EventEmitterLimits` | `maxListeners`, `warnListeners`                  |
 
 ## Public API
 
@@ -63,6 +63,7 @@ class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   ): void;
   clearAll(): void;
   listenerCount(eventName: keyof TEventMap & string): number;
+  isDispatching(eventName: keyof TEventMap & string): boolean;
   setLimits(limits: EventEmitterLimits): void;
 
   static validateCallback(
@@ -78,7 +79,6 @@ class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 interface EventEmitterLimits {
   maxListeners: number; // 0 = unlimited
   warnListeners: number; // 0 = no warning
-  maxEventDepth: number; // 0 = no depth tracking
 }
 
 interface EventEmitterOptions {
@@ -99,16 +99,19 @@ class EventEmitter<TEventMap> {
   readonly #callbacks = new Map<string, Set<AnyCallback>>();
   // Event name → Set of listeners. Lazy: Set created on first on() call.
 
-  #depthMap: Map<string, number> | null = null;
-  // Event name → current recursion depth. Null until first emit with depth tracking.
+  readonly #dispatching = new Set<string>();
+  // Event names whose emit() is currently on the stack — the re-entrancy
+  // coalesce guard. A re-entrant emit of a name already here is a no-op, so an
+  // event never re-enters its own dispatch (depth ≤ 1). Each name self-releases
+  // in emit()'s finally, so the Set never outlives its dispatch.
 
   #warnedEvents: Set<string> | null = null;
   // Event names that already fired onListenerWarn. Latches the warning to once
   // per emitter+event. Null until first warn; the entry is released when the
   // event's last listener is removed (off → empty Set) or on clearAll().
 
-  #limits: EventEmitterLimits;
-  // Current limits (mutable via setLimits).
+  #limits: EventEmitterLimits = DEFAULT_LIMITS;
+  // Current limits (mutable via setLimits). Defaults to all-zero (disabled).
 
   readonly #onListenerError:
     | ((eventName: string, error: unknown) => void)
@@ -122,38 +125,52 @@ class EventEmitter<TEventMap> {
 - `Map`: O(1) lookup by event name
 - `Set`: O(1) add/remove/has, automatic deduplication by identity
 
-**Why `#depthMap` is null?**
+**Why `#dispatching` (the coalesce guard)?**
 
-- Lazy initialization — zero allocation if depth tracking never enabled (`maxEventDepth === 0`)
-- Created on first `emit()` via `??=`
-- The per-event entry is **released when recursion unwinds to zero** (the outermost
-  `finally` deletes `{name → 0}` instead of leaving it), so depth-tracked emits on
-  dynamic event names don't accumulate records unbounded (#750)
+- A `Set<string>` of event names whose `emit()` is currently on the stack.
+- `emit()` early-returns if the name is already present (**coalesce**), adds it before
+  running listeners, and deletes it in a `finally`.
+- So an event can never re-enter its own dispatch — recursion is structurally
+  impossible (**depth ≤ 1**), with no depth bound and no stack-overflow path (#1033).
+  The public `isDispatching(name)` reads this Set.
 
-**Record lifecycle (no leak for dynamic names, #750)**
+**Record lifecycle (no leak for dynamic names, #750 / #1033)**
 
-All three per-event maps (`#callbacks`, `#depthMap`, `#warnedEvents`) are released the
-moment a name goes idle — `off()` deletes the `Set` (and warn latch) when its last
-listener is removed, and the depth-tracking `emit()` finally deletes the depth entry
-when it returns to 0. `listenerCount()` reports 0 either way, so the release is only
-observable via heap — covered by `tests/stress/event-emitter.stress.ts`.
+All three per-event records (`#callbacks`, `#warnedEvents`, `#dispatching`) are released
+the moment a name goes idle — `off()` deletes the listener `Set` (and warn latch) when
+its last listener is removed, and `emit()` releases the `#dispatching` entry in its
+`finally` when the dispatch returns (no re-entrancy, so the entry's lifetime is exactly
+one dispatch). `listenerCount()` reports 0 either way, so the release is only observable
+via heap — covered by `tests/stress/event-emitter.stress.ts` (S1 `#callbacks`,
+S2 `#dispatching`, S3 `#warnedEvents`).
 
 ## Core Algorithms
 
-### on() — Listener Registration
+### on() — Listener Registration (atomic: validate before mutate)
+
+`on()` never mutates until every rejection check has passed, so a rejected registration
+(duplicate, limit, or a throwing warn hook) leaves **no orphan record and no burnt latch**
+(#1167 / #1168):
 
 ```typescript
 on(eventName, cb) {
-  const set = this.#getCallbackSet(eventName);   // get or create Set (lazy)
-  if (set.has(cb)) throw new Error("Duplicate"); // duplicate check
-  if (set.size >= maxListeners) throw new Error("Limit reached"); // limit BEFORE warn
-  // Warn once per event (latched), never for a registration that just threw
-  if (set.size === warnListeners && !this.#warnedEvents.has(eventName)) {
-    this.#warnedEvents.add(eventName);
-    onListenerWarn?.(eventName, warnListeners);
+  // Validate-before-mutate — READ the record, do NOT create it yet.
+  const set = this.#callbacks.get(eventName);            // may be undefined
+  if (set?.has(cb)) throw new Error("Duplicate");        // duplicate check
+  const size = set?.size ?? 0;
+  if (size >= maxListeners) throw new Error("Limit reached"); // limit BEFORE warn
+  // Warn once per event (latched): invoke the advisory hook BEFORE any mutation,
+  // and set the latch only AFTER it returns without throwing…
+  if (size === warnListeners && !this.#warnedEvents?.has(eventName)) {
+    onListenerWarn?.(eventName, warnListeners);          // a throw here aborts on()…
+    (this.#warnedEvents ??= new Set()).add(eventName);   // …so the latch is not burnt
   }
-  set.add(cb);
-  return () => this.off(eventName, cb);          // unsubscribe closure
+  // Mutate LAST: create the record (if absent) and add the listener. A rejection
+  // above never allocated a Set nor touched the latch (atomic).
+  const record = set ?? new Set();
+  if (set === undefined) this.#callbacks.set(eventName, record);
+  record.add(cb);
+  return () => this.off(eventName, cb);                  // unsubscribe closure
 }
 ```
 
@@ -173,63 +190,49 @@ off(eventName, cb) {
 }
 ```
 
-### emit() — Dual-Path Dispatch
+### emit() — Single-Path Dispatch (re-entrancy coalescing)
+
+`emit()` is a **single** path — no dual dispatch, no separate depth-tracked branch. It
+coalesces a re-entrant same-event emit, adds the name to `#dispatching`, runs the
+listeners inside `try`, and releases the name in `finally`:
 
 ```
 emit(eventName, a?, b?, c?, d?)
     │
     ├── argc = arguments.length - 1   // O(1) in V8 strict mode
-    │
     ▼
 ┌───────────────┐
 │  Get Set      │  callbacks.get(eventName)
 │  Empty check  │  → !set || size === 0 → return (fast exit)
 └──────┬────────┘
-       │
        ▼
-┌───────────────────────────────────────┐
-│  maxEventDepth === 0?                 │
-│  ├── YES → #emitFast()                │
-│  └── NO  → #emitWithDepthTracking()   │
-└───────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│  Coalesce: #dispatching.has(eventName)?     │
+│  ├── YES → return (re-entrant no-op)        │
+│  └── NO  → #dispatching.add(eventName)      │
+└──────┬──────────────────────────────────────┘
+       ▼
+   dispatch, inside try / finally:
+     • size === 1 → direct call (skip [...set] snapshot)
+     • size  > 1  → iterate a [...set] snapshot
+     • each listener in try/catch → onListenerError
+   finally → #dispatching.delete(eventName)   // self-release
 ```
 
-**Why explicit params instead of `...args`?** V8 always materializes an array for rest parameters, even when empty. With `(a?, b?, c?, d?)`, V8 passes `undefined` — zero allocation. This eliminates one array allocation per `emit()` call (~5ns saved).
+**Why coalesce?** Emitting an event that is already being dispatched (a listener that
+synchronously re-emits the **same** event) is skipped — a no-op. So an event can never
+re-enter its own dispatch, and recursion is structurally impossible (**depth ≤ 1**): no
+depth bound, no `RecursionDepthError`, no stack-overflow path (#1033). The name is added
+to `#dispatching` before listeners run and removed in the `finally`, so it self-releases
+on **both** normal and abnormal exit.
 
-#### Fast Path (#emitFast)
+**Single-listener fast path.** Inside this one path, `set.size === 1` calls the listener
+directly, skipping the `[...set]` snapshot allocation. Single-subscriber events (the
+common router case) get the shortcut on every emit.
 
-No depth tracking, no try/finally overhead:
-
-```typescript
-#emitFast(set, eventName, argc, a, b, c, d) {
-  // Single-listener fast path — no snapshot needed
-  if (set.size === 1) {
-    const [cb] = set;
-    try { this.#callListener(cb, argc, a, b, c, d); }
-    catch (error) { this.#handleListenerError(eventName, error); }
-    return;
-  }
-
-  const listeners = [...set];                    // snapshot — freeze iteration order
-  for (const cb of listeners) {
-    try {
-      this.#callListener(cb, argc, a, b, c, d);
-    } catch (error) {
-      this.#handleListenerError(eventName, error); // re-throw sentinel, else report
-    }
-  }
-}
-```
-
-Both paths route listener errors through the shared `#handleListenerError`, which
-re-throws `RecursionDepthError` and reports everything else to `onListenerError`.
-The fast path historically swallowed the sentinel (it only reported), diverging
-from the depth-tracked path and the "always re-thrown" contract — centralizing the
-handler makes the two paths impossible to diverge again (#751).
-
-#### Depth-Tracked Path (#emitWithDepthTracking)
-
-Same as fast path but with recursion depth check and try/finally. Like `#emitFast`, it **also special-cases a single listener** (`set.size === 1` → direct call, skipping the `[...set]` snapshot) — measured ~10% faster for one listener (audit 2026-06-20 §2.1). The router runs exclusively on this path (`maxEventDepth = 5`), so single-subscriber events get the shortcut on every emit.
+**Why explicit params instead of `...args`?** V8 always materializes an array for rest
+parameters, even when empty. With `(a?, b?, c?, d?)`, V8 passes `undefined` — zero
+allocation. This eliminates one array allocation per `emit()` call (~5ns saved).
 
 ### #callListener() — Argument Dispatch
 
@@ -251,19 +254,19 @@ Direct calls for 0-4 args by `argc` count — monomorphic call sites, V8 optimiz
 
 - Listener **added** during emit → NOT called in current emit
 - Listener **removed** during emit → STILL called (already in snapshot)
-- **Single listener** → no snapshot, direct call from `set` (optimization: avoids array allocation) — on **both** emit paths (`#emitFast` and `#emitWithDepthTracking`)
+- **Single listener** → no snapshot, direct call from `set` (optimization: avoids array allocation) — the single-listener fast path inside the one dispatch path
 
 Standard pattern in event systems (DOM, Node.js EventEmitter).
 
 ## Error Isolation
 
-Three-level error handling:
+Per-listener isolation with one carve-out for a throwing error hook:
 
-| Level                      | Behavior                                                             |
-| -------------------------- | -------------------------------------------------------------------- |
-| Per-listener `try/catch`   | Each listener isolated — one failing doesn't stop others             |
-| `RecursionDepthError`      | Re-thrown (propagates to caller) on **both** emit paths via the shared `#handleListenerError` |
-| `onListenerError` callback | Called for non-recursion errors; if absent, error silently swallowed |
+| Level                          | Behavior                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Per-listener `try/catch`       | Each listener call is isolated — one throwing doesn't stop the others; the error is forwarded to `onListenerError`. There is **no re-thrown sentinel** |
+| `onListenerError` callback     | Called once per listener throw with `(eventName, error)`; if absent, the error is silently swallowed                                                    |
+| `onListenerError` itself throws (#1165) | The throw **propagates and aborts the rest of the snapshot** (subsequent listeners do not run); `emit()`'s `finally` still releases the `#dispatching` guard on this abnormal exit |
 
 ## Limits System
 
@@ -271,12 +274,12 @@ Three-level error handling:
 | --------------- | ------- | ---------- | ----------------------------------- |
 | `maxListeners`  | 0 (off) | Yes        | `on()` throws Error                 |
 | `warnListeners` | 0 (off) | Yes        | `onListenerWarn()` called, no throw |
-| `maxEventDepth` | 0 (off) | Yes        | `emit()` throws RecursionDepthError |
 
-- **0 = disabled** for all limits
+- **0 = disabled** for both limits
 - `maxListeners` checks `set.size >= limit` and throws **before** the warn check — a registration that hits the limit never warns
-- `warnListeners` fires when `set.size === threshold`, latched to **exactly once per emitter+event** (off/on churn does not re-fire; `clearAll()` resets the latch)
-- `maxEventDepth` checks `depth >= limit` before incrementing
+- `warnListeners` fires when `set.size === threshold`, latched to **exactly once per emitter+event** (off/on churn does not re-fire; `clearAll()` resets the latch). The advisory hook runs **before** the latch is set, so a hook that throws aborts `on()` without burning the latch (#1168)
+
+Re-entrancy is **not** a limit — coalescing is the dispatch model (always on), not an opt-in bound. See the **emit() — Single-Path Dispatch** section above.
 
 ## Usage in @real-router/core
 
@@ -316,7 +319,6 @@ createRouter(routes, {
   limits: {
     maxListeners: 10_000, // per event
     warnListeners: 1_000, // warning threshold
-    maxEventDepth: 5, // recursion protection
   },
 });
 ```
@@ -326,10 +328,9 @@ createRouter(routes, {
 | Operation                | Time    | Notes                                |
 | ------------------------ | ------- | ------------------------------------ |
 | `emit()` — no listeners  | ~5.8 ns | Early return, zero work              |
-| `emit()` — 1 listener    | ~30 ns  | Direct call, no snapshot (both emit paths special-case `set.size === 1`) |
+| `emit()` — 1 listener    | ~30 ns  | Direct call, no snapshot (single-listener fast path) |
 | `emit()` — 10 listeners  | ~90 ns  | Linear: ~18 ns + 5.5 ns per listener |
 | `emit()` — 100 listeners | ~565 ns | Same linear scaling                  |
-| Depth tracking overhead  | +3.8 ns | +12.5% per emit                      |
 | `on()` + `off()` cycle   | ~56 ns  | Single listener add/remove           |
 
 **Scaling model:** `emit(3 args, N listeners) ~ 18 ns + 5.5 ns * N`
@@ -338,8 +339,7 @@ createRouter(routes, {
 
 | Allocation          | Size          | When                                  |
 | ------------------- | ------------- | ------------------------------------- |
-| Snapshot `[...set]` | ~8 B/listener | Every emit with 2+ listeners          |
-| `#depthMap`         | ~400 B        | First emit with depth tracking        |
+| Snapshot `[...set]` | ~8 B/listener | Every emit with 2+ listeners (single-listener fast path skips it) |
 | Closure per `on()`  | ~200 B        | Once per subscription                 |
 | `emit()` args       | **0 B**       | Explicit params, no V8 rest-param array |
 
