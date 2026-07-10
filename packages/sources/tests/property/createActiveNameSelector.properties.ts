@@ -1,6 +1,6 @@
 import { fc, test } from "@fast-check/vitest";
 import { createRouter } from "@real-router/core";
-import { describe, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 import {
   arbNavigationSeq,
@@ -419,4 +419,107 @@ describe("createActiveNameSelector — subscription sharing (audit §6 HIGH)", (
       router.stop();
     },
   );
+
+  test.prop(
+    [
+      fc.constantFrom("users.list", "admin.dashboard", "admin.settings"),
+      fc.integer({ min: 2, max: 5 }),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "stale duplicate-callback unsubscribes never orphan a later live subscriber (#1206)",
+    async (name, dupCount) => {
+      const router = await createStartedRouter();
+      const selector = createActiveNameSelector(router);
+
+      // N duplicate subscriptions of ONE callback → N unsubscribe closures over
+      // a single deduped Set (generation 1).
+      const dup = vi.fn();
+      const dupUnsubs = Array.from({ length: dupCount }, () =>
+        selector.subscribe(name, dup),
+      );
+
+      // The first unsubscribe empties the deduped Set → the name is removed from
+      // the map and the router subscription is dropped. The rest are now STALE.
+      dupUnsubs[0]();
+
+      // A distinct live subscriber re-creates the name (generation 2).
+      const live = vi.fn();
+
+      selector.subscribe(name, live);
+
+      // Fire the remaining stale dup unsubscribes — they must NOT touch gen 2.
+      for (let i = 1; i < dupCount; i++) {
+        dupUnsubs[i]();
+      }
+
+      // Flip `name` active; the live subscriber MUST observe it.
+      await router.navigate(name);
+
+      expect(live).toHaveBeenCalled();
+
+      router.stop();
+    },
+  );
+
+  describe("listener exception isolation (#767 / #1208 §4.3)", () => {
+    let previousUncaught: ((error: Error) => void)[];
+
+    beforeEach(() => {
+      // The selector re-throws a listener's exception asynchronously via
+      // queueMicrotask (mirrors BaseSource). Swallow it here so it doesn't fail
+      // the property run through vitest's default uncaughtException handler.
+      previousUncaught = process.listeners("uncaughtException") as ((
+        error: Error,
+      ) => void)[];
+      process.removeAllListeners("uncaughtException");
+      process.on("uncaughtException", () => {
+        /* re-thrown listener error — genuine surfacing is covered by the unit test */
+      });
+    });
+
+    afterEach(() => {
+      process.removeAllListeners("uncaughtException");
+      for (const listener of previousUncaught) {
+        process.on("uncaughtException", listener);
+      }
+    });
+
+    test.prop(
+      [
+        fc.constantFrom("users.list", "admin.dashboard", "admin.settings"),
+        fc.integer({ min: 1, max: 4 }),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "a throwing listener never suppresses notifications to same-name siblings",
+      async (name, throwerCount) => {
+        const router = await createStartedRouter();
+        const selector = createActiveNameSelector(router);
+
+        // K throwing listeners subscribed BEFORE the observer, all on `name`, so
+        // the notify loop reaches the throwers first.
+        for (let i = 0; i < throwerCount; i++) {
+          selector.subscribe(name, () => {
+            throw new Error("boom");
+          });
+        }
+
+        const observer = vi.fn();
+
+        selector.subscribe(name, observer);
+
+        // Flip `name` active. The observer MUST be notified despite the throwers
+        // — per-listener try/catch isolation (removing it fails this property).
+        await router.navigate(name);
+        // Drain the microtask queue so async re-throws land in our handler.
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(observer).toHaveBeenCalled();
+
+        router.stop();
+      },
+    );
+  });
 });
