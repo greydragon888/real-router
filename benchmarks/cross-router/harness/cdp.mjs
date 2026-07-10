@@ -59,7 +59,18 @@ export async function forceGcHeapBytes(client) {
 // `forceGcHeapBytes` (retained heap after GC) — this counts churn, not footprint.
 export async function sampleAllocationBytes(client, fn, samplingInterval = 256) {
   await client.send("HeapProfiler.enable");
-  await client.send("HeapProfiler.startSampling", { samplingInterval });
+  // includeObjectsCollectedBy{Major,Minor}GC (CDP, Chrome M111+) make the
+  // profile count objects the GC already reclaimed during `fn` — i.e. GROSS
+  // churn (garbage included). Without them the sampling profiler drops a sample
+  // when its object is collected, so `stopSampling` returns only objects LIVE at
+  // stop → the sum degrades to ≈ retained growth and silently under-reports
+  // transient allocation (the metric this function promises). Do not remove
+  // them; that reintroduces #1417 (64 B/nav floor-violating numbers).
+  await client.send("HeapProfiler.startSampling", {
+    samplingInterval,
+    includeObjectsCollectedByMajorGC: true,
+    includeObjectsCollectedByMinorGC: true,
+  });
   await fn();
   const { profile } = await client.send("HeapProfiler.stopSampling");
   await client.send("HeapProfiler.disable");
