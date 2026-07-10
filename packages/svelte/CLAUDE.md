@@ -243,6 +243,32 @@ prop changes). To vary behavior over time, read `$state` / `$derived` values
 Same applies to `useRouteEnter`. This contrasts with React/Preact, where
 `useRouteExit` keeps a `handlerRef` that's updated on every render.
 
+### Synchronous `router.navigate()` inside a `useRouteExit` handler throws `REENTRANT_NAVIGATION`
+
+A `useRouteExit` exit handler runs as a transition-event listener — it is
+forwarded into `router.subscribeLeave` with no isolation. Core bans a
+**synchronous** `router.navigate()` (and `navigateToDefault` / `navigateToState`
+/ `navigateToNotFound`) called from inside such a listener: it throws
+`RouterError(REENTRANT_NAVIGATION)` at the facade (#1030–#1035), so a redirect
+written straight into the handler body tears the exit down instead of navigating.
+**Defer it** out of the listener call stack — wrap in `queueMicrotask(...)`, or
+`await` anything first (any `await` / `.then` moves the call off the listener
+stack, where navigation is allowed):
+
+```svelte
+<script lang="ts">
+  useRouteExit(({ nextRoute }) => {
+    if (nextRoute.name === "checkout" && !isAuthed()) {
+      // WRONG — throws REENTRANT_NAVIGATION (synchronous, inside the listener):
+      //   router.navigate("login");
+      queueMicrotask(() => router.navigate("login")); // CORRECT — deferred
+    }
+  });
+</script>
+```
+
+The same ban applies to `useRouteEnter` handlers.
+
 ### getContext Must Be Called During Component Init
 
 `getContext` (and therefore all composables) must be called synchronously during component initialization — not inside event handlers, `$effect`, or async callbacks:
@@ -286,24 +312,26 @@ Files with the `.svelte.ts` extension use Runes (`$state`, `$derived`, `$effect`
 <p>{route.current?.name}</p>
 ```
 
-**Corollary — all readers gone → subscription dropped → stale on re-show.**
+**Corollary — all readers gone → subscription dropped → reconciled on re-show.**
 The laziness cuts both ways. When **every** `.current` reader disappears at once
 — e.g. the whole app sits behind a plain `{#if loggedIn}` login-gate — the last
 subscriber unwinds and the underlying `createRouteSource` disconnects from the
 router. A navigation that happens _while hidden_ (a post-login deep-link
-redirect, a restored route) is missed; when the gate re-opens, the first
-`.current` read replays the **stale** pre-navigation snapshot until the next
-navigation. Unlike React (needs `<Activity>`) or Solid (needs a lifted-source
-composition), Svelte reaches this with an ordinary `{#if}` around the readers —
-the widest reachability in the adapter series, and a realistic auth-flow pattern.
+redirect, a restored route) fires while the source has no readers; when the gate
+re-opens, the first `.current` read re-subscribes and the source **reconciles** —
+`onFirstSubscribe` runs `stabilizeState` against the current router state, catches
+up the missed navigation, and the reader sees the **current** route (not a stale
+pre-navigation snapshot). Unlike React (needs `<Activity>`) or Solid (needs a
+lifted-source composition), Svelte reaches this hide/show cycle with an ordinary
+`{#if}` around the readers — the widest reachability in the adapter series, and a
+realistic auth-flow pattern.
 
-The window stays closed as long as **any** mounted reader is alive (a single
-`RouteView`, a `useRoute()` consumer, or a template `{route.current}` anywhere),
-so it only bites when literally all of them are gated off together. Root cause is
-`@real-router/sources` ([#765](https://github.com/greydragon888/real-router/issues/765)
-— `createRouteSource` doesn't reconcile on re-subscribe); once it lands this
-collapses to "the subscription drops with no readers, and reconcile catches up
-on the next read."
+The subscription simply drops whenever **no** reader is mounted — a single live
+`RouteView`, a `useRoute()` consumer, or a template `{route.current}` anywhere
+keeps it connected. The catch-up on re-show is the `@real-router/sources` #765
+reconcile ([shipped in sources 0.9.0](https://github.com/greydragon888/real-router/issues/765)),
+pinned by `tests/functional/reactive-lifecycle.test.ts:23` (P1: "a {#if}-gated
+route.current reader is fresh after off → navigate → on").
 
 ### Snippet Names Must Be Valid JS Identifiers
 
