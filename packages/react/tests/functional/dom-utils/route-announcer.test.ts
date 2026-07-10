@@ -640,6 +640,54 @@ describe("createRouteAnnouncer", () => {
     r2.stop();
   });
 
+  it("27 — #1217: a stale instance's destroy() does not remove a re-created (newer-generation) element", async () => {
+    const r1 = makeRouter();
+    const r2 = makeRouter();
+    const ann1 = setupAnnouncer(r1);
+    const ann2 = setupAnnouncer(r2);
+
+    await r1.start("/");
+    await r2.start("/");
+
+    const original = getAnnouncerElement();
+
+    // Host wipes the shared element WITHOUT calling either instance's destroy()
+    // — a subtree clear, an HMR swap, a test teardown that resets the DOM.
+    original?.remove();
+
+    expect(getAnnouncerElement()).toBeNull();
+
+    // A fresh provider re-creates the element — a NEW generation.
+    const r3 = makeRouter();
+    const ann3 = setupAnnouncer(r3);
+
+    await r3.start("/");
+
+    const recreated = getAnnouncerElement();
+
+    expect(recreated).not.toBeNull();
+    expect(recreated).not.toBe(original);
+
+    // The stale ann1/ann2 (old generation) tear down. Before #1217 their
+    // destroy() removed the element by selector — deleting `recreated` (the LIVE
+    // generation's element) and driving the ref-count negative. The generation
+    // guard makes them no-ops.
+    ann1.destroy();
+    ann2.destroy();
+
+    expect(getAnnouncerElement()).toBe(recreated);
+    expect(recreated?.isConnected).toBe(true);
+
+    // The live holder still owns teardown: its destroy removes exactly its element.
+    ann3.destroy();
+
+    expect(getAnnouncerElement()).toBeNull();
+
+    r1.stop();
+    r2.stop();
+    r3.stop();
+  });
+
   it("SSR guard — returns a NOOP instance when `document` is undefined", () => {
     const realDocument = globalThis.document;
 

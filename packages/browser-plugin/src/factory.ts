@@ -146,16 +146,29 @@ function createBrowserPlugin(
 
   const pluginBuildUrl = createPluginBuildUrl(router, options.base);
 
+  const replaceHistoryStateImpl = createReplaceHistoryState(
+    api,
+    router,
+    browser,
+    pluginBuildUrl,
+  );
+
   const removeExtensions = api.extendRouter({
     buildUrl: pluginBuildUrl,
     matchUrl: (url: string) =>
       api.matchPath(urlToPath(url, options.base)) ?? undefined,
-    replaceHistoryState: createReplaceHistoryState(
-      api,
-      router,
-      browser,
-      pluginBuildUrl,
-    ),
+    replaceHistoryState: (
+      ...args: Parameters<typeof replaceHistoryStateImpl>
+    ) => {
+      replaceHistoryStateImpl(...args);
+      // #1212: replaceState fires NO hashchange, so the currentHash cache would
+      // stay stale until the next own nav-write — a later preserve-navigate then
+      // wipes the fragment. Re-sync here; this is a COLD path, so the live read
+      // is free (the #1019 cost only bites the hot navigation stream, which
+      // still reads the cache — see the "does not read location.hash on the
+      // per-navigation hot path" test).
+      syncHashFromBrowser();
+    },
   });
 
   const handler = createPopstateHandler({

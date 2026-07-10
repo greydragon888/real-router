@@ -569,6 +569,28 @@ describe("Browser Plugin — URL", () => {
       expect(lastUrl).toContain("#section");
     });
 
+    it("preserves a hash set via replaceHistoryState({ hash }) through a subsequent navigate (#1212)", async () => {
+      await router.start("/home");
+
+      const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
+
+      // The plugin's OWN replaceHistoryState sets a fragment. replaceState fires
+      // NO hashchange, so the currentHash cache is only kept fresh if
+      // replaceHistoryState re-syncs it (#1212 — the sibling replaceState writer
+      // to the nav-write that #1019 already syncs). Without the sync, a later
+      // preserve-navigate reads the stale cache and wipes the fragment.
+      router.replaceHistoryState("home", {}, { hash: "ch1" });
+
+      // A preserve-navigate (opts.hash === undefined) must carry that fragment.
+      await router.navigate("users.list");
+
+      expect(pushStateSpy).toHaveBeenCalled();
+
+      const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
+
+      expect(lastUrl).toContain("#ch1");
+    });
+
     it("does not read location.hash on the per-navigation hot path (#532 perf)", async () => {
       await router.start("/home");
 

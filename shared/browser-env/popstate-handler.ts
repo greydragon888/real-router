@@ -56,12 +56,15 @@ export interface PopstateHandlerDeps {
 function resolveHashOptions(
   deps: PopstateHandlerDeps,
   matchedPath: string,
+  newHash: string | undefined,
 ): { hash?: string; force?: true; hashChange?: true } {
-  if (!deps.getCurrentHash) {
+  // `newHash` is the fragment snapshotted at the event's fire time (#1210), or
+  // `undefined` for plugins without hash support (hash-plugin) — the former
+  // `!deps.getCurrentHash` guard, preserved.
+  if (newHash === undefined) {
     return {};
   }
 
-  const newHash = deps.getCurrentHash();
   const prevHash = deps.getCurrentContextHash
     ? deps.getCurrentContextHash()
     : "";
@@ -84,17 +87,18 @@ export function createPopstateHandler(
   let deferred: {
     evt: PopStateEvent | HashChangeEvent;
     location: string;
+    hash: string | undefined;
   } | null = null;
 
   function processDeferredEvent(): void {
     if (deferred) {
-      const { evt, location } = deferred;
+      const { evt, location, hash } = deferred;
 
       deferred = null;
       console.warn(
         `[${deps.loggerContext}] Processing deferred popstate event`,
       );
-      void onPopState(evt, location);
+      void onPopState(evt, location, hash);
     }
   }
 
@@ -139,12 +143,13 @@ export function createPopstateHandler(
   async function onPopState(
     evt: PopStateEvent | HashChangeEvent,
     location: string,
+    hash: string | undefined,
   ): Promise<void> {
     if (isTransitioning) {
       console.warn(
         `[${deps.loggerContext}] Transition in progress, deferring popstate event`,
       );
-      deferred = { evt, location };
+      deferred = { evt, location, hash };
 
       return;
     }
@@ -161,7 +166,7 @@ export function createPopstateHandler(
         // extracted into resolveHashOptions so this branch stays readable.
         await deps.api.navigateToState(matched, {
           ...deps.transitionOptions,
-          ...resolveHashOptions(deps, matched.path),
+          ...resolveHashOptions(deps, matched.path, hash),
         });
       } else if (deps.allowNotFound) {
         deps.router.navigateToNotFound(location);
@@ -194,10 +199,19 @@ export function createPopstateHandler(
     }
   }
 
-  // Snapshot the location the instant the event fires — before any in-flight
-  // navigation can overwrite it via replaceState (#757).
+  // Snapshot the location AND fragment the instant the event fires — before any
+  // in-flight navigation can overwrite them via replaceState (#757 for the
+  // path/query location; #1210 for the fragment). A deferred replay must resolve
+  // the target the event referred to, not the live URL a since-committed
+  // in-flight navigation rewrote. `getCurrentHash?.()` is undefined for
+  // hash-less plugins (hash-plugin) — resolveHashOptions treats that as "no
+  // hash augmentation", exactly as the old `!deps.getCurrentHash` guard did.
   return (evt: PopStateEvent | HashChangeEvent) =>
-    void onPopState(evt, deps.browser.getLocation());
+    void onPopState(
+      evt,
+      deps.browser.getLocation(),
+      deps.getCurrentHash?.(),
+    );
 }
 
 export interface PopstateLifecycleDeps {

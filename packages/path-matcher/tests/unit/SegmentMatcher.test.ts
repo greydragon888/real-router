@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { buildParamMeta } from "../../src/buildParamMeta";
-import { createSegmentNode } from "../../src/SegmentMatcher";
 import { EMPTY_STATIC_CHILDREN } from "../../src/pathUtils";
+import { createSegmentNode } from "../../src/SegmentMatcher";
 import { createMatcher } from "../helpers/buildTree";
 import { createTestMatcher } from "../helpers/createTestMatcher";
 
