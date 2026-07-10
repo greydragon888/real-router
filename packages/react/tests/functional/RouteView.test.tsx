@@ -310,7 +310,7 @@ describe("RouteView", () => {
       expect(container).toBeEmptyDOMElement();
     });
 
-    it("should use last NotFound when multiple are present", async () => {
+    it("should use the FIRST NotFound when multiple are present (first-wins, symmetric with Self) (#1220)", async () => {
       await notFoundRouter.start("/non-existent-path");
 
       render(
@@ -329,8 +329,11 @@ describe("RouteView", () => {
         </RouterProvider>,
       );
 
-      expect(screen.queryByTestId("first-nf")).not.toBeInTheDocument();
-      expect(screen.getByTestId("last-nf")).toBeInTheDocument();
+      // First-wins: the first <NotFound> renders and subsequent ones are ignored,
+      // symmetric with <Self> (#1220). Before the fix this was last-wins —
+      // recordFallback assigned notFoundChildren without a first-wins guard.
+      expect(screen.getByTestId("first-nf")).toBeInTheDocument();
+      expect(screen.queryByTestId("last-nf")).not.toBeInTheDocument();
     });
 
     it("should work with NotFound only (no Match)", async () => {

@@ -14,6 +14,7 @@ interface FallbackSlots {
   selfFallback: ReactNode | undefined;
   selfFound: boolean;
   notFoundChildren: ReactNode;
+  notFoundFound: boolean;
 }
 
 // Fixed keys used by appendFallback to distinguish the Self / NotFound
@@ -96,7 +97,13 @@ function renderSlotElement(
 
 function recordFallback(child: ReactElement, slots: FallbackSlots): boolean {
   if (child.type === NotFound) {
-    slots.notFoundChildren = (child.props as NotFoundProps).children;
+    // First-wins: subsequent <NotFound> elements are ignored, symmetric with
+    // <Self> below (#1220). Before this guard the assignment was unconditional
+    // (last-wins), contradicting the documented Self-symmetric contract.
+    if (!slots.notFoundFound) {
+      slots.notFoundChildren = (child.props as NotFoundProps).children;
+      slots.notFoundFound = true;
+    }
 
     return true;
   }
@@ -204,6 +211,7 @@ export function buildRenderList(
     selfFallback: undefined,
     selfFound: false,
     notFoundChildren: null,
+    notFoundFound: false,
   };
   // The segment that activated this render, or null. Reported to the caller so
   // RouteView can commit it to the keepAlive Set post-render (#1251) — this pure
