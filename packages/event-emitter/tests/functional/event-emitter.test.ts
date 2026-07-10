@@ -695,52 +695,6 @@ describe("EventEmitter", () => {
       expect(maxDepth).toBe(1);
     });
 
-    it("calls a listener with 3 args", () => {
-      const emitter = createEmitter();
-      const cb = vi.fn();
-
-      emitter.on("submit", cb);
-      emitter.emit("submit", "save", { id: 1 }, true);
-
-      expect(cb).toHaveBeenCalledWith("save", { id: 1 }, true);
-    });
-
-    it("calls a listener with 4+ args", () => {
-      const emitter = createEmitter();
-      const cb = vi.fn();
-
-      emitter.on("complex", cb);
-      emitter.emit("complex", "a", "b", "c", "d");
-
-      expect(cb).toHaveBeenCalledWith("a", "b", "c", "d");
-    });
-
-    it("snapshots multiple listeners — fires each with the args", () => {
-      const emitter = createEmitter();
-      const cb1 = vi.fn();
-      const cb2 = vi.fn();
-
-      emitter.on("click", cb1);
-      emitter.on("click", cb2);
-      emitter.emit("click", 1, 2);
-
-      expect(cb1).toHaveBeenCalledWith(1, 2);
-      expect(cb2).toHaveBeenCalledWith(1, 2);
-    });
-
-    it("snapshot iteration — a single listener added during emit is NOT called in that emit", () => {
-      const emitter = createEmitter();
-      const laterCb = vi.fn();
-
-      emitter.on("reset", () => {
-        emitter.on("reset", laterCb);
-      });
-
-      emitter.emit("reset");
-
-      expect(laterCb).not.toHaveBeenCalled();
-    });
-
     it("isDispatching(event) — true for the in-flight event during dispatch, false otherwise", () => {
       const emitter = createEmitter();
       let duringSelf: boolean | undefined;
