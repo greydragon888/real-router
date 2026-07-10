@@ -77,7 +77,7 @@ src/
   - `#actions` is **hard-capped** at `|states| × |events|` (last-write-wins; unsub `delete`s) → KB-scale, below the heap noise floor → no signal to threshold against.
   - `send` rest-args / `TransitionInfo` are transient → GC-reclaimed (GC-masked, invisible to heap snapshots). That's GC-pressure/throughput — not locked by any local benchmark suite; functional + property tests cover correctness of the affected paths.
   - Synchronous & single-threaded → no async/concurrency race surface.
-  - Contrast: sibling `event-emitter` *does* ship `tests/stress/` because it holds listener **records** needing explicit release (a real leak class, #752); the FSM's `#listeners[index] = null` releases the ref directly, so that surface doesn't exist here. The lone unbounded path is **misuse** — `on(undeclaredFrom, …)` keeps one never-deleted inner Map per distinct undeclared `from` — a guard candidate (à la #754), **not** a stress test.
+  - Contrast: sibling `event-emitter` *does* ship `tests/stress/` because it holds listener **records** needing explicit release (a real leak class, #752); the FSM's `#listeners[index] = null` releases the ref directly, so that surface doesn't exist here. The former lone unbounded path — `on(undeclaredFrom, …)` accumulating one never-deleted inner Map per distinct undeclared `from` — was **closed by #885** (`requireDeclared` in `on()` now throws before registering, consistent with the declared-state guard gotcha above), so even that misuse surface no longer leaks — **not** a stress test.
 
 ## See Also
 

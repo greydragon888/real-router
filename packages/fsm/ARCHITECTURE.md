@@ -99,7 +99,7 @@ class FSM {
   #state: TStates;                                       // Current state
   #currentTransitions: Partial<Record<TEvents, TStates>>; // Cached lookup table
   #listenerCount: number = 0;                            // Fast-path check
-  #actions: Map<string, (payload: unknown) => void> | null = null; // Lazy
+  #actions: Map<TStates, Map<TEvents, (payload: unknown) => void>> | null = null; // Lazy nested map (state → event → action)
   readonly #context: TContext;                            // External mutable object
   readonly #transitions: Record<...>;                    // Full transition table
   readonly #listeners: (TransitionListener | null)[] = []; // Null-slot array
@@ -141,7 +141,7 @@ send(event, ...args) {
 
   // 3. Execute action for specific (from, event) pair
   if (this.#actions !== null) {
-    const action = this.#actions.get(`${from}\0${event}`);
+    const action = this.#actions.get(from)?.get(event); // nested map: from → event
     if (action !== undefined) {
       action(args[0]);
     }
@@ -172,15 +172,31 @@ send(event, ...args) {
 
 ```typescript
 on(from, event, action) {
-  this.#actions ??= new Map();                   // lazy init
-  const key = `${from}\0${event}`;               // null-char separator
-  this.#actions.set(key, action);                 // overwrites existing
-  return () => { this.#actions?.delete(key); };   // unsubscribe
+  requireDeclared(this.#transitions, from, "on"); // #885 — reject undeclared `from`
+  this.#actions ??= new Map();                     // lazy init (outer: state → inner map)
+
+  let stateActions = this.#actions.get(from);      // inner map: event → action
+  if (!stateActions) {
+    stateActions = new Map();
+    this.#actions.set(from, stateActions);
+  }
+
+  const capturedAction = action;
+  stateActions.set(event, capturedAction);         // overwrites existing (last-write-wins)
+
+  return () => {                                    // identity-guarded unsub (#427)
+    const stateMap = this.#actions?.get(from);
+    if (stateMap?.get(event) === capturedAction) { // only delete if still ours
+      stateMap.delete(event);
+    }
+  };
 }
 ```
 
-- **One action per (from, event) pair** — second `on()` overwrites the first
-- **Key format:** `${from}\0${event}` — null character prevents ambiguity (e.g., `"A\0BC"` vs `"AB\0C"`)
+- **Declared-`from` guard (#885):** `on()` starts with `requireDeclared` — an undeclared `from` throws instead of dead-registering an action that could never fire
+- **Nested Map:** `#actions` is `Map<from, Map<event, action>>` — one inner map per source state (replaced the pre-#316 `${from}\0${event}` string key)
+- **One action per (from, event) pair** — second `on()` overwrites the first (last-write-wins)
+- **Identity-guarded unsubscribe (#427):** the returned unsubscribe deletes the entry **only if it is still the action this call registered** (`stateMap?.get(event) === capturedAction`) — a no-op once the pair was overwritten by a later `on()`, matching INVARIANTS "Action #5"
 - **Lazy Map:** `#actions` is `null` until first `on()` call — zero allocation for consumers that don't use actions
 
 ### onTransition() — Listener Registration (Null-Slot Pattern)
