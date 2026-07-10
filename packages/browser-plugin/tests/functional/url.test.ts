@@ -549,6 +549,15 @@ describe("Browser Plugin — URL", () => {
       );
     });
 
+    it("router.buildUrl treats a percent-literal hash strictly — no interior decode (#1211)", () => {
+      // D1=A: `{ hash: "a%20b" }` is the LITERAL fragment `a%20b` (not `a b`), so
+      // the `%` is encoded → `#a%2520b`. Before #1211 normalizeHashInput's second
+      // decode turned it into `a b` → `#a%20b`, splitting the plugin↔adapter policy.
+      expect(router.buildUrl("home", {}, { hash: "a%20b" })).toBe(
+        "/home#a%2520b",
+      );
+    });
+
     it("preserves hash on replaceHistoryState", async () => {
       await router.start("/home");
 

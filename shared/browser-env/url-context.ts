@@ -42,14 +42,20 @@ export function decodeHashFragment(encoded: string): string {
 }
 
 /**
- * Normalize user-provided hash input: strip ALL leading "#" characters, then
- * decode. Defensive against `<Link hash="#section">` — the prop is documented
- * to accept the fragment name without "#", but we accept both gracefully.
+ * Normalize user-provided hash input: strip ALL leading "#" characters. The
+ * prop is documented to accept the fragment name without "#", but we accept a
+ * leading "#" gracefully. Stripping ALL leading "#" (not just one) keeps the
+ * function idempotent on pathological inputs like `"##section"` (accidental
+ * double-hash / concatenation bugs) — `normalize(normalize(x)) === normalize(x)`
+ * (property test G9 in `hash-encoding.properties.ts`).
  *
- * Stripping a single "#" would leave the function non-idempotent on
- * pathological inputs like `"##section"` (caller's accidental double-hash,
- * concatenation bugs). Property test G9 in `hash-encoding.properties.ts`
- * locks in idempotence — `normalize(normalize(x)) === normalize(x)`.
+ * **STRICTLY-DECODED contract (#1211 / D1=A).** The input is treated as an
+ * already-decoded fragment and is NOT decoded here. A second decode corrupted
+ * literal-percent fragments (`"a%20b"` → `"a b"`, redirect URLs / serialized
+ * tokens broken) and split the plugin↔adapter policy: the adapter `<Link>`
+ * encoder (`encodeFragmentInline` in `shared/dom-utils/link-utils.ts`) is now
+ * strict too, so both layers obey one canonical contract. Callers must pass a
+ * DECODED fragment — do NOT pass raw `location.hash` (which is percent-encoded).
  */
 export function normalizeHashInput(input: string): string {
   let stripped = input;
@@ -58,7 +64,7 @@ export function normalizeHashInput(input: string): string {
     stripped = stripped.slice(1);
   }
 
-  return decodeHashFragment(stripped);
+  return stripped;
 }
 
 /**

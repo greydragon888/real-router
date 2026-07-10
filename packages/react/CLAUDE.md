@@ -482,6 +482,8 @@ etc.) are NOT compared — they don't affect Link's hooks.
 - `""` — clears the hash.
 - `"value"` — sets the hash; click routes through `navigateWithHash`, which auto-adds `force: true, hashChange: true` when the requested hash differs from `state.context.url.hash` on the same route+params (bypasses core's `SAME_STATES`).
 
+**Strictly-decoded (#1211).** The value is a DECODED fragment, encoded verbatim (`encodeURI(s).replace(/#/g, "%23")`) at the URL boundary. Do NOT pass raw `location.hash` (which is percent-encoded) — `hash="a%20b"` is the literal fragment `a%20b` and renders `#a%2520b`, not `#a%20b`. Pass `hash="a b"` for the fragment `a b`. (Before #1211 the plugin double-decoded and the adapter probe-re-encoded, so raw `location.hash` round-tripped — that tolerance is removed; both layers now obey the one strict contract.)
+
 Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected — sibling tab Links (same `routeName`, different `hash`) light up independently. Hash-plugin runtime always returns `false` for hash-aware active checks (consistent with the documented hash-plugin limitation).
 
 ### activeStrict Meaning
