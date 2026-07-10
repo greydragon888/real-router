@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  CONSTRAINT_BODY_PATTERN,
-  isConstraintBalanced,
-} from "../../src/constraint-grammar";
+import { CONSTRAINT_BODY_PATTERN, isConstraintBalanced } from "path-matcher";
 
 describe("constraint-grammar (#804)", () => {
   describe("CONSTRAINT_BODY_PATTERN", () => {

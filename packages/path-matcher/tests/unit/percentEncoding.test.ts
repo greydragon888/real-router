@@ -3,16 +3,21 @@ import { describe, expect, it } from "vitest";
 import { validatePercentEncoding } from "../../src/percentEncoding";
 
 /**
- * `validatePercentEncoding` is a pure `string -> boolean` predicate (its full
- * contract is its return value), and `isHexCodePoint` is its only-internal
- * helper — so these assertions exercise both through the single public entry,
- * matching the direct-`src` convention already used by `encoding.test.ts`.
+ * KEEP-narrow white-box exception (allowlisted in packages/path-matcher/eslint.config.mjs).
  *
- * The boundary cases are chosen to discriminate the exact hex-range comparisons
- * in `isHexCodePoint` (`0x30-0x39`, `0x41-0x46`, `0x61-0x66`): each invalid
- * input picks a code point that lands in a *gap* a mutated comparison would
- * wrongly admit, and each upper-bound input ('F'/'f') is the exact `<=` edge a
- * `<` mutation would drop.
+ * `validatePercentEncoding` is a fast-reject OPTIMISATION, fully backstopped by
+ * `SegmentMatcher.#decodeParams`'s decode try/catch (`SegmentMatcher.ts:716`, documented
+ * there): every malformed `%XX` it rejects, `decodeURIComponent` also throws on — so
+ * `match()` rejects the value whether the fast predicate or the decode catches it. Its
+ * accept/reject VERDICT is therefore publicly INDISTINGUISHABLE (a match-based test would
+ * exercise the decode backstop, not this function, and could not tell the hex-boundary
+ * contract apart), while the module is already 100% covered through the public match path.
+ * Direct testing is the only honest way to pin this optimisation's mutation-critical hex
+ * ranges — hence the exception.
+ *
+ * The boundary cases discriminate the exact hex-range comparisons in `isHexCodePoint`
+ * (`0x30-0x39`, `0x41-0x46`, `0x61-0x66`): each invalid input lands in a *gap* a mutated
+ * comparison would admit, and each 'F'/'f' input is the `<=` edge a `<` mutation drops.
  */
 describe("validatePercentEncoding", () => {
   it("accepts a string with no percent sequences", () => {

@@ -52,13 +52,13 @@ describe("Encoding Properties", () => {
     );
   });
 
-  describe("splat roundtrip — decode(encodeParam(v, enc, true)) === v", () => {
+  describe("splat roundtrip — decode(encodeParam(v, enc)) === v", () => {
     test.prop([arbEncoding, arbEncodableSplatValue], {
       numRuns: NUM_RUNS.thorough,
     })(
       "splat encode+decode restores the value and actually encodes each segment",
       (enc: URLParamsEncodingType, v: string) => {
-        const encoded = encodeParam(v, enc, true);
+        const encoded = encodeParam(v, enc);
 
         // roundtrip (catches a wrong/over-decode)
         expect(DECODING_METHODS[enc](encoded)).toBe(v);
@@ -75,9 +75,9 @@ describe("Encoding Properties", () => {
     test.prop([arbEncoding, arbSplatValue], {
       numRuns: NUM_RUNS.thorough,
     })(
-      "encodeParam(v, enc, true) has the same number of '/' as original v",
+      "encodeParam(v, enc) has the same number of '/' as original v",
       (enc: URLParamsEncodingType, v: string) => {
-        const encoded = encodeParam(v, enc, true);
+        const encoded = encodeParam(v, enc);
         const originalCount = (v.match(/\//g) ?? []).length;
         const encodedCount = (encoded.match(/\//g) ?? []).length;
 
@@ -142,9 +142,9 @@ describe("Encoding Properties", () => {
     test.prop([arbEncoding, arbEncodableValue], {
       numRuns: NUM_RUNS.thorough,
     })(
-      "encodeParam(v, enc, true) === ENCODING_METHODS[enc](v) when v has no slashes",
+      "encodeParam(v, enc) === ENCODING_METHODS[enc](v) when v has no slashes",
       (enc: URLParamsEncodingType, v: string) => {
-        const splatEncoded = encodeParam(v, enc, true);
+        const splatEncoded = encodeParam(v, enc);
         const directEncoded = ENCODING_METHODS[enc](v);
 
         expect(splatEncoded).toBe(directEncoded);
