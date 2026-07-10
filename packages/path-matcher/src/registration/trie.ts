@@ -2,7 +2,11 @@
 // insertion, per-segment `processSegment`, and the `walkTrie` lookups. Builds the
 // segment trie from the node builders in `./trieNodes`.
 
-import { createSegmentNode, normalizeTrailingSlash } from "../pathUtils";
+import {
+  createSegmentNode,
+  EMPTY_STATIC_CHILDREN,
+  normalizeTrailingSlash,
+} from "../pathUtils";
 import {
   throwDuplicateRoutePath,
   throwNonAsciiStatic,
@@ -305,6 +309,11 @@ function processSegment(
   const key = state.options.caseSensitive ? segment : segment.toLowerCase();
 
   if (!(key in node.staticChildren)) {
+    // Copy-on-write off the shared frozen EMPTY_STATIC_CHILDREN sentinel: the
+    // first static child this node gains earns it a fresh mutable null-proto map.
+    if (node.staticChildren === EMPTY_STATIC_CHILDREN) {
+      node.staticChildren = Object.create(null) as Record<string, SegmentNode>;
+    }
     node.staticChildren[key] = createSegmentNode();
     node.hasChildren = true;
   }
