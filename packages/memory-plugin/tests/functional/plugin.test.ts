@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { memoryPluginFactory } from "@real-router/memory-plugin";
@@ -1032,5 +1033,100 @@ describe("Memory plugin", () => {
       expect(restored?.transition).toBeDefined();
       expect(restored?.context).toBeDefined();
     });
+  });
+});
+
+describe("async-guard back() + concurrent navigate() — stack integrity (#1234)", () => {
+  // Residual of #807: #807 fixed the SYNC race (back(); navigate() same tick),
+  // but an ASYNC canActivate on the back() target keeps the restore
+  // navigateToState in flight. A concurrent navigate() cancels the back and
+  // commits synchronously — its onTransitionSuccess is the first after the flag
+  // was set, so the timing-based consumption steals the flag and records the
+  // forward navigate as a phantom history-restore (no push, direction "back",
+  // historyIndex 1). The flag must be attributed by IDENTITY (source), not timing.
+  it("records the concurrent navigate as a forward push, not a phantom history-restore", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "users", path: "/users" },
+      { name: "settings", path: "/settings" },
+      { name: "profile", path: "/profile" },
+    ]);
+
+    r.usePlugin(memoryPluginFactory());
+    await r.start("/");
+    await r.navigate("users");
+    await r.navigate("settings"); // [home, users, settings] idx 2
+
+    // async canActivate on the back() target → navigateToState stays in flight
+    getLifecycleApi(r).addActivateGuard(
+      "users",
+      () => () =>
+        new Promise((resolve) =>
+          setTimeout(() => {
+            resolve(true);
+          }, 20),
+        ),
+    );
+
+    (r as Router & { back: () => void }).back(); // #go(-1) → users, in flight
+    await r.navigate("profile").catch(() => {}); // cancels back, commits sync
+
+    const state = r.getState();
+
+    expect(state?.name).toBe("profile");
+
+    const mem = (
+      state?.context as
+        { memory?: { direction: string; historyIndex: number } } | undefined
+    )?.memory;
+
+    // The forward navigate must be recorded as a navigate, not the cancelled
+    // back's phantom restore.
+    expect(mem?.direction).toBe("navigate");
+    expect(mem?.historyIndex).toBe(2);
+  });
+
+  it("deep go(-2) with the same race keeps #index in bounds — the optimistic-index sibling", async () => {
+    const r = createRouter([
+      { name: "home", path: "/" },
+      { name: "users", path: "/users" },
+      { name: "settings", path: "/settings" },
+      { name: "profile", path: "/profile" },
+      { name: "dashboard", path: "/dashboard" },
+    ]);
+
+    r.usePlugin(memoryPluginFactory());
+    await r.start("/");
+    await r.navigate("users");
+    await r.navigate("settings");
+    await r.navigate("profile"); // [home, users, settings, profile] idx 3
+
+    getLifecycleApi(r).addActivateGuard(
+      "users",
+      () => () =>
+        new Promise((resolve) =>
+          setTimeout(() => {
+            resolve(true);
+          }, 20),
+        ),
+    );
+
+    (r as Router & { go: (delta: number) => void }).go(-2); // → users, in flight
+    await r.navigate("dashboard").catch(() => {}); // cancels the #go, commits sync
+
+    const state = r.getState();
+
+    expect(state?.name).toBe("dashboard");
+
+    const mem = (
+      state?.context as
+        { memory?: { direction: string; historyIndex: number } } | undefined
+    )?.memory;
+
+    expect(mem?.direction).toBe("navigate");
+    // The cancelled #go's .catch reverts #index ONLY if still ours; the
+    // concurrent push already re-based it, so it stays 2 (in bounds), not
+    // previousIndex 3 (which would be out of bounds).
+    expect(mem?.historyIndex).toBe(2);
   });
 });

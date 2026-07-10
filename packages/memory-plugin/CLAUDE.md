@@ -46,9 +46,17 @@ These methods return `void`, not `Promise`. They call `getPluginApi(router).navi
 
 A `#goGeneration` counter protects against superseded reverts: if a second `#go()` runs before the first settles, the first reject handler finds a mismatch and skips the revert — so the second call's optimistic target wins.
 
-### `navigatingFromHistory` flag prevents double-recording
+The `.catch()` reverts `#index` **only when it is still the optimistic target** (`#index === targetIndex`). A concurrent `navigate()` that cancelled a deep `go(-N)` has already re-based `#index` via its own push, so a blind revert to `previousIndex` would push it out of bounds ([#1234]) — the identity check keeps the stack in bounds. Same principle as the `navigatingFromHistory` flag below: act on settle only if the state is still ours.
 
-When `back()`/`forward()`/`go()` navigate, `onTransitionSuccess` skips pushing a new entry because `#navigatingFromHistory` is `true`. The flag is **consumed in `onTransitionSuccess` the moment the restore commit is observed** — not in a later microtask. Core commits `navigateToState` synchronously (optimistic-sync), so resetting only in the `.then`/`.catch` settler left a window where a `navigate()` fired in the **same tick** as `back()` saw the stale flag and was swallowed as a phantom history-restore (no push, stale `direction`/`historyIndex`, orphan forward leg) — [#807]. A guard-blocked or rejected replay never reaches `onTransitionSuccess`, so the `.catch()` handler clears the flag (and reverts `#index`) instead, gated by the `#goGeneration` guard so an older superseded `#go` no-ops on settle.
+[#1234]: https://github.com/greydragon888/real-router/issues/1234
+
+### `navigatingFromHistory` flag prevents double-recording — consumed by identity, not timing
+
+When `back()`/`forward()`/`go()` navigate, `onTransitionSuccess` skips pushing a new entry because `#navigatingFromHistory` is `true`. The restore navigation is tagged `source: MEMORY_RESTORE` (the same `source` convention the browser/hash URL plugins use), and the flag is consumed **only when the committing navigation carries that tag** — attributing it to the navigation that set it, by **identity**, not by timing.
+
+This closes two faces of one root. #807 first moved the reset off a microtask into `onTransitionSuccess` (core commits `navigateToState` synchronously, so a `navigate()` fired in the **same tick** as `back()` otherwise saw the stale flag and was swallowed as a phantom history-restore — no push, stale `direction`/`historyIndex`, orphan forward leg). But timing-based consumption ("the first commit after the flag was set") still mis-fired when an async `canActivate` on the back target kept the restore in flight and a concurrent `navigate()` committed first — [#1234]. The `source` tag fixes both: a foreign commit falls through to the normal push branch; only the plugin's own tagged restore consumes the flag.
+
+A guard-blocked, rejected, or cancelled replay never consumes the flag in `onTransitionSuccess`, so the `.catch()` handler clears it (gated by the `#goGeneration` guard so an older superseded `#go` no-ops on settle). See the `#index` gotcha above for how the same `.catch()` reverts the optimistic index by the same identity check.
 
 [#807]: https://github.com/greydragon888/real-router/issues/807
 
