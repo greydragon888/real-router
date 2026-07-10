@@ -182,8 +182,13 @@ describe("S2: Source creation storm + memory", () => {
     // Throughput / stability guard. Each cycle's sources are destroyed and
     // dropped, and the per-cycle counts are small, so the spread across the 4
     // sampled snapshots reflects GC jitter rather than a per-op leak (mostly
-    // cached node/active sources whose destroy is a no-op anyway). Healthy
-    // spread ≈ 0.04 MB; threshold 0.5 MB sits well above run-to-run noise.
-    expect(maxHeap - minHeap).toBeLessThan(MB / 2);
+    // cached node/active sources whose destroy is a no-op anyway). This is a
+    // NOISE ceiling, not a per-op leak detector (create→destroy is GC-masked).
+    // Healthy spread ≈ 0.04 MB isolated, but under the pre-push's concurrent
+    // turbo build (many stress/property suites in parallel) GC/CPU contention
+    // inflates `heapUsed` jitter to ~0.5 MB — so the ceiling is 1 MB (~2× the
+    // measured loaded-worst-case, still ~25× the isolated healthy). A real
+    // monotonic leak over 100 cycles would be MBs, well above this.
+    expect(maxHeap - minHeap).toBeLessThan(MB);
   });
 });
