@@ -31,14 +31,19 @@ export default [
   // every `src/*` import (and the dead code it may hide) is the whole point.
   {
     files: ["tests/unit/**/*.test.ts"],
-    // TODO(whitebox-migration): these three still import internal `src/*` and are
-    // temporarily exempt — migrate each to the public API (like `parseSegment` /
-    // `buildParamMeta` / `constraint-grammar`, already done) then delete it here.
-    //   SegmentMatcher: `createSegmentNode` + `EMPTY_STATIC_CHILDREN` fixtures;
-    //   encoding / percentEncoding: internal encoder / percent-validation helpers.
+    // KEEP-narrow white-box exceptions (the allowlist). Every OTHER unit test exercises
+    // the public API; these two legitimately cannot, and each documents WHY in its header:
+    //   - createSegmentNode.test.ts — internal trie-node MEMORY / hidden-class invariants
+    //     (#1009 / #1379) a consumer never observes (behaviour is covered publicly in
+    //     SegmentMatcher.test.ts via registerTree + match);
+    //   - percentEncoding.test.ts — a fast-reject OPTIMISATION fully backstopped by the
+    //     decode try/catch (SegmentMatcher.ts:716), so its accept/reject verdict is
+    //     publicly indistinguishable (a match-based test would exercise the decode
+    //     backstop, not the predicate).
+    // buildParamMeta / constraint-grammar / parseSegment / encoding / SegmentMatcher were
+    // all migrated to the public API and are deliberately NOT here.
     ignores: [
-      "tests/unit/SegmentMatcher.test.ts",
-      "tests/unit/encoding.test.ts",
+      "tests/unit/createSegmentNode.test.ts",
       "tests/unit/percentEncoding.test.ts",
     ],
     rules: {

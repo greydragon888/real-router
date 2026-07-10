@@ -142,6 +142,12 @@ export const DECODING_METHODS: Record<
   default: decodeURIComponent,
   uri: decodeURI,
   uriComponent: decodeURIComponent,
+  // `none` decoding is never reached through `match`: `SegmentMatcher` special-cases
+  // `urlParamsEncoding === "none"` to `#decode = null` and skips `#decodeParams`
+  // entirely (so a "none" route also skips %-validation — a deliberate behaviour, not
+  // merely perf). This identity entry exists only for `Record` type completeness and is
+  // exercised by the exempt `tests/property/encoding.properties.ts` round-trip.
+  /* v8 ignore next -- unreachable via match (none → null); see the comment above */
   none: (val) => val,
 };
 
@@ -150,38 +156,32 @@ export const DECODING_METHODS: Record<
 // =============================================================================
 
 /**
- * Encodes a URL parameter value using the specified encoding strategy.
+ * Encodes a SPLAT URL parameter value: each `/`-delimited segment is encoded with the
+ * strategy's encoder, preserving the `/` separators.
  *
- * For splat parameters (*path), encodes each path segment separately
- * while preserving "/" characters.
+ * Splat-only by design (#860): a NON-splat param is encoded by `ENCODING_METHODS[encoding]`
+ * directly — `registration/buildParts.ts`'s `makeBuildParamSlot` routes only SPLAT slots
+ * through here — so the former `!isSpatParam` fast path was unreachable dead code (surfaced
+ * by the public-API test migration) and was dropped.
  *
- * @param param - The parameter value to encode
+ * @param param - The splat parameter value to encode
  * @param encoding - The encoding strategy to use
- * @param isSpatParam - Whether this is a splat parameter
- * @returns The encoded parameter string
+ * @returns The encoded splat value (each segment encoded, `/` preserved)
  *
  * @example
  * ```typescript
- * encodeParam('hello world', 'default', false);
- * // => 'hello%20world'
- *
- * encodeParam('docs/readme.md', 'default', true);
- * // => 'docs/readme.md' (splat preserves slashes)
+ * encodeParam('docs/readme.md', 'default');   // => 'docs/readme.md'
+ * encodeParam('a/hello world', 'default');    // => 'a/hello%20world'
  * ```
  */
 export const encodeParam = (
   param: string | number | boolean,
   encoding: URLParamsEncodingType,
-  isSpatParam: boolean,
 ): string => {
   const encoder = ENCODING_METHODS[encoding];
   const str = String(param);
 
-  if (!isSpatParam) {
-    return encoder(str);
-  }
-
-  // Splat params: encode each segment separately, preserving "/"
+  // Encode each "/"-segment separately, preserving the separators.
   // H6 optimization: string concatenation is 2x faster than template literals
   const segments = str.split("/");
   let result = encoder(segments[0]);
