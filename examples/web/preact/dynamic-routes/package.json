@@ -15,7 +15,7 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@real-router/preact": "workspace:^",
-    "preact": "10.29.4"
+    "preact": "10.29.7"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
