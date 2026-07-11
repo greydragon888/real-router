@@ -308,18 +308,46 @@ class Logger {
     // from breaking the logger or causing cascading failures
     this.#inCallback = true;
     try {
-      this.#config.callback(level, context, message, ...args);
-    } catch (error) {
-      // Fallback error reporting if callback throws
-      // Use console.error directly (don't call logger to avoid infinite loops)
+      // An async callback (`(...) => Promise<void>` is assignable to the
+      // void-typed LogCallback) returns a Promise whose rejection would otherwise
+      // leak as a Node `unhandledRejection` — process-fatal under
+      // `--unhandled-rejections=strict` (Node 22+ default). Read the runtime
+      // return and isolate it like core's subscribe (#944): duck-check the
+      // thenable + `.catch` into the same console.error sink a sync throw uses
+      // (#1161).
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- read the runtime Promise of a void-typed async callback (#1161)
+      const result: unknown = this.#config.callback(
+        level,
+        context,
+        message,
+        ...args,
+      );
+
       if (
-        typeof console !== "undefined" &&
-        typeof console.error === "function"
+        result !== null &&
+        result !== undefined &&
+        typeof (result as PromiseLike<unknown>).then === "function"
       ) {
-        console.error("[Logger] Error in callback:", error);
+        Promise.resolve(result as PromiseLike<unknown>).catch(
+          (error: unknown) => {
+            this.#reportError("[Logger] Error in async callback:", error);
+          },
+        );
       }
+    } catch (error) {
+      // Fallback error reporting if the callback throws synchronously
+      this.#reportError("[Logger] Error in callback:", error);
     } finally {
       this.#inCallback = false;
+    }
+  }
+
+  // Report a callback error via console.error directly — never call the logger
+  // (would recurse). Shared by the sync-throw catch and the async-rejection
+  // `.catch` (#1161). Console-safety guard mirrors #writeToConsole.
+  #reportError(message: string, error: unknown): void {
+    if (typeof console !== "undefined" && typeof console.error === "function") {
+      console.error(message, error);
     }
   }
 }

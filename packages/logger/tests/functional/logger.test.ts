@@ -483,6 +483,41 @@ describe("Logger", () => {
 
       expect(console.warn).toHaveBeenCalledWith("[Router] Warning");
     });
+
+    it("isolates an async callback rejection instead of leaking a Node unhandledRejection (#1161)", async () => {
+      // An async callback (`(...) => Promise<void>` is assignable to the void-typed
+      // LogCallback) returns a Promise; before the fix its rejection was discarded
+      // and surfaced as a Node `unhandledRejection` — process-fatal under
+      // `--unhandled-rejections=strict` (Node 22+ default). It must be isolated
+      // into console.error like core's subscribe (#944 → #1161).
+      const leaked: unknown[] = [];
+      const onUnhandled = (reason: unknown): void => {
+        leaked.push(reason);
+      };
+
+      process.on("unhandledRejection", onUnhandled);
+
+      try {
+        logger.configure({
+          // eslint-disable-next-line @typescript-eslint/no-misused-promises -- #1161: a Promise-returning callback IS assignable to the void-typed LogCallback; that assignability is exactly the misuse under test
+          callback: () => Promise.reject(new Error("async boom")),
+        });
+
+        expect(() => {
+          logger.error("Router", "Test");
+        }).not.toThrow();
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(console.error).toHaveBeenCalledWith(
+          "[Logger] Error in async callback:",
+          expect.any(Error),
+        );
+        expect(leaked).toHaveLength(0);
+      } finally {
+        process.off("unhandledRejection", onUnhandled);
+      }
+    });
   });
 
   describe("console fallback", () => {
