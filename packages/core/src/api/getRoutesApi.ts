@@ -580,7 +580,10 @@ function replaceRoutes<
 function removeRoute<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>, name: string): boolean {
-  const wasRemoved = removeFromDefinitions(store.definitions, name);
+  // `store.definitions` is a fresh tree-derived snapshot — mutate it locally,
+  // then commit the mutated table as the new tree.
+  const definitions = store.definitions;
+  const wasRemoved = removeFromDefinitions(definitions, name);
 
   if (!wasRemoved) {
     return false;
@@ -594,7 +597,7 @@ function removeRoute<
     store.lifecycleNamespace!,
   );
 
-  commitTreeChanges(store);
+  commitTreeChanges(store, definitions);
 
   return true;
 }
