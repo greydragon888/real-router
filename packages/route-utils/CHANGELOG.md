@@ -1,5 +1,13 @@
 # @real-router/route-utils
 
+## 0.2.8
+
+### Patch Changes
+
+- [#1433](https://github.com/greydragon888/real-router/pull/1433) [`85b31d3`](https://github.com/greydragon888/real-router/commit/85b31d3a95badbc968164a5aeb1e95a7b667ba22) Thanks [@greydragon888](https://github.com/greydragon888)! - Segment testers match via flat string comparisons — no RegExp engine ([#1432](https://github.com/greydragon888/real-router/issues/1432))
+
+  `startsWithSegment` / `endsWithSegment` / `includesSegment` no longer build and execute cached RegExps: matching reduces to prefix/suffix/occurrence checks with a dot-or-edge boundary, exactly equivalent to the historical patterns (property-locked against an inline regex reference). Validation is unchanged and still once-per-segment. Cuts the cold-path cost every adapter's `RouteView` pays per navigation — react deep-config@90: **−31 % totalMs** (conservative ABAB browser A/B).
+
 ## 0.2.7
 
 ### Patch Changes
