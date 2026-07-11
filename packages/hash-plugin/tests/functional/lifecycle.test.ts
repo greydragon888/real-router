@@ -317,6 +317,24 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       expect(url).not.toContain("users/list");
       expect(url.split("#")).toHaveLength(2);
     });
+
+    it("warns once and ignores { hash } instead of splicing a fragment (#1230)", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      router.replaceHistoryState("home", {}, { hash: "x" });
+
+      // `#` is the route delimiter here — { hash } must be dropped, not spliced
+      // as "#x" (which the shared explicit-hash branch would otherwise do). Same
+      // warn+ignore contract buildUrl/navigate already honor.
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "home" }),
+        "#/home",
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      warnSpy.mockRestore();
+    });
   });
 
   describe("Plugin Lifecycle", () => {

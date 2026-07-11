@@ -269,14 +269,18 @@ export function createPopstateLifecycle(
  * full navigation, and `hashchange` would be noise.
  *
  * Dedup: a hash-changing history traversal fires the `popstate`+`hashchange`
- * pair synchronously (one browser task). Handling both double-navigates, so the
+ * pair in ONE browser task — but a microtask checkpoint runs BETWEEN the two
+ * listeners (Chromium order: `[popstate, microtask, hashchange, macrotask]`), so
+ * the second still lands in the same task. Handling both double-navigates, so the
  * second of the pair is dropped. The two `saw*` flags are **type-scoped** and
  * **order-independent** — whichever of the pair arrives first is handled and
  * blocks the other, no matter which the browser fires first. They reset on a
- * microtask, so the guard spans only the synchronous pair: distinct user
- * gestures land in separate tasks and are never coalesced, and same-type bursts
- * (two rapid `popstate`s → the deferred-event path) are unaffected because a
- * `popstate` only blocks a following `hashchange`, never another `popstate`.
+ * **macrotask** (`setTimeout 0`), which fires AFTER the pair completes (never on
+ * the microtask checkpoint mid-pair — that was #1228): the guard spans the whole
+ * pair, distinct user gestures land in later macrotasks and are never coalesced,
+ * and same-type bursts (two rapid `popstate`s → the deferred-event path) are
+ * unaffected because a `popstate` only blocks a following `hashchange`, never
+ * another `popstate`.
  *
  * Both listeners are stored under the single `shared.removePopStateListener`
  * slot as a combined remover, preserving the factory-pool last-wins cleanup
@@ -289,17 +293,25 @@ export function createHashSyncLifecycle(
   let sawHashchange = false;
   let resetScheduled = false;
 
+  // Reset on a MACROTASK, not a microtask (#1228). The pair fires in one browser
+  // task, but a microtask checkpoint runs BETWEEN the two listeners — verified in
+  // Chromium the order is [popstate, microtask, hashchange, macrotask]. A
+  // queueMicrotask reset therefore cleared the flags before the pair's second
+  // event, which then double-navigated → a phantom SAME_STATES on every hash
+  // back/forward. A setTimeout(0) reset fires AFTER the pair completes (same
+  // task, verified), so the guard spans the whole pair; distinct gestures land in
+  // later macrotasks and are never coalesced.
   const scheduleReset = (): void => {
     if (resetScheduled) {
       return;
     }
 
     resetScheduled = true;
-    queueMicrotask(() => {
+    setTimeout(() => {
       sawPopstate = false;
       sawHashchange = false;
       resetScheduled = false;
-    });
+    }, 0);
   };
 
   const onPopstate = (evt: PopStateEvent): void => {

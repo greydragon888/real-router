@@ -129,10 +129,11 @@ export function createReplaceHistoryState(
       hashSegment = "";
     }
 
-    // Pass hash through buildUrl when the plugin understands it (avoids
-    // double-append). Hash-plugin's buildUrl ignores the option and warns,
-    // so call without options here for semantic clarity — but the result is
-    // identical because hashSegment is "" in that branch (preserveHash=false).
+    // The fragment is appended separately as `+ hashSegment`; buildUrlFn is
+    // always called without options. For browser/navigation-plugin hashSegment
+    // carries the explicit or preserved fragment; for hash-plugin it is always
+    // "" (preserveHash=false), and the plugin strips { hash } before this runs
+    // (#1230), so no stray fragment is spliced into a hash-route URL.
     const url = buildUrlFn(name, params) + hashSegment;
 
     buffer.name = builtState.name;
