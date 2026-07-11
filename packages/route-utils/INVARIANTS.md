@@ -50,8 +50,17 @@
 | 1   | Character pattern partition | Segments matching `SAFE_SEGMENT_PATTERN` (`/^[\w.-]+$/`) are accepted without throwing. Segments containing any other character throw `TypeError`. All three testers enforce the same validation. |
 | 2   | Length partition            | Segments with length ≤ `MAX_SEGMENT_LENGTH` (10,000) are accepted. Segments exceeding the limit throw `RangeError`. All three testers enforce the same length validation.                         |
 
+## Implementation Equivalence
+
+| #   | Invariant                        | Description                                                                                                                                                                                                                                                                                            |
+| --- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Flat ≡ reference regex semantics | Each tester's flat string-comparison implementation returns exactly what the historical cached-RegExp form (`^seg(?:\.|$)`, `(?:^|\.)seg$`, `(?:^|\.)seg(?:\.|$)` over the escaped segment) returns, for any route name (incl. arbitrary unicode) and any `SAFE_SEGMENT_PATTERN`-valid segment — dots/dashes in any position. |
+| 2   | Curried form preserved           | The curried form equals both the direct form and the regex reference (Inv 5 restated against the reference).                                                                                                                                                                                            |
+| 3   | Throw parity, validation uncached for invalid input | An invalid-character segment throws `TypeError` on EVERY call (never enters the validated-segments cache); an over-length segment throws `RangeError` — same classes and trigger points as the regex-cache implementation.                                                                  |
+
 ## Test Files
 
-| File                                      | Invariants | Category                                                    |
-| ----------------------------------------- | ---------- | ----------------------------------------------------------- |
-| `tests/property/routeUtils.properties.ts` | 21         | Segment testers, route relation, isDescendantOf, validation |
+| File                                                          | Invariants | Category                                                    |
+| ------------------------------------------------------------- | ---------- | ----------------------------------------------------------- |
+| `tests/property/routeUtils.properties.ts`                     | 21         | Segment testers, route relation, isDescendantOf, validation |
+| `tests/property/segmentTesters.regex-equivalence.properties.ts` | 3          | Implementation equivalence (flat ≡ reference regex)         |
