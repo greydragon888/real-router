@@ -102,9 +102,9 @@ export class HashPlugin {
       replaceHistoryState: (
         name: string,
         params?: Params,
-        options?: { hash?: string },
+        opts?: { hash?: string },
       ) => {
-        if (options?.hash !== undefined) {
+        if (opts?.hash !== undefined) {
           warnHashIgnored();
         }
 
