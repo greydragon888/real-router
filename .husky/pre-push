@@ -6,6 +6,8 @@
 #                   first; no files → no-op)
 # - lint:duplicates: Copy-paste detection (jscpd)
 # - build: Final build to ensure compilation
+# - test:stress: Heap/timing stress suites, isolated at --concurrency=1 so
+#                heap measurements are free of build contention (#1423)
 # - lint:types: Validate TypeScript types in dist (arethetypeswrong)
 # - lint:package: Validate package.json exports (publint)
 # - lint:unused: Dead code detection (knip)
@@ -34,6 +36,14 @@ pnpm lint:duplicates
 # Build packages and validate published artifacts
 echo "📦 Building packages..."
 pnpm turbo run build lint:package lint:types --filter='!./examples/**'
+
+# Heap/timing stress suites — run isolated at --concurrency=1 (they were
+# dropped from build.dependsOn in #1423). Under the concurrent build, up to 4
+# heap-sensitive suites ran in parallel and their heapUsed thresholds flaked
+# from GC/CPU contention; serialized they measure clean. This is stress's only
+# gate — CI/post-merge exclude it by design (see IMPLEMENTATION_NOTES).
+echo "🧪 Running stress tests (isolated)..."
+pnpm test:stress
 
 # Check for unused code
 echo "🧹 Checking for unused code..."

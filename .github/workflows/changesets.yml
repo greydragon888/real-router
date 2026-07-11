@@ -174,13 +174,11 @@ jobs:
           fi
 
       # Produce dist for publish — `bundle` ONLY, not `build`. `build` dependsOn
-      # `test:stress`, which no CI/post-merge job ever warms (stress is pre-push
-      # only — see IMPLEMENTATION_NOTES), so `turbo run build` here cold-ran all
-      # ~23 stress tasks every release (~3m of guaranteed cache misses) plus a
-      # redundant test re-run. The version-bump commit being published already
-      # passed the full gate on its release-PR CI, and pre-push runs stress; the
-      # publish step only needs artifacts. `bundle` is a full cache hit off the
-      # post-merge build of the same commit.
+      # `test` + `test:properties`, a redundant full re-run at publish: the
+      # version-bump commit being published already passed the full gate on its
+      # release-PR CI (and pre-push runs stress). The publish step only needs
+      # artifacts, and `bundle` is a full cache hit off the post-merge build of
+      # the same commit.
       - name: Bundle packages for publish
         if: steps.unpublished.outputs.has_unpublished == 'true'
         run: pnpm turbo run bundle --filter='!./examples/**'

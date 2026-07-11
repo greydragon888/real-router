@@ -113,7 +113,7 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 - First publish must be manual (`pnpm publish`) - can't configure Trusted Publisher before package exists (pnpm 11 publishes natively; no npm CLI needed even for bootstrap)
 - Trusted Publisher configured with workflow: `changesets.yml`
 
-**Build optimization:** the release "Bundle packages for publish" step runs `pnpm turbo run bundle --filter='!./examples/**'` — dist artifacts only, no test gate. It deliberately does NOT run `turbo run build`: `build` `dependsOn` `test:stress`, and **no CI/post-merge job ever warms `test:stress`** (stress is pre-push-only — see "CI: test:stress lives only in pre-push"). So `turbo run build` at release cold-ran all ~23 `test:stress` tasks every publish (~3m of *guaranteed* cache misses — 156/179 hit, the 23 misses were exactly the 23 stress-test packages) plus a redundant full test re-run. The commit being published already passed the complete gate on its release-PR CI, and pre-push runs stress; the publish step only needs artifacts. `bundle` is a full cache hit off the post-merge build of the same commit. (An earlier version of this note claimed `build:dist-only` + `test`; that task never existed and the workflow actually ran bare `build` — corrected here.)
+**Build optimization:** the release "Bundle packages for publish" step runs `pnpm turbo run bundle --filter='!./examples/**'` — dist artifacts only, no test gate. It deliberately does NOT run `turbo run build`: `build` `dependsOn` `test:stress`, and **no CI/post-merge job ever warms `test:stress`** (stress is pre-push-only — see "CI: test:stress lives only in pre-push"). So `turbo run build` at release cold-ran all ~23 `test:stress` tasks every publish (~3m of *guaranteed* cache misses — 156/179 hit, the 23 misses were exactly the 23 stress-test packages) plus a redundant full test re-run. The commit being published already passed the complete gate on its release-PR CI, and pre-push runs stress; the publish step only needs artifacts. `bundle` is a full cache hit off the post-merge build of the same commit. (An earlier version of this note claimed `build:dist-only` + `test`; that task never existed and the workflow actually ran bare `build` — corrected here.) **Update #1423:** `build` no longer `dependsOn test:stress` (stress moved to a dedicated `--concurrency=1` pre-push step), so `turbo run build` no longer cold-runs stress at release — but `bundle`-not-`build` stays correct, since `build` still adds `test` + `test:properties`, redundant at publish.
 
 ### Critical: Use `pnpm publish` NOT `npm publish`
 
@@ -265,7 +265,7 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 **Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:package`/`lint:types`/`lint:unused` **also run in CI** now (#813 — see below); only `lint:duplicates`' hard threshold stays pre-push-only (CI keeps an informational jscpd SARIF channel). `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
-The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties`, AND `test:stress` — so pre-push exercises stress tests for every human push. Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
+The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties` (as of #1423, **no longer** `test:stress`). Pre-push exercises stress via a dedicated `pnpm test:stress` step (`turbo run test:stress --concurrency=1`) — isolated from the concurrent build so heap/timing assertions don't flake (#1423). Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
 
 #### Changeset content validation (pre-push fast-block)
 
@@ -453,7 +453,7 @@ Cancels in-progress runs when new commit pushed.
 - `ci.yml` "Test with coverage" step: `pnpm turbo run test test:properties test:stress …` → `pnpm turbo run test test:properties …`
 - `post-merge.yml` "Build" step: `pnpm turbo run build …` → `pnpm turbo run bundle test test:properties …` (avoids the `build` orchestrator dependency on `test:stress` declared in `turbo.json`)
 
-The `build` task in `turbo.json` still lists `test:stress` in its `dependsOn` — so anyone running `pnpm build` locally (and the **pre-push hook**, which does exactly that) continues to exercise the full stress suite. Stress coverage is preserved for every human push.
+**As of #1423**, the `build` task no longer lists `test:stress` in its `dependsOn` (it flaked under the concurrent build — see "Stress tests isolated from the concurrent build" below). The **pre-push hook** now runs stress as a dedicated `pnpm test:stress` step (`turbo run test:stress --concurrency=1`), isolated so heap measurements are contention-free. Stress coverage is still preserved for every human push — as its **only** gate (CI/post-merge exclude it by design).
 
 Post-removal numbers:
 
@@ -5265,3 +5265,23 @@ Split fix from check, aligning with the universal npm convention (`lint` = verif
 The accumulated drift the issue cited (#1409/#1410 test files) had already been cleared in a prior `chore`, so a fresh strict `pnpm lint` was **already green across all 30 packages** (verified: 58/58 turbo tasks pass, 0 drift) — the flip is purely preventive; no companion reformat pass was needed. Discriminating power verified mutationally: injecting `export const lintProbe    =    1` (extra spaces, no semicolon) makes strict `lint` **fail** (`prettier/prettier` error + nonzero exit), while `lint:fix` repairs it to `export const lintProbe = 1;` and exits `0` — reproducing, then closing, the exact no-op the gate had been hiding.
 
 `pnpm lint` no longer edits files — use `pnpm lint:fix` locally. Hooks are unaffected (none call bare `lint`; pre-push `build` reaches strict `lint` transitively, which is the intended tightening). Infra-only (no `packages/*/src`) → no changeset.
+
+## Stress tests isolated from the concurrent build (#1423)
+
+### Problem
+
+`test:stress` reached the gate only through `build.dependsOn: ["bundle","test","test:properties","test:stress"]`, and `.husky/pre-push` runs `pnpm turbo run build …` at the repo's global `concurrency: 4` (`turbo.json` `global.concurrency`). So up to 4 heap/timing-sensitive stress suites (`pool: "forks"`, `--expose-gc`) ran in parallel with each other and with property suites. Heap-stress assertions read `process.memoryUsage().heapUsed` around `forceGC()`; under 4-way CPU/GC contention `global.gc()` is delayed and `heapUsed` jitter (JIT, deopt, page retention) inflates past the isolated baseline, tripping tight spread/delta thresholds. Nondeterministic — the same commit passes on a quieter run. Result: pre-push false-positives on a stress test in a package unrelated to the diff, forcing `--no-verify` pushes or per-test threshold band-aids (e.g. `sources` S2.5 raised to 1 MB in 55002f82). The gate lost signal — a real leak and GC-jitter look identical at those margins.
+
+### Solution
+
+Isolate stress from the concurrent build (issue Option 1), keeping `concurrency: 4` for property throughput:
+
+- Drop `test:stress` from `build.dependsOn` → `["bundle","test","test:properties"]`. `build` (and local `pnpm build`) no longer runs stress.
+- Root `test:stress` → `turbo run test:stress --concurrency=1` (serialized wherever it runs, not only pre-push).
+- `.husky/pre-push`: after the `build …` step, a dedicated `pnpm test:stress` step. Its turbo deps (`^bundle`, `test`, `test:properties`, `lint`, `type-check`) are already cache-warm from the build step, so it runs only the ~17–23 stress suites, one at a time — heap measured contention-free.
+
+### Why `--concurrency=1`, not looser thresholds
+
+The issue's option 3 (widen every heap ceiling to the *loaded* worst-case) erodes leak-detection signal and fights the mutation discipline the thresholds are anchored to (CLAUDE.md: "Heap-threshold stress tests MUST have proven discriminating power"). Isolation removes the *cause* (contention) instead of masking the *symptom* (jitter), so thresholds stay anchored to the measured healthy baseline. `concurrency: 4` is untouched — property tests keep their throughput; only the stress invocation serializes.
+
+Stress stays pre-push-only (CI/post-merge exclude it by design — see "CI: `test:stress` lives only in pre-push"); #1423 only changes *how* pre-push reaches it (dedicated step, not `build.dependsOn`). Infra-only → no changeset.

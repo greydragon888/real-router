@@ -9,7 +9,7 @@
     "bundle": "turbo run bundle",
     "test": "turbo run test",
     "test:verbose": "turbo run test --output-logs=full",
-    "test:stress": "turbo run test:stress",
+    "test:stress": "turbo run test:stress --concurrency=1 --filter='!./examples/**'",
     "test:properties": "turbo run test:properties",
     "test:agent": "turbo run test -- --reporter=agent",
     "test:leaks": "turbo run test -- --detect-async-leaks",

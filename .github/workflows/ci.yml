@@ -199,9 +199,9 @@ jobs:
       # signal is low-frequency and the iterations are CPU-expensive (saves
       # ≈5 min of wall time per run, mostly visible on lockfile-bump PRs where
       # the whole project rebuilds). Stress tests still run locally via the
-      # pre-push hook (`pnpm build` → orchestrator depends on `test:stress`)
-      # and are exercised in turbo.json's `build` task graph for any consumer
-      # of full validation. Re-introduce them here if a memory-leak regression
+      # pre-push hook, as a dedicated `test:stress --concurrency=1` step (#1423,
+      # isolated from the concurrent build so heap thresholds don't flake).
+      # Re-introduce them here if a memory-leak regression
       # from a framework adapter bump (React/Vue/Solid/Svelte) ever slips
       # through pre-push.
       #
