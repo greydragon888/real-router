@@ -5215,3 +5215,33 @@ rosters: `run.mjs` resolves engines by directory (no runner changes), and
 report.mjs whitelists engines per cohort, so the extra results JSON cannot
 leak into the tables. If the full run finds the delta boring, the variant is
 one directory + two devDeps to delete.
+
+## TEMPORARY typescript-eslint 8.62.0 override (registry unpublish incident)
+
+### Problem
+
+The 2026-07-10 Dependabot testing-group bump (#1389) resolved
+`eslint-plugin-import-x`'s peer graph to `@typescript-eslint/*@8.63.0`. On
+2026-07-11 typescript-eslint UNPUBLISHED the whole 8.63.0 line from npm
+(latest back to 8.62.1), leaving the lockfile pointing at seven non-existent
+tarballs. Every `pnpm install` / `pnpm dedupe` then died with
+`ERR_PNPM_NO_MATCHING_VERSION` on `@typescript-eslint/visitor-keys@8.63.0` —
+and because `verify-deps-before-run` gates every `pnpm <script>`, the failure
+cascaded into `pnpm bundle` / the pre-commit hooks / `bench-cross-router.sh`'s
+rebuild step, blocking the full benchmark run.
+
+### Solution
+
+`pnpm-workspace.yaml` overrides pinning the seven affected subpackages
+(`project-service`, `scope-manager`, `tsconfig-utils`, `types`,
+`typescript-estree`, `utils`, `visitor-keys`) to the published `8.62.0`
+(matching the root's exact `typescript-eslint` pin), then
+`pnpm install && pnpm dedupe` — the lockfile now has zero `@8.63.0` entries.
+
+### Why
+
+A pin, not a wait: the incident blocked the imminent full-matrix benchmark
+run (stale dist without #1426/#1433 would have been measured otherwise).
+**REMOVE the override block on the next typescript-eslint bump** — once a
+re-published >=8.63 lands, the pin becomes a stale downgrade that will fight
+Dependabot (the override comment carries the same warning).

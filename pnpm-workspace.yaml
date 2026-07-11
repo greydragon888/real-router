@@ -17,6 +17,20 @@ overrides:
   # pre-commit hook auto-dedupes) pull 8 and kill the solid bundle. Lift both when
   # vite-plugin-solid supports 8. (vite's bound is tightened at its existing entry.)
   '@babel/core': '>=7.29.6 <8'
+  # TEMPORARY (2026-07-11): typescript-eslint UNPUBLISHED 8.63.0 from the registry
+  # (latest is 8.62.1 again) after the 07-10 Dependabot bump had already resolved
+  # eslint-plugin-import-x's peer to 8.63.0 — every install/dedupe then dies with
+  # NO_MATCHING_VERSION on @typescript-eslint/visitor-keys@8.63.0. Pin the trio to
+  # the published 8.62.0 (matching the root's exact `typescript-eslint` pin).
+  # REMOVE on the next typescript-eslint bump (a re-published >=8.63 makes this pin
+  # a stale downgrade that will fight Dependabot).
+  '@typescript-eslint/project-service': 8.62.0
+  '@typescript-eslint/scope-manager': 8.62.0
+  '@typescript-eslint/tsconfig-utils': 8.62.0
+  '@typescript-eslint/types': 8.62.0
+  '@typescript-eslint/typescript-estree': 8.62.0
+  '@typescript-eslint/utils': 8.62.0
+  '@typescript-eslint/visitor-keys': 8.62.0
   '@isaacs/brace-expansion': 5.0.1
   axios: '>=1.16.0'
   follow-redirects: '>=1.16.0'
