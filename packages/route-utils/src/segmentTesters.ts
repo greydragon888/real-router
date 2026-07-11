@@ -10,46 +10,82 @@ import type { SegmentTestFunction } from "./types";
 import type { State } from "@real-router/types";
 
 /**
- * Escapes special RegExp characters in a string.
- * Handles all RegExp metacharacters including dash in character classes.
- *
- * @param str - String to escape
- * @returns Escaped string safe for RegExp construction
- * @internal
+ * `.` as a char code — the boundary the flat comparisons test for. Matching is
+ * exactly the historical regex semantics (`^seg(?:\.|$)` etc. over the escaped
+ * segment) without entering the RegExp engine: for a validated segment the
+ * escaped pattern is a literal, so prefix/suffix/substring checks with a
+ * dot-or-edge boundary are equivalent — locked by
+ * `tests/property/segmentTesters.regex-equivalence.properties.ts` (INVARIANTS: Implementation Equivalence).
  */
-const escapeRegExp = (str: string): string =>
-  str.replaceAll(/[$()*+.?[\\\]^{|}-]/g, String.raw`\$&`);
+const DOT = ROUTE_SEGMENT_SEPARATOR.codePointAt(0);
+
+/** `^seg(?:\.|$)` — prefix hit whose end lands on a dot or the string end. */
+const matchesStart = (name: string, segment: string): boolean =>
+  name.startsWith(segment) &&
+  (name.length === segment.length || name.codePointAt(segment.length) === DOT);
+
+/** `(?:^|\.)seg$` — suffix hit whose start lands on a dot or the string start. */
+const matchesEnd = (name: string, segment: string): boolean =>
+  name.endsWith(segment) &&
+  (name.length === segment.length ||
+    name.codePointAt(name.length - segment.length - 1) === DOT);
 
 /**
- * Creates a segment tester function with specified start and end patterns.
+ * `(?:^|\.)seg(?:\.|$)` — SOME occurrence bounded by dot-or-edge on both
+ * sides. Scans every occurrence (like the regex engine): an unbounded earlier
+ * hit must not mask a bounded later one (`x.b.c` in `ax.b.c.x.b.c`).
+ */
+const matchesAnywhere = (name: string, segment: string): boolean => {
+  let index = name.indexOf(segment);
+
+  while (index !== -1) {
+    const end = index + segment.length;
+
+    if (
+      (index === 0 || name.codePointAt(index - 1) === DOT) &&
+      (end === name.length || name.codePointAt(end) === DOT)
+    ) {
+      return true;
+    }
+
+    index = name.indexOf(segment, index + 1);
+  }
+
+  return false;
+};
+
+/**
+ * Creates a segment tester function around a flat boundary predicate.
  * This is a factory function that produces the actual test functions.
  *
- * @param start - RegExp pattern for start (e.g., "^" for startsWith)
- * @param end - RegExp pattern for end (e.g., "$" or dotOrEnd for specific matching)
+ * @param matches - Boundary predicate over (routeName, validated segment)
  * @returns A test function that can check if routes match the segment pattern
  * @internal
  */
-const makeSegmentTester = (start: string, end: string) => {
-  const regexCache = new Map<string, RegExp>();
+const makeSegmentTester = (
+  matches: (name: string, segment: string) => boolean,
+) => {
+  // Once-per-segment validation: a segment that passed the length + character
+  // checks never re-pays them. An INVALID segment is never cached — it throws
+  // on every call (same contract as the pre-flat regex cache, which also only
+  // stored successfully-built patterns).
+  const validatedSegments = new Set<string>();
 
   /**
-   * Builds a RegExp for testing segment matches.
-   * Validates length and character pattern. Type and empty checks are done by caller.
+   * Validates length and character pattern. Type and empty checks are done by
+   * caller.
    *
    * This optimizes performance by avoiding redundant checks - callers verify
    * type and empty before calling this function.
    *
-   * @param segment - The segment to build a regex for (non-empty string, pre-validated)
-   * @returns RegExp for testing
+   * @param segment - The segment to validate (non-empty string)
    * @throws {RangeError} If segment exceeds maximum length
    * @throws {TypeError} If segment contains invalid characters
    * @internal
    */
-  const buildRegex = (segment: string): RegExp => {
-    const cached = regexCache.get(segment);
-
-    if (cached) {
-      return cached;
+  const validateSegment = (segment: string): void => {
+    if (validatedSegments.has(segment)) {
+      return;
     }
 
     // Type and empty checks are SKIPPED - caller already verified these
@@ -68,11 +104,7 @@ const makeSegmentTester = (start: string, end: string) => {
       );
     }
 
-    const regex = new RegExp(start + escapeRegExp(segment) + end);
-
-    regexCache.set(segment, regex);
-
-    return regex;
+    validatedSegments.add(segment);
   };
 
   // TypeScript cannot infer conditional return type for curried function with union return.
@@ -121,8 +153,10 @@ const makeSegmentTester = (start: string, end: string) => {
           return false;
         }
 
-        // Use buildRegex (type and empty checks already done above)
-        return buildRegex(localSegment).test(name);
+        // Validate once per segment (type and empty checks already done above)
+        validateSegment(localSegment);
+
+        return matches(name, localSegment);
       };
     }
 
@@ -144,17 +178,13 @@ const makeSegmentTester = (start: string, end: string) => {
       return false;
     }
 
-    // Perform the actual regex test
-    // buildRegex skips type and empty checks (already validated above)
-    return buildRegex(segment).test(name);
+    // Perform the actual boundary test
+    // validateSegment skips type and empty checks (already validated above)
+    validateSegment(segment);
+
+    return matches(name, segment);
   };
 };
-
-/**
- * Pattern that matches either a dot separator or end of string.
- * Used for prefix/suffix matching that respects segment boundaries.
- */
-const dotOrEnd = `(?:${escapeRegExp(ROUTE_SEGMENT_SEPARATOR)}|$)`;
 
 /**
  * Tests if a route name starts with the given segment.
@@ -193,8 +223,7 @@ const dotOrEnd = `(?:${escapeRegExp(ROUTE_SEGMENT_SEPARATOR)}|$)`;
  * @see includesSegment for anywhere matching
  */
 export const startsWithSegment = makeSegmentTester(
-  "^",
-  dotOrEnd,
+  matchesStart,
 ) as SegmentTestFunction;
 
 /**
@@ -229,8 +258,7 @@ export const startsWithSegment = makeSegmentTester(
  * @see includesSegment for anywhere matching
  */
 export const endsWithSegment = makeSegmentTester(
-  `(?:^|${escapeRegExp(ROUTE_SEGMENT_SEPARATOR)})`,
-  "$",
+  matchesEnd,
 ) as SegmentTestFunction;
 
 /**
@@ -263,6 +291,5 @@ export const endsWithSegment = makeSegmentTester(
  * @see endsWithSegment for suffix matching
  */
 export const includesSegment = makeSegmentTester(
-  `(?:^|${escapeRegExp(ROUTE_SEGMENT_SEPARATOR)})`,
-  dotOrEnd,
+  matchesAnywhere,
 ) as SegmentTestFunction;

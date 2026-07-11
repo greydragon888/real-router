@@ -20,7 +20,7 @@ Cached read-only query API for route tree structure. **Published** to npm — co
 src/
 ├── RouteUtils.ts        — RouteUtils class (chain/siblings caches, isDescendantOf)
 ├── getRouteUtils.ts     — WeakMap-cached factory for RouteUtils
-├── segmentTesters.ts    — startsWithSegment, endsWithSegment, includesSegment (regex-cached)
+├── segmentTesters.ts    — startsWithSegment, endsWithSegment, includesSegment (flat comparisons, Set-validated)
 ├── routeRelation.ts     — areRoutesRelated (string prefix comparison)
 ├── constants.ts         — MAX_SEGMENT_LENGTH, ROUTE_SEGMENT_SEPARATOR, SAFE_SEGMENT_PATTERN
 ├── types.ts             — RouteTreeNode (structural interface), SegmentTestFunction
@@ -33,7 +33,7 @@ src/
 - **Replace the root, don't mutate it in place** — the cache is keyed by root **identity**. Mutating a root object in place (e.g. pushing a child into its `nonAbsoluteChildren`) keeps the same key, so `getRouteUtils(root)` returns the **prior cached** `RouteUtils` — the new child is invisible (`getChain("newChild") → undefined`). This is **unreachable through core** (both route-CRUD paths rebuild the tree via `adoptRouteArtifacts`, so the root identity changes → WeakMap miss → fresh `RouteUtils`), but if you build trees by hand, construct a **new** root instead of mutating the old one.
 - **All caches are pre-computed and frozen** — `getChain()` and `getSiblings()` return `Object.freeze`-d arrays built at construction time. No lazy computation.
 - **`isDescendantOf` does not handle root** — `isDescendantOf(child, "")` returns `false` because `"users".startsWith(".")` is false. Root is a special case; every route is trivially a descendant of root.
-- **Segment testers use regex caching** — Each segment string builds a `RegExp` once and caches it in a `Map`. Validated for length (`MAX_SEGMENT_LENGTH`) and character safety.
+- **Segment testers match via flat string comparisons** — no RegExp engine: prefix/suffix/occurrence checks with a dot-or-edge boundary (`codePointAt === 46`), exactly equivalent to the historical `^seg(?:\\.|$)`-style patterns (locked by `tests/property/segmentTesters.regex-equivalence.properties.ts`). Validation (length `MAX_SEGMENT_LENGTH` + character safety) runs once per segment via a `Set` cache; an invalid segment throws on every call.
 - **Segment testers accept `State` objects** — When passed a `State`, the `.name` property is extracted automatically.
 - **`areRoutesRelated` is pure string comparison** — No tree lookup; O(k) where k is name length. Checks `===`, `startsWith(a + ".")`, or `startsWith(b + ".")`.
 - **Structural `RouteTreeNode` type** — Defined locally to avoid runtime dependency on `route-tree`. Structurally compatible with `RouteTree`.
