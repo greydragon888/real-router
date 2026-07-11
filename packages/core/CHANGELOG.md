@@ -1,5 +1,32 @@
 # @real-router/core
 
+## 0.75.0
+
+### Minor Changes
+
+- [#1443](https://github.com/greydragon888/real-router/pull/1443) [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): thread `parentName` into the `RouterValidator.routes.validateRoutes` type ([#1224](https://github.com/greydragon888/real-router/issues/1224))
+
+  `RouterValidator.routes.validateRoutes` gained an optional `parentName?: string`
+  third argument, threaded from the `add({ parent })` call site (`getRoutesApi.ts`).
+  Without it the validation plugin validated a parented batch "from the root" and
+  false-rejected a `forwardTo` whose target needs the parent's path params — an add
+  that bare core accepts and runs correctly. Additive, non-breaking (optional
+  param); pre-1.0 `minor` for the public type surface. Bare core is unchanged (the
+  validator is `null` without the plugin).
+
+- [#1443](https://github.com/greydragon888/real-router/pull/1443) [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - refactor(core): drop orphaned `RouterValidator` entries + the dead `validateDependencyLimit` call ([#1226](https://github.com/greydragon888/real-router/issues/1226))
+
+  Removes validation-plugin mirror-drift left after [#960](https://github.com/greydragon888/real-router/issues/960): the never-called
+  `RouterValidator` interface methods `routes.validateExistingRoutes`,
+  `routes.validateForwardToConsistency`, `options.validateLimitValue`,
+  `options.validateLimits`, `dependencies.validateDependencyLimit`,
+  `dependencies.validateDependenciesStructure`, and `eventBus.validateEventName`
+  (core never invoked any of them — the plugin calls its own file-scope versions),
+  plus the dead `ctx.validator?.dependencies.validateDependencyLimit(...)` call in
+  `getDependenciesApi` (the dependency-count limit is enforced by
+  `validateDependencyCount`). Public type-surface removal (pre-1.0 `minor`); no
+  runtime behavior change — bare core never called these.
+
 ## 0.74.9
 
 ### Patch Changes
