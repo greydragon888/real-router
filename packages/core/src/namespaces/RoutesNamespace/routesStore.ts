@@ -1,7 +1,11 @@
 // packages/core/src/namespaces/RoutesNamespace/routesStore.ts
 
 import { logger } from "@real-router/logger";
-import { createMatcher, createRouteTree } from "route-tree";
+import {
+  createMatcher,
+  createRouteTree,
+  routeTreeToDefinitions,
+} from "route-tree";
 
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
@@ -35,6 +39,18 @@ import type {
 export interface RoutesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
+  /**
+   * DERIVED VIEW, not stored state: reconstructed from `tree` on every access
+   * via `routeTreeToDefinitions` (the lossless inverse cloneRouter already
+   * relies on — the `~` absolute marker is restored, child order is the
+   * definition order). The tree is the single source of truth, so a third
+   * retained copy of the route table (~30 B/route) is not kept. Every reader
+   * is a cold CRUD/plugin-registration path; the derive is O(N).
+   *
+   * The returned array is a FRESH snapshot each time — mutating it never
+   * affects the store (pass an explicitly-mutated snapshot to
+   * `commitTreeChanges` instead, as `remove` does).
+   */
   readonly definitions: RouteDefinition[];
   readonly config: RouteConfig;
   tree: RouteTree;
@@ -61,7 +77,7 @@ export interface RoutesStore<
 // =============================================================================
 
 function rebuildTree(
-  definitions: RouteDefinition[],
+  definitions: readonly RouteDefinition[],
   rootPath: string,
   matcherOptions: CreateMatcherOptions | undefined,
 ): { tree: RouteTree; matcher: Matcher } {
@@ -73,14 +89,18 @@ function rebuildTree(
   return { tree, matcher };
 }
 
+/**
+ * Rebuilds tree+matcher in place from `definitions` (defaults to the current
+ * tree's own derived definitions — the same-table case, e.g. a rootPath
+ * change).
+ */
 export function rebuildTreeInPlace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
->(store: RoutesStore<Dependencies>): void {
-  const result = rebuildTree(
-    store.definitions,
-    store.rootPath,
-    store.matcherOptions,
-  );
+>(
+  store: RoutesStore<Dependencies>,
+  definitions: readonly RouteDefinition[] = store.definitions,
+): void {
+  const result = rebuildTree(definitions, store.rootPath, store.matcherOptions);
 
   store.tree = result.tree;
   store.matcher = result.matcher;
@@ -89,8 +109,11 @@ export function rebuildTreeInPlace<
 
 export function commitTreeChanges<
   Dependencies extends DefaultDependencies = DefaultDependencies,
->(store: RoutesStore<Dependencies>): void {
-  rebuildTreeInPlace(store);
+>(
+  store: RoutesStore<Dependencies>,
+  definitions: readonly RouteDefinition[],
+): void {
+  rebuildTreeInPlace(store, definitions);
   store.resolvedForwardMap = refreshForwardMap(store.config);
 }
 
@@ -106,18 +129,18 @@ export function resetStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>): void {
   clearRouteData(store);
-  rebuildTreeInPlace(store);
+  rebuildTreeInPlace(store, []);
 }
 
 /**
  * Clears route data without rebuilding the tree.
  * Used by replace() to avoid double rebuild (clearRouteData + commitTreeChanges).
+ * `definitions` needs no clearing — it is derived from the tree, which the
+ * caller rebuilds (resetStore → empty, replace → the new artifacts).
  */
 export function clearRouteData<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>): void {
-  store.definitions.length = 0;
-
   Object.assign(store.config, createEmptyConfig());
 
   store.resolvedForwardMap = Object.create(null) as Record<string, string>;
@@ -322,7 +345,6 @@ function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
 interface RouteArtifacts<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  readonly definitions: RouteDefinition[];
   readonly config: RouteConfig;
   readonly routeCustomFields: Record<string, Record<string, unknown>>;
   readonly pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>;
@@ -554,7 +576,7 @@ export function assertAddable<Dependencies extends DefaultDependencies>(
  * forwardTo and invalid path constraint — before the caller mutates the store.
  */
 function buildArtifacts<Dependencies extends DefaultDependencies>(
-  definitions: RouteDefinition[],
+  definitions: readonly RouteDefinition[],
   routesForHandlers: readonly Route<Dependencies>[],
   config: RouteConfig,
   routeCustomFields: Record<string, Record<string, unknown>>,
@@ -578,7 +600,6 @@ function buildArtifacts<Dependencies extends DefaultDependencies>(
   const { tree, matcher } = rebuildTree(definitions, rootPath, matcherOptions);
 
   return {
-    definitions,
     config,
     routeCustomFields,
     pendingCanActivate,
@@ -718,13 +739,8 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   const { activate: compiledActivate, deactivate: compiledDeactivate } =
     precompiled ?? compileArtifactGuards(artifacts, deps);
 
-  // Atomic swap — pure assignments, cannot throw.
-  store.definitions.length = 0;
-
-  for (const def of artifacts.definitions) {
-    store.definitions.push(def);
-  }
-
+  // Atomic swap — pure assignments, cannot throw. (`definitions` is derived
+  // from `tree`, so swapping the tree IS the definitions swap.)
   Object.assign(store.config, artifacts.config);
   store.routeCustomFields = artifacts.routeCustomFields;
   store.tree = artifacts.tree;
@@ -1070,8 +1086,11 @@ export function createRoutesStore<
 
   const artifacts = buildReplaceArtifacts(routes, "", matcherOptions);
 
-  return {
-    definitions: artifacts.definitions,
+  const store: RoutesStore<Dependencies> = {
+    // Deferred access: the getter runs only after `store` is initialized.
+    get definitions() {
+      return routeTreeToDefinitions(store.tree);
+    },
     config: artifacts.config,
     tree: artifacts.tree,
     matcher: artifacts.matcher,
@@ -1085,4 +1104,6 @@ export function createRoutesStore<
     pendingCanActivate: artifacts.pendingCanActivate,
     pendingCanDeactivate: artifacts.pendingCanDeactivate,
   };
+
+  return store;
 }
