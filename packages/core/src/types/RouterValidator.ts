@@ -28,7 +28,11 @@ export interface RouterValidator {
       caller: string,
     ) => void;
     validateAddRouteArgs: (routes: unknown) => void;
-    validateRoutes: (routes: unknown[], tree: unknown) => void;
+    validateRoutes: (
+      routes: unknown[],
+      tree: unknown,
+      parentName?: string,
+    ) => void;
     validateRemoveRouteArgs: (name: unknown) => void;
     validateUpdateRouteBasicArgs: (name: unknown, updates: unknown) => void;
     validateUpdateRoutePropertyTypes: (name: string, updates: unknown) => void;

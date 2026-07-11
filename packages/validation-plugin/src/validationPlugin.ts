@@ -105,7 +105,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
         validateAddRouteArgs(routes as readonly Route[]);
       },
 
-      validateRoutes(routes, store) {
+      validateRoutes(routes, store, parentName) {
         const typedStore = store as {
           tree?: unknown;
           matcher?: unknown;
@@ -117,6 +117,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
           typedStore.tree as RouteTree | undefined,
           typedStore.matcher as Matcher | undefined,
           typedStore.config?.forwardMap,
+          parentName,
         );
       },
       validateRemoveRouteArgs,

@@ -230,12 +230,15 @@ function getTargetParams<Dependencies extends DefaultDependencies>(
   return extractParamsFromPaths(collectPathsToRoute(routes, targetRoute));
 }
 
+const EMPTY_PARENT_PARAMS: ReadonlySet<string> = new Set();
+
 function validateSingleForward<Dependencies extends DefaultDependencies>(
   fromRoute: string,
   targetRoute: string,
   routes: readonly Route<Dependencies>[],
   batchNames: Set<string>,
   matcher: Matcher,
+  parentParams: ReadonlySet<string>,
 ): void {
   const existsInMatcher = matcher.hasRoute(targetRoute);
   const existsInBatch = batchNames.has(targetRoute);
@@ -247,9 +250,12 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
     );
   }
 
-  const fromParams = extractParamsFromPaths(
-    collectPathsToRoute(routes, fromRoute),
-  );
+  // A batch route added under { parent } inherits the parent's path params, so
+  // the forward source's available params are the parent's plus its own (#1224).
+  const fromParams = new Set<string>([
+    ...parentParams,
+    ...extractParamsFromPaths(collectPathsToRoute(routes, fromRoute)),
+  ]);
 
   const toParams = getTargetParams(
     targetRoute,
@@ -274,8 +280,23 @@ export function validateForwardToTargets<
   routes: readonly Route<Dependencies>[],
   existingForwardMap: Record<string, string>,
   matcher: Matcher,
+  parentName?: string,
 ): void {
   const batchNames = collectRouteNames(routes);
+  // Added under { parent }, a batch route's full name is `${parent}.${short}` and
+  // it inherits the parent's path params — resolve both from the parent (#1224).
+  const batchFullNames = parentName
+    ? new Set([...batchNames].map((name) => `${parentName}.${name}`))
+    : batchNames;
+  // `validateRoutes` throws on a missing parent before forwardTo validation runs
+  // (both go through the `add({ parent })` path with tree + matcher present), so
+  // the parent's segments are always resolvable here — assert non-null.
+  const parentParams: ReadonlySet<string> = parentName
+    ? getRequiredParams(
+        matcher.getSegmentsByName(parentName) as readonly RouteTree[],
+      )
+    : EMPTY_PARENT_PARAMS;
+
   const batchForwards = collectForwardMappings(routes);
 
   const combinedForwardMap: Record<string, string> = { ...existingForwardMap };
@@ -285,7 +306,14 @@ export function validateForwardToTargets<
   }
 
   for (const [fromRoute, targetRoute] of batchForwards) {
-    validateSingleForward(fromRoute, targetRoute, routes, batchNames, matcher);
+    validateSingleForward(
+      fromRoute,
+      targetRoute,
+      routes,
+      batchFullNames,
+      matcher,
+      parentParams,
+    );
   }
 
   for (const fromRoute of Object.keys(combinedForwardMap)) {
