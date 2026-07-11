@@ -98,6 +98,45 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       expect(navigateSpy).toHaveBeenCalledWith("/nonexistent");
     });
 
+    it("keeps the typed URL when a 404 arrives on popstate (#1229)", async () => {
+      // allowNotFound (default true): core preserves the typed path in
+      // state.path, but onTransitionSuccess rebuilt the address-bar URL from
+      // buildUrl(UNKNOWN_ROUTE) → buildPath("") = "" → URL collapses to the
+      // bare prefix "#", so a refresh loses the 404 and lands on home.
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.history.replaceState({}, "", "/#/no-such-route");
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("@@router/UNKNOWN_ROUTE");
+      expect(router.getState()?.path).toBe("/no-such-route"); // core kept it
+      expect(replaceSpy).toHaveBeenCalled();
+
+      const writtenUrl = replaceSpy.mock.calls.at(-1)?.[1];
+
+      expect(writtenUrl).toBe("#/no-such-route"); // preserved, not "#"
+    });
+
+    it("matched route on popstate writes the same URL from path as from name (#1229 parity control)", async () => {
+      // Locks the fix's invariant: for a matched route, urlPrefix + toState.path
+      // === buildUrl(name, params). Passes before AND after the fix; a query/
+      // encoding divergence would break it.
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.history.replaceState({}, "", "/#/users/view/7");
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("users.view");
+
+      const writtenUrl = replaceSpy.mock.calls.at(-1)?.[1];
+
+      expect(writtenUrl).toBe("#/users/view/7");
+    });
+
     it("emits $$error and rolls back URL when allowNotFound is false and hash does not match (#483)", async () => {
       router.stop();
 

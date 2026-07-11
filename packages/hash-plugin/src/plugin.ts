@@ -24,6 +24,7 @@ import type { PluginApi } from "@real-router/core/api";
 export class HashPlugin {
   readonly #router: Router;
   readonly #browser: Browser;
+  readonly #urlPrefix: string;
   readonly #removeStartInterceptor: () => void;
   readonly #removeExtensions: () => void;
   readonly #lifecycle: Pick<Plugin, "onStart" | "onStop" | "teardown">;
@@ -67,7 +68,7 @@ export class HashPlugin {
       );
     };
 
-    const urlPrefix = `${options.base}#${options.hashPrefix}`;
+    this.#urlPrefix = `${options.base}#${options.hashPrefix}`;
     const pluginBuildUrl = (
       route: string,
       params?: Params,
@@ -77,7 +78,7 @@ export class HashPlugin {
         warnHashIgnored();
       }
 
-      return urlPrefix + router.buildPath(route, params);
+      return this.#urlPrefix + router.buildPath(route, params);
     };
 
     this.#warnHashIgnored = warnHashIgnored;
@@ -155,7 +156,12 @@ export class HashPlugin {
           );
 
         if (!skipHistoryWrite) {
-          const url = this.#router.buildUrl(toState.name, toState.params);
+          // Build from toState.path, not buildUrl(name): for UNKNOWN_ROUTE
+          // buildPath(name) is "" and the typed URL would collapse to the bare
+          // prefix. toState.path is already final and, for matched routes,
+          // equals buildPath(name, params) — so matched behavior is identical
+          // and the 404's typed path is preserved. (#1229)
+          const url = this.#urlPrefix + toState.path;
 
           updateBrowserState(toState, url, replaceHistory, this.#browser);
         }
