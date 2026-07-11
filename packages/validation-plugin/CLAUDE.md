@@ -15,14 +15,14 @@ The `RouterValidator` interface is organized into 8 namespaces, matching core's 
 
 | Namespace      | Key methods                                                                                                                                                                   |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `routes`       | `validateBuildPathArgs`, `validateMatchPathArgs`, `validateIsActiveRouteArgs`, `validateAddRouteArgs`, `validateRemoveRouteArgs`, `validateUpdateRouteBasicArgs`, `validateUpdateRoute`, `validateRouteName`, `validateExistingRoutes`, `validateForwardToConsistency`, `guardRouteCallbacks`, `guardNoAsyncCallbacks` |
-| `options`      | `validateLimitValue`, `validateLimits`, `validateOptions`, `validateResolvedDefaultRoute`                                                                                     |
-| `dependencies` | `validateDependencyName`, `validateSetDependencyArgs`, `validateDependenciesObject`, `validateDependencyExists`, `validateDependencyLimit`, `validateDependenciesStructure`, `validateCloneArgs` |
+| `routes`       | `validateBuildPathArgs`, `validateMatchPathArgs`, `validateIsActiveRouteArgs`, `validateAddRouteArgs`, `validateRemoveRouteArgs`, `validateUpdateRouteBasicArgs`, `validateUpdateRoute`, `validateRouteName`, `guardRouteCallbacks`, `guardNoAsyncCallbacks` |
+| `options`      | `validateOptions`, `validateResolvedDefaultRoute`                                                                                                                             |
+| `dependencies` | `validateDependencyName`, `validateSetDependencyArgs`, `validateDependenciesObject`, `validateDependencyExists`, `validateDependencyCount`, `validateCloneArgs` |
 | `plugins`      | `validatePluginLimit`, `validateNoDuplicatePlugins`, `validatePluginKeys` (validates hook names: `onStart`, `onStop`, `onTransitionStart`, `onTransitionLeaveApprove`, `onTransitionSuccess`, `onTransitionError`, `onTransitionCancel`, `teardown`), `validateCountThresholds`, `validateAddInterceptorArgs` |
 | `lifecycle`    | `validateHandler`, `validateHandlerLimit`, `validateCountThresholds`                                                                                |
 | `navigation`   | `validateNavigateArgs`, `validateNavigateToDefaultArgs`, `validateNavigationOptions`, `validateParams`, `validateStartArgs`                                                   |
 | `state`        | `validateMakeStateArgs`, `validateAreStatesEqualArgs`                                                                                                                         |
-| `eventBus`     | `validateEventName`, `validateListenerArgs` — validates event names: `$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`                      |
+| `eventBus`     | `validateListenerArgs` — validates event names: `$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`                      |
 
 ## Gotchas
 
