@@ -87,6 +87,32 @@ describe("Link component", () => {
       expect(screen.getByTestId("link")).toHaveClass("active");
     });
 
+    it("empty routeName is inactive on an unstarted router — agrees with router.isActiveRoute('') (#1427)", () => {
+      // #1427 — an empty routeName is a misuse (matches no route); the canonical
+      // answer is router.isActiveRoute("") === false. Solid's Link fast path went
+      // through the routeSelector, whose unstarted sentinel (route?.name ?? "")
+      // makes isRouteActive("", "") === true → a misused empty-name Link lit up
+      // before router.start(). The routeName !== "" guard in useFastPath routes an
+      // empty name to the slow createActiveRouteSource (reads router.isActiveRoute("")).
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const unstarted = createTestRouterWithADefaultRouter();
+
+      // NOT started — no active route → the sentinel coerces the current name to "".
+      expect(unstarted.isActiveRoute("")).toBe(false);
+
+      render(() => (
+        <RouterProvider router={unstarted}>
+          <Link routeName="" activeClassName="active" data-testid="empty-link">
+            Empty
+          </Link>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("empty-link")).not.toHaveClass("active");
+
+      errorSpy.mockRestore();
+    });
+
     it("should set active class with route params", async () => {
       const linkRouteName = "items.item";
       const linkRouteParams = { id: 6 };
