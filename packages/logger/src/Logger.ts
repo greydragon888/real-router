@@ -82,22 +82,31 @@ class Logger {
    * ```
    */
   configure(config: Partial<LoggerConfig>): void {
-    if (config.level !== undefined) {
+    // Read each field ONCE into a local — an unstable getter must not be re-read
+    // between validation and storage: re-reading could pass validation with a
+    // valid level and then store a later, unvalidated one, disabling the
+    // threshold filter (a TOCTOU, #1162).
+    const level = config.level;
+
+    if (level !== undefined) {
       // Validate that the provided level is a valid configuration level
-      if (!Object.hasOwn(LEVEL_CONFIGS, config.level)) {
+      if (!Object.hasOwn(LEVEL_CONFIGS, level)) {
         throw new Error(
-          `Invalid log level: "${config.level}". Valid levels are: ${Object.keys(LEVEL_CONFIGS).join(", ")}`,
+          `Invalid log level: "${level}". Valid levels are: ${Object.keys(LEVEL_CONFIGS).join(", ")}`,
         );
       }
 
-      this.#config.level = config.level;
-      this.#currentThreshold = LEVEL_CONFIGS[config.level];
+      this.#config.level = level;
+      this.#currentThreshold = LEVEL_CONFIGS[level];
     }
     if (Object.hasOwn(config, "callback")) {
       this.#config.callback = config.callback;
     }
-    if (config.callbackIgnoresLevel !== undefined) {
-      this.#config.callbackIgnoresLevel = config.callbackIgnoresLevel;
+
+    const callbackIgnoresLevel = config.callbackIgnoresLevel;
+
+    if (callbackIgnoresLevel !== undefined) {
+      this.#config.callbackIgnoresLevel = callbackIgnoresLevel;
     }
   }
 
@@ -308,18 +317,46 @@ class Logger {
     // from breaking the logger or causing cascading failures
     this.#inCallback = true;
     try {
-      this.#config.callback(level, context, message, ...args);
-    } catch (error) {
-      // Fallback error reporting if callback throws
-      // Use console.error directly (don't call logger to avoid infinite loops)
+      // An async callback (`(...) => Promise<void>` is assignable to the
+      // void-typed LogCallback) returns a Promise whose rejection would otherwise
+      // leak as a Node `unhandledRejection` — process-fatal under
+      // `--unhandled-rejections=strict` (Node 22+ default). Read the runtime
+      // return and isolate it like core's subscribe (#944): duck-check the
+      // thenable + `.catch` into the same console.error sink a sync throw uses
+      // (#1161).
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- read the runtime Promise of a void-typed async callback (#1161)
+      const result: unknown = this.#config.callback(
+        level,
+        context,
+        message,
+        ...args,
+      );
+
       if (
-        typeof console !== "undefined" &&
-        typeof console.error === "function"
+        result !== null &&
+        result !== undefined &&
+        typeof (result as PromiseLike<unknown>).then === "function"
       ) {
-        console.error("[Logger] Error in callback:", error);
+        Promise.resolve(result as PromiseLike<unknown>).catch(
+          (error: unknown) => {
+            this.#reportError("[Logger] Error in async callback:", error);
+          },
+        );
       }
+    } catch (error) {
+      // Fallback error reporting if the callback throws synchronously
+      this.#reportError("[Logger] Error in callback:", error);
     } finally {
       this.#inCallback = false;
+    }
+  }
+
+  // Report a callback error via console.error directly — never call the logger
+  // (would recurse). Shared by the sync-throw catch and the async-rejection
+  // `.catch` (#1161). Console-safety guard mirrors #writeToConsole.
+  #reportError(message: string, error: unknown): void {
+    if (typeof console !== "undefined" && typeof console.error === "function") {
+      console.error(message, error);
     }
   }
 }

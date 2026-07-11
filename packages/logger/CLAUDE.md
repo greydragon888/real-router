@@ -37,7 +37,7 @@ src/
 ## Gotchas
 
 - **Singleton** -- `logger` is a module-level instance; all imports share the same config state
-- **Callback errors are swallowed** -- if `callback` throws, the error is caught and reported via `console.error` directly (avoids recursive logger calls)
+- **Callback errors are swallowed — synchronous throws AND async rejections** -- a synchronous `throw` is caught and reported as `[Logger] Error in callback:`; an async callback (a `(...) => Promise<void>` is assignable to the `void`-typed `LogCallback`) whose returned Promise rejects is isolated too (`[Logger] Error in async callback:`), so it is **not** leaked as a Node `unhandledRejection` — process-fatal under `--unhandled-rejections=strict`, Node 22+ default (#1161). Both report via `console.error` directly (avoids recursive logger calls), mirroring core's `subscribe` isolation (#944)
 - **Re-entrant callbacks are a safe no-op** -- if `callback` calls `logger.*`, an `#inCallback` re-entrancy guard skips the nested callback invocation (the nested message still reaches the console once). Without it the call would recurse ~5.9k deep to a swallowed `RangeError` (#791)
 - **`callbackIgnoresLevel`** -- when true, callback receives ALL messages even if console output is filtered; when false (default), callback follows the same threshold as console
 - **Level `"none"` early exit** -- when level is `"none"` and `callbackIgnoresLevel` is false, `#writeLog` returns immediately without any processing

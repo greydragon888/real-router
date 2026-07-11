@@ -195,6 +195,31 @@ describe("Logger", () => {
       }).toThrow(/Invalid log level/);
     });
 
+    it("reads config.level once — immune to an unstable getter TOCTOU (#1162)", () => {
+      // A well-typed getter (returns LogLevelConfig) that changes value between
+      // reads passed validation with a valid level, then the code stored a later
+      // unvalidated one — disabling the threshold filter. Read-once closes it.
+      let reads = 0;
+      const evil: Partial<LoggerConfig> = {
+        get level(): LogLevelConfig {
+          reads++;
+
+          return reads <= 2 ? ERROR_ONLY : ("toString" as LogLevelConfig);
+        },
+      };
+
+      logger.configure(evil);
+
+      // The validated "error-only" is stored (not a later "toString")…
+      expect(logger.getConfig().level).toBe(ERROR_ONLY);
+
+      // …and the threshold filter stays valid: a "toString" level → NaN threshold
+      // would disable it, letting a filtered "log" message through.
+      logger.log("Probe", "x");
+
+      expect(console.log).not.toHaveBeenCalled();
+    });
+
     it("should verify default callbackIgnoresLevel is false in internal config", () => {
       // Reset to defaults to verify internal state
       logger.configure({
@@ -482,6 +507,41 @@ describe("Logger", () => {
       logger.warn("Router", "Warning");
 
       expect(console.warn).toHaveBeenCalledWith("[Router] Warning");
+    });
+
+    it("isolates an async callback rejection instead of leaking a Node unhandledRejection (#1161)", async () => {
+      // An async callback (`(...) => Promise<void>` is assignable to the void-typed
+      // LogCallback) returns a Promise; before the fix its rejection was discarded
+      // and surfaced as a Node `unhandledRejection` — process-fatal under
+      // `--unhandled-rejections=strict` (Node 22+ default). It must be isolated
+      // into console.error like core's subscribe (#944 → #1161).
+      const leaked: unknown[] = [];
+      const onUnhandled = (reason: unknown): void => {
+        leaked.push(reason);
+      };
+
+      process.on("unhandledRejection", onUnhandled);
+
+      try {
+        logger.configure({
+          // eslint-disable-next-line @typescript-eslint/no-misused-promises -- #1161: a Promise-returning callback IS assignable to the void-typed LogCallback; that assignability is exactly the misuse under test
+          callback: () => Promise.reject(new Error("async boom")),
+        });
+
+        expect(() => {
+          logger.error("Router", "Test");
+        }).not.toThrow();
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(console.error).toHaveBeenCalledWith(
+          "[Logger] Error in async callback:",
+          expect.any(Error),
+        );
+        expect(leaked).toHaveLength(0);
+      } finally {
+        process.off("unhandledRejection", onUnhandled);
+      }
     });
   });
 
