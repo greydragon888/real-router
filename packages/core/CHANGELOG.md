@@ -1,5 +1,13 @@
 # @real-router/core
 
+## 0.74.9
+
+### Patch Changes
+
+- [#1428](https://github.com/greydragon888/real-router/pull/1428) [`53a315c`](https://github.com/greydragon888/real-router/commit/53a315c56f329c37c3fa396dafd4b81b29c2b4a7) Thanks [@greydragon888](https://github.com/greydragon888)! - Derive route definitions from the tree on demand — drop the third retained copy of the route table ([#1426](https://github.com/greydragon888/real-router/issues/1426))
+
+  `RoutesStore.definitions` is now a getter over `routeTreeToDefinitions(store.tree)` (the lossless inverse `cloneRouter` already relies on) instead of a permanently-retained parallel array. Browser CDP A/B on the 10k-route table: **−0.229 MB (−3.6 %) retained heap** — cumulatively −30 % with [#1379](https://github.com/greydragon888/real-router/issues/1379)/[#1414](https://github.com/greydragon888/real-router/issues/1414)/[#1415](https://github.com/greydragon888/real-router/issues/1415). The derived array is a fresh snapshot per access (cold CRUD/plugin-registration paths only); behavior is unchanged and the internals surface consumed by `@real-router/validation-plugin` is preserved.
+
 ## 0.74.8
 
 ### Patch Changes
