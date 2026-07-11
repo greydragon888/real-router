@@ -441,7 +441,7 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
   }
 
   if (matcher && forwardMap) {
-    validateForwardToTargets(routes, forwardMap, matcher);
+    validateForwardToTargets(routes, forwardMap, matcher, parentName);
   }
 }
 

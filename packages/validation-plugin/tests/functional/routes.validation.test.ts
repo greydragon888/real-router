@@ -25,6 +25,35 @@ describe("routes API validation — with validationPlugin", () => {
     router.stop();
   });
 
+  describe("addRoute with { parent } + forwardTo (#1224)", () => {
+    it("does not false-reject a forward to a param-carrying sibling under the parent — bare core accepts it", async () => {
+      // #1224 — validateForwardToTargets validated the batch "from the root":
+      // the source "detail" was seen as a root route with no params, so the
+      // forward to "users.profile" (which needs the parent's :userId) was
+      // wrongly rejected. Bare core accepts this add and runs the forward.
+      const r = createRouter([
+        { name: "home", path: "/" },
+        {
+          name: "users",
+          path: "/users/:userId",
+          children: [{ name: "profile", path: "/profile" }],
+        },
+      ]);
+
+      r.usePlugin(validationPlugin());
+      await r.start("/");
+
+      expect(() => {
+        getRoutesApi(r).add(
+          { name: "detail", path: "/detail", forwardTo: "users.profile" },
+          { parent: "users" },
+        );
+      }).not.toThrow();
+
+      r.stop();
+    });
+  });
+
   describe("addRoute validation", () => {
     it("should throw when route name is empty string", () => {
       expect(() => {

@@ -26,7 +26,6 @@ import {
   validateDependencyName,
   validateSetDependencyArgs,
   validateDependenciesObject,
-  validateDependencyLimit,
 } from "../../src/validators/dependencies";
 import {
   validateEventName,
@@ -689,34 +688,6 @@ describe("validateDependenciesObject — property-based", () => {
     expect(() => {
       validateDependenciesObject(obj, "setDependencies");
     }).toThrow("Getters not allowed");
-  });
-});
-
-describe("validateDependencyLimit — property-based", () => {
-  test.prop(
-    [fc.integer({ min: 0, max: 49 }), fc.integer({ min: 1, max: 50 })],
-    { numRuns: NUM_RUNS.standard },
-  )("count within limit never throws", (current, newCount) => {
-    // Ensure current + newCount < max
-    const safeMax = current + newCount + 1;
-
-    expect(() => {
-      validateDependencyLimit(current, newCount, "setDependency", safeMax);
-    }).not.toThrow();
-  });
-
-  test.prop([fc.integer({ min: 1, max: 10_000 })], {
-    numRuns: NUM_RUNS.standard,
-  })("count meeting limit always throws RangeError", (max) => {
-    expect(() => {
-      validateDependencyLimit(max, 0, "setDependency", max);
-    }).toThrow(RangeError);
-  });
-
-  test("maxDependencies=0 disables limit check (never throws)", () => {
-    expect(() => {
-      validateDependencyLimit(9999, 1, "setDependency", 0);
-    }).not.toThrow();
   });
 });
 

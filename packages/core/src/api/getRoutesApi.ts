@@ -674,7 +674,7 @@ export function getRoutesApi<
 
       ctx.validator?.routes.throwIfInternalRouteInArray(routeArray, "addRoute");
       ctx.validator?.routes.validateAddRouteArgs(routeArray);
-      ctx.validator?.routes.validateRoutes(routeArray, store);
+      ctx.validator?.routes.validateRoutes(routeArray, store, parentName);
 
       addRoutes(store, routeArray, parentName);
 

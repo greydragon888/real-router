@@ -28,7 +28,11 @@ export interface RouterValidator {
       caller: string,
     ) => void;
     validateAddRouteArgs: (routes: unknown) => void;
-    validateRoutes: (routes: unknown[], tree: unknown) => void;
+    validateRoutes: (
+      routes: unknown[],
+      tree: unknown,
+      parentName?: string,
+    ) => void;
     validateRemoveRouteArgs: (name: unknown) => void;
     validateUpdateRouteBasicArgs: (name: unknown, updates: unknown) => void;
     validateUpdateRoutePropertyTypes: (name: string, updates: unknown) => void;
@@ -41,9 +45,6 @@ export interface RouterValidator {
     validateRouteName: (name: unknown, caller: string) => void;
     throwIfInternalRoute: (name: unknown, caller: string) => void;
     throwIfInternalRouteInArray: (routes: unknown[], caller: string) => void;
-    // Retrospective validation
-    validateExistingRoutes: (store: unknown) => void;
-    validateForwardToConsistency: (store: unknown) => void;
     validateSetRootPathArgs: (rootPath: unknown) => void;
     guardRouteCallbacks: (route: unknown) => void;
     guardNoAsyncCallbacks: (route: unknown) => void;
@@ -53,8 +54,6 @@ export interface RouterValidator {
    * Options validation methods
    */
   options: {
-    validateLimitValue: (name: string, value: unknown) => void;
-    validateLimits: (limits: unknown) => void;
     validateOptions: (options: unknown, methodName: string) => void;
     validateResolvedDefaultRoute: (routeName: unknown, store: unknown) => void;
   };
@@ -71,9 +70,6 @@ export interface RouterValidator {
     ) => void;
     validateDependenciesObject: (deps: unknown, caller: string) => void;
     validateDependencyExists: (name: string, store: unknown) => void;
-    validateDependencyLimit: (store: unknown, limits: unknown) => void;
-    // Retrospective validation
-    validateDependenciesStructure: (store: unknown) => void;
     validateDependencyCount: (store: unknown, methodName: string) => void;
     validateCloneArgs: (dependencies: unknown) => void;
     warnOverwrite: (name: string, methodName: string) => void;
@@ -141,7 +137,6 @@ export interface RouterValidator {
    * Event bus validation methods
    */
   eventBus: {
-    validateEventName: (name: unknown) => void;
     validateListenerArgs: (name: unknown, cb: unknown) => void;
   };
 }

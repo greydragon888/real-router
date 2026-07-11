@@ -58,26 +58,6 @@ export function validateDependencyExists(
   }
 }
 
-export function validateDependencyLimit(
-  currentCount: number,
-  newCount: number,
-  methodName: string,
-  maxDependencies: number = DEFAULT_MAX_DEPENDENCIES,
-): void {
-  if (maxDependencies === 0) {
-    return;
-  }
-
-  const totalCount = currentCount + newCount;
-
-  if (totalCount >= maxDependencies) {
-    throw new RangeError(
-      `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). ` +
-        `Current: ${totalCount}. This is likely a bug in your code.`,
-    );
-  }
-}
-
 export function validateDependencyCount(
   store: unknown,
   methodName: string,

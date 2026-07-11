@@ -126,46 +126,6 @@ describe("validationPlugin — lifecycle integration", () => {
     }).toThrow();
   });
 
-  it("validateLimitValue wrapper — valid value does not throw", () => {
-    router = createRouter([{ name: "home", path: "/home" }]);
-    router.usePlugin(validationPlugin());
-    const ctx = getInternals(router);
-
-    expect(() =>
-      ctx.validator?.options.validateLimitValue("maxPlugins", 5),
-    ).not.toThrow();
-  });
-
-  it("validateLimitValue wrapper — negative value throws RangeError", () => {
-    router = createRouter([{ name: "home", path: "/home" }]);
-    router.usePlugin(validationPlugin());
-    const ctx = getInternals(router);
-
-    expect(() =>
-      ctx.validator?.options.validateLimitValue("maxPlugins", -1),
-    ).toThrow(RangeError);
-  });
-
-  it("validateLimits wrapper — valid limits object does not throw", () => {
-    router = createRouter([{ name: "home", path: "/home" }]);
-    router.usePlugin(validationPlugin());
-    const ctx = getInternals(router);
-
-    expect(() =>
-      ctx.validator?.options.validateLimits({ maxPlugins: 5 }),
-    ).not.toThrow();
-  });
-
-  it("validateLimits wrapper — invalid limits (string) throws TypeError", () => {
-    router = createRouter([{ name: "home", path: "/home" }]);
-    router.usePlugin(validationPlugin());
-    const ctx = getInternals(router);
-
-    expect(() => ctx.validator?.options.validateLimits("invalid")).toThrow(
-      TypeError,
-    );
-  });
-
   it("validateDependencyExists — missing dependency throws ReferenceError", () => {
     router = createRouter([{ name: "home", path: "/home" }]);
     router.usePlugin(validationPlugin());

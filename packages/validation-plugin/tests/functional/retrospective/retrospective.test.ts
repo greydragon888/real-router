@@ -619,57 +619,15 @@ describe("validateDependenciesStructure", () => {
 });
 
 describe("validateLimitsConsistency", () => {
-  it("passes with no options, store, or deps", () => {
+  it("passes with no options or deps", () => {
     expect(() => {
-      validateLimitsConsistency({}, {}, {});
+      validateLimitsConsistency({}, {});
     }).not.toThrow();
   });
 
   it("passes with undefined options", () => {
     expect(() => {
-      validateLimitsConsistency(undefined, makeStore(), makeDeps());
-    }).not.toThrow();
-  });
-
-  it("throws RangeError when route count exceeds maxRoutes from options", () => {
-    const store = makeStore({
-      definitions: [
-        { name: "a", path: "/a" },
-        { name: "b", path: "/b" },
-        { name: "c", path: "/c" },
-      ],
-    });
-
-    expect(() => {
-      validateLimitsConsistency(
-        { limits: { maxRoutes: 2 } },
-        store,
-        makeDeps(),
-      );
-    }).toThrow(RangeError);
-    expect(() => {
-      validateLimitsConsistency(
-        { limits: { maxRoutes: 2 } },
-        store,
-        makeDeps(),
-      );
-    }).toThrow(/route count/i);
-  });
-
-  it("passes when route count equals maxRoutes", () => {
-    const store = makeStore({
-      definitions: [
-        { name: "a", path: "/a" },
-        { name: "b", path: "/b" },
-      ],
-    });
-
-    expect(() => {
-      validateLimitsConsistency(
-        { limits: { maxRoutes: 2 } },
-        store,
-        makeDeps(),
-      );
+      validateLimitsConsistency(undefined, makeDeps());
     }).not.toThrow();
   });
 
@@ -686,10 +644,10 @@ describe("validateLimitsConsistency", () => {
     });
 
     expect(() => {
-      validateLimitsConsistency({}, makeStore(), deps);
+      validateLimitsConsistency({}, deps);
     }).toThrow(RangeError);
     expect(() => {
-      validateLimitsConsistency({}, makeStore(), deps);
+      validateLimitsConsistency({}, deps);
     }).toThrow(/dependency count/i);
   });
 
@@ -706,40 +664,13 @@ describe("validateLimitsConsistency", () => {
     });
 
     expect(() => {
-      validateLimitsConsistency(
-        { limits: { maxDependencies: 2 } },
-        makeStore(),
-        deps,
-      );
+      validateLimitsConsistency({ limits: { maxDependencies: 2 } }, deps);
     }).toThrow(RangeError);
-  });
-
-  it("passes when store is null — covers FALSE branch of store check", () => {
-    expect(() => {
-      validateLimitsConsistency({}, null, makeDeps());
-    }).not.toThrow();
   });
 
   it("passes when deps is null — covers FALSE branch of deps check", () => {
     expect(() => {
-      validateLimitsConsistency({}, makeStore(), null);
-    }).not.toThrow();
-  });
-
-  it("ignores maxRoutes of 0 (unlimited)", () => {
-    const store = makeStore({
-      definitions: Array.from({ length: 100 }, (_, i) => ({
-        name: `route${i}`,
-        path: `/route${i}`,
-      })),
-    });
-
-    expect(() => {
-      validateLimitsConsistency(
-        { limits: { maxRoutes: 0 } },
-        store,
-        makeDeps(),
-      );
+      validateLimitsConsistency({}, null);
     }).not.toThrow();
   });
 });

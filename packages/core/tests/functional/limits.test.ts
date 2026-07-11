@@ -119,7 +119,7 @@ describe("core/limits (integration via public API)", () => {
       const deps = getDependenciesApi(router);
 
       // Set many dependencies at once via setDependencies - should not throw
-      // This covers validateDependencyLimit with maxDependencies === 0
+      // This covers validateDependencyCount with maxDependencies === 0
       const manyDeps: Record<string, number> = {};
 
       for (let i = 0; i < 150; i++) {
