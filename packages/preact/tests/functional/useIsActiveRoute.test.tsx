@@ -62,6 +62,23 @@ describe("useIsActiveRoute", () => {
     expect(isActiveRouteSpy).toHaveBeenCalled();
   });
 
+  it("an empty routeName is inactive — agrees with router.isActiveRoute('') (#1427)", () => {
+    // #1427 — an empty `routeName` is a misuse (matches no route). The canonical
+    // answer is `router.isActiveRoute("") === false`, and the hook must agree.
+    // The default-options fast-path predicate lacked the `routeName !== ""` guard,
+    // so "" took the name-selector fast path where `selector.isActive("") === true`
+    // (the root is every route's ancestor) and the hook wrongly reported active.
+    // The shared `createActiveSource` builder carries the guard, routing "" to the
+    // slow path whose snapshot is `router.isActiveRoute("")`.
+    expect(router.isActiveRoute("")).toBe(false);
+
+    const { result } = renderHook(() => useIsActiveRoute(""), {
+      wrapper: (props) => wrapper({ ...props, router }),
+    });
+
+    expect(result.current).toBe(false);
+  });
+
   it("should handle non-strict mode", () => {
     const { result } = renderHook(() => useIsActiveRoute("users", {}, false), {
       wrapper: (props) => wrapper({ ...props, router }),

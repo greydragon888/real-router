@@ -67,7 +67,7 @@ src/
 │   ├── useRoute.tsx            # Full route state from context (every navigation)
 │   ├── useNavigator.tsx        # Navigator from context (never re-renders)
 │   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
-│   ├── useIsActiveRoute.tsx    # Active state subscription (cached createActiveRouteSource, useMemo-wrapped opts + source)
+│   ├── useIsActiveRoute.tsx    # Active state subscription — delegates to shared createActiveSource (#1427); useMemo-wrapped
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
 │   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
 │   ├── useRouteExit.tsx        # Wrap subscribeLeave with abort + same-route + latest-handler guards

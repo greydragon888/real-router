@@ -201,6 +201,26 @@ describe("useIsActiveRoute", () => {
     expect(strictResult.current).toBe(false);
   });
 
+  it("an empty routeName is inactive — agrees with router.isActiveRoute('') (#1427)", () => {
+    // #1427 — an empty routeName is a misuse (matches no route). The canonical
+    // answer is router.isActiveRoute("") === false; the hook must agree. Before
+    // the guard, "" took the name-selector fast path where isActive("") === true
+    // (root is every route's ancestor). createActiveSource's routeName !== ""
+    // guard routes "" to the slow path (snapshot = router.isActiveRoute("")).
+    expect(router.isActiveRoute("")).toBe(false);
+
+    let result!: { readonly current: boolean };
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "",
+      onCapture: (r: { readonly current: boolean }) => {
+        result = r;
+      },
+    });
+
+    expect(result.current).toBe(false);
+  });
+
   describe("fast path (#1099 — default options, no params)", () => {
     // A no-params call with defaults (strict=false, ignoreQueryParams=true, no
     // hash) takes the `createActiveNameSelector` fast path — one shared router
