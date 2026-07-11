@@ -610,6 +610,26 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       expect(navSpy).toHaveBeenCalledTimes(1);
     });
 
+    it("dedups the pair even when a microtask checkpoint runs between the two events (#1228)", async () => {
+      // The synchronous dispatch above is the ONE timing where the
+      // microtask-reset dedup survives. A real browser runs a microtask
+      // checkpoint (and, per the older spec, a task boundary) between the
+      // popstate and hashchange of a hash traversal — so the reset fires first,
+      // clears the flags, and the second event double-navigates → phantom
+      // SAME_STATES. Model that checkpoint with an awaited microtask.
+      globalThis.history.replaceState({}, "", "/#/users/list");
+      const navSpy = vi.spyOn(getPluginApi(router), "navigateToState");
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      await Promise.resolve(); // microtask checkpoint — the queued reset runs here
+      globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("users.list");
+      expect(navSpy).toHaveBeenCalledTimes(1); // one navigation, not a double
+    });
+
     it("handles hashchanges from separate tasks independently (dedup guard resets per task)", async () => {
       // Two distinct external changes in separate browser tasks must BOTH be
       // handled — the guard resets on a microtask, so it never coalesces
