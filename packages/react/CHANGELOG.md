@@ -1,5 +1,21 @@
 # @real-router/react
 
+## 0.28.22
+
+### Patch Changes
+
+- [#1430](https://github.com/greydragon888/real-router/pull/1430) [`598b369`](https://github.com/greydragon888/real-router/commit/598b36909c581dd9b8401a84202cf1832078ccca) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(react): `useIsActiveRoute("")` is inactive, matching `router.isActiveRoute("")` ([#1427](https://github.com/greydragon888/real-router/issues/1427))
+
+  `useIsActiveRoute` kept an inline copy of the fast/slow active-source decision
+  whose predicate lacked the `routeName !== ""` guard, so an empty `routeName` took
+  the name-selector fast path — where `isActive("") === true` (the root is every
+  route's ancestor) — and wrongly reported active, diverging from the canonical
+  `router.isActiveRoute("") === false`. The hook now delegates to the shared
+  `createActiveSource` builder from `@real-router/sources`, whose guard routes an
+  empty name to the slow path. No change for any non-empty name — the fast/slow
+  decision and behaviour are otherwise identical (the `[#1248](https://github.com/greydragon888/real-router/issues/1248)` fast path is now the
+  one in the shared builder).
+
 ## 0.28.21
 
 ### Patch Changes
