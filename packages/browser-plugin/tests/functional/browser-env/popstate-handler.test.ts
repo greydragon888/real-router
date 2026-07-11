@@ -831,7 +831,7 @@ describe("popstate handler", () => {
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
-    it("resets the dedup guard on a microtask so separate tasks are both handled", async () => {
+    it("resets the dedup guard on a macrotask so separate tasks are both handled (#1228)", async () => {
       const { handler, lifecycle, fireHashchange, firePopstate } =
         makeHashSyncDeps();
 
@@ -840,12 +840,30 @@ describe("popstate handler", () => {
 
       expect(handler).toHaveBeenCalledTimes(1);
 
-      // Flush the microtask that clears the guard, then a new task's popstate
-      // must NOT be treated as the pair of the earlier hashchange.
-      await Promise.resolve();
+      // Flush the MACROTASK that clears the guard (the reset is setTimeout(0),
+      // not a microtask — #1228: a microtask reset fired on the mid-pair
+      // checkpoint). A genuinely separate task's popstate must NOT be treated as
+      // the pair of the earlier hashchange.
+      await new Promise((resolve) => setTimeout(resolve, 0));
       firePopstate();
 
       expect(handler).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the pair deduped across a microtask checkpoint between the two events (#1228)", async () => {
+      const { handler, lifecycle, firePopstate, fireHashchange } =
+        makeHashSyncDeps();
+
+      lifecycle.onStart?.();
+      // A real browser runs a microtask checkpoint BETWEEN the popstate and
+      // hashchange of one traversal ([popstate, microtask, hashchange]). The
+      // guard must survive it — a microtask-scoped reset (the old behavior)
+      // cleared it mid-pair and the second event double-navigated.
+      firePopstate();
+      await Promise.resolve();
+      fireHashchange();
+
+      expect(handler).toHaveBeenCalledTimes(1);
     });
 
     it("does not coalesce same-type bursts — two popstates in one task both run", () => {
