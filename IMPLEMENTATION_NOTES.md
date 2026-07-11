@@ -5182,10 +5182,36 @@ capabilities", quoted as prose in REPORT-react.md.
 
 ### Why
 
-Deliberately NOT in the `run-all`/REPORT engine rosters: competitors run bare
-(no middleware stacks), so a full-stack rr cell inside the matrix would be an
-apples-to-oranges row. `run.mjs` resolves engines by directory, so the variant
-needs no runner changes; report.mjs whitelists engines per cohort, so the
-extra results JSON cannot leak into the tables. Expected magnitude (post-#1417
-gross alloc): ≈ +1-2 % totalMs, +3-6 % alloc — a documentation coefficient,
-not a competitive signal.
+**This variant compares only against real-router itself — by design.** Its
+whole job is one number: Δ(full − bare) = the per-nav cost of the enabled
+production stack — a CALIBRATION coefficient for reading the matrix ("the
+bench says 0.95 ms; with a production stack multiply by ~K"), not a ranking
+row. The delta isolates exactly one variable — the plugin stack — because the
+app, routes, scenario and framework are identical between the two cells.
+
+A "full vs full" competitor comparison is not skipped for effort reasons — it
+is semantically impossible to make fair: react-router has no detachable
+equivalent of persistent-params / validated-search (its production plumbing is
+middleware/loaders with different semantics), and TanStack's search validation
+is baked into the core and NON-removable — its bare cell already carries that
+price, i.e. TanStack is always "full" on that axis. A full-vs-full row would
+compare different capability sets: apples-to-oranges squared. Hence the matrix
+stays bare-vs-bare and this cell lives beside it.
+
+What the number buys: (1) the "cost of enabled capabilities" prose in
+REPORT-react.md — answers the fair objection that the bench measures an
+unrealistic configuration; (2) the FIRST perf cell in which the per-nav code
+of persistent-params / search-schema / ssr-data executes at all (their bench
+perf coverage was zero — no measured scenario ran them), reusable as a
+regression cell after plugin changes; (3) potentially a new optimization axis
+invisible to the bare matrix — the n=2 smoke already hinted the stack costs
+~+45-50 % gross alloc vs the estimated +3-6 %, pointing inside the plugins
+(persistent-params merge spreads are the first suspect).
+
+React-only on purpose: the plugin stack is core-level and framework-agnostic,
+so one cohort yields the coefficient; replicating across 5 cohorts is 5× the
+work for the same number. Deliberately NOT in the `run-all`/REPORT engine
+rosters: `run.mjs` resolves engines by directory (no runner changes), and
+report.mjs whitelists engines per cohort, so the extra results JSON cannot
+leak into the tables. If the full run finds the delta boring, the variant is
+one directory + two devDeps to delete.
