@@ -82,22 +82,31 @@ class Logger {
    * ```
    */
   configure(config: Partial<LoggerConfig>): void {
-    if (config.level !== undefined) {
+    // Read each field ONCE into a local — an unstable getter must not be re-read
+    // between validation and storage: re-reading could pass validation with a
+    // valid level and then store a later, unvalidated one, disabling the
+    // threshold filter (a TOCTOU, #1162).
+    const level = config.level;
+
+    if (level !== undefined) {
       // Validate that the provided level is a valid configuration level
-      if (!Object.hasOwn(LEVEL_CONFIGS, config.level)) {
+      if (!Object.hasOwn(LEVEL_CONFIGS, level)) {
         throw new Error(
-          `Invalid log level: "${config.level}". Valid levels are: ${Object.keys(LEVEL_CONFIGS).join(", ")}`,
+          `Invalid log level: "${level}". Valid levels are: ${Object.keys(LEVEL_CONFIGS).join(", ")}`,
         );
       }
 
-      this.#config.level = config.level;
-      this.#currentThreshold = LEVEL_CONFIGS[config.level];
+      this.#config.level = level;
+      this.#currentThreshold = LEVEL_CONFIGS[level];
     }
     if (Object.hasOwn(config, "callback")) {
       this.#config.callback = config.callback;
     }
-    if (config.callbackIgnoresLevel !== undefined) {
-      this.#config.callbackIgnoresLevel = config.callbackIgnoresLevel;
+
+    const callbackIgnoresLevel = config.callbackIgnoresLevel;
+
+    if (callbackIgnoresLevel !== undefined) {
+      this.#config.callbackIgnoresLevel = callbackIgnoresLevel;
     }
   }
 

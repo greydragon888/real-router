@@ -195,6 +195,31 @@ describe("Logger", () => {
       }).toThrow(/Invalid log level/);
     });
 
+    it("reads config.level once — immune to an unstable getter TOCTOU (#1162)", () => {
+      // A well-typed getter (returns LogLevelConfig) that changes value between
+      // reads passed validation with a valid level, then the code stored a later
+      // unvalidated one — disabling the threshold filter. Read-once closes it.
+      let reads = 0;
+      const evil: Partial<LoggerConfig> = {
+        get level(): LogLevelConfig {
+          reads++;
+
+          return reads <= 2 ? ERROR_ONLY : ("toString" as LogLevelConfig);
+        },
+      };
+
+      logger.configure(evil);
+
+      // The validated "error-only" is stored (not a later "toString")…
+      expect(logger.getConfig().level).toBe(ERROR_ONLY);
+
+      // …and the threshold filter stays valid: a "toString" level → NaN threshold
+      // would disable it, letting a filtered "log" message through.
+      logger.log("Probe", "x");
+
+      expect(console.log).not.toHaveBeenCalled();
+    });
+
     it("should verify default callbackIgnoresLevel is false in internal config", () => {
       // Reset to defaults to verify internal state
       logger.configure({
