@@ -83,17 +83,33 @@ export class HashPlugin {
 
     this.#warnHashIgnored = warnHashIgnored;
 
+    const replaceHistoryStateImpl = createReplaceHistoryState(
+      api,
+      router,
+      browser,
+      pluginBuildUrl,
+      false,
+    );
+
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,
       matchUrl: (url: string) =>
         api.matchPath(hashUrlToPath(url, prefixRegex)) ?? undefined,
-      replaceHistoryState: createReplaceHistoryState(
-        api,
-        router,
-        browser,
-        pluginBuildUrl,
-        false,
-      ),
+      // #532/#1230: hash-plugin ignores URL fragments (`#` is the route
+      // delimiter). Warn once and drop `{ hash }` — mirroring buildUrl/navigate.
+      // Without this, createReplaceHistoryState's explicit-hash branch splices
+      // "#x" into the hash-route URL regardless of preserveHash=false.
+      replaceHistoryState: (
+        name: string,
+        params?: Params,
+        options?: { hash?: string },
+      ) => {
+        if (options?.hash !== undefined) {
+          warnHashIgnored();
+        }
+
+        replaceHistoryStateImpl(name, params);
+      },
     });
 
     const handler = createPopstateHandler({
