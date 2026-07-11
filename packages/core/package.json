@@ -93,7 +93,8 @@
     "test:mutation:report": "open reports/mutation-report.html",
     "bench": "tsx tests/benchmarks/run.ts",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
+    "lint": "eslint --cache --ext .ts src/ tests/ --max-warnings 0",
+    "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,

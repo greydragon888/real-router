@@ -17,6 +17,7 @@
     "test:mutation": "stryker run",
     "mutation:analyze": "node scripts/mutation-analyze.mjs",
     "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
     "lint:types": "turbo run lint:types",
     "lint:package": "turbo run lint:package",
     "lint:unused": "knip",

@@ -67,7 +67,8 @@ pnpm build:verbose      # Build with full output (debugging)
 pnpm bundle             # Bundle only (tsdown/rollup/svelte-package, no validation)
 pnpm test -- --run      # Run tests once (errors-only output)
 pnpm test:verbose       # Tests with full output (debugging)
-pnpm lint               # ESLint
+pnpm lint               # ESLint check only — the gate; fails on any violation (no --fix)
+pnpm lint:fix           # ESLint with --fix (local auto-fix; not run by the gate)
 pnpm type-check         # TypeScript
 pnpm lint:deps          # Check dependency versions (syncpack)
 pnpm lint:dedupe        # Check for duplicate deps

@@ -526,7 +526,8 @@ pnpm build:verbose    # Build with full output (debugging)
 pnpm test -- --run    # Run tests once (errors-only output)
 pnpm test:verbose     # Tests with full output (debugging)
 pnpm type-check       # TypeScript type checking
-pnpm lint             # ESLint
+pnpm lint             # ESLint check only — the gate (no --fix)
+pnpm lint:fix         # ESLint with --fix (local auto-fix)
 pnpm lint:e2e         # Verify e2e directories have spec files
 pnpm lint:unused      # Check for unused code (knip)
 ```

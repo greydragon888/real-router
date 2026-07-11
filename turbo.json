@@ -115,6 +115,19 @@
       "outputLogs": "errors-only",
       "cache": true
     },
+    "lint:fix": {
+      "dependsOn": ["^bundle"],
+      "outputs": [],
+      "inputs": [
+        "**/*.{ts,tsx,js,jsx}",
+        "../../shared/**/*.ts",
+        "!dist/**",
+        "!coverage/**",
+        "!**/node_modules/**",
+        "eslint.config.*"
+      ],
+      "cache": false
+    },
     "type-check": {
       "dependsOn": ["^type-check"],
       "outputs": [],

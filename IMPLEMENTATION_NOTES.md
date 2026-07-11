@@ -1770,7 +1770,7 @@ Evaluated `eslint-plugin-solid@0.14.5` for the Solid adapter. Decision: not adde
 **Audit workflow for future strictness bumps.** When `pnpm build` fails after a typescript-eslint major:
 
 1. Run `pnpm lint` to surface the manual errors. They will be a small set (`<20` typical).
-2. Run once more with `eslint --fix` enabled (already the default in our `lint` script) to absorb the auto-fixable rewrites.
+2. Run `pnpm lint:fix` (the `--fix` variant) to absorb the auto-fixable rewrites — the `lint` gate itself no longer auto-fixes (#1422, strict-gate flip below).
 3. Run `pnpm type-check` — every `TS2538`/`TS7053`/`TS2322` from the `--fix` pass is a load-bearing cast that was wrongly removed. Re-introduce each with `// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- <load-bearing reason>`. The fixed point converges in 2–3 passes.
 
 **Lesson.** A `pnpm.overrides` pin is the right tool for a confirmed upstream bug with a known fix-version ETA. It is the **wrong** tool for "this newer rule annoys me" — that's a config-level decision and belongs in `eslint.config.mjs`, not in dependency overrides. Once a pin starts suppressing things it wasn't installed to suppress, the cost of keeping it grows silently until something forces the audit (in our case, recurring dependabot dedupe failures).
@@ -5245,3 +5245,23 @@ run (stale dist without #1426/#1433 would have been measured otherwise).
 **REMOVE the override block on the next typescript-eslint bump** — once a
 re-published >=8.63 lands, the pin becomes a stale downgrade that will fight
 Dependabot (the override comment carries the same warning).
+
+## Lint gate flip: `lint` checks, `lint:fix` fixes (#1422)
+
+### Problem
+
+Every package's `lint` script was `eslint … --fix … --max-warnings 0` (30/30), and the CI + pre-push gate reaches eslint **only** through turbo's `test`/`test:properties` → `dependsOn: ["…", "lint", "…"]`. So the gate executed the **`--fix`** script: on CI's ephemeral checkout `--fix` silently repaired every auto-fixable violation (`prettier/prettier`, `@stylistic/padding-line-between-statements`, and every other fixable rule) **in place** → eslint exited `0` → `lint` passed → `test` passed → PR green, and the fix — never committed — was discarded with the checkout. Only genuinely **unfixable** errors ever failed CI. Auto-fixable drift thus accumulated in committed source, invisible to the gate (surfaced when merged test files kept showing format-on-save diffs, 2026-07-10).
+
+### Solution
+
+Split fix from check, aligning with the universal npm convention (`lint` = verify, `lint:fix` = mutate):
+
+- All 30 package `lint` scripts drop `--fix` → **`lint` is now the strict gate**. A new **`lint:fix`** per package carries the original `--fix` command for local DX.
+- Root: `lint => turbo run lint` **unchanged** (still the gate name); added `lint:fix => turbo run lint:fix`. New turbo `lint:fix` task is `cache: false` — a fixer mutates source, so a cached "fix" must never be skipped.
+- **Zero change to `turbo.json` `dependsOn` or `ci.yml`.** This is the whole reason to make `lint` (not a new `lint:check`) the strict task: the entire gate graph already pointed at `lint`, so flipping `lint`'s meaning fixed the gate in place with no wiring edits — the smallest possible blast radius for a direct-to-master infra change.
+
+### Why it was safe to flip with no cleanup
+
+The accumulated drift the issue cited (#1409/#1410 test files) had already been cleared in a prior `chore`, so a fresh strict `pnpm lint` was **already green across all 30 packages** (verified: 58/58 turbo tasks pass, 0 drift) — the flip is purely preventive; no companion reformat pass was needed. Discriminating power verified mutationally: injecting `export const lintProbe    =    1` (extra spaces, no semicolon) makes strict `lint` **fail** (`prettier/prettier` error + nonzero exit), while `lint:fix` repairs it to `export const lintProbe = 1;` and exits `0` — reproducing, then closing, the exact no-op the gate had been hiding.
+
+`pnpm lint` no longer edits files — use `pnpm lint:fix` locally. Hooks are unaffected (none call bare `lint`; pre-push `build` reaches strict `lint` transitively, which is the intended tightening). Infra-only (no `packages/*/src`) → no changeset.
