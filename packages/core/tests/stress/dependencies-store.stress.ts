@@ -64,7 +64,7 @@ describe("S13: Dependencies store churn", () => {
 
   it("S13.3 store churn + recovery: set 101, remove 50, refill 50 — has() stays consistent", () => {
     // NOTE: maxDependencies is enforced by @real-router/validation-plugin
-    // (validateDependencyLimit, inclusive `totalCount >= max`), NOT by core.
+    // (validateDependencyCount, inclusive `currentCount >= maxDependencies`), NOT by core.
     // This stress router has no validation-plugin, so the limit is inert and no
     // set throws — the discriminating invariant here is the store's set/remove/
     // refill bookkeeping (has() below), not limit enforcement. (The previous

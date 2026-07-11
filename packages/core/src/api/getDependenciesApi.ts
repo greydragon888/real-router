@@ -118,7 +118,6 @@ export function getDependenciesApi<
         deps,
         "setDependencies",
       );
-      ctx.validator?.dependencies.validateDependencyLimit(store, store.limits);
 
       setMultipleDependencies(
         store,

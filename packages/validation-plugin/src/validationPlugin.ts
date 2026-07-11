@@ -20,7 +20,7 @@ import {
   warnBatchOverwrite,
   warnRemoveNonExistent,
 } from "./validators/dependencies";
-import { validateEventName, validateListenerArgs } from "./validators/eventBus";
+import { validateListenerArgs } from "./validators/eventBus";
 import {
   validateHandler,
   validateHandlerLimit,
@@ -36,11 +36,7 @@ import {
   validateNavigateParams,
   validateStartArgs,
 } from "./validators/navigation";
-import {
-  validateLimitValue,
-  validateLimits,
-  validateOptions,
-} from "./validators/options";
+import { validateOptions } from "./validators/options";
 import {
   validatePluginLimit,
   validateNoDuplicatePlugins,
@@ -88,7 +84,6 @@ import type {
   Route,
   RouteTree,
   Plugin,
-  Options,
 } from "@real-router/core";
 import type { RouterInternals, Matcher } from "@real-router/core/validation";
 
@@ -179,23 +174,11 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       throwIfInternalRouteInArray(routes, caller) {
         throwIfInternalRouteInArray(routes as readonly Route[], caller);
       },
-      validateExistingRoutes,
-      validateForwardToConsistency,
       validateSetRootPathArgs,
       guardRouteCallbacks,
       guardNoAsyncCallbacks,
     },
     options: {
-      validateLimitValue(name, value) {
-        validateLimitValue(
-          name as keyof NonNullable<Options["limits"]>,
-          value,
-          "validate",
-        );
-      },
-      validateLimits(limits) {
-        validateLimits(limits, "validate");
-      },
       validateOptions,
       validateResolvedDefaultRoute,
     },
@@ -211,9 +194,6 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
 
         validateDependencyExistsRaw(value, name);
       },
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateDependencyLimit(_store, _limits) {},
-      validateDependenciesStructure,
       validateDependencyCount,
       validateCloneArgs,
       warnOverwrite: warnDepsOverwrite,
@@ -286,8 +266,6 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       },
     },
     eventBus: {
-      validateEventName,
-
       validateListenerArgs(name, cb) {
         validateListenerArgs<EventName>(
           name as EventName,
@@ -322,7 +300,7 @@ export function validationPlugin(): PluginFactory {
       validateRoutePropertiesStore(store);
       validateForwardToTargetsStore(store);
       validateDependenciesStructure(deps);
-      validateLimitsConsistency(options, store, deps);
+      validateLimitsConsistency(options, deps);
       ctx.validator.options.validateOptions(
         options,
         "constructor (retrospective)",

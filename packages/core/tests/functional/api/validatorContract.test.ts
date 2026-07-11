@@ -122,15 +122,12 @@ describe("core/validator call-site contract", () => {
       expect(deps.has("u")).toBe(false);
     });
 
-    it("setAll: validates object + limit, counts each new key ('setDependencies')", () => {
+    it("setAll: validates object, counts each new key ('setDependencies')", () => {
       deps.setAll({ a: 1, b: 2 });
 
       expect(
         validator.dependencies.validateDependenciesObject,
       ).toHaveBeenCalledWith({ a: 1, b: 2 }, "setDependencies");
-      expect(
-        validator.dependencies.validateDependencyLimit,
-      ).toHaveBeenCalledTimes(1);
       expect(
         validator.dependencies.validateDependencyCount,
       ).toHaveBeenCalledWith(expect.anything(), "setDependencies");

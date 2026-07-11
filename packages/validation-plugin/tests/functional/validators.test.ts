@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { computeThresholds } from "../../src/helpers";
 import {
-  validateDependencyLimit,
   validateDependencyCount,
   validateCloneArgs,
   warnOverwrite as warnDepOverwrite,
@@ -249,34 +248,6 @@ describe("plugins validators", () => {
       expect(() => {
         validatePluginLimit(50, 1);
       }).toThrow(/Plugin limit exceeded/);
-    });
-  });
-});
-
-describe("dependencies validators", () => {
-  describe("validateDependencyLimit", () => {
-    it("throws when count exceeds limit", () => {
-      expect(() => {
-        validateDependencyLimit(100, 1, "test", 100);
-      }).toThrow(/Dependency limit exceeded/);
-    });
-
-    it("does not throw when count is below limit", () => {
-      expect(() => {
-        validateDependencyLimit(98, 1, "test", 100);
-      }).not.toThrow();
-    });
-
-    it("does not throw when limit is 0 (unlimited)", () => {
-      expect(() => {
-        validateDependencyLimit(1000, 1, "test", 0);
-      }).not.toThrow();
-    });
-
-    it("uses default limit of 100", () => {
-      expect(() => {
-        validateDependencyLimit(100, 1, "test");
-      }).toThrow(/Dependency limit exceeded/);
     });
   });
 });
