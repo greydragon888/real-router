@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-11]
 
+### @real-router/hash-plugin@0.8.17
+
+### Patch Changes
+
+- [#1447](https://github.com/greydragon888/real-router/pull/1447) [`e8203b2`](https://github.com/greydragon888/real-router/commit/e8203b2f9995ea1c77445dc98e4159e5727e9205) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(hash-plugin): reset the popstate/hashchange dedup on a macrotask, not a microtask ([#1228](https://github.com/greydragon888/real-router/issues/1228))
+
+  A hash-changing back/forward fires the `popstate`+`hashchange` pair in one browser task, but a **microtask checkpoint runs between the two listeners** (verified in Chromium: `[popstate, microtask, hashchange, macrotask]`). The dedup's `queueMicrotask` reset therefore cleared its guard flags before the pair's second event, which was then handled as an independent navigation to the same location → a phantom `SAME_STATES` `$$error` on **every** hash back/forward (leaking to `$$error` subscribers — error boundaries, reporting, devtools — and doing a redundant `replaceState`). The `saw*` flags now reset on a `setTimeout(0)` macrotask, which fires **after** the pair completes, so the guard spans the whole pair. State, URL, and the type-scoped / order-independent dedup semantics are unchanged.
+
+- [#1447](https://github.com/greydragon888/real-router/pull/1447) [`e8203b2`](https://github.com/greydragon888/real-router/commit/e8203b2f9995ea1c77445dc98e4159e5727e9205) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(hash-plugin): preserve the typed URL on a 404 popstate ([#1229](https://github.com/greydragon888/real-router/issues/1229))
+
+  `onTransitionSuccess` rebuilt the address-bar URL from `buildUrl(toState.name, toState.params)`; for `UNKNOWN_ROUTE` `buildPath` returns `""`, so the URL collapsed to the bare prefix (`#!`) and the typed 404 path was lost — a refresh then re-started from `#!` and silently landed on `home`. It now builds from `toState.path` (already final, and for matched routes identical to `buildPath(name, params)`), so the typed URL survives and a refresh is idempotent to the same 404 state. Also drops one `buildPath` per successful navigation (parity with browser-plugin).
+
+- [#1447](https://github.com/greydragon888/real-router/pull/1447) [`e8203b2`](https://github.com/greydragon888/real-router/commit/e8203b2f9995ea1c77445dc98e4159e5727e9205) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(hash-plugin): warn+ignore `{ hash }` in `replaceHistoryState` instead of splicing a fragment ([#1230](https://github.com/greydragon888/real-router/issues/1230))
+
+  `replaceHistoryState(name, params, { hash: "x" })` spliced the fragment into the hash-route URL (`#!/about#x`) with no warning — unlike `buildUrl`/`navigate`, which warn once and ignore it (`#` is the route delimiter, so URL fragments are structurally unsupported). The shared `createReplaceHistoryState`'s explicit-hash branch runs independently of the `preserveHash` flag, so hash-plugin's `preserveHash=false` did not suppress it. hash-plugin now wraps the extension: it emits the same one-time warn and drops `{ hash }` before delegating, completing the warn+ignore contract across all three hash-accepting methods. browser-plugin / navigation-plugin (which legitimately support tri-state `{ hash }`) are unaffected.
+
+
 ### @real-router/logger@0.3.3
 
 ### Patch Changes
