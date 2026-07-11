@@ -45,6 +45,7 @@ export default [
   },
   // Note: @real-router/svelte uses svelte-package (individual files),
   // not a single ESM bundle — cannot be measured by size-limit/esbuild.
+  esm("sources", "3 kB", ignoreCore),
   esm("rx", "1.5 kB", ignoreCore),
 
   // ── Plugins ───────────────────────────────────────────────────────
@@ -61,6 +62,10 @@ export default [
   esm("ssr-data-plugin", "2.5 kB", ignoreCore),
   esm("rsc-server-plugin", "2.5 kB", ignoreCore),
 
+  // ── Utilities ─────────────────────────────────────────────────────
+  esm("route-utils", "1 kB"),
+
   // ── Standalone (zero deps) ────────────────────────────────────────
   esm("logger", "0.5 kB"),
+  esm("fsm", "0.5 kB"),
 ];
