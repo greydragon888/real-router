@@ -53,7 +53,7 @@ src/
 │   ├── useRoute.tsx            # Full route state from context (every navigation)
 │   ├── useNavigator.tsx        # Navigator from context (never re-renders)
 │   ├── useRouteNode.tsx        # Node-scoped subscription (cached createRouteNodeSource from sources)
-│   ├── useIsActiveRoute.tsx    # Default opts → shared createActiveNameSelector fast path (#1249); else cached createActiveRouteSource, useMemo-wrapped
+│   ├── useIsActiveRoute.tsx    # Delegates to shared createActiveSource builder (#1427): default opts + non-empty name → createActiveNameSelector fast path (#1249), else cached createActiveRouteSource; useMemo-wrapped
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
 │   ├── useRouterTransition.tsx # Transition lifecycle (cached getTransitionSource)
 │   ├── useRouteExit.tsx        # Wraps subscribeLeave with abort + same-route guards + handler ref
@@ -499,6 +499,6 @@ integration contract:
 - `useRouteNode` uses cached `createRouteNodeSource` from `@real-router/sources` — consumers of the same `nodeName` share one router subscription
 - `useRouterTransition` uses `getTransitionSource` — shared eager source per router
 - `RouterErrorBoundary` uses `createDismissableError` — shared error source with integrated dismissal state (no local `useRouterError` hook)
-- `useIsActiveRoute` resolves default-options active state through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links (#1249); custom params / strict / `ignoreQueryParams: false` / hash fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive)
+- `useIsActiveRoute` delegates to the shared `createActiveSource` builder from `@real-router/sources` (#1427) — the fast/slow decision, and the `routeName !== ""` guard that keeps `useIsActiveRoute("")` in sync with `router.isActiveRoute("") === false`, live in one place for every adapter. Default options + a **non-empty** name resolve through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links (#1249); custom params / strict / `ignoreQueryParams: false` / hash / empty name fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive)
 - `Link` uses `memo()` with custom `areLinkPropsEqual` comparator: `Object.is` for primitives + `style` + `children`, `shallowEqual` (from `dom-utils`) for `routeParams`/`routeOptions`. Nested objects in params are not deep-compared — consumers stabilize via `useMemo` if needed
 - WeakMap caches in `@real-router/sources` are per-router, auto-evicted on router GC

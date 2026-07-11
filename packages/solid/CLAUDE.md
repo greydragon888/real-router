@@ -443,31 +443,33 @@ RouteView renders only the active match. On navigation, the previous component d
 <Link routeName="users" /> // Active even if ?page=2 differs
 ```
 
-### Empty `routeName` Link is always active in unstarted state
+### Empty `routeName` Link is inactive in every router state (#1427)
 
-`<Link routeName="">` is a misuse pattern, but the helper does not validate
-against it. RouterProvider's `routeSelector` uses an empty-string sentinel
-(`routeSignal().route?.name ?? ""`) when the router has no active state
-(unstarted / stopped / disposed). The underlying `isRouteActive("", "")`
-returns `true` via the equality branch — so a Link with `routeName=""`
-ends up matching the sentinel and renders as **always active** until the
-router commits a real route.
+`<Link routeName="">` is a misuse pattern (an empty name matches no route). The
+canonical answer is `router.isActiveRoute("") === false`, and the Link honors it
+in **every** state. The `useFastPath` predicate (`components/Link.tsx`) guards
+`routeName !== ""`, so an empty name skips the `routeSelector` fast path — whose
+unstarted sentinel (`routeSignal().route?.name ?? ""`) would otherwise make
+`isRouteActive("", "") === true` and light the Link up before `router.start()` —
+and falls to the slow `createActiveRouteSource`, which reads
+`router.isActiveRoute("") === false` whether the router is unstarted, stopped, or
+on a real route.
 
 ```tsx
-// WRONG — empty routeName matches the sentinel; this Link is "active"
-// before the router starts, which is rarely what the consumer wants.
-<Link routeName="" activeClassName="active">Home</Link>
+// A misused empty-name Link is never active (tracks router.isActiveRoute("")):
+<Link routeName="" activeClassName="active">Home</Link>  // never "active"
 
-// CORRECT — pass a real route name; helper is safe by construction.
+// CORRECT — pass a real route name.
 <Link routeName="home" activeClassName="active">Home</Link>
 ```
 
-Every `isRouteActive` edge case (incl. `""`, trailing dots, dot-only
-inputs) is regression-locked via property tests — search for
-`isRouteActive` in `tests/property/routerProvider.properties.ts` to
-find the pin-tests when investigating a regression. Validation may
-reject `routeName=""` at register time, but raw helper invocation
-through a custom plugin / `routeSelector("")` is still observable.
+The `isRouteActive` helper itself is **unchanged** — `isRouteActive("", "")` still
+returns `true` (its edge cases stay property-locked in
+`tests/property/routerProvider.properties.ts`, whose Invariant 7 pins only the
+non-empty arms). The guard lives at the Link level (`useFastPath`), routing the
+misuse to the canonical slow path. Locked by `tests/functional/Link.test.tsx`
+(unstarted empty-name inactive) + `tests/integration/Link.test.tsx` (inactive
+before **and** after start).
 
 ### Link Props Are Captured at Init (Slow Path)
 

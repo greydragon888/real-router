@@ -350,10 +350,15 @@ describe("Link - Integration Tests", () => {
   // RouterProvider → routeSelector pipeline so a regression in any
   // layer (selector wrapping, sentinel value change, Link-side
   // short-circuit) becomes visible at the UI boundary.
-  describe("Empty routeName sentinel (Gotcha #16)", () => {
-    it("Link routeName='' is active BEFORE router.start() (sentinel `''` matches)", () => {
-      // Use a router that hasn't been started — override the wrapper's
-      // implicit start from beforeEach by stopping immediately.
+  describe("Empty routeName is inactive in every router state (#1427)", () => {
+    // An empty routeName is a misuse (matches no route). Before #1427 the Link
+    // fast path went through the routeSelector, whose unstarted sentinel
+    // (`route?.name ?? ""`) made `isRouteActive("", "") === true` — the Link lit
+    // up before `router.start()`. The `routeName !== ""` guard in `useFastPath`
+    // now routes an empty name to the slow `createActiveRouteSource`, so the Link
+    // tracks the canonical `router.isActiveRoute("") === false` in EVERY state.
+    it("Link routeName='' is INACTIVE before router.start()", () => {
+      // Stop the router so it has no active route (the sentinel state).
       router.stop();
 
       render(
@@ -365,14 +370,10 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
-      // Sentinel: with no active route, routeSelector falls back to
-      // the empty string. Link with routeName='' compares equal to
-      // the sentinel and renders as active.
-      expect(screen.getByTestId("empty-link")).toHaveClass("active");
+      expect(screen.getByTestId("empty-link")).not.toHaveClass("active");
     });
 
-    it("Link routeName='' becomes INACTIVE after router commits a real route", async () => {
-      // Stop and re-mount; then start to commit a non-empty route name.
+    it("Link routeName='' stays INACTIVE after router commits a real route", async () => {
       router.stop();
 
       render(
@@ -384,14 +385,12 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
-      // Before start — active (sentinel match).
-      expect(screen.getByTestId("empty-link")).toHaveClass("active");
+      // Inactive before start (aligned with isActiveRoute("") === false)…
+      expect(screen.getByTestId("empty-link")).not.toHaveClass("active");
 
       await router.start("/");
 
-      // After start the route name is non-empty (default route
-      // resolved). Sentinel no longer matches → link flips to
-      // inactive.
+      // …and still inactive once a real route resolves.
       expect(screen.getByTestId("empty-link")).not.toHaveClass("active");
     });
   });

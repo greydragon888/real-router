@@ -78,7 +78,7 @@ src/
 │   ├── useRoute.tsx               # Full route state — RouteHookResult<P> with non-nullable route (throws if undefined)
 │   ├── useNavigator.tsx           # Navigator from context (never re-renders)
 │   ├── useRouteNode.tsx           # Node-scoped subscription (cached createRouteNodeSource)
-│   ├── useIsActiveRoute.tsx       # Active state subscription (useMemo-wrapped createActiveRouteSource)
+│   ├── useIsActiveRoute.tsx       # Active state subscription — delegates to shared createActiveSource (#1427); useMemo-wrapped
 │   ├── useRouteUtils.tsx          # RouteUtils from route tree (never re-renders)
 │   ├── useRouterTransition.tsx    # Transition lifecycle (cached getTransitionSource)
 │   ├── useRouteExit.tsx           # Wrap subscribeLeave with reentrant abort + same-route skip + latest-handler ref + StrictMode dedupe

@@ -622,7 +622,7 @@ See also: [Svelte Integration — Server-Side Rendering](https://github.com/grey
 - `useRouteNode` uses cached `createRouteNodeSource` from `@real-router/sources` — N consumers of the same `nodeName` share one router subscription
 - `useRouterTransition` uses `getTransitionSource` — shared eager source per router
 - `RouterErrorBoundary` uses `createDismissableError` — shared error source with integrated dismissal state (no local `useRouterError` composable)
-- `useIsActiveRoute` uses cached `createActiveRouteSource` — params hashed via `canonicalJson` (key-order-insensitive)
+- `useIsActiveRoute` delegates to the shared `createActiveSource` builder from `@real-router/sources` (#1427), bridged via `createReactiveSource`. Default options + a **non-empty** name take the per-router `createActiveNameSelector` fast path (#1099 — one `router.subscribe` for any number of distinct-`routeName` Links); custom params / strict / `ignoreQueryParams: false` / hash / empty name fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive). The `routeName !== ""` guard keeps `useIsActiveRoute("")` in sync with `router.isActiveRoute("") === false`
 - No `memo()` needed — Svelte compiles to fine-grained DOM updates
 - `Link` uses `$derived` for `href` and `class` derivation, `useIsActiveRoute` for active state
 - Most WeakMap caches live in `@real-router/sources` — auto-evicted on router GC. The one **local** per-router cache is `createLinkAction`'s event-delegation state (`WeakMap<Router, …>`, #1253 — see the `use:link` delegation gotcha) — also GC'd with the router

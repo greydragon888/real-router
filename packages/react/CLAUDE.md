@@ -86,7 +86,7 @@ src/
 │   ├── useRoute.tsx                # Returns RouteHookResult<P> — route is non-nullable
 │   ├── useNavigator.tsx
 │   ├── useRouteNode.tsx            # Uses cached createRouteNodeSource from @real-router/sources
-│   ├── useIsActiveRoute.tsx        # Default opts → shared createActiveNameSelector fast path (#1248); else cached createActiveRouteSource, useMemo-wrapped
+│   ├── useIsActiveRoute.tsx        # Delegates to shared createActiveSource builder (#1427): default opts + non-empty name → createActiveNameSelector fast path (#1248), else cached createActiveRouteSource; useMemo-wrapped
 │   ├── useRouteUtils.tsx
 │   ├── useRouterTransition.tsx     # Uses cached getTransitionSource
 │   ├── useRouteEnter.tsx           # Mount-side window: reentrant abort, same-route skip, latest-ref, StrictMode dedupe
@@ -585,5 +585,5 @@ No built-in SSR support. For SSR:
 - `useRouteNode` uses cached `createRouteNodeSource` from `@real-router/sources` — `N` consumers of the same `nodeName` share one router subscription
 - `useRouterTransition` uses `getTransitionSource` — shared eager source per router
 - `RouterErrorBoundary` uses `createDismissableError` — shared error source with integrated dismissal state (no local `useRouterError` hook)
-- `useIsActiveRoute` resolves default-options active state (no params, non-strict, `ignoreQueryParams`, no `hash`) through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links (#1248). Custom params / strict / `ignoreQueryParams: false` / hash fall to cached `createActiveRouteSource` — params are hashed with `canonicalJson` (key-order-insensitive), so `{a:1, b:2}` and `{b:2, a:1}` hit the same cache entry. No `useStableValue` wrapper needed
+- `useIsActiveRoute` delegates to the shared `createActiveSource` builder from `@real-router/sources` (#1427) — the fast/slow decision, and the `routeName !== ""` guard that keeps `useIsActiveRoute("")` in sync with `router.isActiveRoute("") === false`, live in one place for every adapter. Default options (no params, non-strict, `ignoreQueryParams`, no `hash`, **non-empty** name) resolve through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links (#1248). Custom params / strict / `ignoreQueryParams: false` / hash / empty name fall to cached `createActiveRouteSource` — params hashed with `canonicalJson` (key-order-insensitive), so `{a:1, b:2}` and `{b:2, a:1}` hit the same cache entry. `useMemo`-wrapped; no `useStableValue` wrapper needed
 - `Link` uses `memo()` with custom `areLinkPropsEqual` comparator: `Object.is` for primitives + `style` + `children`, `shallowEqual` (Object.is per key, order-insensitive) for `routeParams`/`routeOptions`. Nested objects in params are not deep-compared — consumers stabilize via `useMemo` if needed

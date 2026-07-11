@@ -1,7 +1,4 @@
-import {
-  createActiveNameSelector,
-  createActiveRouteSource,
-} from "@real-router/sources";
+import { createActiveSource } from "@real-router/sources";
 import { useMemo } from "preact/hooks";
 
 import { useSyncExternalStore } from "../useSyncExternalStore";
@@ -18,43 +15,25 @@ export function useIsActiveRoute(
 ): boolean {
   const router = useRouter();
 
-  // Fast path (#1249) — the default-options active check: no custom `params`,
-  // non-strict, query params ignored, no `hash`. Resolve through the per-router
-  // shared `createActiveNameSelector` — ONE `router.subscribe` handle serves any
-  // number of distinct-`routeName` links — instead of a per-instance
-  // `createActiveRouteSource` (a `BaseSource` AND its own router subscription for
-  // every distinct name). Direct port of the svelte (#1101) / angular (#1104) /
-  // react (#1248) fast paths; the selector's `isActive` is exactly non-strict,
-  // query-ignoring, name-only matching. Any deviation falls to the slow path,
-  // whose canonical-args cache handles the full surface (custom params, strict,
-  // `ignoreQueryParams: false`, hash-aware #532).
-  //
-  // The `useMemo` wrap skips the branch + `canonicalJson(params)` + cache lookup
-  // on every render when all primitive deps and the `params` reference are stable.
-  // exactOptionalPropertyTypes forbids `{ hash: undefined }` literally, so we
-  // conditionally spread the key only when the caller passed a value.
-  const store = useMemo(() => {
-    if (
-      params === undefined &&
-      !strict &&
-      ignoreQueryParams &&
-      hash === undefined
-    ) {
-      const selector = createActiveNameSelector(router);
-
-      return {
-        subscribe: (onChange: () => void) =>
-          selector.subscribe(routeName, onChange),
-        getSnapshot: () => selector.isActive(routeName),
-      };
-    }
-
-    return createActiveRouteSource(router, routeName, params, {
-      strict,
-      ignoreQueryParams,
-      ...(hash !== undefined && { hash }),
-    });
-  }, [router, routeName, params, strict, ignoreQueryParams, hash]);
+  // The fast/slow decision — and the `routeName !== ""` guard that keeps
+  // `useIsActiveRoute("")` in sync with `router.isActiveRoute("")` (a misused
+  // empty name matches nothing, #1427) — lives in the shared `createActiveSource`
+  // builder, so every adapter resolves active state identically (#1249 landed the
+  // fast path inline here; #1427 folded it into the shared builder). The `useMemo`
+  // wrap skips the branch + `canonicalJson(params)` + cache lookup on every render
+  // when all deps (including the `params` reference) are stable.
+  const store = useMemo(
+    () =>
+      createActiveSource(
+        router,
+        routeName,
+        params,
+        strict,
+        ignoreQueryParams,
+        hash,
+      ),
+    [router, routeName, params, strict, ignoreQueryParams, hash],
+  );
 
   return useSyncExternalStore(
     store.subscribe,
