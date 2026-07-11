@@ -243,6 +243,9 @@ importers:
       '@real-router/memory-plugin':
         specifier: workspace:^
         version: link:../packages/memory-plugin
+      '@real-router/persistent-params-plugin':
+        specifier: workspace:^
+        version: link:../packages/persistent-params-plugin
       '@real-router/react':
         specifier: workspace:^
         version: link:../packages/react
@@ -252,6 +255,9 @@ importers:
       '@real-router/solid':
         specifier: workspace:^
         version: link:../packages/solid
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../packages/ssr-data-plugin
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../packages/svelte

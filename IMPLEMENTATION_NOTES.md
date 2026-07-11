@@ -5151,3 +5151,41 @@ Three findings (#1215, #1216, #1217) read as independent bugs but shared one str
 The **framework-agnostic** guarantee is enforced at the sources layer, where it belongs: `createRouteSource` / `createRouteNodeSource` / `createActiveRouteSource` reconnect-reconcile (#765/#766) and `createDismissableError` catch-up (#765.2) each carry property invariants (sources INVARIANTS.md); rx `state$` replays current state on subscribe. The adapter-level manifestations (React `<Activity>` hide/show) are locked in the measuring owner's integration suite (react `reactive-lifecycle.test.tsx` P1/P2/PC2). `<Activity>` is a React-19 API with no uniform cross-framework analogue, so a literal "same test × 6 adapters" is not the right shape — the framework-agnostic reconcile those tests exercise is already source-level-tested for every consumer.
 
 **Sweep-2 (2026-07-10, read-only) confirmed the contract holds across every source:** all lazy sources reconcile; eager sources (transition / error) and rx `events$` are event streams by-design; `scroll-restore` / `view-transitions` are transition-driven, not stale-able derived views. No residual reconcile gap.
+
+## `real-router-full` reference bench variant (interceptor-depth calibration)
+
+### Problem
+
+Every cross-router bench app wires only `browserPluginFactory()`, whose single
+interceptor fires on `start` (boot). Per-nav interceptor chains are therefore
+EMPTY in every measured cell, while a realistic production app stacks
+browser + persistent-params + search-schema + ssr-data — per-nav chain depths
+forwardState=2 / buildPath=1, plus the ssr-data leave-listener and
+persistent-param merging on every navigation. The committed numbers are the
+bare router's price, slightly understating the production price (the
+"interceptor-depth" measurement-realism note of the 2026-07 perf-vector hunt).
+
+### Solution
+
+`apps/react/real-router-full/` — the base react app wired with that full
+stack (schema is a hand-rolled Standard Schema V1 object, no zod dep; the one
+ssr-data loader resolves synchronously and only runs on start/invalidate).
+Run manually, one-off:
+
+```bash
+node cross-router/run.mjs nav-latency real-router-full react 50
+node cross-router/run.mjs param-nav  real-router-full react 50
+```
+
+The delta vs the bare `real-router` cells is "the cost of enabled
+capabilities", quoted as prose in REPORT-react.md.
+
+### Why
+
+Deliberately NOT in the `run-all`/REPORT engine rosters: competitors run bare
+(no middleware stacks), so a full-stack rr cell inside the matrix would be an
+apples-to-oranges row. `run.mjs` resolves engines by directory, so the variant
+needs no runner changes; report.mjs whitelists engines per cohort, so the
+extra results JSON cannot leak into the tables. Expected magnitude (post-#1417
+gross alloc): ≈ +1-2 % totalMs, +3-6 % alloc — a documentation coefficient,
+not a competitive signal.
