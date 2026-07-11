@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-11]
 
+### @real-router/logger@0.3.3
+
+### Patch Changes
+
+- [#1445](https://github.com/greydragon888/real-router/pull/1445) [`54c1ef9`](https://github.com/greydragon888/real-router/commit/54c1ef91421fc1b3764fc0a7a8dac39c84fd6a99) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(logger): isolate an async callback rejection instead of leaking a Node unhandledRejection ([#1161](https://github.com/greydragon888/real-router/issues/1161))
+
+  `#invokeCallback` wrapped the user callback in a `try/catch` that isolated only
+  **synchronous** throws. An async callback (a `(...) => Promise<void>` is assignable
+  to the void-typed `LogCallback`, no cast) had its returned Promise discarded, so a
+  rejection surfaced as a Node `unhandledRejection` — process-fatal under
+  `--unhandled-rejections=strict` (Node 22+ default), reachable on the documented
+  async-analytics callback and via `createRouter(routes, { logger: { callback: asyncFn } })`.
+
+  The callback's runtime return is now read, duck-checked for a thenable, and its
+  rejection routed to the same `console.error` sink a sync throw uses (`[Logger] Error
+in async callback:`) — mirroring core's `subscribe` isolation ([#944](https://github.com/greydragon888/real-router/issues/944)). No API change.
+
+- [#1445](https://github.com/greydragon888/real-router/pull/1445) [`54c1ef9`](https://github.com/greydragon888/real-router/commit/54c1ef91421fc1b3764fc0a7a8dac39c84fd6a99) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(logger): read config.level once in configure() — close the unstable-getter TOCTOU ([#1162](https://github.com/greydragon888/real-router/issues/1162))
+
+  `configure()` read `config.level` as a value up to four times (validate `!== undefined`,
+  `Object.hasOwn(LEVEL_CONFIGS, ·)`, store, threshold lookup). A config with an unstable
+  `level` getter that returns different values across reads passed validation with a valid
+  level and then stored a later, unvalidated one — disabling the threshold filter. `level`
+  and `callbackIgnoresLevel` are now read once into a local before validation and storage,
+  so the getter fires once and the validated value is what gets stored. No change for a
+  normal value config.
+
+
 ### @real-router/core@0.75.0
 
 ### Minor Changes
