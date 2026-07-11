@@ -7,6 +7,195 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-11]
 
+### @real-router/core@0.75.0
+
+### Minor Changes
+
+- [#1443](https://github.com/greydragon888/real-router/pull/1443) [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): thread `parentName` into the `RouterValidator.routes.validateRoutes` type ([#1224](https://github.com/greydragon888/real-router/issues/1224))
+
+  `RouterValidator.routes.validateRoutes` gained an optional `parentName?: string`
+  third argument, threaded from the `add({ parent })` call site (`getRoutesApi.ts`).
+  Without it the validation plugin validated a parented batch "from the root" and
+  false-rejected a `forwardTo` whose target needs the parent's path params — an add
+  that bare core accepts and runs correctly. Additive, non-breaking (optional
+  param); pre-1.0 `minor` for the public type surface. Bare core is unchanged (the
+  validator is `null` without the plugin).
+
+- [#1443](https://github.com/greydragon888/real-router/pull/1443) [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - refactor(core): drop orphaned `RouterValidator` entries + the dead `validateDependencyLimit` call ([#1226](https://github.com/greydragon888/real-router/issues/1226))
+
+  Removes validation-plugin mirror-drift left after [#960](https://github.com/greydragon888/real-router/issues/960): the never-called
+  `RouterValidator` interface methods `routes.validateExistingRoutes`,
+  `routes.validateForwardToConsistency`, `options.validateLimitValue`,
+  `options.validateLimits`, `dependencies.validateDependencyLimit`,
+  `dependencies.validateDependenciesStructure`, and `eventBus.validateEventName`
+  (core never invoked any of them — the plugin calls its own file-scope versions),
+  plus the dead `ctx.validator?.dependencies.validateDependencyLimit(...)` call in
+  `getDependenciesApi` (the dependency-count limit is enforced by
+  `validateDependencyCount`). Public type-surface removal (pre-1.0 `minor`); no
+  runtime behavior change — bare core never called these.
+
+### @real-router/validation-plugin@0.11.0
+
+### Minor Changes
+
+- [#1443](https://github.com/greydragon888/real-router/pull/1443) [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(validation-plugin): stop false-rejecting `add({ parent }) + forwardTo` to a param-carrying sibling ([#1224](https://github.com/greydragon888/real-router/issues/1224))
+
+  `validateForwardToTargets` validated a parented batch "from the root": the forward
+  source's available params omitted the parent's path params, so a forward to a
+  target needing them (e.g. the parent's `:userId`) was rejected — while bare core
+  accepts the same add and runs the forward. The validator now threads `parentName`
+  (via the new `RouterValidator.routes.validateRoutes` argument), unions the
+  parent's inherited params into the source's available params, and prefixes batch
+  names with the parent for the batch-sibling exists-check. No tightening — only
+  removal of a false rejection.
+
+- [#1443](https://github.com/greydragon888/real-router/pull/1443) [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - refactor(validation-plugin): remove dead surface — `maxRoutes` phantom, `validateDependencyLimit` stub, orphaned `RouterValidator` wrappers ([#1226](https://github.com/greydragon888/real-router/issues/1226))
+
+  Cleans up mirror-drift found in the wave-2 audit (item 4, the dup-name branch,
+  already landed in [#1351](https://github.com/greydragon888/real-router/issues/1351)):
+
+  - **`maxRoutes` phantom** — `checkRouteCountLimit` was unreachable (`LimitsConfig`
+    has no `maxRoutes` key and `validateOptions` rejects it); removed the function
+    and its white-box tests.
+  - **`validateDependencyLimit` dead stub** — the empty wrapper and its orphaned impl
+    are removed; the dependency-count limit is enforced by `validateDependencyCount`
+    per new key.
+  - **Orphaned `RouterValidator` wrappers** (post-[#960](https://github.com/greydragon888/real-router/issues/960)) — the six interface methods
+    core never called are dropped from the validator object; every underlying
+    file-scope impl stays (each is still called by the retrospective pass or another
+    live validator). No behavior change — all removed surface was dead.
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/angular@0.13.16
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+  - @real-router/sources@0.11.1
+
+### @real-router/browser-plugin@0.18.18
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/hash-plugin@0.8.16
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/lifecycle-plugin@0.6.17
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/logger-plugin@0.5.29
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/memory-plugin@0.4.26
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/navigation-plugin@0.7.28
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/persistent-params-plugin@0.2.29
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/preact@0.16.18
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+  - @real-router/sources@0.11.1
+
+### @real-router/preload-plugin@0.6.19
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/react@0.28.23
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+  - @real-router/sources@0.11.1
+
+### @real-router/rx@0.3.30
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/search-schema-plugin@0.4.17
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/solid@0.16.17
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+  - @real-router/sources@0.11.1
+
+### @real-router/sources@0.11.1
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
+### @real-router/svelte@0.15.16
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+  - @real-router/sources@0.11.1
+
+### @real-router/vue@0.16.17
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+  - @real-router/sources@0.11.1
+
+
 ### @real-router/route-utils@0.2.8
 
 ### Patch Changes

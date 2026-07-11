@@ -1,5 +1,41 @@
 # @real-router/validation-plugin
 
+## 0.11.0
+
+### Minor Changes
+
+- [#1443](https://github.com/greydragon888/real-router/pull/1443) [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(validation-plugin): stop false-rejecting `add({ parent }) + forwardTo` to a param-carrying sibling ([#1224](https://github.com/greydragon888/real-router/issues/1224))
+
+  `validateForwardToTargets` validated a parented batch "from the root": the forward
+  source's available params omitted the parent's path params, so a forward to a
+  target needing them (e.g. the parent's `:userId`) was rejected — while bare core
+  accepts the same add and runs the forward. The validator now threads `parentName`
+  (via the new `RouterValidator.routes.validateRoutes` argument), unions the
+  parent's inherited params into the source's available params, and prefixes batch
+  names with the parent for the batch-sibling exists-check. No tightening — only
+  removal of a false rejection.
+
+- [#1443](https://github.com/greydragon888/real-router/pull/1443) [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - refactor(validation-plugin): remove dead surface — `maxRoutes` phantom, `validateDependencyLimit` stub, orphaned `RouterValidator` wrappers ([#1226](https://github.com/greydragon888/real-router/issues/1226))
+
+  Cleans up mirror-drift found in the wave-2 audit (item 4, the dup-name branch,
+  already landed in [#1351](https://github.com/greydragon888/real-router/issues/1351)):
+
+  - **`maxRoutes` phantom** — `checkRouteCountLimit` was unreachable (`LimitsConfig`
+    has no `maxRoutes` key and `validateOptions` rejects it); removed the function
+    and its white-box tests.
+  - **`validateDependencyLimit` dead stub** — the empty wrapper and its orphaned impl
+    are removed; the dependency-count limit is enforced by `validateDependencyCount`
+    per new key.
+  - **Orphaned `RouterValidator` wrappers** (post-[#960](https://github.com/greydragon888/real-router/issues/960)) — the six interface methods
+    core never called are dropped from the validator object; every underlying
+    file-scope impl stays (each is still called by the retrospective pass or another
+    live validator). No behavior change — all removed surface was dead.
+
+### Patch Changes
+
+- Updated dependencies [[`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc), [`baf1769`](https://github.com/greydragon888/real-router/commit/baf17694d75a1d23d2cf0a23ad3bfbc0bcc5d4bc)]:
+  - @real-router/core@0.75.0
+
 ## 0.10.7
 
 ### Patch Changes
