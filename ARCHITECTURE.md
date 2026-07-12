@@ -103,7 +103,6 @@ graph TD
     CORE -->|dep| LOG
     CORE -->|dep| FSM
     CORE -.->|bundles| RT
-    CORE -.->|bundles| TG
     CORE -.->|bundles| EE
 
     subgraph consumers [Consumer packages]
@@ -201,6 +200,7 @@ graph TD
 
     VP["validation-plugin"]
     VP -->|dep| CORE
+    VP -.->|bundles| TG
 
     SSP["search-schema-plugin"]
     SSP -->|dep| CORE

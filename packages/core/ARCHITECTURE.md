@@ -60,7 +60,6 @@ graph TD
     CORE["core"] -->|dep| FSM["fsm"]
     CORE -->|dep| RT["route-tree"]
     CORE -->|dep| EE["event-emitter"]
-    CORE -->|dep| TG["type-guards"]
     CORE -->|dep| LOG["logger"]
     CORE -->|dep| TYPES["core-types"]
 
@@ -73,7 +72,6 @@ graph TD
 | **fsm**           | `FSM` class                 | `EventBusNamespace` (router lifecycle)   |
 | **route-tree**    | `createMatcher()`, tree ops | `RoutesNamespace` (path matching, build) |
 | **event-emitter** | `EventEmitter` class        | `EventBusNamespace` (event dispatch)     |
-| **type-guards**   | `validateRouteName()`       | Facade validation methods                |
 | **logger**        | `logger` singleton          | Warning/error logging across namespaces  |
 | **core-types**    | Shared type definitions     | All modules                              |
 

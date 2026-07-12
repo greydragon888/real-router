@@ -2273,7 +2273,7 @@ Added `packages/router-benchmarks` (now at `benchmarks/`, `src/` renamed to `cor
 
 **`on(from, event, action): Unsubscribe`** — typed action for a specific `(from, event)` pair. Lazy `#actions` Map (`null` until first `on()`). Uses nested `Map<TStates, Map<TEvents, action>>` for O(1) lookup without string concatenation. Actions fire before `onTransition` listeners. Overwrite semantics (second `on()` for same pair replaces first).
 
-**`forceState(state)`** — direct state update without dispatching actions or notifying listeners. Used by router's navigate hot path to bypass `send()` overhead.
+**`forceState(state)`** — direct state update without dispatching actions or notifying listeners. Used by router's navigate hot path to bypass `send()` overhead. **(Historical — superseded by #1169, 2026-07: `forceState` was removed from the FSM API; core's three hot transitions now dispatch through `send()` + table actions, a deliberate ~+15–20% determinism trade.)**
 
 **Null-slot listener pattern:** Unsubscribed listeners are set to `null` instead of spliced, preventing array reallocation. New listeners reuse null slots.
 
@@ -2344,7 +2344,7 @@ const router = createRouter(routes, {
 
 All packages using logger declare `"logger": "workspace:^"` dependency.
 
-Migrated: `@real-router/core`, `@real-router/browser-plugin`, `@real-router/logger-plugin`.
+Migrated: `@real-router/core`, `@real-router/browser-plugin`, `@real-router/logger-plugin`. *(Historical list — as of 2026-07 the runtime dependents are `@real-router/core` and `@real-router/validation-plugin`; browser-plugin and logger-plugin have since dropped the dependency.)*
 
 ## Logger Plugin Performance Tracking
 
@@ -2788,6 +2788,8 @@ After each navigation, `state.transition` contains `TransitionMeta` with:
 
 #### FSM-Driven Event Flow
 
+> **Historical (superseded by #1169, 2026-07):** `forceState()` no longer exists — NAVIGATE / LEAVE_APPROVE / COMPLETE now dispatch through the FSM table via `send()`, with emits fired as table actions (the table is the sole authority over state; ~+15–20% deliberate cost). The flow below describes the pre-#1169 design.
+
 Router events originate from FSM state changes. The navigate hot path uses `forceState()` for direct state updates + manual emit (bypassing `send()` dispatch overhead):
 
 ```
@@ -2899,6 +2901,8 @@ No hook existed for side-effects between deactivation and activation guards. Dev
 ### Solution
 
 New FSM state `LEAVE_APPROVED` between `TRANSITION_STARTED` and `READY`. New FSM event `LEAVE_APPROVE`. Public API `router.subscribeLeave(listener)` fires after all deactivation guards pass but before activation guards run. Plugin hook `onTransitionLeaveApprove(toState, fromState?)` added alongside `onTransitionStart`. Uses `forceState()` on the hot path — consistent with NAVIGATE and COMPLETE.
+
+> **Historical (superseded by #1169, 2026-07):** LEAVE_APPROVE now dispatches through `send()` like NAVIGATE/COMPLETE — the `forceState` rationale below is inverted by the commit-gate refactor: the table became the sole authority over state.
 
 **Why `forceState()` not `send()`:** The pipeline is the authority on order; the FSM is a state tracker. `forceState()` is honest about this. Consistent with NAVIGATE/COMPLETE. Avoids Map lookup + action dispatch overhead on the hot path.
 

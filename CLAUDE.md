@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 32 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 87 top-level example applications across `examples/web/<framework>/*`, `examples/desktop/{electron,tauri}/*`, and `examples/console/*` (+52 subgroup sub-examples in `web/<framework>/{animation,ssr,hash}-examples/*` → 139 runnable; 145 example workspace packages incl. 6 framework aggregators — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
+pnpm monorepo with 30 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 87 top-level example applications across `examples/web/<framework>/*`, `examples/desktop/{electron,tauri}/*`, and `examples/console/*` (+52 subgroup sub-examples in `web/<framework>/{animation,ssr,hash}-examples/*` → 139 runnable; 145 example workspace packages incl. 6 framework aggregators — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
 
 `shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/`, `shared/dom-utils/`, and `shared/ssr/` that are git-tracked symlink targets. This entry is required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 
@@ -126,7 +126,7 @@ When creating a new `packages/*` package, complete every item:
 - `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports (`types` → `import` → `require`), `"bundle"` script (not `"build"` — turbo `build` task is an orchestrator with no own command)
 - `tsconfig.json` — extends `../../tsconfig.json`, include `src` and `tests`
 - `tsconfig.node.json` — extends `../../tsconfig.node.json`, include `*.mts` and root configs
-- `tsdown.config.mts` — use `createBrowserConfig()` or `createIsomorphicConfig()` from `../../tsdown.base.js`
+- `tsdown.config.mts` — use `createBrowserConfig()` or `createIsomorphicConfig()` from `../../tsdown.base.js` (the file on disk is `tsdown.base.ts` — the `.js` specifier is NodeNext resolution, not a typo)
 - `vitest.config.mts` — extend `../../vitest.config.unit.mjs`, set `environment: "node"`
 - `eslint.config.mjs` — re-export `../../eslint.config.mjs`
 
