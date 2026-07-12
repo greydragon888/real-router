@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-12]
+
+### @real-router/browser-plugin@0.18.19
+
+### Patch Changes
+
+- [#1464](https://github.com/greydragon888/real-router/pull/1464) [`1943598`](https://github.com/greydragon888/real-router/commit/1943598f80136f0f91595f9bed6c7792cce0936d) Thanks [@greydragon888](https://github.com/greydragon888)! - Collapse a not-found popstate storm to a single navigation ([#1448](https://github.com/greydragon888/real-router/issues/1448))
+
+  A back/forward popstate that resolves to the `UNKNOWN_ROUTE` already committed
+  for the exact same path is now a no-op, instead of re-committing an identical
+  not-found state and re-notifying subscribers. This restores parity with the
+  matched-route branch, where a same-state popstate is already suppressed by
+  `navigateToState`'s `SAME_STATES` check — `navigateToNotFound` bypasses the
+  navigate pipeline, so the popstate handler now guards the redundant call itself.
+  A different not-found path still navigates; the short-circuit is path-specific.
+
+### @real-router/hash-plugin@0.8.18
+
+### Patch Changes
+
+- [#1464](https://github.com/greydragon888/real-router/pull/1464) [`1943598`](https://github.com/greydragon888/real-router/commit/1943598f80136f0f91595f9bed6c7792cce0936d) Thanks [@greydragon888](https://github.com/greydragon888)! - Collapse a not-found popstate storm to a single navigation ([#1448](https://github.com/greydragon888/real-router/issues/1448))
+
+  A back/forward popstate that resolves to the `UNKNOWN_ROUTE` already committed
+  for the exact same path is now a no-op, instead of re-committing an identical
+  not-found state and re-notifying subscribers. This restores parity with the
+  matched-route branch, where a same-state popstate is already suppressed by
+  `navigateToState`'s `SAME_STATES` check — `navigateToNotFound` bypasses the
+  navigate pipeline, so the popstate handler now guards the redundant call itself.
+  A different not-found path still navigates; the short-circuit is path-specific.
+
 ## [2026-07-11]
 
 ### @real-router/hash-plugin@0.8.17

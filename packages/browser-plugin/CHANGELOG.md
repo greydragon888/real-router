@@ -1,5 +1,19 @@
 # @real-router/browser-plugin
 
+## 0.18.19
+
+### Patch Changes
+
+- [#1464](https://github.com/greydragon888/real-router/pull/1464) [`1943598`](https://github.com/greydragon888/real-router/commit/1943598f80136f0f91595f9bed6c7792cce0936d) Thanks [@greydragon888](https://github.com/greydragon888)! - Collapse a not-found popstate storm to a single navigation ([#1448](https://github.com/greydragon888/real-router/issues/1448))
+
+  A back/forward popstate that resolves to the `UNKNOWN_ROUTE` already committed
+  for the exact same path is now a no-op, instead of re-committing an identical
+  not-found state and re-notifying subscribers. This restores parity with the
+  matched-route branch, where a same-state popstate is already suppressed by
+  `navigateToState`'s `SAME_STATES` check — `navigateToNotFound` bypasses the
+  navigate pipeline, so the popstate handler now guards the redundant call itself.
+  A different not-found path still navigates; the short-circuit is path-specific.
+
 ## 0.18.18
 
 ### Patch Changes
