@@ -8,8 +8,10 @@
 // DIAGNOSTIC rows (never summed) — the two-factor split is what surfaced #1353 and
 // vue's 2×-pushState, so the diagnostics are kept, only the headline changes.
 // Pilot navMsWall (felt) vs navMsTask (main-thread task time): with the rAF-poll
-// `waitFor` gone (→ MutationObserver settle in cdp.mjs), the driver floor is ~0, so
-// both are clean. Merge-gate: harness/validate-per-nav-metric.mjs.
+// `waitFor` gone (→ MutationObserver settle in cdp.mjs), the driver floor is SMALL —
+// the MO callback (× mutation batch) + a `querySelector` per settle — not literally
+// zero, but symmetric across engines and visible in `_baseline`, so it does not skew
+// the ranking. Merge-gate: harness/validate-per-nav-metric.mjs.
 import {
   getMetrics,
   sampleAllocationBytes,
