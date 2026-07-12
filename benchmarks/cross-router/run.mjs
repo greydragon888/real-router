@@ -64,6 +64,12 @@ function fail(message) {
 const [scenarioName, engine, framework = "react", runsArg] =
   process.argv.slice(2);
 const runs = Number(runsArg) || 30;
+// Below this, a cell is smoke-grade: its ~95% CI is many× wider than stats.mjs
+// (z=1.96) reports, and cross-session sub-ms drift can invert Δ-comparisons — such a
+// cell is indistinguishable from a real one once in results/ and poisons any analysis
+// dividing it (#1455). Smoke runs still build/measure/print (fail-fast intact) but do
+// NOT persist. `--smoke` (n=1) and same-session A/B (n≥12) both stay usable.
+const N_MIN = 10;
 
 const scenario = SCENARIOS[scenarioName];
 if (!scenario) fail(`unknown scenario: ${scenarioName ?? "(none)"}`);
@@ -100,9 +106,18 @@ const out = {
   env: { date: new Date().toISOString() },
 };
 
+console.log(JSON.stringify(out.metrics, null, 2));
+
+if (runs < N_MIN) {
+  console.error(
+    `run.mjs: SMOKE run (runs=${runs} < N_MIN=${N_MIN}) — metrics printed above, NOT written to ` +
+      `results/ (a smoke-grade cell poisons ground truth and inverts Δ-comparisons, #1455). ` +
+      `Use runs ≥ ${N_MIN} to persist a cell.`,
+  );
+  process.exit(0);
+}
+
 const outDir = `${here}/results/${framework}/${scenarioName}`;
 mkdirSync(outDir, { recursive: true });
 writeFileSync(`${outDir}/${engine}.json`, `${JSON.stringify(out, null, 2)}\n`);
-
-console.log(JSON.stringify(out.metrics, null, 2));
 process.exit(0);

@@ -42,9 +42,15 @@ function* resultFiles(cohort) {
 const argNum = (v, d) => (v != null && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : d);
 const stable = argNum(process.argv[2] ?? process.env.RME_STABLE, 15);
 const noisy = argNum(process.argv[3] ?? process.env.RME_NOISY, 40);
+// Minimum sample count for a cell to be trustworthy. Below this, stats.mjs's z=1.96
+// RME badly understates the true small-sample CI, and the cell may be a stray smoke
+// run mixed into results/ (#1455). run.mjs refuses to WRITE such cells; this catches
+// any that pre-date the guard or arrive by other means.
+const minN = argNum(process.env.RME_MIN_N, 10);
 const cohorts = process.argv[4] ? [process.argv[4]] : FW;
 
 const violations = [];
+const underpowered = [];
 let scanned = 0;
 for (const cohort of cohorts) {
   for (const [scen, engine, path] of resultFiles(cohort)) {
@@ -53,6 +59,14 @@ for (const cohort of cohorts) {
       data = JSON.parse(readFileSync(path, "utf8"));
     } catch {
       continue;
+    }
+    // Cell-level n (uniform across a cell's metrics) — flag smoke-grade cells (#1455).
+    const cellN =
+      typeof data.runs === "number"
+        ? data.runs
+        : Object.values(data.metrics ?? {})[0]?.n;
+    if (typeof cellN === "number" && cellN < minN) {
+      underpowered.push({ cohort, scen, engine, n: cellN });
     }
     for (const [k, s] of Object.entries(data.metrics ?? {})) {
       if (s == null || typeof s.rme !== "number") continue;
@@ -71,17 +85,31 @@ if (!existsSync(RESULTS) || scanned === 0) {
 
 violations.sort((a, b) => b.rme - a.rme);
 console.log(
-  `RME-gate — stable ≤ ${stable}% · noisy(blink/latency/fcp) ≤ ${noisy}% · scanned ${scanned} metrics across ${cohorts.join("/")}\n`,
+  `RME-gate — stable ≤ ${stable}% · noisy(blink/latency/fcp) ≤ ${noisy}% · min-n ≥ ${minN} · scanned ${scanned} metrics across ${cohorts.join("/")}\n`,
 );
-if (violations.length === 0) {
-  console.log("✓ PASS — every metric within its RME threshold.");
+if (violations.length === 0 && underpowered.length === 0) {
+  console.log("✓ PASS — every metric within its RME threshold, every cell n ≥ min-n.");
   process.exit(0);
 }
-const stableN = violations.filter((v) => v.family === "stable").length;
-console.log(`✗ FAIL — ${violations.length} metric(s) over threshold (${stableN} stable, ${violations.length - stableN} noisy):\n`);
-console.log("| RME% | limit | family | cohort | scenario | engine | metric | n |");
-console.log("|---|---|---|---|---|---|---|---|");
-for (const v of violations) {
-  console.log(`| ${v.rme.toFixed(1)} | ${v.limit} | ${v.family} | ${v.cohort} | ${v.scen} | ${v.engine} | ${v.k} | ${v.n} |`);
+if (underpowered.length > 0) {
+  underpowered.sort((a, b) => a.n - b.n);
+  console.log(
+    `✗ ${underpowered.length} smoke-grade cell(s) with n < ${minN} (#1455 — quarantine or re-measure same-session):\n`,
+  );
+  console.log("| n | cohort | scenario | engine |");
+  console.log("|---|---|---|---|");
+  for (const u of underpowered) {
+    console.log(`| ${u.n} | ${u.cohort} | ${u.scen} | ${u.engine} |`);
+  }
+  console.log("");
+}
+if (violations.length > 0) {
+  const stableN = violations.filter((v) => v.family === "stable").length;
+  console.log(`✗ FAIL — ${violations.length} metric(s) over threshold (${stableN} stable, ${violations.length - stableN} noisy):\n`);
+  console.log("| RME% | limit | family | cohort | scenario | engine | metric | n |");
+  console.log("|---|---|---|---|---|---|---|---|");
+  for (const v of violations) {
+    console.log(`| ${v.rme.toFixed(1)} | ${v.limit} | ${v.family} | ${v.cohort} | ${v.scen} | ${v.engine} | ${v.k} | ${v.n} |`);
+  }
 }
 process.exit(1);
