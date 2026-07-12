@@ -1,9 +1,13 @@
 // deep-config — matcher + nested-layout composition scaling by DEPTH (sweep depth
-// 3 / 30 / 60 / 90 in a 90-level nested chain). Per depth: `scriptMs@D` (V8 matcher
-// + composition + per-nav floor — the pure scaling signal, read the CURVE: rising =
-// composition cost grows with depth) + `blinkMs@D` (history.pushState Blink) →
-// `totalMs@D` (honest absolute). Blink is a per-nav constant (independent of D), so
-// `total` = `script` + offset — the depth CURVE survives, the absolute stops misleading.
+// 3 / 30 / 60 / 90 in a 90-level nested chain). Headline per depth = the UNIFIED
+// wall-clock click→DOM-settle (`navMsWall@D`, felt) + its ΔTaskDuration twin
+// (`navMsTask@D`) — both capture the microtask-flush work `ScriptDuration` is BLIND
+// to (#1451), which is load-bearing here: async-scheduling engines (@solidjs/router,
+// vue-router, @tanstack/solid-router) do their composition in a microtask, so the old
+// `scriptMs@D` under-counted them and printed a FALSE flat curve ("solid-router flat
+// vs rr O(depth)") the audit flagged as instrumental. `scriptMs@D` is kept as a ⚠
+// DIAGNOSTIC and `blinkMs@D` as a diagnostic; the additive `totalMs@D` is RETIRED.
+// Read the CURVE: rising = composition cost grows with depth.
 //
 // STEADY-STATE, not cold first-nav (#1453): every `land()` is a full reload that
 // resets V8 to interpreted code, so a single post-reload nav measured the cold
@@ -11,8 +15,7 @@
 // realm with WARM_NAVS in-document home↔D round-trips before the ONE measured nav.
 // Deep's nav is home-only (gone on a target), so the return leg is `history.back()`
 // and "back on home" is detected by the target VANISHING (settleGone) — a universal
-// signal, since every engine renders `page-item[data-n=D]` only on the target. The
-// measured nav stays exactly home→D (identical semantics), just optimized.
+// signal. The measured nav stays exactly home→D, just optimized and settle-timed.
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
 const TARGETS = [3, 30, 60, 90];
@@ -23,15 +26,17 @@ export const deepConfig = {
   async run({ page, client, baseURL }) {
     const out = {};
 
+    // One optimized home→D nav, timed click→settle (perf.now) — settle closes on the
+    // async composition flush so wall AND ΔTaskDuration capture the microtask work
+    // ScriptDuration misses (#1451). Returns wall ms.
     const navTo = (depth) =>
       page.evaluate(async (d) => {
+        const t0 = performance.now();
         document.querySelector(`[data-testid="link-deep-${d}"]`).click();
-        for (let k = 0; k < 240; k++) {
-          const el = document.querySelector('[data-testid="page-item"]');
-          if (el && el.getAttribute("data-n") === String(d)) return;
-          await new Promise((r) => requestAnimationFrame(r));
-        }
-        throw new Error(`deep-config: depth ${d} not rendered`);
+        await window.__navMetric.settle(
+          `[data-testid="page-item"][data-n="${d}"]`,
+        );
+        return performance.now() - t0;
       }, depth);
     const land = async (d) => {
       await page.goto(baseURL, { waitUntil: "load" });
@@ -64,19 +69,22 @@ export const deepConfig = {
       await land(d); // on home
       await warm(d); // ends on home, realm optimized
 
-      // script pass — one optimized home→D nav, clean ScriptDuration (untraced)
+      // measured pass — ONE optimized home→D nav: wall + task + script (⚠ diag).
       const before = await getMetrics(client);
-      await navTo(d);
+      const wallMs = await navTo(d);
       const after = await getMetrics(client);
-      const script = (after.ScriptDuration - before.ScriptDuration) * 1000;
+      const navMsTask =
+        (after.TaskDuration - before.TaskDuration) * 1000;
+      const scriptMs = (after.ScriptDuration - before.ScriptDuration) * 1000;
 
-      // blink pass — same home→D nav, traced (history.pushState work)
-      await backHome(d); // reset D→home
-      const blink = (await traceBlinkUs(client, () => navTo(d))) / 1000;
+      // blink diagnostic — same home→D nav, traced (history.pushState work).
+      await backHome(); // reset D→home
+      const blinkMs = (await traceBlinkUs(client, () => navTo(d))) / 1000;
 
-      out[`scriptMs@${d}`] = script;
-      out[`blinkMs@${d}`] = blink;
-      out[`totalMs@${d}`] = script + blink;
+      out[`navMsWall@${d}`] = wallMs;
+      out[`navMsTask@${d}`] = navMsTask;
+      out[`scriptMs@${d}`] = scriptMs;
+      out[`blinkMs@${d}`] = blinkMs;
     }
 
     return out;

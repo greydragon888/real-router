@@ -1,19 +1,21 @@
 // wide-config — matcher scaling by WIDTH (sweep item-10 / -100 / -1000 in a flat
-// 1000-route table). Per size: `scriptMs@N` (V8 matcher + per-nav floor — the pure
-// matcher-scaling signal: flat = O(1)/trie, rising = O(N)/scan) + `blinkMs@N`
-// (history.pushState Blink) → `totalMs@N` (honest absolute). Blink is a per-nav
-// constant (independent of N), so `total` = `script` + offset — the matcher CURVE
-// survives, the absolute stops misleading.
+// 1000-route table). Headline per size = the UNIFIED wall-clock click→DOM-settle
+// (`navMsWall@N`, felt) + its ΔTaskDuration twin (`navMsTask@N`) — both capture the
+// microtask-flush work `ScriptDuration` is BLIND to (#1451) AND the Blink pushState
+// inside the click task (#1452). `scriptMs@N` is kept as a ⚠ DIAGNOSTIC (V8-only,
+// undercounts async engines) and `blinkMs@N` as a diagnostic; the old additive
+// `totalMs@N = script + blink` is RETIRED (same reasons as the per-nav scenarios).
+// Read the CURVE: flat = O(1)/trie, rising = O(N)/scan — the width signal.
 //
 // STEADY-STATE, not cold first-nav (#1453): measure.mjs runs each sample in a fresh
 // context, and every `land()` is a full `page.goto` reload that resets V8 to
 // baseline/interpreted code — so a single post-reload nav measured the INTERPRETER,
-// not the optimized steady state a real app pays, and the per-engine cold penalty
-// (larger for heavier bundles) poisoned the cross-engine @N absolutes. Fix: warm the
-// realm with WARM_NAVS in-document navs (toggling target↔pivot via the persistent
-// nav) before the ONE measured nav. Matcher cost is source-independent, so the width
-// signal is unchanged; only the cold-JIT floor is removed. The old top-of-run warmup
-// was dead — the loop's first `land()` reload wiped it.
+// not the optimized steady state, and the per-engine cold penalty poisoned the @N
+// absolutes. Fix: warm the realm with WARM_NAVS in-document navs (toggling
+// target↔pivot via the persistent nav) before the ONE measured nav; matcher cost is
+// source-independent, so the width signal is unchanged and only the cold-JIT floor is
+// removed. The measured nav closes on the shared MutationObserver settle (gap=0), the
+// same signal the per-nav scenarios use — no rAF-poll frame quantization.
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
 const TARGETS = [10, 100, 1000];
@@ -24,22 +26,26 @@ export const wideConfig = {
   async run({ page, client, baseURL }) {
     const out = {};
 
+    // One optimized nav to `target` via the persistent nav, timed click→settle
+    // (perf.now). The MutationObserver settle closes the window on the async render
+    // flush, so wall AND ΔTaskDuration capture the microtask work ScriptDuration
+    // misses (#1451). Returns the wall ms (perf.now's ~100 µs clamp is medianed out
+    // over the sample runs). Replaces the frame-quantized rAF-poll navTo.
     const navTo = (target) =>
       page.evaluate(async (t) => {
+        const t0 = performance.now();
         document.querySelector(`[data-testid="link-item-${t}"]`).click();
-        for (let k = 0; k < 240; k++) {
-          const el = document.querySelector('[data-testid="page-item"]');
-          if (el && el.getAttribute("data-n") === String(t)) return;
-          await new Promise((r) => requestAnimationFrame(r));
-        }
-        throw new Error(`wide-config: item ${t} not rendered`);
+        await window.__navMetric.settle(
+          `[data-testid="page-item"][data-n="${t}"]`,
+        );
+        return performance.now() - t0;
       }, target);
     const land = async (n) => {
       await page.goto(baseURL, { waitUntil: "load" });
       await page.waitForSelector(`[data-testid="link-item-${n}"]`);
     };
-    // Warm V8 in-realm by toggling target↔pivot (both matcher-exercising navs via
-    // the persistent nav), ending on pivot so the measured navTo(n) is one optimized
+    // Warm V8 in-realm by toggling target↔pivot (both matcher-exercising navs via the
+    // persistent nav), ending on pivot so the measured navTo(n) is one optimized
     // pivot→N nav. Settles only on the universal `page-item[data-n]` marker (#1453).
     const warm = (target, pivot) =>
       page.evaluate(
@@ -60,19 +66,23 @@ export const wideConfig = {
       await land(n);
       await warm(n, pivot); // ends on pivot, realm optimized
 
-      // script pass — one optimized pivot→N nav, clean ScriptDuration (untraced)
+      // measured pass — ONE optimized pivot→N nav: wall (felt) + task (microtask-
+      // inclusive) + script (⚠ V8-only diagnostic) from one window.
       const before = await getMetrics(client);
-      await navTo(n);
+      const wallMs = await navTo(n);
       const after = await getMetrics(client);
-      const script = (after.ScriptDuration - before.ScriptDuration) * 1000;
+      const navMsTask =
+        (after.TaskDuration - before.TaskDuration) * 1000;
+      const scriptMs = (after.ScriptDuration - before.ScriptDuration) * 1000;
 
-      // blink pass — same nav from the same pivot, traced (history.pushState work)
+      // blink diagnostic — same nav from the same pivot, traced (pushState work).
       await navTo(pivot); // reset N→pivot
-      const blink = (await traceBlinkUs(client, () => navTo(n))) / 1000;
+      const blinkMs = (await traceBlinkUs(client, () => navTo(n))) / 1000;
 
-      out[`scriptMs@${n}`] = script;
-      out[`blinkMs@${n}`] = blink;
-      out[`totalMs@${n}`] = script + blink;
+      out[`navMsWall@${n}`] = wallMs;
+      out[`navMsTask@${n}`] = navMsTask;
+      out[`scriptMs@${n}`] = scriptMs;
+      out[`blinkMs@${n}`] = blinkMs;
     }
 
     return out;
