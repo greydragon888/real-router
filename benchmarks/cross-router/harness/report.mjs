@@ -17,7 +17,7 @@ const FEATURES = existsSync(`${RESULTS}/features.json`)
 // Scenario row configs (metric keys/labels) — framework-agnostic. Blurbs live
 // per-framework in FW[*].blurbs so each cohort tells its own story.
 const SCENARIOS = [
-  { id: "cold-start", title: "Cold start", rows: [["scriptDurationMs", "main-thread script", "ms", "lower"], ["jsHeapMB", "JS heap", "MB", "lower"], ["fcpMs", "FCP", "ms", "lower"]] },
+  { id: "cold-start", title: "Cold start", rows: [["scriptDurationMs", "main-thread script", "ms", "lower"], ["jsHeapMB", "JS heap (retained, post-GC)", "MB", "lower"], ["jsHeapPreGcMB", "· JS heap @FCP (pre-GC, boot garbage — diag #1454)", "MB", "lower"], ["fcpMs", "FCP", "ms", "lower"]] },
   { id: "nav-latency", title: "Navigation — per-nav wall-clock (click→DOM settle)", rows: [["navMsWall", "nav / wall (click→settle)", "ms", "lower"], ["navMsTask", "· nav / task (ΔTaskDuration)", "ms", "lower"], ["scriptDurationMs", "· ⚠ script (V8, microtask-blind #1451)", "ms", "lower"], ["blinkMs", "· blink diag (gap=0, #1452)", "ms", "lower"], ["allocKBPerNav", "alloc / nav (GC pressure)", "KB", "lower"]] },
   { id: "param-nav", title: "Param navigation — per-nav wall-clock (click→DOM settle)", rows: [["navMsWall", "nav / wall (click→settle)", "ms", "lower"], ["navMsTask", "· nav / task (ΔTaskDuration)", "ms", "lower"], ["scriptDurationMs", "· ⚠ script (V8, microtask-blind #1451)", "ms", "lower"], ["blinkMs", "· blink diag (gap=0, #1452)", "ms", "lower"], ["allocKBPerNav", "alloc / nav (GC pressure)", "KB", "lower"]] },
   { id: "wide-config", title: "Wide config — matcher breadth (sweep)", rows: [["totalMs@10", "≈ total @10", "ms", "lower"], ["totalMs@100", "≈ total @100", "ms", "lower"], ["totalMs@1000", "≈ total @1000", "ms", "lower"], ["scriptMs@10", "· script (matcher) @10", "ms", "lower"], ["scriptMs@100", "· script (matcher) @100", "ms", "lower"], ["scriptMs@1000", "· script (matcher) @1000", "ms", "lower"]] },
@@ -347,7 +347,7 @@ lines.push("");
 // Per-nav is ranked router-vs-router in the tables above (#1326).
 const BASELINE_ROWS = [
   { scenario: "cold-start", metric: "scriptDurationMs", label: "cold-start script (ms)" },
-  { scenario: "cold-start", metric: "jsHeapMB", label: "cold-start heap (MB)" },
+  { scenario: "cold-start", metric: "jsHeapMB", label: "cold-start heap retained (MB)" },
   { scenario: "link-build", metric: "scriptMs", label: "link-build script (ms)" },
 ];
 if (read("cold-start", "_baseline")) {
