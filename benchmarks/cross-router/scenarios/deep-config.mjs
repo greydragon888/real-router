@@ -81,10 +81,13 @@ export const deepConfig = {
       await backHome(); // reset D→home
       const blinkMs = (await traceBlinkUs(client, () => navTo(d))) / 1000;
 
-      out[`navMsWall@${d}`] = wallMs;
       out[`navMsTask@${d}`] = navMsTask;
       out[`scriptMs@${d}`] = scriptMs;
       out[`blinkMs@${d}`] = blinkMs;
+      // navMsWall is perf.now clamp-quantized (~100 µs) → emit ONLY at the endpoint
+      // (largest, least-quantized point; matches the report row) so the noisy small
+      // points don't flood rme-gate. navMsTask@D (unclamped) carries the curve.
+      if (d === TARGETS[TARGETS.length - 1]) out[`navMsWall@${d}`] = wallMs;
     }
 
     return out;

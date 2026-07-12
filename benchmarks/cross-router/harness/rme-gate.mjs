@@ -25,7 +25,12 @@ const FW = ["react", "vue", "solid", "svelte", "angular"];
 
 // Inherently-noisy metric families — CDP Blink trace (history.pushState), wall-clock
 // latency, and FCP all have a fat RME tail by nature (small absolute / paint cadence).
-const isNoisy = (k) => /blink|latency|fcp/i.test(k);
+// `navMsWall@N` (sweep single-nav wall) is `perf.now` clamp-quantized (~100 µs), so on
+// the fast points it has a high RME by QUANTIZATION, not instability — classify it noisy
+// so it can't fail a healthy matrix. NOTE: the per-nav `navMsWall` (no `@` — it sums N
+// navs, so its wall is clean) and the sweep headline `navMsTask@N` (ΔTaskDuration,
+// unclamped) are deliberately NOT matched → they stay stable-gated (≤15%).
+const isNoisy = (k) => /blink|latency|fcp/i.test(k) || /^navMsWall@/.test(k);
 
 function* resultFiles(cohort) {
   const root = join(RESULTS, cohort);

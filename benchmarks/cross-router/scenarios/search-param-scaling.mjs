@@ -80,10 +80,13 @@ export const searchParamScaling = {
       await navTo(pivot); // reset N→pivot
       const blinkMs = (await traceBlinkUs(client, () => navTo(n))) / 1000;
 
-      out[`navMsWall@${n}`] = wallMs;
       out[`navMsTask@${n}`] = navMsTask;
       out[`scriptMs@${n}`] = scriptMs;
       out[`blinkMs@${n}`] = blinkMs;
+      // navMsWall is perf.now clamp-quantized (~100 µs) → emit ONLY at the endpoint
+      // (largest, least-quantized point; matches the report row) so the noisy small
+      // points don't flood rme-gate. navMsTask@N (unclamped) carries the curve.
+      if (n === COUNTS[COUNTS.length - 1]) out[`navMsWall@${n}`] = wallMs;
     }
 
     // Allocation pass — GC pressure of high-count query handling (@max <-> @1
