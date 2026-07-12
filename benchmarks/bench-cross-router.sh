@@ -1,14 +1,14 @@
 #!/bin/bash
 # =============================================================================
 # Cross-Router Benchmark Runner — machine-readiness + full unattended matrix
-# Sibling of bench-compare.sh, but for the cross-router (Playwright + CDP) suite.
+# Sibling of bench-compare.sh.bak, but for the cross-router (Playwright + CDP) suite.
 #
 # Rebuilds every package's dist, gates on machine readiness for a ~3 h unattended
 # run, and — on success — runs the full n=15 matrix across all cohorts, then
 # regenerates each REPORT.
 #
-# ROOT vs USER split (why this is not a straight bench-compare.sh clone):
-#   bench-compare.sh runs its mitata workload AS ROOT (node-only, needs nice -20).
+# ROOT vs USER split (why this is not a straight bench-compare.sh.bak clone):
+#   bench-compare.sh.bak runs its mitata workload AS ROOT (node-only, needs nice -20).
 #   The cross-router workload drives a real Chromium via Playwright and MUST run
 #   as the invoking (non-root) user:
 #     • Playwright's browser cache lives under the user's $HOME
@@ -193,7 +193,7 @@ confirm_or_abort() {
     fi
 }
 
-# --- Thermal helpers (Apple Silicon; identical discipline to bench-compare.sh) --
+# --- Thermal helpers (Apple Silicon; identical discipline to bench-compare.sh.bak) --
 get_thermal_pressure() {
     local output
     output=$(sudo powermetrics --samplers thermal -i 1 -n 1 2>/dev/null)
@@ -279,6 +279,10 @@ cleanup() {
     echo -e "${GREEN}[Cleanup] Spotlight indexing restored${NC}"
     sudo tmutil enable >/dev/null 2>&1 || true
     echo -e "${GREEN}[Cleanup] Time Machine restored${NC}"
+    if [[ -n "${QUIETED:-}" ]]; then
+        for d in $QUIETED; do killall -CONT "$d" 2>/dev/null || true; done
+        echo -e "${GREEN}[Cleanup] Resumed paused daemons:${QUIETED}${NC}"
+    fi
 }
 trap cleanup EXIT INT TERM
 
@@ -361,6 +365,25 @@ sudo tmutil disable >/dev/null 2>&1 || true
 echo -e "${GREEN}Time Machine disabled${NC}"
 sync && sudo purge 2>/dev/null || true
 echo -e "${GREEN}File system caches purged${NC}"
+# Pause (SIGSTOP) known-safe, NON-critical background daemons that spike CPU and inflate
+# sub-ms per-nav RME (media/photo analysis, notification UI). SIGSTOP suspends without
+# killing — launchd does NOT respawn a stopped process, and cleanup() resumes them with
+# SIGCONT, so this is fully reversible. Only this curated allowlist is touched — never a
+# system-critical process (WindowServer, kernel_task) or the benchmark's own node/vite/
+# Chromium. If the script is hard-killed (SIGKILL) before cleanup, recover with
+# `killall -CONT <name>` (or just reboot). Extend via env: BENCH_QUIET_EXTRA="name ...".
+QUIET_DAEMONS="mediaanalysisd photoanalysisd photolibraryd NotificationCenter ${BENCH_QUIET_EXTRA:-}"
+QUIETED=""
+for d in $QUIET_DAEMONS; do
+    if pgrep -x "$d" >/dev/null 2>&1 && killall -STOP "$d" 2>/dev/null; then
+        QUIETED="$QUIETED $d"
+    fi
+done
+if [[ -n "$QUIETED" ]]; then
+    echo -e "${GREEN}Paused (SIGSTOP) non-critical daemons:${QUIETED} — resumed on cleanup${NC}"
+else
+    echo -e "${GREEN}No pausable background daemons currently running${NC}"
+fi
 
 # -----------------------------------------------------------------------------
 # Step 4: Rebuild all package dist

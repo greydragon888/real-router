@@ -12,12 +12,7 @@ export const N_MIN = 10;
 // (runs < N_MIN) — still measured/printed by the caller, just not persisted. Returns
 // true if written.
 export function writeCell(resultsDir, out, runs) {
-  if (runs < N_MIN) {
-    console.error(
-      `write-cell: SMOKE run (runs=${runs} < N_MIN=${N_MIN}) — ${out.framework}·${out.scenario}×${out.engine} NOT written to results/ (a smoke-grade cell poisons ground truth, #1455).`,
-    );
-    return false;
-  }
+  if (runs < N_MIN) return false; // smoke-grade (runs < N_MIN) — not persisted (#1455)
   const dir = `${resultsDir}/${out.framework}/${out.scenario}`;
   mkdirSync(dir, { recursive: true });
   writeFileSync(`${dir}/${out.engine}.json`, `${JSON.stringify(out, null, 2)}\n`);
