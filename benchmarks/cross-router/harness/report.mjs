@@ -57,7 +57,7 @@ const VUE_BLURBS = {
   "search-param-scaling": "Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **vue-router is lightest and FLAT on CPU** — `route.query` is a plain reactive object, cheap at any count; **real-router is also flat** (eager immutable params, slope ~0). **tanstack rises steeply — ~1 ms @50** (its O(count) search parse/validate/structural-share pipeline). So on CPU vue-router's plain-object query edges real-router's flat curve, and tanstack degrades at scale. *(Flat-vs-rising is the robust story; the sub-ms flat absolutes are session-dependent.)* **`alloc/nav` (GC pressure) flips it in memory:** real-router is the **leanest allocator — it ties/beats even vue-router** (~0.24 vs ~0.26 KB/nav @50, both flat; alloc is memory-class, load-stable) and crushes tanstack (~2.6, **~11×**). So real-router's eager snapshot **wins the memory axis exactly where it narrowly cedes CPU** — its params reference URL-parsed strings (flat), refuting 'eager = more garbage' even against the leanest lazy competitor.",
   "nav-churn": "200-nav stress; per-nav total (script + Blink) + heap. **vue-router lightest CPU/nav (0.51 total)**, tanstack 0.52, real-router 0.62; **real-router retains the least heap (511 ≈ vue-router 519; tanstack ~2× at 1072)**. navsPerSec frame-capped — read CPU/nav + heap.",
   "active-links": "Per-nav total recompute across 100 links (steady-state toggle). **All three near-parity — real-router / vue-router / tanstack cluster ~0.37–0.49 ms**, and the ranking is within run-to-run noise (real-router led one run at 0.37, tanstack another at 0.39 — a ~0.05 ms sub-metric spread). No stable winner here: unlike React/Svelte/Angular (where competitors pay heavier per-link active machinery), Vue's fine-grained reactivity is already lean enough that real-router's shared active-source doesn't separate from it.",
-  "link-build": "Wall-clock to mount 1000 links, each building its href (real-router `buildPath` · vue-router `resolve` · tanstack build). ⚠️ Pre-#1418 this row used `ScriptDuration`, which is BLIND to Vue's async microtask render — it read ~0.2 ms for EVERY engine regardless of real work, even inverting with load (more work → lower number), so the old \"all tiny, not a differentiator\" read was a pure measurement artifact. Wall-clock un-blinds it: a probe shows the real span is ~3.5 ms (bare-Vue floor) → ~18 ms (real-router) → ~25 ms (vue-router) — Vue's link mount is latency-bound (reactive cascade) and the router DOES add measurable cost. Final numbers await a wall-clock re-population.",
+  "link-build": "Wall-clock to mount 1000 links, each building its href (real-router `buildPath` · vue-router `resolve` · tanstack build). ⚠️ Pre-#1418 this row used `ScriptDuration`, which is BLIND to Vue's async microtask render — it read ~0.2 ms for EVERY engine regardless of real work, even inverting with load (more work → lower number), so the old \"all tiny, not a differentiator\" read was a pure measurement artifact. Wall-clock un-blinds it: a probe shows the real span is ~3.5 ms (bare-Vue floor) → ~18 ms (real-router) → ~25 ms (vue-router) — Vue's link mount is latency-bound (reactive cascade) and the router DOES add measurable cost.",
   "nested-switch": "Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **A 3-way near-tie on total (~10% spread)** — tanstack edges it, real-router ~4% behind, vue-router last (its lean script is offset by its 2× Blink `pushState`, same as nav-latency). *(Sub-ms — exact order is session/load-dependent; read the tight spread, not the ranking.)*",
   "back-forward": "Browser **back/forward** (popstate) steady-state. **real-router WINS — ~1.38 ms vs vue-router ~1.47, tanstack ~2.7** — a **flip after #1353**: skipping the no-op popstate `replaceState` removed real-router's redundant second history event, turning a ~24% loss into a ~6% win over vue-router's single-popstate. Leaner allocator too (~0.18 < vue-router 0.21; tanstack 2.3). *(n=15.)*",
 };
@@ -142,7 +142,7 @@ const FW = {
     blurbs: VUE_BLURBS,
     baselineLabel: "bare Vue",
     warningLine: "⚠️ Preliminary local numbers — directional, not a published verdict. Reported metrics are the **stable signals** — CPU (`script`), heap, FCP. Felt latency was dropped (render/frame-bound, not router-attributable). `nav-churn` throughput is frame-capped — read CPU/nav + heap. **Caveat — `script` is V8-only:** CDP `ScriptDuration` excludes Blink C++ — notably `history.pushState`'s `updateForSameDocumentNavigation` (~130 µs/nav, CDP-traced) and paint — which is ~identical across routers, so `script` *ratios* overstate the *total* per-nav gap (e.g. a ~4× `script` ratio is ≈ parity in total — Vue cohort all ~0.32 ms, CDP-traced + harness-reported).",
-    cohortLine: "**Cohort:** `@real-router/vue` · `vue-router@4` (the official Vue 3 router) · `@tanstack/vue-router` — three full routers that own a navigation pipeline (route resolution, guards, nested layouts, reactive/immutable state). `vue-router@5` is excluded because it pulls `pinia`/`@pinia/colada` as peer deps, which would inflate non-router metrics; v4 is the self-contained Vue 3 standard.",
+    cohortLine: "**Cohort:** `@real-router/vue` · `vue-router@5` (the official Vue 3 router — bumped from v4 by Dependabot #1142; v5 pulls no extra runtime into the measured app bundle, so the comparison stays clean) · `@tanstack/vue-router` — three full routers that own a navigation pipeline (route resolution, guards, nested layouts, reactive/immutable state).",
     scopeNote: "**Scope — three full routers, like-for-like.** Unlike the Preact cohort, no minimalist exclusion is needed: all three own a real navigation pipeline. vue-router 4 is the official Vue 3 router; tanstack is the type-first challenger. The honest split that emerges along **two axes (don't conflate them)**: on **scale** — route tables/depth, i.e. the matcher + memory (wide-config @1000, table-heap @10k, deep) — **real-router wins** (O(1) trie + lean core); on **per-nav render** — small tables, heavy re-render (param-nav, active-links, nested-switch) — **vue-router's native reactivity is leaner** (the Vue-adapter soft spot, *not* the core). A heavy *route table* ≠ a heavy *render*. **tanstack is heaviest on memory and degrades at depth**.",
     capabilityIntro: "Among three full routers, first-class API coverage still differs. `✓` = built-in API, `N/A` = none (hand-rolled in user-land). The differentiator here is validated search — vue-router exposes raw query only, exactly the gap react-router has in the React cohort.",
     capabilities: [
@@ -157,7 +157,7 @@ const FW = {
     baselineReading: "**Reading:** over bare Vue, on startup vue-router adds the least (+1.7 ms), real-router is middle (+3.0), tanstack heaviest (+4.0). The marginal costs are small — at realistic scale all three are fast. The separation appears **at scale** (wide / table-heap / deep), where real-router's trie wins CPU *and* memory and tanstack degrades. (Per-nav is not baseline-relative here — vue-router's targeted reactivity beats the naive full-re-render baseline — so it is read router-vs-router in the tables above.)",
     caveats: [
       "- **No cross-framework ranking** — each column is the same framework (Vue); the delta is router work. (Do NOT compare to the React/Preact cohorts.)",
-      "- **vue-router 4, not 5** — v5 pulls `pinia`/`@pinia/colada` as peers (would inflate non-router metrics); v4 is the self-contained Vue 3 standard.",
+      "- **vue-router 5** (bumped from v4 by Dependabot #1142) — v5 pulls no extra runtime into the measured app bundle, so the comparison is clean; the earlier v4-only note (pinia concern) is obsolete.",
       "- **`nav-churn` navsPerSec is frame-capped** — CPU/nav + retained heap differentiate.",
       "- `real-router` includes `browser-plugin` (real History API) — part of its cold-start by contract.",
       "- `wide`/`deep` are scaling sweeps — the per-size *curve* matters more than any single point (real-router flat; vue-router degrades at wide @1000; tanstack at deep).",
@@ -275,13 +275,44 @@ function fmt(value) {
 }
 
 function metaLine() {
+  const cells = [];
   for (const scenario of SCENARIOS) {
     for (const engine of ENGINES) {
       const data = read(scenario.id, engine);
-      if (data) return `runs ${data.runs} · warmup ${data.warmup} · throttle ${data.throttle} · ${data.env?.date ?? "?"}`;
+      if (data) cells.push({ scenario: scenario.id, engine, data });
     }
   }
-  return "(no results yet)";
+  if (cells.length === 0) return "(no results yet)";
+  // Cohort-coherence check (#1459): a mixed-epoch REPORT — some cells measured before
+  // a fix, some after — otherwise regenerates with no trace. Warn on disagreeing
+  // env.commit or a wide date span (the 07-11 vue matrix silently measured pre-#1424).
+  const commits = new Set(
+    cells.map((c) => c.data.env?.commit).filter(Boolean),
+  );
+  if (commits.size > 1) {
+    console.warn(
+      `report.mjs: ${FRAMEWORK} cohort spans ${commits.size} commits [${[...commits].join(", ")}] — MIXED-EPOCH results (a re-baseline should measure ONE commit); e.g. ${cells
+        .filter((c) => c.data.env?.commit)
+        .slice(0, 5)
+        .map((c) => `${c.scenario}×${c.engine}@${c.data.env.commit}`)
+        .join(", ")}…`,
+    );
+  }
+  const dates = cells
+    .map((c) => c.data.env?.date)
+    .filter(Boolean)
+    .sort();
+  if (dates.length > 1) {
+    const spanH = (new Date(dates.at(-1)) - new Date(dates[0])) / 3.6e6;
+    if (spanH > 6) {
+      console.warn(
+        `report.mjs: ${FRAMEWORK} cohort dates span ${spanH.toFixed(1)} h (${dates[0]} … ${dates.at(-1)}) — check for a mixed-session matrix.`,
+      );
+    }
+  }
+  const { runs, warmup, throttle, env } = cells[0].data;
+  const commitStr = env?.commit ? ` · ${env.commit}${env.dirty ? "-dirty" : ""}` : "";
+  return `runs ${runs} · warmup ${warmup} · throttle ${throttle} · ${env?.date ?? "?"}${commitStr}`;
 }
 
 const lines = [];
@@ -293,7 +324,7 @@ lines.push(cfg.cohortLine);
 lines.push("");
 lines.push(cfg.scopeNote);
 lines.push("");
-lines.push(`**Run:** ${metaLine()} · Apple M3 Pro · numbers are **median** (winner per row **bold**).`);
+lines.push(`**Run:** ${metaLine()} · Apple M3 Pro · numbers are **median** (winner per row **bold**; a **⚖** row = the top-2 medians' 95% CIs overlap, so no winner is bolded — not statistically separable, #1460).`);
 lines.push("");
 lines.push(cfg.warningLine);
 lines.push("");
@@ -308,11 +339,31 @@ for (const scenario of SCENARIOS) {
   lines.push(`| metric | ${ENGINES.join(" | ")} |`);
   lines.push(`|---|${ENGINES.map(() => "---").join("|")}|`);
   for (const [key, label, unit, dir] of scenario.rows) {
-    const values = ENGINES.map((engine) => read(scenario.id, engine)?.metrics?.[key]?.median ?? null);
-    const present = values.filter((v) => v != null);
-    const best = present.length === 0 ? null : dir === "higher" ? Math.max(...present) : Math.min(...present);
-    const cells = values.map((v) => (v == null ? "—" : v === best ? `**${fmt(v)}**` : fmt(v)));
-    lines.push(`| ${label} (${unit}) | ${cells.join(" | ")} |`);
+    const cells = ENGINES.map((engine) => {
+      const m = read(scenario.id, engine)?.metrics?.[key];
+      return m?.median == null
+        ? null
+        : { v: m.median, half: (Math.abs(m.median) * (m.rme ?? 0)) / 100 };
+    });
+    const present = cells.filter(Boolean);
+    const best =
+      present.length === 0
+        ? null
+        : dir === "higher"
+          ? Math.max(...present.map((c) => c.v))
+          : Math.min(...present.map((c) => c.v));
+    const bestCell = present.find((c) => c.v === best);
+    // Near-tie: a runner-up's 95% CI overlaps the winner's → the "win" is not
+    // statistically established (S4/#1460) → do NOT bold any winner for this row.
+    const nearTie =
+      bestCell != null &&
+      present.some(
+        (c) => c !== bestCell && Math.abs(c.v - best) <= c.half + bestCell.half,
+      );
+    const rendered = cells.map((c) =>
+      c == null ? "—" : c.v === best && !nearTie ? `**${fmt(c.v)}**` : fmt(c.v),
+    );
+    lines.push(`| ${label} (${unit})${nearTie ? " ⚖" : ""} | ${rendered.join(" | ")} |`);
   }
   lines.push("");
 }
@@ -359,8 +410,19 @@ if (read("cold-start", "_baseline")) {
   lines.push(`| metric | ${cfg.baselineLabel} | ${ENGINES.join(" | ")} |`);
   lines.push(`|---|---|${ENGINES.map(() => "---").join("|")}|`);
   for (const row of BASELINE_ROWS) {
-    const base = read(row.scenario, "_baseline")?.metrics?.[row.metric]?.median;
-    if (base == null) continue;
+    const baseCell = read(row.scenario, "_baseline");
+    const base = baseCell?.metrics?.[row.metric]?.median;
+    if (base == null) {
+      // Loud skip (#1458): a results file that EXISTS but lacks the requested key is
+      // schema drift (a renamed metric), not a genuinely missing cell — warn so the
+      // row can't silently vanish (as link-build's did when scriptMs→mountMs).
+      if (baseCell && !(row.metric in (baseCell.metrics ?? {}))) {
+        console.warn(
+          `report.mjs: BASELINE_ROWS "${row.scenario}" wants metric "${row.metric}", but the _baseline cell has [${Object.keys(baseCell.metrics ?? {}).join(", ")}] — schema drift, row DROPPED. Fix BASELINE_ROWS or re-measure.`,
+        );
+      }
+      continue;
+    }
     const cells = ENGINES.map((engine) => {
       const v = read(row.scenario, engine)?.metrics?.[row.metric]?.median;
       if (v == null) return "—";

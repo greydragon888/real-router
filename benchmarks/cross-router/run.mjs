@@ -3,53 +3,16 @@
 // scenario K times → write results/<framework>/<scenario>/<engine>.json.
 //   node cross-router/run.mjs <scenario> <engine> [framework=react] [runs]
 // Path-convention: app at apps/<framework>/<engine>/, scenario in scenarios/.
-import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { build, preview } from "vite";
 
 import { measure } from "./harness/measure.mjs";
-import { activeLinks } from "./scenarios/active-links.mjs";
-import { backForward } from "./scenarios/back-forward.mjs";
-import { coldStart } from "./scenarios/cold-start.mjs";
-import { deepConfig } from "./scenarios/deep-config.mjs";
-import { linkBuild } from "./scenarios/link-build.mjs";
-import { navChurn } from "./scenarios/nav-churn.mjs";
-import { navLatency } from "./scenarios/nav-latency.mjs";
-import { nestedSwitch } from "./scenarios/nested-switch.mjs";
-import { paramNav } from "./scenarios/param-nav.mjs";
-import { searchParamScaling } from "./scenarios/search-param-scaling.mjs";
-import { tableHeap } from "./scenarios/table-heap.mjs";
-import { wideConfig } from "./scenarios/wide-config.mjs";
-
-const SCENARIOS = {
-  "cold-start": coldStart,
-  "nav-latency": navLatency,
-  "param-nav": paramNav,
-  "wide-config": wideConfig,
-  "deep-config": deepConfig,
-  "search-param-scaling": searchParamScaling,
-  "table-heap": tableHeap,
-  "nav-churn": navChurn,
-  "active-links": activeLinks,
-  "back-forward": backForward,
-  "link-build": linkBuild,
-  "nested-switch": nestedSwitch,
-};
-
-// Big-route-table scenarios render against a variant subdir so base scenarios
-// keep a small table (no cold-start ↔ table-size conflation).
-const VARIANT = {
-  "wide-config": "wide",
-  "deep-config": "deep",
-  "search-param-scaling": "searchparams",
-  "table-heap": "tableheap",
-  "link-build": "linkbuild",
-  "nested-switch": "nested",
-  "active-links": "links",
-};
+import { freshnessGateAndProvenance } from "./harness/provenance.mjs";
+import { appRoot, SCENARIOS } from "./harness/scenarios-registry.mjs";
+import { writeCell } from "./harness/write-cell.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -65,25 +28,19 @@ function fail(message) {
 const [scenarioName, engine, framework = "react", runsArg] =
   process.argv.slice(2);
 const runs = Number(runsArg) || 30;
-// Below this, a cell is smoke-grade: its ~95% CI is many× wider than stats.mjs
-// (z=1.96) reports, and cross-session sub-ms drift can invert Δ-comparisons — such a
-// cell is indistinguishable from a real one once in results/ and poisons any analysis
-// dividing it (#1455). Smoke runs still build/measure/print (fail-fast intact) but do
-// NOT persist. `--smoke` (n=1) and same-session A/B (n≥12) both stay usable.
-const N_MIN = 10;
 
 const scenario = SCENARIOS[scenarioName];
 if (!scenario) fail(`unknown scenario: ${scenarioName ?? "(none)"}`);
 if (!engine) fail("missing <engine>");
 
-const variant = VARIANT[scenarioName] ?? "";
-const root = variant
-  ? `${here}/apps/${framework}/${engine}/${variant}`
-  : `${here}/apps/${framework}/${engine}`;
+const root = appRoot(here, framework, engine, scenarioName);
 const configFile = `${root}/vite.config.ts`;
 if (!existsSync(configFile)) {
   fail(`no app at ${root} (missing vite.config.ts)`);
 }
+
+// Pre-flight: refuse a stale dist + capture provenance (#1459) before wasting a build.
+const provenance = freshnessGateAndProvenance(here);
 
 await build({ root, configFile, logLevel: "warn" });
 
@@ -99,41 +56,14 @@ console.error(`[run] ${engine} · ${scenarioName} @ ${baseURL} (runs=${runs})`);
 const result = await measure({ baseURL, scenario, runs });
 await server.close();
 
-// Minimum provenance (#1459 / S3): stamp the git commit + dirty flag the cell was
-// measured against. Engines resolve to `dist/` (fair, but stale if not rebuilt), so a
-// bare date can't tell whether the matrix measured the code it claims — the vue-07-11
-// matrix silently measured dist without a just-merged fix. `dirty` = uncommitted src,
-// so the built dist may not match `commit`. Not a freshness gate (that's a follow-up),
-// just the trace to detect the S3 class after the fact.
-let commit = "unknown";
-let dirty = null;
-try {
-  commit = execSync("git rev-parse --short HEAD", { cwd: here }).toString().trim();
-  dirty = execSync("git status --porcelain", { cwd: here }).toString().trim() !== "";
-} catch {
-  /* not a git checkout / git unavailable — leave commit=unknown */
-}
-
 const out = {
   scenario: scenarioName,
   engine,
   framework,
   ...result,
-  env: { date: new Date().toISOString(), commit, dirty },
+  env: { date: new Date().toISOString(), ...provenance },
 };
 
 console.log(JSON.stringify(out.metrics, null, 2));
-
-if (runs < N_MIN) {
-  console.error(
-    `run.mjs: SMOKE run (runs=${runs} < N_MIN=${N_MIN}) — metrics printed above, NOT written to ` +
-      `results/ (a smoke-grade cell poisons ground truth and inverts Δ-comparisons, #1455). ` +
-      `Use runs ≥ ${N_MIN} to persist a cell.`,
-  );
-  process.exit(0);
-}
-
-const outDir = `${here}/results/${framework}/${scenarioName}`;
-mkdirSync(outDir, { recursive: true });
-writeFileSync(`${outDir}/${engine}.json`, `${JSON.stringify(out, null, 2)}\n`);
+writeCell(`${here}/results`, out, runs);
 process.exit(0);

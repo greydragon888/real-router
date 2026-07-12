@@ -2,60 +2,49 @@
 // Run the full matrix (every scenario × engine, per cohort) to populate results/,
 // then `node harness/report.mjs <fw>` turns results/ into REPORT[-<fw>].md.
 //   node cross-router/run-all.mjs [runs=15] [framework]
-// No framework arg → all cohorts (react + vue + solid + svelte) = the full matrix. (preact cohort removed — see COHORT_ENGINES.)
-// A framework arg restricts to that cohort, using its OWN engine roster (the
-// engines differ per cohort — that is why a single hardcoded list was wrong).
-import { spawnSync } from "node:child_process";
+// No framework arg → all cohorts (react + vue + solid + svelte) = the full matrix.
+// A framework arg restricts to that cohort, using its OWN engine roster.
+//
+// INTERLEAVED (#1460): for each scenario, all of a cohort's engines are built + served,
+// then measured ROUND-ROBIN in one browser session (rotating order each round) rather
+// than engine-at-a-time. Machine drift then hits every engine equally — no engine is
+// systematically measured first — closing the position-bias class a fixed roster order
+// left open. Cells are written via the shared writeCell (smoke-grade guard, #1455) with
+// the shared provenance stamp (#1459).
+import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { build, preview } from "vite";
+
+import { measureInterleaved } from "./harness/measure.mjs";
+import { freshnessGateAndProvenance } from "./harness/provenance.mjs";
+import { appRoot, SCENARIOS } from "./harness/scenarios-registry.mjs";
+import { writeCell } from "./harness/write-cell.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 
-// Per-cohort engine rosters — each cohort compares real-router against that
-// framework's real competitors (see apps/<fw>/ and the REPORT Scope sections).
+// Per-cohort engine rosters — each cohort compares real-router against that framework's
+// real competitors (see apps/<fw>/ and the REPORT Scope sections). The engines differ
+// per cohort — that is why a single hardcoded list was wrong.
 const COHORT_ENGINES = {
   react: ["real-router", "tanstack", "react-router"],
-  // preact cohort REMOVED — no full-router competitor: preact-iso is a minimalist (recommended) location-matcher, preact-router is deprecated. No honest competitive perf benchmark possible. (real-router/preact adapter still ships + is tested; just not benchmarked here.)
   vue: ["real-router", "vue-router", "tanstack"],
   solid: ["real-router", "solid-router", "tanstack"],
   svelte: ["real-router", "sv-router", "mateo-router"],
   angular: ["real-router", "angular-router"],
 };
-const SCENARIOS = [
-  "cold-start",
-  "nav-latency",
-  "param-nav",
-  "wide-config",
-  "deep-config",
-  "search-param-scaling",
-  "table-heap",
-  "nav-churn",
-  "active-links",
-  "back-forward",
-  "link-build",
-  "nested-switch",
-];
+const SCENARIO_NAMES = Object.keys(SCENARIOS);
 // _baseline (bare framework, no router) — reference floor for scenarios with a
 // no-router analog. Run after the main matrix of each cohort.
 const BASELINE_SCENARIOS = ["cold-start", "nav-latency", "link-build"];
 
-// Documented competitor limitations — (cohort → scenario → [engines]) cells that
-// CANNOT produce a COMPARABLE result: either the COMPETING router errors on the
-// scenario, or it structurally cannot express the scenario's semantics (so a cell
-// would measure different — usually less — work). Not a harness or app bug. These
-// are SKIPPED: not run, not counted as a failure — the per-cohort REPORT documents
-// the N/A. Remove an entry if the competitor changes and the cell should measure again.
+// Documented competitor limitations — (cohort → scenario → [engines]) cells that CANNOT
+// produce a COMPARABLE result: either the competing router errors, or it structurally
+// cannot express the scenario's semantics. SKIPPED (not run, not a failure); the REPORT
+// documents the N/A. Remove an entry if the competitor changes.
 const KNOWN_NA = {
-  // @tanstack/solid-router trips its internal error boundary on 60+-segment
-  // deep-nested routes (renders 3/30, errors at 60/90). @tanstack/react-router
-  // renders depth 90 — a solid-port limitation. See REPORT-solid.md.
   solid: { "deep-config": ["tanstack"] },
-  // @mateothegreat/svelte5-router renders through `{#key result.path.original}` (the
-  // FULL evaluated URL, verified in its route.svelte.d.ts), so an idiomatic two-level
-  // app REMOUNTS the outer layout + inner router on every /sec/a↔/sec/b switch —
-  // full-remount, not the ancestor-REUSE nested-switch measures. The reuse contract
-  // is inexpressible in this router; a cell would price different (less) work than the
-  // other cohorts' verified two-level cells. See REPORT-svelte.md (#1456).
   svelte: { "nested-switch": ["mateo-router"] },
 };
 const isKnownNA = (framework, scenario, engine) =>
@@ -65,27 +54,78 @@ const runs = process.argv[2] ?? "15";
 const fwArg = process.argv[3];
 const frameworks = fwArg ? [fwArg] : Object.keys(COHORT_ENGINES);
 
+// Gate a stale dist + capture provenance ONCE, before any build (#1459).
+const provenance = freshnessGateAndProvenance(here);
+
 let ok = 0;
 let failed = 0;
 let skipped = 0;
 
-const runOne = (scenario, engine, framework) => {
-  if (isKnownNA(framework, scenario, engine)) {
-    skipped += 1;
-    console.error(`⊘ ${framework} · ${scenario} × ${engine}: documented competitor N/A — skipped (see REPORT-${framework}.md)`);
-    return;
+// Build + serve every listed engine's app for one scenario, measure them interleaved,
+// write one cell each. Engines whose app is missing / fails to build are counted and
+// skipped; an engine whose scenario throws mid-run is dropped by measureInterleaved.
+const runScenario = async (framework, scenarioName, engineList) => {
+  const scenario = SCENARIOS[scenarioName];
+  const apps = [];
+  const servers = [];
+  for (const engine of engineList) {
+    const root = appRoot(here, framework, engine, scenarioName);
+    const configFile = `${root}/vite.config.ts`;
+    if (!existsSync(configFile)) {
+      failed += 1;
+      console.error(`!! no app at ${root} (${framework}·${scenarioName}×${engine})`);
+      continue;
+    }
+    try {
+      await build({ root, configFile, logLevel: "warn" });
+      const server = await preview({
+        root,
+        configFile,
+        preview: { port: 0 },
+        logLevel: "warn",
+      });
+      servers.push(server);
+      apps.push({ engine, baseURL: server.resolvedUrls.local[0] });
+    } catch (error) {
+      failed += 1;
+      console.error(
+        `!! build/serve failed: ${framework}·${scenarioName}×${engine}: ${error.message}`,
+      );
+    }
   }
-  console.error(`\n=== ${framework} · ${scenario} × ${engine} (runs=${runs}) ===`);
-  const result = spawnSync(
-    "node",
-    [`${here}/run.mjs`, scenario, engine, framework, runs],
-    { stdio: ["inherit", "ignore", "inherit"], env: process.env },
+  if (apps.length === 0) return;
+
+  console.error(
+    `\n=== ${framework} · ${scenarioName} × [${apps.map((a) => a.engine).join(", ")}] interleaved (runs=${runs}) ===`,
   );
-  if (result.status === 0) {
-    ok += 1;
-  } else {
-    failed += 1;
-    console.error(`!! FAILED: ${framework} · ${scenario} × ${engine} (status ${result.status})`);
+  let results;
+  try {
+    results = await measureInterleaved({
+      apps,
+      scenario,
+      runs: Number(runs),
+    });
+  } catch (error) {
+    failed += apps.length;
+    console.error(`!! measure failed: ${framework}·${scenarioName}: ${error.message}`);
+    return;
+  } finally {
+    await Promise.all(servers.map((s) => s.close()));
+  }
+
+  for (const { engine } of apps) {
+    if (!results[engine]) {
+      failed += 1; // dropped mid-interleave (threw)
+      continue;
+    }
+    const out = {
+      scenario: scenarioName,
+      engine,
+      framework,
+      ...results[engine],
+      env: { date: new Date().toISOString(), ...provenance },
+    };
+    if (writeCell(`${here}/results`, out, Number(runs))) ok += 1;
   }
 };
 
@@ -93,13 +133,30 @@ for (const framework of frameworks) {
   const engines = COHORT_ENGINES[framework];
   if (!engines) {
     failed += 1;
-    console.error(`!! unknown framework: ${framework} (expected one of ${Object.keys(COHORT_ENGINES).join(", ")})`);
+    console.error(
+      `!! unknown framework: ${framework} (expected one of ${Object.keys(COHORT_ENGINES).join(", ")})`,
+    );
     continue;
   }
-  for (const scenario of SCENARIOS) {
-    for (const engine of engines) runOne(scenario, engine, framework);
+  for (const scenarioName of SCENARIO_NAMES) {
+    const participants = engines.filter((engine) => {
+      if (isKnownNA(framework, scenarioName, engine)) {
+        skipped += 1;
+        console.error(
+          `⊘ ${framework} · ${scenarioName} × ${engine}: documented competitor N/A — skipped (see REPORT-${framework}.md)`,
+        );
+        return false;
+      }
+      return true;
+    });
+    if (participants.length > 0) {
+      await runScenario(framework, scenarioName, participants);
+    }
   }
-  for (const scenario of BASELINE_SCENARIOS) runOne(scenario, "_baseline", framework);
+  // _baseline is a single engine per applicable scenario (nothing to interleave).
+  for (const scenarioName of BASELINE_SCENARIOS) {
+    await runScenario(framework, scenarioName, ["_baseline"]);
+  }
 }
 
 console.error(
