@@ -24,13 +24,16 @@ const RESULTS = join(CR, "results");
 const FW = ["react", "vue", "solid", "svelte", "angular"];
 
 // Inherently-noisy metric families — CDP Blink trace (history.pushState), wall-clock
-// latency, and FCP all have a fat RME tail by nature (small absolute / paint cadence).
-// `navMsWall@N` (sweep single-nav wall) is `perf.now` clamp-quantized (~100 µs), so on
-// the fast points it has a high RME by QUANTIZATION, not instability — classify it noisy
-// so it can't fail a healthy matrix. NOTE: the per-nav `navMsWall` (no `@` — it sums N
-// navs, so its wall is clean) and the sweep headline `navMsTask@N` (ΔTaskDuration,
-// unclamped) are deliberately NOT matched → they stay stable-gated (≤15%).
-const isNoisy = (k) => /blink|latency|fcp/i.test(k) || /^navMsWall@/.test(k);
+// latency, and FCP have a fat RME tail by nature. The SWEEP single-nav per-size metrics
+// `navMsWall@N` / `navMsTask@N` / `scriptMs@N` are noisy for a STRUCTURAL reason too: a
+// sweep measures ONE nav per size (not the N-summed windows the per-nav scenarios use),
+// so their RME is inherently wider — `navMsWall@N` is also `perf.now` clamp-quantized
+// (~100 µs), and even the unclamped `navMsTask@N`/`scriptMs@N` ran 15–26% on the 07-12
+// n=15 matrix (single-nav noise, NOT instability; the matcher-scaling CURVE is what
+// matters, not the per-point absolute). Classify all three noisy so they can't fail a
+// healthy matrix. The per-nav `navMsWall`/`navMsTask` (NO `@` — they sum N navs, so they
+// are clean) stay stable-gated (≤15%).
+const isNoisy = (k) => /blink|latency|fcp/i.test(k) || /^(navMsWall|navMsTask|scriptMs)@/.test(k);
 
 function* resultFiles(cohort) {
   const root = join(RESULTS, cohort);
