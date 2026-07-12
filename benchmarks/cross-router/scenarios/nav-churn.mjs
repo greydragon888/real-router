@@ -1,8 +1,13 @@
 // nav-churn (stress) — hammer N navigations toggling 2 routes; report throughput
-// (navs/sec) + retained heap after N navs (forced GC) + per-nav CPU. Now also a
-// Blink-history pass → total / nav (script `ScriptDuration` V8 + Blink history,
-// which V8 does not count). Heap delta is REPORTED with a healthy baseline, not
-// asserted (H2): a flat router does not accumulate per-nav.
+// (navs/sec) + retained heap after N navs (forced GC) + per-nav CPU. Headline: the
+// unified wall-clock per-nav (`navMsWall` = elapsed / N — the SAME `performance.now`
+// window that yields `navsPerSec`, so `navMsWall = 1000 / navsPerSec` holds BY
+// CONSTRUCTION — the wall-bound invariant the old paced `totalMsPerNav` violated,
+// F1/#1452) + its ΔTaskDuration twin (`navMsTask`). script/blink kept as DIAGNOSTICS,
+// the broken additive `totalMsPerNav = script + blink` retired. With the rAF-poll
+// `waitFor` replaced by the precise MutationObserver settle, `navsPerSec` is now the
+// REAL throughput (no per-nav frame quantization → no ~121/s cap). Heap delta is
+// reported with a healthy baseline, not asserted (H2).
 import { forceGcHeapBytes, getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
 const N = 200;
@@ -15,47 +20,41 @@ export const navChurn = {
     await page.waitForSelector('[data-testid="link-about"]');
     await page.waitForSelector('[data-testid="link-home"]');
 
-    const toggle = (n, gap) =>
-      page.evaluate(
-        async ([count, g]) => {
-          const waitFor = async (sel) => {
-            for (let t = 0; t < 240; t++) {
-              if (document.querySelector(sel)) return;
-              await new Promise((r) => requestAnimationFrame(r));
-            }
-            throw new Error(`nav-churn: ${sel} not rendered`);
-          };
-          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-          const start = performance.now();
-          for (let i = 0; i < count; i++) {
-            const a = i % 2 === 0;
-            document
-              .querySelector(`[data-testid="${a ? "link-about" : "link-home"}"]`)
-              .click();
-            await waitFor(`[data-testid="${a ? "page-about" : "page-home"}"]`);
-            if (g) await sleep(g);
-          }
-          return performance.now() - start;
-        },
-        [n, gap],
-      );
+    const toggle = (count) =>
+      page.evaluate(async (c) => {
+        const settle = window.__navMetric.settle;
+        const start = performance.now();
+        for (let i = 0; i < c; i++) {
+          const a = i % 2 === 0;
+          document
+            .querySelector(`[data-testid="${a ? "link-about" : "link-home"}"]`)
+            .click();
+          await settle(`[data-testid="${a ? "page-about" : "page-home"}"]`);
+        }
+        return performance.now() - start;
+      }, count);
 
     const heapBefore = await forceGcHeapBytes(client);
     const cpuBefore = await getMetrics(client);
-    const elapsedMs = await toggle(N, 0);
+    const elapsedMs = await toggle(N);
     const cpuAfter = await getMetrics(client);
     const heapAfter = await forceGcHeapBytes(client);
+
+    const navMsWall = elapsedMs / N;
+    const navMsTask =
+      ((cpuAfter.TaskDuration - cpuBefore.TaskDuration) * 1000) / N;
     const scriptMsPerNav =
       ((cpuAfter.ScriptDuration - cpuBefore.ScriptDuration) * 1000) / N;
 
     const blinkMsPerNav =
-      (await traceBlinkUs(client, () => toggle(BLINK_NAVS, 80))) /
+      (await traceBlinkUs(client, () => toggle(BLINK_NAVS))) /
       BLINK_NAVS /
       1000;
 
     return {
+      navMsWall,
+      navMsTask,
       navsPerSec: (N / elapsedMs) * 1000,
-      totalMsPerNav: scriptMsPerNav + blinkMsPerNav,
       scriptMsPerNav,
       blinkMsPerNav,
       heapDeltaKB: (heapAfter - heapBefore) / 1024,

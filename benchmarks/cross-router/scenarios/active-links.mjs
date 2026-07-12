@@ -1,11 +1,14 @@
 // active-links — per-navigation active-state recompute across 100 mounted links,
 // STEADY-STATE toggle /tab/1 ↔ /tab/2 (all 100 links recompute active each nav).
-// total = script (`ScriptDuration`, V8 — the O(links) recompute + render) + Blink
-// history. (Was single-nav script-only — now steady-state + total.)
+// Headline: unified wall-clock click→DOM-settle (`navMsWall`) + its ΔTaskDuration
+// twin (`navMsTask`) — capture async engines' microtask flush (#1451) + Blink
+// pushState (#1452); script/blink kept as DIAGNOSTICS, the broken additive
+// `totalMs = script + blink` retired. Settle = the page's `data-n` ATTRIBUTE (the
+// 100-link recompute + render completes as that leaf attribute flips).
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
 const WARMUP_NAVS = 6;
-const SCRIPT_NAVS = 20;
+const MEASURE_NAVS = 20;
 const BLINK_NAVS = 16;
 
 export const activeLinks = {
@@ -15,43 +18,33 @@ export const activeLinks = {
     await page.waitForSelector('[data-testid="page-tab"]');
     await page.waitForSelector('[data-testid="link-tab-2"]');
 
-    const drive = (navs, gap) =>
-      page.evaluate(
-        async ([n, g]) => {
-          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-          const waitN = async (v) => {
-            for (let t = 0; t < 240; t++) {
-              const el = document.querySelector('[data-testid="page-tab"]');
-              if (el && el.getAttribute("data-n") === v) return;
-              await new Promise((r) => requestAnimationFrame(r));
-            }
-            throw new Error(`active-links: tab ${v} not rendered`);
-          };
-          for (let i = 0; i < n / 2; i++) {
-            document.querySelector('[data-testid="link-tab-2"]').click();
-            await waitN("2");
-            if (g) await sleep(g);
-            document.querySelector('[data-testid="link-tab-1"]').click();
-            await waitN("1");
-            if (g) await sleep(g);
-          }
-        },
-        [navs, gap],
-      );
+    const drive = (navs) =>
+      page.evaluate(async (n) => {
+        const settle = window.__navMetric.settle;
+        const t0 = performance.now();
+        for (let i = 0; i < n / 2; i++) {
+          document.querySelector('[data-testid="link-tab-2"]').click();
+          await settle('[data-testid="page-tab"][data-n="2"]');
+          document.querySelector('[data-testid="link-tab-1"]').click();
+          await settle('[data-testid="page-tab"][data-n="1"]');
+        }
+        return performance.now() - t0;
+      }, navs);
 
-    await drive(WARMUP_NAVS, 0);
+    await drive(WARMUP_NAVS);
 
     const before = await getMetrics(client);
-    await drive(SCRIPT_NAVS, 0);
+    const wallTotalMs = await drive(MEASURE_NAVS);
     const after = await getMetrics(client);
+    const navMsWall = wallTotalMs / MEASURE_NAVS;
+    const navMsTask =
+      ((after.TaskDuration - before.TaskDuration) * 1000) / MEASURE_NAVS;
     const scriptDurationMs =
-      ((after.ScriptDuration - before.ScriptDuration) * 1000) / SCRIPT_NAVS;
+      ((after.ScriptDuration - before.ScriptDuration) * 1000) / MEASURE_NAVS;
 
     const blinkMs =
-      (await traceBlinkUs(client, () => drive(BLINK_NAVS, 80))) /
-      BLINK_NAVS /
-      1000;
+      (await traceBlinkUs(client, () => drive(BLINK_NAVS))) / BLINK_NAVS / 1000;
 
-    return { totalMs: scriptDurationMs + blinkMs, scriptDurationMs, blinkMs };
+    return { navMsWall, navMsTask, scriptDurationMs, blinkMs };
   },
 };
