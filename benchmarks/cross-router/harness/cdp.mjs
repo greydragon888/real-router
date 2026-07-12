@@ -55,31 +55,51 @@ export async function traceBlinkUs(client, fn) {
 // felt cost: the microtask flush `ScriptDuration` misses AND the Blink pushState
 // inside the click task — the unified per-nav metric the audit converged on.
 export function installNavMetric() {
-  window.__navMetric = {
-    settle(selector, timeoutMs = 4000) {
-      return new Promise((resolve, reject) => {
-        if (document.querySelector(selector)) {
-          resolve();
-          return;
-        }
-        let timer;
-        const obs = new MutationObserver(() => {
-          if (!document.querySelector(selector)) return;
-          obs.disconnect();
-          clearTimeout(timer);
-          resolve();
-        });
-        obs.observe(document.documentElement, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          characterData: true,
-        });
-        timer = setTimeout(() => {
-          obs.disconnect();
-          reject(new Error(`__navMetric.settle timeout: ${selector}`));
-        }, timeoutMs);
+  const observe = (selector, done, timeoutMs, label) =>
+    new Promise((resolve, reject) => {
+      if (done()) {
+        resolve();
+        return;
+      }
+      let timer;
+      const obs = new MutationObserver(() => {
+        if (!done()) return;
+        obs.disconnect();
+        clearTimeout(timer);
+        resolve();
       });
+      obs.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        characterData: true,
+      });
+      timer = setTimeout(() => {
+        obs.disconnect();
+        reject(new Error(`__navMetric.${label} timeout: ${selector}`));
+      }, timeoutMs);
+    });
+  window.__navMetric = {
+    // Resolve when `selector` FIRST matches (element swap / class toggle / text /
+    // attribute change) — the close-of-window signal for a nav TO a target.
+    settle(selector, timeoutMs = 4000) {
+      return observe(
+        selector,
+        () => document.querySelector(selector) !== null,
+        timeoutMs,
+        "settle",
+      );
+    },
+    // Resolve when `selector` stops matching — the mirror signal used to detect a
+    // return to a page that lacks a positive universal marker (e.g. the sweep apps'
+    // home, which only renders its nav): "back on home" = the target is GONE (#1453).
+    settleGone(selector, timeoutMs = 4000) {
+      return observe(
+        selector,
+        () => document.querySelector(selector) === null,
+        timeoutMs,
+        "settleGone",
+      );
     },
   };
 }
