@@ -201,6 +201,58 @@ describe("popstate handler", () => {
       expect(notFoundSpy).toHaveBeenCalledWith("/nope");
     });
 
+    describe("not-found same-state short-circuit (#1448)", () => {
+      it("skips navigateToNotFound when already at UNKNOWN_ROUTE for the same path", async () => {
+        const deps = makeDeps({ allowNotFound: true });
+
+        deps.browser.getLocation = () => "/nope";
+        // Commit UNKNOWN_ROUTE for /nope, THEN spy — the setup commit is not
+        // counted, only the handler-driven call is.
+        router.navigateToNotFound("/nope");
+        const notFoundSpy = vi.spyOn(router, "navigateToNotFound");
+        const handler = createPopstateHandler(deps);
+
+        handler(makePopStateEvent(null));
+        await flushAsync();
+
+        // Already at this exact not-found state → the popstate is a no-op,
+        // parity with the matched-route SAME_STATES suppression.
+        expect(notFoundSpy).not.toHaveBeenCalled();
+      });
+
+      it("still navigates when already at UNKNOWN_ROUTE but the location differs", async () => {
+        const deps = makeDeps({ allowNotFound: true });
+
+        deps.browser.getLocation = () => "/nope-b";
+        router.navigateToNotFound("/nope-a");
+        const notFoundSpy = vi.spyOn(router, "navigateToNotFound");
+        const handler = createPopstateHandler(deps);
+
+        handler(makePopStateEvent(null));
+        await flushAsync();
+
+        // A different not-found path is not redundant — the short-circuit is
+        // path-specific, so navigateToNotFound fires again.
+        expect(notFoundSpy).toHaveBeenCalledWith("/nope-b");
+      });
+
+      it("navigates to not-found when no state is committed yet (defensive)", async () => {
+        const deps = makeDeps({ allowNotFound: true });
+
+        deps.browser.getLocation = () => "/nope";
+        // Two-phase-start edge: isActive() true while getState() is undefined —
+        // there is no committed not-found to dedup against, so navigate.
+        vi.spyOn(router, "getState").mockReturnValue(undefined);
+        const notFoundSpy = vi.spyOn(router, "navigateToNotFound");
+        const handler = createPopstateHandler(deps);
+
+        handler(makePopStateEvent(null));
+        await flushAsync();
+
+        expect(notFoundSpy).toHaveBeenCalledWith("/nope");
+      });
+    });
+
     it("strict mode: emits ROUTE_NOT_FOUND and rolls the URL back to the current state", async () => {
       const deps = makeDeps();
 
