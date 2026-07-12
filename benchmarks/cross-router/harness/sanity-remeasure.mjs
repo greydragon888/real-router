@@ -14,8 +14,11 @@
 //   fresh ≫ recorded → load (or heat) is present NOW: late-matrix sub-ms cells
 //                      may be inflated and this comparison itself is tainted.
 // Either direction flags. allocKBPerNav is printed as a control: allocation is a
-// byte count, not a duration — if totalMs shifted but alloc held, it was load,
-// not a code change. Wire it after run-all in bench-cross-router.sh.
+// byte count, not a duration — if navMsWall shifted but alloc held, it was load,
+// not a code change. Wire it after run-all in bench-cross-router.sh. Canary metric =
+// `navMsWall` (the unified click→settle wall-clock, #1451/#1452): it is the MOST
+// load-sensitive per-nav signal, so it is the sharpest load canary (the retired
+// `totalMs` is gone — do NOT key on it, or this guard silently exit-2's on every run).
 //
 // Usage:
 //   node cross-router/harness/sanity-remeasure.mjs <framework> [runs=12] [shift%=20]
@@ -54,9 +57,9 @@ try {
   console.error(`sanity-remeasure: cannot parse ${recordedPath} — skipping.`);
   process.exit(2);
 }
-const recordedTotal = recorded?.metrics?.totalMs?.median;
-if (typeof recordedTotal !== "number" || recordedTotal <= 0) {
-  console.error("sanity-remeasure: recorded result has no totalMs.median — skipping.");
+const recordedWall = recorded?.metrics?.navMsWall?.median;
+if (typeof recordedWall !== "number" || recordedWall <= 0) {
+  console.error("sanity-remeasure: recorded result has no navMsWall.median — skipping.");
   process.exit(2);
 }
 
@@ -78,16 +81,16 @@ try {
   await server.close();
 }
 
-const freshTotal = fresh.metrics.totalMs.median;
+const freshWall = fresh.metrics.navMsWall.median;
 // + = recorded higher than fresh (the matrix was the inflated one).
-const shift = ((recordedTotal - freshTotal) / recordedTotal) * 100;
+const shift = ((recordedWall - freshWall) / recordedWall) * 100;
 
 console.log(
-  `sanity-remeasure — nav-latency × real-router × ${framework}: recorded (n=${recorded.metrics.totalMs.n}) vs fresh (n=${fresh.metrics.totalMs.n}) · flag |shift| > ${shiftLimit}%\n`,
+  `sanity-remeasure — nav-latency × real-router × ${framework}: recorded (n=${recorded.metrics.navMsWall.n}) vs fresh (n=${fresh.metrics.navMsWall.n}) · flag |shift| > ${shiftLimit}%\n`,
 );
 console.log("| metric | recorded | fresh | recorded−fresh |");
 console.log("|---|---|---|---|");
-for (const key of ["totalMs", "scriptDurationMs", "blinkMs", "allocKBPerNav"]) {
+for (const key of ["navMsWall", "navMsTask", "scriptDurationMs", "blinkMs", "allocKBPerNav"]) {
   const r = recorded.metrics?.[key]?.median;
   const f = fresh.metrics?.[key]?.median;
   if (typeof r !== "number" || typeof f !== "number") continue; // alloc absent in pre-07-05 results
@@ -97,17 +100,17 @@ for (const key of ["totalMs", "scriptDurationMs", "blinkMs", "allocKBPerNav"]) {
 console.log("");
 
 if (Math.abs(shift) <= shiftLimit) {
-  console.log(`✓ PASS — totalMs medians agree within ${shiftLimit}% (shift ${shift >= 0 ? "+" : ""}${shift.toFixed(1)}%): no sign of mid-run load inflation.`);
+  console.log(`✓ PASS — navMsWall medians agree within ${shiftLimit}% (shift ${shift >= 0 ? "+" : ""}${shift.toFixed(1)}%): no sign of mid-run load inflation.`);
   process.exit(0);
 }
 if (shift > 0) {
-  console.log(`✗ FLAG — recorded totalMs is ${shift.toFixed(1)}% above a fresh same-session re-measure.`);
+  console.log(`✗ FLAG — recorded navMsWall is ${shift.toFixed(1)}% above a fresh same-session re-measure.`);
   console.log("  The matrix likely ran under load that has since receded: treat this cohort's");
   console.log("  sub-ms per-nav absolutes (nav-latency / param-nav / active-links / nested-switch /");
   console.log("  per-nav script) as load-inflated. Stable classes (wide/deep sweeps, table-heap,");
   console.log("  link-build, alloc) are unaffected. Re-run the cohort for trustworthy sub-ms numbers.");
 } else {
-  console.log(`✗ FLAG — fresh totalMs is ${(-shift).toFixed(1)}% above the recorded value.`);
+  console.log(`✗ FLAG — fresh navMsWall is ${(-shift).toFixed(1)}% above the recorded value.`);
   console.log("  Load (or heat) is present NOW: late-matrix sub-ms cells may be inflated and this");
   console.log("  comparison itself is tainted. Check the machine (pnpm cpu, thermal) and consider");
   console.log("  re-running the cohort.");

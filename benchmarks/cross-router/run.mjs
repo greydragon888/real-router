@@ -3,6 +3,7 @@
 // scenario K times → write results/<framework>/<scenario>/<engine>.json.
 //   node cross-router/run.mjs <scenario> <engine> [framework=react] [runs]
 // Path-convention: app at apps/<framework>/<engine>/, scenario in scenarios/.
+import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -98,12 +99,27 @@ console.error(`[run] ${engine} · ${scenarioName} @ ${baseURL} (runs=${runs})`);
 const result = await measure({ baseURL, scenario, runs });
 await server.close();
 
+// Minimum provenance (#1459 / S3): stamp the git commit + dirty flag the cell was
+// measured against. Engines resolve to `dist/` (fair, but stale if not rebuilt), so a
+// bare date can't tell whether the matrix measured the code it claims — the vue-07-11
+// matrix silently measured dist without a just-merged fix. `dirty` = uncommitted src,
+// so the built dist may not match `commit`. Not a freshness gate (that's a follow-up),
+// just the trace to detect the S3 class after the fact.
+let commit = "unknown";
+let dirty = null;
+try {
+  commit = execSync("git rev-parse --short HEAD", { cwd: here }).toString().trim();
+  dirty = execSync("git status --porcelain", { cwd: here }).toString().trim() !== "";
+} catch {
+  /* not a git checkout / git unavailable — leave commit=unknown */
+}
+
 const out = {
   scenario: scenarioName,
   engine,
   framework,
   ...result,
-  env: { date: new Date().toISOString() },
+  env: { date: new Date().toISOString(), commit, dirty },
 };
 
 console.log(JSON.stringify(out.metrics, null, 2));

@@ -349,7 +349,7 @@ lines.push("");
 const BASELINE_ROWS = [
   { scenario: "cold-start", metric: "scriptDurationMs", label: "cold-start script (ms)" },
   { scenario: "cold-start", metric: "jsHeapMB", label: "cold-start heap retained (MB)" },
-  { scenario: "link-build", metric: "scriptMs", label: "link-build script (ms)" },
+  { scenario: "link-build", metric: "mountMs", label: "link-build mount (ms)" },
 ];
 if (read("cold-start", "_baseline")) {
   lines.push(`## Router overhead over ${cfg.baselineLabel} (\`_baseline\`)`);
