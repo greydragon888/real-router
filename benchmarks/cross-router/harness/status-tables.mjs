@@ -28,7 +28,14 @@ const num = (c) => {
   return m ? parseFloat(m[0]) : null;
 };
 
+// Non-comparable metrics (#1462/CL16): `navsPerSec` is derived (= 1000/navMsWall) and
+// was historically an artifact (sync vs frame-capped throughput) the harness itself
+// documents as "NOT comparable" — ranking it printed the largest fictitious rr win in
+// the status view. nav-churn is ranked by navMsWall + retained heap; skip a verdict here.
+const NON_COMPARABLE = /throughput|navsPerSec/i;
+
 function status(metric, vals) {
+  if (NON_COMPARABLE.test(metric)) return "— (n/c — read navMsWall)";
   const rr = vals["real-router"];
   const others = Object.entries(vals).filter(([e]) => e !== "real-router");
   if (rr == null || others.length === 0) return "—";

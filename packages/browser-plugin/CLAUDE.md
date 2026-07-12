@@ -43,6 +43,9 @@ Transition completes → process deferred event
 ```
 Only the **last** deferred event is kept (intermediate states skipped).
 
+### Not-Found Popstate Same-State Short-Circuit (#1448)
+`navigateToNotFound` is synchronous and **bypasses the navigate pipeline**, so it has no `SAME_STATES` guard of its own — the deferred queue above never engages for a not-found storm (each event fully commits before the next runs). The popstate handler adds the missing guard: a back/forward popstate that resolves to the `UNKNOWN_ROUTE` **already committed for the exact same path** is skipped. A storm of identical not-found popstates therefore collapses to a **single** commit, parity with the matched-route branch (where `navigateToState` suppresses the same-state case). The guard is **path-specific** — a popstate to a *different* unmatched path still navigates. Shared via `browser-env`, so hash-plugin gets the same short-circuit.
+
 ### Base Path Normalization
 ```typescript
 { base: "/app/" }  // Input

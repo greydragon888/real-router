@@ -17,18 +17,18 @@ const FEATURES = existsSync(`${RESULTS}/features.json`)
 // Scenario row configs (metric keys/labels) — framework-agnostic. Blurbs live
 // per-framework in FW[*].blurbs so each cohort tells its own story.
 const SCENARIOS = [
-  { id: "cold-start", title: "Cold start", rows: [["scriptDurationMs", "main-thread script", "ms", "lower"], ["jsHeapMB", "JS heap", "MB", "lower"], ["fcpMs", "FCP", "ms", "lower"]] },
-  { id: "nav-latency", title: "Navigation — per-nav total main-thread (script + history)", rows: [["totalMs", "≈ total main-thread", "ms", "lower"], ["scriptDurationMs", "· script (V8 only)", "ms", "lower"], ["blinkMs", "· Blink history (pushState)", "ms", "lower"], ["allocKBPerNav", "alloc / nav (GC pressure)", "KB", "lower"]] },
-  { id: "param-nav", title: "Param navigation — per-nav total (script + history)", rows: [["totalMs", "≈ total main-thread", "ms", "lower"], ["scriptDurationMs", "· script (V8 only)", "ms", "lower"], ["blinkMs", "· Blink history (pushState)", "ms", "lower"], ["allocKBPerNav", "alloc / nav (GC pressure)", "KB", "lower"]] },
-  { id: "wide-config", title: "Wide config — matcher breadth (sweep)", rows: [["totalMs@10", "≈ total @10", "ms", "lower"], ["totalMs@100", "≈ total @100", "ms", "lower"], ["totalMs@1000", "≈ total @1000", "ms", "lower"], ["scriptMs@10", "· script (matcher) @10", "ms", "lower"], ["scriptMs@100", "· script (matcher) @100", "ms", "lower"], ["scriptMs@1000", "· script (matcher) @1000", "ms", "lower"]] },
+  { id: "cold-start", title: "Cold start", rows: [["scriptDurationMs", "main-thread script", "ms", "lower"], ["jsHeapMB", "JS heap (retained, post-GC)", "MB", "lower"], ["jsHeapPreGcMB", "· JS heap @FCP (pre-GC, boot garbage — diag #1454)", "MB", "lower"], ["fcpMs", "FCP", "ms", "lower"]] },
+  { id: "nav-latency", title: "Navigation — per-nav wall-clock (click→DOM settle)", rows: [["navMsWall", "nav / wall (click→settle)", "ms", "lower"], ["navMsTask", "· nav / task (ΔTaskDuration)", "ms", "lower"], ["scriptDurationMs", "· ⚠ script (V8, microtask-blind #1451)", "ms", "lower"], ["blinkMs", "· blink diag (gap=0, #1452)", "ms", "lower"], ["allocKBPerNav", "alloc / nav (GC pressure)", "KB", "lower"]] },
+  { id: "param-nav", title: "Param navigation — per-nav wall-clock (click→DOM settle)", rows: [["navMsWall", "nav / wall (click→settle)", "ms", "lower"], ["navMsTask", "· nav / task (ΔTaskDuration)", "ms", "lower"], ["scriptDurationMs", "· ⚠ script (V8, microtask-blind #1451)", "ms", "lower"], ["blinkMs", "· blink diag (gap=0, #1452)", "ms", "lower"], ["allocKBPerNav", "alloc / nav (GC pressure)", "KB", "lower"]] },
+  { id: "wide-config", title: "Wide config — matcher breadth (sweep)", rows: [["navMsTask@10", "nav / task @10", "ms", "lower"], ["navMsTask@100", "nav / task @100", "ms", "lower"], ["navMsTask@1000", "nav / task @1000", "ms", "lower"], ["navMsWall@1000", "· nav / wall @1000 (felt)", "ms", "lower"], ["scriptMs@10", "· ⚠ script (V8, microtask-blind #1451) @10", "ms", "lower"], ["scriptMs@100", "· ⚠ script @100", "ms", "lower"], ["scriptMs@1000", "· ⚠ script @1000", "ms", "lower"]] },
   { id: "table-heap", title: "Route-table memory — heap to hold N routes (sweep)", rows: [["jsHeapMB@1", "heap @1 (floor)", "MB", "lower"], ["jsHeapMB@1000", "heap @1k", "MB", "lower"], ["jsHeapMB@10000", "heap @10k", "MB", "lower"]] },
-  { id: "deep-config", title: "Deep config — nesting depth (sweep)", rows: [["totalMs@3", "≈ total @3", "ms", "lower"], ["totalMs@30", "≈ total @30", "ms", "lower"], ["totalMs@60", "≈ total @60", "ms", "lower"], ["totalMs@90", "≈ total @90", "ms", "lower"], ["scriptMs@3", "· script (matcher) @3", "ms", "lower"], ["scriptMs@30", "· script (matcher) @30", "ms", "lower"], ["scriptMs@60", "· script (matcher) @60", "ms", "lower"], ["scriptMs@90", "· script (matcher) @90", "ms", "lower"]] },
-  { id: "search-param-scaling", title: "Search-param scaling — query-param count (sweep, reads all values)", rows: [["totalMs@1", "≈ total @1", "ms", "lower"], ["totalMs@10", "≈ total @10", "ms", "lower"], ["totalMs@50", "≈ total @50", "ms", "lower"], ["scriptMs@1", "· script (query-parse) @1", "ms", "lower"], ["scriptMs@10", "· script (query-parse) @10", "ms", "lower"], ["scriptMs@50", "· script (query-parse) @50", "ms", "lower"], ["allocKBPerNav", "alloc / nav @50↔@1 (GC pressure)", "KB", "lower"]] },
-  { id: "nav-churn", title: "Nav churn (stress)", rows: [["totalMsPerNav", "≈ total / nav", "ms", "lower"], ["scriptMsPerNav", "· script / nav (V8)", "ms", "lower"], ["blinkMsPerNav", "· Blink / nav (pushState)", "ms", "lower"], ["heapDeltaKB", "heap retained (200 navs)", "KB", "lower"], ["navsPerSec", "throughput (frame-capped)", "/s", "higher"]] },
-  { id: "active-links", title: "Active links (100) — per-nav total (script + history)", rows: [["totalMs", "≈ total main-thread", "ms", "lower"], ["scriptDurationMs", "· script (V8 only)", "ms", "lower"], ["blinkMs", "· Blink history (pushState)", "ms", "lower"]] },
-  { id: "back-forward", title: "Back / forward — per-nav total, browser history traversal (popstate)", rows: [["totalMs", "≈ total main-thread", "ms", "lower"], ["scriptDurationMs", "· script (V8 only)", "ms", "lower"], ["blinkMs", "· Blink history (popstate)", "ms", "lower"], ["allocKBPerNav", "alloc / nav (GC pressure)", "KB", "lower"]] },
-  { id: "link-build", title: "Link build — mount 1000 links (href construction, wall-clock)", rows: [["mountMs", "mount 1000 links (wall)", "ms", "lower"]] },
-  { id: "nested-switch", title: "Nested switch (reuse) — per-nav total (script + history)", rows: [["totalMs", "≈ total main-thread", "ms", "lower"], ["scriptDurationMs", "· script (V8 only)", "ms", "lower"], ["blinkMs", "· Blink history (pushState)", "ms", "lower"]] },
+  { id: "deep-config", title: "Deep config — nesting depth (sweep)", rows: [["navMsTask@3", "nav / task @3", "ms", "lower"], ["navMsTask@30", "nav / task @30", "ms", "lower"], ["navMsTask@60", "nav / task @60", "ms", "lower"], ["navMsTask@90", "nav / task @90", "ms", "lower"], ["navMsWall@90", "· nav / wall @90 (felt)", "ms", "lower"], ["scriptMs@3", "· ⚠ script (V8, microtask-blind #1451) @3", "ms", "lower"], ["scriptMs@30", "· ⚠ script @30", "ms", "lower"], ["scriptMs@60", "· ⚠ script @60", "ms", "lower"], ["scriptMs@90", "· ⚠ script @90", "ms", "lower"]] },
+  { id: "search-param-scaling", title: "Search-param scaling — query-param count (sweep, reads all values)", rows: [["navMsTask@1", "nav / task @1", "ms", "lower"], ["navMsTask@10", "nav / task @10", "ms", "lower"], ["navMsTask@50", "nav / task @50", "ms", "lower"], ["navMsWall@50", "· nav / wall @50 (felt)", "ms", "lower"], ["scriptMs@1", "· ⚠ script (query-parse, V8-blind #1451) @1", "ms", "lower"], ["scriptMs@10", "· ⚠ script @10", "ms", "lower"], ["scriptMs@50", "· ⚠ script @50", "ms", "lower"], ["allocKBPerNav", "alloc / nav @50↔@1 (GC pressure)", "KB", "lower"]] },
+  { id: "nav-churn", title: "Nav churn (stress)", rows: [["navMsWall", "nav / wall (= 1000/navsPerSec)", "ms", "lower"], ["navMsTask", "· nav / task (ΔTaskDuration)", "ms", "lower"], ["navsPerSec", "throughput (real, settle-timed)", "/s", "higher"], ["scriptMsPerNav", "· ⚠ script / nav (microtask-blind #1451)", "ms", "lower"], ["blinkMsPerNav", "· blink diag (gap=0, #1452)", "ms", "lower"], ["heapDeltaKB", "heap Δ 0→200 navs (⚠ warmup-dominated, not a leak #1462)", "KB", "lower"]] },
+  { id: "active-links", title: "Active links (100) — per-nav wall-clock (click→DOM settle)", rows: [["navMsWall", "nav / wall (click→settle)", "ms", "lower"], ["navMsTask", "· nav / task (ΔTaskDuration)", "ms", "lower"], ["scriptDurationMs", "· ⚠ script (V8, microtask-blind #1451)", "ms", "lower"], ["blinkMs", "· blink diag (gap=0, #1452)", "ms", "lower"]] },
+  { id: "back-forward", title: "Back / forward — per-nav wall-clock (popstate → DOM settle)", rows: [["navMsWall", "nav / wall (back/fwd→settle)", "ms", "lower"], ["navMsTask", "· nav / task (ΔTaskDuration)", "ms", "lower"], ["scriptDurationMs", "· ⚠ script (V8, microtask-blind #1451)", "ms", "lower"], ["blinkMs", "· blink diag (gap=0; rr 2×/nav honest)", "ms", "lower"], ["allocKBPerNav", "alloc / nav (GC pressure)", "KB", "lower"]] },
+  { id: "link-build", title: "Link build — mount 1000 links (href construction, wall-clock)", rows: [["mountMs", "mount 1000 links (wall → DOM-commit, pre-paint; #1462)", "ms", "lower"]] },
+  { id: "nested-switch", title: "Nested switch (reuse) — per-nav wall-clock (click→DOM settle)", rows: [["navMsWall", "nav / wall (click→settle)", "ms", "lower"], ["navMsTask", "· nav / task (ΔTaskDuration)", "ms", "lower"], ["scriptDurationMs", "· ⚠ script (V8, microtask-blind #1451)", "ms", "lower"], ["blinkMs", "· blink diag (gap=0, #1452)", "ms", "lower"]] },
 ];
 
 const REACT_BLURBS = {
@@ -57,7 +57,7 @@ const VUE_BLURBS = {
   "search-param-scaling": "Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **vue-router is lightest and FLAT on CPU** — `route.query` is a plain reactive object, cheap at any count; **real-router is also flat** (eager immutable params, slope ~0). **tanstack rises steeply — ~1 ms @50** (its O(count) search parse/validate/structural-share pipeline). So on CPU vue-router's plain-object query edges real-router's flat curve, and tanstack degrades at scale. *(Flat-vs-rising is the robust story; the sub-ms flat absolutes are session-dependent.)* **`alloc/nav` (GC pressure) flips it in memory:** real-router is the **leanest allocator — it ties/beats even vue-router** (~0.24 vs ~0.26 KB/nav @50, both flat; alloc is memory-class, load-stable) and crushes tanstack (~2.6, **~11×**). So real-router's eager snapshot **wins the memory axis exactly where it narrowly cedes CPU** — its params reference URL-parsed strings (flat), refuting 'eager = more garbage' even against the leanest lazy competitor.",
   "nav-churn": "200-nav stress; per-nav total (script + Blink) + heap. **vue-router lightest CPU/nav (0.51 total)**, tanstack 0.52, real-router 0.62; **real-router retains the least heap (511 ≈ vue-router 519; tanstack ~2× at 1072)**. navsPerSec frame-capped — read CPU/nav + heap.",
   "active-links": "Per-nav total recompute across 100 links (steady-state toggle). **All three near-parity — real-router / vue-router / tanstack cluster ~0.37–0.49 ms**, and the ranking is within run-to-run noise (real-router led one run at 0.37, tanstack another at 0.39 — a ~0.05 ms sub-metric spread). No stable winner here: unlike React/Svelte/Angular (where competitors pay heavier per-link active machinery), Vue's fine-grained reactivity is already lean enough that real-router's shared active-source doesn't separate from it.",
-  "link-build": "Wall-clock to mount 1000 links, each building its href (real-router `buildPath` · vue-router `resolve` · tanstack build). ⚠️ Pre-#1418 this row used `ScriptDuration`, which is BLIND to Vue's async microtask render — it read ~0.2 ms for EVERY engine regardless of real work, even inverting with load (more work → lower number), so the old \"all tiny, not a differentiator\" read was a pure measurement artifact. Wall-clock un-blinds it: a probe shows the real span is ~3.5 ms (bare-Vue floor) → ~18 ms (real-router) → ~25 ms (vue-router) — Vue's link mount is latency-bound (reactive cascade) and the router DOES add measurable cost. Final numbers await a wall-clock re-population.",
+  "link-build": "Wall-clock to mount 1000 links, each building its href (real-router `buildPath` · vue-router `resolve` · tanstack build). ⚠️ Pre-#1418 this row used `ScriptDuration`, which is BLIND to Vue's async microtask render — it read ~0.2 ms for EVERY engine regardless of real work, even inverting with load (more work → lower number), so the old \"all tiny, not a differentiator\" read was a pure measurement artifact. Wall-clock un-blinds it: a probe shows the real span is ~3.5 ms (bare-Vue floor) → ~18 ms (real-router) → ~25 ms (vue-router) — Vue's link mount is latency-bound (reactive cascade) and the router DOES add measurable cost.",
   "nested-switch": "Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **A 3-way near-tie on total (~10% spread)** — tanstack edges it, real-router ~4% behind, vue-router last (its lean script is offset by its 2× Blink `pushState`, same as nav-latency). *(Sub-ms — exact order is session/load-dependent; read the tight spread, not the ranking.)*",
   "back-forward": "Browser **back/forward** (popstate) steady-state. **real-router WINS — ~1.38 ms vs vue-router ~1.47, tanstack ~2.7** — a **flip after #1353**: skipping the no-op popstate `replaceState` removed real-router's redundant second history event, turning a ~24% loss into a ~6% win over vue-router's single-popstate. Leaner allocator too (~0.18 < vue-router 0.21; tanstack 2.3). *(n=15.)*",
 };
@@ -88,7 +88,7 @@ const SVELTE_BLURBS = {
   "nav-churn": "200-nav stress; CPU/nav + retained heap. **sv-router leanest — CPU/nav 0.52, retained heap 243 KB**; mateo-router 0.78 / 295 KB; real-router 0.82 / 380 KB (heaviest here). `navsPerSec` is ~121 for all three (frame-capped in this cohort — read CPU/nav + heap).",
   "active-links": "Per-nav total recompute across 100 links (steady-state toggle). **real-router WINS** (its shared cached active-source, one `router.subscribe`) over sv-router and mateo-router (per-link `isActiveLink` attachment recompute). A clear per-nav win — and part of real-router's cross-cohort active-links lead (React / Angular win too). *(Sub-ms — the win is robust; absolute ms session/load-dependent.)*",
   "link-build": "CPU to mount 1000 links, each building its href. **sv-router leanest (3.25 ms ≈ the bare-`<a>` floor 3.01) — plain `<a href>` intercepted by a global click handler, no per-link component**; mateo-router 7.19; **real-router heaviest (12.1 ms)** — after #1101's shared active-name selector removed the per-link subscription, the residual is `@real-router/svelte`'s `<Link>` running `buildPath` per link + per-component instantiation; sv-router avoids both with a literal `<a href>` (`buildPath` is inherent — React/Solid/Angular rr pay it and win their link-build).",
-  "nested-switch": "Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **sv-router leanest; mateo-router second; real-router third** — sv-router's minimal model leads this sub-ms per-nav-render metric. *(Sub-ms — session/load-dependent.)*",
+  "nested-switch": "Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **sv-router leanest; real-router second** on this sub-ms per-nav-render metric. **mateo-router is N/A** — its `<Router>` renders through `{#key result.path.original}` (the full evaluated URL), so a two-level app REMOUNTS the layout + inner router on every switch (full-remount, not the ancestor-reuse this scenario measures); the reuse contract is inexpressible in this router, so no ranked number is published for it (#1456). *(Sub-ms — session/load-dependent.)*",
   "back-forward": "Browser **back/forward** (popstate) steady-state. **Near 3-way tie (~3% spread) after #1353** — sv-router ~1.37, mateo-router ~1.41, real-router ~1.41 (tied with mateo, +2.9% over sv-router). The skip-no-op-`replaceState` fix cut real-router's back/forward from a **~53% loss to a dead heat** with the two minimal Svelte routers. #2 on allocation (~0.10; sv-router 0.07 leanest). *(n=15.)*",
 };
 
@@ -142,7 +142,7 @@ const FW = {
     blurbs: VUE_BLURBS,
     baselineLabel: "bare Vue",
     warningLine: "⚠️ Preliminary local numbers — directional, not a published verdict. Reported metrics are the **stable signals** — CPU (`script`), heap, FCP. Felt latency was dropped (render/frame-bound, not router-attributable). `nav-churn` throughput is frame-capped — read CPU/nav + heap. **Caveat — `script` is V8-only:** CDP `ScriptDuration` excludes Blink C++ — notably `history.pushState`'s `updateForSameDocumentNavigation` (~130 µs/nav, CDP-traced) and paint — which is ~identical across routers, so `script` *ratios* overstate the *total* per-nav gap (e.g. a ~4× `script` ratio is ≈ parity in total — Vue cohort all ~0.32 ms, CDP-traced + harness-reported).",
-    cohortLine: "**Cohort:** `@real-router/vue` · `vue-router@4` (the official Vue 3 router) · `@tanstack/vue-router` — three full routers that own a navigation pipeline (route resolution, guards, nested layouts, reactive/immutable state). `vue-router@5` is excluded because it pulls `pinia`/`@pinia/colada` as peer deps, which would inflate non-router metrics; v4 is the self-contained Vue 3 standard.",
+    cohortLine: "**Cohort:** `@real-router/vue` · `vue-router@5` (the official Vue 3 router — bumped from v4 by Dependabot #1142; v5 pulls no extra runtime into the measured app bundle, so the comparison stays clean) · `@tanstack/vue-router` — three full routers that own a navigation pipeline (route resolution, guards, nested layouts, reactive/immutable state).",
     scopeNote: "**Scope — three full routers, like-for-like.** Unlike the Preact cohort, no minimalist exclusion is needed: all three own a real navigation pipeline. vue-router 4 is the official Vue 3 router; tanstack is the type-first challenger. The honest split that emerges along **two axes (don't conflate them)**: on **scale** — route tables/depth, i.e. the matcher + memory (wide-config @1000, table-heap @10k, deep) — **real-router wins** (O(1) trie + lean core); on **per-nav render** — small tables, heavy re-render (param-nav, active-links, nested-switch) — **vue-router's native reactivity is leaner** (the Vue-adapter soft spot, *not* the core). A heavy *route table* ≠ a heavy *render*. **tanstack is heaviest on memory and degrades at depth**.",
     capabilityIntro: "Among three full routers, first-class API coverage still differs. `✓` = built-in API, `N/A` = none (hand-rolled in user-land). The differentiator here is validated search — vue-router exposes raw query only, exactly the gap react-router has in the React cohort.",
     capabilities: [
@@ -157,7 +157,7 @@ const FW = {
     baselineReading: "**Reading:** over bare Vue, on startup vue-router adds the least (+1.7 ms), real-router is middle (+3.0), tanstack heaviest (+4.0). The marginal costs are small — at realistic scale all three are fast. The separation appears **at scale** (wide / table-heap / deep), where real-router's trie wins CPU *and* memory and tanstack degrades. (Per-nav is not baseline-relative here — vue-router's targeted reactivity beats the naive full-re-render baseline — so it is read router-vs-router in the tables above.)",
     caveats: [
       "- **No cross-framework ranking** — each column is the same framework (Vue); the delta is router work. (Do NOT compare to the React/Preact cohorts.)",
-      "- **vue-router 4, not 5** — v5 pulls `pinia`/`@pinia/colada` as peers (would inflate non-router metrics); v4 is the self-contained Vue 3 standard.",
+      "- **vue-router 5** (bumped from v4 by Dependabot #1142) — v5 pulls no extra runtime into the measured app bundle, so the comparison is clean; the earlier v4-only note (pinia concern) is obsolete.",
       "- **`nav-churn` navsPerSec is frame-capped** — CPU/nav + retained heap differentiate.",
       "- `real-router` includes `browser-plugin` (real History API) — part of its cold-start by contract.",
       "- `wide`/`deep` are scaling sweeps — the per-size *curve* matters more than any single point (real-router flat; vue-router degrades at wide @1000; tanstack at deep).",
@@ -217,6 +217,7 @@ const FW = {
       "- **Deep-nesting rises O(depth) (script 4.46 ms @90) — cause not yet decomposed for Svelte.** #1094's Solid research showed the analogous rise was ~60% a *Solid-specific* benchmark-app artifact (O(d²) lazy props) + adapter bugs (cache-key + subtree remount), reduced to ~1.1 ms @90 in prototype. The Svelte deep app was not analyzed the same way — treat the curve as directional pending a #1094-style decomposition. The core matcher is flat-capable (Vue 0.24 @90).",
       "- **`@real-router/svelte` `<Link>` is heavy** — link-build 12.1 ms for 1000 links (vs bare-`<a>` 3.0, sv-router 3.3). #1101's shared active-name selector already removed the per-link subscription (14.6 → 12.0); the residual is `buildPath` per link (inherent) + per-`<Link>`-component instantiation. sv-router avoids both via a literal `<a href>` + a global click handler.",
       "- **`mateo-router` renders depth 90** — no internal error boundary at deep nesting (contrast the Solid cohort's `@tanstack/solid-router`, which errored past ~30).",
+      "- **`mateo-router` `nested-switch` is N/A** — its `<Router>` renders through `{#key result.path.original}` (the full evaluated URL, per its `route.svelte.d.ts`), so a two-level app REMOUNTS the outer layout + inner router on every `/sec/a↔/sec/b` switch (full-remount, not ancestor-reuse). The scenario's reuse contract is inexpressible in this router, so the cell is SKIPPED (`run-all` `KNOWN_NA`) rather than published as a ranked number for less work (#1456). The other 13 nested cells are verified two-level.",
       "- `real-router` includes `browser-plugin` (real History API) — part of its per-nav floor by contract.",
       "- `wide`/`deep` are scaling sweeps — the per-size *curve* matters (wide separates real-router flat-trie from sv-router O(N); deep separates the adapters' composition cost).",
       "- **Per-nav `nav-latency` `script` medians are near timer granularity** (`_baseline` and sv-router per-nav script is sub-0.3 ms → inflated *relative* variance); at n=30 they sit within the RME gate. The nav-latency *total* and the headline findings (wide/deep sweeps, table-heap, cold-start heap, link-build) rest on stable, larger-magnitude signals (RME < ~5%).",
@@ -274,13 +275,44 @@ function fmt(value) {
 }
 
 function metaLine() {
+  const cells = [];
   for (const scenario of SCENARIOS) {
     for (const engine of ENGINES) {
       const data = read(scenario.id, engine);
-      if (data) return `runs ${data.runs} · warmup ${data.warmup} · throttle ${data.throttle} · ${data.env?.date ?? "?"}`;
+      if (data) cells.push({ scenario: scenario.id, engine, data });
     }
   }
-  return "(no results yet)";
+  if (cells.length === 0) return "(no results yet)";
+  // Cohort-coherence check (#1459): a mixed-epoch REPORT — some cells measured before
+  // a fix, some after — otherwise regenerates with no trace. Warn on disagreeing
+  // env.commit or a wide date span (the 07-11 vue matrix silently measured pre-#1424).
+  const commits = new Set(
+    cells.map((c) => c.data.env?.commit).filter(Boolean),
+  );
+  if (commits.size > 1) {
+    console.warn(
+      `report.mjs: ${FRAMEWORK} cohort spans ${commits.size} commits [${[...commits].join(", ")}] — MIXED-EPOCH results (a re-baseline should measure ONE commit); e.g. ${cells
+        .filter((c) => c.data.env?.commit)
+        .slice(0, 5)
+        .map((c) => `${c.scenario}×${c.engine}@${c.data.env.commit}`)
+        .join(", ")}…`,
+    );
+  }
+  const dates = cells
+    .map((c) => c.data.env?.date)
+    .filter(Boolean)
+    .sort();
+  if (dates.length > 1) {
+    const spanH = (new Date(dates.at(-1)) - new Date(dates[0])) / 3.6e6;
+    if (spanH > 6) {
+      console.warn(
+        `report.mjs: ${FRAMEWORK} cohort dates span ${spanH.toFixed(1)} h (${dates[0]} … ${dates.at(-1)}) — check for a mixed-session matrix.`,
+      );
+    }
+  }
+  const { runs, warmup, throttle, env } = cells[0].data;
+  const commitStr = env?.commit ? ` · ${env.commit}${env.dirty ? "-dirty" : ""}` : "";
+  return `runs ${runs} · warmup ${warmup} · throttle ${throttle} · ${env?.date ?? "?"}${commitStr}`;
 }
 
 const lines = [];
@@ -292,7 +324,7 @@ lines.push(cfg.cohortLine);
 lines.push("");
 lines.push(cfg.scopeNote);
 lines.push("");
-lines.push(`**Run:** ${metaLine()} · Apple M3 Pro · numbers are **median** (winner per row **bold**).`);
+lines.push(`**Run:** ${metaLine()} · Apple M3 Pro · numbers are **median** (winner per row **bold**; a **⚖** row = the top-2 medians' 95% CIs overlap, so no winner is bolded — not statistically separable, #1460).`);
 lines.push("");
 lines.push(cfg.warningLine);
 lines.push("");
@@ -307,11 +339,31 @@ for (const scenario of SCENARIOS) {
   lines.push(`| metric | ${ENGINES.join(" | ")} |`);
   lines.push(`|---|${ENGINES.map(() => "---").join("|")}|`);
   for (const [key, label, unit, dir] of scenario.rows) {
-    const values = ENGINES.map((engine) => read(scenario.id, engine)?.metrics?.[key]?.median ?? null);
-    const present = values.filter((v) => v != null);
-    const best = present.length === 0 ? null : dir === "higher" ? Math.max(...present) : Math.min(...present);
-    const cells = values.map((v) => (v == null ? "—" : v === best ? `**${fmt(v)}**` : fmt(v)));
-    lines.push(`| ${label} (${unit}) | ${cells.join(" | ")} |`);
+    const cells = ENGINES.map((engine) => {
+      const m = read(scenario.id, engine)?.metrics?.[key];
+      return m?.median == null
+        ? null
+        : { v: m.median, half: (Math.abs(m.median) * (m.rme ?? 0)) / 100 };
+    });
+    const present = cells.filter(Boolean);
+    const best =
+      present.length === 0
+        ? null
+        : dir === "higher"
+          ? Math.max(...present.map((c) => c.v))
+          : Math.min(...present.map((c) => c.v));
+    const bestCell = present.find((c) => c.v === best);
+    // Near-tie: a runner-up's 95% CI overlaps the winner's → the "win" is not
+    // statistically established (S4/#1460) → do NOT bold any winner for this row.
+    const nearTie =
+      bestCell != null &&
+      present.some(
+        (c) => c !== bestCell && Math.abs(c.v - best) <= c.half + bestCell.half,
+      );
+    const rendered = cells.map((c) =>
+      c == null ? "—" : c.v === best && !nearTie ? `**${fmt(c.v)}**` : fmt(c.v),
+    );
+    lines.push(`| ${label} (${unit})${nearTie ? " ⚖" : ""} | ${rendered.join(" | ")} |`);
   }
   lines.push("");
 }
@@ -347,8 +399,8 @@ lines.push("");
 // Per-nav is ranked router-vs-router in the tables above (#1326).
 const BASELINE_ROWS = [
   { scenario: "cold-start", metric: "scriptDurationMs", label: "cold-start script (ms)" },
-  { scenario: "cold-start", metric: "jsHeapMB", label: "cold-start heap (MB)" },
-  { scenario: "link-build", metric: "scriptMs", label: "link-build script (ms)" },
+  { scenario: "cold-start", metric: "jsHeapMB", label: "cold-start heap retained (MB)" },
+  { scenario: "link-build", metric: "mountMs", label: "link-build mount (ms)" },
 ];
 if (read("cold-start", "_baseline")) {
   lines.push(`## Router overhead over ${cfg.baselineLabel} (\`_baseline\`)`);
@@ -358,8 +410,19 @@ if (read("cold-start", "_baseline")) {
   lines.push(`| metric | ${cfg.baselineLabel} | ${ENGINES.join(" | ")} |`);
   lines.push(`|---|---|${ENGINES.map(() => "---").join("|")}|`);
   for (const row of BASELINE_ROWS) {
-    const base = read(row.scenario, "_baseline")?.metrics?.[row.metric]?.median;
-    if (base == null) continue;
+    const baseCell = read(row.scenario, "_baseline");
+    const base = baseCell?.metrics?.[row.metric]?.median;
+    if (base == null) {
+      // Loud skip (#1458): a results file that EXISTS but lacks the requested key is
+      // schema drift (a renamed metric), not a genuinely missing cell — warn so the
+      // row can't silently vanish (as link-build's did when scriptMs→mountMs).
+      if (baseCell && !(row.metric in (baseCell.metrics ?? {}))) {
+        console.warn(
+          `report.mjs: BASELINE_ROWS "${row.scenario}" wants metric "${row.metric}", but the _baseline cell has [${Object.keys(baseCell.metrics ?? {}).join(", ")}] — schema drift, row DROPPED. Fix BASELINE_ROWS or re-measure.`,
+        );
+      }
+      continue;
+    }
     const cells = ENGINES.map((engine) => {
       const v = read(row.scenario, engine)?.metrics?.[row.metric]?.median;
       if (v == null) return "—";

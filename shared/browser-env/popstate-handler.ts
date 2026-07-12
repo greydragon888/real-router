@@ -1,4 +1,4 @@
-import { errorCodes, RouterError } from "@real-router/core";
+import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
 
 import { getRouteFromEvent } from "./popstate-utils.js";
 
@@ -169,7 +169,18 @@ export function createPopstateHandler(
           ...resolveHashOptions(deps, matched.path, hash),
         });
       } else if (deps.allowNotFound) {
-        deps.router.navigateToNotFound(location);
+        // Same-state short-circuit (#1448): a popstate that resolves to the
+        // UNKNOWN_ROUTE already committed for this exact path is a no-op — skip
+        // the redundant navigateToNotFound so a storm of identical not-found
+        // popstates collapses to a single commit. navigateToNotFound bypasses
+        // the navigate pipeline, so it has no SAME_STATES guard of its own; this
+        // restores parity with the matched-route branch, where a same-state
+        // popstate is already suppressed by navigateToState's SAME_STATES check.
+        const current = deps.router.getState();
+
+        if (current?.name !== UNKNOWN_ROUTE || current.path !== location) {
+          deps.router.navigateToNotFound(location);
+        }
       } else {
         // Strict mode — unmatched URL is an error. Emit $$error and sync URL
         // back to the current router state (no silent fallback to defaultRoute).
@@ -207,11 +218,7 @@ export function createPopstateHandler(
   // hash-less plugins (hash-plugin) — resolveHashOptions treats that as "no
   // hash augmentation", exactly as the old `!deps.getCurrentHash` guard did.
   return (evt: PopStateEvent | HashChangeEvent) =>
-    void onPopState(
-      evt,
-      deps.browser.getLocation(),
-      deps.getCurrentHash?.(),
-    );
+    void onPopState(evt, deps.browser.getLocation(), deps.getCurrentHash?.());
 }
 
 export interface PopstateLifecycleDeps {

@@ -42,6 +42,68 @@ export async function traceBlinkUs(client, fn) {
   return sum;
 }
 
+// Per-nav settle detector, installed once via `page.addInitScript` (measure.mjs)
+// so EVERY per-nav scenario shares ONE precise, symmetric close-of-window signal.
+// Replaces the old rAF-poll `waitFor` (frame-quantized ~16 ms — it forced async
+// engines to wait a whole frame after the click microtask, so any wall-clock built
+// on it was frame-quantized and `ScriptDuration`-only was the only sub-ms signal —
+// F1/F2, #1451/#1452). A MutationObserver resolves the instant the target selector
+// matches — element swap, class toggle, or text change — because the catch-all
+// observer re-checks `querySelector` on every mutation and only resolves on the
+// real target. Timing a `click()`→`settle()` window with `performance.now`
+// (summed over N, so the 100 µs perf.now clamp averages out) captures the FULL
+// felt cost: the microtask flush `ScriptDuration` misses AND the Blink pushState
+// inside the click task — the unified per-nav metric the audit converged on.
+export function installNavMetric() {
+  const observe = (selector, done, timeoutMs, label) =>
+    new Promise((resolve, reject) => {
+      if (done()) {
+        resolve();
+        return;
+      }
+      let timer;
+      const obs = new MutationObserver(() => {
+        if (!done()) return;
+        obs.disconnect();
+        clearTimeout(timer);
+        resolve();
+      });
+      obs.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        characterData: true,
+      });
+      timer = setTimeout(() => {
+        obs.disconnect();
+        reject(new Error(`__navMetric.${label} timeout: ${selector}`));
+      }, timeoutMs);
+    });
+  window.__navMetric = {
+    // Resolve when `selector` FIRST matches (element swap / class toggle / text /
+    // attribute change) — the close-of-window signal for a nav TO a target.
+    settle(selector, timeoutMs = 4000) {
+      return observe(
+        selector,
+        () => document.querySelector(selector) !== null,
+        timeoutMs,
+        "settle",
+      );
+    },
+    // Resolve when `selector` stops matching — the mirror signal used to detect a
+    // return to a page that lacks a positive universal marker (e.g. the sweep apps'
+    // home, which only renders its nav): "back on home" = the target is GONE (#1453).
+    settleGone(selector, timeoutMs = 4000) {
+      return observe(
+        selector,
+        () => document.querySelector(selector) === null,
+        timeoutMs,
+        "settleGone",
+      );
+    },
+  };
+}
+
 // Real forced GC (the browser upgrade over jsdom forceGC), then read used heap.
 export async function forceGcHeapBytes(client) {
   await client.send("HeapProfiler.collectGarbage");

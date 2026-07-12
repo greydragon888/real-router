@@ -167,9 +167,13 @@ describe("Popstate Storm (Hash)", () => {
 
     await waitForTransitions();
 
-    // Deferred-popstate dedup collapses the 50-event storm into a SINGLE
-    // not-found navigation — not 50 redundant ones. The count is the real
-    // invariant here: without dedup the spy would fire ~50 times.
+    // Same-state short-circuit (#1448) collapses the 50-event storm into a
+    // SINGLE not-found navigation: after the first commit the router sits at
+    // UNKNOWN_ROUTE for this path, so every following identical popstate is a
+    // no-op — parity with the matched-route SAME_STATES suppression. The count
+    // is the real invariant here: without the short-circuit the spy fires ~50
+    // times (navigateToNotFound is synchronous, so the deferred-popstate queue
+    // never engages for a not-found storm).
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith("/nonexistent");
   });

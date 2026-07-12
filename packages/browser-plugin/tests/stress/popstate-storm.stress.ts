@@ -143,7 +143,7 @@ describe("B1 — Popstate Storm", () => {
     expect(router.getState()?.name).toBe("home");
   });
 
-  it("1.4 — 50 null-state events with allowNotFound=true: navigateToNotFound called", async () => {
+  it("1.4 — 50 null-state events with allowNotFound=true: storm collapses to a single navigateToNotFound (#1448)", async () => {
     const result = createStressRouter({ allowNotFound: true });
 
     router = result.router;
@@ -151,8 +151,10 @@ describe("B1 — Popstate Storm", () => {
 
     const { dispatchPopstate } = result;
 
-    globalThis.history.replaceState({}, "", "/nonexistent");
+    // Start on a matched route ("/" → index). Set the non-matching path AFTER
+    // start so browser.getLocation() returns it on the null-state popstate storm.
     await router.start();
+    globalThis.history.replaceState({}, "", "/nonexistent");
 
     const spy = vi.spyOn(router, "navigateToNotFound");
 
@@ -162,7 +164,13 @@ describe("B1 — Popstate Storm", () => {
 
     await waitForTransitions();
 
-    expect(spy).toHaveBeenCalled();
+    // Same-state short-circuit (#1448): the first popstate commits UNKNOWN_ROUTE
+    // for /nonexistent; every following identical popstate is a no-op — parity
+    // with the matched-route SAME_STATES suppression. Without it the spy fires
+    // ~50 times (navigateToNotFound is synchronous, so the deferred-popstate
+    // queue never engages for a not-found storm).
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("/nonexistent");
   });
 
   it("1.5 — 50 same-state popstate events: SAME_STATES suppressed, state stable", async () => {
