@@ -2,7 +2,7 @@
 // context per sample → cold cache / isolated heap), aggregate to median/p95/RME.
 import { chromium } from "playwright";
 
-import { attachCDP } from "./cdp.mjs";
+import { attachCDP, installNavMetric } from "./cdp.mjs";
 import { aggregate } from "./stats.mjs";
 
 export async function measure({
@@ -19,6 +19,9 @@ export async function measure({
     for (let i = 0; i < warmup + runs; i++) {
       const context = await browser.newContext();
       const page = await context.newPage();
+      // Shared per-nav settle detector (window.__navMetric) for every scenario —
+      // installed before any app load so it's present on the measured page (#1451).
+      await page.addInitScript(installNavMetric);
       const client = await attachCDP(page);
 
       if (throttle > 1) {

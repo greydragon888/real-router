@@ -42,6 +42,48 @@ export async function traceBlinkUs(client, fn) {
   return sum;
 }
 
+// Per-nav settle detector, installed once via `page.addInitScript` (measure.mjs)
+// so EVERY per-nav scenario shares ONE precise, symmetric close-of-window signal.
+// Replaces the old rAF-poll `waitFor` (frame-quantized ~16 ms — it forced async
+// engines to wait a whole frame after the click microtask, so any wall-clock built
+// on it was frame-quantized and `ScriptDuration`-only was the only sub-ms signal —
+// F1/F2, #1451/#1452). A MutationObserver resolves the instant the target selector
+// matches — element swap, class toggle, or text change — because the catch-all
+// observer re-checks `querySelector` on every mutation and only resolves on the
+// real target. Timing a `click()`→`settle()` window with `performance.now`
+// (summed over N, so the 100 µs perf.now clamp averages out) captures the FULL
+// felt cost: the microtask flush `ScriptDuration` misses AND the Blink pushState
+// inside the click task — the unified per-nav metric the audit converged on.
+export function installNavMetric() {
+  window.__navMetric = {
+    settle(selector, timeoutMs = 4000) {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector(selector)) {
+          resolve();
+          return;
+        }
+        let timer;
+        const obs = new MutationObserver(() => {
+          if (!document.querySelector(selector)) return;
+          obs.disconnect();
+          clearTimeout(timer);
+          resolve();
+        });
+        obs.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          characterData: true,
+        });
+        timer = setTimeout(() => {
+          obs.disconnect();
+          reject(new Error(`__navMetric.settle timeout: ${selector}`));
+        }, timeoutMs);
+      });
+    },
+  };
+}
+
 // Real forced GC (the browser upgrade over jsdom forceGC), then read used heap.
 export async function forceGcHeapBytes(client) {
   await client.send("HeapProfiler.collectGarbage");
