@@ -40,15 +40,23 @@ const SCENARIOS = [
 const BASELINE_SCENARIOS = ["cold-start", "nav-latency", "link-build"];
 
 // Documented competitor limitations — (cohort → scenario → [engines]) cells that
-// CANNOT produce a result because the COMPETING router itself errors on the
-// scenario (not a harness or app bug). These are SKIPPED: not run, not counted as
-// a failure — the per-cohort REPORT documents the N/A. Remove an entry if the
-// competitor fixes the limitation and the cell should measure again.
+// CANNOT produce a COMPARABLE result: either the COMPETING router errors on the
+// scenario, or it structurally cannot express the scenario's semantics (so a cell
+// would measure different — usually less — work). Not a harness or app bug. These
+// are SKIPPED: not run, not counted as a failure — the per-cohort REPORT documents
+// the N/A. Remove an entry if the competitor changes and the cell should measure again.
 const KNOWN_NA = {
   // @tanstack/solid-router trips its internal error boundary on 60+-segment
   // deep-nested routes (renders 3/30, errors at 60/90). @tanstack/react-router
   // renders depth 90 — a solid-port limitation. See REPORT-solid.md.
   solid: { "deep-config": ["tanstack"] },
+  // @mateothegreat/svelte5-router renders through `{#key result.path.original}` (the
+  // FULL evaluated URL, verified in its route.svelte.d.ts), so an idiomatic two-level
+  // app REMOUNTS the outer layout + inner router on every /sec/a↔/sec/b switch —
+  // full-remount, not the ancestor-REUSE nested-switch measures. The reuse contract
+  // is inexpressible in this router; a cell would price different (less) work than the
+  // other cohorts' verified two-level cells. See REPORT-svelte.md (#1456).
+  svelte: { "nested-switch": ["mateo-router"] },
 };
 const isKnownNA = (framework, scenario, engine) =>
   KNOWN_NA[framework]?.[scenario]?.includes(engine) ?? false;
