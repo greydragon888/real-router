@@ -47,7 +47,8 @@ export const coldStart = {
     return {
       fcpMs,
       scriptDurationMs: m.ScriptDuration * 1000,
-      layoutDurationMs: m.LayoutDuration * 1000,
+      // layoutDurationMs dropped (#1462): consumed by no table, ~identical across all
+      // engines incl. _baseline (zero router signal) — a dead key, not a real axis.
       jsHeapMB: retainedBytes / (1024 * 1024),
       jsHeapPreGcMB: m.JSHeapUsedSize / (1024 * 1024),
     };

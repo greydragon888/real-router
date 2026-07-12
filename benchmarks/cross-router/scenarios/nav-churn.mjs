@@ -7,7 +7,12 @@
 // the broken additive `totalMsPerNav = script + blink` retired. With the rAF-poll
 // `waitFor` replaced by the precise MutationObserver settle, `navsPerSec` is now the
 // REAL throughput (no per-nav frame quantization → no ~121/s cap). Heap delta is
-// reported with a healthy baseline, not asserted (H2).
+// reported with a healthy baseline, not asserted (H2). ⚠ `heapDeltaKB` (0→200-nav
+// retained delta) is WARMUP-DOMINATED, NOT a leak signal (#1462/CL4): a checkpoint
+// probe (1/50/200/400/800 navs) found ~80-87% of Δ@200 is non-stationary warmup, and
+// it is spread across navs (d@1 is only 16-21% of Δ@200) — a flat router still shows a
+// positive Δ here. For a genuine per-nav leak use a two-point Δ (N=200 vs N=800); read
+// this number as "warmup footprint", not accumulation.
 import { forceGcHeapBytes, getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
 const N = 200;
