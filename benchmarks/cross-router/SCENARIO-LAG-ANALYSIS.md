@@ -1,0 +1,124 @@
+# Scenario Lag Analysis — why real-router lags, factually
+
+> The **canonical, tracked ledger** of *why* real-router loses or trails a competitor
+> in a cross-router benchmark cell. Every entry is a **root cause proven by
+> investigation** — a same-session A/B, a code trace, or an issue-backed fact — not a
+> guess. This complements the per-cohort `REPORT-{cohort}.md` (which narrate *what* the
+> numbers are) and the `status-tables.mjs --grid` matrix (which shows *the* verdict); this
+> file answers **"is the red a weakness or a paid-for trade-off, and is it winnable?"**
+>
+> **Why this file exists:** we run many perf investigations. Their conclusions used to live
+> only in the assistant's private memory. This ledger makes them durable, reviewable, and
+> extensible in the repo.
+
+## How to read an entry
+
+Each lag carries three tags:
+
+**Confidence** (how the cause was established):
+- `A/B-proven` — an isolated same-session A/B pinned the cause (built the variant, measured OLD vs NEW back-to-back, drift-cancelled).
+- `code-traced` — traced in source to the deciding line(s), issue-backed.
+- `inferred` — reasoned from the bench data + cross-cohort pattern; **hypothesis, not yet A/B'd**.
+
+**Cause class** (the handful of structural axes that explain almost every lag):
+- `EAGER-CORE` — core loads/parses its full graph + builds the trie + runs the initial transition upfront (the price of O(1) matching + the full pipeline). Boot cost.
+- `<Link>-COMPONENT` — real-router's `<Link>` is a component (reactive href + active-class); the competitor uses a plain `<a>`. real-router's own plain-`<a>` API is `use:link` (Svelte) / equivalents. Component-vs-plain-`<a>`.
+- `IMMUTABLE-STATE` — a fresh, frozen `State` is allocated per navigation; the competitor mutates a signal/store in place. Retained-heap / GC-churn cost.
+- `SCALE-FLOOR` — matcher/route-tree/table cost at scale (deep nesting, 10k routes); eager trie vs the competitor's lazy/lighter structure.
+- `FRAMEWORK-NATIVE` — the competitor is compiler-fused (sv-router is written *in* Svelte) or has native per-instance reactivity (vue-router); it does structurally less.
+- `DEFERRED-COMMIT` — an adapter surfaced the route change to the DOM a task late (a scheduler hop). **Addressable** — see angular #1466.
+- `COMPETITOR-ARTIFACT` — the "lag" is the competitor's metric quirk (non-monotonic sweep, throughput confound), not a real-router cost.
+- `NOISE` — the margin is within/near RME; the rank is not stable.
+
+**Verdict** (what we do about it):
+- `FIXED` — root-caused and fixed (issue #).
+- `STRUCTURAL` — an identity trade-off we keep in v1 (does more, scales differently); not chased.
+- `FEATURE-COST` — the lag *buys* a capability the competitor doesn't offer (active-class, validated pipeline). Reframe, don't chase.
+- `WINNABLE (open)` — a real, addressable adapter lever that has NOT been done. The only class worth an issue/PR.
+- `v2-CANDIDATE` — v1-structural, but a named v2 RFC would plausibly reduce it (not a v1 action).
+- `ARTIFACT` / `NOISE` — not an action item.
+
+**Discipline:** sub-ms cells are session/load-dependent — a lag is only "real" when the margin ≫ RME, and "winnable" is only ever proven by a same-session A/B, never by reasoning. Record the RME.
+
+---
+
+## Summary matrix (lags only; wins omitted)
+
+| cohort | scenario | margin vs best competitor | cause class | confidence | verdict |
+|---|---|---|---|---|---|
+| all | cold-start | +36–75% (svelte +44%, angular 3.1×) | `EAGER-CORE` | code-traced (#1106) | `STRUCTURAL` / `v2-CANDIDATE` |
+| svelte | link-build | 🔴 3.8× (12.1 vs 3.2 ms mount) | `<Link>-COMPONENT` | code-traced (#1099/#1247/#1253) | `FEATURE-COST` (use:link = fast path) |
+| svelte | nested-switch | +42% (0.135 vs 0.095) | `<Link>-COMPONENT` (active-class flip ×2) | **A/B-proven** | `FEATURE-COST` — *outlet-swap BEATS sv-router* |
+| svelte | param-nav | +16% (0.093 vs 0.080) | `<Link>-COMPONENT` + `IMMUTABLE-STATE` | **A/B-proven** | `STRUCTURAL` (plain-a → parity-minus, no flip) |
+| svelte | table-heap | 🔴 2.6× (5.9 vs 2.3 MB @10k) | `SCALE-FLOOR` | inferred | `STRUCTURAL` |
+| svelte | nav-churn | +60% (396 vs 248 KB/nav) | `IMMUTABLE-STATE` | code-traced | `STRUCTURAL` / `v2-CANDIDATE` |
+| svelte | deep-config | +56% (3.23 vs 2.07 @90, CPU) | `SCALE-FLOOR` + `FRAMEWORK-NATIVE` | inferred | `STRUCTURAL` |
+| svelte | back-forward | +2% (0.207 vs 0.203) | core back/forward path; sv 4µs lighter | inferred | `FRAMEWORK-NATIVE` (tiny; ~floor) |
+| solid | nav-churn | +28% (310 vs 242 KB/nav) | `IMMUTABLE-STATE` | code-traced | `STRUCTURAL` / `v2-CANDIDATE` |
+| solid | table-heap | +3% (5.78 vs 5.61 MB @10k) | `SCALE-FLOOR` | inferred (rme 0.0%, 0.17 MB) | `STRUCTURAL` (tiny) |
+| angular | nav-latency/param/nested/active/back-fwd/churn | *(was up to ~4× behind)* | `DEFERRED-COMMIT` (zoneless async CD) | **A/B-proven** | ✅ `FIXED` (#1466 — sync-commit) |
+| angular | cold-start, table-heap | 3.1×, +70% | `EAGER-CORE`, `SCALE-FLOOR` | code-traced | `STRUCTURAL` |
+| react, vue | deep-config @90 | +71% / +82% | `COMPETITOR-ARTIFACT` (react-router/vue-router non-monotonic parabola) | inferred | `ARTIFACT` |
+| vue | active-links | 🔴 +55% | `FRAMEWORK-NATIVE` (vue-router native per-link reactivity at floor) | inferred | `STRUCTURAL` |
+| vue | nav-churn | 🟡 +2% | `IMMUTABLE-STATE` / near-floor | inferred | `NOISE`/`STRUCTURAL` |
+
+**Cross-cohort read:** real-router's red is concentrated on **four structural axes** — eager-core boot, `<Link>`-component vs plain-`<a>`, immutable-state allocation, and matcher/table scale-floor — plus the competitor's own framework-native lightness. None is a per-nav *slowness* of the core (per-nav, real-router leads every cohort). The one genuinely-addressable class, `DEFERRED-COMMIT`, was found and fixed (#1466).
+
+---
+
+## Detailed root causes (A/B-proven)
+
+### angular per-nav — `DEFERRED-COMMIT` → **FIXED (#1466)**
+
+- **Was:** every plain-link nav on the angular adapter surfaced the route change to the DOM ~0.6–0.9 ms after the click task (`navMsWall ≫ navMsTask`), so angular *felt* up to ~4× slower on nav-latency despite real-router's CPU/task being the cohort's lowest.
+- **Root cause (A/B-proven):** under zoneless change detection the route source notifies **synchronously** from `router.navigate()`, but a route-state read in a template only re-renders on Angular's **asynchronously scheduled** CD flush. `@angular/router` commits its `<router-outlet>` imperatively in-task; the adapter deferred.
+- **Fix:** `RouteView` + `injectRoute`/`injectRouteNode` call a local `detectChanges()` from the source callback (fires outside Angular CD, so it's safe — mirrors `RealLink`'s direct-DOM write). Same-session A/B: nav-latency 0.97 → 0.07 (~13×). n=50 @`622b27be`: real-router now leads `@angular/router` on all six per-nav wall axes.
+- **Lesson:** a deferred-commit lag *is* addressable — look for a scheduler hop between the source notify and the view commit.
+
+### svelte nested-switch — `<Link>`-COMPONENT (active-class flip) → **FEATURE-COST**
+
+- **Number:** rr 0.135 vs sv-router 0.095 (+42%, RME ~1%). Bench switches sibling sections `sec.a ↔ sec.b` under a shared layout; both sibling `<Link>`s flip active-class every switch.
+- **A/B (same-session, drift-cancelled, n=20):** baseline `<Link>` **0.135** · rr `use:link` (plain-`<a>`, no active-class) **0.092** · sv-router **0.095**.
+- **Root cause:** the entire +42% is the **`<Link>` active-class flip on the two sibling links** (~21 µs/link of Svelte component-update: `createSubscriber` invalidate → `finalClassName` `$derived` → class-attr). The active *source* (`createActiveNameSelector`) is already optimal (#1099 — one shared subscription, `areRoutesRelated` pre-filter, diff-before-notify); the cost is the component re-render, not the source.
+- **Key positive:** with plain-`<a>`, rr (0.092) **BEATS** sv-router (0.095) — real-router's **RouteView outlet-swap is faster than sv-router's**. The reported loss is 100% the active-class *feature* (auto active styling) that sv-router's plain-`<a>` simply doesn't offer.
+- **Verdict:** `FEATURE-COST`. With idiomatic `<Link>` it's red; the loss buys a capability. `use:link` wins for consumers who don't need active styling. **Open thread:** whether the ~21 µs/link Svelte-reactivity bridge (`createSubscriber` → direct `$state`) is reducible — an adapter-code A/B, likely inherent (source already optimal).
+
+### svelte param-nav — `<Link>`-COMPONENT + IMMUTABLE-STATE → **STRUCTURAL**
+
+- **Number:** rr 0.093 vs sv-router 0.080 (+16%, RME 1.5%). Bench advances `/users/:id` id+1 on the same route (no outlet swap); the "Next" `<Link>`'s `routeParams` change each click.
+- **A/B (same-session, drift-cancelled, n=20):** baseline `<Link>` **0.093–0.095** · rr `use:link` **0.085** · sv-router **0.080**.
+- **Root cause:** ~8 µs is the `<Link>` component tax (buildHref re-derive on `routeParams` change + component render); ~5 µs is the core `IMMUTABLE-STATE` floor (fresh frozen state per nav; sv-router mutates a signal). `use:link` takes it +16% → +6%, **but does not flip** — the residual is the immutable-state floor, structural.
+- **Verdict:** `STRUCTURAL`. Not winnable even with plain-`<a>`; same axes as the rest of the svelte cohort. The immutable-state residual is a `v2-CANDIDATE` (RFC-6 snapshot-store).
+
+---
+
+## Detailed root causes (code-traced / issue-backed)
+
+### cold-start (all cohorts) — `EAGER-CORE` → `STRUCTURAL` / `v2-CANDIDATE`
+
+Core eagerly imports + parses its full dependency graph (path-matcher + route-tree + fsm + sources + event-emitter), builds the trie, and runs the initial match + transition at boot — ~3.9 ms over the bare framework, the largest cross-cohort boot gap (#1106). Competitors tree-shake / lazy-load. One-time cost, not per-nav. **v2-CANDIDATE:** the v2 package collapse (9 foundation units → 3–4) + sources absorption would reduce the parsed graph.
+
+### svelte link-build — `<Link>`-COMPONENT → `FEATURE-COST`
+
+rr 12.1 ms vs sv-router 3.2 ms to mount ~1000 links. sv-router uses plain-`<a>`; rr's `<Link>` instantiates a Svelte component per link. Already litigated: #1099 (`<Link>` render overhead), #1247 (per-link `createSubscriber` → shared active-name), #1253 (per-link listeners → event-delegation "to match sv-router's plain-`<a>` lightness") — all closed. **`use:link` is the documented fast path** (README recommends it for link-heavy/paginated pages; ~2× cheaper to mount, and — per the param-nav/nested-switch A/Bs — also cheaper on *update*, not just mount). `<Link>` stays the idiomatic default; the component cost buys ergonomics (auto active-state, hash support).
+
+### nav-churn (solid, svelte) — `IMMUTABLE-STATE` → `STRUCTURAL` / `v2-CANDIDATE`
+
+real-router retains more heap per create→navigate→dispose cycle (svelte +60%, solid +28%; RME 0.0% — deterministic) because it allocates a fresh, frozen `State` per navigation. solid-router/sv-router mutate a signal in place. This is the eager-immutable identity (explicitly kept in the v2 review). **v2-CANDIDATE:** RFC-6 (versioned snapshot-store + total freeze) targets exactly this floor.
+
+### table-heap, deep-config, back-forward — `SCALE-FLOOR` / `FRAMEWORK-NATIVE` → `STRUCTURAL`
+
+- **table-heap** (route-table memory @10k routes) and **deep-config** (matcher CPU @depth-90): real-router's eager trie + full route-tree is heavier at scale than sv-router's lazy/compiler-native matching. The price of O(1) matching + the full pipeline. `rr ≈ mateo-router` on deep-config (3.23 ≈ 3.27) — sv-router is the outlier, not rr the laggard.
+- **back-forward** (+2%, svelte): real-router's back/forward replay is ~0.206 on **both** svelte and solid — a *core* path cost, identical across adapters; sv-router is 4 µs lighter framework-native. Tiny, ~floor.
+
+---
+
+## How to add an entry
+
+When a new investigation pins a cause:
+1. Add a row to the **Summary matrix** (cohort, scenario, margin, cause class, confidence, verdict).
+2. If A/B-proven or a notable trace, add a **Detailed** subsection with: the numbers (median + RME + n), the A/B recipe/result or the code-trace (`file:line`), the root cause in one paragraph, and the verdict.
+3. Cite the issue/PR if one exists. Keep `inferred` entries clearly marked until an A/B upgrades them.
+4. This file is benchmark infra → commit directly to `master`, no changeset.
+
+**A/B recipe (reusable):** build+serve+measure a variant app dir with the harness's `measure()` (no `writeCell` → never contaminates `results/`); run OLD/NEW/OLD/NEW interleaved to cancel drift; the win threshold is the competitor's *same-session* median (absolutes drift ~1 quantum between sessions). Sub-ms verdicts require this — never cross-session.
