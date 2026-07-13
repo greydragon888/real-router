@@ -1,15 +1,18 @@
-// status-tables — flat per-cohort view of the committed REPORTs, one table per
-// cohort: | сценарий | metric | <engines> | rr status |. The `rr status` column
-// reads: 🟡 ≈ parity (engines differ < 10%); 🟢 win / 🔴 loss otherwise, with the
-// delta measured from the WINNER (when real-router is not first) or from the
-// nearest competitor (when real-router IS first). Lower = better, except
-// throughput (`/s`). Source of truth = the committed REPORT*.md (no results/ needed).
+// status-tables — rr-status views of the cross-router benchmark. Two modes:
+//   • verbose (default / <cohort>) — one detailed table per cohort, every metric row,
+//     parsed from the committed REPORT*.md: | сценарий | metric | <engines> | rr status |.
+//   • --grid — one compact 12×5 matrix (scenario × cohort), the HEADLINE metric only,
+//     read straight from results/ (stable metric keys, not REPORT prose). An at-a-glance
+//     index that fits one screen; the verbose tables remain the detail.
+// The `rr status` column reads: 🟡 ≈ parity (engines differ < 10%); 🟢 win / 🔴 loss
+// otherwise, delta from the nearest competitor. Lower = better, except throughput (`/s`).
 //
 // Usage:
-//   node cross-router/harness/status-tables.mjs            # all 3 cohorts
-//   node cross-router/harness/status-tables.mjs vue        # one cohort
+//   node cross-router/harness/status-tables.mjs            # verbose, all 5 cohorts
+//   node cross-router/harness/status-tables.mjs vue        # verbose, one cohort
+//   node cross-router/harness/status-tables.mjs --grid     # compact 12×5 headline grid
 //   node cross-router/harness/status-tables.mjs > view.md  # snapshot to a file
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +24,25 @@ const ENG = {
   solid: ["real-router", "solid-router", "tanstack"],
   svelte: ["real-router", "sv-router", "mateo-router"],
   angular: ["real-router", "angular-router"],
+};
+
+// --grid: headline metric per scenario (lower = better for all). Keys are the raw
+// results/ metric names (stable), NOT the REPORT prose the verbose view parses.
+const RESULTS = join(CR, "results");
+const FW = ["react", "vue", "solid", "svelte", "angular"];
+const HEADLINE = {
+  "cold-start": "scriptDurationMs",
+  "nav-latency": "navMsWall",
+  "param-nav": "navMsWall",
+  "nested-switch": "navMsWall",
+  "active-links": "navMsWall",
+  "back-forward": "navMsWall",
+  "wide-config": "navMsTask@1000",
+  "deep-config": "navMsTask@90",
+  "search-param-scaling": "navMsTask@50",
+  "table-heap": "jsHeapMB@10000",
+  "nav-churn": "heapDeltaKB",
+  "link-build": "mountMs",
 };
 
 const num = (c) => {
@@ -101,6 +123,61 @@ function cohortTable(cohort) {
   return out.join("\n");
 }
 
-const arg = process.argv[2];
-const cohorts = arg ? [arg] : ["react", "vue"];
-for (const c of cohorts) console.log(cohortTable(c));
+// --grid: read one headline metric per (cohort, scenario) from results/ and render a
+// compact matrix. Verdict vs nearest competitor, same emoji semantics as the verbose view.
+function headlineVals(cohort, scenario, key) {
+  const dir = join(RESULTS, cohort, scenario);
+  if (!existsSync(dir)) return null;
+  const vals = {};
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith(".json")) continue;
+    const en = f.replace(/\.json$/, "");
+    if (en === "_baseline") continue;
+    try {
+      const m = JSON.parse(readFileSync(join(dir, f), "utf8")).metrics?.[key];
+      if (m && typeof m.median === "number") vals[en] = m.median;
+    } catch {
+      /* skip unreadable cell */
+    }
+  }
+  return Object.keys(vals).length ? vals : null;
+}
+
+function gridCell(vals) {
+  const rr = vals["real-router"];
+  const others = Object.entries(vals).filter(([e]) => e !== "real-router").map(([, v]) => v);
+  if (rr == null || others.length === 0) return "—";
+  const ref = Math.min(...others); // nearest (best) competitor
+  const rrBest = rr <= ref + 1e-9;
+  const r = rrBest ? ref / rr : rr / ref;
+  const pct = (r - 1) * 100;
+  if (r < 1.1) return `🟡 ${rrBest ? "-" : "+"}${Math.abs(pct).toFixed(0)}%`;
+  const d = r >= 2 ? `${r.toFixed(1)}×` : `${rrBest ? "win " : "+"}${pct.toFixed(0)}%`;
+  return `${rrBest ? "🟢" : "🔴"} ${d}`;
+}
+
+function gridTable() {
+  const out = ["\n# cross-router — rr headline-status grid (source: results/, lower = better)\n"];
+  out.push(`| scenario (headline) | ${FW.join(" | ")} |`);
+  out.push(`|---|${"---|".repeat(FW.length)}`);
+  for (const sc of Object.keys(HEADLINE)) {
+    const cells = FW.map((fw) => {
+      const vals = headlineVals(fw, sc, HEADLINE[sc]);
+      return vals ? gridCell(vals) : "—";
+    });
+    out.push(`| ${sc} \`${HEADLINE[sc]}\` | ${cells.join(" | ")} |`);
+  }
+  out.push("\n> ⚠ Mechanical status vs nearest competitor — an index, not the authority. Read the per-cohort");
+  out.push("> REPORT for the wall/task split (angular per-nav navMsWall carries async change-detection settle;");
+  out.push("> its CPU/navMsTask differs) and sweep curves (e.g. react deep@90 = react-router non-monotonicity).");
+  return out.join("\n");
+}
+
+const args = process.argv.slice(2);
+if (args.includes("--grid")) {
+  console.log(gridTable());
+} else {
+  const arg = args.find((a) => !a.startsWith("--"));
+  const cohorts = arg ? [arg] : ["react", "vue", "solid", "svelte", "angular"];
+  for (const c of cohorts) console.log(cohortTable(c));
+}
