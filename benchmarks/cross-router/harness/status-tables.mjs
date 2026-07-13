@@ -1,9 +1,13 @@
-// status-tables — rr-status views of the cross-router benchmark. Two modes:
+// status-tables — rr-status views of the cross-router benchmark. Three modes:
 //   • verbose (default / <cohort>) — one detailed table per cohort, every metric row,
 //     parsed from the committed REPORT*.md: | сценарий | metric | <engines> | rr status |.
 //   • --grid — one compact 12×5 matrix (scenario × cohort), the HEADLINE metric only,
 //     read straight from results/ (stable metric keys, not REPORT prose). An at-a-glance
 //     index that fits one screen; the verbose tables remain the detail.
+//   • --engines <cohort> — ONE cohort pivoted to routers-as-columns (scenario × engine),
+//     raw median of the HEADLINE metric per cell, row winner marked 🟢. The head-to-head
+//     analysis view: --grid collapses a cohort to a single rr verdict, this keeps every
+//     engine's absolute number so you see WHAT rr beats (or loses to) and by how much.
 // The `rr status` column reads: 🟡 ≈ parity (engines differ < 10%); 🟢 win / 🔴 loss
 // otherwise, delta from the nearest competitor. Lower = better, except throughput (`/s`).
 //
@@ -11,6 +15,7 @@
 //   node cross-router/harness/status-tables.mjs            # verbose, all 5 cohorts
 //   node cross-router/harness/status-tables.mjs vue        # verbose, one cohort
 //   node cross-router/harness/status-tables.mjs --grid     # compact 12×5 headline grid
+//   node cross-router/harness/status-tables.mjs --engines svelte  # per-router grid, one cohort
 //   node cross-router/harness/status-tables.mjs > view.md  # snapshot to a file
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -184,11 +189,48 @@ function gridTable() {
   return out.join("\n");
 }
 
+// --engines <cohort>: raw median per HEADLINE metric, routers as columns, row winner 🟢.
+const fmtVal = (v) => {
+  const a = Math.abs(v);
+  return v.toFixed(a < 1 ? 3 : a < 100 ? 2 : 1);
+};
+
+function enginesTable(cohort) {
+  const engs = ENG[cohort];
+  if (!engs) return `\n# unknown cohort "${cohort}" — expected: ${Object.keys(ENG).join(", ")}`;
+  const out = [`\n# ${cohort} — per-router headline grid (source: results/, lower = better)\n`];
+  out.push(`| scenario (headline) | ${engs.join(" | ")} |`);
+  out.push(`|---|${"---|".repeat(engs.length)}`);
+  const wins = Object.fromEntries(engs.map((e) => [e, 0]));
+  for (const sc of Object.keys(HEADLINE)) {
+    const key = HEADLINE[sc];
+    const vals = headlineVals(cohort, sc, key) ?? {};
+    const present = engs.map((e) => (e in vals ? vals[e] : null));
+    const nums = present.filter((v) => v != null);
+    const min = nums.length ? Math.min(...nums) : null;
+    const cells = present.map((v, i) => {
+      if (v == null) return "—";
+      if (v === min) {
+        wins[engs[i]]++;
+        return `🟢 **${fmtVal(v)}**`;
+      }
+      return fmtVal(v);
+    });
+    out.push(`| ${sc} \`${key}\` | ${cells.join(" | ")} |`);
+  }
+  out.push(`\n**Row wins (🟢 lowest):** ${engs.map((e) => `${e} ${wins[e]}`).join(" · ")}`);
+  out.push("\n> Raw medians in each row-metric's unit; 🟢 = fastest/lowest that row. Lower = better for");
+  out.push("> every headline metric. Pair with `--grid` (which collapses this to one rr-vs-best verdict).");
+  return out.join("\n");
+}
+
 const args = process.argv.slice(2);
-if (args.includes("--grid")) {
+const positional = args.find((a) => !a.startsWith("--"));
+if (args.includes("--engines")) {
+  console.log(enginesTable(positional ?? "svelte"));
+} else if (args.includes("--grid")) {
   console.log(gridTable());
 } else {
-  const arg = args.find((a) => !a.startsWith("--"));
-  const cohorts = arg ? [arg] : ["react", "vue", "solid", "svelte", "angular"];
+  const cohorts = positional ? [positional] : ["react", "vue", "solid", "svelte", "angular"];
   for (const c of cohorts) console.log(cohortTable(c));
 }
