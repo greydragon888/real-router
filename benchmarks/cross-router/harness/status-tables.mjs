@@ -151,8 +151,11 @@ function gridCell(vals) {
   const rrBest = rr <= ref + 1e-9;
   const r = rrBest ? ref / rr : rr / ref;
   const pct = (r - 1) * 100;
+  // Signed delta, rr's view of a lower-is-better metric: "-N%" = rr faster,
+  // "+N%" = rr slower. The 🟢/🔴 emoji is the verdict, the sign the direction; a
+  // whole column reads uniformly (- everywhere rr leads). Near-ties are 🟡, same sign.
   if (r < 1.1) return `🟡 ${rrBest ? "-" : "+"}${Math.abs(pct).toFixed(0)}%`;
-  const d = r >= 2 ? `${r.toFixed(1)}×` : `${rrBest ? "win " : "+"}${pct.toFixed(0)}%`;
+  const d = r >= 2 ? `${r.toFixed(1)}×` : `${rrBest ? "-" : "+"}${pct.toFixed(0)}%`;
   return `${rrBest ? "🟢" : "🔴"} ${d}`;
 }
 
@@ -160,13 +163,21 @@ function gridTable() {
   const out = ["\n# cross-router — rr headline-status grid (source: results/, lower = better)\n"];
   out.push(`| scenario (headline) | ${FW.join(" | ")} |`);
   out.push(`|---|${"---|".repeat(FW.length)}`);
+  const tally = Object.fromEntries(FW.map((fw) => [fw, { g: 0, y: 0, r: 0 }]));
   for (const sc of Object.keys(HEADLINE)) {
     const cells = FW.map((fw) => {
       const vals = headlineVals(fw, sc, HEADLINE[sc]);
-      return vals ? gridCell(vals) : "—";
+      const cell = vals ? gridCell(vals) : "—";
+      if (cell.startsWith("🟢")) tally[fw].g++;
+      else if (cell.startsWith("🟡")) tally[fw].y++;
+      else if (cell.startsWith("🔴")) tally[fw].r++;
+      return cell;
     });
     out.push(`| ${sc} \`${HEADLINE[sc]}\` | ${cells.join(" | ")} |`);
   }
+  out.push(
+    `\n**Tally:** ${FW.map((fw) => `${fw} ${tally[fw].g}🟢/${tally[fw].y}🟡/${tally[fw].r}🔴`).join(" · ")}`,
+  );
   out.push("\n> ⚠ Mechanical status vs nearest competitor — an index, not the authority. Read the per-cohort");
   out.push("> REPORT for sweep curves (e.g. react/vue/svelte deep@90 = competitor non-monotonicity / scale-floor)");
   out.push("> and cohort caveats. Angular per-nav now commits in-task (#1466 fixed), so its wall ≈ task.");
