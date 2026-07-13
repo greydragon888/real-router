@@ -1,9 +1,11 @@
 import { NgTemplateOutlet } from "@angular/common";
 import {
+  ChangeDetectorRef,
   Component,
   computed,
   contentChildren,
   effect,
+  inject,
   input,
   signal,
   type TemplateRef,
@@ -16,7 +18,6 @@ import { RouteMatch } from "../directives/RouteMatch";
 import { RouteNotFound } from "../directives/RouteNotFound";
 import { RouteSelf } from "../directives/RouteSelf";
 import { injectRouter } from "../functions/injectRouter";
-import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
 import type { RouteSnapshot } from "@real-router/sources";
 
@@ -46,6 +47,7 @@ export class RouteView {
   );
 
   private readonly router = injectRouter();
+  private readonly cdr = inject(ChangeDetectorRef);
   private readonly routeState = signal<RouteSnapshot>(EMPTY_SNAPSHOT);
 
   private readonly matchEntries = computed(() => {
@@ -131,11 +133,29 @@ export class RouteView {
     effect((onCleanup) => {
       const source = createRouteNodeSource(this.router, this.nodeName());
 
-      onCleanup(
-        subscribeSourceToSignal(source, (snap) => {
-          this.routeState.set(snap);
-        }),
-      );
+      // Initial snapshot — applied during the effect's first flush (inside
+      // Angular's change detection), so set the signal ONLY. A re-entrant
+      // detectChanges() here would throw.
+      this.routeState.set(source.getSnapshot());
+
+      const unsub = source.subscribe(() => {
+        this.routeState.set(source.getSnapshot());
+        // #1466: commit the `ngTemplateOutlet` swap SYNCHRONOUSLY. The route
+        // source notifies in the click task, but the template
+        // `@if (activeTemplate())` only re-renders on a change-detection pass,
+        // which zoneless Angular schedules asynchronously — a ~0.85 ms idle
+        // felt-wall gap where `@angular/router` activates its outlet in-task.
+        // The source callback fires from `router.navigate()` (OUTSIDE Angular
+        // CD), so a local `detectChanges()` is safe here and materialises the
+        // route DOM now, collapsing the gap. Mirrors `RealLink`'s direct-DOM
+        // write — both bypass the deferred scheduler flush for a same-task commit.
+        this.cdr.detectChanges();
+      });
+
+      onCleanup(() => {
+        unsub();
+        source.destroy();
+      });
     });
   }
 }

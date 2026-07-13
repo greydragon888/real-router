@@ -368,6 +368,15 @@ Signal-first approach. No `rxjs` or `@angular/core/rxjs-interop` dependencies.
 - Tests that watch `host.attributes` via Angular's `ComponentRef.changeDetectorRef` will NOT see the update via `fixture.detectChanges()` alone — they must read the DOM attribute directly.
 - `prevHref` / `prevActiveClass` instance fields cache the last-written values to skip redundant `setAttribute` / `classList.remove` calls (added per audit §8.2 hot-path optimization).
 
+### RouteView commits the route swap synchronously — bypasses the deferred zoneless CD flush (#1466)
+
+`RouteView`'s route-source subscribe callback calls `this.cdr.detectChanges()` immediately after `this.routeState.set(...)`. The route source notifies **synchronously** from `router.navigate()`, but the template `@if (activeTemplate())` / `ngTemplateOutlet` swap only renders on a change-detection pass — which zoneless Angular **schedules asynchronously**. That deferral was a ~0.85 ms idle gap between the click and the route-DOM commit (`navMsWall` ≫ `navMsTask`). Because the callback fires **outside** Angular's CD (from the click task, via `navigate()`), a local `detectChanges()` there materialises the outlet swap in the same task — collapsing felt nav latency to ≈ its CPU cost (measured **navMsWall 0.97 → 0.07 ms**, ~13× on nav-latency; nested-switch ~7×, nav-churn ~13×). `@angular/router` activates its `<router-outlet>` synchronously for the same reason, so this brings `RouteView` to parity/ahead. Philosophically identical to the sibling `RealLink` direct-DOM-write above — both commit **in-task** rather than waiting for the scheduler.
+
+- **Initial snapshot is NOT `detectChanges()`d.** The effect's first run applies `source.getSnapshot()` while inside the initial CD, where a re-entrant `detectChanges()` would throw. Only subsequent navigation emissions (which fire from `navigate()`, outside CD) sync-commit.
+- **The render now lands in-task**, so CPU-metric sweeps (`wide`/`deep`/`search-param` `navMsTask@N`) tick up a few µs — this is the same render relocating into the measured window, not new work (the deferred flush did it later); real-router stays far ahead of `@angular/router` on all of them.
+- **Re-entrant `router.navigate()` during a CD pass** (e.g. from a user `effect()`) would make this `detectChanges()` re-entrant — an anti-pattern the lifecycle handlers already ban (`REENTRANT_NAVIGATION`); defer such navigations (`queueMicrotask`). In dev this may surface `ExpressionChangedAfterItHasBeenChecked`.
+- **Same-route param changes are out of scope.** The node source does not re-emit on a param-only nav (same segment), so the leaf's param binding re-renders on the normal scheduled CD — as it does for `@angular/router` (which shows the same `param-nav` wall gap). This fix targets route-**switch** navigations, which is the #1466 case.
+
 ### Internal `@@`-prefixed routes are stripped from announcements
 
 `createRouteAnnouncer` filters out route names starting with `@@` (used internally by core for synthetic states like `UNKNOWN_ROUTE`). The announcer falls back to `document.title` or `location.pathname` when the route name is internal.
