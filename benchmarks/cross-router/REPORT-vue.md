@@ -23,7 +23,7 @@ App init + parse/exec to first route painted. vue-router is the lightest to boot
 
 ## Navigation — per-nav wall-clock (click→DOM settle) — `nav-latency`
 
-Per-nav **wall** (click→DOM settle, felt) + **task** (ΔTaskDuration, CPU). On the ⚠ `script` diagnostic vue-router looks ~2× leaner (Vue's fine-grained reactivity: a minimal reactive-ref update + `<RouterView>` swap) — **but `script` is V8-only, blind to Blink C++ + microtasks.** The felt **wall** tells the real story: **real-router WINS ~2× — 0.075 vs vue-router 0.146, tanstack 0.263** — because vue-router fires `history.pushState` **2×/nav** (`replaceState`+`pushState`) vs real-router **1×**, and the settle-timed wall captures the Blink work `script` misses. *(Sub-ms — read ranking/ratio; the load-bearing fact is structural: vue-router's 2× vs real-router's 1× `pushState` is exact from source.)* `alloc/nav`: real-router leanest too (~11 KB vs vue-router 17 / tanstack 73).
+Per-nav **wall** (click→DOM settle, felt) + **task** (ΔTaskDuration, CPU). On the ⚠ `script` diagnostic vue-router looks ~2× leaner (Vue's fine-grained reactivity: a minimal reactive-ref update + `<RouterView>` swap) — **but `script` is V8-only, blind to Blink C++ + microtasks.** The felt **wall** tells the real story: **real-router WINS ~1.9× — 0.075 vs vue-router 0.146, tanstack 0.263** — because vue-router fires `history.pushState` **2×/nav** (`replaceState`+`pushState`) vs real-router **1×**, and the settle-timed wall captures the Blink work `script` misses. *(Sub-ms — read ranking/ratio; the load-bearing fact is structural: vue-router's 2× vs real-router's 1× `pushState` is exact from source.)* `alloc/nav`: real-router leanest too (~11 KB vs vue-router 17 / tanstack 73).
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Per-nav **wall** (click→DOM settle, felt) + **task** (ΔTaskDuration, CPU). On
 
 ## Param navigation — per-nav wall-clock (click→DOM settle) — `param-nav`
 
-Per-nav wall + task changing :id (steady-state sweep). **real-router wins felt wall — ~0.11 vs vue-router 0.155, tanstack 0.425** — the `script`-diagnostic's vue-router lead is offset by its 2× `pushState` in the settle-timed wall. *(Sub-ms — read ranking/ratio.)* `alloc/nav`: real-router leanest (~12 KB vs vue-router 15 / tanstack 113).
+Per-nav wall + task changing :id (steady-state sweep). **real-router wins felt wall — 0.110 vs vue-router 0.155, tanstack 0.425** — the `script`-diagnostic's vue-router lead is offset by its 2× `pushState` in the settle-timed wall. *(Sub-ms — read ranking/ratio.)* `alloc/nav`: real-router leanest (~12 KB vs vue-router 15 / tanstack 113).
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -47,7 +47,7 @@ Per-nav wall + task changing :id (steady-state sweep). **real-router wins felt w
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
-Navigate into a flat 1000-route table — **the matcher crossover.** vue-router is lightest at small N (lean Vue floor) but **degrades @1000** (O(N) matcher); **real-router stays flat and WINS @1000 — task 0.275 vs vue-router 0.546, tanstack 0.72** (~2×). The trie's structural win at scale survives the honest metric.
+Navigate into a flat 1000-route table — **the matcher crossover.** vue-router is lightest at small N (lean Vue floor) but **degrades @1000** (O(N) matcher); **real-router stays flat and WINS @1000 — task 0.275 vs vue-router 0.546, tanstack 0.720** (~2×). The trie's structural win at scale survives the honest metric.
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -71,7 +71,7 @@ Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **real-router is t
 
 ## Deep config — nesting depth (sweep) — `deep-config`
 
-Navigate into a 90-level nested chain. **vue-router stays near-flat and is leanest at depth** (0.46 → 0.84 @90 — a sublinear matcher); **real-router rises** (0.36 → 1.52 @90); **tanstack explodes O(depth)** (0.82 → 3.24, ~2× real-router @90). real-router wins @3, but vue-router's flat deep curve leads from ~@30; both full pipelines stay bounded while tanstack's deep-nav cost grows. Real apps rarely nest past ~10.
+Navigate into a 90-level nested chain. **vue-router stays near-flat and is leanest at depth** (0.458 → 0.838 @90 — a sublinear matcher); **real-router rises** (0.357 → 1.52 @90); **tanstack explodes O(depth)** (0.816 → 3.24, ~2.1× real-router @90). real-router wins @3, but vue-router's flat deep curve leads from ~@30; both full pipelines stay bounded while tanstack's deep-nav cost grows. Real apps rarely nest past ~10.
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -87,7 +87,7 @@ Navigate into a 90-level nested chain. **vue-router stays near-flat and is leane
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
-Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **real-router WINS @50 — task 0.287 vs vue-router 0.7, tanstack 2.245** — and stays flat across @10→@50 (eager immutable params). vue-router's `route.query` is a plain reactive object but costs more at count here; **tanstack rises steeply** (O(count) parse/validate/structural-share). *(Flat-vs-rising is the robust story; sub-ms flat absolutes are session-dependent.)* **`alloc/nav` (GC pressure) agrees:** real-router is the **leanest allocator — ~18 KB/nav, a decisive ~1.8× under vue-router (33)** and ~27× under tanstack (489). Its eager params reference URL-parsed strings (flat), winning the memory axis too — refuting 'eager = more garbage' even against the lean-object competitor.
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **real-router WINS @50 — task 0.287 vs vue-router 0.700, tanstack 2.25** — and stays flat across @10→@50 (eager immutable params). vue-router's `route.query` is a plain reactive object but costs more at count here; **tanstack rises steeply** (O(count) parse/validate/structural-share). *(Flat-vs-rising is the robust story; sub-ms flat absolutes are session-dependent.)* **`alloc/nav` (GC pressure) agrees:** real-router is the **leanest allocator — ~18 KB/nav vs vue-router 33 (~80%) and tanstack 489 (~26.6×)** — its eager params reference URL-parsed strings (flat), winning the memory axis too — refuting 'eager = more garbage' even against the lean-object competitor.
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -102,7 +102,7 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 ## Nav churn (stress) — `nav-churn`
 
-200-nav stress; per-nav **task** (CPU) + retained **heap Δ**. **real-router lightest CPU/nav — task 0.081** vs vue-router 0.135, tanstack 0.237; **real-router retains the least heap (532 KB ≈ vue-router 524; tanstack ~2× at 1069)**. `navsPerSec` is settle-timed (real-router ~13.5k/s) — read CPU/nav + heap (heap Δ warmup-dominated, not a leak #1462).
+200-nav stress; per-nav **task** (CPU) + retained **heap Δ**. **real-router lightest CPU/nav — task 0.081** vs vue-router 0.135, tanstack 0.237; **real-router retains the least heap (532 KB ≈ vue-router 524; tanstack ~2× at 1069)**. `navsPerSec` is settle-timed — read CPU/nav + heap (heap Δ warmup-dominated, not a leak #1462).
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -115,7 +115,7 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 ## Active links (100) — per-nav wall-clock (click→DOM settle) — `active-links`
 
-Per-nav wall recompute across 100 links (steady-state toggle). **vue-router leads — 0.32 vs real-router 0.495 (+55%), tanstack 0.832** — the one cohort where real-router cedes active-links. Vue's fine-grained reactivity keeps per-link active updates lean enough that real-router's shared active-source doesn't separate from it (real-router wins active-links in React / Solid / Svelte / Angular). *(Sub-ms — session/load-dependent.)*
+Per-nav wall recompute across 100 links (steady-state toggle). **vue-router leads — 0.320 vs real-router 0.495 (~55%), tanstack 0.832** — the one cohort where real-router cedes active-links. Vue's fine-grained reactivity keeps per-link active updates lean enough that real-router's shared active-source doesn't separate from it (real-router wins active-links in React / Solid / Svelte / Angular). *(Sub-ms — session/load-dependent.)*
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -126,7 +126,7 @@ Per-nav wall recompute across 100 links (steady-state toggle). **vue-router lead
 
 ## Back / forward — per-nav wall-clock (popstate → DOM settle) — `back-forward`
 
-Browser **back/forward** (popstate) steady-state. **real-router WINS — wall 0.211 vs vue-router 0.235, tanstack 0.375** — a **flip after #1353**: skipping the no-op popstate `replaceState` removed real-router's redundant second history event, turning a loss into a ~10% win over vue-router's single-popstate. Leaner allocator too (~11 KB vs vue-router 15 / tanstack 67). *(n=50.)*
+Browser **back/forward** (popstate) steady-state. **real-router WINS — wall 0.211 vs vue-router 0.235, tanstack 0.375** — a **flip after #1353**: skipping the no-op popstate `replaceState` removed real-router's redundant second history event, turning a loss into a ~11% win over vue-router's single-popstate. Leaner allocator too (~11 KB vs vue-router 15 / tanstack 67). *(n=50.)*
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -138,7 +138,7 @@ Browser **back/forward** (popstate) steady-state. **real-router WINS — wall 0.
 
 ## Link build — mount 1000 links (href construction, wall-clock) — `link-build`
 
-Wall-clock to mount 1000 links, each building its href (real-router `buildPath` · vue-router `resolve` · tanstack build). **real-router leanest — 14.4 ms** vs vue-router 23.7, tanstack 43.8 (~3×). Vue's link mount is latency-bound (reactive cascade) over the ~3.5 ms bare-Vue floor; real-router adds the least — the reverse-matcher `buildPath` is cheaper than vue-router's `resolve` here.
+Wall-clock to mount 1000 links, each building its href (real-router `buildPath` · vue-router `resolve` · tanstack build). **real-router leanest — 14.40 ms** vs vue-router 23.70, tanstack 43.80 (~3×). Vue's link mount is latency-bound (reactive cascade) over the ~3.5 ms bare-Vue floor; real-router adds the least — the reverse-matcher `buildPath` is cheaper than vue-router's `resolve` here.
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|
@@ -146,7 +146,7 @@ Wall-clock to mount 1000 links, each building its href (real-router `buildPath` 
 
 ## Nested switch (reuse) — per-nav wall-clock (click→DOM settle) — `nested-switch`
 
-Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **real-router WINS — wall 0.1 vs vue-router 0.22, tanstack 0.32** (~2.2× lighter). *(Sub-ms — session/load-dependent.)*
+Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **real-router WINS — wall 0.100 vs vue-router 0.220, tanstack 0.320** (~2.2×). *(Sub-ms — session/load-dependent.)*
 
 | metric | real-router | vue-router | tanstack |
 |---|---|---|---|

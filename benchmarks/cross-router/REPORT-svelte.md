@@ -12,7 +12,7 @@
 
 ## Cold start — `cold-start`
 
-App init + parse/exec to first route painted. **sv-router is the lightest to boot** (script 3.58 ms, heap 1.85 MB); mateo-router 4.0 ms / 1.89 MB; real-router heaviest (5.16 ms / 2.20 MB). Over the bare-Svelte floor real-router adds the most boot cost (#1106).
+App init + parse/exec to first route painted. **sv-router is the lightest to boot** (script 3.58 ms, heap 1.85 MB); mateo-router 4.00 ms / 1.89 MB; real-router heaviest (5.16 ms / 2.20 MB). Over the bare-Svelte floor real-router adds the most boot cost (#1106).
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -23,7 +23,7 @@ App init + parse/exec to first route painted. **sv-router is the lightest to boo
 
 ## Navigation — per-nav wall-clock (click→DOM settle) — `nav-latency`
 
-Per-nav **wall** (click→DOM settle, felt) + **task** (CPU). **A near-tie at the Svelte floor — real-router edges the felt wall (0.073 vs sv-router 0.082, mateo-router 0.09); task a dead heat (0.086 ≈ 0.087).** sv-router's `script` sits at the bare-Svelte floor (minimal pipeline); on the settle-timed wall real-router's single `pushState` keeps it just ahead. *(Sub-ms — the ranking is tight and session/load-dependent; read it as floor-parity.)*
+Per-nav **wall** (click→DOM settle, felt) + **task** (CPU). **A near-tie at the Svelte floor — real-router edges the felt wall (0.073 vs sv-router 0.082, mateo-router 0.090); task a dead heat (0.086 ≈ 0.087).** sv-router's `script` sits at the bare-Svelte floor (minimal pipeline); on the settle-timed wall real-router's single `pushState` keeps it just ahead. *(Sub-ms — the ranking is tight and session/load-dependent; read it as floor-parity.)*
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Per-nav **wall** (click→DOM settle, felt) + **task** (CPU). **A near-tie at th
 
 ## Param navigation — per-nav wall-clock (click→DOM settle) — `param-nav`
 
-Per-nav wall + task changing :id (steady-state). **sv-router leanest (wall 0.08); real-router second (0.093, +16%); mateo-router third (0.14)** — sv-router's minimal reactive model sits just below real-router's eager pipeline. *(Sub-ms — session/load-dependent.)*
+Per-nav wall + task changing :id (steady-state). **sv-router leanest (wall 0.080); real-router second (0.093, ~16%); mateo-router third (0.140)** — sv-router's minimal reactive model sits just below real-router's eager pipeline. *(Sub-ms — session/load-dependent.)*
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -47,7 +47,7 @@ Per-nav wall + task changing :id (steady-state). **sv-router leanest (wall 0.08)
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
-Navigate into a flat 1000-route table — **the matcher crossover, and real-router's clearest win in this cohort.** real-router's segment trie stays FLAT (task ~0.23 across @10/@100/@1000) while **sv-router degrades O(N)** (0.475 @1000 — it sorts + scans its route-key list per nav, NOT a segment trie) and mateo-router carries a high floor (~0.52). **real-router WINS @1000** — task 0.233 vs sv-router 0.475 (~2×), mateo 0.519 — the structural trie advantage holds in Svelte (as in React/Vue/Solid).
+Navigate into a flat 1000-route table — **the matcher crossover, and real-router's clearest win in this cohort.** real-router's segment trie stays FLAT (task ~0.233 across @10/@100/@1000) while **sv-router degrades O(N)** (0.475 @1000 — it sorts + scans its route-key list per nav, NOT a segment trie) and mateo-router carries a high floor (~0.519). **real-router WINS @1000** — task 0.233 vs sv-router 0.475 (~2×), mateo 0.519 — the structural trie advantage holds in Svelte (as in React/Vue/Solid).
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -71,7 +71,7 @@ Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **sv-router wins d
 
 ## Deep config — nesting depth (sweep) — `deep-config`
 
-Navigate into a 90-level nested chain. **All three rise O(depth)** — sv-router leanest (2.07 @90), real-router second (0.42 → 3.23 @90), mateo-router heaviest (3.27). **Read directionally:** #1094's Solid research found the analogous deep rise was ~60% a *Solid-specific* bench-app artifact plus adapter bugs; the Svelte deep cost has **not** been decomposed the same way, so the split between app-structure and `@real-router/svelte` `RouteView` composition here is open (the core matcher is flat-capable). **mateo-router renders depth 90 fine** — unlike `@tanstack/solid-router`, which errored past ~30 in the Solid cohort. Real apps rarely nest past ~10.
+Navigate into a 90-level nested chain. **All three rise O(depth)** — sv-router leanest (2.07 @90), real-router second (0.415 → 3.23 @90), mateo-router heaviest (3.27). **Read directionally:** #1094's Solid research found the analogous deep rise was ~60% a *Solid-specific* bench-app artifact plus adapter bugs; the Svelte deep cost has **not** been decomposed the same way, so the split between app-structure and `@real-router/svelte` `RouteView` composition here is open (the core matcher is flat-capable). **mateo-router renders depth 90 fine** — unlike `@tanstack/solid-router`, which errored past ~30 in the Solid cohort. Real apps rarely nest past ~10.
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -102,7 +102,7 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 ## Nav churn (stress) — `nav-churn`
 
-200-nav stress; per-nav **task** (CPU) + retained **heap Δ**. **CPU/nav a 3-way tie (~0.08 task).** sv-router retains the least heap (247 KB), mateo-router 303, real-router 396 (heaviest here). `navsPerSec` is settle-timed ~14k/s for all three — read CPU/nav + heap (heap Δ warmup-dominated, not a leak #1462).
+200-nav stress; per-nav **task** (CPU) + retained **heap Δ**. **CPU/nav a 3-way tie (~0.078 task).** sv-router retains the least heap (247 KB), mateo-router 303, real-router 396 (heaviest here). `navsPerSec` is settle-timed ~14k/s for all three — read CPU/nav + heap (heap Δ warmup-dominated, not a leak #1462).
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -115,7 +115,7 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 ## Active links (100) — per-nav wall-clock (click→DOM settle) — `active-links`
 
-Per-nav wall recompute across 100 links (steady-state toggle). **real-router WINS — wall 0.09 vs sv-router 0.195, mateo-router 0.2 (~2.2×)** (its shared cached active-source, one `router.subscribe`) over per-link active recompute. A clear per-nav win — part of real-router's cross-cohort active-links lead (React / Angular win too). *(Sub-ms — the win is robust; absolute ms session/load-dependent.)*
+Per-nav wall recompute across 100 links (steady-state toggle). **real-router WINS — wall 0.090 vs sv-router 0.195, mateo-router 0.200 (~2.2×)** (its shared cached active-source, one `router.subscribe`) over per-link active recompute. A clear per-nav win — part of real-router's cross-cohort active-links lead (React / Angular win too). *(Sub-ms — the win is robust; absolute ms session/load-dependent.)*
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -126,7 +126,7 @@ Per-nav wall recompute across 100 links (steady-state toggle). **real-router WIN
 
 ## Back / forward — per-nav wall-clock (popstate → DOM settle) — `back-forward`
 
-Browser **back/forward** (popstate) steady-state. **Near 3-way tie (~5% spread) after #1353** — sv-router ~0.203, real-router ~0.207, mateo-router ~0.213. The skip-no-op-`replaceState` fix cut real-router's back/forward from a **~53% loss to a dead heat** with the two minimal Svelte routers. Allocation near-parity (real-router ~12.6 KB; sv-router ~11.9 leanest; mateo 17.2). *(n=50.)*
+Browser **back/forward** (popstate) steady-state. **Near 3-way tie (~5% spread) after #1353** — sv-router ~0.203, real-router ~0.207, mateo-router ~0.213. The skip-no-op-`replaceState` fix cut real-router's back/forward from a **~53% loss to a dead heat** with the two minimal Svelte routers. Allocation near-parity (real-router ~13 KB; sv-router ~12 leanest; mateo 17). *(n=50.)*
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
@@ -138,7 +138,7 @@ Browser **back/forward** (popstate) steady-state. **Near 3-way tie (~5% spread) 
 
 ## Link build — mount 1000 links (href construction, wall-clock) — `link-build`
 
-CPU to mount 1000 links, each building its href. **sv-router leanest (3.2 ms ≈ the bare-`<a>` floor) — plain `<a href>` intercepted by a global click handler, no per-link component**; mateo-router 7.2; **real-router heaviest (12.1 ms)** — after #1101's shared active-name selector removed the per-link subscription, the residual is `@real-router/svelte`'s `<Link>` running `buildPath` per link + per-component instantiation. sv-router avoids both with a literal `<a href>`: the Svelte loss is **structural** (component `<Link>` vs plain anchor), not slow engineering — `buildPath` is inherent and React/Solid/Angular rr pay it and *win* their link-build.
+CPU to mount 1000 links, each building its href. **sv-router leanest (3.20 ms ≈ the bare-`<a>` floor) — plain `<a href>` intercepted by a global click handler, no per-link component**; mateo-router 7.20; **real-router heaviest (12.10 ms)** — after #1101's shared active-name selector removed the per-link subscription, the residual is `@real-router/svelte`'s `<Link>` running `buildPath` per link + per-component instantiation. sv-router avoids both with a literal `<a href>`: the Svelte loss is **structural** (component `<Link>` vs plain anchor), not slow engineering — `buildPath` is inherent and React/Solid/Angular rr pay it and *win* their link-build.
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|

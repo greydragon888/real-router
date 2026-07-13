@@ -35,7 +35,7 @@ Per-nav **wall** (click→DOM settle, felt) + **task** (ΔTaskDuration, CPU); `s
 
 ## Param navigation — per-nav wall-clock (click→DOM settle) — `param-nav`
 
-Per-nav wall + task changing :id (steady-state sweep /users/1→2→3…). **real-router lightest** — ~40% under react-router on felt wall, lowest task. *(Sub-ms — read ranking/ratio, not absolute ms.)* `alloc/nav`: real-router's immutable State references the new `:id` rather than re-copying — ~12 KB/nav vs react-router ~34 (~2.9×) and tanstack ~124 (~11×).
+Per-nav wall + task changing :id (steady-state sweep /users/1→2→3…). **real-router lightest** — wall 0.140 vs react-router 0.225 (~61%), tanstack 0.310; lowest task. *(Sub-ms — read ranking/ratio, not absolute ms.)* `alloc/nav`: real-router's immutable State references the new `:id` rather than re-copying — ~12 KB/nav vs react-router ~34 (~2.9×) and tanstack ~124 (~10.7×).
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -47,7 +47,7 @@ Per-nav wall + task changing :id (steady-state sweep /users/1→2→3…). **rea
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
-Navigate into a flat 1000-route table; per size **task** (CPU matcher) + **wall @1000** (felt). Flat curve = O(1)/trie, rising = O(N)/scan. **real-router stays flat and wins every size** — task@1000 **0.273 vs react-router 0.773 (~2.8×) and tanstack 1.057 (~3.9×)**; react-router degrades with N (O(N) scan). The matcher win is decisive.
+Navigate into a flat 1000-route table; per size **task** (CPU matcher) + **wall @1000** (felt). Flat curve = O(1)/trie, rising = O(N)/scan. **real-router stays flat and wins every size** — task@1000 **0.273 vs react-router 0.773 (~2.8×) and tanstack 1.06 (~3.9×)**; react-router degrades with N (O(N) scan). The matcher win is decisive.
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -61,7 +61,7 @@ Navigate into a flat 1000-route table; per size **task** (CPU matcher) + **wall 
 
 ## Route-table memory — heap to hold N routes (sweep) — `table-heap`
 
-Retained JS heap holding a table of 1 / 1000 / 10000 routes (forced GC; @1 ≈ the React/app floor). The memory counterpart to wide-config. real-router's segment trie *historically* cost the most here — but heap-profiling traced the bulk to **empty per-route collections + redundant indexes, not the trie itself**, and **#1009 + #1010 removed them** (shared frozen sentinels, a monomorphic `CompiledRoute`, and dropping two duplicate `name→route` maps). At 10k real-router is now the **lightest** of the three — **6.05 MB vs react-router 8.73 (~31% under) and tanstack 11.22 (~46% under)** — while keeping the flat O(1) match; the benchmark drove a real core optimization. At the @1 floor real-router (2.27) sits a hair over react-router (2.16). heap is the most stable signal (RME < 0.3%).
+Retained JS heap holding a table of 1 / 1000 / 10000 routes (forced GC; @1 ≈ the React/app floor). The memory counterpart to wide-config. real-router's segment trie *historically* cost the most here — but heap-profiling traced the bulk to **empty per-route collections + redundant indexes, not the trie itself**, and **#1009 + #1010 removed them** (shared frozen sentinels, a monomorphic `CompiledRoute`, and dropping two duplicate `name→route` maps). At 10k real-router is now the **lightest** of the three — **6.05 MB vs react-router 8.73 (~44%) and tanstack 11.22 (~1.9×)** — while keeping the flat O(1) match; the benchmark drove a real core optimization. At the @1 floor real-router (2.27) sits a hair over react-router (2.16). heap is the most stable signal (RME < 0.3%).
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -71,7 +71,7 @@ Retained JS heap holding a table of 1 / 1000 / 10000 routes (forced GC; @1 ≈ t
 
 ## Deep config — nesting depth (sweep) — `deep-config`
 
-Navigate into a 90-level nested chain (sweep 3 / 30 / 60 / 90). **real-router scales cleanly and monotonically** (0.41 → 0.91 → 1.67 → 2.56 ms task) and **wins every realistic depth — ~2.2× @3, ~3.7× @30, ~2.9× @60** vs react-router. **react-router's curve is a parabola**: it rises to ~4.8 ms at depth 60 (~2.9× real-router) then **declines to ~1.5 ms at depth 90**, so at the single @90 point it dips below real-router's honest 2.56. Root cause (CPU-profiled + confirmed in react-router source): `matchRoutes` tries route branches **deepest-first** (`computeScore` ranks more segments higher) and re-matches every *deeper* branch before reaching the target — depth D wastes `O((maxDepth−D)×D)` path re-normalization (`matchRouteBranch`/`joinPaths`), maximal mid-depth, zero only when the target *is* the deepest route (@90). real-router walks its precompiled segment trie straight to the match (O(depth), no branch-retrying, no per-nav string normalization). Real apps rarely nest past ~10, where real-router wins outright. *(@90 is the react-router parabola's zero-point, not a real-router regression — read the whole curve.)*
+Navigate into a 90-level nested chain (sweep 3 / 30 / 60 / 90). **real-router scales cleanly and monotonically** (0.408 → 0.911 → 1.67 → 2.56 ms task) and **wins every realistic depth — ~2.2× @3, ~3.7× @30, ~2.9× @60** vs react-router. **react-router's curve is a parabola**: it rises to ~4.81 ms at depth 60 (~2.9× real-router) then **declines to ~1.50 ms at depth 90**, so at the single @90 point it dips below real-router's honest 2.56. Root cause (CPU-profiled + confirmed in react-router source): `matchRoutes` tries route branches **deepest-first** (`computeScore` ranks more segments higher) and re-matches every *deeper* branch before reaching the target — depth D wastes `O((maxDepth−D)×D)` path re-normalization (`matchRouteBranch`/`joinPaths`), maximal mid-depth, zero only when the target *is* the deepest route (@90). real-router walks its precompiled segment trie straight to the match (O(depth), no branch-retrying, no per-nav string normalization). Real apps rarely nest past ~10, where real-router wins outright. *(@90 is the react-router parabola's zero-point, not a real-router regression — read the whole curve.)*
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -87,7 +87,7 @@ Navigate into a 90-level nested chain (sweep 3 / 30 / 60 / 90). **real-router sc
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
-Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`) — the realistic high-count vector (marketplace filters / analytics / tracking; path params top out at ~4). The leaf reads EVERY value, so lazy query is materialized (apples-to-apples). **real-router wins @50 — task 0.349 vs react-router 0.375, tanstack 2.837 — and stays flat across @10→@50** (eager immutable params make reading all 50 a cheap property access). **tanstack EXPLODES — 2.84 ms @50 (~8× real-router), O(query-count)**: its per-nav search parse + validate + structural-share pipeline. react-router is flat too (0.375 @50 — `URLSearchParams` is a cheap plain object) but no lower. **`alloc/nav` (GC pressure, @50↔@1 toggle) tells the SAME story in memory:** real-router allocates ~32 KB/nav **flat** — its eager params *reference* the browser's URL-parsed strings instead of copying — vs react-router ~40 and tanstack ~507 (**~16× real-router**). So the eager model wins **both** axes at high count — flat CPU *and* far less garbage — refuting the intuition that an eager snapshot must produce more garbage.
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`) — the realistic high-count vector (marketplace filters / analytics / tracking; path params top out at ~4). The leaf reads EVERY value, so lazy query is materialized (apples-to-apples). **real-router wins @50 — task 0.349 vs react-router 0.375, tanstack 2.84 — and stays flat across @10→@50** (eager immutable params make reading all 50 a cheap property access). **tanstack EXPLODES — 2.84 ms @50 (~8.1× real-router), O(query-count)**: its per-nav search parse + validate + structural-share pipeline. react-router is flat too (0.375 @50 — `URLSearchParams` is a cheap plain object) but no lower. **`alloc/nav` (GC pressure, @50↔@1 toggle) tells the SAME story in memory:** real-router allocates ~32 KB/nav **flat** — its eager params *reference* the browser's URL-parsed strings instead of copying — vs react-router ~40 and tanstack ~507 (**~16×**). So the eager model wins **both** axes at high count — flat CPU *and* far less garbage — refuting the intuition that an eager snapshot must produce more garbage.
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -102,7 +102,7 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`) — the
 
 ## Nav churn (stress) — `nav-churn`
 
-200-nav stress; per-nav **task** (CPU) + retained **heap Δ**. **real-router lightest CPU/nav — task 0.093** vs react-router 0.161, tanstack 0.234 — **and retains the least heap (717 KB)** (react-router 887, tanstack 1140). `navsPerSec` is settle-timed throughput (real-router ~11.7k/s); read CPU/nav + heap (heap Δ is warmup-dominated, not a leak #1462).
+200-nav stress; per-nav **task** (CPU) + retained **heap Δ**. **real-router lightest CPU/nav — task 0.093** vs react-router 0.161, tanstack 0.234 — **and retains the least heap (717 KB)** (react-router 887, tanstack 1140). `navsPerSec` is settle-timed throughput; read CPU/nav + heap (heap Δ is warmup-dominated, not a leak #1462).
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -115,7 +115,7 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`) — the
 
 ## Active links (100) — per-nav wall-clock (click→DOM settle) — `active-links`
 
-Per-nav wall recompute across 100 links (steady-state toggle). **real-router lightest by a wide margin — wall 0.25 ms vs tanstack 0.805 / react-router 0.905 (~3× lighter)**: a shared cached active-source recomputes all 100 links off **one** `router.subscribe`, where react-router / tanstack pay per-link active machinery. **This is a cross-cohort strength — real-router leads active-links in four of five cohorts** (Svelte + Angular wins below; Solid near-parity; only Vue's fine-grained reactivity edges it).
+Per-nav wall recompute across 100 links (steady-state toggle). **real-router lightest by a wide margin — wall 0.250 ms vs tanstack 0.805 / react-router 0.905 (~3.6×)**: a shared cached active-source recomputes all 100 links off **one** `router.subscribe`, where react-router / tanstack pay per-link active machinery. **This is a cross-cohort strength — real-router leads active-links in four of five cohorts** (Svelte + Angular wins below; Solid near-parity; only Vue's fine-grained reactivity edges it).
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -126,7 +126,7 @@ Per-nav wall recompute across 100 links (steady-state toggle). **real-router lig
 
 ## Back / forward — per-nav wall-clock (popstate → DOM settle) — `back-forward`
 
-Browser **back/forward** (popstate) steady-state — the distinct history-traversal path (every other scenario drives `pushState` *forward*; this drives `history.back()/forward()`, one of the commonest real ops). **real-router WINS — wall 0.217 ms vs react-router 0.259, tanstack 0.315** (~19% under react-router). **#1353 landed** (skip no-op popstate `replaceState`): real-router now fires **1 `updateForSameDocumentNavigation`/nav** (the browser's own traversal), not 2 — the redundant second history event on back/forward is gone. Leanest allocator too (~10 KB/nav vs react-router 26 / tanstack 63). *(n=50 — ranking robust.)*
+Browser **back/forward** (popstate) steady-state — the distinct history-traversal path (every other scenario drives `pushState` *forward*; this drives `history.back()/forward()`, one of the commonest real ops). **real-router WINS — wall 0.217 ms vs react-router 0.259, tanstack 0.315 (~19%)**. **#1353 landed** (skip no-op popstate `replaceState`): real-router now fires **1** `updateForSameDocumentNavigation`/nav (the browser's own traversal), not 2 — the redundant second history event on back/forward is gone. Leanest allocator too (~10 KB/nav vs react-router 26 / tanstack 63). *(n=50 — ranking robust.)*
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -138,7 +138,7 @@ Browser **back/forward** (popstate) steady-state — the distinct history-traver
 
 ## Link build — mount 1000 links (href construction, wall-clock) — `link-build`
 
-CPU to mount 1000 `<Link>`s at once — each builds its href via the router's reverse-matcher (`buildPath` / `generatePath` / `buildLocation`), isolated from route construction (done once at startup). A real cost for link-heavy pages (nav menus, sitemaps, paginated lists). **real-router leanest — 6.9 ms** (its `<Link>` active state resolves through a shared per-router active-name selector — one `router.subscribe` for all links, not a subscription per link); react-router 9.6 (real-router leads by ~2.7 ms), tanstack 14.2 (~2× slower).
+CPU to mount 1000 `<Link>`s at once — each builds its href via the router's reverse-matcher (`buildPath` / `generatePath` / `buildLocation`), isolated from route construction (done once at startup). A real cost for link-heavy pages (nav menus, sitemaps, paginated lists). **real-router leanest — 6.90 ms** (its `<Link>` active state resolves through a shared per-router active-name selector — one `router.subscribe` for all links, not a subscription per link); react-router 9.60 (~39%), tanstack 14.20 (~2.1×).
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|
@@ -146,7 +146,7 @@ CPU to mount 1000 `<Link>`s at once — each builds its href via the router's re
 
 ## Nested switch (reuse) — per-nav wall-clock (click→DOM settle) — `nested-switch`
 
-Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **real-router lightest — wall 0.115 ms** vs react-router 0.23 / tanstack 0.295 (~2× lighter).
+Sibling switch a↔b under a shared layout (steady-state) — reuse the parent. **real-router lightest — wall 0.115 ms** vs react-router 0.230 / tanstack 0.295 (~2×).
 
 | metric | real-router | tanstack | react-router |
 |---|---|---|---|

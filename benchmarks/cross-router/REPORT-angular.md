@@ -12,7 +12,7 @@
 
 ## Cold start — `cold-start`
 
-App init + parse/exec to first route painted. **@angular/router boots far lighter — script 2.07 ms** vs real-router 6.41 (~3× the boot script); **retained heap is at parity (2.65 = 2.65 MB, post-GC #1454).** Bare-Angular floor ~1.8 ms, so `@real-router/angular` adds ~4.3 ms of startup. **Decomposed (#1106, isolation ladder): the excess is CORE, not the adapter** — ~57% is parse+eval of the full `@real-router/core` bundle, ~28% is `createRouter`+`start()` (a warm re-run showed ~90% of *that* is one-time V8 cold-JIT, not initialization *work*); `provideRealRouter` DI (~0.04 ms) and `RouteView` (~0.64 ms) are cheap. A **code-size-driven one-time cost** — the price of shipping the full pipeline; competitors' lightness ∝ their smaller / tree-shaken code. Cross-cohort-consistent (~4.5–7 ms across solid/svelte/angular). #1106 tracks it (post-1.0 RFC-candidate; SSR/SSG amortizes boot).
+App init + parse/exec to first route painted. **@angular/router boots far lighter — script 2.07 ms** vs real-router 6.41 (~3.1× the boot script); **retained heap is at parity (2.65 = 2.65 MB, post-GC #1454).** Bare-Angular floor ~1.8 ms, so `@real-router/angular` adds ~4.3 ms of startup. **Decomposed (#1106, isolation ladder): the excess is CORE, not the adapter** — ~57% is parse+eval of the full `@real-router/core` bundle, ~28% is `createRouter`+`start()` (a warm re-run showed ~90% of *that* is one-time V8 cold-JIT, not initialization *work*); `provideRealRouter` DI (~0.04 ms) and `RouteView` (~0.64 ms) are cheap. A **code-size-driven one-time cost** — the price of shipping the full pipeline; competitors' lightness ∝ their smaller / tree-shaken code. Cross-cohort-consistent (~4.5–7 ms across solid/svelte/angular). #1106 tracks it (post-1.0 RFC-candidate; SSR/SSG amortizes boot).
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -23,7 +23,7 @@ App init + parse/exec to first route painted. **@angular/router boots far lighte
 
 ## Navigation — per-nav wall-clock (click→DOM settle) — `nav-latency`
 
-Per-nav **wall** (click→DOM settle, felt) + **task** (ΔTaskDuration, CPU). **A split verdict: @angular/router wins the felt wall (0.228 vs real-router 0.982), but real-router wins CPU (task 0.11 vs 0.238, ~2.2×) and allocation (~7 vs 122 KB/nav, ~17×).** The ~0.87 ms wall gap is idle time — the `@real-router/angular` adapter commits the route DOM a task later than the click (async change-detection settle), where @angular/router commits within the click task (**#1466, under investigation**). So real-router does far less CPU/GC work per nav yet *feels* slower on plain-link navs. *(Sub-ms task; wall carries the adapter's async settle — read both rows.)*
+Per-nav **wall** (click→DOM settle, felt) + **task** (ΔTaskDuration, CPU). **A split verdict: @angular/router wins the felt wall (0.228 vs real-router 0.982), but real-router wins CPU (task 0.110 vs 0.238, ~2.2×) and allocation (~7 vs 122 KB/nav, ~16.7×).** The ~0.87 ms wall gap is idle time — the `@real-router/angular` adapter commits the route DOM a task later than the click (async change-detection settle), where @angular/router commits within the click task (**#1466, under investigation**). So real-router does far less CPU/GC work per nav yet *feels* slower on plain-link navs. *(Sub-ms task; wall carries the adapter's async settle — read both rows.)*
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -35,7 +35,7 @@ Per-nav **wall** (click→DOM settle, felt) + **task** (ΔTaskDuration, CPU). **
 
 ## Param navigation — per-nav wall-clock (click→DOM settle) — `param-nav`
 
-Per-nav wall + task changing :id (steady-state). **real-router wins CPU — task 0.14 vs @angular/router 0.345 (~2.5×) and alloc ~16× leaner (9 vs 146 KB)**; felt wall ~parity (0.752 vs 0.807, both carry Angular's async settle). *(Sub-ms — session/load-dependent.)*
+Per-nav wall + task changing :id (steady-state). **real-router wins CPU — task 0.140 vs @angular/router 0.345 (~2.5×) and alloc ~15.7× leaner (9 vs 146 KB)**; felt wall ~parity (0.752 vs 0.807, both carry Angular's async settle). *(Sub-ms — session/load-dependent.)*
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -47,7 +47,7 @@ Per-nav wall + task changing :id (steady-state). **real-router wins CPU — task
 
 ## Wide config — matcher breadth (sweep) — `wide-config`
 
-Navigate into a flat 1000-route table. **real-router stays flat and WINS @1000 by a wide margin — task 0.22 vs @angular/router 2.834 (~12.9×)** — @angular/router's matcher degrades sharply with N (it is *not* flat at scale), so real-router's segment trie is decisive here (as in React/Vue/Solid/Svelte). Its official router is not a trie.
+Navigate into a flat 1000-route table. **real-router stays flat and WINS @1000 by a wide margin — task 0.220 vs @angular/router 2.83 (~12.9×)** — @angular/router's matcher degrades sharply with N (it is *not* flat at scale), so real-router's segment trie is decisive here (as in React/Vue/Solid/Svelte). Its official router is not a trie.
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -61,7 +61,7 @@ Navigate into a flat 1000-route table. **real-router stays flat and WINS @1000 b
 
 ## Route-table memory — heap to hold N routes (sweep) — `table-heap`
 
-Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **@angular/router lighter at 10k — 3.68 MB vs real-router 6.24.** real-router's segment-trie route storage is the heavier structure — but unlike the earlier read, it DOES buy the matcher-scale CPU win here (real-router wins wide @1000 ~13×, @angular/router's matcher degrades). So this cohort splits: real-router pays memory (trie storage), @angular/router pays CPU at scale.
+Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **@angular/router lighter at 10k — 3.67 MB vs real-router 6.24.** real-router's segment-trie route storage is the heavier structure — but unlike the earlier read, it DOES buy the matcher-scale CPU win here (real-router wins wide @1000 ~12.9×, @angular/router's matcher degrades). So this cohort splits: real-router pays memory (trie storage), @angular/router pays CPU at scale.
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -71,7 +71,7 @@ Retained JS heap holding 1 / 1000 / 10000 routes (forced GC). **@angular/router 
 
 ## Deep config — nesting depth (sweep) — `deep-config`
 
-Navigate into a 90-level nested chain. **real-router WINS decisively — task 0.49 → 1.67 @90 vs @angular/router 1.14 → 5.50 (~3.3× @90)** — both rise O(depth) but @angular/router far steeper. Real apps rarely nest past ~10, where real-router already leads.
+Navigate into a 90-level nested chain. **real-router WINS decisively — task 0.493 → 1.67 @90 vs @angular/router 1.14 → 5.50 (~3.3× @90)** — both rise O(depth) but @angular/router far steeper. Real apps rarely nest past ~10, where real-router already leads.
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -87,7 +87,7 @@ Navigate into a 90-level nested chain. **real-router WINS decisively — task 0.
 
 ## Search-param scaling — query-param count (sweep, reads all values) — `search-param-scaling`
 
-Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **real-router WINS @50 — task 0.245 vs @angular/router 1.074 (~4.4×)** — real-router stays flat (eager immutable params) while @angular/router's `snapshot.queryParams` cost rises with count. **`alloc/nav`** (GC pressure): real-router ~15 KB/nav vs @angular/router ~524 (**~35×**) — eager params reference URL-parsed strings; @angular/router allocates heavily per nav.
+Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the realistic high-count vector), reading every value. **real-router WINS @50 — task 0.245 vs @angular/router 1.07 (~4.4×)** — real-router stays flat (eager immutable params) while @angular/router's `snapshot.queryParams` cost rises with count. **`alloc/nav`** (GC pressure): real-router ~15 KB/nav vs @angular/router ~524 (~35.3×) — eager params reference URL-parsed strings; @angular/router allocates heavily per nav.
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -115,7 +115,7 @@ Navigate into routes with 1 / 10 / 50 **query** params (`/sN?k1=v1&…`, the rea
 
 ## Active links (100) — per-nav wall-clock (click→DOM settle) — `active-links`
 
-Per-nav recompute across 100 links (steady-state toggle). **real-router WINS — task (CPU) 0.132 vs @angular/router 0.84 (~6.4×)**; felt wall also leads (0.74 vs 1.05). Its shared cached active-source (one `router.subscribe`) beats `@angular/router`'s per-link `routerLinkActive` router-event subscription — real-router's clearest per-nav win in this cohort, part of its cross-cohort active-links lead (React + Svelte win too). *(The CPU win is robust; wall carries the async settle.)*
+Per-nav recompute across 100 links (steady-state toggle). **real-router WINS — task (CPU) 0.132 vs @angular/router 0.840 (~6.4×)**; felt wall also leads (0.740 vs 1.05). Its shared cached active-source (one `router.subscribe`) beats `@angular/router`'s per-link `routerLinkActive` router-event subscription — real-router's clearest per-nav win in this cohort, part of its cross-cohort active-links lead (React + Svelte win too). *(The CPU win is robust; wall carries the async settle.)*
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -126,7 +126,7 @@ Per-nav recompute across 100 links (steady-state toggle). **real-router WINS —
 
 ## Back / forward — per-nav wall-clock (popstate → DOM settle) — `back-forward`
 
-Browser **back/forward** (popstate) steady-state. **real-router WINS — wall 0.207 vs @angular/router 0.395 (~2×), task 0.116 vs 0.35.** **#1353** (skip no-op popstate `replaceState`) removed real-router's redundant second history event. real-router the leaner **allocator** too (~8 KB/nav vs @angular/router 128, ~17×). *(n=50.)*
+Browser **back/forward** (popstate) steady-state. **real-router WINS — wall 0.207 vs @angular/router 0.395 (~1.9×), task 0.116 vs 0.350.** **#1353** (skip no-op popstate `replaceState`) removed real-router's redundant second history event. real-router the leaner **allocator** too (~8 KB/nav vs @angular/router 128, ~16.8×). *(n=50.)*
 
 | metric | real-router | angular-router |
 |---|---|---|
@@ -138,7 +138,7 @@ Browser **back/forward** (popstate) steady-state. **real-router WINS — wall 0.
 
 ## Link build — mount 1000 links (href construction, wall-clock) — `link-build`
 
-CPU to mount 1000 links, each building its href. **real-router leaner — 13.1 ms** vs @angular/router 18.4, both heavy over the bare-`<a>` floor. real-router's `RealLink` runs the reverse-matcher (`buildPath`); `@angular/router`'s `routerLink` serializes a URL tree (config-independent) — different mechanisms, both costly. (`RealLink`'s active state uses the shared active-name selector fast path #1104; the residual is `buildPath` per link + directive/effect setup, not a per-link subscription.)
+CPU to mount 1000 links, each building its href. **real-router leaner — 13.10 ms** vs @angular/router 18.40, both heavy over the bare-`<a>` floor. real-router's `RealLink` runs the reverse-matcher (`buildPath`); `@angular/router`'s `routerLink` serializes a URL tree (config-independent) — different mechanisms, both costly. (`RealLink`'s active state uses the shared active-name selector fast path #1104; the residual is `buildPath` per link + directive/effect setup, not a per-link subscription.)
 
 | metric | real-router | angular-router |
 |---|---|---|
