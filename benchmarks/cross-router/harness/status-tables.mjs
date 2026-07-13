@@ -168,8 +168,8 @@ function gridTable() {
     out.push(`| ${sc} \`${HEADLINE[sc]}\` | ${cells.join(" | ")} |`);
   }
   out.push("\n> ⚠ Mechanical status vs nearest competitor — an index, not the authority. Read the per-cohort");
-  out.push("> REPORT for the wall/task split (angular per-nav navMsWall carries async change-detection settle;");
-  out.push("> its CPU/navMsTask differs) and sweep curves (e.g. react deep@90 = react-router non-monotonicity).");
+  out.push("> REPORT for sweep curves (e.g. react/vue/svelte deep@90 = competitor non-monotonicity / scale-floor)");
+  out.push("> and cohort caveats. Angular per-nav now commits in-task (#1466 fixed), so its wall ≈ task.");
   return out.join("\n");
 }
 
