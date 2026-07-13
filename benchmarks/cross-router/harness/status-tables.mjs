@@ -16,6 +16,7 @@
 //   node cross-router/harness/status-tables.mjs vue        # verbose, one cohort
 //   node cross-router/harness/status-tables.mjs --grid     # compact 12×5 headline grid
 //   node cross-router/harness/status-tables.mjs --engines svelte  # per-router grid, one cohort
+//   node cross-router/harness/status-tables.mjs --engines svelte --only=real-router,mateo-router  # 1:1 subset
 //   node cross-router/harness/status-tables.mjs > view.md  # snapshot to a file
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -195,10 +196,17 @@ const fmtVal = (v) => {
   return v.toFixed(a < 1 ? 3 : a < 100 ? 2 : 1);
 };
 
-function enginesTable(cohort) {
-  const engs = ENG[cohort];
+function enginesTable(cohort, only) {
+  let engs = ENG[cohort];
   if (!engs) return `\n# unknown cohort "${cohort}" — expected: ${Object.keys(ENG).join(", ")}`;
-  const out = [`\n# ${cohort} — per-router headline grid (source: results/, lower = better)\n`];
+  if (only && only.length) {
+    const set = new Set(only);
+    engs = engs.filter((e) => set.has(e));
+    if (!engs.length)
+      return `\n# no engines matched ${JSON.stringify(only)} in ${cohort} — have: ${ENG[cohort].join(", ")}`;
+  }
+  const title = only ? `${cohort} — 1:1 (${engs.join(" vs ")})` : `${cohort} — per-router headline grid`;
+  const out = [`\n# ${title} (source: results/, lower = better)\n`];
   out.push(`| scenario (headline) | ${engs.join(" | ")} |`);
   out.push(`|---|${"---|".repeat(engs.length)}`);
   const wins = Object.fromEntries(engs.map((e) => [e, 0]));
@@ -226,8 +234,12 @@ function enginesTable(cohort) {
 
 const args = process.argv.slice(2);
 const positional = args.find((a) => !a.startsWith("--"));
+const onlyArg = args.find((a) => a.startsWith("--only="));
+const only = onlyArg
+  ? onlyArg.slice(7).split(",").map((s) => s.trim()).filter(Boolean)
+  : null;
 if (args.includes("--engines")) {
-  console.log(enginesTable(positional ?? "svelte"));
+  console.log(enginesTable(positional ?? "svelte", only));
 } else if (args.includes("--grid")) {
   console.log(gridTable());
 } else {
