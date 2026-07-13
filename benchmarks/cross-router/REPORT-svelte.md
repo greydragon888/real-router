@@ -12,7 +12,7 @@
 
 ## Cold start — `cold-start`
 
-App init + parse/exec to first route painted. **sv-router is the lightest to boot** (script 3.58 ms, heap 1.85 MB); mateo-router 4.0 / 1.89; real-router heaviest (5.16 / 2.20). Over the bare-Svelte floor real-router adds the most boot cost (#1106).
+App init + parse/exec to first route painted. **sv-router is the lightest to boot** (script 3.58 ms, heap 1.85 MB); mateo-router 4.0 ms / 1.89 MB; real-router heaviest (5.16 ms / 2.20 MB). Over the bare-Svelte floor real-router adds the most boot cost (#1106).
 
 | metric | real-router | sv-router | mateo-router |
 |---|---|---|---|
