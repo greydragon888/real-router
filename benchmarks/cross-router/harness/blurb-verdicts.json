@@ -193,7 +193,7 @@
   },
   "angular/active-links": {
     "winner": "real-router",
-    "bucket": "clear"
+    "bucket": "3x+"
   },
   "angular/back-forward": {
     "winner": "real-router",
@@ -213,19 +213,19 @@
   },
   "angular/nav-churn": {
     "winner": "real-router",
-    "bucket": "clear"
+    "bucket": "2x"
   },
   "angular/nav-latency": {
-    "winner": "angular-router",
+    "winner": "real-router",
     "bucket": "3x+"
   },
   "angular/nested-switch": {
     "winner": "real-router",
-    "bucket": "tie"
+    "bucket": "3x+"
   },
   "angular/param-nav": {
     "winner": "real-router",
-    "bucket": "slim"
+    "bucket": "3x+"
   },
   "angular/search-param-scaling": {
     "winner": "real-router",

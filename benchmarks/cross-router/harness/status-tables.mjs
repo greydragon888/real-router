@@ -1,9 +1,13 @@
-// status-tables — rr-status views of the cross-router benchmark. Two modes:
+// status-tables — rr-status views of the cross-router benchmark. Three modes:
 //   • verbose (default / <cohort>) — one detailed table per cohort, every metric row,
 //     parsed from the committed REPORT*.md: | сценарий | metric | <engines> | rr status |.
 //   • --grid — one compact 12×5 matrix (scenario × cohort), the HEADLINE metric only,
 //     read straight from results/ (stable metric keys, not REPORT prose). An at-a-glance
 //     index that fits one screen; the verbose tables remain the detail.
+//   • --engines <cohort> — ONE cohort pivoted to routers-as-columns (scenario × engine),
+//     raw median of the HEADLINE metric per cell, row winner marked 🟢. The head-to-head
+//     analysis view: --grid collapses a cohort to a single rr verdict, this keeps every
+//     engine's absolute number so you see WHAT rr beats (or loses to) and by how much.
 // The `rr status` column reads: 🟡 ≈ parity (engines differ < 10%); 🟢 win / 🔴 loss
 // otherwise, delta from the nearest competitor. Lower = better, except throughput (`/s`).
 //
@@ -11,6 +15,8 @@
 //   node cross-router/harness/status-tables.mjs            # verbose, all 5 cohorts
 //   node cross-router/harness/status-tables.mjs vue        # verbose, one cohort
 //   node cross-router/harness/status-tables.mjs --grid     # compact 12×5 headline grid
+//   node cross-router/harness/status-tables.mjs --engines svelte  # per-router grid, one cohort
+//   node cross-router/harness/status-tables.mjs --engines svelte --only=real-router,mateo-router  # 1:1 subset
 //   node cross-router/harness/status-tables.mjs > view.md  # snapshot to a file
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -151,8 +157,11 @@ function gridCell(vals) {
   const rrBest = rr <= ref + 1e-9;
   const r = rrBest ? ref / rr : rr / ref;
   const pct = (r - 1) * 100;
+  // Signed delta, rr's view of a lower-is-better metric: "-N%" = rr faster,
+  // "+N%" = rr slower. The 🟢/🔴 emoji is the verdict, the sign the direction; a
+  // whole column reads uniformly (- everywhere rr leads). Near-ties are 🟡, same sign.
   if (r < 1.1) return `🟡 ${rrBest ? "-" : "+"}${Math.abs(pct).toFixed(0)}%`;
-  const d = r >= 2 ? `${r.toFixed(1)}×` : `${rrBest ? "win " : "+"}${pct.toFixed(0)}%`;
+  const d = r >= 2 ? `${r.toFixed(1)}×` : `${rrBest ? "-" : "+"}${pct.toFixed(0)}%`;
   return `${rrBest ? "🟢" : "🔴"} ${d}`;
 }
 
@@ -160,24 +169,80 @@ function gridTable() {
   const out = ["\n# cross-router — rr headline-status grid (source: results/, lower = better)\n"];
   out.push(`| scenario (headline) | ${FW.join(" | ")} |`);
   out.push(`|---|${"---|".repeat(FW.length)}`);
+  const tally = Object.fromEntries(FW.map((fw) => [fw, { g: 0, y: 0, r: 0 }]));
   for (const sc of Object.keys(HEADLINE)) {
     const cells = FW.map((fw) => {
       const vals = headlineVals(fw, sc, HEADLINE[sc]);
-      return vals ? gridCell(vals) : "—";
+      const cell = vals ? gridCell(vals) : "—";
+      if (cell.startsWith("🟢")) tally[fw].g++;
+      else if (cell.startsWith("🟡")) tally[fw].y++;
+      else if (cell.startsWith("🔴")) tally[fw].r++;
+      return cell;
     });
     out.push(`| ${sc} \`${HEADLINE[sc]}\` | ${cells.join(" | ")} |`);
   }
+  out.push(
+    `\n**Tally:** ${FW.map((fw) => `${fw} ${tally[fw].g}🟢/${tally[fw].y}🟡/${tally[fw].r}🔴`).join(" · ")}`,
+  );
   out.push("\n> ⚠ Mechanical status vs nearest competitor — an index, not the authority. Read the per-cohort");
-  out.push("> REPORT for the wall/task split (angular per-nav navMsWall carries async change-detection settle;");
-  out.push("> its CPU/navMsTask differs) and sweep curves (e.g. react deep@90 = react-router non-monotonicity).");
+  out.push("> REPORT for sweep curves (e.g. react/vue/svelte deep@90 = competitor non-monotonicity / scale-floor)");
+  out.push("> and cohort caveats. Angular per-nav now commits in-task (#1466 fixed), so its wall ≈ task.");
+  return out.join("\n");
+}
+
+// --engines <cohort>: raw median per HEADLINE metric, routers as columns, row winner 🟢.
+const fmtVal = (v) => {
+  const a = Math.abs(v);
+  return v.toFixed(a < 1 ? 3 : a < 100 ? 2 : 1);
+};
+
+function enginesTable(cohort, only) {
+  let engs = ENG[cohort];
+  if (!engs) return `\n# unknown cohort "${cohort}" — expected: ${Object.keys(ENG).join(", ")}`;
+  if (only && only.length) {
+    const set = new Set(only);
+    engs = engs.filter((e) => set.has(e));
+    if (!engs.length)
+      return `\n# no engines matched ${JSON.stringify(only)} in ${cohort} — have: ${ENG[cohort].join(", ")}`;
+  }
+  const title = only ? `${cohort} — 1:1 (${engs.join(" vs ")})` : `${cohort} — per-router headline grid`;
+  const out = [`\n# ${title} (source: results/, lower = better)\n`];
+  out.push(`| scenario (headline) | ${engs.join(" | ")} |`);
+  out.push(`|---|${"---|".repeat(engs.length)}`);
+  const wins = Object.fromEntries(engs.map((e) => [e, 0]));
+  for (const sc of Object.keys(HEADLINE)) {
+    const key = HEADLINE[sc];
+    const vals = headlineVals(cohort, sc, key) ?? {};
+    const present = engs.map((e) => (e in vals ? vals[e] : null));
+    const nums = present.filter((v) => v != null);
+    const min = nums.length ? Math.min(...nums) : null;
+    const cells = present.map((v, i) => {
+      if (v == null) return "—";
+      if (v === min) {
+        wins[engs[i]]++;
+        return `🟢 **${fmtVal(v)}**`;
+      }
+      return fmtVal(v);
+    });
+    out.push(`| ${sc} \`${key}\` | ${cells.join(" | ")} |`);
+  }
+  out.push(`\n**Row wins (🟢 lowest):** ${engs.map((e) => `${e} ${wins[e]}`).join(" · ")}`);
+  out.push("\n> Raw medians in each row-metric's unit; 🟢 = fastest/lowest that row. Lower = better for");
+  out.push("> every headline metric. Pair with `--grid` (which collapses this to one rr-vs-best verdict).");
   return out.join("\n");
 }
 
 const args = process.argv.slice(2);
-if (args.includes("--grid")) {
+const positional = args.find((a) => !a.startsWith("--"));
+const onlyArg = args.find((a) => a.startsWith("--only="));
+const only = onlyArg
+  ? onlyArg.slice(7).split(",").map((s) => s.trim()).filter(Boolean)
+  : null;
+if (args.includes("--engines")) {
+  console.log(enginesTable(positional ?? "svelte", only));
+} else if (args.includes("--grid")) {
   console.log(gridTable());
 } else {
-  const arg = args.find((a) => !a.startsWith("--"));
-  const cohorts = arg ? [arg] : ["react", "vue", "solid", "svelte", "angular"];
+  const cohorts = positional ? [positional] : ["react", "vue", "solid", "svelte", "angular"];
   for (const c of cohorts) console.log(cohortTable(c));
 }
