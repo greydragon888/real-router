@@ -1,4 +1,4 @@
-import { Injector, runInInjectionContext } from "@angular/core";
+import { Component, Injector, runInInjectionContext } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { createRouter, getNavigator } from "@real-router/core";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -145,6 +145,34 @@ describe("inject functions", () => {
         expect(route.routeState().route.name).toBe("home");
         expect(typeof params).toBe("object");
       });
+    });
+
+    it("sync-commits the consuming component on navigation, then cleans up (#1466)", async () => {
+      @Component({ template: "" })
+      class RouteConsumer {
+        readonly route = injectRoute();
+        readonly node = injectRouteNode("");
+      }
+
+      const fixture = TestBed.createComponent(RouteConsumer);
+
+      fixture.detectChanges();
+
+      // In a component context the #1466 sync-commit path is active: a
+      // navigation drives the route sources and calls detectChanges() on this
+      // component's ChangeDetectorRef in-task (exercises the subscribe callback).
+      await router.navigate("users");
+
+      expect(fixture.componentInstance.route.routeState().route.name).toBe(
+        "users",
+      );
+      expect(fixture.componentInstance.node.routeState()).toBeDefined();
+
+      // Teardown unsubscribes the extra listener + destroys the (cached, no-op)
+      // source; a post-destroy navigation must NOT touch the torn-down view
+      // (would throw on a destroyed ChangeDetectorRef if cleanup were missing).
+      fixture.destroy();
+      await router.navigate("home");
     });
   });
 
