@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-14]
 
+### @real-router/validation-plugin@0.12.1
+
+### Patch Changes
+
+- [#1473](https://github.com/greydragon888/real-router/pull/1473) [`814b202`](https://github.com/greydragon888/real-router/commit/814b20240e01b2b5e5ca707f9368f41bfc96159d) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix retrospective dependency-count off-by-one that broke cloneRouter at the limit ([#1225](https://github.com/greydragon888/real-router/issues/1225))
+
+  The retrospective limits pass used `depCount >= maxDependencies`, but the live limiter (`validateDependencyCount`) counts **before** the insert — so a store may legally REACH exactly `maxDependencies`. Because the retrospective re-runs on `usePlugin` and on every `cloneRouter()`, it rejected a state it had itself allowed to be reached, making every SSR per-request clone of an at-limit base throw `RangeError`. Changed `>=` to `>` so an at-limit store passes and only a store that _strictly exceeds_ the limit throws; the message now reads "exceeds" instead of "reaches or exceeds".
+
+
 ### @real-router/core@0.76.0
 
 ### Minor Changes
