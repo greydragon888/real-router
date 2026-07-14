@@ -5,7 +5,8 @@ import {
   getLifecycleApi,
   getPluginApi,
 } from "@real-router/core/api";
-import { describe, it, expect, afterEach } from "vitest";
+import { logger } from "@real-router/logger";
+import { describe, it, expect, afterEach, vi } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
 
@@ -323,6 +324,84 @@ describe("core/limits — with validationPlugin", () => {
       router = createRouter([], { limits: undefined } as never);
 
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+    });
+  });
+
+  // #1188 — proactive warn@20% / error@50% threshold for the listener counter,
+  // mirroring plugins / lifecycle / dependencies. Core keeps the bare-Error hard
+  // cap; the plugin surfaces an actionable signal well before it. maxListeners:10
+  // ⇒ warn at floor(10*0.2)=2, error at floor(10*0.5)=5. The resolved
+  // warnListeners stays at the default 1000 (> maxListeners), so the core
+  // emitter's own onListenerWarn is unreachable — the only log here is the plugin
+  // threshold.
+  describe("listener count thresholds (#1188)", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("warns via router.subscribe when the count reaches the warn threshold", () => {
+      router = createRouter([], { limits: { maxListeners: 10 } });
+      router.usePlugin(validationPlugin());
+
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      router.subscribe(() => {}); // count 1 — below warn (2)
+
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      router.subscribe(() => {}); // count 2 — warn
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "router.subscribe",
+        expect.stringContaining("listeners registered"),
+      );
+    });
+
+    it("errors via router.subscribe when the count reaches the error threshold", () => {
+      router = createRouter([], { limits: { maxListeners: 10 } });
+      router.usePlugin(validationPlugin());
+
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+      for (let i = 0; i < 5; i++) {
+        router.subscribe(() => {}); // 5th subscribe → count 5 → error
+      }
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "router.subscribe",
+        expect.stringContaining("Hard limit at 10"),
+      );
+    });
+
+    it("warns via getPluginApi().addEventListener on the same counter", () => {
+      router = createRouter([], { limits: { maxListeners: 10 } });
+      router.usePlugin(validationPlugin());
+
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const api = getPluginApi(router);
+
+      api.addEventListener(events.ROUTER_START, () => {}); // count 1
+      api.addEventListener(events.ROUTER_START, () => {}); // count 2 → warn
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "router.addEventListener",
+        expect.stringContaining("listeners registered"),
+      );
+    });
+
+    it("does not warn when maxListeners = 0 (unlimited)", () => {
+      router = createRouter([], { limits: { maxListeners: 0 } });
+      router.usePlugin(validationPlugin());
+
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+      for (let i = 0; i < 20; i++) {
+        router.subscribe(() => {});
+      }
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
     });
   });
 });

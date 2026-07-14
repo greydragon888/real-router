@@ -54,6 +54,7 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
     getInternals(ns.router).validator;
 
   wireLimits(ns);
+  wireEventBus(ns, getValidator);
   wireRouteLifecycle(ns, compileFactory, getValidator);
   wireRoutes(ns);
   wirePlugins(ns, compileFactory, getValidator);
@@ -87,6 +88,18 @@ function wireLimits<Dependencies extends DefaultDependencies>(
     maxListeners: ns.limits.maxListeners,
     warnListeners: ns.limits.warnListeners,
   });
+}
+
+/**
+ * Hands EventBusNamespace the shared lazy validator accessor so `subscribe` /
+ * `addEventListener` can run the opt-in listener-count threshold (#1188) — the
+ * emitter-side parallel to the plugins / lifecycle / dependencies counters.
+ */
+function wireEventBus<Dependencies extends DefaultDependencies>(
+  ns: NamespaceBag<Dependencies>,
+  getValidator: () => RouterValidator | null,
+): void {
+  ns.eventBus.setValidatorAccessor(getValidator);
 }
 
 function wireRouteLifecycle<Dependencies extends DefaultDependencies>(

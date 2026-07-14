@@ -20,7 +20,10 @@ import {
   warnBatchOverwrite,
   warnRemoveNonExistent,
 } from "./validators/dependencies";
-import { validateListenerArgs } from "./validators/eventBus";
+import {
+  validateListenerArgs,
+  validateListenerCountThresholds,
+} from "./validators/eventBus";
 import {
   validateHandler,
   validateHandlerLimit,
@@ -270,6 +273,16 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
         validateListenerArgs<EventName>(
           name as EventName,
           cb as Plugin[EventMethodMap[EventName]],
+        );
+      },
+      validateCountThresholds(count, eventName, methodName) {
+        const maxListeners = ctx.getOptions().limits?.maxListeners ?? 10_000;
+
+        validateListenerCountThresholds(
+          count,
+          eventName,
+          methodName,
+          maxListeners,
         );
       },
     },

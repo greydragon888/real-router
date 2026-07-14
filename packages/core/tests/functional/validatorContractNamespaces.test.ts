@@ -1,6 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getLifecycleApi } from "@real-router/core/api";
+import { events } from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
 import { installSpyValidator } from "../helpers/spyValidator";
@@ -232,6 +233,34 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
       expect(validator.lifecycle.warnAsyncGuardSync).toHaveBeenCalledWith(
         "home",
         "canNavigateTo",
+      );
+    });
+  });
+
+  // ===========================================================================
+  // EventBusNamespace — proactive listener-count threshold (#1188). subscribe()
+  // and getPluginApi().addEventListener() both feed the emitter's per-event
+  // cap; core reads the pre-add count and calls the validator so the plugin can
+  // warn/error before the bare-Error hard cap ever throws.
+  // ===========================================================================
+  describe("EventBusNamespace", () => {
+    it("subscribe: checks listener-count thresholds ('$$success','subscribe')", () => {
+      router.subscribe(() => {});
+
+      expect(validator.eventBus.validateCountThresholds).toHaveBeenCalledWith(
+        expect.any(Number),
+        events.TRANSITION_SUCCESS,
+        "subscribe",
+      );
+    });
+
+    it("addEventListener: checks listener-count thresholds (eventName,'addEventListener')", () => {
+      getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
+
+      expect(validator.eventBus.validateCountThresholds).toHaveBeenCalledWith(
+        expect.any(Number),
+        events.ROUTER_START,
+        "addEventListener",
       );
     });
   });

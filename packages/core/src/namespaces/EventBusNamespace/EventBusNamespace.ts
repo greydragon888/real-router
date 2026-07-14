@@ -7,6 +7,7 @@ import { RouterError } from "../../RouterError";
 import type { EventBusOptions } from "./types";
 import type { RouterEvent, RouterPayloads, RouterState } from "../../fsm";
 import type { EventMethodMap, RouterEventMap } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 import type { FSM } from "@real-router/fsm";
 import type {
   EventName,
@@ -104,6 +105,10 @@ export class EventBusNamespace {
   // Effect of the FSM CANCEL action: aborts the in-flight navigation's
   // controller. Wired to NavigationNamespace.
   readonly #abortController: (reason?: unknown) => void;
+  // Lazy accessor for the opt-in RouterValidator (wired by wireNamespaces).
+  // Returns `null` until validation-plugin is registered — so the proactive
+  // listener-count threshold (#1188) costs the no-plugin path nothing.
+  #getValidator: (() => RouterValidator | null) | undefined;
   readonly #leaveListeners: LeaveFn[] = [];
 
   // Depth of the synchronous transition-dispatch window — elevated while a
@@ -441,6 +446,8 @@ export class EventBusNamespace {
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
   ): Unsubscribe {
+    this.#checkListenerThreshold(eventName, "addEventListener");
+
     return this.#emitter.on(
       eventName,
       cb as (...args: RouterEventMap[typeof eventName]) => void,
@@ -473,6 +480,8 @@ export class EventBusNamespace {
     if (this.isDisposed()) {
       throw new RouterError(errorCodes.ROUTER_DISPOSED);
     }
+
+    this.#checkListenerThreshold(events.TRANSITION_SUCCESS, "subscribe");
 
     return this.#emitter.on(
       events.TRANSITION_SUCCESS,
@@ -667,6 +676,16 @@ export class EventBusNamespace {
     this.#emitter.setLimits(limits);
   }
 
+  /**
+   * Injects the lazy validator accessor (wireNamespaces), mirroring
+   * `PluginsNamespace` / `RouteLifecycleNamespace`. The closure reads the live
+   * `RouterInternals.validator`, so a validation-plugin registered AFTER wiring
+   * is still observed on the next `subscribe` / `addEventListener`.
+   */
+  setValidatorAccessor(getValidator: () => RouterValidator | null): void {
+    this.#getValidator = getValidator;
+  }
+
   // Single guarded entry point for routing a cancel into the FSM `CANCEL` action
   // — used by every source: stop/dispose (RouterLifecycle) pass no reason;
   // supersede / external `opts.signal` (via the wiring `cancelNavigation` dep)
@@ -680,6 +699,27 @@ export class EventBusNamespace {
     }
 
     this.sendCancel(toState, fromState, reason);
+  }
+
+  /**
+   * Proactive listener-count threshold (#1188) — mirrors the plugins /
+   * lifecycle / dependencies counters. Opt-in: the emitter's per-event count is
+   * read ONLY when the validator is installed, so the bare-core hot path pays
+   * nothing. `count` is the POST-add size (`listenerCount + 1`), matching
+   * `RouteLifecycleNamespace`'s `count + 1`, so warn/error fire exactly when the
+   * new listener reaches the threshold. Core keeps the emitter's bare-`Error`
+   * hard cap; this only surfaces an actionable signal well before it.
+   */
+  #checkListenerThreshold(eventName: EventName, methodName: string): void {
+    const validator = this.#getValidator?.();
+
+    if (validator) {
+      validator.eventBus.validateCountThresholds(
+        this.#emitter.listenerCount(eventName) + 1,
+        eventName,
+        methodName,
+      );
+    }
   }
 
   #emitPendingError(): void {
