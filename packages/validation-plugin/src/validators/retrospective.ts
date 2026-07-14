@@ -458,7 +458,8 @@ export function validateDependenciesStructure(deps: unknown): void {
  * Adapted from: validateLimits() in OptionsNamespace/validators.ts
  *
  * @param options - Router options (typed as unknown to avoid core coupling)
- * @throws {RangeError} If dependency count reaches or exceeds maxDependencies limit
+ * @throws {RangeError} If dependency count exceeds maxDependencies limit (#1225:
+ *   `>` not `>=` — an at-limit store is legal, mirroring the live limiter)
  */
 function extractConfiguredLimits(options: unknown): Record<string, unknown> {
   const opts =
@@ -501,9 +502,15 @@ function checkDepCountLimit(
       ? maxDepsFromOptions
       : maxDepsFromStore;
 
-  if (typeof maxDeps === "number" && maxDeps > 0 && depCount >= maxDeps) {
+  // `>`, not `>=` (#1225): the live limiter (`validateDependencyCount`) counts
+  // BEFORE the insert, so a store may legally REACH exactly maxDependencies. This
+  // retrospective pass checks committed STATE (re-run on usePlugin AND every
+  // cloneRouter), so it must accept an at-limit store and reject only one that
+  // STRICTLY exceeds the limit — else every SSR per-request clone of an at-limit
+  // base throws.
+  if (typeof maxDeps === "number" && maxDeps > 0 && depCount > maxDeps) {
     throw new RangeError(
-      `[validation-plugin] validateLimitsConsistency: dependency count (${depCount}) reaches or exceeds maxDependencies limit (${maxDeps})`,
+      `[validation-plugin] validateLimitsConsistency: dependency count (${depCount}) exceeds maxDependencies limit (${maxDeps})`,
     );
   }
 }

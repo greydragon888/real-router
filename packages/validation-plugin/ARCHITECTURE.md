@@ -51,7 +51,7 @@ router.usePlugin(validationPlugin())
     │       ├── retroV.validateRoutePropertiesStore(store)
     │       ├── retroV.validateForwardToTargetsStore(store)
     │       ├── retroV.validateDependenciesStructure(deps)
-    │       ├── retroV.validateLimitsConsistency(options, store, deps)
+    │       ├── retroV.validateLimitsConsistency(options, deps)
     │       ├── validator.options.validateOptions(options)
     │       │       └── cross-field: warnListeners ≤ maxListeners, callbackIgnoresLevel requires callback
     │       └── retroV.validateResolvedDefaultRoute(options.defaultRoute, store)  ← string defaultRoute only

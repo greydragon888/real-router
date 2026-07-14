@@ -47,6 +47,7 @@ import {
   validatePluginLimit,
   validateAddInterceptorArgs,
 } from "../../src/validators/plugins";
+import { validateLimitsConsistency } from "../../src/validators/retrospective";
 import {
   validateBuildPathArgs,
   validateMatchPathArgs,
@@ -730,6 +731,51 @@ describe("validateLimitValue — property-based", () => {
       validateLimitValue("maxDependencies", value, "test");
     }).toThrow(RangeError);
   });
+});
+
+// =============================================================================
+// Retrospective: dependency-count boundary (#1225)
+// =============================================================================
+//
+// Class-guard for the false-rejection pair (#1224 / #1225): the opt-in
+// validation layer must never reject a state bare core accepts. The live
+// limiter (`validateDependencyCount`) counts BEFORE the insert, so a store may
+// legally REACH exactly maxDependencies — the retrospective pass must accept
+// that boundary and reject only a store that STRICTLY exceeds it.
+describe("validateLimitsConsistency — dependency-count boundary (#1225)", () => {
+  const depStore = (count: number, max: number) => {
+    const dependencies: Record<string, number> = {};
+
+    for (let i = 0; i < count; i++) {
+      dependencies[`d${i}`] = i;
+    }
+
+    return { dependencies, limits: { maxDependencies: max } };
+  };
+
+  test.prop([fc.integer({ min: 1, max: 100 })], { numRuns: NUM_RUNS.standard })(
+    "a store at exactly maxDependencies never throws (plugin ⊇ core)",
+    (max) => {
+      expect(() => {
+        validateLimitsConsistency(
+          { limits: { maxDependencies: max } },
+          depStore(max, max),
+        );
+      }).not.toThrow();
+    },
+  );
+
+  test.prop([fc.integer({ min: 1, max: 100 })], { numRuns: NUM_RUNS.standard })(
+    "a store strictly over maxDependencies always throws RangeError",
+    (max) => {
+      expect(() => {
+        validateLimitsConsistency(
+          { limits: { maxDependencies: max } },
+          depStore(max + 1, max),
+        );
+      }).toThrow(RangeError);
+    },
+  );
 });
 
 // =============================================================================
