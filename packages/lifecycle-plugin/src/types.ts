@@ -17,6 +17,11 @@ export type LifecycleHook = (
  * Factory function for creating lifecycle hooks.
  * Receives the router instance and a dependency getter (same pattern as GuardFnFactory).
  * Factory runs once at first invocation; the returned hook is cached per route.
+ *
+ * A throwing factory (e.g. a failing DI init) is isolated exactly like a throwing
+ * hook body — caught and re-thrown asynchronously via `queueMicrotask` (#1222), so
+ * it never swallows a sibling `onNavigate` and never aborts the transition. A
+ * failed compile is NOT cached, so the factory is retried on every navigation.
  */
 export type LifecycleHookFactory<
   Dependencies extends DefaultDependencies = DefaultDependencies,
