@@ -404,4 +404,40 @@ describe("core/limits — with validationPlugin", () => {
       expect(errorSpy).not.toHaveBeenCalled();
     });
   });
+
+  // #1225 — a store that legally REACHED maxDependencies (the live limiter
+  // `validateDependencyCount` counts BEFORE the insert, so exactly maxDeps is
+  // reachable) must not be rejected by the retrospective pass, which re-runs on
+  // every usePlugin AND every cloneRouter() → i.e. on every SSR per-request clone.
+  describe("dependency count at exactly maxDependencies (#1225)", () => {
+    it("cloneRouter succeeds when the base is at exactly maxDependencies", () => {
+      const r = createRouter<NumDeps>([], { limits: { maxDependencies: 3 } });
+
+      r.usePlugin(validationPlugin());
+
+      const deps = getDependenciesApi(r);
+
+      deps.set("d1", 1);
+      deps.set("d2", 2);
+      deps.set("d3", 3); // live limiter allows reaching exactly 3
+
+      expect(() => cloneRouter(r)).not.toThrow();
+
+      r.stop();
+    });
+
+    it("usePlugin passes when depCount already equals maxDependencies", () => {
+      // deps seeded via the constructor's 3rd arg — no live limiter runs, so the
+      // store sits at exactly the limit when the plugin's retrospective fires.
+      const r = createRouter<NumDeps>(
+        [],
+        { limits: { maxDependencies: 3 } },
+        { d1: 1, d2: 2, d3: 3 },
+      );
+
+      expect(() => r.usePlugin(validationPlugin())).not.toThrow();
+
+      r.stop();
+    });
+  });
 });

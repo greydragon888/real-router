@@ -112,9 +112,11 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
     r.stop();
   });
 
-  it("dependency count at limit triggers RangeError on usePlugin", () => {
+  it("dependency count over limit triggers RangeError on usePlugin", () => {
     const deps: Record<string, number> = {};
 
+    // 5 deps > maxDependencies 3 — strictly over the limit (#1225: an at-limit
+    // store is legal, so the throw case here is over-limit).
     for (let i = 0; i < 5; i++) {
       deps[`dep${i}`] = i;
     }

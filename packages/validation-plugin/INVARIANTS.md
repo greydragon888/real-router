@@ -153,6 +153,15 @@ Invariants verified by property-based tests (`tests/property/`). Each invariant 
 | 10  | `validateDependencyLimit`: count meeting limit always throws `RangeError`                  | 50   |
 | 11  | `validateDependencyLimit`: `maxDependencies=0` disables limit (never throws)               | —    |
 
+## Retrospective — validateLimitsConsistency
+
+The retrospective pass checks committed **state** (re-run on `usePlugin` and every `cloneRouter()`), so it must accept any count the live limiter lets a store REACH. The live limiter counts before the insert, so reaching exactly `maxDependencies` is legal — the boundary is `>`, not `>=` (#1225).
+
+| #   | Invariant                                                                                   | Runs |
+| --- | ------------------------------------------------------------------------------------------- | ---- |
+| 1   | A store at exactly `maxDependencies` never throws (plugin ⊇ core — #1225)                    | 50   |
+| 2   | A store strictly over `maxDependencies` always throws `RangeError`                           | 50   |
+
 ## Options — validateLimitValue
 
 | #   | Invariant                                                                          | Runs |

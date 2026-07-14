@@ -631,9 +631,11 @@ describe("validateLimitsConsistency", () => {
     }).not.toThrow();
   });
 
-  it("throws RangeError when dep count reaches maxDependencies from deps store", () => {
+  it("throws RangeError when dep count exceeds maxDependencies from deps store", () => {
     const deps = makeDeps({
-      dependencies: { dep1: 1, dep2: 2, dep3: 3 },
+      // 4 deps > maxDependencies 3 — strictly over (#1225: at-limit is legal, so
+      // the throw case is now over-limit, not at-limit).
+      dependencies: { dep1: 1, dep2: 2, dep3: 3, dep4: 4 },
       limits: {
         maxDependencies: 3,
         maxPlugins: 50,
@@ -653,7 +655,9 @@ describe("validateLimitsConsistency", () => {
 
   it("prefers maxDependencies from options over deps store limit", () => {
     const deps = makeDeps({
-      dependencies: { dep1: 1, dep2: 2 },
+      // 3 deps: strictly over the OPTIONS limit (2) but well under the STORE
+      // limit (100). The throw proves the options limit is the one applied.
+      dependencies: { dep1: 1, dep2: 2, dep3: 3 },
       limits: {
         maxDependencies: 100,
         maxPlugins: 50,
@@ -671,6 +675,27 @@ describe("validateLimitsConsistency", () => {
   it("passes when deps is null — covers FALSE branch of deps check", () => {
     expect(() => {
       validateLimitsConsistency({}, null);
+    }).not.toThrow();
+  });
+
+  // #1225 — the live limiter (`validateDependencyCount`) counts BEFORE the
+  // insert, so reaching EXACTLY maxDependencies is legal. The retrospective pass
+  // checks state, not room-for-next-insert, so it must accept an at-limit store
+  // (else every cloneRouter on an at-limit base throws — breaking SSR).
+  it("passes when dep count equals maxDependencies (#1225)", () => {
+    const deps = makeDeps({
+      dependencies: { dep1: 1, dep2: 2, dep3: 3 },
+      limits: {
+        maxDependencies: 3,
+        maxPlugins: 50,
+        maxListeners: 10_000,
+        warnListeners: 1000,
+        maxLifecycleHandlers: 200,
+      },
+    });
+
+    expect(() => {
+      validateLimitsConsistency({}, deps);
     }).not.toThrow();
   });
 });
