@@ -1,5 +1,12 @@
 # router-benchmarks
 
+## 0.3.92
+
+### Patch Changes
+
+- Updated dependencies [[`171071b`](https://github.com/greydragon888/real-router/commit/171071bd9316eccf39b90c7c07d326746a7dbd75)]:
+  - @real-router/lifecycle-plugin@0.7.0
+
 ## 0.3.91
 
 ### Patch Changes
