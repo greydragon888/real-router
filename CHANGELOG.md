@@ -5,6 +5,154 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-14]
+
+### @real-router/core@0.76.0
+
+### Minor Changes
+
+- [#1471](https://github.com/greydragon888/real-router/pull/1471) [`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d) Thanks [@greydragon888](https://github.com/greydragon888)! - Call the validator's listener-count threshold from `subscribe` / `addEventListener` ([#1188](https://github.com/greydragon888/real-router/issues/1188))
+
+  `EventBusNamespace` now reads the per-event listener count and calls the opt-in `RouterValidator.eventBus.validateCountThresholds` on each `subscribe` / `addEventListener`, mirroring the plugins / lifecycle / dependencies counters. The new interface method and `wireEventBus` accessor are additive; without `@real-router/validation-plugin` the accessor returns `null` and the call is a no-op, so the bare-core hot path and the emitter's bare-`Error` hard cap are unchanged.
+
+### @real-router/validation-plugin@0.12.0
+
+### Minor Changes
+
+- [#1471](https://github.com/greydragon888/real-router/pull/1471) [`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d) Thanks [@greydragon888](https://github.com/greydragon888)! - Add proactive listener-count threshold for `subscribe` / `addEventListener` ([#1188](https://github.com/greydragon888/real-router/issues/1188))
+
+  Listeners were the only resource counter without an early-warning threshold: plugins, lifecycle handlers and dependencies each get a `warn@20% / error@50%` signal (`computeThresholds`), but the listener counter silently accumulated up to the core hard cap (`maxListeners`, default 10 000) before throwing a bare `Error`. The plugin now emits an actionable `[router.subscribe]` / `[router.addEventListener]` warn/error well before that cap, catching a listener leak (e.g. a missing `unsubscribe`, [#766](https://github.com/greydragon888/real-router/issues/766)) early. Core keeps its bare-`Error` hard cap as the structural backstop — this only adds the opt-in DX signal, restoring symmetry across all four resource counters.
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/angular@0.13.18
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+  - @real-router/sources@0.11.2
+
+### @real-router/browser-plugin@0.18.20
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/hash-plugin@0.8.19
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/lifecycle-plugin@0.6.18
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/logger-plugin@0.5.30
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/memory-plugin@0.4.27
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/navigation-plugin@0.7.29
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/persistent-params-plugin@0.2.30
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/preact@0.16.19
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+  - @real-router/sources@0.11.2
+
+### @real-router/preload-plugin@0.6.20
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/react@0.28.24
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+  - @real-router/sources@0.11.2
+
+### @real-router/rx@0.3.31
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/search-schema-plugin@0.4.18
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/solid@0.16.18
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+  - @real-router/sources@0.11.2
+
+### @real-router/sources@0.11.2
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
+### @real-router/svelte@0.15.17
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+  - @real-router/sources@0.11.2
+
+### @real-router/vue@0.16.18
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+  - @real-router/sources@0.11.2
+
 ## [2026-07-13]
 
 ### @real-router/angular@0.13.17

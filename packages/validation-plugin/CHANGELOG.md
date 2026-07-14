@@ -1,5 +1,18 @@
 # @real-router/validation-plugin
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1471](https://github.com/greydragon888/real-router/pull/1471) [`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d) Thanks [@greydragon888](https://github.com/greydragon888)! - Add proactive listener-count threshold for `subscribe` / `addEventListener` ([#1188](https://github.com/greydragon888/real-router/issues/1188))
+
+  Listeners were the only resource counter without an early-warning threshold: plugins, lifecycle handlers and dependencies each get a `warn@20% / error@50%` signal (`computeThresholds`), but the listener counter silently accumulated up to the core hard cap (`maxListeners`, default 10 000) before throwing a bare `Error`. The plugin now emits an actionable `[router.subscribe]` / `[router.addEventListener]` warn/error well before that cap, catching a listener leak (e.g. a missing `unsubscribe`, [#766](https://github.com/greydragon888/real-router/issues/766)) early. Core keeps its bare-`Error` hard cap as the structural backstop — this only adds the opt-in DX signal, restoring symmetry across all four resource counters.
+
+### Patch Changes
+
+- Updated dependencies [[`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d)]:
+  - @real-router/core@0.76.0
+
 ## 0.11.0
 
 ### Minor Changes
