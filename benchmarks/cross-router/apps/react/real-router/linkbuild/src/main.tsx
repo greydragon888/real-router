@@ -10,7 +10,8 @@ import { createRoot } from "react-dom/client";
 import type { Route } from "@real-router/core";
 import type { JSX } from "react";
 
-const COUNT = 1000;
+const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const COUNT = _n > 0 ? _n : 1000;
 
 const routes: Route[] = [
   { name: "home", path: "/" },

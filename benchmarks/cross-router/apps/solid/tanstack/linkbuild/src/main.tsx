@@ -13,7 +13,8 @@ import { render } from "solid-js/web";
 
 import type { JSX } from "solid-js";
 
-const COUNT = 1000;
+const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const COUNT = _n > 0 ? _n : 1000;
 const rIndexes = Array.from({ length: COUNT }, (_, i) => i);
 
 function Home(): JSX.Element {

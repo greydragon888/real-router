@@ -1,4 +1,4 @@
-// search-param-scaling — QUERY-param handling cost by count (sweep 1 / 10 / 50
+// search-param-scaling — QUERY-param handling cost by count (sweep 1 … 256
 // query params, the realistic marketplace/analytics vector — cf. path params which
 // top out at ~4). Headline per size = the UNIFIED wall-clock click→DOM-settle
 // (`navMsWall@N`, felt) + its ΔTaskDuration twin (`navMsTask@N`) — both capture the
@@ -21,7 +21,7 @@ import {
   traceBlinkUs,
 } from "../harness/cdp.mjs";
 
-const COUNTS = [1, 10, 50];
+const COUNTS = [1, 2, 4, 8, 16, 32, 64, 128, 256];
 const WARM_NAVS = 12; // in-realm navs to reach optimized steady state before measuring
 const ALLOC_NAVS = 60;
 
@@ -64,6 +64,7 @@ export const searchParamScaling = {
       );
 
     for (const n of COUNTS) {
+      try {
       const pivot = n === COUNTS[0] ? COUNTS[1] : COUNTS[0];
       await land(n);
       await warm(n, pivot); // ends on pivot, realm optimized
@@ -87,16 +88,18 @@ export const searchParamScaling = {
       // (largest, least-quantized point; matches the report row) so the noisy small
       // points don't flood rme-gate. navMsTask@N (unclamped) carries the curve.
       if (n === COUNTS[COUNTS.length - 1]) out[`navMsWall@${n}`] = wallMs;
+      } catch (sweepErr) { console.error(`search-param-scaling @${n}: ${sweepErr.message} — skipping this point`); }
     }
 
-    // Allocation pass — GC pressure of high-count query handling (@max <-> @1
+    // Allocation pass — GC pressure of high-count query handling (@max <-> @min
     // toggle; both leaves read ALL their values). The eager-vs-lazy allocation
     // contrast: eager immutable params reference URL-parsed strings (flat) while
     // parse / validate / structural-share pipelines produce O(count) garbage.
     const hi = COUNTS[COUNTS.length - 1];
+    const lo = COUNTS[0]; // pivot leaf (lowest count)
     const driveToggle = (navs) =>
       page.evaluate(
-        async ([n, h]) => {
+        async ([n, h, l]) => {
           const waitCount = async (c) => {
             for (let t = 0; t < 240; t++) {
               const el = document.querySelector('[data-testid="page-search"]');
@@ -108,19 +111,23 @@ export const searchParamScaling = {
           for (let i = 0; i < n / 2; i++) {
             document.querySelector(`[data-testid="link-search-${h}"]`).click();
             await waitCount(h);
-            document.querySelector('[data-testid="link-search-1"]').click();
-            await waitCount(1);
+            document.querySelector(`[data-testid="link-search-${l}"]`).click();
+            await waitCount(l);
           }
         },
-        [navs, hi],
+        [navs, hi, lo],
       );
 
-    await land(hi);
-    await driveToggle(8); // warmup (discarded)
-    out.allocKBPerNav =
-      (await sampleAllocationBytes(client, () => driveToggle(ALLOC_NAVS))) /
-      ALLOC_NAVS /
-      1024;
+    try {
+      await land(hi);
+      await driveToggle(8); // warmup (discarded)
+      out.allocKBPerNav =
+        (await sampleAllocationBytes(client, () => driveToggle(ALLOC_NAVS))) /
+        ALLOC_NAVS /
+        1024;
+    } catch (allocErr) {
+      console.error(`search-param-scaling alloc @${hi}: ${allocErr.message} — skipping allocKBPerNav`);
+    }
 
     return out;
   },

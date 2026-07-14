@@ -1,7 +1,8 @@
 import { Component } from "@angular/core";
 import { RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
-const TAB_COUNT = 100;
+const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const TAB_COUNT = _n > 0 ? _n : 100;
 
 @Component({
   selector: "app-root",

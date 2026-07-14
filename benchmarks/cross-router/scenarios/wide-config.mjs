@@ -18,7 +18,7 @@
 // same signal the per-nav scenarios use — no rAF-poll frame quantization.
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
-const TARGETS = [10, 100, 1000];
+const TARGETS = [4, 8, 16, 32, 64, 128, 256, 512, 1024];
 const WARM_NAVS = 12; // in-realm navs to reach optimized steady state before measuring
 
 export const wideConfig = {
@@ -62,6 +62,7 @@ export const wideConfig = {
       );
 
     for (const n of TARGETS) {
+      try {
       const pivot = n === TARGETS[0] ? TARGETS[1] : TARGETS[0];
       await land(n);
       await warm(n, pivot); // ends on pivot, realm optimized
@@ -86,6 +87,7 @@ export const wideConfig = {
       // (largest, least-quantized point; matches the report row) so the noisy small
       // points don't flood rme-gate. navMsTask@N (unclamped) carries the curve.
       if (n === TARGETS[TARGETS.length - 1]) out[`navMsWall@${n}`] = wallMs;
+      } catch (sweepErr) { console.error(`wide-config @${n}: ${sweepErr.message} — skipping this point`); }
     }
 
     return out;

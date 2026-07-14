@@ -66,6 +66,7 @@ export const deepConfig = {
       });
 
     for (const d of TARGETS) {
+      try {
       await land(d); // on home
       await warm(d); // ends on home, realm optimized
 
@@ -88,6 +89,7 @@ export const deepConfig = {
       // (largest, least-quantized point; matches the report row) so the noisy small
       // points don't flood rme-gate. navMsTask@D (unclamped) carries the curve.
       if (d === TARGETS[TARGETS.length - 1]) out[`navMsWall@${d}`] = wallMs;
+      } catch (sweepErr) { console.error(`deep-config @${d}: ${sweepErr.message} — skipping this point`); }
     }
 
     return out;

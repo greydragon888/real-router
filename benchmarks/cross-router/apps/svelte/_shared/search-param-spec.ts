@@ -7,7 +7,7 @@
 // `useSearchParams`, react-router `useSearchParams`) to actually materialize, so the
 // comparison is apples-to-apples: cost to make all declared params *usable*, not the
 // fake "extract params the app then ignores" that a keys-only read measured.
-export const SEARCH_COUNTS = [1, 10, 50] as const;
+export const SEARCH_COUNTS = [1, 2, 4, 8, 16, 32, 64, 128, 256] as const;
 
 export function searchKeys(n: number): string[] {
   return Array.from({ length: n }, (_, i) => `k${i + 1}`);

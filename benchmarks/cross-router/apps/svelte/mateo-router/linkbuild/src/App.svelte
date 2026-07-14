@@ -10,7 +10,8 @@
   // mount-links → render 1000 <a use:routeAction>. mateo uses explicit href
   // strings (no reverse-matcher), so this isolates action-mount + <a> render
   // cost — the honest mateo counterpart to the other engines' href-builders.
-  const COUNT = 1000;
+  const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+  const COUNT = _n > 0 ? _n : 1000;
   const items: number[] = Array.from({ length: COUNT }, (_, i) => i);
   const routes: RouteConfig[] = [{ path: "/", component: Home }];
 

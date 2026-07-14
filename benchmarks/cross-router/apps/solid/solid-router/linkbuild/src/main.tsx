@@ -8,7 +8,8 @@ import { render } from "solid-js/web";
 import type { RouteDefinition } from "@solidjs/router";
 import type { JSX } from "solid-js";
 
-const COUNT = 1000;
+const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const COUNT = _n > 0 ? _n : 1000;
 
 function Home(): JSX.Element {
   const [show, setShow] = createSignal(false);

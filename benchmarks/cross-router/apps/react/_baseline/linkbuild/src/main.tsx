@@ -5,7 +5,8 @@ import { createRoot } from "react-dom/client";
 
 import type { JSX } from "react";
 
-const COUNT = 1000;
+const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const COUNT = _n > 0 ? _n : 1000;
 
 function App(): JSX.Element {
   const [show, setShow] = useState(false);

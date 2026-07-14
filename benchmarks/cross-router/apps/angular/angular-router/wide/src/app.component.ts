@@ -1,8 +1,9 @@
 import { Component } from "@angular/core";
 import { RouterLink, RouterOutlet } from "@angular/router";
 
-// WIDE_TARGETS — the sweep positions (item-10 / -100 / -1000) the driver clicks.
-const WIDE_TARGETS = [10, 100, 1000] as const;
+// Single source — sweep targets live in ./routes.ts (WIDE_COUNT derives from their max),
+// so the nav links and the route table can't drift.
+import { WIDE_TARGETS } from "./routes";
 
 @Component({
   selector: "app-root",

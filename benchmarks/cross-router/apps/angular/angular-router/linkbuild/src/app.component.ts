@@ -1,7 +1,8 @@
 import { Component, signal } from "@angular/core";
 import { RouterLink, RouterOutlet } from "@angular/router";
 
-const COUNT = 1000;
+const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const COUNT = _n > 0 ? _n : 1000;
 
 // The mount-links button flips `show`, rendering 1000 <a routerLink>. Each link
 // builds its href via the router (reverse-matching) — the measured cost.

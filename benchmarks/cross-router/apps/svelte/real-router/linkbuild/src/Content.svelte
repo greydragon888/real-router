@@ -5,7 +5,8 @@
   // the driver knows the whole batch committed.
   import { Link } from "@real-router/svelte";
 
-  const COUNT = 1000;
+  const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+  const COUNT = _n > 0 ? _n : 1000;
   const items: number[] = Array.from({ length: COUNT }, (_, i) => i);
 
   let show = $state(false);

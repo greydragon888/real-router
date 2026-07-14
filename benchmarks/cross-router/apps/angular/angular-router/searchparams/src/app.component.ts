@@ -1,7 +1,10 @@
 import { Component } from "@angular/core";
 import { RouterLink, RouterOutlet } from "@angular/router";
 
-const SEARCH_COUNTS = [1, 10, 50] as const;
+// Single source of truth — the nav links and the route table share ONE SEARCH_COUNTS
+// (a duplicated copy here silently broke angular-router search twice: links rendered
+// for the old counts while routes moved on → link-search-N never appeared → timeouts).
+import { SEARCH_COUNTS } from "./routes";
 
 @Component({
   selector: "app-root",

@@ -1,21 +1,34 @@
-// cold-start — app init + parse/exec cost to first route painted.
-// Fresh context per sample (measure.mjs) → cold cache.
+// cold-start — app init + parse/exec cost to first route painted, at a SINGLE small
+// route count (10, from `?n=`) — charted as a BAR, not a sweep (the boot floor is flat
+// 1→1000; the trie-build term only dominates at large tables, which we don't chart here).
+// Reuses the tableheap variant app
+// (builds N synthetic routes, renders one minimal view — so boot cost = bundle parse
+// + build N-route tree + first match + one paint, WITHOUT an N-link render muddying
+// it). The curve separates the FIXED bundle-parse cost from the trie-build term
+// (#1106): flat = boot is bundle-bound, rising = the route tree dominates at scale.
+//
+// COLD semantics: each measure.mjs sample is a fresh context (cold cache), so every
+// sample is a genuine cold boot at 10 routes (n = runs). `sampleIndex` rotation over
+// SIZES is retained for when a multi-size sweep is wanted, but degenerates to size 10
+// with a single-entry SIZES.
 //
 // Heap is read RETAINED (post-GC), not raw (#1454): `JSHeapUsedSize` right after FCP
-// includes the transient boot garbage (parse/exec/init allocations not yet collected)
-// — ~19-28% of the reading, and that fraction DIFFERS per engine, so the raw number
-// conflated footprint with garbage and produced misleading cross-engine gaps (the
-// angular "real-router heavier heap" was a garbage differential — retained is parity).
-// One `HeapProfiler.collectGarbage` (the same proven-stable path table-heap/nav-churn
-// use, RME < 0.01%) after the FCP wait yields the true retained footprint. The raw
-// pre-GC reading is kept as `jsHeapPreGcMB` (boot transient pressure — diagnostic).
+// includes transient boot garbage (~19-28%, engine-dependent). One
+// `HeapProfiler.collectGarbage` yields the true retained footprint; raw pre-GC kept as
+// `jsHeapPreGcMB` (diagnostic).
 import { forceGcHeapBytes, getMetrics } from "../harness/cdp.mjs";
+
+const SIZES = [10]; // single boot point — cold start at 10 routes (realistic small app; charted as a bar)
 
 export const coldStart = {
   name: "cold-start",
-  async run({ page, client, baseURL }) {
-    await page.goto(baseURL, { waitUntil: "load" });
-    await page.waitForSelector('[data-testid="page-home"]');
+  async run({ page, client, baseURL, sampleIndex = 0 }) {
+    const n = SIZES[sampleIndex % SIZES.length]; // one cold size per sample
+    try {
+    const url = new URL(baseURL);
+    url.searchParams.set("n", String(n));
+    await page.goto(url.href, { waitUntil: "load" });
+    await page.waitForSelector('[data-testid="page-ready"]');
 
     // Wait for the FCP entry via a buffered observer (reading synchronously
     // races the paint and returns 0 on some loads → bimodal/noisy).
@@ -40,17 +53,19 @@ export const coldStart = {
     );
 
     const m = await getMetrics(client);
-    // Retained footprint after one full GC — the honest heap headline. Read AFTER the
-    // raw metrics so `jsHeapPreGcMB` captures the pre-GC used heap (boot garbage incl).
+    // Retained footprint after one full GC — read AFTER raw metrics so jsHeapPreGcMB
+    // captures the pre-GC used heap (boot garbage incl).
     const retainedBytes = await forceGcHeapBytes(client);
 
     return {
-      fcpMs,
-      scriptDurationMs: m.ScriptDuration * 1000,
-      // layoutDurationMs dropped (#1462): consumed by no table, ~identical across all
-      // engines incl. _baseline (zero router signal) — a dead key, not a real axis.
-      jsHeapMB: retainedBytes / (1024 * 1024),
-      jsHeapPreGcMB: m.JSHeapUsedSize / (1024 * 1024),
+      [`fcpMs@${n}`]: fcpMs,
+      [`scriptDurationMs@${n}`]: m.ScriptDuration * 1000,
+      [`jsHeapMB@${n}`]: retainedBytes / (1024 * 1024),
+      [`jsHeapPreGcMB@${n}`]: m.JSHeapUsedSize / (1024 * 1024),
     };
+    } catch (coldErr) {
+      console.error(`cold-start @${n}: ${coldErr.message} — skipping this sample`);
+      return {};
+    }
   },
 };

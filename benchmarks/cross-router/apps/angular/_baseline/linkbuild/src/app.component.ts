@@ -1,5 +1,7 @@
 import { Component, signal } from "@angular/core";
 
+const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+
 // _baseline linkbuild — 1000 plain <a>, NO router. The FLOOR for link-build:
 // raw <a> render cost (href is a literal, no reverse-matcher).
 @Component({
@@ -21,7 +23,7 @@ import { Component, signal } from "@angular/core";
   `,
 })
 export class AppComponent {
-  readonly count = 1000;
+  readonly count = _n > 0 ? _n : 1000;
   readonly items = Array.from({ length: this.count }, (_, i) => i);
   readonly show = signal(false);
 }

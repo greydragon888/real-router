@@ -1,8 +1,11 @@
-// link-build — elapsed time to mount 1000 <Link>s at once. Each Link builds its
-// href via the router's reverse-matcher (buildPath / generatePath /
-// buildLocation), so this isolates href-construction + Link render from route
-// construction (done once at startup). A real cost for link-heavy pages: nav
-// menus, sitemaps, paginated lists.
+// link-build — elapsed time to mount N <Link>s at once, SWEPT 4 / 8 / … / 1024
+// (log-uniform ×2 steps — even coverage of the flat floor and the rising mount-cost tail;
+// link count comes from `?n=` at load). Each Link builds its href via the
+// router's reverse-matcher (buildPath / generatePath / buildLocation), so this
+// isolates href-construction + Link render from route construction (done once at
+// startup). A real cost for link-heavy pages: nav menus, sitemaps, paginated lists.
+// The CURVE shows whether mount cost is linear in link count and the SHAPE of the
+// component-<Link>-vs-plain-<a> gap (constant factor or growing).
 //
 // Measured as WALL-CLOCK from the mount click to the last link in the DOM: a
 // MutationObserver resolves on the microtask that inserts `last-link`, so no RAF
@@ -15,29 +18,40 @@
 // cost and ≈ the old `ScriptDuration` for the synchronous cohorts
 // (react/solid/svelte/angular mount in-task, so wall ≈ script there — the
 // numbers barely move; only Vue is un-blinded).
+const TARGETS = [4, 8, 16, 32, 64, 128, 256, 512, 1024]; // links mounted per page — the mount-cost axis
+
 export const linkBuild = {
   name: "link-build",
   async run({ page, baseURL }) {
-    await page.goto(baseURL, { waitUntil: "load" });
-    await page.waitForSelector('[data-testid="mount-links"]');
+    const out = {};
 
-    const mountMs = await page.evaluate(
-      () =>
-        new Promise((resolve) => {
-          const btn = document.querySelector('[data-testid="mount-links"]');
-          let t0 = 0;
-          const obs = new MutationObserver(() => {
-            if (document.querySelector('[data-testid="last-link"]')) {
-              obs.disconnect();
-              resolve(performance.now() - t0);
-            }
-          });
-          obs.observe(document.body, { childList: true, subtree: true });
-          t0 = performance.now();
-          btn.click();
-        }),
-    );
+    for (const count of TARGETS) {
+      try {
+      // ?n=<count> → the app renders `count` links on mount; `last-link` marks the Nth.
+      await page.goto(new URL(`?n=${count}`, baseURL).href, {
+        waitUntil: "load",
+      });
+      await page.waitForSelector('[data-testid="mount-links"]');
 
-    return { mountMs };
+      out[`mountMs@${count}`] = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const btn = document.querySelector('[data-testid="mount-links"]');
+            let t0 = 0;
+            const obs = new MutationObserver(() => {
+              if (document.querySelector('[data-testid="last-link"]')) {
+                obs.disconnect();
+                resolve(performance.now() - t0);
+              }
+            });
+            obs.observe(document.body, { childList: true, subtree: true });
+            t0 = performance.now();
+            btn.click();
+          }),
+      );
+      } catch (sweepErr) { console.error(`link-build @${count}: ${sweepErr.message} — skipping this point`); }
+    }
+
+    return out;
   },
 };

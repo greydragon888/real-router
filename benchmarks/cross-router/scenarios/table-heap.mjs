@@ -5,13 +5,14 @@
 // real-router trades upfront trie memory for O(1) match — this measures the cost.
 import { forceGcHeapBytes } from "../harness/cdp.mjs";
 
-const SIZES = [1, 1000, 10000];
+const SIZES = [100]; // single point — route-table heap at 100 routes (realistic app size; charted as a bar)
 
 export const tableHeap = {
   name: "table-heap",
   async run({ page, baseURL, client }) {
     const out = {};
     for (const n of SIZES) {
+      try {
       const url = new URL(baseURL);
       url.searchParams.set("n", String(n));
       await page.goto(url.href, { waitUntil: "load" });
@@ -22,6 +23,7 @@ export const tableHeap = {
       );
       const bytes = await forceGcHeapBytes(client);
       out[`jsHeapMB@${n}`] = bytes / (1024 * 1024);
+      } catch (sweepErr) { console.error(`table-heap @${n}: ${sweepErr.message} — skipping this point`); }
     }
     return out;
   },

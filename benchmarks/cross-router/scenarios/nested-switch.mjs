@@ -1,11 +1,15 @@
-// nested-switch — sibling switch under a shared layout (reuse axis), STEADY-STATE
-// toggle /sec/a ↔ /sec/b; the shared SectionLayout + ancestors are REUSED, only the
-// leaf swaps. Headline: unified wall-clock click→DOM-settle (`navMsWall`) + its
-// ΔTaskDuration twin (`navMsTask`) — capture async engines' microtask flush (#1451)
-// + Blink pushState (#1452); script/blink kept as DIAGNOSTICS, the broken additive
-// `totalMs = script + blink` retired. Settle = the leaf's `data-n` ATTRIBUTE.
+// nested-switch — sibling switch under a shared layout chain of DEPTH D (SWEPT
+// 1 / 2 / 4 / 8 / 16 / 32, powers of 2, from `?n=`). STEADY-STATE toggle the a↔b leaves at the BOTTOM of the
+// chain; every ancestor layout is REUSED, only the leaf swaps — so the curve tests
+// whether swap cost stays flat with depth (true parent reuse) or grows (the router
+// re-renders the reused chain). Depth lives in the app (nested route tree); the
+// driver just navigates to the deep `a` and toggles. Headline per depth =
+// `navMsTask@D` (CPU task-time, microtask-inclusive #1451 — carries the sub-ms
+// curve without perf.now's ~100µs wall clamp); `navMsWall@D` (endpoint) +
+// `scriptMs@D`/`blinkMs@D` diagnostics. Settle = the leaf's `data-n` attribute.
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
+const TARGETS = [1, 2, 4, 8, 16, 32]; // shared-layout depth above the a/b switch
 const WARMUP_NAVS = 6;
 const MEASURE_NAVS = 20;
 const BLINK_NAVS = 16;
@@ -13,9 +17,7 @@ const BLINK_NAVS = 16;
 export const nestedSwitch = {
   name: "nested-switch",
   async run({ page, client, baseURL }) {
-    await page.goto(new URL("sec/a", baseURL).href, { waitUntil: "load" });
-    await page.waitForSelector('[data-testid="page-item"]');
-    await page.waitForSelector('[data-testid="link-sec-b"]');
+    const out = {};
 
     const drive = (navs) =>
       page.evaluate(async (n) => {
@@ -30,20 +32,36 @@ export const nestedSwitch = {
         return performance.now() - t0;
       }, navs);
 
-    await drive(WARMUP_NAVS);
+    for (const depth of TARGETS) {
+      try {
+      // parent path of the a/b leaves at this depth: /sec/l2/.../l{depth}
+      let parent = "sec";
+      for (let k = 2; k <= depth; k++) parent += `/l${k}`;
+      // ?n=<depth> → the app builds a depth-deep nested route tree at load.
+      await page.goto(new URL(`${parent}/a?n=${depth}`, baseURL).href, {
+        waitUntil: "load",
+      });
+      await page.waitForSelector('[data-testid="page-item"]');
+      await page.waitForSelector('[data-testid="link-sec-b"]'); // chain built to bottom
 
-    const before = await getMetrics(client);
-    const wallTotalMs = await drive(MEASURE_NAVS);
-    const after = await getMetrics(client);
-    const navMsWall = wallTotalMs / MEASURE_NAVS;
-    const navMsTask =
-      ((after.TaskDuration - before.TaskDuration) * 1000) / MEASURE_NAVS;
-    const scriptDurationMs =
-      ((after.ScriptDuration - before.ScriptDuration) * 1000) / MEASURE_NAVS;
+      await drive(WARMUP_NAVS);
 
-    const blinkMs =
-      (await traceBlinkUs(client, () => drive(BLINK_NAVS))) / BLINK_NAVS / 1000;
+      const before = await getMetrics(client);
+      const wallTotalMs = await drive(MEASURE_NAVS);
+      const after = await getMetrics(client);
+      out[`navMsTask@${depth}`] =
+        ((after.TaskDuration - before.TaskDuration) * 1000) / MEASURE_NAVS;
+      out[`scriptMs@${depth}`] =
+        ((after.ScriptDuration - before.ScriptDuration) * 1000) / MEASURE_NAVS;
+      out[`blinkMs@${depth}`] =
+        (await traceBlinkUs(client, () => drive(BLINK_NAVS))) / BLINK_NAVS / 1000;
+      // navMsWall (perf.now ~100µs clamp) only at the deepest, least-quantized point.
+      if (depth === TARGETS[TARGETS.length - 1]) {
+        out[`navMsWall@${depth}`] = wallTotalMs / MEASURE_NAVS;
+      }
+      } catch (sweepErr) { console.error(`nested-switch @${depth}: ${sweepErr.message} — skipping this point`); }
+    }
 
-    return { navMsWall, navMsTask, scriptDurationMs, blinkMs };
+    return out;
   },
 };

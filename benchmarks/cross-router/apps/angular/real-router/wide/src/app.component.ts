@@ -1,8 +1,9 @@
 import { Component, computed, input } from "@angular/core";
 import { injectRoute, RealLink } from "@real-router/angular";
 
-// nav sweep targets (WIDE_TARGETS from apps/solid/_shared/wide-spec.ts).
-const WIDE_TARGETS = [10, 100, 1000] as const;
+// Single source — sweep targets live in ./routes.ts (WIDE_COUNT derives from their max),
+// so the nav links and the route table can't drift.
+import { WIDE_TARGETS } from "./routes";
 
 // Wide/deep leaf — `data-n` lets the sweep driver confirm it reached item N.
 @Component({
