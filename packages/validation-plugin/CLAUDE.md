@@ -22,7 +22,7 @@ The `RouterValidator` interface is organized into 8 namespaces, matching core's 
 | `lifecycle`    | `validateHandler`, `validateHandlerLimit`, `validateCountThresholds`                                                                                |
 | `navigation`   | `validateNavigateArgs`, `validateNavigateToDefaultArgs`, `validateNavigationOptions`, `validateParams`, `validateStartArgs`                                                   |
 | `state`        | `validateMakeStateArgs`, `validateAreStatesEqualArgs`                                                                                                                         |
-| `eventBus`     | `validateListenerArgs` — validates event names: `$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`                      |
+| `eventBus`     | `validateListenerArgs` — validates event names: `$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`; `validateCountThresholds` — proactive `warn@20% / error@50%` on the per-event listener count for `subscribe` / `addEventListener` (#1188), mirroring the plugins / lifecycle / dependencies counters |
 
 ## Gotchas
 

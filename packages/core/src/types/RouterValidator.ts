@@ -138,5 +138,10 @@ export interface RouterValidator {
    */
   eventBus: {
     validateListenerArgs: (name: unknown, cb: unknown) => void;
+    validateCountThresholds: (
+      count: number,
+      eventName: string,
+      methodName: string,
+    ) => void;
   };
 }
