@@ -251,6 +251,30 @@ export default tsEslint.config(
       ],
 
       // ============================================
+      // isolate(produce()) GUARD — throw-isolation class (#1477)
+      // ============================================
+      // An isolation wrapper must receive a RECIPE (a name / thunk), never a
+      // pre-produced value: passing a factory/compile CALL as its isolated
+      // argument evaluates the produce BEFORE the wrapper's try/catch (JS
+      // argument-evaluation order), leaking the produce-throw. This is the
+      // structural preventer for the throw-isolation class (#767 → #798 → #1222
+      // → #1476) that #1039 decreed but never built. Extend the selector list as
+      // new isolation wrappers are added — each `<wrapper>(produce())` re-opens
+      // the same anti-pattern. (Shape 2 — a lazy `producer().then().catch()`
+      // whose sync throw escapes the async-only `.catch`, #806/#1476 — is not
+      // syntactically distinguishable from any promise chain, so it is guarded by
+      // a per-site sync-throw test at each producer, not by this rule.)
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']",
+          message:
+            "isolate(produce()) anti-pattern (#1222/#1477): pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState)`.",
+        },
+      ],
+
+      // ============================================
       // STYLISTIC TYPE-CHECKED RULES (v8.0+)
       // ============================================
       // v8.0+: Prefer .find() over .filter()[0] for better performance
