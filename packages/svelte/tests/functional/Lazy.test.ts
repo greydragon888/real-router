@@ -97,6 +97,38 @@ describe("Lazy component", () => {
     );
   });
 
+  it("should show the error UI when the loader throws synchronously (#1476)", async () => {
+    const testError = new Error("sync loader boom");
+    // A loader that throws *before* returning a promise (init work before the
+    // dynamic import). The async `.catch` only covers the returned promise, so
+    // pre-fix the sync throw escapes the $effect and the component's own error
+    // UI is bypassed — same throw-isolation class as #806.
+    const loader: LazyLoader = vi.fn(() => {
+      throw testError;
+    });
+
+    render(LazyTest, {
+      props: {
+        router,
+        loader,
+        fallback: MockFallbackComponent,
+      },
+    });
+
+    await vi.waitFor(() => {
+      flushSync();
+
+      expect(screen.getByText(/Error loading component: /)).toBeInTheDocument();
+    });
+
+    const errorLine = screen.getByText(/Error loading component: /);
+
+    expect(errorLine.textContent).toBe(
+      "Error loading component: sync loader boom",
+    );
+    expect(screen.queryByTestId("loaded")).not.toBeInTheDocument();
+  });
+
   it("should call loader function on mount", () => {
     const loader: LazyLoader = vi.fn(() =>
       Promise.resolve({ default: MockLoadedComponent }),

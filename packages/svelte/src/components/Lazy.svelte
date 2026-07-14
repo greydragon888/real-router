@@ -20,7 +20,21 @@
     state = { status: "loading" };
     let active = true;
 
-    loader()
+    // Isolate a synchronously-throwing loader (#1476): a loader that throws
+    // *before* returning its promise (init work before the dynamic import) would
+    // otherwise escape the `.catch` below — the async channel only covers the
+    // returned promise — and bypass the error UI. The try/catch routes a sync
+    // throw into the same rejection path as an async failure, while still
+    // invoking the loader synchronously on mount (throw-isolation class, #806).
+    let pending: Promise<{ default: Component }>;
+
+    try {
+      pending = loader();
+    } catch (err) {
+      pending = Promise.reject(err);
+    }
+
+    pending
       .then((module) => {
         if (!active) return;
         if (!module || typeof module.default === "undefined") {
