@@ -3,8 +3,8 @@
 > The **canonical, tracked ledger** of *why* real-router loses or trails a competitor
 > in a cross-router benchmark cell. Every entry is a **root cause proven by
 > investigation** — a same-session A/B, a code trace, or an issue-backed fact — not a
-> guess. This complements the per-cohort `REPORT-{cohort}.md` (which narrate *what* the
-> numbers are) and the `status-tables.mjs --grid` matrix (which shows *the* verdict); this
+> guess. This complements the interactive infographic deck (built from `results/`, which
+> shows *what* the numbers are and *the* verdict); this
 > file answers **"is the red a weakness or a paid-for trade-off, and is it winnable?"**
 >
 > **Why this file exists:** we run many perf investigations. Their conclusions used to live

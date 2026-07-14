@@ -9,14 +9,18 @@ benchmarks/
 ├── cross-router/          # ⭐ the live suite — REAL Chromium (Playwright + CDP), all competitors, per-cohort
 │   ├── apps/<fw>/<engine>/    # engine-agnostic cohort shells (only routing differs)
 │   ├── scenarios/*.mjs        # engine-agnostic drivers (11 scenarios)
-│   ├── harness/*.mjs          # cdp · measure · stats · report · rme-gate · sanity-remeasure
-│   ├── run.mjs · run-all.mjs  # one cell / full matrix → results/ (gitignored)
-│   └── REPORT-react.md + REPORT-{vue,solid,svelte,angular}.md   # committed, curated results
+│   ├── harness/*.mjs          # cdp · measure · stats · rme-gate · sanity-remeasure
+│   └── run.mjs · run-all.mjs  # one cell / full matrix → results/ (gitignored — source for the deck)
 ├── audit-probes/     # committed `/deep-audit` regression probes (NOT a benchmark suite)
-└── bench-cross-router.sh  # sudo orchestrator: rebuild → readiness-gate → matrix → rme-gate → sanity → REPORT regen
+├── react-router-bug/ # isolated repro for react-router#15249 (surfaced by cross-router deep-config)
+└── bench-cross-router.sh  # sudo orchestrator: rebuild → readiness-gate → matrix → rme-gate → sanity
 ```
 
 > **2026-07-05:** the old `core/` mitata suite (real-router vs router5 / router6) and the `vs-tanstack/` jsdom suite (speed / memory-churn / bundle-size) were **removed** — both superseded by `cross-router/` (real browser, all current competitors). Git-recoverable; the TanStack stack-overflow finding lives in git history at `vs-tanstack/TANSTACK_STACK_OVERFLOW.md`.
+
+## Findings & isolated repros
+
+- **react-router #15249 — deep-route match blowup.** The cross-router `deep-config` sweep surfaced a non-monotonic (parabolic) match-cost curve for react-router; [`react-router-bug/`](react-router-bug/) isolates it to a pure-Node `matchRoutes()` repro — the identical URL match is **~10× slower in a 210-deep route tree than a 90-deep one** (routes *below* the match are re-scanned). Live chart (browser-measured, match + render, swept to depth 210): <https://claude.ai/code/artifact/58736d29-e694-4c20-9f0c-3469bbcb6c44>.
 
 ## Cross-Router — real browser, all competitors
 
@@ -29,10 +33,9 @@ Cohorts (each 2–3 FULL routers): **react** (real-router · react-router@8 · @
 ```bash
 sudo ./bench-cross-router.sh                    # full unattended refresh (all cohorts, sudo orchestrator)
 node cross-router/run-all.mjs 30 angular        # one cohort at n=30 → results/
-node cross-router/harness/report.mjs solid      # results/ → REPORT-solid.md
 ```
 
-**Full measured tables + caveats live in the committed [`cross-router/REPORT-react.md`](cross-router/REPORT-react.md)** (+ per-framework `REPORT-{vue,solid,svelte,angular}.md`). Design: [`.claude/cross-router-benchmarks-design.md`](../.claude/cross-router-benchmarks-design.md). See [`cross-router/CLAUDE.md`](CLAUDE.md) for the harness internals, metric map, and gotchas.
+**Results feed the interactive infographic deck** (rebuilt from `results/`); the committed text `REPORT-*.md` were **retired 2026-07-14** in favor of it. Design: [`.claude/cross-router-benchmarks-design.md`](../.claude/cross-router-benchmarks-design.md). See [`cross-router/CLAUDE.md`](CLAUDE.md) for the harness internals, metric map, and gotchas.
 
 ## Machine & stability
 
