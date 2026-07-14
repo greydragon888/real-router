@@ -1,5 +1,13 @@
 # @real-router/core
 
+## 0.76.0
+
+### Minor Changes
+
+- [#1471](https://github.com/greydragon888/real-router/pull/1471) [`943fa4e`](https://github.com/greydragon888/real-router/commit/943fa4efc26a68ad7b5d75d6a4a91ac485cdd10d) Thanks [@greydragon888](https://github.com/greydragon888)! - Call the validator's listener-count threshold from `subscribe` / `addEventListener` ([#1188](https://github.com/greydragon888/real-router/issues/1188))
+
+  `EventBusNamespace` now reads the per-event listener count and calls the opt-in `RouterValidator.eventBus.validateCountThresholds` on each `subscribe` / `addEventListener`, mirroring the plugins / lifecycle / dependencies counters. The new interface method and `wireEventBus` accessor are additive; without `@real-router/validation-plugin` the accessor returns `null` and the call is a no-op, so the bare-core hot path and the emitter's bare-`Error` hard cap are unchanged.
+
 ## 0.75.0
 
 ### Minor Changes
