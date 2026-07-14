@@ -567,6 +567,73 @@ describe("onNavigate orthogonality survives a throwing onEnter (#798)", () => {
 });
 
 // =============================================================================
+// onNavigate Orthogonality under throwing hook FACTORY (#1222)
+// =============================================================================
+
+describe("onNavigate orthogonality survives a throwing onEnter FACTORY (#1222)", () => {
+  test.prop([arbDistinctRouteNamePair], { numRuns: NUM_RUNS.standard })(
+    "a throwing onEnter factory (compile-throw) does not swallow onNavigate",
+    async ([fromRoute, toRoute]) => {
+      const onNavigate = vi.fn();
+      const boom = new Error("onEnter factory boom");
+      const throwingFactory: LifecycleHookFactory = () => {
+        throw boom;
+      };
+      const routes: Route[] = ["home", "about", "contact"].map((name) => ({
+        name,
+        path: name === "home" ? "/" : `/${name}`,
+        onEnter: throwingFactory,
+        onNavigate: () => onNavigate,
+      }));
+      const router = createRouter(routes, { defaultRoute: "home" });
+
+      router.usePlugin(lifecyclePluginFactory());
+
+      // The compile (factory) throw is isolated one seam earlier than the #798
+      // body throw and re-thrown asynchronously — capture it, restore listeners.
+      const rethrown: unknown[] = [];
+      const previousListeners = [...process.listeners("uncaughtException")];
+
+      process.removeAllListeners("uncaughtException");
+      const captureHandler = (error: unknown): void => {
+        rethrown.push(error);
+      };
+
+      process.on("uncaughtException", captureHandler);
+
+      try {
+        await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
+        await Promise.resolve();
+        await Promise.resolve();
+        onNavigate.mockClear();
+        rethrown.length = 0;
+
+        await router.navigate(toRoute);
+
+        await Promise.resolve();
+        await Promise.resolve();
+
+        const callsForTarget = onNavigate.mock.calls.filter(
+          ([toState]) => toState.name === toRoute,
+        );
+
+        // onEnter FACTORY threw, yet onNavigate still fired — the orthogonality
+        // invariant holds under a throwing factory, not just a throwing body.
+        expect(callsForTarget).toHaveLength(1);
+        expect(rethrown).toStrictEqual([boom]);
+      } finally {
+        process.removeListener("uncaughtException", captureHandler);
+        for (const listener of previousListeners) {
+          process.on("uncaughtException", listener);
+        }
+
+        router.stop();
+      }
+    },
+  );
+});
+
+// =============================================================================
 // Compilation Referential Stability
 // =============================================================================
 

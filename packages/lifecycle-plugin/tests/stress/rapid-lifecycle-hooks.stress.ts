@@ -228,32 +228,68 @@ describe("Rapid Lifecycle Hook Invocation", () => {
     }
   });
 
-  it("100 navigations with throwing hook factory: factory retried each time", async () => {
+  it("100 navigations with throwing hook factory: retried each time, sibling onNavigate still fires (#1222)", async () => {
     let factoryCallCount = 0;
     const throwingFactory: LifecycleHookFactory = () => {
       factoryCallCount++;
 
       throw new Error(`factory error ${factoryCallCount}`);
     };
+    let navCount = 0;
 
     router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "about", path: "/about", onEnter: throwingFactory },
+        {
+          name: "about",
+          path: "/about",
+          onEnter: throwingFactory,
+          onNavigate: () => () => {
+            navCount++;
+          },
+        },
       ],
       { defaultRoute: "home" },
     );
     router.usePlugin(lifecyclePluginFactory());
 
-    await router.start("/");
+    // The factory (compile) throw is isolated and re-thrown asynchronously —
+    // #1222 unifies it with the #798 body-throw channel. Capture the
+    // queueMicrotask re-throws so they don't fail the run, then restore.
+    const rethrown: unknown[] = [];
+    const previousListeners = [...process.listeners("uncaughtException")];
 
-    for (let i = 0; i < 100; i++) {
-      await router.navigate("about");
-      await router.navigate("home");
+    process.removeAllListeners("uncaughtException");
+    const captureHandler = (error: unknown): void => {
+      rethrown.push(error);
+    };
+
+    process.on("uncaughtException", captureHandler);
+
+    try {
+      await router.start("/");
+
+      for (let i = 0; i < 100; i++) {
+        await router.navigate("about");
+        await router.navigate("home");
+      }
+
+      // Drain queueMicrotask-scheduled re-throws.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Factory throws → hook not cached → factory retried each navigation.
+      expect(factoryCallCount).toBe(100);
+      // The throwing factory does NOT swallow the sibling onNavigate (#1222).
+      expect(navCount).toBe(100);
+      // Each compile-throw surfaced asynchronously (channel unified with #798).
+      expect(rethrown).toHaveLength(100);
+      expect(router.getState()?.name).toBe("home");
+    } finally {
+      process.removeListener("uncaughtException", captureHandler);
+      for (const listener of previousListeners) {
+        process.on("uncaughtException", listener);
+      }
     }
-
-    // Factory throws → hook not cached → factory retried each navigation to "about"
-    expect(factoryCallCount).toBe(100);
-    expect(router.getState()?.name).toBe("home");
   });
 });

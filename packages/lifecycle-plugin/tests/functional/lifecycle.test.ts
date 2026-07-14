@@ -648,6 +648,79 @@ describe("@real-router/lifecycle-plugin", () => {
 
       errorSpy.mockRestore();
     });
+
+    // #1222 — the compile (factory) throw is one seam earlier than the #798
+    // hook-body throw. It must be isolated the same way, else a throwing FACTORY
+    // (the common DI-init shape) swallows a sibling onNavigate and re-throws on
+    // every navigation (failed compile is not cached).
+    it("still fires onNavigate when the onEnter FACTORY throws (#1222)", async () => {
+      const boom = new Error("factory boomE");
+      const throwingFactory: LifecycleHookFactory = () => {
+        throw boom;
+      };
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "about",
+            path: "/about",
+            onEnter: throwingFactory,
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+
+      const rethrown = await withUncaughtCapture(async () => {
+        await router.navigate("about");
+      });
+
+      // Navigation still commits.
+      expect(router.getState()?.name).toBe("about");
+      // onNavigate is NOT swallowed by the throwing factory.
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      // The factory error surfaces via the SAME async channel as a body throw
+      // (#798), not the sync "Error in listener" sink — channel unified.
+      expect(rethrown).toStrictEqual([boom]);
+    });
+
+    it("still fires onNavigate when the onStay FACTORY throws (#1222)", async () => {
+      const boom = new Error("factory boomS");
+      const throwingFactory: LifecycleHookFactory = () => {
+        throw boom;
+      };
+      const onNavigate = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users.view",
+            path: "/users/:id",
+            onStay: throwingFactory,
+            onNavigate: () => onNavigate,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("users.view", { id: "1" });
+      onNavigate.mockClear();
+
+      const rethrown = await withUncaughtCapture(async () => {
+        await router.navigate("users.view", { id: "2" });
+      });
+
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      expect(rethrown).toStrictEqual([boom]);
+    });
   });
 
   describe("onLeave with failing activation guard", () => {
