@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Run the full matrix (every scenario × engine, per cohort) to populate results/,
-// then `node harness/report.mjs <fw>` turns results/ into REPORT[-<fw>].md.
+// Run the full matrix (every scenario × engine, per cohort) to populate results/
+// (the source the infographic deck is rebuilt from; text REPORT-*.md are retired).
 //   node cross-router/run-all.mjs [runs=15] [framework]
 // No framework arg → all cohorts (react + vue + solid + svelte) = the full matrix.
 // A framework arg restricts to that cohort, using its OWN engine roster.
@@ -66,6 +66,7 @@ let skipped = 0;
 // skipped; an engine whose scenario throws mid-run is dropped by measureInterleaved.
 const runScenario = async (framework, scenarioName, engineList) => {
   const scenario = SCENARIOS[scenarioName];
+  const started = Date.now();
   const apps = [];
   const servers = [];
   for (const engine of engineList) {
@@ -96,7 +97,7 @@ const runScenario = async (framework, scenarioName, engineList) => {
   if (apps.length === 0) return;
 
   console.error(
-    `\n=== ${framework} · ${scenarioName} × [${apps.map((a) => a.engine).join(", ")}] interleaved (runs=${runs}) ===`,
+    `\n=== ${framework} · ${scenarioName} × [${apps.map((a) => a.engine).join(", ")}] interleaved ===`,
   );
   let results;
   try {
@@ -127,6 +128,9 @@ const runScenario = async (framework, scenarioName, engineList) => {
     };
     if (writeCell(`${here}/results`, out, Number(runs))) ok += 1;
   }
+  console.error(
+    `  · ${scenarioName}: ${((Date.now() - started) / 1000).toFixed(1)}s`,
+  );
 };
 
 for (const framework of frameworks) {
@@ -143,7 +147,7 @@ for (const framework of frameworks) {
       if (isKnownNA(framework, scenarioName, engine)) {
         skipped += 1;
         console.error(
-          `⊘ ${framework} · ${scenarioName} × ${engine}: documented competitor N/A — skipped (see REPORT-${framework}.md)`,
+          `⊘ ${framework} · ${scenarioName} × ${engine}: documented competitor N/A — skipped (KNOWN_NA registry)`,
         );
         return false;
       }

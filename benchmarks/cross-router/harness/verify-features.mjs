@@ -2,7 +2,8 @@
 // Functional verification of the capability axes: for each (feature × engine)
 // that claims support, build the demo app, drive it with Playwright, and ASSERT
 // the feature actually works in-harness. Writes results/<fw>/features.json
-// ({feature: {engine: "verified"|"FAIL"}}) → report.mjs annotates the matrix.
+// ({feature: {engine: "verified"|"FAIL"}}) → results/features.json — a standalone
+// capability check (previously fed the retired REPORT capability matrix).
 // This is functional (pass/fail), NOT perf — these features cost sub-µs.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";

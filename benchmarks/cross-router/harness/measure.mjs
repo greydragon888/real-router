@@ -30,7 +30,7 @@ export async function measure({
 
       let sample;
       try {
-        sample = await scenario.run({ page, client, baseURL });
+        sample = await scenario.run({ page, client, baseURL, sampleIndex: i });
       } finally {
         await context.close();
       }
@@ -93,7 +93,12 @@ export async function measureInterleaved({
 
         let sample;
         try {
-          sample = await scenario.run({ page, client, baseURL: app.baseURL });
+          sample = await scenario.run({
+            page,
+            client,
+            baseURL: app.baseURL,
+            sampleIndex: i,
+          });
         } catch (error) {
           failed.add(app.engine);
           console.error(

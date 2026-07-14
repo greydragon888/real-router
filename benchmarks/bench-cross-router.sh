@@ -4,8 +4,8 @@
 # Sibling of bench-compare.sh.bak, but for the cross-router (Playwright + CDP) suite.
 #
 # Rebuilds every package's dist, gates on machine readiness for a ~3 h unattended
-# run, and — on success — runs the full n=15 matrix across all cohorts, then
-# regenerates each REPORT.
+# run, and — on success — runs the full n=15 matrix across all cohorts, writing
+# results/ (the source for the infographic deck; text REPORT-*.md are retired).
 #
 # ROOT vs USER split (why this is not a straight bench-compare.sh.bak clone):
 #   bench-compare.sh.bak runs its mitata workload AS ROOT (node-only, needs nice -20).
@@ -22,7 +22,7 @@
 #
 # Flow: preflight (power/thermal/apps) → disable distractions → rebuild all
 # package dist (pnpm bundle) → [optional n=1 smoke] → cooldown → per-cohort
-# n=15 matrix → rme-gate → sub-ms sanity re-measure (#1261) → REPORT regen,
+# n=15 matrix → rme-gate → sub-ms sanity re-measure (#1261),
 # with thermal cooldown + heavy-process recheck between cohorts.
 #
 # NOTE: deliberately NOT `set -e` — a 3 h unattended run must survive a single
@@ -59,7 +59,7 @@ show_help() {
     echo "Usage: sudo ./bench-cross-router.sh [OPTIONS] [COHORTS...]"
     echo ""
     echo "Rebuild all package dist, verify machine readiness, then run the full"
-    echo "cross-router (Playwright + CDP) matrix and regenerate the REPORTs."
+    echo "cross-router (Playwright + CDP) matrix, writing results/ for the deck."
     echo ""
     echo "Arguments:"
     echo "  COHORTS     Subset of: $ALL_COHORTS (default: all)"
@@ -137,6 +137,17 @@ if [[ "$ORIGINAL_USER" == "root" ]]; then
     echo "Chromium cannot launch as root."
     exit 1
 fi
+
+# Save the full run to a timestamped, gitignored log (an artifact — a ~2 h run is easy
+# to lose to terminal scrollback). tee keeps it live on-console too; chown so the
+# invoking user (not root) owns it.
+RUN_LOG_DIR="$SCRIPT_DIR/cross-router/run-logs"
+mkdir -p "$RUN_LOG_DIR"
+LOGFILE="$RUN_LOG_DIR/run-$(date +%Y%m%d-%H%M%S).log"
+touch "$LOGFILE"
+chown "$ORIGINAL_USER" "$RUN_LOG_DIR" "$LOGFILE" 2>/dev/null || true
+exec > >(tee -a "$LOGFILE") 2>&1
+echo "Logging this run to: $LOGFILE"
 
 # Reconstruct the invoking user's HOME / shell / PATH: the workload runs as them,
 # but sudo resets the environment, so we must rebuild what their login shell sets
@@ -372,7 +383,13 @@ echo -e "${GREEN}File system caches purged${NC}"
 # system-critical process (WindowServer, kernel_task) or the benchmark's own node/vite/
 # Chromium. If the script is hard-killed (SIGKILL) before cleanup, recover with
 # `killall -CONT <name>` (or just reboot). Extend via env: BENCH_QUIET_EXTRA="name ...".
-QUIET_DAEMONS="mediaanalysisd photoanalysisd photolibraryd NotificationCenter ${BENCH_QUIET_EXTRA:-}"
+# sysmond = the system-monitor daemon (feeds Activity Monitor / stats — NOT `ps`/`pmset`,
+# which read the kernel directly, so pausing it doesn't blind our own readiness checks).
+# SIP-protected daemons that refuse SIGSTOP just fall through the guard below (harmless).
+# NOTE: fontd is deliberately NOT here — Chromium needs it to render text (fresh context
+# per sample re-resolves fonts), so pausing it stalls renders. Try at your own risk via
+# BENCH_QUIET_EXTRA="fontd".
+QUIET_DAEMONS="mediaanalysisd photoanalysisd photolibraryd NotificationCenter sysmond ${BENCH_QUIET_EXTRA:-}"
 QUIETED=""
 for d in $QUIET_DAEMONS; do
     if pgrep -x "$d" >/dev/null 2>&1 && killall -STOP "$d" 2>/dev/null; then
@@ -441,21 +458,10 @@ LAST_COHORT="${COHORTS[${#COHORTS[@]}-1]}"   # bash 3.2: no ${arr[-1]}
 FAILED_COHORTS=""
 RME_FLAGGED=""
 SANITY_FLAGGED=""
-REPORT_FAILED=""
 
 for cohort in "${COHORTS[@]}"; do
     banner "Cohort: $cohort  (n=$RUNS)"
-
-    # react-only: capability demos feed report.mjs's ✓ⁱ matrix (verify-features
-    # is hardcoded to FW=react). Skipped for other cohorts (no such apps).
-    if [[ "$cohort" == "react" ]]; then
-        echo -e "${BLUE}  Verifying capability features (react)...${NC}"
-        if as_user "cd '$SCRIPT_DIR' && node cross-router/harness/verify-features.mjs"; then
-            echo -e "${GREEN}  ✓ capability features verified${NC}"
-        else
-            echo -e "${YELLOW}  ⚠ verify-features failed — react capability matrix may be stale${NC}"
-        fi
-    fi
+    cohort_start=$SECONDS
 
     # Perf matrix. run-all continues past a failed cell but exits 1 if any failed;
     # we tally and move on (a flaky cell must not kill the remaining cohorts).
@@ -496,13 +502,8 @@ for cohort in "${COHORTS[@]}"; do
         fi
     fi
 
-    # Regenerate the committed REPORT from results/.
-    if as_user "cd '$SCRIPT_DIR' && node cross-router/harness/report.mjs $cohort"; then
-        echo -e "${GREEN}  ✓ REPORT regenerated${NC}"
-    else
-        echo -e "${RED}  ⚠ report.mjs $cohort failed${NC}"
-        REPORT_FAILED="$REPORT_FAILED $cohort"
-    fi
+    cohort_elapsed=$((SECONDS - cohort_start))
+    echo -e "${BLUE}  ⏱ $cohort cohort: $((cohort_elapsed / 60))m $((cohort_elapsed % 60))s${NC}"
 
     if [[ "$cohort" != "$LAST_COHORT" ]]; then
         echo ""
@@ -519,12 +520,12 @@ echo ""
 banner "Cross-Router Benchmark Complete"
 echo "  Elapsed: $((SECONDS / 60)) min ($((SECONDS / 3600))h $(((SECONDS % 3600) / 60))m)"
 echo "  Cohorts run: ${COHORTS[*]} (n=$RUNS)"
-echo "  Results:  $SCRIPT_DIR/cross-router/results/<cohort>/ (gitignored)"
-echo "  REPORTs:  $SCRIPT_DIR/cross-router/REPORT[-<cohort>].md (regenerated)"
+echo "  Results:  $SCRIPT_DIR/cross-router/results/<cohort>/ (gitignored — source for the infographic deck)"
+echo "  Log:      $LOGFILE"
 echo ""
 if [[ -n "$FAILED_COHORTS" ]]; then
     echo -e "${RED}  ⚠ cohorts with failed matrix cells:$FAILED_COHORTS${NC}"
-    echo -e "${RED}    → re-run those cohorts; REPORTs from partial results may be incomplete.${NC}"
+    echo -e "${RED}    → re-run those cohorts before rebuilding the deck.${NC}"
 fi
 if [[ -n "$RME_FLAGGED" ]]; then
     echo -e "${YELLOW}  ⚠ cohorts flagged by the RME gate:$RME_FLAGGED${NC}"
@@ -539,11 +540,8 @@ if [[ -n "$LOAD_FLAGGED" ]]; then
     echo -e "${YELLOW}  ⚠ heavy processes appeared mid-run (after cohorts:$LOAD_FLAGGED)${NC}"
     echo -e "${YELLOW}    → sub-ms cells measured near those points are suspect.${NC}"
 fi
-if [[ -n "$REPORT_FAILED" ]]; then
-    echo -e "${RED}  ⚠ REPORT regeneration failed for:$REPORT_FAILED${NC}"
-fi
-if [[ -z "$FAILED_COHORTS" && -z "$RME_FLAGGED" && -z "$SANITY_FLAGGED" && -z "$LOAD_FLAGGED" && -z "$REPORT_FAILED" ]]; then
-    echo -e "${GREEN}  ✓ clean run — all cohorts complete, RME + sub-ms sanity clean, REPORTs regenerated.${NC}"
-    echo -e "${GREEN}    Review git diff of cross-router/REPORT*.md, then commit.${NC}"
+if [[ -z "$FAILED_COHORTS" && -z "$RME_FLAGGED" && -z "$SANITY_FLAGGED" && -z "$LOAD_FLAGGED" ]]; then
+    echo -e "${GREEN}  ✓ clean run — all cohorts complete, RME + sub-ms sanity clean.${NC}"
+    echo -e "${GREEN}    Rebuild the infographic deck from results/.${NC}"
 fi
 echo ""

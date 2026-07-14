@@ -36,6 +36,7 @@ export const VARIANT = {
   "deep-config": "deep",
   "search-param-scaling": "searchparams",
   "table-heap": "tableheap",
+  "cold-start": "tableheap", // reuses the N-route/minimal-render app for a boot sweep
   "link-build": "linkbuild",
   "nested-switch": "nested",
   "active-links": "links",
