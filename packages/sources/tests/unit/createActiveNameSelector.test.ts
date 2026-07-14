@@ -5,6 +5,27 @@ import { createActiveNameSelector } from "../../src";
 
 import type { Router } from "@real-router/core";
 
+// #1478: the per-name recompute (`areRoutesRelated` / `isActiveNonStrict`) cannot
+// throw with the real pure-string impl, so the latent-seam guard is verified by
+// injecting the throw it must isolate — `areRoutesRelated` throws for the
+// synthetic name "__throws__", simulating a future param-aware / predicate
+// recompute that CAN throw. All other names delegate to the real impl, so every
+// other test is unaffected.
+vi.mock(import("@real-router/route-utils"), async (importOriginal) => {
+  const actual = await importOriginal();
+
+  return {
+    ...actual,
+    areRoutesRelated(route1: string, route2: string): boolean {
+      if (route1 === "__throws__") {
+        throw new Error("recompute boom");
+      }
+
+      return actual.areRoutesRelated(route1, route2);
+    },
+  };
+});
+
 describe("createActiveNameSelector", () => {
   let router: Router;
 
@@ -135,6 +156,52 @@ describe("createActiveNameSelector", () => {
       await Promise.resolve();
 
       expect(rethrown).toStrictEqual([thrown]);
+    } finally {
+      process.removeListener("uncaughtException", captureHandler);
+      for (const listener of previousListeners) {
+        process.on("uncaughtException", listener);
+      }
+    }
+  });
+
+  it("isolates a throwing per-name recompute — later names still notified (#1478)", async () => {
+    const selector = createActiveNameSelector(router);
+    const laterNameSurvivor = vi.fn();
+
+    // Capture the asynchronously re-thrown recompute error before vitest's
+    // default uncaughtException handler fails the test (mirrors the #767 capture).
+    const rethrown: unknown[] = [];
+    const previousListeners = [...process.listeners("uncaughtException")];
+
+    process.removeAllListeners("uncaughtException");
+    const captureHandler = (error: unknown): void => {
+      rethrown.push(error);
+    };
+
+    process.on("uncaughtException", captureHandler);
+
+    try {
+      // "__throws__" (mocked `areRoutesRelated` throws for it) is iterated FIRST;
+      // the real name "home" flips on the same navigation and is iterated LATER.
+      // The per-name recompute runs OUTSIDE the per-listener `try`, so without
+      // per-name isolation the throw unwinds the shared subscribe callback and
+      // skips "home" — structurally the #767 failure mode one level up (#1478).
+      selector.subscribe("__throws__", () => {});
+      selector.subscribe("home", laterNameSurvivor);
+
+      // home → users.list: "home" flips true → false (would notify the survivor).
+      await router.navigate("users.list");
+
+      // A later-iterated name is NOT skipped by the recompute throw.
+      expect(laterNameSurvivor).toHaveBeenCalledTimes(1);
+
+      // Drain the microtask queue so the queueMicrotask(throw) lands.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The genuine recompute error still surfaces asynchronously (not swallowed).
+      expect(rethrown).toHaveLength(1);
+      expect((rethrown[0] as Error).message).toBe("recompute boom");
     } finally {
       process.removeListener("uncaughtException", captureHandler);
       for (const listener of previousListeners) {
