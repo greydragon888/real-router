@@ -5,7 +5,6 @@ import { createActiveRouteSource } from "@real-router/sources";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { injectRouter } from "../../src/functions/injectRouter";
-import { buildActiveRouteOptions } from "../../src/internal/buildActiveRouteOptions";
 import { createStableParams } from "../../src/internal/createStableParams";
 import { subscribeSourceToSignal } from "../../src/internal/subscribeSourceToSignal";
 import { provideRealRouter } from "../../src/providers";
@@ -83,7 +82,7 @@ describe("createStableParams", () => {
             this.router,
             "users",
             this.stableParams(),
-            buildActiveRouteOptions(false, true, undefined),
+            { strict: false, ignoreQueryParams: true },
           );
 
           this.recreations++;

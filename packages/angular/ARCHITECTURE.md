@@ -65,8 +65,7 @@ src/                            # Main entry — client API
 │   └── index.ts
 ├── internal/                   # Internal helpers (not re-exported from src/index.ts)
 │   ├── install.ts              # installScrollRestoration + installViewTransitions — shared by providers + providersFactory
-│   ├── subscribeSourceToSignal.ts  # subscribe → setState → cleanup pattern used by RealLink/RealLinkActive/RouteView
-│   └── buildActiveRouteOptions.ts  # Builds ActiveRouteSourceOptions honoring exactOptionalPropertyTypes
+│   └── subscribeSourceToSignal.ts  # subscribe → setState → cleanup pattern used by RealLink/RealLinkActive/RouteView
 ├── directives/                 # Directives
 │   ├── RouteMatch.ts           # ng-template[routeMatch] — segment marker
 │   ├── RouteSelf.ts            # ng-template[routeSelf] — exact-match slot for the node itself
