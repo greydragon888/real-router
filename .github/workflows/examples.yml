@@ -24,7 +24,12 @@ env:
 jobs:
   examples:
     name: Build & Test Examples
-    runs-on: ubuntu-latest
+    # Build-only job on the self-hosted VPS runner. examples.yml triggers on
+    # schedule + workflow_dispatch ONLY (no fork-PR) → no self-hosted RCE surface.
+    # E2E + notify-failure stay on ubuntu-latest: E2E's Playwright/Electron
+    # downloads need a one-time VPS pre-install (RU-network DPI), and notify must
+    # run even if the VPS is offline.
+    runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v7
