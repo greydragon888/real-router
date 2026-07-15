@@ -59,6 +59,7 @@ Each lag carries three tags:
 | angular | nav-latency/param/nested/active/back-fwd/churn | *(was up to ~4× behind)* | `DEFERRED-COMMIT` (zoneless async CD) | **A/B-proven** | ✅ `FIXED` (#1466 — sync-commit) |
 | angular | cold-start, table-heap | 3.1×, +70% | `EAGER-CORE`, `SCALE-FLOOR` | code-traced | `STRUCTURAL` |
 | react, vue | deep-config @90 | +71% / +82% | `COMPETITOR-ARTIFACT` (react-router/vue-router non-monotonic parabola) | inferred | `ARTIFACT` |
+| react | search-param-scaling | 🔴 +48% (0.53 vs 0.36 ms @256, both sub-ms) | `IMMUTABLE-STATE` (eager O(count) materialize; react-router's eager read is lighter) | measured one-realm n=50 | `STRUCTURAL` (rr does more per pass) |
 | vue | active-links | ~~🔴 +55%~~ → **rr WINS 4.3×** | `COMPETITOR-ARTIFACT` (bench-app: rr shell subscribed to route over N `<Link>`; vue-router isolates in `<RouterView>`) | **A/B-proven** | ✅ `FIXED` (#1483 — bench-app view-isolation) |
 | vue | nav-churn | 🟡 +2% | `IMMUTABLE-STATE` / near-floor | inferred | `NOISE`/`STRUCTURAL` |
 
@@ -101,6 +102,16 @@ Each lag carries three tags:
 - **A/B (same-session, drift-cancelled, n=20):** baseline `<Link>` **0.093–0.095** · rr `use:link` **0.085** · sv-router **0.080**.
 - **Root cause:** ~8 µs is the `<Link>` component tax (buildHref re-derive on `routeParams` change + component render); ~5 µs is the core `IMMUTABLE-STATE` floor (fresh frozen state per nav; sv-router mutates a signal). `use:link` takes it +16% → +6%, **but does not flip** — the residual is the immutable-state floor, structural.
 - **Verdict:** `STRUCTURAL`. Not winnable even with plain-`<a>`; same axes as the rest of the svelte cohort. The immutable-state residual is a `v2-CANDIDATE` (RFC-6 snapshot-store).
+
+### react search-param-scaling — `IMMUTABLE-STATE` eager O(count) floor → **STRUCTURAL** · one-realm measurement fix (2026-07-16)
+
+- **Number:** rr 0.532 vs react-router 0.360 ms @256 params (+48%, RME 4%, n=50); both sub-ms. rr rises O(count) from a ~0.18 ms floor (2.9× floor→256); react-router reads eagerly too but into a lighter structure and stays ~flat.
+- **Measurement fix (one-realm):** search-param-scaling was rewritten to **one-realm** measurement (`goto` once → warm the whole count range → measure each `pivot→N` nav in the warm realm; no per-point `land()` reload). This killed the first-point cold-realm bump: `navMsTask@1/@2` **1.20–1.53× → 0.90–1.00× in all 5 cohorts** (@1 now the smallest workload — physically correct). rr react @256 **0.865 (per-point cold) → 0.532 (one-realm)**.
+- **Steepness suspicion RESOLVED — was a cold artifact, not adapter cost:** the pre-fix "rr grows steepest on react (3.12×) + angular (3.08×)" was mostly cold-realm inflation. **angular fully converged** — @256 **0.362 ms, now the lowest of all cohorts** (ratio → 2.48×, in the vue/solid pack). react keeps only a **~0.15 ms** real VDOM-re-render residual over the ~0.37 ms vue/solid/angular floor. Not a #1483-class bench-app bug — the searchparams app is view-isolated (leaf renders O(1): one `count·Σchecksum` line).
+- **Root cause of the react lag:** rr eagerly materializes all 256 params into fresh immutable state each nav (O(count)); react-router does less per pass. Same `IMMUTABLE-STATE` family as nav-churn / param-nav. rr **WINS the other 4 cohorts** (vue 1.35×, solid 17×, svelte 1.74×, angular 8.6× vs best rival) — the lazy routers explode (TanStack 6–12 ms, solid-router 15 ms); react-router is the lone competitor that also reads eagerly and stays light.
+- **New observation (NOT a lag — rr wins):** svelte is now rr's **steepest** search-param cohort (@256 0.566 ms, 3.58× floor) yet rr still WINS svelte (sv-router 0.985, mateo 1.237). Likely compiled-reactivity O(count) read; sub-ms, small-signal. Logged for completeness, no issue.
+- **gc-per-nav side-effect:** one-realm shifted rr's measured `allocKBPerNav` up ~20% every cohort (warm steady-state; rr code unchanged — react 217→237, vue 92→113, solid 140→160, svelte 91→112, angular 86→106 KB). Story intact (rr lightest in vue/solid/svelte/angular; react-router edges rr 87 vs 237). Deck blurbs synced.
+- **Verdict:** `STRUCTURAL`. Sub-ms; eager-immutable materialization is the trade-off that buys the flat floor + O(1) matching. Not winnable without abandoning eager-immutable state.
 
 ---
 
