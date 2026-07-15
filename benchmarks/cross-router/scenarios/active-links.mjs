@@ -1,5 +1,5 @@
 // active-links — per-navigation active-state recompute across a SWEEP of mounted
-// link counts (4 / 8 / 16 / … / 1024 — log-uniform ×2 steps, so the flat O(1) floor
+// link counts (4 / 8 / 16 / … / 256 — log-uniform ×2 steps, so the flat O(1) floor
 // and the rising O(N) tail get even coverage). STEADY-STATE toggle /tab/1 ↔ /tab/2; every mounted
 // link recomputes active each nav, so cost ∝ link count — the curve is the O(1)
 // shared-source (flat) vs O(N) per-link (rising) signal. Link count comes from `?n=`
@@ -10,7 +10,7 @@
 // page's `data-n` attribute flip (the N-link recompute + render completes as it flips).
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
-const TARGETS = [4, 8, 16, 32, 64, 128, 256, 512, 1024]; // links mounted per page — the active-recompute axis
+const TARGETS = [4, 8, 16, 32, 64, 128, 256]; // links mounted per page — the active-recompute axis (capped at 256 = the deck's endpoint; each point costs ∝ N × navs, and 512/1024 were ~75% of runtime for points the deck no longer charts)
 const WARMUP_NAVS = 6;
 const MEASURE_NAVS = 20;
 const BLINK_NAVS = 16;
@@ -32,6 +32,19 @@ export const activeLinks = {
         }
         return performance.now() - t0;
       }, navs);
+
+    // Pre-sweep warmup (#1453 class): the first goto in a fresh context is colder than
+    // the rest (one-time app parse/compile), so the first swept point reads slightly
+    // high vs its warm neighbours. Warm the realm once (goto + WARMUP_NAVS toggles)
+    // so every measured point is steady-state.
+    try {
+      await page.goto(new URL(`tab/1?n=32`, baseURL).href, { waitUntil: "load" });
+      await page.waitForSelector('[data-testid="page-tab"]');
+      await page.waitForSelector('[data-testid="link-tab-32"]');
+      await drive(WARMUP_NAVS);
+    } catch (warmErr) {
+      console.error(`active-links warmup: ${warmErr.message}`);
+    }
 
     for (const count of TARGETS) {
       try {

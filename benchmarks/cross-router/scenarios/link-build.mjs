@@ -1,4 +1,4 @@
-// link-build — elapsed time to mount N <Link>s at once, SWEPT 4 / 8 / … / 1024
+// link-build — elapsed time to mount N <Link>s at once, SWEPT 4 / 8 / … / 256
 // (log-uniform ×2 steps — even coverage of the flat floor and the rising mount-cost tail;
 // link count comes from `?n=` at load). Each Link builds its href via the
 // router's reverse-matcher (buildPath / generatePath / buildLocation), so this
@@ -18,22 +18,17 @@
 // cost and ≈ the old `ScriptDuration` for the synchronous cohorts
 // (react/solid/svelte/angular mount in-task, so wall ≈ script there — the
 // numbers barely move; only Vue is un-blinded).
-const TARGETS = [4, 8, 16, 32, 64, 128, 256, 512, 1024]; // links mounted per page — the mount-cost axis
+const TARGETS = [4, 8, 16, 32, 64, 128, 256]; // links mounted per page — the mount-cost axis (capped at 256 = the deck's endpoint; 512/1024 were ~75% of runtime for points the deck no longer charts)
 
 export const linkBuild = {
   name: "link-build",
   async run({ page, baseURL }) {
     const out = {};
 
-    for (const count of TARGETS) {
-      try {
-      // ?n=<count> → the app renders `count` links on mount; `last-link` marks the Nth.
-      await page.goto(new URL(`?n=${count}`, baseURL).href, {
-        waitUntil: "load",
-      });
-      await page.waitForSelector('[data-testid="mount-links"]');
-
-      out[`mountMs@${count}`] = await page.evaluate(
+    // Mount N links, resolving with the wall-clock ms from click to the Nth link in
+    // the DOM (a MutationObserver fires on the microtask that inserts `last-link`).
+    const mountMeasure = () =>
+      page.evaluate(
         () =>
           new Promise((resolve) => {
             const btn = document.querySelector('[data-testid="mount-links"]');
@@ -49,6 +44,30 @@ export const linkBuild = {
             btn.click();
           }),
       );
+
+    // Pre-sweep warmup (#1453 class): the FIRST goto+mount in a fresh context pays a
+    // one-time V8 parse + bytecode-compile + cold-cache cost that later points don't
+    // (once any mount has run, the path is compiled). Without it the first swept point
+    // reads ~4x its true cost — a universal cold-start floor, NOT per-link work: the
+    // bare-framework `_baseline` shows the identical @4-vs-@8 hook. One throwaway
+    // mount warms the path so every measured point is steady-state.
+    try {
+      await page.goto(new URL(`?n=32`, baseURL).href, { waitUntil: "load" });
+      await page.waitForSelector('[data-testid="mount-links"]');
+      await mountMeasure();
+    } catch (warmErr) {
+      console.error(`link-build warmup: ${warmErr.message}`);
+    }
+
+    for (const count of TARGETS) {
+      try {
+      // ?n=<count> → the app renders `count` links on mount; `last-link` marks the Nth.
+      await page.goto(new URL(`?n=${count}`, baseURL).href, {
+        waitUntil: "load",
+      });
+      await page.waitForSelector('[data-testid="mount-links"]');
+
+      out[`mountMs@${count}`] = await mountMeasure();
       } catch (sweepErr) { console.error(`link-build @${count}: ${sweepErr.message} — skipping this point`); }
     }
 

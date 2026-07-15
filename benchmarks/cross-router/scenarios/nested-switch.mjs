@@ -32,6 +32,21 @@ export const nestedSwitch = {
         return performance.now() - t0;
       }, navs);
 
+    // Pre-sweep warmup (#1453 class): the first goto in a fresh context is colder than
+    // the rest (one-time app parse/compile), so the first swept depth reads slightly
+    // high vs its warm neighbours. Warm the realm once (goto a mid depth + toggles)
+    // so every measured point is steady-state.
+    try {
+      let wparent = "sec";
+      for (let k = 2; k <= 8; k++) wparent += `/l${k}`;
+      await page.goto(new URL(`${wparent}/a?n=8`, baseURL).href, { waitUntil: "load" });
+      await page.waitForSelector('[data-testid="page-item"]');
+      await page.waitForSelector('[data-testid="link-sec-b"]');
+      await drive(WARMUP_NAVS);
+    } catch (warmErr) {
+      console.error(`nested-switch warmup: ${warmErr.message}`);
+    }
+
     for (const depth of TARGETS) {
       try {
       // parent path of the a/b leaves at this depth: /sec/l2/.../l{depth}
