@@ -1,5 +1,13 @@
 # @real-router/solid
 
+## 0.16.19
+
+### Patch Changes
+
+- [#1485](https://github.com/greydragon888/real-router/pull/1485) [`c9f596c`](https://github.com/greydragon888/real-router/commit/c9f596cc3ff5202117d4a237ca5fb37ec05d9f33) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `use:link` opening a duplicate active-route source for no-params links
+
+  The `use:link` directive fed the `EMPTY_PARAMS` (`{}`) default into `createActiveRouteSource` instead of the raw `routeParams`, keying the sources cache as `"{}"` instead of the canonical `""` (the [#776](https://github.com/greydragon888/real-router/issues/776) adapter contract). A no-params `use:link` with `activeClassName` therefore opened a second cached source and a second router subscription for the same question a sibling `<Link>` already answered. The active-state result is unchanged — the fix restores the single shared subscription. ([#1438](https://github.com/greydragon888/real-router/issues/1438))
+
 ## 0.16.18
 
 ### Patch Changes
