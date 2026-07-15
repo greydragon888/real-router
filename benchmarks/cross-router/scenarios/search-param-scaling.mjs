@@ -1,20 +1,28 @@
-// search-param-scaling — QUERY-param handling cost by count (sweep 1 … 256
-// query params, the realistic marketplace/analytics vector — cf. path params which
-// top out at ~4). Headline per size = the UNIFIED wall-clock click→DOM-settle
-// (`navMsWall@N`, felt) + its ΔTaskDuration twin (`navMsTask@N`) — both capture the
-// microtask-flush work `ScriptDuration` is BLIND to (#1451, which matters here: lazy
-// routers materialize query values in a reactive microtask). `scriptMs@N` is a ⚠
-// DIAGNOSTIC (V8-only) and `blinkMs@N` a diagnostic; the additive `totalMs@N` is
-// RETIRED. The leaf reads EVERY query VALUE (not just keys), so lazy routers must
-// materialize — apples-to-apples "cost to make all params usable". Read the CURVE.
-// COUNTS mirrors SEARCH_COUNTS in apps/_shared/search-param-spec.ts (keep in sync).
+// search-param-scaling — QUERY-param handling cost by count (sweep 1 … 256 query
+// params, the realistic marketplace/analytics vector — cf. path params which top out
+// at ~4). Headline per size = the UNIFIED wall-clock click→DOM-settle (`navMsWall@N`,
+// felt) + its ΔTaskDuration twin (`navMsTask@N`) — both capture the microtask-flush
+// work `ScriptDuration` is BLIND to (#1451: lazy routers materialize query values in a
+// reactive microtask). `scriptMs@N` is a ⚠ DIAGNOSTIC (V8-only), `blinkMs@N` a
+// diagnostic; the additive `totalMs@N` is RETIRED. The leaf reads EVERY query VALUE
+// (not just keys) so lazy routers must materialize — apples-to-apples "cost to make all
+// params usable". Read the CURVE. COUNTS mirrors SEARCH_COUNTS in
+// apps/_shared/search-param-spec.ts (keep in sync).
 //
-// STEADY-STATE, not cold first-nav (#1453): every `land()` is a full reload that
-// resets V8 to interpreted code, so a single post-reload nav measured the cold
-// interpreter (per-engine penalty poisons cross-engine @N absolutes). Fix: warm the
-// realm with WARM_NAVS in-document navs (toggling count↔pivot via the persistent nav)
-// before the ONE measured nav — the query-parse cost is source-independent, so the
-// count CURVE is unchanged; only the cold-JIT floor is removed.
+// ONE-REALM measurement (supersedes the per-point-reload #1453 warm). Unlike the
+// depth/link-count sweeps, search-param's count is CLIENT-navigable — clicking
+// link-search-N rewrites the query with no page reload — so every point is measured in
+// a SINGLE page load: goto once, warm the realm across the whole count range, then time
+// each pivot→N nav IN that warm realm. This removes the first-point elevation the old
+// per-point `land()` reload caused: each `land()` started a fresh V8 realm (JIT feedback
+// + ICs gone), so the first swept point was measured coldest and read ~1.3× its steady
+// cost — a per-point-cold-realm artifact the in-realm `warm()` could NOT remove (the
+// next `land()` destroyed it). A direction/position probe confirmed all single-nav
+// transitions are symmetric ~0.19 ms in a warmed realm. Absolutes now reflect the true
+// steady-state per-nav cost; the flat-then-O(count) SHAPE is unchanged. (The
+// depth/link-count sweeps can't do this — their N is a load-time param, so per-point
+// reload stays forced and their small first-point bump is an accepted, cross-engine-
+// uniform artifact.)
 import {
   getMetrics,
   sampleAllocationBytes,
@@ -22,7 +30,7 @@ import {
 } from "../harness/cdp.mjs";
 
 const COUNTS = [1, 2, 4, 8, 16, 32, 64, 128, 256];
-const WARM_NAVS = 12; // in-realm navs to reach optimized steady state before measuring
+const WARM_PASSES = 5; // full sweeps of the count range to tier-up the realm before measuring
 const ALLOC_NAVS = 60;
 
 export const searchParamScaling = {
@@ -30,9 +38,9 @@ export const searchParamScaling = {
   async run({ page, client, baseURL }) {
     const out = {};
 
-    // One optimized nav to search-`count`, timed click→settle (perf.now) — settle
-    // closes on the async render flush so wall AND ΔTaskDuration capture the reactive
-    // materialization microtask ScriptDuration misses (#1451). Returns wall ms.
+    // One nav to search-`count`, timed click→settle (perf.now) — settle closes on the
+    // async render flush so wall AND ΔTaskDuration capture the reactive materialization
+    // microtask ScriptDuration misses (#1451). Returns wall ms.
     const navTo = (count) =>
       page.evaluate(async (c) => {
         const t0 = performance.now();
@@ -42,59 +50,55 @@ export const searchParamScaling = {
         );
         return performance.now() - t0;
       }, count);
-    const land = async (n) => {
-      await page.goto(baseURL, { waitUntil: "load" });
-      await page.waitForSelector(`[data-testid="link-search-${n}"]`);
-    };
-    // Warm V8 in-realm by toggling count↔pivot (both parse-exercising navs via the
-    // persistent nav), ending on pivot so the measured navTo(n) is one optimized
-    // pivot→N nav. Settles only on the universal `page-search[data-count]` (#1453).
-    const warm = (count, pivot) =>
-      page.evaluate(
-        async ([c, p, rounds]) => {
-          const { settle } = window.__navMetric;
-          for (let i = 0; i < rounds; i++) {
-            document.querySelector(`[data-testid="link-search-${c}"]`).click();
-            await settle(`[data-testid="page-search"][data-count="${c}"]`);
-            document.querySelector(`[data-testid="link-search-${p}"]`).click();
-            await settle(`[data-testid="page-search"][data-count="${p}"]`);
-          }
-        },
-        [count, pivot, WARM_NAVS / 2],
-      );
+
+    // Load ONCE, then warm the whole realm across the count range so every measured
+    // point below is timed in a fully tiered-up realm (no per-point reload → no
+    // first-point cold-realm bump).
+    await page.goto(baseURL, { waitUntil: "load" });
+    await page.waitForSelector(`[data-testid="link-search-${COUNTS[0]}"]`);
+    for (let p = 0; p < WARM_PASSES; p++) {
+      for (const c of COUNTS) await navTo(c);
+    }
 
     for (const n of COUNTS) {
       try {
-      const pivot = n === COUNTS[0] ? COUNTS[1] : COUNTS[0];
-      await land(n);
-      await warm(n, pivot); // ends on pivot, realm optimized
+        const pivot = n === COUNTS[0] ? COUNTS[1] : COUNTS[0];
+        // Reach `pivot` via a REAL n→pivot transition — never a no-op click on the
+        // count we're already on (that leaves a transient bleeding into the very next
+        // measured window). navTo(n) first guarantees pivot is arrived at from a
+        // different count, so every point's measured nav is a clean pivot→N.
+        await navTo(n);
+        await navTo(pivot);
 
-      // measured pass — ONE optimized pivot→N nav: wall + task + script (⚠ diag).
-      const before = await getMetrics(client);
-      const wallMs = await navTo(n);
-      const after = await getMetrics(client);
-      const navMsTask =
-        (after.TaskDuration - before.TaskDuration) * 1000;
-      const scriptMs = (after.ScriptDuration - before.ScriptDuration) * 1000;
+        // measured pass — ONE nav pivot→N: wall + task + script (⚠ diag).
+        const before = await getMetrics(client);
+        const wallMs = await navTo(n);
+        const after = await getMetrics(client);
+        out[`navMsTask@${n}`] =
+          (after.TaskDuration - before.TaskDuration) * 1000;
+        out[`scriptMs@${n}`] =
+          (after.ScriptDuration - before.ScriptDuration) * 1000;
 
-      // Blink diagnostic — same nav from the same pivot, traced (pushState work).
-      await navTo(pivot); // reset N→pivot
-      const blinkMs = (await traceBlinkUs(client, () => navTo(n))) / 1000;
+        // Blink diagnostic — same nav from the same pivot, traced (pushState work).
+        await navTo(pivot);
+        out[`blinkMs@${n}`] =
+          (await traceBlinkUs(client, () => navTo(n))) / 1000;
 
-      out[`navMsTask@${n}`] = navMsTask;
-      out[`scriptMs@${n}`] = scriptMs;
-      out[`blinkMs@${n}`] = blinkMs;
-      // navMsWall is perf.now clamp-quantized (~100 µs) → emit ONLY at the endpoint
-      // (largest, least-quantized point; matches the report row) so the noisy small
-      // points don't flood rme-gate. navMsTask@N (unclamped) carries the curve.
-      if (n === COUNTS[COUNTS.length - 1]) out[`navMsWall@${n}`] = wallMs;
-      } catch (sweepErr) { console.error(`search-param-scaling @${n}: ${sweepErr.message} — skipping this point`); }
+        // navMsWall is perf.now clamp-quantized (~100 µs) → emit ONLY at the endpoint
+        // (largest, least-quantized point; matches the report row) so the noisy small
+        // points don't flood rme-gate. navMsTask@N (unclamped) carries the curve.
+        if (n === COUNTS[COUNTS.length - 1]) out[`navMsWall@${n}`] = wallMs;
+      } catch (sweepErr) {
+        console.error(
+          `search-param-scaling @${n}: ${sweepErr.message} — skipping this point`,
+        );
+      }
     }
 
-    // Allocation pass — GC pressure of high-count query handling (@max <-> @min
-    // toggle; both leaves read ALL their values). The eager-vs-lazy allocation
-    // contrast: eager immutable params reference URL-parsed strings (flat) while
-    // parse / validate / structural-share pipelines produce O(count) garbage.
+    // Allocation pass — same warm realm; GC pressure of high-count query handling
+    // (@max <-> @min toggle; both leaves read ALL their values). The eager-vs-lazy
+    // allocation contrast: eager immutable params reference URL-parsed strings (flat)
+    // while parse / validate / structural-share pipelines produce O(count) garbage.
     const hi = COUNTS[COUNTS.length - 1];
     const lo = COUNTS[0]; // pivot leaf (lowest count)
     const driveToggle = (navs) =>
@@ -119,14 +123,16 @@ export const searchParamScaling = {
       );
 
     try {
-      await land(hi);
+      await navTo(hi); // establish in-realm (was land(hi) — no reload needed)
       await driveToggle(8); // warmup (discarded)
       out.allocKBPerNav =
         (await sampleAllocationBytes(client, () => driveToggle(ALLOC_NAVS))) /
         ALLOC_NAVS /
         1024;
     } catch (allocErr) {
-      console.error(`search-param-scaling alloc @${hi}: ${allocErr.message} — skipping allocKBPerNav`);
+      console.error(
+        `search-param-scaling alloc @${hi}: ${allocErr.message} — skipping allocKBPerNav`,
+      );
     }
 
     return out;
