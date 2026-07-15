@@ -63,18 +63,6 @@ export const searchParamScaling = {
         [count, pivot, WARM_NAVS / 2],
       );
 
-    // Pre-sweep warmup (#1453 first-point): the per-point warm() tiers up the nav path,
-    // but TurboFan tier-up ACCUMULATES across points — the first measured point (@1)
-    // has the fewest accumulated nav executions in the isolate and reads ~1.2-2.5x high
-    // (worst on heavier frameworks: angular ~2.5x). One extra land+warm cycle before the
-    // loop lifts point 1 to the same steady state as its neighbours.
-    try {
-      await land(COUNTS[0]);
-      await warm(COUNTS[0], COUNTS[1]);
-    } catch (warmErr) {
-      console.error(`search-param-scaling pre-warmup: ${warmErr.message}`);
-    }
-
     for (const n of COUNTS) {
       try {
       const pivot = n === COUNTS[0] ? COUNTS[1] : COUNTS[0];
