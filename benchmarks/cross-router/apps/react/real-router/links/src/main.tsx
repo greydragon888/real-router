@@ -25,10 +25,28 @@ router.usePlugin(browserPluginFactory());
 
 await router.start();
 
-function App(): JSX.Element {
+// The route-dependent <main> lives in its own route-subscribed component, so the
+// App shell that mounts the N <Link>s does NOT call useRoute() and never
+// re-renders on navigation — mirrors react-router's <Outlet> app. Without this,
+// App's useRoute() re-renders the whole shell every nav, re-creating all N
+// <Link> elements → O(N) reconciliation per navigation (memo softens the child
+// re-render, but the shell walk is still O(N)). Symmetric with the vue variant.
+function TabView(): JSX.Element {
   const { route } = useRoute();
   const n = route.name.startsWith("tab") ? route.name.slice(3) : "";
 
+  return n ? (
+    <main data-testid="page-tab" data-n={n}>
+      <h1>Tab {n}</h1>
+    </main>
+  ) : (
+    <main data-testid="page-home">
+      <h1>Home</h1>
+    </main>
+  );
+}
+
+function App(): JSX.Element {
   return (
     <>
       <nav>
@@ -43,15 +61,7 @@ function App(): JSX.Element {
           </Link>
         ))}
       </nav>
-      {n ? (
-        <main data-testid="page-tab" data-n={n}>
-          <h1>Tab {n}</h1>
-        </main>
-      ) : (
-        <main data-testid="page-home">
-          <h1>Home</h1>
-        </main>
-      )}
+      <TabView />
     </>
   );
 }

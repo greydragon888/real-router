@@ -22,36 +22,50 @@ router.usePlugin(browserPluginFactory());
 
 await router.start();
 
-const App = defineComponent({
+// The route-dependent <main> lives in its own route-subscribed component, so the
+// App shell that mounts the N <Link>s does NOT call useRoute() and never
+// re-renders on navigation — mirrors vue-router's <RouterView> app, where only
+// the matched view re-renders while the N links stay mounted untouched. Without
+// this, App's useRoute() re-renders the whole shell every nav, re-creating all N
+// <Link> vnodes → O(N) VDOM reconciliation per navigation (the #1483 lag was
+// this bench-app asymmetry, not the adapter: rr's active-source is already
+// O(1)+O(changed) via createActiveNameSelector).
+const TabMain = defineComponent({
   setup() {
     const { route } = useRoute();
     return () => {
       const { name } = route.value;
       const n = name.startsWith("tab") ? name.slice(3) : "";
-      return (
-        <>
-          <nav>
-            {tabs.map((i) => (
-              <Link
-                key={i}
-                routeName={`tab${i}`}
-                activeClassName="active"
-                data-testid={`link-tab-${i}`}
-              >
-                Tab {i}
-              </Link>
-            ))}
-          </nav>
-          {n ? (
-            <main data-testid="page-tab" data-n={n}>
-              Tab {n}
-            </main>
-          ) : (
-            <main data-testid="page-home">Home</main>
-          )}
-        </>
+      return n ? (
+        <main data-testid="page-tab" data-n={n}>
+          Tab {n}
+        </main>
+      ) : (
+        <main data-testid="page-home">Home</main>
       );
     };
+  },
+});
+
+const App = defineComponent({
+  setup() {
+    return () => (
+      <>
+        <nav>
+          {tabs.map((i) => (
+            <Link
+              key={i}
+              routeName={`tab${i}`}
+              activeClassName="active"
+              data-testid={`link-tab-${i}`}
+            >
+              Tab {i}
+            </Link>
+          ))}
+        </nav>
+        <TabMain />
+      </>
+    );
   },
 });
 

@@ -59,10 +59,10 @@ Each lag carries three tags:
 | angular | nav-latency/param/nested/active/back-fwd/churn | *(was up to ~4× behind)* | `DEFERRED-COMMIT` (zoneless async CD) | **A/B-proven** | ✅ `FIXED` (#1466 — sync-commit) |
 | angular | cold-start, table-heap | 3.1×, +70% | `EAGER-CORE`, `SCALE-FLOOR` | code-traced | `STRUCTURAL` |
 | react, vue | deep-config @90 | +71% / +82% | `COMPETITOR-ARTIFACT` (react-router/vue-router non-monotonic parabola) | inferred | `ARTIFACT` |
-| vue | active-links | 🔴 +55% | `FRAMEWORK-NATIVE` (vue-router native per-link reactivity at floor) | inferred | `STRUCTURAL` |
+| vue | active-links | ~~🔴 +55%~~ → **rr WINS 4.3×** | `COMPETITOR-ARTIFACT` (bench-app: rr shell subscribed to route over N `<Link>`; vue-router isolates in `<RouterView>`) | **A/B-proven** | ✅ `FIXED` (#1483 — bench-app view-isolation) |
 | vue | nav-churn | 🟡 +2% | `IMMUTABLE-STATE` / near-floor | inferred | `NOISE`/`STRUCTURAL` |
 
-**Cross-cohort read:** real-router's red is concentrated on **four structural axes** — eager-core boot, `<Link>`-component vs plain-`<a>`, immutable-state allocation, and matcher/table scale-floor — plus the competitor's own framework-native lightness. None is a per-nav *slowness* of the core (per-nav, real-router leads every cohort). The one genuinely-addressable class, `DEFERRED-COMMIT`, was found and fixed (#1466).
+**Cross-cohort read:** real-router's red is concentrated on **four structural axes** — eager-core boot, `<Link>`-component vs plain-`<a>`, immutable-state allocation, and matcher/table scale-floor — plus the competitor's own framework-native lightness. None is a per-nav *slowness* of the core (per-nav, real-router leads every cohort). **Two** genuinely-addressable classes have now been found and closed: `DEFERRED-COMMIT` (#1466, adapter sync-commit) and a bench-app `COMPETITOR-ARTIFACT` (#1483 — the vue active-links "lag" was the rr links-app subscribing its `<Link>`-mounting shell to route; aligning it to the competitor's view-isolation flips rr from −2.15× to **+4.3×** and O(N)→O(changed)). Neither was an adapter or core cost.
 
 ---
 
@@ -74,6 +74,17 @@ Each lag carries three tags:
 - **Root cause (A/B-proven):** under zoneless change detection the route source notifies **synchronously** from `router.navigate()`, but a route-state read in a template only re-renders on Angular's **asynchronously scheduled** CD flush. `@angular/router` commits its `<router-outlet>` imperatively in-task; the adapter deferred.
 - **Fix:** `RouteView` + `injectRoute`/`injectRouteNode` call a local `detectChanges()` from the source callback (fires outside Angular CD, so it's safe — mirrors `RealLink`'s direct-DOM write). Same-session A/B: nav-latency 0.97 → 0.07 (~13×). n=50 @`622b27be`: real-router now leads `@angular/router` on all six per-nav wall axes.
 - **Lesson:** a deferred-commit lag *is* addressable — look for a scheduler hop between the source notify and the view commit.
+
+### vue + react active-links — `COMPETITOR-ARTIFACT` (bench-app shell subscribed to route) → **FIXED (bench-app view-isolation)**
+
+- **Was:** rr *appeared* to lose vue active-links to vue-router (@256 `navMsTask` **1.19 ms** vs **0.55 ms**, +115% / 2.15×, RME <1%) — framed as the one cohort where a framework-native router beats rr on active-links (#1483, "O(N) render per nav").
+- **Root cause (A/B-proven):** NOT the adapter and NOT a `FRAMEWORK-NATIVE` floor. The rr links **bench-app** subscribed its root `App` shell to `useRoute()` (to render the inline `<main>`), so every navigation re-rendered the whole shell — re-creating all N `<Link>` vnodes → **O(N) VDOM reconciliation per nav**. vue-router's app isolates the route-dependent view in `<RouterView>` (react-router in `<Outlet>`), so its `<Link>`-mounting shell never re-renders. rr's active-source (`createActiveNameSelector`) is already O(1) subscription + O(changed) notify (#1416) — it was never the cost. Sites: `apps/vue/real-router/links/src/main.tsx`, `apps/react/real-router/links/src/main.tsx`.
+- **Fix:** move the route-dependent `<main>` into its own route-subscribed component, so the shell that mounts the N `<Link>`s does not call `useRoute()` and never re-renders on navigation — mirroring the competitor's view-isolation.
+- **A/B (same-session, drift-cancelled ≤1%, n=20, navMsTask@256):**
+  - **vue:** rr-current **1.19** (slope 11×, O(N)) → rr-fixed **0.128** (slope 1.6×, **O(changed)**) vs vue-router **0.55** (slope 3.4×, O(N)). Fixed rr **BEATS vue-router 4.3×** — and is O(changed) where vue-router is O(N). Fix gain 9.3×.
+  - **react** (symmetry, same VDOM class): rr-current **0.464** (slope 3.5×, `memo`-softened) → rr-fixed **0.156** (slope 1.4×, **O(changed)**) vs react-router **2.04** (slope 8.4×). rr already won; fix extends the lead to ~13×.
+- **Verdict:** `COMPETITOR-ARTIFACT` — an unfair bench-app (the rr shell did O(N) work the competitor's view-isolated shell doesn't), not an rr cost. Applies to the **VDOM** cohorts (vue, react); the **fine-grained** cohorts (solid `<For>`, svelte runes) don't cascade a shell re-render into the N Links, so they were never affected (inferred N/A — angular uses OnPush + injected route, likewise isolated). Reframes #1483: rr active-links is O(changed) and *wins* once the app is view-isolated like the competitor.
+- **Lesson:** a per-cohort "lag" can live entirely in the **bench-app's component structure**. When the competitor uses view-isolation (`RouterView` / `Outlet`) and the rr app inlines a route read over the mounted-link list, the rr app pays an O(N) shell re-render the competitor never does — align the app structure before ruling the adapter slow. (Same class as #1456 mateo — an unequal app measuring different work — but here it was rr's own app doing *more*.)
 
 ### svelte nested-switch — `<Link>`-COMPONENT (active-class flip) → **FEATURE-COST**
 
