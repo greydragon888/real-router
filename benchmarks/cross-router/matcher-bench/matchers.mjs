@@ -46,7 +46,10 @@ function storeFile(pkg, sub) {
   throw new Error(`matcher-bench: cannot locate ${pkg}/${sub} under ${PNPM}`);
 }
 
-export const N_SWEEP = [4, 8, 16, 32, 64, 128, 256, 512, 1024];
+// wide-config deck shows powers of 4 [4,16,64,256] (linearity proven → few points suffice),
+// so the isolated runner measures exactly those — no unused points. (Full-sweep scaling to
+// 1024, e.g. react-router 185× / @angular 219×, lives in git history + the standalone probe.)
+export const N_SWEEP = [4, 16, 64, 256];
 const range = (n) => Array.from({ length: n }, (_, i) => i + 1);
 const URL_OF = (n) => `/catalog/item-${n}`; // worst-case target = the last route
 
@@ -155,6 +158,43 @@ const LOADERS = {
       check: (r) => r && r.match !== undefined && !!r.match,
     };
   },
+  // @angular/router's index needs the JIT compiler for its decorators, so load
+  // @angular/compiler first (what platform-browser-dynamic does), from the angular app
+  // dir where @angular/* resolve. recognize() is not public; its core is: parse the URL,
+  // then walk the config calling the public defaultUrlMatcher until a route consumes ALL
+  // segments (the recognizer rejects partial/leftover matches). Faithful O(N); the
+  // absolute is a lower bound on the full recognizer (which adds per-route snapshot/guard
+  // work on top of the path match).
+  "angular-router": async () => {
+    const ngReq = createRequire(
+      path.join(CROSS_ROOT, "apps/angular/angular-router/wide") + "/",
+    );
+    const ngImp = (p) => import(pathToFileURL(ngReq.resolve(p)).href);
+    await ngImp("@angular/compiler"); // side-effect: install JIT
+    const R = await ngImp("@angular/router");
+    const PRIMARY = R.PRIMARY_OUTLET ?? "primary";
+    const ser = new R.DefaultUrlSerializer();
+    const { defaultUrlMatcher } = R;
+    return {
+      build(n) {
+        const routes = [
+          { path: "" },
+          ...range(n).map((i) => ({ path: `catalog/item-${i}` })),
+        ];
+        const tree = ser.parse(URL_OF(n));
+        const group = tree.root.children[PRIMARY] ?? tree.root;
+        const segs = group.segments;
+        return () => {
+          for (const route of routes) {
+            const m = defaultUrlMatcher(segs, group, route);
+            if (m && m.consumed.length === segs.length) return m;
+          }
+          return null;
+        };
+      },
+      check: (r) => r != null,
+    };
+  },
 };
 
 // real-router + tanstack are framework-agnostic matchers → measured in every cohort as
@@ -164,7 +204,7 @@ export const COHORTS = {
   vue: ["real-router", "vue-router", "tanstack"],
   solid: ["real-router", "solid-router", "tanstack"],
   svelte: ["real-router", "sv-router"],
-  angular: ["real-router"],
+  angular: ["real-router", "angular-router"],
 };
 
 // Competitors whose matcher can't be isolated headless — surfaced in output so the deck
@@ -176,14 +216,6 @@ export const HOLDOUTS = {
       class: "O(N)",
       reason:
         "matcher is a Svelte-runes RouterInstance method; O(N) by source (iterate routes + route.test(path))",
-    },
-  ],
-  angular: [
-    {
-      id: "angular-router",
-      class: "O(N)",
-      reason:
-        "needs Angular JIT/platform to run headless; O(N) already clean in the browser card (0.56→2.96 ms, rme ~1%)",
     },
   ],
 };

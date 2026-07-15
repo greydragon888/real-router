@@ -53,9 +53,14 @@ input (the `O(1)` constant of input marshalling does not change a curve's slope)
 | vue-router | `router.resolve(url)` | `vue-router` |
 | solid-router | `getRouteMatches(createBranches(routes), url)` | direct file `@solidjs/router/dist/routing.js` |
 | sv-router | `matchRoute(url, routes)` | direct file `sv-router/src/helpers/match-route.js` |
+| @angular/router | parse + `defaultUrlMatcher` walk | load `@angular/compiler` (JIT) first, then `@angular/router` |
 
 `@solidjs/router` and `sv-router` are client-only at their package **index** but expose a
 pure matcher in an internal file, imported directly from the pnpm store (hash-free glob).
+`@angular/router`'s index needs the JIT compiler for its decorators, so `@angular/compiler`
+is imported first (what `platform-browser-dynamic` does); `recognize()` isn't public, so its
+core is replicated with the public `defaultUrlMatcher` (walk the config until a route
+consumes all segments) — a faithful `O(N)`, absolute is a lower bound on the full recognizer.
 
 ## Result — the O-class map
 
@@ -70,6 +75,7 @@ Isolated µs per match at N = 1024 (representative run):
 | solid-router | O(N) branch scan | ~125 | ~238× |
 | sv-router | O(N·log N) sort + scan | ~250 | ~337× |
 | react-router | O(N) flatten + rank per call | ~2328 | ~185× |
+| @angular/router | O(N) recognizer walk | ~92 | ~219× |
 
 (Absolutes are Node V8 and vary with the machine; the **O-class and shape** are what the
 card reports. react-router's absolute includes re-flattening branches every call — its
@@ -77,13 +83,9 @@ public `matchRoutes` does this; `createBrowserRouter` may amortize it across nav
 
 ## Holdouts
 
-Two competitors cannot be isolated headless; both are **O(N)** by other evidence and keep
-that verdict from the browser card:
+One competitor cannot be isolated headless; it is **O(N)** by other evidence and keeps that
+verdict from the browser card:
 
-- **@angular/router** — needs Angular's JIT/platform to run outside a browser. Its `O(N)`
-  is already clean in the Playwright card (`0.56 → 2.96 ms`, rme ~1 %): angular is the one
-  cohort whose matcher is expensive enough to clear the render-noise floor, so the browser
-  card there is already honest and does not need this harness.
 - **@mateothegreat/svelte5-router** — its matcher is a method on a Svelte-runes
   `RouterInstance` class (needs the runes runtime). `O(N)` by source: the router iterates
   its routes and calls `route.test(path)` on each.
