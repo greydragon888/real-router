@@ -134,8 +134,7 @@ function createBrowserPlugin(
 
   // Cache the current URL fragment instead of reading location.hash on every
   // navigation (#532). A per-nav `location.*` read forces the browser to commit
-  // the pending pushState synchronously (~0.04 ms/nav — see
-  // benchmarks/cross-router/VUE_NAV_DECOMPOSITION.md). The cache stays fresh via
+  // the pending pushState synchronously (~0.04 ms/nav). The cache stays fresh via
   // (a) the plugin's own navigations (set in onTransitionSuccess) and (b) a
   // hashchange listener for *external* fragment changes (anchor clicks,
   // `location.hash = …`) — exactly what the per-nav read used to detect.
