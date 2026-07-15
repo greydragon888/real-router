@@ -52,7 +52,12 @@ permissions:
 jobs:
   benchmarks:
     name: Core hot-path benchmarks
-    runs-on: ubuntu-latest
+    # Self-hosted VPS runner = consistent hardware, which fixes the #984 cause (GitHub's
+    # heterogeneous ubuntu-latest pool put base/head on different CPUs → phantom
+    # instruction-count swings). PHASE 1: workflow_dispatch-only verification before
+    # enabling push/PR triggers (see the DISABLED block above). SECURITY: keep fork-PR
+    # code OFF this runner — Phase 2 gates pull_request to same-repo only.
+    runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v7
