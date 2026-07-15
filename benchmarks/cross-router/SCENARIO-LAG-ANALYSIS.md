@@ -109,7 +109,7 @@ Each lag carries three tags:
 - **Measurement fix (one-realm):** search-param-scaling was rewritten to **one-realm** measurement (`goto` once → warm the whole count range → measure each `pivot→N` nav in the warm realm; no per-point `land()` reload). This killed the first-point cold-realm bump: `navMsTask@1/@2` **1.20–1.53× → 0.90–1.00× in all 5 cohorts** (@1 now the smallest workload — physically correct). rr react @256 **0.865 (per-point cold) → 0.532 (one-realm)**.
 - **Steepness suspicion RESOLVED — was a cold artifact, not adapter cost:** the pre-fix "rr grows steepest on react (3.12×) + angular (3.08×)" was mostly cold-realm inflation. **angular fully converged** — @256 **0.362 ms, now the lowest of all cohorts** (ratio → 2.48×, in the vue/solid pack). react keeps only a **~0.15 ms** real VDOM-re-render residual over the ~0.37 ms vue/solid/angular floor. Not a #1483-class bench-app bug — the searchparams app is view-isolated (leaf renders O(1): one `count·Σchecksum` line).
 - **Root cause of the react lag:** rr eagerly materializes all 256 params into fresh immutable state each nav (O(count)); react-router does less per pass. Same `IMMUTABLE-STATE` family as nav-churn / param-nav. rr **WINS the other 4 cohorts** (vue 1.35×, solid 17×, svelte 1.74×, angular 8.6× vs best rival) — the lazy routers explode (TanStack 6–12 ms, solid-router 15 ms); react-router is the lone competitor that also reads eagerly and stays light.
-- **New observation (NOT a lag — rr wins):** svelte is now rr's **steepest** search-param cohort (@256 0.566 ms, 3.58× floor) yet rr still WINS svelte (sv-router 0.985, mateo 1.237). Likely compiled-reactivity O(count) read; sub-ms, small-signal. Logged for completeness, no issue.
+- **New observation (NOT a lag — rr wins):** svelte is now rr's **steepest** search-param cohort (@256 0.566 ms, 3.58× floor, **monotonic**, rme 3.2%) yet rr still WINS svelte (sv-router 0.985, mateo 1.237). **Bench-app equality code-confirmed (2026-07-16):** react/solid/svelte leaves all run the identical `_shared/search-param-spec` `readSearch(Object.entries(params))` over the same 9-`<Link>` nav (not 256) — no svelte-specific extra work. The steeper slope is the **per-param constant of Svelte's `$derived` recompute** — O(count) contribution ~0.40 ms @256 vs react VDOM ~0.35, solid fine-grained ~0.21 (solid's floor dilutes its ratio to 1.4×; svelte's low floor + high slope reads as a late spike). Framework reactivity, not app or router-core. Sub-ms, structural, no issue.
 - **gc-per-nav side-effect:** one-realm shifted rr's measured `allocKBPerNav` up ~20% every cohort (warm steady-state; rr code unchanged — react 217→237, vue 92→113, solid 140→160, svelte 91→112, angular 86→106 KB). Story intact (rr lightest in vue/solid/svelte/angular; react-router edges rr 87 vs 237). Deck blurbs synced.
 - **Verdict:** `STRUCTURAL`. Sub-ms; eager-immutable materialization is the trade-off that buys the flat floor + O(1) matching. Not winnable without abandoning eager-immutable state.
 
@@ -133,6 +133,29 @@ real-router retains more heap per create→navigate→dispose cycle (svelte +60%
 
 - **table-heap** (route-table memory @10k routes) and **deep-config** (matcher CPU @depth-90): real-router's eager trie + full route-tree is heavier at scale than sv-router's lazy/compiler-native matching. The price of O(1) matching + the full pipeline. `rr ≈ mateo-router` on deep-config (3.23 ≈ 3.27) — sv-router is the outlier, not rr the laggard.
 - **back-forward** (+2%, svelte): real-router's back/forward replay is ~0.206 on **both** svelte and solid — a *core* path cost, identical across adapters; sv-router is 4 µs lighter framework-native. Tiny, ~floor.
+
+---
+
+## Deck-shape artifacts (sub-ms wiggles — non-substantive)
+
+Reviewed 2026-07-16 (deck walk-through). Three sub-ms deck curves show visible wiggles
+that are **measurement shape, not router behavior** — logged so the deck's "waves"
+aren't re-chased. All three cells are rr **WINS**.
+
+- **solid search-param @32 (0.296 ms)** — a lone point above trend (@16 0.167 → @32
+  0.296 → @64 0.199). rme 5.7% (tight), yet **@32 > @64 is non-physical** (32 params
+  cannot cost more than 64 doing the same O(count) read). A session-systematic
+  per-position blip (V8 tier-up / GC on the 6th sweep slot), which the deck's
+  Catmull-Rom smoothing inflates into a "wave" over @16–@64. ~0.1 ms over trend.
+- **svelte active-links @64 (0.112 ms)** — bump above @32 (0.085) and @128 (0.082).
+  rme 1.3% (very tight) but **@64 > @128 is non-physical**. Same class: a ~30 µs
+  per-position blip on an 80–110 µs curve, smoothing-amplified into the hump. rr wins
+  (0.101 @256 vs sv-router 0.39).
+- **Why tight rme is still an artifact:** rme is the run-to-run spread of the *median*;
+  a per-position systematic offset (the same sweep slot every interleaved round) does
+  not widen it. The tell is **non-monotonicity on a monotone workload**, not variance —
+  and deck smoothing turns one such point into a visible wave. Only *monotonic* rises
+  are substantive (e.g. svelte search-param @256 — see the react search-param entry).
 
 ---
 
