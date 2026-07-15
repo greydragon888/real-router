@@ -1,7 +1,8 @@
 import { Component, Injector, runInInjectionContext } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { createRouter, getNavigator } from "@real-router/core";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { createActiveNameSelector } from "@real-router/sources";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { injectIsActiveRoute } from "../../src/functions/injectIsActiveRoute";
 import { injectNavigator } from "../../src/functions/injectNavigator";
@@ -255,6 +256,33 @@ describe("inject functions", () => {
 
         expect(isActive()).toBe(true);
       });
+    });
+
+    it("default-options injectIsActiveRoute takes the shared name-selector fast path — no extra source (#1437)", () => {
+      const injector = TestBed.inject(Injector);
+      const subscribeSpy = vi.spyOn(router, "subscribe");
+
+      runInInjectionContext(injector, () => {
+        injectIsActiveRoute("users");
+      });
+
+      // sourceToSignal subscribes eagerly, so the active source is connected by now.
+      const before = subscribeSpy.mock.calls.length;
+
+      // The shared per-router name selector answers the same question. If
+      // injectIsActiveRoute took the fast path (createActiveSource →
+      // createActiveNameSelector), the selector is already connected — this sibling
+      // subscribe adds a listener with NO new router.subscribe (delta 0). If it took
+      // the slow createActiveRouteSource path (the #1437 bypass), the selector was
+      // never instantiated → this is its first subscribe → connect → router.subscribe
+      // (delta 1).
+      const selector = createActiveNameSelector(router);
+      const unsubscribe = selector.subscribe("users", () => {});
+      const delta = subscribeSpy.mock.calls.length - before;
+
+      unsubscribe();
+
+      expect(delta).toBe(0);
     });
   });
 });

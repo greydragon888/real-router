@@ -1,7 +1,6 @@
 import { assertInInjectionContext } from "@angular/core";
-import { createActiveRouteSource } from "@real-router/sources";
+import { createActiveSource } from "@real-router/sources";
 
-import { buildActiveRouteOptions } from "../internal/buildActiveRouteOptions";
 import { sourceToSignal } from "../sourceToSignal";
 import { injectRouter } from "./injectRouter";
 
@@ -16,15 +15,18 @@ export function injectIsActiveRoute(
   assertInInjectionContext(injectIsActiveRoute);
 
   const router = injectRouter();
-  const source = createActiveRouteSource(
+  // Route through the shared fast/slow builder (mirrors RealLink / RealLinkActive):
+  // a default-options call (non-empty name, no params, non-strict, query-ignoring, no
+  // hash) shares the per-router createActiveNameSelector fast path instead of a
+  // dedicated createActiveRouteSource + subscription (#1437). Behavior-identical —
+  // createActiveRouteSource normalizes the options internally either way.
+  const source = createActiveSource(
     router,
     routeName,
     params,
-    buildActiveRouteOptions(
-      options?.strict ?? false,
-      options?.ignoreQueryParams ?? true,
-      options?.hash,
-    ),
+    options?.strict ?? false,
+    options?.ignoreQueryParams ?? true,
+    options?.hash,
   );
 
   return sourceToSignal(source);
