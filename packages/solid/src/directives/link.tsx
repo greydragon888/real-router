@@ -72,7 +72,15 @@ export function link<P extends Params = Params>(
     const activeSource = createActiveRouteSource(
       router,
       options.routeName,
-      resolvedRouteParams,
+      // Pass RAW `options.routeParams` (NOT the EMPTY_PARAMS-defaulted
+      // `resolvedRouteParams`). When params are omitted the raw value is
+      // `undefined`, which `createActiveRouteSource` keys as the canonical ""
+      // (never "{}"), so a no-params `use:link` shares ONE cached source + one
+      // router subscription with a sibling `<Link>` (`components/Link.tsx` passes
+      // raw `props.routeParams` for the same reason) — the #776 contract.
+      // `resolvedRouteParams` stays for buildHref (concrete object) + navigate.
+      // (#1438 — the audit-§8a hoist reintroduced the default on this path.)
+      options.routeParams,
       {
         strict: options.activeStrict ?? false,
         ignoreQueryParams: options.ignoreQueryParams ?? true,
