@@ -1,3 +1,4 @@
+import { createActiveRouteSource } from "@real-router/sources";
 import { render, screen } from "@solidjs/testing-library";
 import { fireEvent } from "@testing-library/dom";
 import { userEvent } from "@testing-library/user-event";
@@ -598,6 +599,44 @@ describe("link directive", () => {
       // Stronger: directive must not set ANY class attribute when
       // activeClassName is omitted (catches accidental `class="other"`).
       expect(linkElement.getAttribute("class")).toBeNull();
+    });
+  });
+
+  describe("active source sharing (#776 / #1438)", () => {
+    it("no-params use:link shares ONE active source with a canonical undefined-key source (no split subscription)", () => {
+      const subscribeSpy = vi.spyOn(router, "subscribe");
+
+      render(
+        () => (
+          <a
+            use:link={{ routeName: "home", activeClassName: "active" }}
+            data-testid="link"
+          >
+            Home
+          </a>
+        ),
+        { wrapper },
+      );
+
+      // The directive's active source has subscribed to the router by now.
+      const before = subscribeSpy.mock.calls.length;
+
+      // A sibling asking the SAME logical question via the canonical raw-undefined
+      // key (#776: no-params → key "", never "{}"). When the directive keys its
+      // source under the raw undefined params too, this reuses that already-
+      // subscribed cached source — NO new router.subscribe. If the directive feeds
+      // the EMPTY_PARAMS ({}) default instead, it keys "{}" ≠ "" → a SECOND cached
+      // source + a second router.subscribe (the #1438 regression).
+      const sibling = createActiveRouteSource(router, "home", undefined, {
+        strict: false,
+        ignoreQueryParams: true,
+      });
+      const unsubscribe = sibling.subscribe(() => {});
+      const delta = subscribeSpy.mock.calls.length - before;
+
+      unsubscribe();
+
+      expect(delta).toBe(0);
     });
   });
 
