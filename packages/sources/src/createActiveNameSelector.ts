@@ -80,50 +80,81 @@ export function createActiveNameSelector(router: Router): ActiveNameSelector {
     );
   };
 
+  // Diffs and notifies a single route name on a router transition. Extracted
+  // from the subscribe callback so the fan-out loop stays a trivial
+  // isolate-per-name shell (#1478) — the recompute below (`areRoutesRelated` /
+  // `isActiveNonStrict`) runs OUTSIDE the per-listener `try`, so the caller
+  // wraps this whole call in a per-name `try` too.
+  const notifyName = (
+    routeName: string,
+    listeners: Set<() => void>,
+    newRouteName: string,
+    previousRouteName: string | undefined,
+  ): void => {
+    // Cheap pre-filter: if neither new nor previous route is related to this
+    // name, its active state cannot have changed. Empty routeName is the
+    // implicit root — every route is its descendant, so the filter would
+    // falsely exclude it (`areRoutesRelated` doesn't treat `""` specially).
+    // Skip the filter for the root.
+    if (routeName !== "") {
+      const isNewRelated = areRoutesRelated(routeName, newRouteName);
+      const isPrevRelated =
+        previousRouteName !== undefined &&
+        areRoutesRelated(routeName, previousRouteName);
+
+      if (!isNewRelated && !isPrevRelated) {
+        return;
+      }
+    }
+
+    // activeByName always has an entry for names present in listenersByName —
+    // subscribe() seeds it, and we only iterate over listenersByName.
+    const prevActive = activeByName.get(routeName) === true;
+    const nextActive = isActiveNonStrict(routeName);
+
+    if (prevActive === nextActive) {
+      return;
+    }
+
+    activeByName.set(routeName, nextActive);
+    // Per-listener exception isolation — mirrors `BaseSource.notify`
+    // (INVARIANTS "BaseSource 3"). Without it, one throwing Link listener would
+    // abort notifications to the remaining listeners of this name (#767).
+    // `activeByName.set` already ran above, so the per-name diff is committed
+    // before any listener fires. Re-throw asynchronously so the genuine bug
+    // still surfaces to global error handlers.
+    for (const listener of listeners) {
+      try {
+        listener();
+      } catch (error) {
+        queueMicrotask(() => {
+          throw error;
+        });
+      }
+    }
+  };
+
   const connect = (): void => {
     routerUnsubscribe = router.subscribe((next) => {
+      const newRouteName = next.route.name;
+      const previousRouteName = next.previousRoute?.name;
+
       for (const [routeName, listeners] of listenersByName) {
-        // Cheap pre-filter: if neither new nor previous route is related
-        // to this name, its active state cannot have changed. Empty
-        // routeName is the implicit root — every route is its descendant,
-        // so the filter would falsely exclude it (`areRoutesRelated`
-        // doesn't treat `""` specially). Skip the filter for the root.
-        if (routeName !== "") {
-          const isNewRelated = areRoutesRelated(routeName, next.route.name);
-          const isPrevRelated =
-            next.previousRoute &&
-            areRoutesRelated(routeName, next.previousRoute.name);
-
-          if (!isNewRelated && !isPrevRelated) {
-            continue;
-          }
-        }
-
-        // activeByName always has an entry for names present in listenersByName —
-        // subscribe() seeds it, and we only iterate over listenersByName.
-        const prevActive = activeByName.get(routeName) === true;
-        const nextActive = isActiveNonStrict(routeName);
-
-        if (prevActive === nextActive) {
-          continue;
-        }
-
-        activeByName.set(routeName, nextActive);
-        // Per-listener exception isolation — mirrors `BaseSource.notify`
-        // (INVARIANTS "BaseSource 3"). Without it, one throwing Link listener
-        // would abort notifications to the remaining listeners of this name AND
-        // every later name in the iteration, leaving their `activeByName` state
-        // stale (#767). `activeByName.set` already ran above, so the per-name
-        // diff is committed before any listener fires. Re-throw asynchronously
-        // so the genuine bug still surfaces to global error handlers.
-        for (const listener of listeners) {
-          try {
-            listener();
-          } catch (error) {
-            queueMicrotask(() => {
-              throw error;
-            });
-          }
+        // Per-name exception isolation (#1478): `notifyName`'s recompute runs
+        // OUTSIDE its per-listener `try`. A throw from it for one name would
+        // unwind this shared subscribe callback, skipping every later name's
+        // diff/notify and leaving their `activeByName` stale — structurally the
+        // #767 failure mode one level up. Safe by construction today (`getState`
+        // is a frozen-field read; the rest is pure string ops with no user code
+        // in the path), but a future param-aware / predicate recompute could
+        // throw here; isolate it the same way, re-throwing asynchronously so a
+        // genuine bug still surfaces.
+        try {
+          notifyName(routeName, listeners, newRouteName, previousRouteName);
+        } catch (error) {
+          queueMicrotask(() => {
+            throw error;
+          });
         }
       }
     });
