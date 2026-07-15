@@ -65,6 +65,17 @@ export const deepConfig = {
         return window.__navMetric.settleGone('[data-testid="page-item"]');
       });
 
+    // Pre-sweep warmup (#1453 first-point): warm() tiers up per-point, but TurboFan
+    // tier-up accumulates across points, so the first measured depth reads slightly high
+    // (masked here by the rising O(depth) curve, but present by the same mechanism as
+    // the flat sweeps). One extra land+warm cycle lifts point 1 to steady state.
+    try {
+      await land(TARGETS[0]);
+      await warm(TARGETS[0]);
+    } catch (warmErr) {
+      console.error(`deep-config pre-warmup: ${warmErr.message}`);
+    }
+
     for (const d of TARGETS) {
       try {
       await land(d); // on home
