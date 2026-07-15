@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-15]
 
+### @real-router/angular@0.13.19
+
+### Patch Changes
+
+- [#1487](https://github.com/greydragon888/real-router/pull/1487) [`1b928b3`](https://github.com/greydragon888/real-router/commit/1b928b37cf6f88908799120535364cd443a3a596) Thanks [@greydragon888](https://github.com/greydragon888)! - Route `injectIsActiveRoute` through the shared `createActiveSource` fast/slow builder ([#1437](https://github.com/greydragon888/real-router/issues/1437))
+
+  `injectIsActiveRoute` called `createActiveRouteSource` directly, so a default-options call always took the slow per-`(router, name)` cached source with its own router subscription — instead of the shared per-router `createActiveNameSelector` fast path the directives (`RealLink`, `RealLinkActive`) already use. Routing it through `createActiveSource` gives the fast path (one shared subscription for any number of distinct-name consumers); the active-state result is identical. Also removes the now-unused `internal/buildActiveRouteOptions.ts`. ([#1437](https://github.com/greydragon888/real-router/issues/1437))
+
+
 ### @real-router/solid@0.16.19
 
 ### Patch Changes
