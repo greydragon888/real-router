@@ -7,7 +7,7 @@
  * Isolated in its own file/process so the encode-strategy call-site stays
  * monomorphic under instrumentation (§9.2 / §6.6.1).
  */
-import { isMain, keep, makeBench } from "./fixtures";
+import { addBatched, isMain, keep, makeBench, settleHeap } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
@@ -24,7 +24,7 @@ export async function run(): Promise<void> {
     await router.start("/users/seed");
     const api = getPluginApi(router);
 
-    bench.add("matchPath/encoding-uri", () => {
+    addBatched(bench, "matchPath/encoding-uri", 48, () => {
       keep(api.matchPath("/users/hello%20world"));
     });
   }
@@ -34,11 +34,12 @@ export async function run(): Promise<void> {
 
     await router.start("/users/seed");
 
-    bench.add("buildPath/encoding-uri", () => {
+    addBatched(bench, "buildPath/encoding-uri", 48, () => {
       keep(router.buildPath("user", { id: "hello world" }));
     });
   }
 
+  await settleHeap();
   await bench.run();
   console.table(bench.table());
 }

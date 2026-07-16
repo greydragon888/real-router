@@ -5,7 +5,7 @@
  * its encode-strategy call-site stays monomorphic under instrumentation,
  * distinct from the default and uriComponent forms (§9.2 / §6.6.1).
  */
-import { isMain, keep, makeBench } from "./fixtures";
+import { addBatched, isMain, keep, makeBench, settleHeap } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
@@ -22,7 +22,7 @@ export async function run(): Promise<void> {
     await router.start("/users/seed");
     const api = getPluginApi(router);
 
-    bench.add("matchPath/encoding-none", () => {
+    addBatched(bench, "matchPath/encoding-none", 48, () => {
       keep(api.matchPath("/users/plainvalue"));
     });
   }
@@ -32,11 +32,12 @@ export async function run(): Promise<void> {
 
     await router.start("/users/seed");
 
-    bench.add("buildPath/encoding-none", () => {
+    addBatched(bench, "buildPath/encoding-none", 48, () => {
       keep(router.buildPath("user", { id: "plainvalue" }));
     });
   }
 
+  await settleHeap();
   await bench.run();
   console.table(bench.table());
 }

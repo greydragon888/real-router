@@ -6,7 +6,7 @@
  * in its own file/process to keep its matcher shape from polluting the
  * default-form inline caches (§9.2).
  */
-import { isMain, keep, makeBench } from "./fixtures";
+import { addBatched, isMain, keep, makeBench, settleHeap } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
@@ -29,7 +29,7 @@ export async function run(): Promise<void> {
     const api = getPluginApi(router);
     let i = 0;
 
-    bench.add("matchPath/trailing-preserve", () => {
+    addBatched(bench, "matchPath/trailing-preserve", 48, () => {
       keep(api.matchPath(urls[i++ % urls.length]));
     });
   }
@@ -42,7 +42,7 @@ export async function run(): Promise<void> {
     const api = getPluginApi(router);
     let i = 0;
 
-    bench.add("navigate/trailing-preserve-roundtrip", () => {
+    addBatched(bench, "navigate/trailing-preserve-roundtrip", 12, () => {
       const matched = api.matchPath(urls[i++ % urls.length]);
 
       if (matched) {
@@ -51,6 +51,7 @@ export async function run(): Promise<void> {
     });
   }
 
+  await settleHeap();
   await bench.run();
   console.table(bench.table());
 }
