@@ -1,4 +1,4 @@
-import { Component, inject, input } from "@angular/core";
+import { Component, inject, input, isDevMode } from "@angular/core";
 
 import { HTTP_STATUS_SINK } from "../utils/createHttpStatusSink";
 
@@ -100,6 +100,23 @@ export class HttpStatusCode implements OnInit {
     const value = this.code();
 
     if (value !== undefined) {
+      // Dev-only validation (parity with the other adapters, #1441): Node's
+      // res.end() throws `Invalid status code` on NaN / 0 / non-integer / >999.
+      // Surface the bad value at the source instead of at the response boundary.
+      // Angular uses `isDevMode()` rather than `process.env.NODE_ENV` — ng-packagr
+      // does not replace the latter and `process` is undefined in the browser.
+      // JIT/TestBed reads `code()` as undefined, so this branch (and the sink
+      // write below) is reachable only under AOT — covered by the AOT
+      // ssr-examples once an `<http-status-code>` consumer lands there.
+      if (
+        isDevMode() &&
+        (!Number.isInteger(value) || value < 100 || value > 999)
+      ) {
+        console.error(
+          `[real-router] <http-status-code [code]="${String(value)}" /> received an invalid HTTP status code. Node's res.end() rejects values that are not an integer in [100, 999] — pass a real HTTP status (commonly 4xx/5xx).`,
+        );
+      }
+
       this.sink.code = value;
     }
   }
