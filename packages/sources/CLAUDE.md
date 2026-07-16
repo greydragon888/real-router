@@ -209,6 +209,10 @@ Hash-plugin runtime does not claim the `"url"` namespace → `state.context.url 
 
 `BaseSource.subscribe` adds the listener to `#listeners` **before** calling `onFirstSubscribe`. Critical for `useSyncExternalStore` adapters: if reconcile inside `onFirstSubscribe` triggers `updateSnapshot`, the just-added listener receives the notification. Without this order, the post-reconnection snapshot would be missed on re-mount (e.g. Preact RouteView nested remount).
 
+### Partial-registration safety — eager transition / error sources (#1440)
+
+`createTransitionSource` (5 listeners) and `createErrorSource` (2) register their router-event listeners **one-by-one inside a `try`**. If `api.addEventListener` throws mid-registration — the emitter rejects a duplicate listener (`EventEmitter` throws) or hits its `maxListeners` cap — the `catch` unwinds the already-registered listeners and rethrows, so a half-wired source never leaks live listeners that pin the router. `unsubs` is declared **before** the `BaseSource` so its `onDestroy` closure always closes over an initialized binding (a never-assigned `unsubs` would strand the source in the TDZ, undestroyable). Mirrors `@real-router/rx`'s `events$`. The lazy single-listener factories (`createRouteSource` / `createRouteNodeSource` / `createActiveRouteSource` / `createActiveNameSelector`) register exactly one listener, so they have no partial-registration window.
+
 ## Module Structure
 
 ```

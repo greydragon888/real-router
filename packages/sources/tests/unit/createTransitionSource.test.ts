@@ -275,6 +275,44 @@ describe("createTransitionSource", () => {
     expect(source.getSnapshot().isTransitioning).toBe(false);
   });
 
+  it("unwinds already-registered listeners when addEventListener throws mid-registration (#1440)", () => {
+    // Same partial-registration hazard as createErrorSource: the factory
+    // registers 5 listeners; a throw on the 3rd (the emitter rejecting a
+    // duplicate listener / hitting its maxListeners cap) must unwind the first
+    // 2 instead of leaking them and stranding the undestroyable half-wired
+    // source (unsubs TDZ).
+    const api = getPluginApi(router);
+    const originalAdd = api.addEventListener.bind(api);
+    const registeredUnsubs: (() => void)[] = [];
+    let calls = 0;
+
+    const spy = vi
+      .spyOn(api, "addEventListener")
+      .mockImplementation((event, cb) => {
+        calls += 1;
+
+        if (calls === 3) {
+          throw new Error("addEventListener boom");
+        }
+
+        const unsub = vi.fn(originalAdd(event, cb));
+
+        registeredUnsubs.push(unsub);
+
+        return unsub;
+      });
+
+    expect(() => createTransitionSource(router)).toThrow(/boom/);
+
+    // Both already-registered listeners must have been unsubscribed during the
+    // unwind — not left live.
+    expect(registeredUnsubs).toHaveLength(2);
+    expect(registeredUnsubs[0]).toHaveBeenCalledTimes(1);
+    expect(registeredUnsubs[1]).toHaveBeenCalledTimes(1);
+
+    spy.mockRestore();
+  });
+
   it("concurrent navigation: updates toRoute to new target", async () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (value: boolean) => void;

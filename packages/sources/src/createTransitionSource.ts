@@ -88,6 +88,11 @@ export function nextLeaveApproveSnapshot(
 export function createTransitionSource(
   router: Router,
 ): RouterSource<RouterTransitionSnapshot> {
+  // Declared before `source` so its onDestroy closure closes over an
+  // initialized binding — a mid-registration throw below no longer leaves it
+  // in the TDZ, keeping the source destroyable (#1440).
+  const unsubs: (() => void)[] = [];
+
   const source = new BaseSource(IDLE_SNAPSHOT, {
     onDestroy: () => {
       for (const unsub of unsubs) {
@@ -102,55 +107,72 @@ export function createTransitionSource(
     source.updateSnapshot(IDLE_SNAPSHOT);
   };
 
-  // Eager connection: subscribe to router events immediately
-  const unsubs = [
-    api.addEventListener(
-      events.TRANSITION_START,
-      (toState: State, fromState?: State) => {
-        // The same-paths dedup branch inside nextTransitionStartSnapshot is
-        // structurally unreachable after #605 (every router-emitted
-        // TRANSITION_START carries a fresh State per navigate()), but the
-        // helper is kept testable for future stabilizer changes — see the
-        // direct unit test in createTransitionSource.test.ts.
-        const next = nextTransitionStartSnapshot(
-          source.getSnapshot(),
-          toState,
-          fromState,
-        );
+  const onTransitionStart = (toState: State, fromState?: State): void => {
+    // The same-paths dedup branch inside nextTransitionStartSnapshot is
+    // structurally unreachable after #605 (every router-emitted
+    // TRANSITION_START carries a fresh State per navigate()), but the
+    // helper is kept testable for future stabilizer changes — see the
+    // direct unit test in createTransitionSource.test.ts.
+    const next = nextTransitionStartSnapshot(
+      source.getSnapshot(),
+      toState,
+      fromState,
+    );
 
-        /* v8 ignore next 3 -- @preserve: dedup-skip branch unreachable through
-           normal router flow; covered directly via nextTransitionStartSnapshot
-           unit test. */
-        if (next === null) {
-          return;
-        }
+    /* v8 ignore next 3 -- @preserve: dedup-skip branch unreachable through
+       normal router flow; covered directly via nextTransitionStartSnapshot
+       unit test. */
+    if (next === null) {
+      return;
+    }
 
-        source.updateSnapshot(next);
-      },
-    ),
-    api.addEventListener(
-      events.TRANSITION_LEAVE_APPROVE,
-      (toState: State, fromState?: State) => {
-        const next = nextLeaveApproveSnapshot(
-          source.getSnapshot(),
-          toState,
-          fromState,
-        );
+    source.updateSnapshot(next);
+  };
 
-        /* v8 ignore next 3 -- @preserve: dedup-skip branch unreachable through
-           normal router flow (LEAVE_APPROVE fires once per pipeline); covered
-           directly via nextLeaveApproveSnapshot unit test. */
-        if (next === null) {
-          return;
-        }
+  const onLeaveApprove = (toState: State, fromState?: State): void => {
+    const next = nextLeaveApproveSnapshot(
+      source.getSnapshot(),
+      toState,
+      fromState,
+    );
 
-        source.updateSnapshot(next);
-      },
-    ),
-    api.addEventListener(events.TRANSITION_SUCCESS, resetToIdle),
-    api.addEventListener(events.TRANSITION_ERROR, resetToIdle),
-    api.addEventListener(events.TRANSITION_CANCEL, resetToIdle),
-  ];
+    /* v8 ignore next 3 -- @preserve: dedup-skip branch unreachable through
+       normal router flow (LEAVE_APPROVE fires once per pipeline); covered
+       directly via nextLeaveApproveSnapshot unit test. */
+    if (next === null) {
+      return;
+    }
+
+    source.updateSnapshot(next);
+  };
+
+  // Eager connection: subscribe to router events immediately. Register
+  // one-by-one so a throw mid-registration (the emitter rejects a duplicate
+  // listener / hits its maxListeners cap) unwinds the already-registered
+  // listeners instead of leaking them and stranding the half-wired source
+  // (#1440). Mirrors @real-router/rx's events$ partial-registration safety.
+  /* eslint-disable unicorn/prefer-single-call -- register one-by-one so a
+     mid-registration throw unwinds the already-pushed unsubs; a single
+     push(a, b) evaluates every addEventListener arg BEFORE pushing, leaving an
+     earlier registration untracked and leaked (#1440). */
+  try {
+    unsubs.push(
+      api.addEventListener(events.TRANSITION_START, onTransitionStart),
+    );
+    unsubs.push(
+      api.addEventListener(events.TRANSITION_LEAVE_APPROVE, onLeaveApprove),
+    );
+    unsubs.push(api.addEventListener(events.TRANSITION_SUCCESS, resetToIdle));
+    unsubs.push(api.addEventListener(events.TRANSITION_ERROR, resetToIdle));
+    unsubs.push(api.addEventListener(events.TRANSITION_CANCEL, resetToIdle));
+  } catch (error) {
+    for (const unsub of unsubs) {
+      unsub();
+    }
+
+    throw error;
+  }
+  /* eslint-enable unicorn/prefer-single-call */
 
   return source;
 }
