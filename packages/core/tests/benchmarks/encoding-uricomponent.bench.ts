@@ -5,7 +5,7 @@
  * from the default. Isolated in its own file/process so the encode-strategy
  * call-site stays monomorphic under instrumentation (§9.2 / §6.6.1).
  */
-import { addBatched, isMain, keep, makeBench, settleHeap } from "./fixtures";
+import { batched, isMain, keep, makeBench, settleHeap } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
@@ -22,9 +22,12 @@ export async function run(): Promise<void> {
     await router.start("/users/seed");
     const api = getPluginApi(router);
 
-    addBatched(bench, "matchPath/encoding-uriComponent", 48, () => {
-      keep(api.matchPath("/users/hello%20world"));
-    });
+    bench.add(
+      "matchPath/encoding-uriComponent",
+      batched(384, () => {
+        keep(api.matchPath("/users/hello%20world"));
+      }),
+    );
   }
 
   {
@@ -32,9 +35,12 @@ export async function run(): Promise<void> {
 
     await router.start("/users/seed");
 
-    addBatched(bench, "buildPath/encoding-uriComponent", 48, () => {
-      keep(router.buildPath("user", { id: "hello world" }));
-    });
+    bench.add(
+      "buildPath/encoding-uriComponent",
+      batched(1536, () => {
+        keep(router.buildPath("user", { id: "hello world" }));
+      }),
+    );
   }
 
   await settleHeap();

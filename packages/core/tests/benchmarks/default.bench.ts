@@ -17,7 +17,7 @@
  * built + started, states captured) happens outside the measured task fns.
  */
 import {
-  addBatched,
+  batched,
   deepName,
   deepPath,
   deepRoutes,
@@ -44,7 +44,11 @@ import type { Bench } from "tinybench";
  * neighbouring dispatch path, not a substitute for N success subscribers.
  */
 async function addSubscribeFanout(bench: Bench): Promise<void> {
-  for (const count of [1, 3, 5]) {
+  for (const [count, batch] of [
+    [1, 192],
+    [3, 384],
+    [5, 384],
+  ] as const) {
     const router = createRouter([
       { name: "home", path: "/" },
       { name: "page", path: "/page" },
@@ -58,9 +62,12 @@ async function addSubscribeFanout(bench: Bench): Promise<void> {
     const targets = ["page", "home"] as const;
     let i = 0;
 
-    addBatched(bench, `navigate/subscribe-${String(count)}`, 24, () => {
-      void router.navigate(targets[i++ % targets.length]);
-    });
+    bench.add(
+      `navigate/subscribe-${String(count)}`,
+      batched(batch, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
   }
 }
 
@@ -86,9 +93,12 @@ async function addDeactivateGuards(bench: Bench): Promise<void> {
   const targets = ["b", "a"] as const;
   let i = 0;
 
-  addBatched(bench, "navigate/sync-deactivate-guards", 24, () => {
-    void router.navigate(targets[i++ % targets.length]);
-  });
+  bench.add(
+    "navigate/sync-deactivate-guards",
+    batched(256, () => {
+      void router.navigate(targets[i++ % targets.length]);
+    }),
+  );
 }
 
 /**
@@ -115,17 +125,26 @@ async function addCanNavigateTo(bench: Bench): Promise<void> {
   await nav.start("/");
   const navbar = ["home", "dashboard", "profile", "settings", "help"];
 
-  addBatched(bench, "state/canNavigateTo-allowed", 48, () => {
-    keep(nav.canNavigateTo("dashboard"));
-  });
-  addBatched(bench, "state/canNavigateTo-navbar-5", 24, () => {
-    for (const name of navbar) {
-      keep(nav.canNavigateTo(name));
-    }
-  });
-  addBatched(bench, "state/canNavigateTo-guarded", 48, () => {
-    keep(nav.canNavigateTo("admin"));
-  });
+  bench.add(
+    "state/canNavigateTo-allowed",
+    batched(1024, () => {
+      keep(nav.canNavigateTo("dashboard"));
+    }),
+  );
+  bench.add(
+    "state/canNavigateTo-navbar-5",
+    batched(192, () => {
+      for (const name of navbar) {
+        keep(nav.canNavigateTo(name));
+      }
+    }),
+  );
+  bench.add(
+    "state/canNavigateTo-guarded",
+    batched(1024, () => {
+      keep(nav.canNavigateTo("admin"));
+    }),
+  );
 }
 
 export async function run(): Promise<void> {
@@ -147,9 +166,12 @@ export async function run(): Promise<void> {
     const targets = ["about", "users", "home"] as const;
     let i = 0;
 
-    addBatched(bench, "navigate/sync-baseline", 24, () => {
-      void router.navigate(targets[i++ % targets.length]);
-    });
+    bench.add(
+      "navigate/sync-baseline",
+      batched(64, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
   }
 
   // same-state fast-reject: navigate to the current route (cached rejection).
@@ -161,9 +183,12 @@ export async function run(): Promise<void> {
 
     await router.start("/about");
 
-    addBatched(bench, "navigate/same-state-reject", 12, () => {
-      void router.navigate("about");
-    });
+    bench.add(
+      "navigate/same-state-reject",
+      batched(512, () => {
+        void router.navigate("about");
+      }),
+    );
   }
 
   // sync-guards: 3 passthrough activate guards (AbortController alloc+release, #722).
@@ -181,9 +206,12 @@ export async function run(): Promise<void> {
     const targets = ["page", "home"] as const;
     let i = 0;
 
-    addBatched(bench, "navigate/sync-guards", 24, () => {
-      void router.navigate(targets[i++ % targets.length]);
-    });
+    bench.add(
+      "navigate/sync-guards",
+      batched(96, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
   }
 
   // sync-deactivate-guards: deactivation-phase guards every iteration — helper.
@@ -197,9 +225,12 @@ export async function run(): Promise<void> {
     const targets = [deepName(depth), "l0"] as const;
     let i = 0;
 
-    addBatched(bench, `navigate/deep-${String(depth)}`, 24, () => {
-      void router.navigate(targets[i++ % targets.length]);
-    });
+    bench.add(
+      `navigate/deep-${String(depth)}`,
+      batched(256, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
   }
 
   // forwardTo redirect (members → users).
@@ -214,13 +245,20 @@ export async function run(): Promise<void> {
     const targets = ["members", "home"] as const;
     let i = 0;
 
-    addBatched(bench, "navigate/forwardTo", 24, () => {
-      void router.navigate(targets[i++ % targets.length]);
-    });
+    bench.add(
+      "navigate/forwardTo",
+      batched(384, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
   }
 
   // N-plugin onTransitionSuccess fan-out (1 / 3 / 5).
-  for (const count of [1, 3, 5]) {
+  for (const [count, batch] of [
+    [1, 192],
+    [3, 384],
+    [5, 384],
+  ] as const) {
     const router = createRouter([
       { name: "home", path: "/" },
       { name: "page", path: "/page" },
@@ -234,9 +272,12 @@ export async function run(): Promise<void> {
     const targets = ["page", "home"] as const;
     let i = 0;
 
-    addBatched(bench, `navigate/plugins-${String(count)}`, 24, () => {
-      void router.navigate(targets[i++ % targets.length]);
-    });
+    bench.add(
+      `navigate/plugins-${String(count)}`,
+      batched(batch, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
   }
 
   // N router.subscribe success listeners (1 / 3 / 5) — see helper docstring.
@@ -258,9 +299,12 @@ export async function run(): Promise<void> {
     const targets = ["about", "users", "home"] as const;
     let i = 0;
 
-    addBatched(bench, `navigate/leave-${String(count)}`, 24, () => {
-      void router.navigate(targets[i++ % targets.length]);
-    });
+    bench.add(
+      `navigate/leave-${String(count)}`,
+      batched(192, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
   }
 
   // ========================================================================
@@ -299,35 +343,62 @@ export async function run(): Promise<void> {
   const toState = await view.navigate("users.view", { id: "123" });
 
   // buildPath (warm — after start(), options cached).
-  addBatched(bench, "buildPath/warm-static", 96, () => {
-    keep(view.buildPath("users.list"));
-  });
-  addBatched(bench, "buildPath/warm-params", 48, () => {
-    keep(view.buildPath("users.view", { id: "123" }));
-  });
-  addBatched(bench, "buildPath/warm-defaultParams", 48, () => {
-    keep(view.buildPath("withDefaults", { id: "5" }));
-  });
-  addBatched(bench, "buildPath/warm-encoder", 48, () => {
-    keep(view.buildPath("encoded", { id: "x" }));
-  });
-  addBatched(bench, "buildPath/warm-splat", 48, () => {
-    keep(view.buildPath("files", { path: "a/b/c" }));
-  });
+  bench.add(
+    "buildPath/warm-static",
+    batched(6144, () => {
+      keep(view.buildPath("users.list"));
+    }),
+  );
+  bench.add(
+    "buildPath/warm-params",
+    batched(2048, () => {
+      keep(view.buildPath("users.view", { id: "123" }));
+    }),
+  );
+  bench.add(
+    "buildPath/warm-defaultParams",
+    batched(256, () => {
+      keep(view.buildPath("withDefaults", { id: "5" }));
+    }),
+  );
+  bench.add(
+    "buildPath/warm-encoder",
+    batched(2048, () => {
+      keep(view.buildPath("encoded", { id: "x" }));
+    }),
+  );
+  bench.add(
+    "buildPath/warm-splat",
+    batched(768, () => {
+      keep(view.buildPath("files", { path: "a/b/c" }));
+    }),
+  );
 
   // isActiveRoute — active state is users.view {id:123}.
-  addBatched(bench, "state/isActiveRoute-exact", 48, () => {
-    keep(view.isActiveRoute("users.view", { id: "123" }));
-  });
-  addBatched(bench, "state/isActiveRoute-parent", 96, () => {
-    keep(view.isActiveRoute("users"));
-  });
-  addBatched(bench, "state/isActiveRoute-sibling", 96, () => {
-    keep(view.isActiveRoute("users.list"));
-  });
-  addBatched(bench, "state/isActiveRoute-strict", 96, () => {
-    keep(view.isActiveRoute("users.view", { id: "123" }, true));
-  });
+  bench.add(
+    "state/isActiveRoute-exact",
+    batched(4096, () => {
+      keep(view.isActiveRoute("users.view", { id: "123" }));
+    }),
+  );
+  bench.add(
+    "state/isActiveRoute-parent",
+    batched(8192, () => {
+      keep(view.isActiveRoute("users"));
+    }),
+  );
+  bench.add(
+    "state/isActiveRoute-sibling",
+    batched(16_384, () => {
+      keep(view.isActiveRoute("users.list"));
+    }),
+  );
+  bench.add(
+    "state/isActiveRoute-strict",
+    batched(6144, () => {
+      keep(view.isActiveRoute("users.view", { id: "123" }, true));
+    }),
+  );
   {
     const navbar = [
       "home",
@@ -337,11 +408,14 @@ export async function run(): Promise<void> {
       "withDefaults",
     ];
 
-    addBatched(bench, "state/isActiveRoute-navbar-5", 96, () => {
-      for (const name of navbar) {
-        keep(view.isActiveRoute(name));
-      }
-    });
+    bench.add(
+      "state/isActiveRoute-navbar-5",
+      batched(1024, () => {
+        for (const name of navbar) {
+          keep(view.isActiveRoute(name));
+        }
+      }),
+    );
   }
 
   // canNavigateTo — synchronous per-Link disabled-state (Navigator) — helper.
@@ -352,11 +426,14 @@ export async function run(): Promise<void> {
     const names = ["home", "users", "users.list", "users.view", "withDefaults"];
     const predicates = names.map((name) => view.shouldUpdateNode(name));
 
-    addBatched(bench, "state/shouldUpdateNode-batch", 96, () => {
-      for (const predicate of predicates) {
-        keep(predicate(toState, fromState));
-      }
-    });
+    bench.add(
+      "state/shouldUpdateNode-batch",
+      batched(2048, () => {
+        for (const predicate of predicates) {
+          keep(predicate(toState, fromState));
+        }
+      }),
+    );
   }
 
   // areStatesEqual — two states differing only in a query param.
@@ -370,12 +447,18 @@ export async function run(): Promise<void> {
     const sA = await eq.navigate("search", { q: "a", page: "1" });
     const sB = await eq.navigate("search", { q: "a", page: "2" });
 
-    addBatched(bench, "state/areStatesEqual-ignoreQuery", 96, () => {
-      keep(eq.areStatesEqual(sA, sB));
-    });
-    addBatched(bench, "state/areStatesEqual-fullCompare", 96, () => {
-      keep(eq.areStatesEqual(sA, sB, false));
-    });
+    bench.add(
+      "state/areStatesEqual-ignoreQuery",
+      batched(65_536, () => {
+        keep(eq.areStatesEqual(sA, sB));
+      }),
+    );
+    bench.add(
+      "state/areStatesEqual-fullCompare",
+      batched(8192, () => {
+        keep(eq.areStatesEqual(sA, sB, false));
+      }),
+    );
   }
 
   // ========================================================================
@@ -390,7 +473,7 @@ export async function run(): Promise<void> {
     url: string;
   }[] = [
     {
-      batch: 48,
+      batch: 768,
       name: "matchPath/flat",
       routes: [
         { name: "home", path: "/" },
@@ -401,7 +484,7 @@ export async function run(): Promise<void> {
       url: "/users",
     },
     {
-      batch: 48,
+      batch: 384,
       name: "matchPath/nested-4",
       routes: [
         {
@@ -426,7 +509,7 @@ export async function run(): Promise<void> {
       url: "/app/users/123/settings",
     },
     {
-      batch: 24,
+      batch: 128,
       name: "matchPath/search-params",
       routes: [
         { name: "home", path: "/" },
@@ -436,7 +519,7 @@ export async function run(): Promise<void> {
       url: "/search?q=hello&page=1&category=books",
     },
     {
-      batch: 48,
+      batch: 768,
       name: "matchPath/forwardTo",
       routes: [
         { name: "home", path: "/" },
@@ -447,7 +530,7 @@ export async function run(): Promise<void> {
       url: "/members",
     },
     {
-      batch: 24,
+      batch: 192,
       name: "matchPath/defaultParams",
       routes: [
         { name: "home", path: "/" },
@@ -461,21 +544,21 @@ export async function run(): Promise<void> {
       url: "/users?sort=desc",
     },
     {
-      batch: 48,
+      batch: 384,
       name: "matchPath/splat-backtrack",
       routes: splatRoutes(50),
       start: "/base",
       url: "/base/unknown/deep/path",
     },
     {
-      batch: 24,
+      batch: 256,
       name: "matchPath/utf8-decode",
       routes: [{ name: "user", path: "/users/:id" }],
       start: "/users/seed",
       url: "/users/%E4%B8%AD%E6%96%87%E6%B5%8B%E8%AF%95",
     },
     {
-      batch: 24,
+      batch: 256,
       name: "matchPath/multi-decode",
       routes: [
         {
@@ -488,21 +571,21 @@ export async function run(): Promise<void> {
       url: "/a/hello%20world/b/foo%26bar",
     },
     {
-      batch: 48,
+      batch: 768,
       name: "matchPath/wide-500",
       routes: wideRoutes(500),
       start: "/route0",
       url: "/route250",
     },
     {
-      batch: 48,
+      batch: 768,
       name: "matchPath/deep-10",
       routes: deepRoutes(10),
       start: "/l0",
       url: deepPath(10),
     },
     {
-      batch: 48,
+      batch: 256,
       name: "matchPath/constraints",
       routes: [
         {
@@ -514,7 +597,7 @@ export async function run(): Promise<void> {
       url: "/a/1/abc/2/def/3",
     },
     {
-      batch: 48,
+      batch: 384,
       name: "matchPath/constraints-uuid",
       routes: [
         {
@@ -526,14 +609,14 @@ export async function run(): Promise<void> {
       url: "/entities/550e8400-e29b-41d4-a716-446655440000",
     },
     {
-      batch: 48,
+      batch: 512,
       name: "matchPath/optional-present",
       routes: [{ name: "profile", path: "/profiles/:id?" }],
       start: "/profiles",
       url: "/profiles/456",
     },
     {
-      batch: 48,
+      batch: 512,
       name: "matchPath/optional-absent",
       routes: [{ name: "profile", path: "/profiles/:id?" }],
       start: "/profiles/seed",
@@ -547,9 +630,12 @@ export async function run(): Promise<void> {
     await router.start(matchCase.start);
     const api = getPluginApi(router);
 
-    addBatched(bench, matchCase.name, matchCase.batch, () => {
-      keep(api.matchPath(matchCase.url));
-    });
+    bench.add(
+      matchCase.name,
+      batched(matchCase.batch, () => {
+        keep(api.matchPath(matchCase.url));
+      }),
+    );
   }
 
   await settleHeap();

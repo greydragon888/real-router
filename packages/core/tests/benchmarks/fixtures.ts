@@ -77,28 +77,31 @@ export function makeBench(name: string): Bench {
  *
  * Batching gives the measurement enough mass that a stray event is ≤ ~5%
  * noise, and turns GC from a lottery into a steady, near-deterministic
- * fraction of the batch. Pick `iterations` so the batch costs ~3–6 ms of
- * simulated CPU (per-op costs from the CodSpeed dashboard):
+ * fraction of the batch.
  *
- *   <60 µs → 96 | 60–120 µs → 48 | 120–250 µs → 24 | 250–500 µs → 12 |
- *   ≥500 µs → 4
+ * Sizing `iterations`: target ≥ ~3 ms of OPERATIONS per measured call, using
+ * per-op costs derived from a BATCHED CodSpeed run — `(total − ~60 µs) / K`.
+ * The plugin's fixed per-measure harness cost (async root frame + microtask
+ * drain, ~50–60 µs simulated) does NOT scale with K, and the pre-batching
+ * single-shot numbers were dominated by it (e.g. `areStatesEqual-ignoreQuery`
+ * "54 µs" was ~99% harness — the op itself is ~0.08 µs; run `6a588535`), so
+ * K derived from single-shot numbers lands far below budget.
  *
- * The budget has ~2× slack — revisit an `iterations` pick only when an op's
- * cost shifts by multiples. Local wall-clock numbers (`pnpm bench`) are per
- * BATCH, not per op — divide by `iterations` when eyeballing (the numbers are
- * not the gate — CodSpeed is).
+ * USAGE: always `bench.add(name, batched(K, fn))` — the CodSpeed plugin
+ * attributes the benchmark URI to the file that CALLS `bench.add`, so the
+ * `add` must stay in the suite file. (An add-wrapping helper here re-homed
+ * all 56 URIs to `fixtures.ts::…` — run `6a588535`, 2026-07-16.)
+ *
+ * Local wall-clock numbers (`pnpm bench`) are per BATCH, not per op — divide
+ * by `iterations` when eyeballing (the numbers are not the gate — CodSpeed
+ * is).
  */
-export function addBatched(
-  bench: Bench,
-  name: string,
-  iterations: number,
-  fn: () => void,
-): void {
-  bench.add(name, () => {
+export function batched(iterations: number, fn: () => void): () => void {
+  return () => {
     for (let i = 0; i < iterations; i++) {
       fn();
     }
-  });
+  };
 }
 
 /**
