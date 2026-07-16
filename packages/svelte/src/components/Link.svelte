@@ -72,7 +72,7 @@
       router,
       routeName,
       routeParams ?? EMPTY_PARAMS,
-      hash !== undefined ? { hash } : undefined,
+      hash,
     ),
   );
 

@@ -50,23 +50,22 @@ type BuildUrlFn = (
  * - Falls back to `router.buildPath` for runtimes without a URL plugin
  *   (memory-plugin, console UIs, NativeScript). In that fallback the hash
  *   is appended manually so the rendered href is still correct.
- * - The optional 4th argument is an options object so the contract stays
- *   extensible. The `hash` option is a decoded fragment without leading "#";
- *   `<Link hash="#section">` is accepted defensively (leading "#" stripped).
- *   Frozen API: previous 3-arg call sites continue to work unchanged.
+ * - The optional 4th argument is the decoded hash fragment (no leading "#";
+ *   `<Link hash="#section">` is accepted defensively — leading "#" stripped),
+ *   passed positionally to mirror `navigateWithHash(router, name, params, hash)`
+ *   (#1442). Previous 3-arg call sites continue to work unchanged.
  */
 export function buildHref(
   router: Router,
   routeName: string,
   routeParams: Params,
-  options?: { hash?: string },
+  hash?: string,
 ): string | undefined {
   try {
-    const rawHash = options?.hash;
     let normHash: string | undefined;
 
-    if (rawHash !== undefined) {
-      normHash = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
+    if (hash !== undefined) {
+      normHash = hash.startsWith("#") ? hash.slice(1) : hash;
     }
 
     const buildUrl = router.buildUrl as BuildUrlFn | undefined;

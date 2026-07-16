@@ -281,7 +281,7 @@ describe("buildHref", () => {
       buildPath: vi.fn().mockReturnValue(""),
     } as unknown as Router;
 
-    const result = buildHref(router, "weird-route", {}, { hash: "tab" });
+    const result = buildHref(router, "weird-route", {}, "tab");
 
     expect(result).toBeUndefined();
     expect(consoleError).toHaveBeenCalledWith(
@@ -504,7 +504,7 @@ describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
     // (`%` → `%25`). Before #1211 the probe-roundtrip decoded it to ✓ and
     // re-encoded to "%E2%9C%93" (the copy-from-location.hash tolerance, E.1,
     // now removed so the adapter matches the strict plugin layer).
-    const href = buildHref(routerWith("/p"), "r", {}, { hash: "%E2%9C%93" });
+    const href = buildHref(routerWith("/p"), "r", {}, "%E2%9C%93");
 
     expect(href).toBe("/p#%25E2%259C%2593");
   });
@@ -513,7 +513,7 @@ describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
     // "%C3%28" is a literal fragment; the strict encoder has no probe/catch —
     // it always plain-encodes, so each `%` → `%25`. (Coincides with the old
     // decode-throws → catch → plain-encode fallthrough, but is now the ONLY path.)
-    const href = buildHref(routerWith("/p"), "r", {}, { hash: "%C3%28" });
+    const href = buildHref(routerWith("/p"), "r", {}, "%C3%28");
 
     expect(href).toBe("/p#%25C3%2528");
   });
@@ -536,20 +536,20 @@ describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
       "x=1&y=2",
       "100%",
     ]) {
-      const href = buildHref(routerWith("/p"), "r", {}, { hash: input });
+      const href = buildHref(routerWith("/p"), "r", {}, input);
 
       expect(href).toBe(`/p#${canonical(input)}`);
     }
   });
 
   it("encodes a plain (non-percent) hash directly", () => {
-    const href = buildHref(routerWith("/p"), "r", {}, { hash: "a b" });
+    const href = buildHref(routerWith("/p"), "r", {}, "a b");
 
     expect(href).toBe("/p#a%20b");
   });
 
   it("strips a single leading '#' before encoding", () => {
-    const href = buildHref(routerWith("/p"), "r", {}, { hash: "#frag" });
+    const href = buildHref(routerWith("/p"), "r", {}, "#frag");
 
     expect(href).toBe("/p#frag");
   });

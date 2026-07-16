@@ -65,16 +65,14 @@ export class RealLink {
   // equality already collapses repeated `string` results, so no custom
   // comparator is required (review §8b note 3 — applies after verifying that
   // `buildHref` returns a primitive).
-  private readonly href = computed(() => {
-    const hashValue = this.hash();
-
-    return buildHref(
+  private readonly href = computed(() =>
+    buildHref(
       this.router,
       this.routeName(),
       this.stableParams() ?? EMPTY_PARAMS,
-      hashValue === undefined ? undefined : { hash: hashValue },
-    );
-  });
+      this.hash(),
+    ),
+  );
   private prevActiveClass = "";
   private prevHref: string | undefined = undefined;
   // Skip-same-value: only re-touch the DOM `class` list when the active state
