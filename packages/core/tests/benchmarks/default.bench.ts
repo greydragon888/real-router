@@ -166,9 +166,15 @@ export async function run(): Promise<void> {
     const targets = ["about", "users", "home"] as const;
     let i = 0;
 
+    // K=512 (≈7 ms — double the usual target): as TASK #1 of the CI process
+    // this bench sits closest to startup noise (`--predictable` does not
+    // virtualize wall-clock, and module-compile/IO jitter shifts the GC
+    // alignment near the first measure window). At K=256 a same-sha pair
+    // straddled the 10% report threshold (3.7↔3.4 ms); the extra mass turns
+    // that ±0.3 ms wiggle into ~4%.
     bench.add(
       "navigate/sync-baseline",
-      batched(256, () => {
+      batched(512, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
