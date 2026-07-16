@@ -63,7 +63,7 @@ pnpm -F @real-router/svelte test:properties -- --run # property-тесты (ду
 | Функция | Используется в | Стабильность |
 |---|---|---|
 | `shouldNavigate(evt)` | все `Link` компоненты + directives/actions | frozen |
-| `buildHref(router, name, params, options?)` | все `Link` компоненты + Angular directive | frozen (4-й arg `{ hash? }` добавлен в #532, обратно совместимо) |
+| `buildHref(router, name, params, hash?)` | все `Link` компоненты + Angular directive | frozen (4-й arg — **позиционный** decoded hash-фрагмент, #1442; зеркалит `navigateWithHash`; ранее был `options { hash? }` из #532; 3-arg вызовы совместимы) |
 | `navigateWithHash(router, name, params, hash, opts?)` | все `Link` компоненты в click handler | frozen (#532) |
 | `buildActiveClassName(isActive, active, base)` | все `Link` компоненты | frozen |
 | `applyLinkA11y(el)` | все `Link` компоненты + directives | frozen |

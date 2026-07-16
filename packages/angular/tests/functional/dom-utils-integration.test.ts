@@ -70,14 +70,10 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     await router.start("/");
 
-    expect(buildHref(router, "users", {}, { hash: "anchor" })).toBe(
-      "/users#anchor",
-    );
-    expect(buildHref(router, "users", {}, { hash: "" })).toBe("/users");
-    expect(buildHref(router, "users", {}, { hash: "#anchor" })).toBe(
-      "/users#anchor",
-    );
-    expect(buildHref(router, "users", {}, { hash: "a b&c#d" })).toBe(
+    expect(buildHref(router, "users", {}, "anchor")).toBe("/users#anchor");
+    expect(buildHref(router, "users", {}, "")).toBe("/users");
+    expect(buildHref(router, "users", {}, "#anchor")).toBe("/users#anchor");
+    expect(buildHref(router, "users", {}, "a b&c#d")).toBe(
       "/users#a%20b&c%23d",
     );
 

@@ -387,7 +387,7 @@ describe("buildHref — Property Tests", () => {
       numRuns: NUM_RUNS.thorough,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
       const router = makeFakeRouter(undefined, () => path);
-      const href = buildHref(router, "any", {}, { hash: rawHash });
+      const href = buildHref(router, "any", {}, rawHash);
 
       const stripped = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
 
@@ -426,8 +426,8 @@ describe("buildHref — Property Tests", () => {
 
       const router = makeFakeRouter(undefined, () => path);
 
-      const withHash = buildHref(router, "any", {}, { hash: `#${rawHash}` });
-      const withoutHash = buildHref(router, "any", {}, { hash: rawHash });
+      const withHash = buildHref(router, "any", {}, `#${rawHash}`);
+      const withoutHash = buildHref(router, "any", {}, rawHash);
 
       expect(withHash).toBe(withoutHash);
     });
@@ -476,7 +476,7 @@ describe("buildHref — Property Tests", () => {
           () => "/path",
         );
 
-        buildHref(router, name, {}, { hash: rawHash });
+        buildHref(router, name, {}, rawHash);
 
         expect(calls).toHaveLength(1);
 

@@ -51,7 +51,7 @@ function storeFile(pkg, sub) {
 // 1024, e.g. react-router 185× / @angular 219×, lives in git history + the standalone probe.)
 export const N_SWEEP = [4, 16, 64, 256];
 const range = (n) => Array.from({ length: n }, (_, i) => i + 1);
-const URL_OF = (n) => `/catalog/item-${n}`; // worst-case target = the last route
+export const URL_OF = (n) => `/catalog/item-${n}`; // worst-case target = the last route
 
 // deep-config isolation — matcher DEPTH scaling. Mirrors apps/*/_shared/deep-spec.ts:
 // a SINGLE nested chain /deep/l1/.../l90 (DEEP_DEPTH) with one child per level, matched
@@ -236,9 +236,14 @@ const LOADERS = {
     const M = await impAbs(storeFile("sv-router", "src/helpers/match-route.js"));
     return {
       build(n) {
+        // Mark each route's component fn with its path. sv-router's matchRoute returns the
+        // matched route's component fn as `.match` — otherwise anonymous and structurally
+        // indistinguishable, so the wide correctness gate can't tell a target-hit from a
+        // fuzzy match. The marker lets the gate assert `.match.__path === target` (audit Q4).
+        const mark = (p) => Object.assign(() => {}, { __path: p });
         const routes = {
-          "/": () => {},
-          ...Object.fromEntries(range(n).map((i) => [URL_OF(i), () => {}])),
+          "/": mark("/"),
+          ...Object.fromEntries(range(n).map((i) => [URL_OF(i), mark(URL_OF(i))])),
         };
         const url = URL_OF(n);
         return () => M.matchRoute(url, routes);

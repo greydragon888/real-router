@@ -99,12 +99,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
     // render that does not bail out — and on bail-out the function body
     // doesn't execute, so the cache never pays off. Same logic for
     // `buildActiveClassName` and `handleClick` below.
-    const href = buildHref(
-      router,
-      routeName,
-      paramsForNav,
-      hash === undefined ? undefined : { hash },
-    );
+    const href = buildHref(router, routeName, paramsForNav, hash);
 
     const handleClick = (evt: TargetedMouseEvent<HTMLAnchorElement>): void => {
       if (onClick) {

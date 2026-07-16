@@ -515,7 +515,7 @@ describe("buildHref — Property Tests (Solid)", () => {
       numRuns: NUM_RUNS.thorough,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
       const router = makeFakeRouter(undefined, () => path);
-      const href = buildHref(router, "any", {}, { hash: rawHash });
+      const href = buildHref(router, "any", {}, rawHash);
 
       const stripped = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
 
@@ -552,8 +552,8 @@ describe("buildHref — Property Tests (Solid)", () => {
 
       const router = makeFakeRouter(undefined, () => path);
 
-      const withHash = buildHref(router, "any", {}, { hash: `#${rawHash}` });
-      const withoutHash = buildHref(router, "any", {}, { hash: rawHash });
+      const withHash = buildHref(router, "any", {}, `#${rawHash}`);
+      const withoutHash = buildHref(router, "any", {}, rawHash);
 
       expect(withHash).toBe(withoutHash);
     });
@@ -567,7 +567,7 @@ describe("buildHref — Property Tests (Solid)", () => {
     })("hash === '' returns path without `#` suffix", (path) => {
       const router = makeFakeRouter(undefined, () => path);
 
-      expect(buildHref(router, "any", {}, { hash: "" })).toBe(path);
+      expect(buildHref(router, "any", {}, "")).toBe(path);
     });
 
     test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
@@ -577,7 +577,7 @@ describe("buildHref — Property Tests (Solid)", () => {
       (path) => {
         const router = makeFakeRouter(undefined, () => path);
 
-        expect(buildHref(router, "any", {}, { hash: "#" })).toBe(path);
+        expect(buildHref(router, "any", {}, "#")).toBe(path);
       },
     );
   });
@@ -624,7 +624,7 @@ describe("buildHref — Property Tests (Solid)", () => {
           () => "/path",
         );
 
-        buildHref(router, name, {}, { hash: rawHash });
+        buildHref(router, name, {}, rawHash);
 
         expect(calls).toHaveLength(1);
 
@@ -652,8 +652,8 @@ describe("buildHref — Property Tests (Solid)", () => {
       (rawHash, path, name) => {
         const router = makeFakeRouter(undefined, () => path);
 
-        const first = buildHref(router, name, {}, { hash: rawHash });
-        const second = buildHref(router, name, {}, { hash: rawHash });
+        const first = buildHref(router, name, {}, rawHash);
+        const second = buildHref(router, name, {}, rawHash);
 
         expect(first).toBe(second);
       },
@@ -673,12 +673,12 @@ describe("buildHref — Property Tests (Solid)", () => {
         // Use a hash with a `#` to exercise the defensive %23 replacement on
         // both rounds (the dangerous case for a non-idempotent encoder).
         const rawHash = "tab#section";
-        const href1 = buildHref(router, "any", {}, { hash: rawHash });
+        const href1 = buildHref(router, "any", {}, rawHash);
 
         // Extract fragment from first call, feed it back.
         const fragment1 = href1!.slice(`${path}#`.length);
         const decoded = decodeURI(fragment1.replaceAll("%23", "#"));
-        const href2 = buildHref(router, "any", {}, { hash: decoded });
+        const href2 = buildHref(router, "any", {}, decoded);
 
         expect(href2).toBe(href1);
       },
@@ -705,7 +705,7 @@ describe("buildHref — Property Tests (Solid)", () => {
       (pathSegment, queryValue, hash) => {
         const pathWithQuery = `/${pathSegment}?q=${queryValue}`;
         const router = makeFakeRouter(undefined, () => pathWithQuery);
-        const href = buildHref(router, "any", {}, { hash });
+        const href = buildHref(router, "any", {}, hash);
 
         // Hash MUST appear after the query, not inside it.
         expect(href).toBe(`${pathWithQuery}#${encodeURI(hash)}`);
@@ -732,7 +732,7 @@ describe("buildHref — Property Tests (Solid)", () => {
       "relative path (no leading `/`) + hash yields `<path>#<hash>` verbatim",
       (relativePath, hash) => {
         const router = makeFakeRouter(undefined, () => relativePath);
-        const href = buildHref(router, "any", {}, { hash });
+        const href = buildHref(router, "any", {}, hash);
 
         // Path stays relative — no leading `/` injected.
         expect(href).toBe(`${relativePath}#${encodeURI(hash)}`);
@@ -768,7 +768,7 @@ describe("buildHref — Property Tests (Solid)", () => {
         // leading position so the helper's leading-`#` strip doesn't eat
         // the first one.
         const hash = Array.from({ length: count }, () => "a").join("#");
-        const href = buildHref(router, "any", {}, { hash });
+        const href = buildHref(router, "any", {}, hash);
         const fragment = href!.slice("/x#".length);
 
         // No bare `#` survives encoding.
@@ -839,7 +839,7 @@ describe("buildHref — Property Tests (Solid)", () => {
           () => "",
           () => path,
         );
-        const href = buildHref(router, "any", {}, { hash });
+        const href = buildHref(router, "any", {}, hash);
 
         // The fallback path appends the encoded hash; the empty buildUrl
         // result is correctly skipped, so the final href reflects the
@@ -864,7 +864,7 @@ describe("buildHref — Property Tests (Solid)", () => {
       numRuns: NUM_RUNS.standard,
     })("literal `%20foo` is encoded verbatim to `%2520foo`", (path) => {
       const router = makeFakeRouter(undefined, () => `/${path}`);
-      const href = buildHref(router, "any", {}, { hash: "%20foo" });
+      const href = buildHref(router, "any", {}, "%20foo");
 
       expect(href).toBeDefined();
       expect(href!).toContain("%2520foo");
@@ -872,7 +872,7 @@ describe("buildHref — Property Tests (Solid)", () => {
 
     test("multi-token literal fragment is encoded verbatim (every `%` → `%25`)", () => {
       const router = makeFakeRouter(undefined, () => "/x");
-      const href = buildHref(router, "any", {}, { hash: "tab%20A%2Csection" });
+      const href = buildHref(router, "any", {}, "tab%20A%2Csection");
 
       // Decoded-input contract: `tab%20A%2Csection` is a literal string;
       // `encodeURI` escapes each literal `%` to `%25` and leaves the rest
@@ -883,7 +883,7 @@ describe("buildHref — Property Tests (Solid)", () => {
     test("NOT idempotent: feeding helper output back double-encodes (decoded-input contract)", () => {
       const router = makeFakeRouter(undefined, () => "/x");
       // Plain (decoded) input → first encode adds percent-escapes.
-      const first = buildHref(router, "any", {}, { hash: "a b" });
+      const first = buildHref(router, "any", {}, "a b");
 
       expect(first).toBe("/x#a%20b");
 
@@ -891,7 +891,7 @@ describe("buildHref — Property Tests (Solid)", () => {
       // literal `%` is re-escaped to `%25`, so the second pass is strictly
       // NOT equal to the first. This is the contract, not a regression.
       const fragment1 = first!.slice("/x#".length); // "a%20b"
-      const second = buildHref(router, "any", {}, { hash: fragment1 });
+      const second = buildHref(router, "any", {}, fragment1);
 
       expect(second).toBe("/x#a%2520b");
       expect(second).not.toBe(first);
@@ -902,7 +902,7 @@ describe("buildHref — Property Tests (Solid)", () => {
       // `encodeFragmentInline` always runs plain `encodeURI`, which never
       // throws and encodes the literal `%` to `%25`.
       const router = makeFakeRouter(undefined, () => "/x");
-      const href = buildHref(router, "any", {}, { hash: "bad%ZZ" });
+      const href = buildHref(router, "any", {}, "bad%ZZ");
 
       expect(href).toBe("/x#bad%25ZZ");
     });

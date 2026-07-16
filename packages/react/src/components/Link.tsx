@@ -78,13 +78,7 @@ const LinkImpl: FC<LinkProps> = ({
   // Navigation/href building need a concrete params object — default here only.
   const paramsForNav = routeParams ?? EMPTY_PARAMS;
 
-  // No useMemo: outer memo()+shallowEqual prevents Link re-render unless a
-  // prop actually changed. When this body runs, either `hash` differs from
-  // last render or another prop changed — in both cases the `{ hash }` alloc
-  // is unavoidable. The useMemo wrapper added one closure + deps slot per
-  // render without saving an allocation.
-  const hashOption = hash === undefined ? undefined : { hash };
-  const href = buildHref(router, routeName, paramsForNav, hashOption);
+  const href = buildHref(router, routeName, paramsForNav, hash);
 
   // useCallback was wasteful: 7 deps recreated the closure on every meaningful
   // render anyway, and `<a onClick>` does not benefit from a stable function
