@@ -53,6 +53,20 @@ export const N_SWEEP = [4, 16, 64, 256];
 const range = (n) => Array.from({ length: n }, (_, i) => i + 1);
 const URL_OF = (n) => `/catalog/item-${n}`; // worst-case target = the last route
 
+// deep-config isolation — matcher DEPTH scaling. Mirrors apps/*/_shared/deep-spec.ts:
+// a SINGLE nested chain /deep/l1/.../l90 (DEEP_DEPTH) with one child per level, matched
+// at each target depth. The browser deep-config card times matcher + nested-layout RENDER
+// (ms); isolated here the pure matcher reads in µs — revealing whether react-router's
+// #15249 parabola is a real matcher artifact or was render-dominated. Same build(d) =>
+// zero-arg match-closure contract as the wide loaders, so run.mjs sweeps both identically.
+export const DEPTH_SWEEP = [3, 30, 60, 90]; // = deep-spec DEEP_TARGETS (the deck's deep points)
+const DEEP_DEPTH = 90; // = deep-spec DEEP_DEPTH (the nested-chain depth every engine builds)
+const deepPath = (d) => {
+  let p = "/deep";
+  for (let i = 1; i <= d; i++) p += `/l${i}`;
+  return p;
+};
+
 // Each loader returns { build(n) => matchFn, check(result) => bool }. build() constructs
 // exactly-N routes and returns a zero-arg closure running one pure match of the target.
 const LOADERS = {
@@ -70,6 +84,21 @@ const LOADERS = {
         );
         const url = URL_OF(n);
         return () => api.matchPath(url);
+      },
+      buildDeep(d) {
+        const mk = (k) => ({
+          name: `l${k}`,
+          path: `/l${k}`,
+          children: k < DEEP_DEPTH ? [mk(k + 1)] : [],
+        });
+        const routes = [
+          { name: "home", path: "/" },
+          { name: "deep", path: "/deep", children: [mk(1)] },
+        ];
+        const api = getPluginApi(
+          core.createRouter(routes, { defaultRoute: "home", allowNotFound: true }),
+        );
+        return () => api.matchPath(deepPath(d));
       },
       check: (r) => r != null,
     };
@@ -89,6 +118,17 @@ const LOADERS = {
         ];
         const url = URL_OF(n);
         return () => matchRoutes(routes, url);
+      },
+      buildDeep(d) {
+        const mk = (k) => {
+          const children = [{ index: true }];
+          if (k < DEEP_DEPTH) children.push(mk(k + 1));
+          return { path: `l${k}`, children };
+        };
+        const routes = [
+          { path: "/", children: [{ index: true }, { path: "deep", children: [mk(1)] }] },
+        ];
+        return () => matchRoutes(routes, deepPath(d));
       },
       check: (r) => Array.isArray(r) && r.length > 0,
     };
@@ -111,6 +151,26 @@ const LOADERS = {
         const loc = { pathname: p, search: {}, hash: "", href: p, searchStr: "" };
         return () => router.matchRoutes(loc);
       },
+      buildDeep(d) {
+        const root = T.createRootRoute({});
+        const deep = T.createRoute({ getParentRoute: () => root, path: "deep" });
+        const levels = [];
+        let parent = deep;
+        for (let k = 1; k <= DEEP_DEPTH; k++) {
+          const lvl = T.createRoute({ getParentRoute: () => parent, path: `l${k}` });
+          levels.push(lvl);
+          parent = lvl;
+        }
+        let tree = levels[DEEP_DEPTH - 1];
+        for (let k = DEEP_DEPTH - 2; k >= 0; k--) tree = levels[k].addChildren([tree]);
+        const router = T.createRouter({
+          routeTree: root.addChildren([deep.addChildren([tree])]),
+          history: T.createMemoryHistory({ initialEntries: ["/"] }),
+        });
+        const p = deepPath(d);
+        const loc = { pathname: p, search: {}, hash: "", href: p, searchStr: "" };
+        return () => router.matchRoutes(loc);
+      },
       check: (r) => Array.isArray(r) && r.length > 0,
     };
   },
@@ -126,6 +186,19 @@ const LOADERS = {
         const url = URL_OF(n);
         return () => router.resolve(url);
       },
+      buildDeep(d) {
+        const mk = (k) => ({
+          path: `l${k}`,
+          component: {},
+          children: k < DEEP_DEPTH ? [mk(k + 1)] : [],
+        });
+        const routes = [
+          { path: "/", component: {} },
+          { path: "/deep", component: {}, children: [mk(1)] },
+        ];
+        const router = V.createRouter({ history: V.createMemoryHistory(), routes });
+        return () => router.resolve(deepPath(d));
+      },
       check: (r) => r && (r.matched?.length > 0 || r.name != null),
     };
   },
@@ -139,6 +212,16 @@ const LOADERS = {
         const branches = S.createBranches(routes);
         const url = URL_OF(n);
         return () => S.getRouteMatches(branches, url);
+      },
+      buildDeep(d) {
+        const mk = (k) => {
+          const children = [{ path: "/" }];
+          if (k < DEEP_DEPTH) children.push(mk(k + 1));
+          return { path: `l${k}`, children };
+        };
+        const routes = [{ path: "/" }, { path: "/deep", children: [mk(1)] }];
+        const branches = S.createBranches(routes);
+        return () => S.getRouteMatches(branches, deepPath(d));
       },
       check: (r) => Array.isArray(r) && r.length > 0,
     };
@@ -154,6 +237,15 @@ const LOADERS = {
         };
         const url = URL_OF(n);
         return () => M.matchRoute(url, routes);
+      },
+      buildDeep(d) {
+        const mk = (k) => {
+          const node = { layout: () => {}, "/": () => {} };
+          if (k < DEEP_DEPTH) node[`/l${k + 1}`] = mk(k + 1);
+          return node;
+        };
+        const routes = { "/": () => {}, "/deep": { "/l1": mk(1) } };
+        return () => M.matchRoute(deepPath(d), routes);
       },
       check: (r) => r && r.match !== undefined && !!r.match,
     };
@@ -216,6 +308,40 @@ export const HOLDOUTS = {
       class: "O(N)",
       reason:
         "matcher is a Svelte-runes RouterInstance method; O(N) by source (iterate routes + route.test(path))",
+    },
+  ],
+};
+
+// deep-config isolation — react cohort first (the #15249 headline). real-router + tanstack
+// are the cross-cohort anchor matchers (measured in every deep cohort as they are for wide);
+// per-cohort competitors (vue-router, solid-router, sv-router, angular-router) are added as
+// each nested matcher is verified. Engines absent here keep their browser deep-config verdict.
+export const DEEP_COHORTS = {
+  react: ["real-router", "react-router", "tanstack"],
+  vue: ["real-router", "vue-router", "tanstack"],
+  solid: ["real-router", "solid-router", "tanstack"],
+  svelte: ["real-router", "sv-router"],
+  angular: ["real-router"],
+};
+// Deep holdouts — matchers whose nested match can't be faithfully isolated headless.
+// mateo: Svelte-runes RouterInstance method (same as its wide holdout). angular-router:
+// the recognizer's recursive nested descent (empty-path routes, per-level segment
+// consumption + guard/snapshot work) can't be replicated the way the flat wide scan was —
+// its deep verdict stays the browser card's O(depth) (~1.5→6.8 ms @90).
+export const DEEP_HOLDOUTS = {
+  svelte: [
+    {
+      id: "mateo-router",
+      class: "O(N·depth)",
+      reason: "matcher is a Svelte-runes RouterInstance method; not isolatable (as for wide)",
+    },
+  ],
+  angular: [
+    {
+      id: "angular-router",
+      class: "O(depth)",
+      reason:
+        "recognizer's recursive nested descent isn't faithfully isolatable; O(depth) by the browser card",
     },
   ],
 };

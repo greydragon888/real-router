@@ -18,32 +18,34 @@ name: CodSpeed
 # regression threshold / gate semantics live in the CodSpeed project settings,
 # not here — this workflow only runs the suite under instrumentation and uploads.
 
-# ⏸ TEMPORARILY DISABLED (2026-06-27). The `simulation` gate is invalid on
-# GitHub's heterogeneous `ubuntu-latest` pool: base and head land on different
-# CPUs (AMD EPYC vs Intel Xeon), so callgrind emits different instruction counts
-# and every PR red-flags with phantom ±30–4000% swings — proven by master→master
-# runs drifting ±34% with zero code change
-# (root cause: https://codspeed.io/blog/unrelated-benchmark-regression).
+# ✅ ENABLED — Phase 2 (2026-07-16). History: the gate was disabled (#984,
+# 2026-06-27) because GitHub's heterogeneous `ubuntu-latest` pool landed base
+# and head on different CPUs (AMD EPYC vs Intel Xeon), so callgrind emitted
+# different instruction counts and every PR red-flagged with phantom
+# ±30–4000% swings (root cause:
+# https://codspeed.io/blog/unrelated-benchmark-regression). Phase 1 moved the
+# job to a dedicated self-hosted VPS (consistent hardware) — but a same-sha
+# dispatch pair STILL drifted 3/56 (×5.1 / +82% / +41%): the plugin's
+# single-measured-iteration `simulation` mode occasionally drops a full-GC
+# tail into the one measured call. Fixed by BATCHING each task to ~4-6 ms of
+# operations + a pre-run `settleHeap()` (see packages/core/tests/benchmarks/
+# fixtures.ts and IMPLEMENTATION_NOTES "Batched measurements + heap settling");
+# verified 0/56 across three same-code run pairs. The installer download from
+# codspeed.io is unreachable from the RF VPS, so runner-version is pinned to a
+# cargo-git rev (see the action step below).
 #
-# TO RE-ENABLE (planned in 1–2 months, once an x64 4-core GitHub Large Runner is
-# rented for consistent hardware — ~$0.012/min):
-#   1. Uncomment the `push` + `pull_request` triggers below.
-#   2. Change `runs-on: ubuntu-latest` → the larger-runner label (e.g. `runs-on:
-#      [self-hosted, linux, x64, codspeed-4core]` or the GitHub larger-runner
-#      group name). Same x64 arch → no harness/baseline rebuild, `simulation`
-#      stays as-is.
-# Alternative (free): transfer the repo to a GitHub org and switch to
-# `runs-on: codspeed-macro` + `mode: walltime` (Macro Runners are org-only and
-# walltime-only — needs a harness rebuild and a fresh baseline).
-#
-# Kept on `workflow_dispatch` so the suite can still be run manually meanwhile;
-# CodSpeed is NOT a required status check, so disabling it does not gate merges.
+# Phase 2 (this state): push:[master] seeds/updates the baseline, pull_request
+# compares against it. The regression threshold / gate semantics live in the
+# CodSpeed project settings, not here; CodSpeed is NOT a required status check,
+# so a red comparison informs but does not block merges. SECURITY: the job `if`
+# gates pull_request to same-repo PRs only — fork-PR code never executes on the
+# self-hosted VPS (public-repo RCE / resource-abuse surface).
 on:
-  # push:
-  #   branches: [master]
-  # pull_request:
-  #   branches: [master]
-  # Lets CodSpeed trigger a backtest run to seed the initial baseline data.
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # Manual re-seed / backtest of the CodSpeed baseline.
   workflow_dispatch:
 
 permissions:
@@ -52,18 +54,55 @@ permissions:
 jobs:
   benchmarks:
     name: Core hot-path benchmarks
-    # Self-hosted VPS runner = consistent hardware, which fixes the #984 cause (GitHub's
-    # heterogeneous ubuntu-latest pool put base/head on different CPUs → phantom
-    # instruction-count swings). PHASE 1: workflow_dispatch-only verification before
-    # enabling push/PR triggers (see the DISABLED block above). SECURITY: keep fork-PR
-    # code OFF this runner — Phase 2 gates pull_request to same-repo only.
+    # SECURITY (self-hosted + public repo): never run untrusted fork-PR code on
+    # the VPS. This gate lets push + workflow_dispatch through unconditionally
+    # (they carry no pull_request payload, so the first clause is true), and
+    # allows a pull_request ONLY when its head is a branch in THIS repo (a
+    # collaborator's branch). A fork PR has head.repo.full_name =
+    # "<forker>/real-router" != github.repository, so the job is skipped — fork
+    # code never executes on the runner.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    # Self-hosted VPS runner = consistent hardware, which fixes the #984 cause:
+    # GitHub's heterogeneous ubuntu-latest pool put base/head on different CPUs
+    # (AMD EPYC vs Intel Xeon) → phantom instruction-count swings.
     runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        # clean: false keeps the persistent runner's gitignored node_modules
+        # (and pnpm store) between dispatches — checkout still fetches + resets
+        # tracked files to the new sha, only the `git clean -ffdx` is skipped.
+        # `pnpm install --frozen-lockfile` in Setup then no-ops instead of
+        # re-linking 30 workspace packages, cutting Setup from ~36 s to a few s.
+        # Safe here: the suite runs from src via tsx + --conditions=
+        # @real-router/internal-source (no vitest, no dist build), so leftover
+        # artifacts can't perturb resolution or the callgrind counts.
+        with:
+          clean: false
 
       - name: Setup
         uses: ./.github/actions/setup
+        # node-cache: "" skips setup-node's pnpm-store cache restore — on this
+        # persistent runner the store + node_modules already live on local disk
+        # (see clean:false above), and the restore re-downloads a ~200 MB
+        # tarball from GitHub's cache backend every run (~20 s) just to unpack
+        # it over an identical local store.
+        with:
+          node-cache: ""
+
+      # runner-version: rev:… installs codspeed-runner via `cargo install` into
+      # ~/.cargo/bin. Actions runs each step in a non-login, non-interactive
+      # shell (`bash --noprofile --norc`), which does NOT read the ~/.profile
+      # line rustup adds — so ~/.cargo/bin is off PATH, and the action's runner
+      # invocation dies with `codspeed: command not found` (exit 127) even
+      # though the install succeeded. Persist the dir on PATH for every later
+      # step (incl. the action's internal run step) via $GITHUB_PATH. The
+      # release/curl path installs onto PATH itself and would not need this;
+      # it is specific to the cargo-install path we switched to.
+      - name: Put cargo bin dir on PATH (for cargo-installed codspeed-runner)
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       # CodSpeed injects its required V8 flags (--allow-natives-syntax, --no-opt,
       # …) ONLY into the process it wraps directly, and those flags can't ride
@@ -80,9 +119,27 @@ jobs:
       # fails the run before any bench executes. `simulation` is the
       # deterministic instruction-count instrument (vs `walltime`, which needs
       # dedicated runners).
+      #
+      # runner-version: `rev:v4.18.4` forces the action's cargo-install branch
+      # (`source $HOME/.cargo/env; cargo install --locked --git
+      # https://github.com/CodSpeedHQ/codspeed --rev v4.18.4 codspeed-runner`)
+      # INSTEAD of its default release path, which curls the installer from
+      # `https://codspeed.io/v4.18.4/install.sh`. That host is intermittently
+      # unreachable from the RF-hosted self-hosted VPS — ~50% of dispatches died
+      # with `curl: (28) SSL connection timeout` after 300 s, before any bench
+      # ran. The cargo path fetches from github.com + crates.io only (no
+      # codspeed.io). v4.18.4 pins the SAME runner the release path used, so
+      # measurement is unchanged. PREREQUISITE (VPS-side, one-time): rustup/cargo
+      # must be installed for the `gh-runner` user — the action does
+      # `source $HOME/.cargo/env`; without it the step fails fast. On the
+      # PERSISTENT runner cargo compiles once (~2-3 min, needs crates.io) then
+      # reports "already installed" and skips on every later dispatch (no
+      # network), so the flake is retired after the first green run. Bump this
+      # rev in lockstep with any CodSpeedHQ/action major upgrade.
       - name: Run core hot-path benchmarks under CodSpeed
         uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
+          runner-version: rev:v4.18.4
           working-directory: packages/core
           run: node --conditions=@real-router/internal-source --import tsx tests/benchmarks/codspeed.ts

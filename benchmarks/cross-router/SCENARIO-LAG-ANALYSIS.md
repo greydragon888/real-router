@@ -50,15 +50,15 @@ Each lag carries three tags:
 | svelte | link-build | 🔴 3.8× (12.1 vs 3.2 ms mount) | `<Link>-COMPONENT` | code-traced (#1099/#1247/#1253) | `FEATURE-COST` (use:link = fast path) |
 | svelte | nested-switch | +42% (0.135 vs 0.095) | `<Link>-COMPONENT` (active-class flip ×2) | **A/B-proven** | `FEATURE-COST` — *outlet-swap BEATS sv-router* |
 | svelte | param-nav | +16% (0.093 vs 0.080) | `<Link>-COMPONENT` + `IMMUTABLE-STATE` | **A/B-proven** | `STRUCTURAL` (plain-a → parity-minus, no flip) |
-| svelte | table-heap | 🔴 2.6× (5.9 vs 2.3 MB @10k) | `SCALE-FLOOR` | inferred | `STRUCTURAL` |
+| svelte | table-heap | 🔴 2.6× (5.9 vs 2.3 MB @10k) | `SCALE-FLOOR` (**98% route-tree+trie**, ~650 B/route) | **measured (heap-decomp)** | `STRUCTURAL` |
 | svelte | nav-churn | +60% (396 vs 248 KB/nav) | `IMMUTABLE-STATE` | code-traced | `STRUCTURAL` / `v2-CANDIDATE` |
-| svelte | deep-config | +56% (3.23 vs 2.07 @90, CPU) | `SCALE-FLOOR` + `FRAMEWORK-NATIVE` | inferred | `STRUCTURAL` |
+| svelte | deep-config | +56% browser (3.23 vs 2.07 @90) — **RENDER, not matcher** | `FRAMEWORK-NATIVE` render (isolated matcher: rr **WINS 72×**, sv-router 200 vs 2.8 µs) | **measured (isolated)** | `STRUCTURAL` (compiled render) |
 | svelte | back-forward | +2% (0.207 vs 0.203) | core back/forward path; sv 4µs lighter | inferred | `FRAMEWORK-NATIVE` (tiny; ~floor) |
 | solid | nav-churn | +28% (310 vs 242 KB/nav) | `IMMUTABLE-STATE` | code-traced | `STRUCTURAL` / `v2-CANDIDATE` |
-| solid | table-heap | +3% (5.78 vs 5.61 MB @10k) | `SCALE-FLOOR` | inferred (rme 0.0%, 0.17 MB) | `STRUCTURAL` (tiny) |
+| solid | table-heap | +3% (5.78 vs 5.61 MB @10k) | `SCALE-FLOOR` (route-tree+trie — same class) | **measured (heap-decomp)** · +3% near-floor | `STRUCTURAL` (tiny) |
 | angular | nav-latency/param/nested/active/back-fwd/churn | *(was up to ~4× behind)* | `DEFERRED-COMMIT` (zoneless async CD) | **A/B-proven** | ✅ `FIXED` (#1466 — sync-commit) |
-| angular | cold-start, table-heap | 3.1×, +70% | `EAGER-CORE`, `SCALE-FLOOR` | code-traced | `STRUCTURAL` |
-| react, vue | deep-config @90 | +71% / +82% | `COMPETITOR-ARTIFACT` (react-router/vue-router non-monotonic parabola) | inferred | `ARTIFACT` |
+| angular | cold-start, table-heap | 3.1×, +70% | `EAGER-CORE`, `SCALE-FLOOR` (route-tree+trie) | code-traced / **heap-decomp** | `STRUCTURAL` |
+| react, vue, solid | deep-config (matcher, isolated) | 🟡 rr #2 to TanStack O(1) (~2.7×, µs) | `SCALE-FLOOR` (trie O(depth) vs static-path index O(1)) | **measured (isolated matcher)** | `STRUCTURAL` — react-router #15249 = **6–9 ms** matcher (debunked as the @90 "winner") |
 | react | search-param-scaling | 🔴 +48% (0.53 vs 0.36 ms @256, both sub-ms) | `IMMUTABLE-STATE` (eager O(count) materialize; react-router's eager read is lighter) | measured one-realm n=50 | `STRUCTURAL` (rr does more per pass) |
 | vue | active-links | ~~🔴 +55%~~ → **rr WINS 4.3×** | `COMPETITOR-ARTIFACT` (bench-app: rr shell subscribed to route over N `<Link>`; vue-router isolates in `<RouterView>`) | **A/B-proven** | ✅ `FIXED` (#1483 — bench-app view-isolation) |
 | vue | nav-churn | 🟡 +2% | `IMMUTABLE-STATE` / near-floor | inferred | `NOISE`/`STRUCTURAL` |
@@ -129,9 +129,19 @@ rr 12.1 ms vs sv-router 3.2 ms to mount ~1000 links. sv-router uses plain-`<a>`;
 
 real-router retains more heap per create→navigate→dispose cycle (svelte +60%, solid +28%; RME 0.0% — deterministic) because it allocates a fresh, frozen `State` per navigation. solid-router/sv-router mutate a signal in place. This is the eager-immutable identity (explicitly kept in the v2 review). **v2-CANDIDATE:** RFC-6 (versioned snapshot-store + total freeze) targets exactly this floor.
 
-### table-heap, deep-config, back-forward — `SCALE-FLOOR` / `FRAMEWORK-NATIVE` → `STRUCTURAL`
+### deep-config (all cohorts) — MATCHER isolated → the browser card was render-dominated (2026-07-16, measured)
 
-- **table-heap** (route-table memory @10k routes) and **deep-config** (matcher CPU @depth-90): real-router's eager trie + full route-tree is heavier at scale than sv-router's lazy/compiler-native matching. The price of O(1) matching + the full pipeline. `rr ≈ mateo-router` on deep-config (3.23 ≈ 3.27) — sv-router is the outlier, not rr the laggard.
+The browser deep-config times matcher **+ nested-layout RENDER** composition (ms). Isolating the pure matcher (matcher-bench depth sweep — every engine builds the same 90-level nested chain `/deep/l1/../l90`, matched in pure Node, µs) reveals the true class and **debunks two browser-era conclusions**:
+
+- **react-router #15249 is a REAL, catastrophic MATCHER cost, not a render quirk.** The isolated matcher re-flattens + re-ranks the whole 90-deep config every call: a **parabola peaking at depth 60 (9.6 ms), ~4600× real-router's matcher** — same parabola shape (peak @60) as the browser card, a matcher-algorithm signature (render would be monotonic in depth). **The browser "react-router wins deep @90" (1.5 ms) was render**: its matcher @90 is 5953 µs, ~2000× heavier than real-router (2.85 µs). The old `COMPETITOR-ARTIFACT` / `ARTIFACT` verdict was wrong — it is a real, severe react-router matcher cost.
+- **real-router's matcher is O(depth) but LIGHT** — 0.6 → 2.8 µs at depth 90 (the trie walks d levels). **TanStack (static-path index) is O(1)** — flat ~1 µs, so it edges real-router at deep (@90 1.04 vs 2.85 µs, 2.7×). This is the *only* real deep-matcher lag: trie-O(depth) vs index-O(1), µs-scale, `STRUCTURAL` (the trie buys prefix-sharing + the full pipeline).
+- **vue-router** is µs-competitive (O(depth), 4.7 µs @90). **solid-router (272 µs) and sv-router (200 µs)** are O(depth) with heavy constants — real-router wins their matcher **97× / 72×**. So the browser svelte "rr loses deep +56%" was sv-router's lighter **compiled render**, not its matcher (rr's matcher wins 72×).
+- **angular-router — deep HOLDOUT.** The recognizer's recursive nested descent + per-level snapshot/guard work can't be faithfully isolated headless (unlike the flat wide scan). Its deep card keeps the browser full-nav (O(depth), ~5.5 ms @90 vs rr ~1.6 — rr wins there). mateo (svelte) is a holdout for the same reason as wide.
+- **Deck:** deep-config now reads the isolated matcher (log µs, uniform with wide-config) for react/vue/solid/svelte; angular falls back to the browser card. Deep matches are µs–ms (not sub-µs like wide), so the runner uses a low iteration floor for the deep sweep.
+
+### table-heap, back-forward — `SCALE-FLOOR` / `FRAMEWORK-NATIVE` → `STRUCTURAL`
+
+- **table-heap** (route-table memory) — **decomposed 2026-07-16 (measured, `node --expose-gc` retained-heap probe):** real-router's router heap scales as `fixed 0.16 MB [O(1): FSM + sources + state] + ~650 B/route [O(routes): route-tree + trie]`. At 10k routes the **O(routes) route-tree + trie is 6.87 MB = 98 % of the router heap** (7.0 MB); the fixed machinery is 2 %, non-scaling. So the `SCALE-FLOOR` cause is **confirmed — it is the eager trie + route-tree** (the price of O(1) *wide* matching + the full pipeline), not the FSM/sources/state. sv-router's compiler-native / lazy structure stores less per route (its lighter 2.3 MB page). (deep-config's matcher is measured separately — see above.)
 - **back-forward** (+2%, svelte): real-router's back/forward replay is ~0.206 on **both** svelte and solid — a *core* path cost, identical across adapters; sv-router is 4 µs lighter framework-native. Tiny, ~floor.
 
 ---

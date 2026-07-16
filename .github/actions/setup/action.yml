@@ -8,6 +8,16 @@ inputs:
     description: Arguments passed to `pnpm install` (e.g. `--frozen-lockfile --ignore-scripts`).
     required: false
     default: "--frozen-lockfile"
+  node-cache:
+    description:
+      Value for actions/setup-node's `cache` input. Default "pnpm" restores the
+      pnpm store from GitHub's cache backend — right for ephemeral GitHub-hosted
+      runners. Pass "" to skip the restore/save entirely on persistent
+      self-hosted runners, where the local store + node_modules survive between
+      runs and the ~200 MB tarball download is pure network overhead
+      (codspeed.yml does this).
+    required: false
+    default: "pnpm"
 runs:
   using: composite
   steps:
@@ -18,7 +28,7 @@ runs:
       uses: actions/setup-node@v6
       with:
         node-version: 24
-        cache: pnpm
+        cache: ${{ inputs.node-cache }}
 
     - name: Install dependencies
       shell: bash

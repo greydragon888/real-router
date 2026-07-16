@@ -1,10 +1,10 @@
-# matcher-bench — isolated matcher scaling (wide table match)
+# matcher-bench — isolated matcher scaling (wide table + deep tree match)
 
 Pure-Node microbench that measures each router's **matcher** in isolation — no browser,
-no framework render — across a width sweep of `4 … 1024` flat sibling routes. It is the
-honest instrument for the **"wide table match"** question ("how does match cost scale with
-table width?"), which the Playwright `wide-config` scenario cannot answer at
-sub-millisecond magnitudes.
+no framework render — across two sweeps: a **width** sweep of `4 … 1024` flat sibling routes
+(`wide-config`) and a **depth** sweep of a `3 … 90`-level nested chain (`deep-config`). It is
+the honest instrument for the **"how does match cost scale?"** questions that the Playwright
+`wide-config` / `deep-config` scenarios cannot answer at sub-millisecond magnitudes.
 
 ## Why it exists
 
@@ -81,11 +81,37 @@ Isolated µs per match at N = 1024 (representative run):
 card reports. react-router's absolute includes re-flattening branches every call — its
 public `matchRoutes` does this; `createBrowserRouter` may amortize it across navigations.)
 
+## Deep tree match — depth sweep
+
+The same isolation applied to `deep-config` ("how does match cost scale with nesting
+**depth**?"). Every engine builds the identical 90-level nested chain `/deep/l1/…/l90`
+(`deep-spec`) and matches the URL at each target depth `[3, 30, 60, 90]`. Isolated µs per
+match at depth 90 (representative run):
+
+| router | class | µs @90 | note |
+| --- | --- | ---: | --- |
+| tanstack | **O(1)** static-path index | ~1.0 | flat — the deep-match champion |
+| real-router | **O(depth)** trie walk | ~2.8 | light; edged by TanStack's O(1) at depth |
+| vue-router | O(depth) | ~4.7 | µs-competitive |
+| sv-router | O(depth) | ~200 | heavy constant |
+| solid-router | O(depth) | ~272 | heavy constant |
+| react-router | **catastrophic** (#15249) | **~6000** | parabola peaking @60 (**9.6 ms**); re-flatten + re-rank every call |
+
+**react-router #15249 is confirmed a MATCHER cost, not render:** the isolated matcher
+reproduces the browser card's exact **parabola (peak @60)** — a matcher-algorithm signature,
+not the monotonic curve render would produce. The browser "react-router wins deep @90" was
+render (its matcher @90 is ~5953 µs, ~2000× real-router's). Deep matches are µs–ms (not
+sub-µs like wide), so the deep sweep uses a low per-loop iteration floor.
+
 ## Holdouts
 
-One competitor cannot be isolated headless; it is **O(N)** by other evidence and keeps that
-verdict from the browser card:
+Competitors that cannot be isolated headless are **O(N)/O(depth)** by other evidence and keep
+that verdict from the browser card:
 
-- **@mateothegreat/svelte5-router** — its matcher is a method on a Svelte-runes
+- **@mateothegreat/svelte5-router** (wide + deep) — its matcher is a method on a Svelte-runes
   `RouterInstance` class (needs the runes runtime). `O(N)` by source: the router iterates
   its routes and calls `route.test(path)` on each.
+- **@angular/router** (deep only) — the flat wide scan isolates via `defaultUrlMatcher`, but
+  the *nested* recognizer needs a recursive descent (per-level segment consumption +
+  snapshot/guard work) that can't be faithfully replicated headless. Its deep card keeps the
+  browser full-nav (O(depth), ~5.5 ms @90 vs real-router ~1.6).
