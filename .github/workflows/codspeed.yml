@@ -80,9 +80,27 @@ jobs:
       # fails the run before any bench executes. `simulation` is the
       # deterministic instruction-count instrument (vs `walltime`, which needs
       # dedicated runners).
+      #
+      # runner-version: `rev:v4.18.4` forces the action's cargo-install branch
+      # (`source $HOME/.cargo/env; cargo install --locked --git
+      # https://github.com/CodSpeedHQ/codspeed --rev v4.18.4 codspeed-runner`)
+      # INSTEAD of its default release path, which curls the installer from
+      # `https://codspeed.io/v4.18.4/install.sh`. That host is intermittently
+      # unreachable from the RF-hosted self-hosted VPS — ~50% of dispatches died
+      # with `curl: (28) SSL connection timeout` after 300 s, before any bench
+      # ran. The cargo path fetches from github.com + crates.io only (no
+      # codspeed.io). v4.18.4 pins the SAME runner the release path used, so
+      # measurement is unchanged. PREREQUISITE (VPS-side, one-time): rustup/cargo
+      # must be installed for the `gh-runner` user — the action does
+      # `source $HOME/.cargo/env`; without it the step fails fast. On the
+      # PERSISTENT runner cargo compiles once (~2-3 min, needs crates.io) then
+      # reports "already installed" and skips on every later dispatch (no
+      # network), so the flake is retired after the first green run. Bump this
+      # rev in lockstep with any CodSpeedHQ/action major upgrade.
       - name: Run core hot-path benchmarks under CodSpeed
         uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
+          runner-version: rev:v4.18.4
           working-directory: packages/core
           run: node --conditions=@real-router/internal-source --import tsx tests/benchmarks/codspeed.ts
