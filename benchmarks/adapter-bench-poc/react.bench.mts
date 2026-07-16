@@ -116,7 +116,7 @@ function mount(startPath: string): Promise<MountResult> {
 
   bench.add(
     "react/navigate-param-swap",
-    batched(16, () => {
+    batched(2, () => {
       flushSync(() => {
         void router.navigate("items", { id: ids[i++ % ids.length] });
       });
@@ -133,7 +133,7 @@ function mount(startPath: string): Promise<MountResult> {
 
   bench.add(
     "react/navigate-route-swap",
-    batched(16, () => {
+    batched(2, () => {
       const name = targets[i++ % targets.length];
 
       flushSync(() => {
@@ -153,7 +153,7 @@ function mount(startPath: string): Promise<MountResult> {
 
   bench.add(
     "react/back-forward",
-    batched(16, () => {
+    batched(2, () => {
       flushSync(() => {
         if (back) {
           router.back();
