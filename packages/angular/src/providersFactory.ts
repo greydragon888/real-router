@@ -17,7 +17,7 @@ import {
 } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
-import { createRouteSource } from "@real-router/sources";
+import { createRouteSource, primeErrorSource } from "@real-router/sources";
 
 import {
   installScrollRestoration,
@@ -241,6 +241,20 @@ export function provideRealRouterFactory<
     // `RouterErrorBoundary` on subsequent renders.
     provideAppInitializer(async () => {
       const router = inject(ROUTER);
+
+      // #778 P2 / #1232: eagerly create the per-request error source before the
+      // first component renders, so a navigation error that fires AFTER start()
+      // but BEFORE a lazily-rendered RouterErrorBoundary mounts is still
+      // captured (the boundary's createDismissableError reuses this cached
+      // source). Symmetric intent to the SPA `provideRealRouter` prime, but done
+      // HERE, not in a `provideEnvironmentInitializer`: the factory's router is
+      // lazily cloned via `inject(ROUTER)`, so a clone failure (e.g. a disposed
+      // baseRouter) must stay on the async Option-A reject path — an env
+      // initializer runs earlier and would surface it as a synchronous bootstrap
+      // throw. `primeErrorSource` no-ops on a router with no internals registry,
+      // so it is safe on the server clone.
+      primeErrorSource(router);
+
       const request = inject(REQUEST, { optional: true });
       const transferState = inject(TransferState);
 
