@@ -6,7 +6,8 @@
   "scripts": {
     "bench:cross-router": "node cross-router/run.mjs",
     "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
-    "bench:adapter-poc": "vite build --config adapter-bench-poc/vite.config.mts && node --expose-gc --import tsx adapter-bench-poc/react.bench.mts"
+    "bench:adapter-poc": "pnpm run prebuild:adapter-poc && node --expose-gc --import tsx adapter-bench-poc/react.bench.mts",
+    "prebuild:adapter-poc": "vite build --config adapter-bench-poc/vite.config.mts"
   },
   "dependencies": {
     "@angular/common": "~22.0.6",
