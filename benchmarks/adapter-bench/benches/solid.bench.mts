@@ -48,7 +48,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "solid/navigate-route-swap",
-      batched(2, () => {
+      batched(4, () => {
         const name = targets[i++ % targets.length];
 
         app.commitNavigate(name, name === "items" ? { id: "1" } : undefined);
