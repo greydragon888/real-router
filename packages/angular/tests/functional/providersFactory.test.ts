@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-extraneous-class -- Angular test host components use empty classes with @Component decorators */
 import {
   ApplicationInitStatus,
+  Component,
   EnvironmentInjector,
   Injector,
   REQUEST,
@@ -10,6 +12,7 @@ import {
   runInInjectionContext,
 } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import {
   createRouter,
   type PluginFactory,
@@ -18,6 +21,7 @@ import {
 import { getDependenciesApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { RouterErrorBoundary } from "../../src/components/RouterErrorBoundary";
 import { NAVIGATOR, ROUTE, ROUTER } from "../../src/providers";
 import {
   provideRealRouterFactory,
@@ -514,6 +518,55 @@ describe("provideRealRouterFactory", () => {
       await expect(
         TestBed.inject(ApplicationInitStatus).donePromise,
       ).rejects.toThrow();
+    });
+  });
+
+  describe("error source priming (#1232)", () => {
+    // Symmetric with the SPA `provideRealRouter` P2 test
+    // (reactive-lifecycle.test.ts): a navigation error that fires AFTER a
+    // successful start() but BEFORE a lazily-rendered RouterErrorBoundary mounts
+    // must still be captured. `provideRealRouterFactory` must eagerly prime the
+    // per-request error source at bootstrap — exactly as the SPA path does.
+    // Without the prime the boundary's `createDismissableError` creates the
+    // error source lazily on init, AFTER the error, and stays silent (#1232).
+    it("a RouterErrorBoundary mounted AFTER a post-start navigation error shows the error", async () => {
+      @Component({
+        template: `<router-error-boundary
+          ><span>app</span></router-error-boundary
+        >`,
+        imports: [RouterErrorBoundary],
+      })
+      class BoundaryHost {}
+
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: REQUEST, useValue: new Request("http://localhost/") },
+          provideRealRouterFactory({ baseRouter }),
+        ],
+      });
+
+      // Bootstrap: environment initializers (the prime) + app initializer
+      // (start at "/").
+      await TestBed.inject(ApplicationInitStatus).donePromise;
+
+      const router = TestBed.inject(ROUTER);
+
+      // Navigation error AFTER a successful start, BEFORE the boundary mounts.
+      await router.navigate("nonexistent").catch(() => {});
+
+      // Now mount the boundary (e.g. a lazily-rendered error region).
+      const fixture = TestBed.createComponent(BoundaryHost);
+
+      fixture.detectChanges();
+
+      const boundary = fixture.debugElement.query(
+        By.directive(RouterErrorBoundary),
+      ).componentInstance as RouterErrorBoundary;
+
+      const ctx = boundary.errorContext();
+
+      expect(ctx).not.toBeNull();
+      expect(ctx!.$implicit.code).toBe("ROUTE_NOT_FOUND");
     });
   });
 
