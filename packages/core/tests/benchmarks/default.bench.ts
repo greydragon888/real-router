@@ -33,7 +33,7 @@ import {
 import { createRouter } from "../../src";
 import { getLifecycleApi, getPluginApi } from "../../src/api";
 
-import type { Route } from "../../src";
+import type { Params, Route } from "../../src";
 import type { Bench } from "tinybench";
 
 /**
@@ -249,6 +249,58 @@ export async function run(): Promise<void> {
       "navigate/forwardTo",
       batched(384, () => {
         void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
+  }
+
+  // param navigation: item→item on the same param route — the canonical list
+  // click-through. Non-empty params hit the branches every navigate bench
+  // above skips: normalizeParams' non-empty arm (the static-route benches all
+  // reuse the frozen EMPTY_PARAMS singleton, #1027), freezeStateInPlace over a
+  // real params object, setStateMetaParams with content, and the param-encode
+  // inside buildNavigateState's buildPath. Two alternating ids keep every
+  // iteration a real transition (paths differ → no same-state reject).
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "user", path: "/users/:id" },
+    ]);
+
+    await router.start("/");
+    const targets: Params[] = [{ id: "17" }, { id: "42" }];
+    let i = 0;
+
+    bench.add(
+      "navigate/params",
+      batched(192, () => {
+        void router.navigate("user", targets[i++ % targets.length]);
+      }),
+    );
+  }
+
+  // query navigation under the DEFAULT loose queryParamsMode — the form apps
+  // run unless they opt into strict (that branch lives in
+  // strict-query.bench.ts). Query values ride normalizeParams + the
+  // search-params stringify on every build; alternating sets keep the paths
+  // distinct (the same-state check compares paths, and query params are part
+  // of the path), so every iteration is a real transition.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page" },
+    ]);
+
+    await router.start("/");
+    const targets: Params[] = [
+      { q: "alpha", page: "1" },
+      { q: "beta", page: "2" },
+    ];
+    let i = 0;
+
+    bench.add(
+      "navigate/query-params",
+      batched(192, () => {
+        void router.navigate("search", targets[i++ % targets.length]);
       }),
     );
   }
@@ -621,6 +673,19 @@ export async function run(): Promise<void> {
       routes: [{ name: "profile", path: "/profiles/:id?" }],
       start: "/profiles/seed",
       url: "/profiles",
+    },
+    {
+      // Full-miss guard (matchPath → undefined) — every garbage URL on SSR /
+      // the allowNotFound path. The URL first HITS the wide tree's static map
+      // (route250), then dead-ends on the extra segment (no children, no
+      // splat); a root-level miss would walk strictly less. Pins the miss path
+      // to its O(1)-ish cost so an accidental O(N) sibling scan on failure
+      // gets caught.
+      batch: 1536,
+      name: "matchPath/no-match",
+      routes: wideRoutes(500),
+      start: "/route0",
+      url: "/route250/extra",
     },
   ];
 
