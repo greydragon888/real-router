@@ -1,6 +1,7 @@
 name: CodSpeed Adapters
 
-# Adapter hot-path benchmark suite (PoC: react) — pure tinybench + vite
+# Adapter hot-path benchmark suite (react/preact/vue/solid/svelte/angular)
+# — pure tinybench + vite
 # prebuild under jsdom; design record in IMPLEMENTATION_NOTES ("CodSpeed
 # benchmark gate") and benchmarks/adapter-bench-poc/.
 #
@@ -22,7 +23,7 @@ permissions:
 
 jobs:
   benchmarks:
-    name: React adapter hot-path benchmarks (PoC)
+    name: Adapter hot-path benchmarks (6 frameworks)
     # Same self-hosted VPS as the core gate: consistent hardware; runner
     # processes one job at a time, so core/adapters runs queue, never race.
     runs-on: self-hosted
@@ -47,11 +48,13 @@ jobs:
       - name: Put cargo bin dir on PATH (for cargo-installed codspeed-runner)
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      - name: Prebuild the bench app (vite, production, NOT instrumented)
+      - name: Prebuild the bench apps (vite ×6, production, NOT instrumented)
         working-directory: benchmarks
         # via the workspace script (not `pnpm exec vite`) so knip resolves the
         # vite binary against benchmarks/package.json, where it is declared.
-        run: pnpm run prebuild:adapter-poc
+        # The script also bundles the angular graph first (turbo): the angular
+        # suite resolves @real-router/* to built dist — see vite/base.mts.
+        run: pnpm run prebuild:adapter
 
       # runner-version: rev:… = cargo-install path (github.com + crates.io
       # only; codspeed.io is unreachable from this VPS ~50% of the time).
@@ -64,4 +67,4 @@ jobs:
           mode: simulation
           runner-version: rev:v4.18.4
           working-directory: benchmarks
-          run: node --import tsx adapter-bench-poc/react.bench.mts
+          run: node --import tsx adapter-bench/codspeed.mts
