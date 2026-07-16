@@ -1,5 +1,16 @@
 # @real-router/angular
 
+## 0.14.1
+
+### Patch Changes
+
+- [#1495](https://github.com/greydragon888/real-router/pull/1495) [`9124e50`](https://github.com/greydragon888/real-router/commit/9124e50bdebb9a1755f887344d16f2c87cdcccb6) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor internal `buildHref` DOM helper to a positional hash argument ([#1442](https://github.com/greydragon888/real-router/issues/1442))
+
+  `buildHref(router, name, params, hash?)` now takes the hash fragment positionally instead of wrapping it in an options object, mirroring the existing `navigateWithHash(router, name, params, hash)` signature and simplifying the `RealLink` href `computed`. Internal-only helper — the git-tracked `src/dom-utils/` copy is kept byte-identical to `shared/dom-utils/`. No public API surface or runtime behavior change; rendered hrefs are identical.
+
+- Updated dependencies [[`996a6da`](https://github.com/greydragon888/real-router/commit/996a6daf9a7092ea1b9878d245d663cbac8f265e)]:
+  - @real-router/sources@0.11.4
+
 ## 0.14.0
 
 ### Minor Changes
