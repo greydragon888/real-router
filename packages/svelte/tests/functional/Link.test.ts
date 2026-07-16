@@ -204,6 +204,43 @@ describe("Link component", () => {
 
       expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
     });
+
+    it("still navigates (isolated) when the onclick handler throws (#1436)", () => {
+      // Native <a> semantics: a throwing click listener is logged and the
+      // default action still runs — mirrors vue's #1352 isolation. Pre-fix the
+      // throw escapes handleClick before navigateWithHash, aborting navigation.
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      vi.spyOn(router, "navigate").mockResolvedValue({} as State);
+
+      renderWithRouter(router, Link, {
+        routeName: "one-more-test",
+        onclick: () => {
+          throw new Error("boom");
+        },
+      });
+
+      const link = document.querySelector("a")!;
+      const event = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+      });
+
+      // Swallow the pre-fix propagated throw so the discriminating asserts run.
+      try {
+        link.dispatchEvent(event);
+      } catch {
+        /* pre-fix: unisolated throw */
+      }
+
+      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[real-router]"),
+        expect.any(Error),
+      );
+
+      errorSpy.mockRestore();
+    });
   });
 
   describe("URL Building", () => {
