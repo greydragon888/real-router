@@ -82,7 +82,19 @@
 
   function handleClick(evt: MouseEvent) {
     if (userOnClick) {
-      userOnClick(evt);
+      // Isolate a throwing user handler (#1436): native <a> logs a throwing
+      // click listener and still performs the default action. Without this the
+      // throw escapes before navigateWithHash, silently aborting navigation.
+      // The user's own preventDefault() runs before any throw, so the
+      // defaultPrevented contract below is unchanged. Mirrors vue's #1352.
+      try {
+        userOnClick(evt);
+      } catch (error) {
+        console.error(
+          "[real-router] A <Link> onclick handler threw; navigation is unaffected.",
+          error,
+        );
+      }
 
       if (evt.defaultPrevented) {
         return;
