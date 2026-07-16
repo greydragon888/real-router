@@ -217,6 +217,47 @@ describe("Link component", () => {
       expect(onClickMock).toHaveBeenCalledWith(expect.any(MouseEvent));
     });
 
+    it("still navigates (isolated) when the onClick handler throws (#1436)", async () => {
+      // Native <a> semantics: a throwing click listener is logged and the
+      // default action still runs — mirrors vue's #1352 isolation. Pre-fix the
+      // throw escapes handleClick before navigateWithHash, aborting navigation.
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      vi.spyOn(router, "navigate");
+      const onClickMock = vi.fn(() => {
+        throw new Error("boom");
+      });
+
+      render(
+        () => (
+          <Link
+            routeName="one-more-test"
+            onClick={onClickMock}
+            data-testid="link"
+          >
+            Test
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      // Swallow the pre-fix propagated throw so the discriminating asserts run.
+      try {
+        await user.click(screen.getByTestId("link"));
+      } catch {
+        /* pre-fix: unisolated throw */
+      }
+
+      expect(onClickMock).toHaveBeenCalledTimes(1);
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[real-router]"),
+        expect.any(Error),
+      );
+
+      errorSpy.mockRestore();
+    });
+
     it("should prevent navigation on non-left click", () => {
       vi.spyOn(router, "navigate");
 

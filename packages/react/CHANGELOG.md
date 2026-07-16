@@ -1,5 +1,13 @@
 # @real-router/react
 
+## 0.29.2
+
+### Patch Changes
+
+- [#1497](https://github.com/greydragon888/real-router/pull/1497) [`3b6174d`](https://github.com/greydragon888/real-router/commit/3b6174d8dc5e68a6f81bc0abe1e8be010632e368) Thanks [@greydragon888](https://github.com/greydragon888)! - Isolate a throwing `<Link>` onClick handler from navigation ([#1436](https://github.com/greydragon888/real-router/issues/1436))
+
+  `<Link>` invoked the user's `onClick` handler with no exception isolation and before its own `preventDefault` + navigate, so a throwing handler propagated out of the click handler and silently aborted navigation. Native `<a>` logs a throwing click listener and still performs the default action; the handler is now wrapped in try/catch (logged via `console.error`), matching the codebase's consumer-callback isolation norm (vue's [#1352](https://github.com/greydragon888/real-router/issues/1352), `InkLink` [#799](https://github.com/greydragon888/real-router/issues/799)). The handler's own `preventDefault()` still blocks navigation (it runs before any throw), so the `defaultPrevented` contract is unchanged.
+
 ## 0.29.1
 
 ### Patch Changes
