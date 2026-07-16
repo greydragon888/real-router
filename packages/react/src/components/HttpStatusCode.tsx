@@ -59,6 +59,21 @@ export function HttpStatusCode({ code }: HttpStatusCodeProps): ReactNode {
   const sink = useContext(HttpStatusContext);
 
   if (sink) {
+    // Dev-only validation: Node's `res.end()` throws `Invalid status code` on
+    // NaN / 0 / negative / non-integer / >999. Surface the bad value at the
+    // source so the consumer can fix the routing logic, instead of waiting
+    // for the server to crash mid-response. Production builds (Vite, esbuild,
+    // tsdown all replace `process.env.NODE_ENV !== "production"` with `false`)
+    // strip the check.
+    if (
+      process.env.NODE_ENV !== "production" &&
+      (!Number.isInteger(code) || code < 100 || code > 999)
+    ) {
+      console.error(
+        `[real-router] <HttpStatusCode code={${String(code)}} /> received an invalid HTTP status code. Node's res.end() rejects values that are not an integer in [100, 999] — pass a real HTTP status (commonly 4xx/5xx).`,
+      );
+    }
+
     sink.code = code;
   }
 

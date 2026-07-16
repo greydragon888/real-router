@@ -1,5 +1,5 @@
 import { render, screen } from "@solidjs/testing-library";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import {
   HttpStatusCode,
@@ -128,6 +128,70 @@ describe("HttpStatusCode", () => {
       ));
 
       expect(screen.getByText("visible content")).toBeInTheDocument();
+    });
+  });
+
+  describe("dev-only validation (#1441)", () => {
+    // Symmetric with the preact HttpStatusCode dev-only validation: an invalid
+    // `code` (not an integer in [100, 999]) logs a console.error at the source
+    // — Node's res.end() would otherwise reject it mid-response. The value is
+    // still written to the sink (the warning is informational, not a block).
+    // Stripped from production bundles via the `process.env.NODE_ENV` guard.
+    it.each([[Number.NaN], [0], [1.5], [1000]])(
+      "dev-warns when code === %s (still writes to sink)",
+      (invalidCode) => {
+        const sink = createHttpStatusSink();
+        const consoleError = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+
+        render(() => (
+          <HttpStatusProvider sink={sink}>
+            <HttpStatusCode code={invalidCode} />
+          </HttpStatusProvider>
+        ));
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /^\[real-router\] <HttpStatusCode code=\{.+\} \/> received an invalid HTTP status code\./,
+          ),
+        );
+        expect(sink.code).toBe(invalidCode);
+
+        consoleError.mockRestore();
+      },
+    );
+
+    it("does NOT warn for valid integer codes in [100, 999]", () => {
+      const sink = createHttpStatusSink();
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      render(() => (
+        <HttpStatusProvider sink={sink}>
+          <HttpStatusCode code={100} />
+          <HttpStatusCode code={404} />
+          <HttpStatusCode code={999} />
+        </HttpStatusProvider>
+      ));
+
+      expect(consoleError).not.toHaveBeenCalled();
+
+      consoleError.mockRestore();
+    });
+
+    it("does NOT warn without a provider (validation only fires on the write path)", () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      render(() => <HttpStatusCode code={Number.NaN} />);
+
+      expect(consoleError).not.toHaveBeenCalled();
+
+      consoleError.mockRestore();
     });
   });
 });

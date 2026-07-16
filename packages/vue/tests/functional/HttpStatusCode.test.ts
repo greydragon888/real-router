@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createSSRApp, defineComponent, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 
@@ -194,6 +194,47 @@ describe("HttpStatusCode", () => {
       const wrapper = mount(Host);
 
       expect(wrapper.text()).toContain("visible content");
+    });
+  });
+
+  describe("dev-only validation (#1441)", () => {
+    // Symmetric with the preact HttpStatusCode dev-only validation: an invalid
+    // `code` (not an integer in [100, 999]) logs a console.error in setup() —
+    // Node's res.end() would otherwise reject it mid-response. The value is
+    // still written to the sink (the warning is informational, not a block).
+    it.each([[Number.NaN], [0], [1.5], [1000]])(
+      "dev-warns when code === %s (still writes to sink)",
+      async (invalidCode) => {
+        const sink = createHttpStatusSink();
+        const consoleError = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+
+        await renderToString(createSSRApp(buildHost(sink, invalidCode)));
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /^\[real-router\] <HttpStatusCode :code="[^"]*" \/> received an invalid HTTP status code\./,
+          ),
+        );
+        expect(sink.code).toBe(invalidCode);
+
+        consoleError.mockRestore();
+      },
+    );
+
+    it("does NOT warn for a valid integer code in [100, 999]", async () => {
+      const sink = createHttpStatusSink();
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      await renderToString(createSSRApp(buildHost(sink, 404)));
+
+      expect(consoleError).not.toHaveBeenCalled();
+
+      consoleError.mockRestore();
     });
   });
 });

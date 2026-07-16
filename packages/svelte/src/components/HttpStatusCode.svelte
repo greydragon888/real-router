@@ -55,9 +55,24 @@
 
   if (sink) {
     // svelte-ignore state_referenced_locally
-    // Intentional one-time write at component init: the sink is read by the
+    // Intentional one-time read at component init: the sink is read by the
     // server after `await render()` and a single value is the contract.
-    // Consumers that need to update the code mid-render should remount.
-    sink.code = code;
+    // Consumers that need to update the code mid-render should remount. Captured
+    // into a local so the validation + write below don't re-reference the prop.
+    const value = code;
+
+    // Dev-only validation: Node's `res.end()` throws `Invalid status code` on
+    // NaN / 0 / negative / non-integer / >999. Surface the bad value at the
+    // source; production builds strip the `process.env.NODE_ENV` check.
+    if (
+      process.env.NODE_ENV !== "production" &&
+      (!Number.isInteger(value) || value < 100 || value > 999)
+    ) {
+      console.error(
+        `[real-router] <HttpStatusCode code={${String(value)}} /> received an invalid HTTP status code. Node's res.end() rejects values that are not an integer in [100, 999] — pass a real HTTP status (commonly 4xx/5xx).`,
+      );
+    }
+
+    sink.code = value;
   }
 </script>
