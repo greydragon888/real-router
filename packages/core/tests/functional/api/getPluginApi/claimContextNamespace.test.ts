@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
 import { cloneRouter, getPluginApi } from "@real-router/core/api";
+import { serializeRouterState } from "@real-router/core/utils";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -291,6 +292,54 @@ describe("getPluginApi().claimContextNamespace()", () => {
 
       expect(caught).toBeInstanceOf(RouterError);
       expect(caught!.code).toBe(errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED);
+    });
+  });
+
+  describe("prototype-name & input-shape hardening (#1191)", () => {
+    it('write to a "__proto__" namespace creates an own key, not a prototype swap (N3)', async () => {
+      const claim = api.claimContextNamespace("__proto__");
+
+      await router.start("/home");
+
+      const state = router.getState()!;
+
+      claim.write(state, { data: 42 });
+
+      // Pre-fix: `state.context["__proto__"] = value` dispatches into the
+      // inherited Object.prototype.__proto__ setter and swaps the prototype
+      // instead of creating an own entry — Object.keys is empty and the data
+      // silently vanishes from the SSR transport.
+      expect(Object.keys(state.context)).toContain("__proto__");
+      expect(Object.getPrototypeOf(state.context)).toBe(Object.prototype);
+      expect(state.context.__proto__).toStrictEqual({ data: 42 });
+    });
+
+    it('"__proto__" namespace data survives a serializeRouterState roundtrip (N3 SSR transport)', async () => {
+      const claim = api.claimContextNamespace("__proto__");
+
+      await router.start("/home");
+
+      const state = router.getState()!;
+
+      claim.write(state, { data: 42 });
+
+      const parsed = JSON.parse(serializeRouterState(state)) as {
+        context: Record<string, unknown>;
+      };
+
+      // Pre-fix: context serializes as {} (no own keys) → plugin data lost.
+      expect(Object.keys(parsed.context)).toStrictEqual(["__proto__"]);
+      expect(parsed.context.__proto__).toStrictEqual({ data: 42 });
+    });
+
+    it("rejects an empty-string namespace with a TypeError (N4)", () => {
+      expect(() => api.claimContextNamespace("")).toThrow(TypeError);
+    });
+
+    it("rejects a non-string namespace with a TypeError (N4)", () => {
+      expect(() => api.claimContextNamespace(42 as unknown as string)).toThrow(
+        TypeError,
+      );
     });
   });
 });
