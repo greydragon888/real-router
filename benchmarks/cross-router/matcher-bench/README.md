@@ -90,12 +90,14 @@ match at depth 90 (representative run):
 
 | router | class | µs @90 | note |
 | --- | --- | ---: | --- |
-| tanstack | **O(1)** static-path index | ~1.0 | flat — the deep-match champion |
-| real-router | **O(depth)** trie walk | ~2.8 | light; edged by TanStack's O(1) at depth |
-| vue-router | O(depth) | ~4.7 | µs-competitive |
-| sv-router | O(depth) | ~200 | heavy constant |
-| solid-router | O(depth) | ~272 | heavy constant |
-| react-router | **catastrophic** (#15249) | **~6000** | parabola peaking @60 (**9.6 ms**); re-flatten + re-rank every call |
+| real-router | **O(depth)** trie walk | ~2.8 | **the lightest — wins the deep matcher in every cohort** |
+| vue-router | O(depth) | ~4.8 | µs-competitive (rr wins ~1.7×) |
+| tanstack | O(depth) | ~70 | walks the parent chain per level too; rr wins **~25×** |
+| sv-router | O(depth) | ~202 | heavy constant (rr wins ~72×) |
+| solid-router | O(depth) | ~273 | heavy constant (rr wins ~99×) |
+| react-router | **catastrophic** (#15249) | **~5900** | parabola peaking @60 (**9.6 ms**); re-flatten + re-rank every call |
+
+> ⚠️ **Fixed 2026-07-16 (independent audit, C9):** an earlier version reported TanStack deep as **O(1) ~1 µs** ("champion") — a matcher-bench bug: `tanstack buildDeep` closed over a mutated `let parent` (late-binding), so the 90-level tree never built and `matchRoutes` fuzzy-matched to `/deep` (2 matches) at any depth; the `length > 0` gate passed it. Fixed with per-iteration `const` capture + a depth-assert gate (the match must reach depth d). TanStack deep is **O(depth)**; **real-router wins the deep matcher in every cohort.**
 
 **react-router #15249 is confirmed a MATCHER cost, not render:** the isolated matcher
 reproduces the browser card's exact **parabola (peak @60)** — a matcher-algorithm signature,

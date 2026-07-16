@@ -35,7 +35,7 @@ sudo ./bench-cross-router.sh                    # full unattended refresh (all c
 node cross-router/run-all.mjs 30 angular        # one cohort at n=30 → results/
 ```
 
-**Results feed the interactive infographic deck** (rebuilt from `results/`); the committed text `REPORT-*.md` were **retired 2026-07-14** in favor of it. Design: [`.claude/cross-router-benchmarks-design.md`](../.claude/cross-router-benchmarks-design.md). See [`cross-router/CLAUDE.md`](CLAUDE.md) for the harness internals, metric map, and gotchas.
+**Results feed the interactive infographic deck** (rebuilt from `results/`); the committed text `REPORT-*.md` were **retired 2026-07-14** in favor of it. Design: [`.claude/cross-router-benchmarks-design.md`](.claude/cross-router-benchmarks-design.md). See [`cross-router/CLAUDE.md`](CLAUDE.md) for the harness internals, metric map, and gotchas.
 
 ## Machine & stability
 
