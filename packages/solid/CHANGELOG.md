@@ -1,5 +1,13 @@
 # @real-router/solid
 
+## 0.17.0
+
+### Minor Changes
+
+- [#1492](https://github.com/greydragon888/real-router/pull/1492) [`983ef1d`](https://github.com/greydragon888/real-router/commit/983ef1d8b41f18040da91f43d8767875a358f8e5) Thanks [@greydragon888](https://github.com/greydragon888)! - Dev-only validation for `<HttpStatusCode>` invalid codes ([#1441](https://github.com/greydragon888/real-router/issues/1441))
+
+  `<HttpStatusCode code={N}>` now logs a `console.error` in development when `code` is not an integer in `[100, 999]` — Node's `res.end()` rejects such values with "Invalid status code", so the warning surfaces the bad value at the source rather than at the response boundary. The value is still written to the sink (informational, not a block); the check is stripped from production via the `process.env.NODE_ENV` guard. Ports the validation that previously existed only in preact.
+
 ## 0.16.19
 
 ### Patch Changes
