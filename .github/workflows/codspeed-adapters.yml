@@ -1,21 +1,29 @@
 name: CodSpeed Adapters
 
-# Adapter hot-path benchmark suite (react/preact/vue/solid/svelte/angular)
-# — pure tinybench + vite
-# prebuild under jsdom; design record in IMPLEMENTATION_NOTES ("CodSpeed
-# benchmark gate") and benchmarks/adapter-bench-poc/.
+# Adapter hot-path benchmark suite (react/preact/vue/solid/svelte/angular) —
+# pure tinybench + vite prebuild under jsdom; design record in
+# IMPLEMENTATION_NOTES ("Adapter benches — all six frameworks") and
+# benchmarks/adapter-bench/.
 #
-# PHASE 1: workflow_dispatch-ONLY while the callgrind numbers are verified
-# (same staging the core gate used — see #984): dispatch → K recalibration
-# from the first honest run → same-sha pair with 0 phantoms → only then
-# consider auto triggers. Kept SEPARATE from codspeed.yml so an adapter-suite
-# failure never blocks the core gate signal (and vice versa).
+# ✅ ENABLED — Phase 2 (2026-07-16). Phase 1 (dispatch-only) verified the
+# suite the same way the core gate was verified (#984): first-callgrind K
+# calibration (three convergence iterations; solid/navigate-param-swap needed
+# the core-task-#1 double-mass medicine) → final same-sha pair 18/18
+# unchanged, impact +0.014%. push:[master] seeds/updates the baseline,
+# pull_request compares; CodSpeed is NOT a required status check. Kept
+# SEPARATE from codspeed.yml so an adapter-suite failure never blocks the
+# core gate signal (and vice versa); the single runner queues the two jobs.
 #
 # The prebuild step runs OUTSIDE the CodSpeed action on purpose: vite build
 # must not be instrumented — only the bench process is. The bench itself is a
 # single direct `node` (no vitest, no spawn hops), the exact process shape
 # whose V8-flag injection the core gate already proved on this runner.
 on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # Manual re-seed / backtest of the CodSpeed baseline.
   workflow_dispatch:
 
 permissions:
@@ -24,6 +32,14 @@ permissions:
 jobs:
   benchmarks:
     name: Adapter hot-path benchmarks (6 frameworks)
+    # SECURITY (self-hosted + public repo): same gate as codspeed.yml — push
+    # + workflow_dispatch run unconditionally (no pull_request payload, first
+    # clause true); a pull_request runs ONLY when its head is a branch in
+    # THIS repo. Fork PRs are skipped, so untrusted fork code never executes
+    # on the VPS.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     # Same self-hosted VPS as the core gate: consistent hardware; runner
     # processes one job at a time, so core/adapters runs queue, never race.
     runs-on: self-hosted
