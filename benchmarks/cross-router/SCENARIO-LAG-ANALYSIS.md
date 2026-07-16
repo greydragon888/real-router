@@ -62,8 +62,8 @@ Each lag carries three tags:
 | react | search-param-scaling | 🔴 +48% (0.53 vs 0.36 ms @256, both sub-ms) | `IMMUTABLE-STATE` (eager O(count) materialize; react-router 8.2.0 = one native `URLSearchParams`) | measured n=50; **code-traced** (magnitude inferred) | `STRUCTURAL` (rr does more per pass) |
 | vue | active-links | ~~🔴 +55%~~ → **rr WINS 4.3×** | `COMPETITOR-ARTIFACT` (bench-app: rr shell subscribed to route over N `<Link>`; vue-router isolates in `<RouterView>`) | **A/B-proven** | ✅ `FIXED` (#1483 — bench-app view-isolation) |
 | vue | nav-churn | ≈parity (07-15: rr −1.4% ahead; ±2% cross-session band) | `IMMUTABLE-STATE` / near-floor | inferred | `NOISE` — off lag-list |
-| react, vue | table-heap | +5.4% / +9.5% @100 (rr 2.39/2.29 vs 2.26/2.09) | `SCALE-FLOOR` | measured (Ф3-audit 07-16) | `STRUCTURAL` (small) |
-| solid | link-build | +7.1% @256 (rr 3.0 vs solid-router 2.8) | `<Link>-COMPONENT` | measured (Ф3-audit) | `STRUCTURAL` — ⚠ contradicts CLAUDE.md "rr wins link-build" |
+| react, vue | table-heap | +5.4% / +9.5% @100 (rr 2.39/2.29 vs 2.26/2.09) | `SCALE-FLOOR` | measured (Ф3-audit 07-16) **+ corroborated** (cold-start heap@10: +6.0%/+13.2%, same sign, 2.7–4.7× > ±2% band) | `STRUCTURAL` (small) |
+| solid | link-build | endpoint-only: +7.1% @256 (3.0 vs 2.8) but **rr WINS @8–@128** (−25% / −11% / −12%) | `<Link>-COMPONENT`; @256 flip = solid-router @128→@256 **sublinear ×1.65 kink**, not an rr lag | measured (Ф3-audit; **sweep-corroborated** 07-16) | `OBSERVATION` — off lag-list; CLAUDE.md "rr wins link-build" holds @8–@128 |
 | vue | deep-config (browser) | +73% @90 (rr 1.52 vs vue-router 0.88) — **RENDER** (matcher: rr wins 1.7×) | `FRAMEWORK-NATIVE` render | measured (Ф3-audit) | `STRUCTURAL` |
 | react | search-param **alloc** | +171% allocKBPerNav (237 vs 87) | `IMMUTABLE-STATE` gross-alloc | measured (prose only — alloc axis absent from matrix) | `STRUCTURAL` |
 
@@ -146,6 +146,7 @@ The browser deep-config times matcher **+ nested-layout RENDER** composition (ms
 ### table-heap, back-forward — `SCALE-FLOOR` / `FRAMEWORK-NATIVE` → `STRUCTURAL`
 
 - **table-heap** (route-table memory) — **decomposed 2026-07-16 (measured, `node --expose-gc` retained-heap probe):** real-router's router heap scales as `fixed 0.16 MB [O(1): FSM + sources + state] + ~650 B/route [O(routes): route-tree + trie]`. At 10k routes the **O(routes) route-tree + trie is 6.87 MB = 98 % of the router heap** (7.0 MB); the fixed machinery is 2 %, non-scaling. So the `SCALE-FLOOR` cause is **confirmed — it is the eager trie + route-tree** (the price of O(1) *wide* matching + the full pipeline), not the FSM/sources/state. sv-router's compiler-native / lazy structure stores less per route (its lighter 2.3 MB page). (deep-config's matcher is measured separately — see above.)
+- **table-heap @100 (react/vue small-N)** — the +5.4% / +9.5% @100 margins are **cross-scenario corroborated** (Ф3-audit 07-16): cold-start `jsHeapMB@10` shows the same-sign per-route overhead (react +6.0%, vue +13.2%) at an independent load point, 2.7–4.7× above the ±2% cross-session heap band — so the small-N table-heap lag is a real per-route footprint, not measurement noise. Same `SCALE-FLOOR` mechanism as the @10k decomposition, one order of magnitude down.
 - **back-forward** (+4%, svelte): real-router's back/forward replay is ~0.206 **wall** on both svelte and solid — a *core* path cost; sv-router ~8 µs lighter framework-native. (Wall-only: `navMsTask` diverges — svelte 0.116 vs solid 0.098.) Tiny, ~floor.
 
 ---

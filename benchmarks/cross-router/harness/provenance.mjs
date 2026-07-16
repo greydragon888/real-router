@@ -68,15 +68,30 @@ export function freshnessGateAndProvenance(here) {
   }
   let commit = "unknown";
   let dirty = null;
+  let dirtyFiles = null;
+  let dirtyCode = null;
   try {
     commit = execSync("git rev-parse --short HEAD", { cwd: here }).toString().trim();
-    dirty = execSync("git status --porcelain", { cwd: here }).toString().trim() !== "";
+    // Record WHICH files were dirty at MEASUREMENT time. A bare `dirty` bool can't tell
+    // "docs-only" from "bench/src code dirty" — and the latter means the cell measures an
+    // un-pinnable state (the code that ran was never committed). `dirtyCode` flags exactly
+    // that load-bearing case (any dirty JS/TS), making the provenance a verifiable per-run
+    // fact instead of a retrospective guess (audit Q1, 2026-07-16).
+    // Split the RAW output (no leading .trim() — that strips the first line's leading
+    // status space, e.g. an unstaged " M path", shifting slice(3) one char into the path).
+    // Porcelain v1 lines are `XY PATH` (2 status chars + 1 space), so the path is slice(3).
+    const porcelain = execSync("git status --porcelain", { cwd: here }).toString();
+    dirtyFiles = porcelain.split("\n").filter((l) => l).map((l) => l.slice(3));
+    dirty = dirtyFiles.length > 0;
+    dirtyCode = dirtyFiles.some((f) => /\.(mjs|cjs|js|ts|tsx)$/.test(f));
   } catch {
     /* git unavailable — leave commit=unknown */
   }
   return {
     commit,
     dirty,
+    dirtyFiles,
+    dirtyCode,
     distNewestMtime: distMtime ? new Date(distMtime).toISOString() : null,
   };
 }

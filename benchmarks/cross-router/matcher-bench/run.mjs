@@ -18,6 +18,7 @@ import {
   DEPTH_SWEEP,
   HOLDOUTS,
   N_SWEEP,
+  URL_OF,
   loadEngine,
 } from "./matchers.mjs";
 
@@ -64,15 +65,31 @@ async function runSweep(ids, sweep, buildMethod) {
   const built = {};
   for (const id of ids) for (const n of sweep) built[`${id}@${n}`] = loaded[id][buildMethod](n);
 
-  // correctness gate — every matcher must hit its target. For the DEEP sweep, ALSO assert
-  // the match actually REACHES depth n (across each engine's result shape): a fuzzy
-  // short-match (e.g. a broken route tree resolving to /deep) passes length>0 and reads as
-  // a false "O(1) flat ~1 µs" — exactly the tanstack late-binding bug this gate now catches.
+  // correctness gate — every matcher must hit its target. `check()` only asserts non-empty;
+  // a fuzzy/short match (broken tree resolving to a shallower or wrong route) passes it and
+  // reads as a false result. So ALSO assert the match reached the RIGHT target, per sweep:
+  //
+  //   DEEP  — the match reaches depth n (the tanstack late-binding bug: a fuzzy 2-match at
+  //           any depth read as a false "O(1) flat ~1 µs" until this gate caught it).
+  //   WIDE  — the match hit the target route /catalog/item-n (not item-1 / home / a fuzzy
+  //           prefix). Each engine's result shape empirically probed (2026-07-16); sv-router's
+  //           match is an anonymous component fn, marked with `__path` in its build() so it's
+  //           assertable like the other six (audit Q4).
   const reachesDepth = (r, d) =>
     (Array.isArray(r) && r.length >= d) || // react-router / tanstack / solid-router
     (r?.matched?.length ?? 0) >= d || // vue-router
     (r?.layouts?.length ?? 0) >= d || // sv-router
     (typeof r?.name === "string" && r.name.split(".").length === d + 1); // real-router
+  const reachesWide = (r, n) => {
+    const full = URL_OF(n); // /catalog/item-n
+    return (
+      (typeof r?.name === "string" && r.name === `item${n}`) || // real-router (route name)
+      r?.path === full || // real-router / vue-router (resolve().path)
+      r?.match?.__path === full || // sv-router (marked component fn)
+      r?.consumed?.at(-1)?.path === `item-${n}` || // angular-router (UrlSegment[], no leading /)
+      (Array.isArray(r) && (r.at(-1)?.pathname === full || r.at(-1)?.path === full)) // react-router / tanstack / solid-router
+    );
+  };
   for (const id of ids) {
     for (const n of sweep) {
       const r = built[`${id}@${n}`]();
@@ -81,6 +98,9 @@ async function runSweep(ids, sweep, buildMethod) {
       }
       if (buildMethod === "buildDeep" && !reachesDepth(r, n)) {
         throw new Error(`${id}@${n} (buildDeep) matched but did NOT reach depth ${n} — broken tree / fuzzy match`);
+      }
+      if (buildMethod === "build" && !reachesWide(r, n)) {
+        throw new Error(`${id}@${n} (build) matched but did NOT hit target ${URL_OF(n)} — fuzzy/wrong match`);
       }
     }
   }
