@@ -84,6 +84,13 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        # node-cache: "" skips setup-node's pnpm-store cache restore — on this
+        # persistent runner the store + node_modules already live on local disk
+        # (see clean:false above), and the restore re-downloads a ~200 MB
+        # tarball from GitHub's cache backend every run (~20 s) just to unpack
+        # it over an identical local store.
+        with:
+          node-cache: ""
 
       # runner-version: rev:… installs codspeed-runner via `cargo install` into
       # ~/.cargo/bin. Actions runs each step in a non-login, non-interactive
