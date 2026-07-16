@@ -250,6 +250,9 @@ importers:
       '@real-router/memory-plugin':
         specifier: workspace:^
         version: link:../packages/memory-plugin
+      '@real-router/preact':
+        specifier: workspace:^
+        version: link:../packages/preact
       '@real-router/react':
         specifier: workspace:^
         version: link:../packages/react
@@ -286,6 +289,9 @@ importers:
       nanostores:
         specifier: 0.11.4
         version: 0.11.4
+      preact:
+        specifier: ~10.29.7
+        version: 10.29.7(preact-render-to-string@6.7.0)
       react:
         specifier: ~19.2.7
         version: 19.2.7

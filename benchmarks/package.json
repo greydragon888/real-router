@@ -6,8 +6,8 @@
   "scripts": {
     "bench:cross-router": "node cross-router/run.mjs",
     "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
-    "bench:adapter-poc": "pnpm run prebuild:adapter-poc && node --expose-gc --import tsx adapter-bench-poc/react.bench.mts",
-    "prebuild:adapter-poc": "vite build --config adapter-bench-poc/vite.config.mts"
+    "prebuild:adapter": "pnpm -w exec turbo run bundle --filter=@real-router/angular --filter=@real-router/memory-plugin --output-logs=errors-only && vite build --config adapter-bench/vite/react.config.mts && vite build --config adapter-bench/vite/preact.config.mts && vite build --config adapter-bench/vite/vue.config.mts && vite build --config adapter-bench/vite/solid.config.mts && vite build --config adapter-bench/vite/svelte.config.mts && vite build --config adapter-bench/vite/angular.config.mts",
+    "bench:adapter": "pnpm run prebuild:adapter && node --expose-gc --import tsx adapter-bench/codspeed.mts"
   },
   "dependencies": {
     "@angular/common": "~22.0.6",
@@ -23,6 +23,7 @@
     "@real-router/core": "workspace:^",
     "@real-router/lifecycle-plugin": "workspace:^",
     "@real-router/memory-plugin": "workspace:^",
+    "@real-router/preact": "workspace:^",
     "@real-router/react": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/solid": "workspace:^",
@@ -35,6 +36,7 @@
     "@tanstack/vue-router": "~1.170.16",
     "mitata": "1.0.34",
     "nanostores": "0.11.4",
+    "preact": "~10.29.7",
     "react": "~19.2.7",
     "react-dom": "~19.2.7",
     "react-router": "~8.2.0",

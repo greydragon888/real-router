@@ -1,14 +1,8 @@
 /**
- * PoC adapter-bench app — React + @real-router/react + memory-plugin.
- *
- * Deliberately minimal (no nanostores/zod/search-schema of the retired
- * vs-tanstack app): the subject is the ADAPTER's per-navigation work —
- * useSyncExternalStore fan-out, <Link> active-class recompute, RouteView
- * subtree swap — not app-land selector churn.
- *
- * Built by vite (see vite.config.mts) into dist/app.mjs with react-dom
- * bundled in production mode; the bench process imports `mountTestApp` after
- * installing the jsdom globals (jsdom-env.mts).
+ * React adapter-bench app. Subject: per-navigation adapter work — uSES
+ * fan-out, <Link> active-class recompute, RouteView subtree swap.
+ * Commit mechanics: `flushSync` wraps each navigation so the synchronous
+ * React commit lands inside the measure window.
  */
 import { createRouter } from "@real-router/core";
 import { memoryPluginFactory } from "@real-router/memory-plugin";
@@ -19,10 +13,11 @@ import {
   useRoute,
   useRouteNode,
 } from "@real-router/react";
-import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
+import { createRoot } from "react-dom/client";
 
-import type { Route, Router } from "@real-router/core";
+import type { MountedApp } from "../shared/bench-utils.mjs";
+import type { Route } from "@real-router/core";
 
 const routes: Route[] = [
   { name: "home", path: "/" },
@@ -33,6 +28,8 @@ const routes: Route[] = [
   },
   { name: "about", path: "/about" },
 ];
+
+const indices = [0, 1, 2, 3, 4];
 
 /** 5 useRoute subscribers — the uSES fan-out every mounted component pays. */
 function RootSubscriber({ index }: { index: number }) {
@@ -55,8 +52,6 @@ function ItemsSubscriber({ index }: { index: number }) {
     </span>
   );
 }
-
-const indices = [0, 1, 2, 3, 4];
 
 /** 8 Links with activeClassName — per-navigation href/active recompute. */
 function LinkPanel() {
@@ -118,16 +113,10 @@ function App() {
   );
 }
 
-export interface MountResult {
-  router: Router;
-  unmount: () => void;
-}
-
-/** Mounts the app synchronously (flushSync) and resolves after start(). */
 export async function mountTestApp(
   container: HTMLElement,
   startPath: string,
-): Promise<MountResult> {
+): Promise<MountedApp> {
   const router = createRouter(routes);
 
   router.usePlugin(memoryPluginFactory());
@@ -144,11 +133,22 @@ export async function mountTestApp(
   });
 
   return {
-    router,
+    commitNavigate: (name, params) => {
+      flushSync(() => {
+        void router.navigate(name, params);
+      });
+    },
+    commitHistory: (dir) => {
+      flushSync(() => {
+        if (dir === "back") {
+          router.back();
+        } else {
+          router.forward();
+        }
+      });
+    },
     unmount: () => {
       root.unmount();
     },
   };
 }
-
-export { flushSync };

@@ -4,5 +4,12 @@
     "jsx": "react-jsx",
     "noEmit": true
   },
-  "include": ["./*.tsx", "./*.mts", "./*.d.ts"]
+  "include": [
+    "./*.tsx",
+    "./*.mts",
+    "./*.d.ts"
+  ],
+  "files": [
+    "shared/jsdom.d.ts"
+  ]
 }
