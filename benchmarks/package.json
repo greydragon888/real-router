@@ -5,7 +5,8 @@
   "description": "Benchmark tests for @real-router/core",
   "scripts": {
     "bench:cross-router": "node cross-router/run.mjs",
-    "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10"
+    "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
+    "bench:adapter-poc": "vite build --config adapter-bench-poc/vite.config.mts && node --expose-gc --import tsx adapter-bench-poc/react.bench.mts"
   },
   "dependencies": {
     "@angular/common": "~22.0.6",
@@ -57,6 +58,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "@vitejs/plugin-vue": "6.0.7",
     "@vitejs/plugin-vue-jsx": "5.1.5",
+    "jsdom": "29.1.1",
     "playwright": "1.61.1",
     "vite": "7.3.6",
     "vite-plugin-solid": "2.11.12"
