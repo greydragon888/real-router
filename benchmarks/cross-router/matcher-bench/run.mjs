@@ -64,11 +64,23 @@ async function runSweep(ids, sweep, buildMethod) {
   const built = {};
   for (const id of ids) for (const n of sweep) built[`${id}@${n}`] = loaded[id][buildMethod](n);
 
-  // correctness gate — every matcher must hit its target
+  // correctness gate — every matcher must hit its target. For the DEEP sweep, ALSO assert
+  // the match actually REACHES depth n (across each engine's result shape): a fuzzy
+  // short-match (e.g. a broken route tree resolving to /deep) passes length>0 and reads as
+  // a false "O(1) flat ~1 µs" — exactly the tanstack late-binding bug this gate now catches.
+  const reachesDepth = (r, d) =>
+    (Array.isArray(r) && r.length >= d) || // react-router / tanstack / solid-router
+    (r?.matched?.length ?? 0) >= d || // vue-router
+    (r?.layouts?.length ?? 0) >= d || // sv-router
+    (typeof r?.name === "string" && r.name.split(".").length === d + 1); // real-router
   for (const id of ids) {
     for (const n of sweep) {
-      if (!loaded[id].check(built[`${id}@${n}`]())) {
+      const r = built[`${id}@${n}`]();
+      if (!loaded[id].check(r)) {
         throw new Error(`${id}@${n} (${buildMethod}) returned empty match`);
+      }
+      if (buildMethod === "buildDeep" && !reachesDepth(r, n)) {
+        throw new Error(`${id}@${n} (buildDeep) matched but did NOT reach depth ${n} — broken tree / fuzzy match`);
       }
     }
   }

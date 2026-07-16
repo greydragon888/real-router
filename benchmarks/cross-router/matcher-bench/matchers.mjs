@@ -157,7 +157,12 @@ const LOADERS = {
         const levels = [];
         let parent = deep;
         for (let k = 1; k <= DEEP_DEPTH; k++) {
-          const lvl = T.createRoute({ getParentRoute: () => parent, path: `l${k}` });
+          // Capture parent per-iteration: `() => parent` over the mutated `let` late-binds
+          // EVERY level to levels[89] → the tree never builds, matchRoutes fuzzy-matches to
+          // /deep (2 matches) at any depth → a false "O(1) flat ~1 µs". Each level must close
+          // over ITS OWN parent (const).
+          const parentRoute = parent;
+          const lvl = T.createRoute({ getParentRoute: () => parentRoute, path: `l${k}` });
           levels.push(lvl);
           parent = lvl;
         }
