@@ -65,6 +65,18 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      # runner-version: rev:… installs codspeed-runner via `cargo install` into
+      # ~/.cargo/bin. Actions runs each step in a non-login, non-interactive
+      # shell (`bash --noprofile --norc`), which does NOT read the ~/.profile
+      # line rustup adds — so ~/.cargo/bin is off PATH, and the action's runner
+      # invocation dies with `codspeed: command not found` (exit 127) even
+      # though the install succeeded. Persist the dir on PATH for every later
+      # step (incl. the action's internal run step) via $GITHUB_PATH. The
+      # release/curl path installs onto PATH itself and would not need this;
+      # it is specific to the cargo-install path we switched to.
+      - name: Put cargo bin dir on PATH (for cargo-installed codspeed-runner)
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
       # CodSpeed injects its required V8 flags (--allow-natives-syntax, --no-opt,
       # …) ONLY into the process it wraps directly, and those flags can't ride
       # through NODE_OPTIONS. So we wrap a DIRECT `node` that runs the whole suite
