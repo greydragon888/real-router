@@ -34,7 +34,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "solid/navigate-param-swap",
-      batched(2, () => {
+      batched(8, () => {
         app.commitNavigate("items", { id: ids[i++ % ids.length] });
       }),
     );
