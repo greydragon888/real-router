@@ -210,7 +210,7 @@ export const Link = defineComponent({
         router,
         props.routeName,
         stableParams.value ?? EMPTY_PARAMS,
-        props.hash === undefined ? undefined : { hash: props.hash },
+        props.hash,
       ),
     );
 

@@ -101,18 +101,8 @@ export function Link<P extends Params = Params>(
         ),
       );
 
-  // Separate memo for the hash-options object so the `{ hash }` literal
-  // is allocated only when `local.hash` actually changes (instead of on
-  // every `href` memo evaluation). For static `<Link hash="foo">` this
-  // produces ONE allocation total; for dynamic hash through `<Show keyed>`
-  // workaround the allocation cost scales with hash changes, not with
-  // routeName/routeParams changes (§8c A4 audit fix).
-  const hashOpts = createMemo(() =>
-    local.hash === undefined ? undefined : { hash: local.hash },
-  );
-
   const href = createMemo(() =>
-    buildHref(router, local.routeName, local.routeParams, hashOpts()),
+    buildHref(router, local.routeName, local.routeParams, local.hash),
   );
 
   const handleClick = (evt: MouseEvent) => {
