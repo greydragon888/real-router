@@ -29,6 +29,11 @@ export function createErrorSource(
   let errorVersion = 0;
   let hasError = false;
 
+  // Declared before `source` so its onDestroy closure closes over an
+  // initialized binding — a mid-registration throw below no longer leaves it
+  // in the TDZ, keeping the source destroyable (#1440).
+  const unsubs: (() => void)[] = [];
+
   const source = new BaseSource(INITIAL_SNAPSHOT, {
     onDestroy: () => {
       for (const unsub of unsubs) {
@@ -39,41 +44,60 @@ export function createErrorSource(
 
   const api = getPluginApi(router);
 
-  // Eager connection: subscribe to router events immediately
-  const unsubs = [
-    api.addEventListener(
-      events.TRANSITION_ERROR,
-      (
-        toState: State | undefined,
-        fromState: State | undefined,
-        err: RouterError,
-      ) => {
-        errorVersion++;
-        hasError = true;
-        source.updateSnapshot({
-          error: err,
-          toRoute: toState ?? null,
-          /* v8 ignore next -- @preserve: fromState undefined only during start() error; unreachable via navigate() */
-          fromRoute: fromState ?? null,
-          version: errorVersion,
-        });
-      },
-    ),
-    api.addEventListener(events.TRANSITION_SUCCESS, () => {
-      // Skip if no error — avoids unnecessary re-renders.
-      // BaseSource.updateSnapshot() always notifies listeners (new object = new ref),
-      // and useSyncExternalStore compares via Object.is().
-      if (hasError) {
-        hasError = false;
-        source.updateSnapshot({
-          error: null,
-          toRoute: null,
-          fromRoute: null,
-          version: errorVersion,
-        });
-      }
-    }),
-  ];
+  // Eager connection: subscribe to router events immediately. Register
+  // one-by-one so a throw mid-registration (the emitter rejects a duplicate
+  // listener / hits its maxListeners cap) unwinds the already-registered
+  // listeners instead of leaking them and stranding the half-wired source
+  // (#1440). Mirrors @real-router/rx's events$ partial-registration safety.
+  /* eslint-disable unicorn/prefer-single-call -- register one-by-one so a
+     mid-registration throw unwinds the already-pushed unsubs; a single
+     push(a, b) evaluates every addEventListener arg BEFORE pushing, leaving an
+     earlier registration untracked and leaked (#1440). */
+  try {
+    unsubs.push(
+      api.addEventListener(
+        events.TRANSITION_ERROR,
+        (
+          toState: State | undefined,
+          fromState: State | undefined,
+          err: RouterError,
+        ) => {
+          errorVersion++;
+          hasError = true;
+          source.updateSnapshot({
+            error: err,
+            toRoute: toState ?? null,
+            /* v8 ignore next -- @preserve: fromState undefined only during start() error; unreachable via navigate() */
+            fromRoute: fromState ?? null,
+            version: errorVersion,
+          });
+        },
+      ),
+    );
+    unsubs.push(
+      api.addEventListener(events.TRANSITION_SUCCESS, () => {
+        // Skip if no error — avoids unnecessary re-renders.
+        // BaseSource.updateSnapshot() always notifies listeners (new object = new ref),
+        // and useSyncExternalStore compares via Object.is().
+        if (hasError) {
+          hasError = false;
+          source.updateSnapshot({
+            error: null,
+            toRoute: null,
+            fromRoute: null,
+            version: errorVersion,
+          });
+        }
+      }),
+    );
+  } catch (error) {
+    for (const unsub of unsubs) {
+      unsub();
+    }
+
+    throw error;
+  }
+  /* eslint-enable unicorn/prefer-single-call */
 
   return source;
 }

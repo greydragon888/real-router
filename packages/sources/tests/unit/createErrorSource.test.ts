@@ -1,5 +1,5 @@
 import { createRouter, errorCodes } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createErrorSource, getErrorSource, primeErrorSource } from "../../src";
@@ -280,6 +280,44 @@ describe("createErrorSource", () => {
     expect(() => {
       unsubscribe();
     }).not.toThrow();
+  });
+
+  it("unwinds already-registered listeners when addEventListener throws mid-registration (#1440)", () => {
+    // The emitter's on() throws on a duplicate listener (EventEmitter.ts:84) or
+    // at the maxListeners cap — i.e. api.addEventListener CAN throw. If it throws
+    // on the 2nd of the factory's two registrations, the 1st (TRANSITION_ERROR)
+    // listener is already live: without an unwind it leaks and pins the router,
+    // and unsubs never gets assigned so the half-wired source is undestroyable
+    // (TDZ). Simulate the throw and assert the registered listener is unwound.
+    const api = getPluginApi(router);
+    const originalAdd = api.addEventListener.bind(api);
+    const registeredUnsubs: (() => void)[] = [];
+    let calls = 0;
+
+    const spy = vi
+      .spyOn(api, "addEventListener")
+      .mockImplementation((event, cb) => {
+        calls += 1;
+
+        if (calls === 2) {
+          throw new Error("addEventListener boom");
+        }
+
+        const unsub = vi.fn(originalAdd(event, cb));
+
+        registeredUnsubs.push(unsub);
+
+        return unsub;
+      });
+
+    expect(() => createErrorSource(router)).toThrow(/boom/);
+
+    // The one already-registered listener must have been unsubscribed during
+    // the unwind — not left live.
+    expect(registeredUnsubs).toHaveLength(1);
+    expect(registeredUnsubs[0]).toHaveBeenCalledTimes(1);
+
+    spy.mockRestore();
   });
 });
 
