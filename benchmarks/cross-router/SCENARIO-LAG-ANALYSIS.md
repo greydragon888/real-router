@@ -50,14 +50,14 @@ Each lag carries three tags:
 | svelte | link-build | 🔴 3.8× (12.1 vs 3.2 ms mount) | `<Link>-COMPONENT` | code-traced (#1099/#1247/#1253) | `FEATURE-COST` (use:link = fast path) |
 | svelte | nested-switch | +42% (0.135 vs 0.095) | `<Link>-COMPONENT` (active-class flip ×2) | **A/B-proven** | `FEATURE-COST` — *outlet-swap BEATS sv-router* |
 | svelte | param-nav | +16% (0.093 vs 0.080) | `<Link>-COMPONENT` + `IMMUTABLE-STATE` | **A/B-proven** | `STRUCTURAL` (plain-a → parity-minus, no flip) |
-| svelte | table-heap | 🔴 2.6× (5.9 vs 2.3 MB @10k) | `SCALE-FLOOR` | inferred | `STRUCTURAL` |
+| svelte | table-heap | 🔴 2.6× (5.9 vs 2.3 MB @10k) | `SCALE-FLOOR` (**98% route-tree+trie**, ~650 B/route) | **measured (heap-decomp)** | `STRUCTURAL` |
 | svelte | nav-churn | +60% (396 vs 248 KB/nav) | `IMMUTABLE-STATE` | code-traced | `STRUCTURAL` / `v2-CANDIDATE` |
 | svelte | deep-config | +56% browser (3.23 vs 2.07 @90) — **RENDER, not matcher** | `FRAMEWORK-NATIVE` render (isolated matcher: rr **WINS 72×**, sv-router 200 vs 2.8 µs) | **measured (isolated)** | `STRUCTURAL` (compiled render) |
 | svelte | back-forward | +2% (0.207 vs 0.203) | core back/forward path; sv 4µs lighter | inferred | `FRAMEWORK-NATIVE` (tiny; ~floor) |
 | solid | nav-churn | +28% (310 vs 242 KB/nav) | `IMMUTABLE-STATE` | code-traced | `STRUCTURAL` / `v2-CANDIDATE` |
-| solid | table-heap | +3% (5.78 vs 5.61 MB @10k) | `SCALE-FLOOR` | inferred (rme 0.0%, 0.17 MB) | `STRUCTURAL` (tiny) |
+| solid | table-heap | +3% (5.78 vs 5.61 MB @10k) | `SCALE-FLOOR` (route-tree+trie — same class) | **measured (heap-decomp)** · +3% near-floor | `STRUCTURAL` (tiny) |
 | angular | nav-latency/param/nested/active/back-fwd/churn | *(was up to ~4× behind)* | `DEFERRED-COMMIT` (zoneless async CD) | **A/B-proven** | ✅ `FIXED` (#1466 — sync-commit) |
-| angular | cold-start, table-heap | 3.1×, +70% | `EAGER-CORE`, `SCALE-FLOOR` | code-traced | `STRUCTURAL` |
+| angular | cold-start, table-heap | 3.1×, +70% | `EAGER-CORE`, `SCALE-FLOOR` (route-tree+trie) | code-traced / **heap-decomp** | `STRUCTURAL` |
 | react, vue, solid | deep-config (matcher, isolated) | 🟡 rr #2 to TanStack O(1) (~2.7×, µs) | `SCALE-FLOOR` (trie O(depth) vs static-path index O(1)) | **measured (isolated matcher)** | `STRUCTURAL` — react-router #15249 = **6–9 ms** matcher (debunked as the @90 "winner") |
 | react | search-param-scaling | 🔴 +48% (0.53 vs 0.36 ms @256, both sub-ms) | `IMMUTABLE-STATE` (eager O(count) materialize; react-router's eager read is lighter) | measured one-realm n=50 | `STRUCTURAL` (rr does more per pass) |
 | vue | active-links | ~~🔴 +55%~~ → **rr WINS 4.3×** | `COMPETITOR-ARTIFACT` (bench-app: rr shell subscribed to route over N `<Link>`; vue-router isolates in `<RouterView>`) | **A/B-proven** | ✅ `FIXED` (#1483 — bench-app view-isolation) |
@@ -141,7 +141,7 @@ The browser deep-config times matcher **+ nested-layout RENDER** composition (ms
 
 ### table-heap, back-forward — `SCALE-FLOOR` / `FRAMEWORK-NATIVE` → `STRUCTURAL`
 
-- **table-heap** (route-table memory @10k routes): real-router's eager trie + full route-tree is heavier at scale than sv-router's lazy/compiler-native structure. The price of O(1) matching + the full pipeline. (deep-config's matcher is now measured in isolation — see above.)
+- **table-heap** (route-table memory) — **decomposed 2026-07-16 (measured, `node --expose-gc` retained-heap probe):** real-router's router heap scales as `fixed 0.16 MB [O(1): FSM + sources + state] + ~650 B/route [O(routes): route-tree + trie]`. At 10k routes the **O(routes) route-tree + trie is 6.87 MB = 98 % of the router heap** (7.0 MB); the fixed machinery is 2 %, non-scaling. So the `SCALE-FLOOR` cause is **confirmed — it is the eager trie + route-tree** (the price of O(1) *wide* matching + the full pipeline), not the FSM/sources/state. sv-router's compiler-native / lazy structure stores less per route (its lighter 2.3 MB page). (deep-config's matcher is measured separately — see above.)
 - **back-forward** (+2%, svelte): real-router's back/forward replay is ~0.206 on **both** svelte and solid — a *core* path cost, identical across adapters; sv-router is 4 µs lighter framework-native. Tiny, ~floor.
 
 ---
