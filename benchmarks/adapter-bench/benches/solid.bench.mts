@@ -27,6 +27,10 @@ export async function run(): Promise<void> {
 
   // param navigation: items/1 <-> items/2 — subscriber fan-out + Link
   // active recompute; RouteView subtree stays mounted.
+  // K=24 (~13 ms — double the usual target): this bench is the suite's
+  // chronic GC-alignment victim (straddled the 10% threshold at K=2 AND K=8
+  // with a ~0.2-0.5 ms swing; same class as core's task-#1 sync-baseline —
+  // extra mass, not more K-nudging, is the fix).
   {
     const app = await mountTestApp(newContainer(), "/items/1");
     const ids = ["2", "1"] as const;
@@ -34,7 +38,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "solid/navigate-param-swap",
-      batched(8, () => {
+      batched(24, () => {
         app.commitNavigate("items", { id: ids[i++ % ids.length] });
       }),
     );
