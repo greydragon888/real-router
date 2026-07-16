@@ -45,7 +45,7 @@ import type { Bench } from "tinybench";
  */
 async function addSubscribeFanout(bench: Bench): Promise<void> {
   for (const [count, batch] of [
-    [1, 192],
+    [1, 384],
     [3, 384],
     [5, 384],
   ] as const) {
@@ -168,7 +168,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/sync-baseline",
-      batched(64, () => {
+      batched(256, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -208,7 +208,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/sync-guards",
-      batched(96, () => {
+      batched(192, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -307,7 +307,7 @@ export async function run(): Promise<void> {
 
   // N-plugin onTransitionSuccess fan-out (1 / 3 / 5).
   for (const [count, batch] of [
-    [1, 192],
+    [1, 384],
     [3, 384],
     [5, 384],
   ] as const) {
@@ -409,7 +409,7 @@ export async function run(): Promise<void> {
   );
   bench.add(
     "buildPath/warm-defaultParams",
-    batched(256, () => {
+    batched(768, () => {
       keep(view.buildPath("withDefaults", { id: "5" }));
     }),
   );
@@ -421,7 +421,7 @@ export async function run(): Promise<void> {
   );
   bench.add(
     "buildPath/warm-splat",
-    batched(768, () => {
+    batched(1536, () => {
       keep(view.buildPath("files", { path: "a/b/c" }));
     }),
   );
@@ -501,7 +501,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "state/areStatesEqual-ignoreQuery",
-      batched(65_536, () => {
+      batched(8192, () => {
         keep(eq.areStatesEqual(sA, sB));
       }),
     );
@@ -561,7 +561,7 @@ export async function run(): Promise<void> {
       url: "/app/users/123/settings",
     },
     {
-      batch: 128,
+      batch: 256,
       name: "matchPath/search-params",
       routes: [
         { name: "home", path: "/" },

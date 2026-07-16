@@ -24,11 +24,12 @@ export async function run(): Promise<void> {
     await router.start("/users/seed");
     const api = getPluginApi(router);
 
-    // Genuinely ~99 µs/op — ×7 its encoding siblings (stable across runs
-    // 6a588535/6a5887c4, so a real cost, not a GC artifact), hence the low K.
+    // Genuinely ~34 µs/op — ~×3 its encoding siblings (~10-12 µs; stable
+    // across runs, so a real decodeURI-strategy cost, not a GC artifact).
+    // The earlier "~99 µs" read came from a dirty single-shot measurement.
     bench.add(
       "matchPath/encoding-uri",
-      batched(48, () => {
+      batched(128, () => {
         keep(api.matchPath("/users/hello%20world"));
       }),
     );
