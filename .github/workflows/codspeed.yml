@@ -71,6 +71,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        # clean: false keeps the persistent runner's gitignored node_modules
+        # (and pnpm store) between dispatches — checkout still fetches + resets
+        # tracked files to the new sha, only the `git clean -ffdx` is skipped.
+        # `pnpm install --frozen-lockfile` in Setup then no-ops instead of
+        # re-linking 30 workspace packages, cutting Setup from ~36 s to a few s.
+        # Safe here: the suite runs from src via tsx + --conditions=
+        # @real-router/internal-source (no vitest, no dist build), so leftover
+        # artifacts can't perturb resolution or the callgrind counts.
+        with:
+          clean: false
 
       - name: Setup
         uses: ./.github/actions/setup
