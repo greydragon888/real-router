@@ -15,6 +15,7 @@
  * (RFC §9.2). The process-per-file runner (`run.ts`) keeps forms isolated.
  */
 import { argv } from "node:process";
+import { setImmediate as nextTask } from "node:timers/promises";
 
 import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import { Bench } from "tinybench";
@@ -59,6 +60,77 @@ export function makeBench(name: string): Bench {
   return withCodSpeed(
     new Bench({ name, time: 100, warmup: false, throws: true }),
   );
+}
+
+/**
+ * `bench.add` wrapper that runs `fn` `iterations` times per measured call.
+ *
+ * Under CodSpeed `simulation` the plugin instruments a SINGLE task invocation
+ * (7 deterministic warmup calls → `global.gc()` → one measured call). Despite
+ * the runner's determinism flags (`--predictable`, `--predictable-gc-schedule`,
+ * fixed hash/random seeds), residual entropy — wall-clock-driven V8/Node
+ * heuristics plus full-GC unmapper tails — occasionally drops GC work into
+ * that one measured iteration. The event costs ~0.13–0.22 ms of simulated CPU
+ * (syscall storm + marking/copying instructions), which read as phantom
+ * ×5.1 / +82% / +41% swings between two same-SHA runs during the #984 Phase 1
+ * self-hosted verification (2026-07-15).
+ *
+ * Batching gives the measurement enough mass that a stray event is ≤ ~5%
+ * noise, and turns GC from a lottery into a steady, near-deterministic
+ * fraction of the batch.
+ *
+ * Sizing `iterations`: target ≥ ~3 ms of OPERATIONS per measured call, using
+ * per-op costs derived from a BATCHED CodSpeed run — `(total − ~60 µs) / K`.
+ * The plugin's fixed per-measure harness cost (async root frame + microtask
+ * drain, ~50–60 µs simulated) does NOT scale with K, and the pre-batching
+ * single-shot numbers were dominated by it (e.g. `areStatesEqual-ignoreQuery`
+ * "54 µs" was ~99% harness — the op itself is ~0.08 µs; run `6a588535`), so
+ * K derived from single-shot numbers lands far below budget.
+ *
+ * USAGE: always `bench.add(name, batched(K, fn))` — the CodSpeed plugin
+ * attributes the benchmark URI to the file that CALLS `bench.add`, so the
+ * `add` must stay in the suite file. (An add-wrapping helper here re-homed
+ * all 56 URIs to `fixtures.ts::…` — run `6a588535`, 2026-07-16.)
+ *
+ * Local wall-clock numbers (`pnpm bench`) are per BATCH, not per op — divide
+ * by `iterations` when eyeballing (the numbers are not the gate — CodSpeed
+ * is).
+ */
+export function batched(iterations: number, fn: () => void): () => void {
+  return () => {
+    for (let i = 0; i < iterations; i++) {
+      fn();
+    }
+  };
+}
+
+/**
+ * Retires heap debt BEFORE the first measured task of a suite.
+ *
+ * The process's first full GC is its heaviest (tsx compilation + suite-setup
+ * garbage), and a full GC leaves tails: page unmapping (`madvise`/`munmap`)
+ * and finalization land on the NEXT macrotask boundaries — i.e. inside the
+ * first measured iterations when the collection is triggered by the plugin's
+ * own pre-measure `global.gc()`. That is exactly why tasks #1/#2 of the CI
+ * process (`navigate/sync-baseline`, `navigate/same-state-reject`) flaked in
+ * the #984 Phase 1 verification. Two gc→drain rounds before `bench.run()`
+ * settle that debt outside any measurement window; the second round collects
+ * what the first round's finalizers released.
+ *
+ * No-op without `--expose-gc` (local wall-clock runs — tinybench's statistics
+ * absorb GC noise there; the CodSpeed runner always injects the flag).
+ */
+export async function settleHeap(): Promise<void> {
+  const gc = (globalThis as { gc?: () => void }).gc;
+
+  if (!gc) {
+    return;
+  }
+
+  for (let round = 0; round < 2; round++) {
+    gc();
+    await nextTask();
+  }
 }
 
 /**

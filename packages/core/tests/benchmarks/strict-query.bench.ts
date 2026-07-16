@@ -5,7 +5,7 @@
  * (RFC §6.5). Isolated in its own file/process so its matcher shape does not
  * megamorphic-pollute the default-form inline caches (§9.2 / §6.6.1).
  */
-import { isMain, keep, makeBench } from "./fixtures";
+import { batched, isMain, keep, makeBench, settleHeap } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
@@ -26,9 +26,12 @@ export async function run(): Promise<void> {
     await router.start("/");
     const api = getPluginApi(router);
 
-    bench.add("matchPath/strict-query", () => {
-      keep(api.matchPath(url));
-    });
+    bench.add(
+      "matchPath/strict-query",
+      batched(128, () => {
+        keep(api.matchPath(url));
+      }),
+    );
   }
 
   {
@@ -41,9 +44,12 @@ export async function run(): Promise<void> {
     ];
     let i = 0;
 
-    bench.add("navigate/strict-query", () => {
-      void router.navigate("search", targets[i++ % targets.length]);
-    });
+    bench.add(
+      "navigate/strict-query",
+      batched(192, () => {
+        void router.navigate("search", targets[i++ % targets.length]);
+      }),
+    );
   }
 
   {
@@ -58,11 +64,15 @@ export async function run(): Promise<void> {
       limit: "10",
     };
 
-    bench.add("buildPath/strict-query", () => {
-      keep(router.buildPath("search", params));
-    });
+    bench.add(
+      "buildPath/strict-query",
+      batched(384, () => {
+        keep(router.buildPath("search", params));
+      }),
+    );
   }
 
+  await settleHeap();
   await bench.run();
   console.table(bench.table());
 }

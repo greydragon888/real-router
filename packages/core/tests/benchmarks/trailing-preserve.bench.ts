@@ -6,7 +6,7 @@
  * in its own file/process to keep its matcher shape from polluting the
  * default-form inline caches (§9.2).
  */
-import { isMain, keep, makeBench } from "./fixtures";
+import { batched, isMain, keep, makeBench, settleHeap } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
@@ -29,9 +29,12 @@ export async function run(): Promise<void> {
     const api = getPluginApi(router);
     let i = 0;
 
-    bench.add("matchPath/trailing-preserve", () => {
-      keep(api.matchPath(urls[i++ % urls.length]));
-    });
+    bench.add(
+      "matchPath/trailing-preserve",
+      batched(768, () => {
+        keep(api.matchPath(urls[i++ % urls.length]));
+      }),
+    );
   }
 
   // Popstate round-trip under preserve: matchPath → navigate.
@@ -42,15 +45,19 @@ export async function run(): Promise<void> {
     const api = getPluginApi(router);
     let i = 0;
 
-    bench.add("navigate/trailing-preserve-roundtrip", () => {
-      const matched = api.matchPath(urls[i++ % urls.length]);
+    bench.add(
+      "navigate/trailing-preserve-roundtrip",
+      batched(192, () => {
+        const matched = api.matchPath(urls[i++ % urls.length]);
 
-      if (matched) {
-        void router.navigate(matched.name, matched.params);
-      }
-    });
+        if (matched) {
+          void router.navigate(matched.name, matched.params);
+        }
+      }),
+    );
   }
 
+  await settleHeap();
   await bench.run();
   console.table(bench.table());
 }
