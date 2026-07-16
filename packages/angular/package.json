@@ -1,6 +1,6 @@
 {
   "name": "@real-router/angular",
-  "version": "0.13.20",
+  "version": "0.14.0",
   "type": "commonjs",
   "description": "Angular 22 integration for Real-Router",
   "exports": {
