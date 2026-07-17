@@ -153,9 +153,10 @@ The browser deep-config times matcher **+ nested-layout RENDER** composition (ms
 
 ## Deck-shape artifacts (sub-ms wiggles — non-substantive)
 
-Reviewed 2026-07-16 (deck walk-through). Three sub-ms deck curves show visible wiggles
-that are **measurement shape, not router behavior** — logged so the deck's "waves"
-aren't re-chased. All three cells are rr **WINS**.
+Reviewed 2026-07-16 (deck walk-through); react @4 profiled 2026-07-17. Four sub-ms deck
+curves show visible wiggles that are **measurement shape, not router behavior** — logged
+so the deck's "waves" aren't re-chased. The first three are rr **WINS** in rr's own curve;
+the fourth (react search-param @4) is a bump in the **competitor's** (react-router) curve.
 
 - **solid search-param @32 (0.296 ms)** — a lone point above trend (@16 0.167 → @32
   0.296 → @64 0.199). rme 5.7% (tight), yet **@32 > @64 is non-physical** (32 params
@@ -166,6 +167,19 @@ aren't re-chased. All three cells are rr **WINS**.
   rme 1.3% (very tight) but **@64 > @128 is non-physical**. Same class: a ~30 µs
   per-position blip on an 80–110 µs curve, smoothing-amplified into the hump. rr wins
   (0.101 @256 vs sv-router 0.37; per-slot tier-up/GC attribution untested).
+- **react search-param @4 — react-router bump (0.454 ms vs ~0.27 neighbours)** — lone
+  point above trend (@2 0.27 → @4 **0.45** → @8 0.27); **@4 > @8 is non-physical** on the
+  same O(count) read. In the **competitor** curve (react-router), in an rr **loss** cell.
+  **Profiled 2026-07-17** (CDP CPU profile, `keepNames` build, `scratchpad/profile-sp4.mjs`):
+  @4 and @8 navs profile **structurally identical** — `pushState` + route match + react
+  render, **no @4-specific hot function** → the +0.18 ms is not distinct work. Warm
+  long-lived realm: @4 = 0.22 ms (no bump); the `keepNames` build has no bump at all →
+  **code-shape-sensitive = V8 JIT-tiering artifact of the scenario's fresh-context
+  measurement**, not a react-router cost at 4 params. Confidence: **profile-proven** (no
+  hot path) + steady-state-normal; exact opt/deopt event **inferred, not traced** (a clean
+  sub-ms timing re-repro needs a quiet machine — this one was run under load). Does not
+  touch rr's standing here (both eager, sub-ms; rr's 🔴 is the @256 immutable-state floor —
+  see the react search-param matrix row).
 - **Why tight rme is still an artifact:** rme is the run-to-run spread of the *median*;
   a per-position systematic offset (the same sweep slot every interleaved round) does
   not widen it. The tell is **non-monotonicity on a monotone workload**, not variance —
