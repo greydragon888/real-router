@@ -15,20 +15,20 @@ import {
   normalizeForComparison,
   NUM_RUNS,
 } from "./helpers";
-import { build, parse } from "../../src";
+import { build, parseQuery } from "../../src";
 
 import type { BooleanFormat, Options, SearchParams } from "../../src";
 
 const STRING_SAFE = { numberFormat: "none", booleanFormat: "none" } as const;
 
-describe("parse/build roundtrip", () => {
+describe("parseQuery/build roundtrip", () => {
   test.prop([arbSearchParamsStrings, arbOptionsStringSafe], {
     numRuns: NUM_RUNS.standard,
   })(
-    "roundtrip: parse(build(params, opts), opts) === params for string-only values",
+    "roundtrip: parseQuery(build(params, opts), opts) === params for string-only values",
     (params: Record<string, string>, opts: Options) => {
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -37,7 +37,7 @@ describe("parse/build roundtrip", () => {
   test.prop([arbSearchParams, arbOptions], {
     numRuns: NUM_RUNS.standard,
   })(
-    "roundtrip with type normalization: parse(build(params, opts), opts) ≈ normalizeForComparison(params, opts)",
+    "roundtrip with type normalization: parseQuery(build(params, opts), opts) ≈ normalizeForComparison(params, opts)",
     (params: SearchParams, opts: Options) => {
       // `null` is not representable under empty-true: the bare-key `?key` form is
       // reserved for `true`, so null collapses to `true` (a documented loss —
@@ -57,18 +57,18 @@ describe("parse/build roundtrip", () => {
       fc.pre(!erasesEmptyKey(params, opts));
 
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
       const expected = normalizeForComparison(params, opts);
 
       expect(parsed).toStrictEqual(expected);
     },
   );
 
-  // No options ⇒ build and parse share the cached auto defaults, so the roundtrip
+  // No options ⇒ build and parseQuery share the cached auto defaults, so the roundtrip
   // holds without passing options at all. Guards the #744 symmetry generatively
   // (previously only a single hardcoded example existed).
   test.prop([arbSearchParams], { numRuns: NUM_RUNS.standard })(
-    "no-options roundtrip: parse(build(params)) ≈ normalizeForComparison(params, {}) (auto defaults)",
+    "no-options roundtrip: parseQuery(build(params)) ≈ normalizeForComparison(params, {}) (auto defaults)",
     (params: SearchParams) => {
       // No-options build uses auto defaults (nullFormat "default"), so the empty
       // key carrying null is erased here too (#1051) — exclude it (the loss is
@@ -76,7 +76,7 @@ describe("parse/build roundtrip", () => {
       fc.pre(!erasesEmptyKey(params, {}));
 
       const qs = build(params);
-      const parsed = parse(qs);
+      const parsed = parseQuery(qs);
       const expected = normalizeForComparison(params, {});
 
       expect(parsed).toStrictEqual(expected);
@@ -95,7 +95,7 @@ describe("parse/build roundtrip", () => {
     "string boolean tokens coerce under auto/empty-true (oracle parity)",
     (booleanFormat: BooleanFormat, token: string) => {
       const opts = { booleanFormat };
-      const parsed = parse(build({ k: token }, opts), opts);
+      const parsed = parseQuery(build({ k: token }, opts), opts);
 
       expect(parsed).toStrictEqual(normalizeForComparison({ k: token }, opts));
       expect(parsed.k).toBe(token === "true");
@@ -107,12 +107,12 @@ describe("stability", () => {
   test.prop([arbSearchParams, arbOptions], {
     numRuns: NUM_RUNS.standard,
   })(
-    "stability: parse(build(parse(build(p)), opts)) ≡ parse(build(p, opts))",
+    "stability: parseQuery(build(parseQuery(build(p)), opts)) ≡ parseQuery(build(p, opts))",
     (params: SearchParams, opts: Options) => {
       const qs1 = build(params, opts);
-      const parsed1 = parse(qs1, opts);
+      const parsed1 = parseQuery(qs1, opts);
       const qs2 = build(parsed1, opts);
-      const parsed2 = parse(qs2, opts);
+      const parsed2 = parseQuery(qs2, opts);
 
       expect(parsed2).toStrictEqual(parsed1);
     },
@@ -132,12 +132,12 @@ describe("determinism", () => {
 });
 
 describe("acceptance of boundary values", () => {
-  it("parse('') returns {}", () => {
-    expect(parse("")).toStrictEqual({});
+  it("parseQuery('') returns {}", () => {
+    expect(parseQuery("")).toStrictEqual({});
   });
 
-  it("parse('?') returns {}", () => {
-    expect(parse("?")).toStrictEqual({});
+  it("parseQuery('?') returns {}", () => {
+    expect(parseQuery("?")).toStrictEqual({});
   });
 
   it("build({}) returns ''", () => {
@@ -164,10 +164,10 @@ describe("encode/decode fidelity", () => {
   test.prop([arbSearchParamsEncodable, arbOptionsStringSafe], {
     numRuns: NUM_RUNS.standard,
   })(
-    "percent-encoding roundtrip: values with special chars survive build→parse",
+    "percent-encoding roundtrip: values with special chars survive build→parseQuery",
     (params: Record<string, string>, opts: Options) => {
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -177,11 +177,13 @@ describe("encode/decode fidelity", () => {
     [fc.dictionary(arbEncodableKey, arbSafeString, { minKeys: 1, maxKeys: 4 })],
     { numRuns: NUM_RUNS.standard },
   )(
-    "percent-encoding roundtrip: keys with special chars survive build→parse",
+    "percent-encoding roundtrip: keys with special chars survive build→parseQuery",
     (params: Record<string, string>) => {
-      expect(parse(build(params, STRING_SAFE), STRING_SAFE)).toStrictEqual({
-        ...params,
-      });
+      expect(parseQuery(build(params, STRING_SAFE), STRING_SAFE)).toStrictEqual(
+        {
+          ...params,
+        },
+      );
     },
   );
 
@@ -189,11 +191,13 @@ describe("encode/decode fidelity", () => {
     [fc.dictionary(arbSafeKey, arbUnicodeString, { minKeys: 1, maxKeys: 4 })],
     { numRuns: NUM_RUNS.standard },
   )(
-    "percent-encoding roundtrip: multibyte/unicode values survive build→parse",
+    "percent-encoding roundtrip: multibyte/unicode values survive build→parseQuery",
     (params: Record<string, string>) => {
-      expect(parse(build(params, STRING_SAFE), STRING_SAFE)).toStrictEqual({
-        ...params,
-      });
+      expect(parseQuery(build(params, STRING_SAFE), STRING_SAFE)).toStrictEqual(
+        {
+          ...params,
+        },
+      );
     },
   );
 
@@ -241,7 +245,7 @@ describe("encode/decode fidelity", () => {
       const qs = build(params, opts);
 
       expect(qs).toBe("");
-      expect(parse(qs, opts)).toStrictEqual({});
+      expect(parseQuery(qs, opts)).toStrictEqual({});
     },
   );
 });

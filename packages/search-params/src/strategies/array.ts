@@ -76,7 +76,7 @@ const encodeValue = (value: unknown): string => {
 // `""`) and `brackets` (suffix `"[]"`). A `null` element encodes to the SAME
 // wire token a scalar null does via `nullStrategy` — the bare key
 // `${name}${suffix}` under `nullFormat: "default"`, or `""` (dropped, filtered
-// below so no `&&` appears) under `"hidden"`. So `parse("a&a=1")` →
+// below so no `&&` appears) under `"hidden"`. So `parseQuery("a&a=1")` →
 // `{a:[null,"1"]}` round-trips to `"a&a=1"` instead of throwing (#1155).
 const repeatKey = (
   name: string,

@@ -1,35 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import { build, parse } from "../../src";
+import { build, parseQuery } from "../../src";
 
 /**
- * Scale guards for `parse` breadth and array accumulation.
+ * Scale guards for `parseQuery` breadth and array accumulation.
  *
- * `parse` is on the router hot path (every navigation parses the query string)
+ * `parseQuery` is on the router hot path (every navigation parses the query string)
  * and the input is user-controlled (the address bar). These assert what unit and
  * property tests (small inputs, ≤5 keys) cannot: across tens of thousands of
- * params, parse (a) drops/merges/cross-wires no key and accumulates arrays in
+ * params, parseQuery (a) drops/merges/cross-wires no key and accumulates arrays in
  * order, and (b) stays well below quadratic. The precise, non-flaky guard is the
  * structural correctness at scale (count + sampled identity); the timing ceiling
  * is a generous catastrophe-guard for a severe super-linear regression (e.g.
  * replacing the `Object.hasOwn` collision check with an `Object.keys().includes`
  * scan → O(n²)), sized far above the healthy time so it does not flake.
  *
- * **No heap tests:** `parse` returns a fresh object and retains nothing (the only
+ * **No heap tests:** `parseQuery` returns a fresh object and retains nothing (the only
  * caches are the fixed `DEFAULT_OPTIONS`/strategy singletons), so a create→drop
  * loop is GC-masked — a heap-threshold assertion here would be theatre. **No
- * recursion-depth guard:** parse is fully iterative; there is no stack to blow.
+ * recursion-depth guard:** parseQuery is fully iterative; there is no stack to blow.
  */
 
-describe("parse: wide breadth (distinct keys)", () => {
+describe("parseQuery: wide breadth (distinct keys)", () => {
   const N = 50_000;
   const qs = Array.from({ length: N }, (_, i) => `k${i}=v${i}`).join("&");
 
   it(`parses ${N} distinct params with no key dropped, merged, or cross-wired`, () => {
-    parse(qs); // warm up JIT before timing
+    parseQuery(qs); // warm up JIT before timing
 
     const t0 = performance.now();
-    const parsed = parse(qs);
+    const parsed = parseQuery(qs);
     const ms = performance.now() - t0;
 
     // Precise guard: every key present exactly once, mapped to its own value.
@@ -48,15 +48,15 @@ describe("parse: wide breadth (distinct keys)", () => {
   });
 });
 
-describe("parse: repeated-key array accumulation", () => {
+describe("parseQuery: repeated-key array accumulation", () => {
   const K = 80_000;
   const qs = Array.from({ length: K }, (_, i) => `tag=v${i}`).join("&");
 
   it(`accumulates ${K} repeats of one key into an ordered array of length ${K}`, () => {
-    parse(qs, { numberFormat: "none" }); // warm up
+    parseQuery(qs, { numberFormat: "none" }); // warm up
 
     const t0 = performance.now();
-    const parsed = parse(qs, { numberFormat: "none" });
+    const parsed = parseQuery(qs, { numberFormat: "none" });
     const ms = performance.now() - t0;
 
     const tag = parsed.tag;
@@ -76,15 +76,15 @@ describe("parse: repeated-key array accumulation", () => {
   });
 });
 
-describe("parse: key-only chunks (no '=')", () => {
+describe("parseQuery: key-only chunks (no '=')", () => {
   const N = 300_000;
   const qs = "a&".repeat(N); // N repeats of the key-only chunk `a` (a&a&a&…)
 
   it(`parses ${N} key-only chunks in O(n) — the missing-'=' scan does not go quadratic`, () => {
-    parse(qs); // warm up
+    parseQuery(qs); // warm up
 
     const t0 = performance.now();
-    const parsed = parse(qs);
+    const parsed = parseQuery(qs);
     const ms = performance.now() - t0;
 
     // Precise guard: a key-only chunk decodes to null (auto boolean), and the
@@ -106,7 +106,7 @@ describe("parse: key-only chunks (no '=')", () => {
   });
 });
 
-describe("parse: comma array at scale (literal commas preserved)", () => {
+describe("parseQuery: comma array at scale (literal commas preserved)", () => {
   const N = 20_000;
   // Half the elements embed a literal comma → encoded as %2C by build and must
   // survive as a literal, distinct from the unencoded ',' element separator.
@@ -117,7 +117,7 @@ describe("parse: comma array at scale (literal commas preserved)", () => {
   const qs = build({ list: elements }, opts);
 
   it(`splits ${N} comma elements in order, keeping embedded commas literal`, () => {
-    const parsed = parse(qs, opts);
+    const parsed = parseQuery(qs, opts);
     const list = parsed.list;
 
     expect(Array.isArray(list)).toBe(true);
@@ -129,7 +129,7 @@ describe("parse: comma array at scale (literal commas preserved)", () => {
   });
 });
 
-describe("parse: bracket array at scale", () => {
+describe("parseQuery: bracket array at scale", () => {
   const N = 20_000;
   const qs = Array.from({ length: N }, (_, i) => `items[]=v${i}`).join("&");
   const opts = {
@@ -138,7 +138,7 @@ describe("parse: bracket array at scale", () => {
   };
 
   it(`accumulates ${N} bracketed elements into an ordered array`, () => {
-    const parsed = parse(qs, opts);
+    const parsed = parseQuery(qs, opts);
     const items = parsed.items;
 
     expect(Array.isArray(items)).toBe(true);

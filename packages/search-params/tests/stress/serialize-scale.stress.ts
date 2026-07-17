@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { build, parse } from "../../src";
+import { build, parseQuery } from "../../src";
 
 /**
- * Scale guards for `build` and the `build → parse` round-trip.
+ * Scale guards for `build` and the `build → parseQuery` round-trip.
  *
  * `build` serializes query params on every navigation. These assert at scale what
  * small-input tests cannot: building tens of thousands of params round-trips
- * losslessly through `parse` (the cross-check oracle — no key dropped, reordered,
+ * losslessly through `parseQuery` (the cross-check oracle — no key dropped, reordered,
  * or value mangled). The lossless round-trip is the precise discriminating guard.
  *
  * The wide-build case adds a catastrophe timing ceiling: `build` accumulates with
@@ -41,7 +41,7 @@ describe("build: wide breadth round-trips losslessly", () => {
     const qs = build(params, STRING_SAFE);
     const ms = performance.now() - t0;
 
-    const parsed = parse(qs, STRING_SAFE);
+    const parsed = parseQuery(qs, STRING_SAFE);
 
     expect(Object.keys(parsed)).toHaveLength(N);
     expect(parsed).toStrictEqual(params);
@@ -59,7 +59,7 @@ describe("build: large single array round-trips losslessly", () => {
 
   it(`builds a ${N}-element array (repeated keys) and parses it back in order`, () => {
     const qs = build({ list }, opts);
-    const parsed = parse(qs, opts);
+    const parsed = parseQuery(qs, opts);
 
     expect(parsed.list).toHaveLength(N);
     expect(parsed.list).toStrictEqual(list);

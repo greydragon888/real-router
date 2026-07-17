@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { parse } from "../../src";
+import { parseQuery } from "../../src";
 
 /**
  * Robustness / DoS-resistance for adversarial query strings.
  *
- * `parse` runs on user-controlled URLs, so it must stay well-behaved on inputs no
+ * `parseQuery` runs on user-controlled URLs, so it must stay well-behaved on inputs no
  * realistic app produces but an attacker can: multi-megabyte values, hundreds of
  * thousands of params, degenerate separators, deeply bracketed names. These
- * assert that parse completes without crashing and returns a correct, bounded
+ * assert that parseQuery completes without crashing and returns a correct, bounded
  * result at scale — coverage and small-input property tests never reach these
  * sizes. These are no-crash + structural-correctness guards (the "never throws on
  * adversarial input" contract plus correct, input-proportional output); there are
@@ -20,7 +20,7 @@ import { parse } from "../../src";
  * pinning, since a regression that scanned the whole value would surface here.
  *
  * **No heap tests** — output size is input-proportional, not retained state.
- * **No recursion guard** — parse is iterative; there is no call stack to blow.
+ * **No recursion guard** — parseQuery is iterative; there is no call stack to blow.
  */
 
 describe("very long single value", () => {
@@ -32,7 +32,7 @@ describe("very long single value", () => {
     let parsed: Record<string, unknown> = {};
 
     expect(() => {
-      parsed = parse(qs);
+      parsed = parseQuery(qs);
     }).not.toThrow();
 
     // Value survives byte-for-byte and stays a string (the leading 'x' makes
@@ -50,7 +50,7 @@ describe("massive param count", () => {
     let parsed: Record<string, unknown> = {};
 
     expect(() => {
-      parsed = parse(qs);
+      parsed = parseQuery(qs);
     }).not.toThrow();
 
     expect(Object.keys(parsed)).toHaveLength(N);
@@ -67,7 +67,7 @@ describe("massive repeated key", () => {
     let parsed: Record<string, unknown> = {};
 
     expect(() => {
-      parsed = parse(qs, { numberFormat: "none" });
+      parsed = parseQuery(qs, { numberFormat: "none" });
     }).not.toThrow();
 
     expect(parsed.r).toHaveLength(K);
@@ -79,12 +79,12 @@ describe("degenerate separators", () => {
     const ampersands = "&".repeat(100_000);
     const equals = "=".repeat(100_000);
 
-    expect(() => parse(`a=1${ampersands}b=2`)).not.toThrow();
-    expect(() => parse(ampersands)).not.toThrow();
-    expect(() => parse(`x${equals}y`)).not.toThrow();
+    expect(() => parseQuery(`a=1${ampersands}b=2`)).not.toThrow();
+    expect(() => parseQuery(ampersands)).not.toThrow();
+    expect(() => parseQuery(`x${equals}y`)).not.toThrow();
 
     // Real keys around the noise are still recovered.
-    const parsed = parse(`a=1${ampersands}b=2`, { numberFormat: "none" });
+    const parsed = parseQuery(`a=1${ampersands}b=2`, { numberFormat: "none" });
 
     expect(parsed.a).toBe("1");
     expect(parsed.b).toBe("2");
@@ -97,7 +97,7 @@ describe("deeply bracketed parameter name", () => {
     let parsed: Record<string, unknown> = {};
 
     expect(() => {
-      parsed = parse(`a${brackets}=v`, {
+      parsed = parseQuery(`a${brackets}=v`, {
         arrayFormat: "brackets",
         numberFormat: "none",
       });
@@ -117,7 +117,7 @@ describe("percent-encoding heavy value", () => {
     let parsed: Record<string, unknown> = {};
 
     expect(() => {
-      parsed = parse(qs, { numberFormat: "none" });
+      parsed = parseQuery(qs, { numberFormat: "none" });
     }).not.toThrow();
 
     expect(parsed.code).toBe("A".repeat(N));

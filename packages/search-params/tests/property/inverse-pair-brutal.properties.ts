@@ -7,12 +7,12 @@ import {
   arbStringWithComma,
   arbUnicodeString,
 } from "./helpers";
-import { build, parse } from "../../src";
+import { build, parseQuery } from "../../src";
 
 import type { Options } from "../../src";
 
 /**
- * BRUTAL inverse-pair contract: `range(parse) ⊆ dom(build)` (#1155/#1156, axis A7)
+ * BRUTAL inverse-pair contract: `range(parseQuery) ⊆ dom(build)` (#1155/#1156, axis A7)
  * — the search-params counterpart of `path-matcher`'s brutal inverse-half sweep.
  *
  * `inversePair.properties.ts` closes the blind zone with the WIRE grammar and the
@@ -22,15 +22,15 @@ import type { Options } from "../../src";
  * (`a[`, `a]`), extreme indices (`a[999999999]`), nested brackets (`a[0][1]`),
  * doubled `=`, and depth up to 8 chunks — under all 48 option combinations.
  *
- * Scope: VALID percent only. `parse` throws `URIError` on MALFORMED percent
- * (`%zz`) by design — that input is outside `dom(parse)`, and the router already
+ * Scope: VALID percent only. `parseQuery` throws `URIError` on MALFORMED percent
+ * (`%zz`) by design — that input is outside `dom(parseQuery)`, and the router already
  * guards the throw at `SegmentMatcher.#mergeQueryParams` (a try/catch → the URL
  * resolves to UNKNOWN_ROUTE, never a crash — #737). It is therefore not part of
- * this `range(parse) ⊆ dom(build)` contract.
+ * this `range(parseQuery) ⊆ dom(build)` contract.
  *
- * Lone (unpaired) surrogates ARE in scope (#1314): `parse` accepts one verbatim
+ * Lone (unpaired) surrogates ARE in scope (#1314): `parseQuery` accepts one verbatim
  * (its non-percent decode is identity), and `build` must not throw on it — the
- * former blind axis that made the whole suite pass while `build(parse("a=\uD800"))`
+ * former blind axis that made the whole suite pass while `build(parseQuery("a=\uD800"))`
  * threw `URIError`. `safeEncode` now sanitizes it to U+FFFD, so totality holds; the
  * `LONE`/`PAIR` tokens below arm the generators for it, and the value-oracle block
  * pins the (lossy but total) result.
@@ -105,16 +105,16 @@ const arbBrutalChunk: fc.Arbitrary<string> = fc.oneof(
     .tuple(arbBrutalKey, fc.nat({ max: 3 }), fc.nat({ max: 3 }))
     .map(([k, i, j]) => `${k}[${i}][${j}]`), // nested brackets
   // Non-numeric bracket content (`a[b]`): the bracket carries a NAME, not an
-  // index — `parse` treats it as an array push, not a positional insert. Was a
+  // index — `parseQuery` treats it as an array push, not a positional insert. Was a
   // qs-first generator gap (audit 2026-07-07): the wire grammar emitted only
-  // numeric `[i]` / empty `[]`, so `build(parse("a[b]=x"))` was never exercised.
+  // numeric `[i]` / empty `[]`, so `build(parseQuery("a[b]=x"))` was never exercised.
   fc
     .tuple(arbBrutalKey, fc.constantFrom("b", "x", "id"))
     .map(([k, b]) => `${k}[${b}]`),
   fc
     .tuple(arbBrutalKey, fc.constantFrom("b", "x", "id"), arbBrutalValue)
     .map(([k, b, v]) => `${k}[${b}]=${v}`),
-  // Percent-encoded brackets (`a%5B%5D`): the `[]` is ENCODED, so `parse` reads
+  // Percent-encoded brackets (`a%5B%5D`): the `[]` is ENCODED, so `parseQuery` reads
   // the literal key `a[]` (a scalar), NOT an array — the encoded-bracket edge.
   // Same audit gap: only raw `[]` was generated.
   arbBrutalKey.map((k) => `${k}%5B%5D`),
@@ -134,15 +134,15 @@ const arbAllOptions: fc.Arbitrary<Options> = fc.record({
 
 describe("inverse-pair BRUTAL (#1155/#1156, A7)", () => {
   test.prop([arbBrutalQs, arbAllOptions], { numRuns: 1000 })(
-    "range(parse) ⊆ dom(build): build(parse(qs)) never throws, brutal keys/values/brackets × full matrix",
+    "range(parseQuery) ⊆ dom(build): build(parseQuery(qs)) never throws, brutal keys/values/brackets × full matrix",
     (qs: string, opts: Options) => {
       const protoKeysBefore = Object.keys(Object.prototype).length;
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
-      // TOTALITY — parse's output is always in build's domain.
+      // TOTALITY — parseQuery's output is always in build's domain.
       expect(() => build(parsed, opts)).not.toThrow();
-      // A second wire round (re-parse the built string) must not throw either.
-      expect(() => parse(build(parsed, opts), opts)).not.toThrow();
+      // A second wire round (re-parseQuery the built string) must not throw either.
+      expect(() => parseQuery(build(parsed, opts), opts)).not.toThrow();
       // A `__proto__` / `constructor` / `prototype` key must not pollute the global prototype.
       expect(Object.keys(Object.prototype)).toHaveLength(protoKeysBefore);
     },
@@ -151,7 +151,7 @@ describe("inverse-pair BRUTAL (#1155/#1156, A7)", () => {
 
 describe("lone surrogate — total but lossy (#1314)", () => {
   test("build sanitizes a lone surrogate to U+FFFD instead of throwing (scalar)", () => {
-    expect(build(parse(`a=${LONE_SURROGATE}`))).toBe("a=%EF%BF%BD");
+    expect(build(parseQuery(`a=${LONE_SURROGATE}`))).toBe("a=%EF%BF%BD");
   });
 
   test("build sanitizes a lone surrogate array element (Format Roundtrips #9)", () => {
@@ -159,12 +159,12 @@ describe("lone surrogate — total but lossy (#1314)", () => {
   });
 
   test("first round-trip mutates the garbage to U+FFFD, then stabilises", () => {
-    // \uD800 is non-round-trippable garbage; build → %EF%BF%BD → parse → U+FFFD.
-    const once = parse(build(parse(`a=${LONE_SURROGATE}`)));
+    // \uD800 is non-round-trippable garbage; build → %EF%BF%BD → parseQuery → U+FFFD.
+    const once = parseQuery(build(parseQuery(`a=${LONE_SURROGATE}`)));
 
     expect(once).toStrictEqual({ a: "�" });
     // Idempotent thereafter — no further drift (Format Roundtrips #20).
-    expect(parse(build(once))).toStrictEqual({ a: "�" });
+    expect(parseQuery(build(once))).toStrictEqual({ a: "�" });
   });
 });
 
@@ -176,14 +176,14 @@ describe("over-encoded coercion — locked as documented (#1317)", () => {
   // Parse/Build #11), NOT a fixed bug — the oracle pins the CURRENT behavior so a
   // future coercion change is caught and the asymmetry cannot drift silently.
   test("number coerces THROUGH percent-encoding (decoded value)", () => {
-    expect(parse("a=42")).toStrictEqual({ a: 42 });
-    expect(parse("a=4%32")).toStrictEqual({ a: 42 }); // %32 → "2" → 42
-    expect(parse("a=%2D5")).toStrictEqual({ a: -5 }); // %2D → "-"
+    expect(parseQuery("a=42")).toStrictEqual({ a: 42 });
+    expect(parseQuery("a=4%32")).toStrictEqual({ a: 42 }); // %32 → "2" → 42
+    expect(parseQuery("a=%2D5")).toStrictEqual({ a: -5 }); // %2D → "-"
   });
 
   test("boolean words match RAW only — an over-encoded 'true' stays a string", () => {
-    expect(parse("a=true")).toStrictEqual({ a: true });
-    expect(parse("a=%74rue")).toStrictEqual({ a: "true" }); // %74 → "t"; raw ≠ "true"
-    expect(parse("a=tru%65")).toStrictEqual({ a: "true" });
+    expect(parseQuery("a=true")).toStrictEqual({ a: true });
+    expect(parseQuery("a=%74rue")).toStrictEqual({ a: "true" }); // %74 → "t"; raw ≠ "true"
+    expect(parseQuery("a=tru%65")).toStrictEqual({ a: "true" });
   });
 });

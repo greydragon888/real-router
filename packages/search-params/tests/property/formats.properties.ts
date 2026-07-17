@@ -10,7 +10,7 @@ import {
   erasesEmptyKey,
   NUM_RUNS,
 } from "./helpers";
-import { build, parse } from "../../src";
+import { build, parseQuery } from "../../src";
 
 import type { ArrayFormat, BooleanFormat, NumberFormat } from "../../src";
 
@@ -45,11 +45,11 @@ const arbBoolFormatForNull = fc.constantFrom(
 
 describe("array format roundtrip", () => {
   test.prop([arbArrayParamsBracketsOrIndex], { numRuns: NUM_RUNS.standard })(
-    "brackets/index formats: parse(build(params, opts), opts) === params for string arrays",
+    "brackets/index formats: parseQuery(build(params, opts), opts) === params for string arrays",
     ([params, arrayFormat]: [Record<string, string[]>, ArrayFormat]) => {
       const opts = { arrayFormat, numberFormat: "none" as NumberFormat };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -58,9 +58,9 @@ describe("array format roundtrip", () => {
   test.prop([fc.array(arbSafeString, { minLength: 2, maxLength: 6 })], {
     numRuns: NUM_RUNS.standard,
   })(
-    "index format: out-of-order indexed chunks parse back in index order",
+    "index format: out-of-order indexed chunks parseQuery back in index order",
     (values: string[]) => {
-      // Emit a[i]=v in REVERSED order; parse must sort by the bracket index and
+      // Emit a[i]=v in REVERSED order; parseQuery must sort by the bracket index and
       // recover the original array (not insertion order). (#856)
       const opts = {
         arrayFormat: "index" as ArrayFormat,
@@ -71,7 +71,7 @@ describe("array format roundtrip", () => {
         .toReversed()
         .join("&");
 
-      expect(parse(reversed, opts)).toStrictEqual({ a: values });
+      expect(parseQuery(reversed, opts)).toStrictEqual({ a: values });
     },
   );
 
@@ -92,7 +92,7 @@ describe("array format roundtrip", () => {
         numberFormat: "none" as NumberFormat,
       };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -115,7 +115,7 @@ describe("array format roundtrip", () => {
         numberFormat: "none" as NumberFormat,
       };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -137,7 +137,7 @@ describe("array format roundtrip", () => {
       // distinct from the unencoded ',' element separator. (INVARIANTS Format #3)
       const opts = { arrayFormat: "comma" as ArrayFormat, ...STRING_SAFE };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -146,11 +146,11 @@ describe("array format roundtrip", () => {
 
 describe("boolean format roundtrip", () => {
   test.prop([arbBoolParams], { numRuns: NUM_RUNS.standard })(
-    "booleanFormat 'auto': parse(build(params, opts), opts) === params preserving boolean types",
+    "booleanFormat 'auto': parseQuery(build(params, opts), opts) === params preserving boolean types",
     (params: Record<string, boolean>) => {
       const opts = { booleanFormat: "auto" as BooleanFormat };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -175,7 +175,7 @@ describe("boolean format roundtrip", () => {
 
       const opts = { booleanFormat: "empty-true" as BooleanFormat };
       const qs = build(trueOnly, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual(trueOnly);
     },
@@ -195,7 +195,7 @@ describe("boolean format roundtrip", () => {
 
       const opts = { booleanFormat: "empty-true" as BooleanFormat };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -206,7 +206,7 @@ describe("null format roundtrip", () => {
   test.prop([arbNullParams, arbBoolFormatForNull], {
     numRuns: NUM_RUNS.standard,
   })(
-    "nullFormat 'default': parse(build(params, opts), opts) === params preserving null",
+    "nullFormat 'default': parseQuery(build(params, opts), opts) === params preserving null",
     (params: Record<string, null>, booleanFormat: BooleanFormat) => {
       const opts = { nullFormat: "default" as const, booleanFormat };
 
@@ -215,7 +215,7 @@ describe("null format roundtrip", () => {
       fc.pre(!erasesEmptyKey(params, opts));
 
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -228,7 +228,7 @@ describe("null format roundtrip", () => {
       const qs = build(params, opts);
 
       expect(qs).toBe("");
-      expect(parse(qs, opts)).toStrictEqual({});
+      expect(parseQuery(qs, opts)).toStrictEqual({});
     },
   );
 
@@ -250,7 +250,7 @@ describe("null format roundtrip", () => {
       const qs = build({ [key]: null }, opts);
 
       expect(qs).toBe(key); // null and true collapse to the same bare-key token
-      expect(parse(qs, opts)).toStrictEqual({ [key]: true });
+      expect(parseQuery(qs, opts)).toStrictEqual({ [key]: true });
     },
   );
 
@@ -262,21 +262,21 @@ describe("null format roundtrip", () => {
   test("empty key carrying a bare-key value is erased (documented loss, #1051)", () => {
     // true under empty-true → bare key → "" → dropped
     expect(build({ "": true }, { booleanFormat: "empty-true" })).toBe("");
-    expect(parse("", { booleanFormat: "empty-true" })).toStrictEqual({});
+    expect(parseQuery("", { booleanFormat: "empty-true" })).toStrictEqual({});
 
     // null under nullFormat default → bare key → "" → dropped
     expect(build({ "": null }, { nullFormat: "default" })).toBe("");
-    expect(parse("", { nullFormat: "default" })).toStrictEqual({});
+    expect(parseQuery("", { nullFormat: "default" })).toStrictEqual({});
 
     // contrast: the SAME values round-trip under a non-empty key, and the empty
     // key round-trips for non-bare values (`=false` / `=x` keep the chunk).
     expect(
-      parse(build({ k: true }, { booleanFormat: "empty-true" }), {
+      parseQuery(build({ k: true }, { booleanFormat: "empty-true" }), {
         booleanFormat: "empty-true",
       }),
     ).toStrictEqual({ k: true });
     expect(
-      parse(build({ "": false }, { booleanFormat: "empty-true" }), {
+      parseQuery(build({ "": false }, { booleanFormat: "empty-true" }), {
         booleanFormat: "empty-true",
       }),
     ).toStrictEqual({ "": false });
@@ -290,11 +290,11 @@ describe("number format roundtrip", () => {
   });
 
   test.prop([arbNatParams], { numRuns: NUM_RUNS.standard })(
-    "numberFormat 'auto': parse(build(params, opts), opts) === params for non-negative integers",
+    "numberFormat 'auto': parseQuery(build(params, opts), opts) === params for non-negative integers",
     (params: Record<string, number>) => {
       const opts = { numberFormat: "auto" as NumberFormat };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -309,11 +309,11 @@ describe("number format roundtrip", () => {
   );
 
   test.prop([arbDecimalParams], { numRuns: NUM_RUNS.standard })(
-    "numberFormat 'auto': parse(build(params, opts), opts) === params for decimals",
+    "numberFormat 'auto': parseQuery(build(params, opts), opts) === params for decimals",
     (params: Record<string, number>) => {
       const opts = { numberFormat: "auto" as NumberFormat };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -326,11 +326,11 @@ describe("number format roundtrip", () => {
   );
 
   test.prop([arbNegativeParams], { numRuns: NUM_RUNS.standard })(
-    "numberFormat 'auto': parse(build(params, opts), opts) === params for negative integers",
+    "numberFormat 'auto': parseQuery(build(params, opts), opts) === params for negative integers",
     (params: Record<string, number>) => {
       const opts = { numberFormat: "auto" as NumberFormat };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(parsed).toStrictEqual({ ...params });
     },
@@ -341,7 +341,7 @@ describe("number format roundtrip", () => {
     (params: Record<string, number>) => {
       const opts = { numberFormat: "none" as NumberFormat };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       for (const key of Object.keys(params)) {
         expect(typeof parsed[key]).toBe("string");
@@ -354,10 +354,10 @@ describe("number format roundtrip", () => {
   })(
     "numberFormat 'auto': non-canonical numeric strings (leading-zero/unsafe/exponent) stay strings",
     (key: string, value: string) => {
-      // Build the value as a string (numberFormat none), then parse under auto:
+      // Build the value as a string (numberFormat none), then parseQuery under auto:
       // the narrowing must keep "007"/unsafe-int/"1e5" as their exact text. (#742)
       const qs = build({ [key]: value }, { numberFormat: "none" });
-      const parsed = parse(qs, { numberFormat: "auto" });
+      const parsed = parseQuery(qs, { numberFormat: "auto" });
 
       expect(parsed[key]).toBe(value);
       expect(typeof parsed[key]).toBe("string");
@@ -371,12 +371,12 @@ describe("number format roundtrip", () => {
 
 describe("decoding equivalence", () => {
   test.prop([arbSearchParamsEncodable], { numRuns: NUM_RUNS.standard })(
-    "plus-as-space: parse treats + as space equivalently to %20",
+    "plus-as-space: parseQuery treats + as space equivalently to %20",
     (params: Record<string, string>) => {
       const qs = build(params);
       const qsWithPlus = qs.replaceAll("%20", "+");
 
-      expect(parse(qsWithPlus)).toStrictEqual(parse(qs));
+      expect(parseQuery(qsWithPlus)).toStrictEqual(parseQuery(qs));
     },
   );
 });
@@ -442,7 +442,7 @@ describe("single-element array asymmetry", () => {
         numberFormat: "none" as NumberFormat,
       };
       const qs = build(params, opts);
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       for (const [key, [value]] of Object.entries(params)) {
         expect(parsed[key]).toBe(value);

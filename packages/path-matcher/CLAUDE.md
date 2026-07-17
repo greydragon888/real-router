@@ -9,7 +9,7 @@ Public surface is intentionally narrow (#740): `index.ts` exports only these plu
 | Export | Description |
 |--------|-------------|
 | `SegmentMatcher` | Core class: `registerTree()`, `match()`, `buildPath()`, `hasRoute()` |
-| `buildParamMeta(path)` | Extracts URL/query/splat params + constraints; exports `PARAM_NAME_PATTERN` (single param-name grammar) |
+| `buildParamMeta(path)` | Extracts URL/query/splat params + constraints |
 
 ### Types
 

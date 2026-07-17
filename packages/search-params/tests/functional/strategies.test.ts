@@ -1,9 +1,9 @@
 /**
- * Format strategies — exercised through the PUBLIC `parse`/`build`.
+ * Format strategies — exercised through the PUBLIC `parseQuery`/`build`.
  *
  * Migrated off direct `src/strategies/*` imports (white-box guardrail,
  * eslint.config.mjs): every strategy's encode/decode arm is observable in
- * parse/build output under the matching format option, so a strategy branch that
+ * parseQuery/build output under the matching format option, so a strategy branch that
  * were dead through the public surface would surface as an uncovered line rather
  * than being exercised from the inside. Organised per format axis so a per-arm
  * mutant (a strategy returning the wrong token / failing to coerce) is killed by
@@ -11,9 +11,9 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { build, parse } from "search-params";
+import { build, parseQuery } from "search-params";
 
-describe("format strategies (through parse/build)", () => {
+describe("format strategies (through parseQuery/build)", () => {
   // ===========================================================================
   // Boolean strategies
   // ===========================================================================
@@ -29,7 +29,7 @@ describe("format strategies (through parse/build)", () => {
     });
 
     it("decodes a key-only param to null (decodeUndefined)", () => {
-      expect(parse("flag", { booleanFormat: "none" })).toStrictEqual({
+      expect(parseQuery("flag", { booleanFormat: "none" })).toStrictEqual({
         flag: null,
       });
     });
@@ -37,7 +37,7 @@ describe("format strategies (through parse/build)", () => {
     it("never coerces 'true'/'false' — they stay strings (decodeRaw→null, decodeValue as-is)", () => {
       // `none` does no raw matching and returns the decoded value verbatim.
       expect(
-        parse("a=true&b=false", {
+        parseQuery("a=true&b=false", {
           booleanFormat: "none",
           numberFormat: "none",
         }),
@@ -52,12 +52,12 @@ describe("format strategies (through parse/build)", () => {
 
     it("decodes 'true'/'false' to booleans and leaves other strings alone", () => {
       expect(
-        parse("a=true&b=false&c=other", { numberFormat: "none" }),
+        parseQuery("a=true&b=false&c=other", { numberFormat: "none" }),
       ).toStrictEqual({ a: true, b: false, c: "other" });
     });
 
     it("decodes a key-only param to null (decodeUndefined)", () => {
-      expect(parse("flag")).toStrictEqual({ flag: null });
+      expect(parseQuery("flag")).toStrictEqual({ flag: null });
     });
   });
 
@@ -69,14 +69,16 @@ describe("format strategies (through parse/build)", () => {
     });
 
     it("decodes a key-only param to true (decodeUndefined)", () => {
-      expect(parse("flag", { booleanFormat: "empty-true" })).toStrictEqual({
-        flag: true,
-      });
+      expect(parseQuery("flag", { booleanFormat: "empty-true" })).toStrictEqual(
+        {
+          flag: true,
+        },
+      );
     });
 
     it("decodes explicit 'true'/'false' to booleans, other strings verbatim", () => {
       expect(
-        parse("a=true&b=false&c=anything", {
+        parseQuery("a=true&b=false&c=anything", {
           booleanFormat: "empty-true",
           numberFormat: "none",
         }),
@@ -106,14 +108,17 @@ describe("format strategies (through parse/build)", () => {
   describe("number: none", () => {
     it("leaves numeric strings as strings (passthrough decode)", () => {
       expect(
-        parse("a=123&b=abc", { numberFormat: "none", booleanFormat: "none" }),
+        parseQuery("a=123&b=abc", {
+          numberFormat: "none",
+          booleanFormat: "none",
+        }),
       ).toStrictEqual({ a: "123", b: "abc" });
     });
   });
 
   describe("number: auto", () => {
     const num = (raw: string): unknown =>
-      parse(`x=${raw}`, { numberFormat: "auto", booleanFormat: "none" }).x;
+      parseQuery(`x=${raw}`, { numberFormat: "auto", booleanFormat: "none" }).x;
 
     it("decodes plain integers", () => {
       expect(num("0")).toBe(0);
@@ -206,9 +211,9 @@ describe("format strategies (through parse/build)", () => {
       );
     });
 
-    it("round-trips a bracketed array through parse", () => {
+    it("round-trips a bracketed array through parseQuery", () => {
       expect(
-        parse("items[]=a&items[]=b", { arrayFormat: "brackets" }),
+        parseQuery("items[]=a&items[]=b", { arrayFormat: "brackets" }),
       ).toStrictEqual({ items: ["a", "b"] });
     });
   });
@@ -265,29 +270,37 @@ describe("format strategies (through parse/build)", () => {
       );
     });
 
-    it("splits a comma value into an array on parse", () => {
+    it("splits a comma value into an array on parseQuery", () => {
       expect(
-        parse("items=a,b,c", { arrayFormat: "comma", numberFormat: "none" }),
+        parseQuery("items=a,b,c", {
+          arrayFormat: "comma",
+          numberFormat: "none",
+        }),
       ).toStrictEqual({ items: ["a", "b", "c"] });
     });
 
     it("treats a comma-less value as a scalar (decodeValue→null), incl. empty", () => {
       expect(
-        parse("q=single", { arrayFormat: "comma", numberFormat: "none" }),
+        parseQuery("q=single", { arrayFormat: "comma", numberFormat: "none" }),
       ).toStrictEqual({ q: "single" });
       // Empty value: no comma → decodeValue returns null → scalar empty string.
-      expect(parse("q=", { arrayFormat: "comma" })).toStrictEqual({ q: "" });
+      expect(parseQuery("q=", { arrayFormat: "comma" })).toStrictEqual({
+        q: "",
+      });
     });
 
     it("preserves encoded values across the split (raw split, then decode)", () => {
       expect(
-        parse("items=a%20b,c%26d", { arrayFormat: "comma" }),
+        parseQuery("items=a%20b,c%26d", { arrayFormat: "comma" }),
       ).toStrictEqual({ items: ["a b", "c&d"] });
     });
 
     it("keeps empty elements between commas", () => {
       expect(
-        parse("items=a,,b", { arrayFormat: "comma", numberFormat: "none" }),
+        parseQuery("items=a,,b", {
+          arrayFormat: "comma",
+          numberFormat: "none",
+        }),
       ).toStrictEqual({ items: ["a", "", "b"] });
     });
   });
