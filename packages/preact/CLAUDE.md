@@ -380,29 +380,30 @@ Lock: `RouteView.test.tsx` "consumer footgun: RouteView.Match wrapped in memo()"
 suite (3 tests — memo-wrapped negative, function-wrapper negative,
 identity-preserving alias positive).
 
-### Multiple `<RouteView.NotFound>` — Last Wins
+### Multiple `<RouteView.NotFound>` — First Wins
 
 When more than one `<RouteView.NotFound>` is declared in the same `RouteView`,
-**the last one renders**. Asymmetric with `<Match>` and `<Self>` (both
-first-wins). `assignFallbackSlot` has no guard for NotFound — each subsequent
-NotFound overwrites the slot. Prefer a single `<RouteView.NotFound>` per
-RouteView; declare it at the bottom for readability.
+**the first one renders** — symmetric with `<Match>` and `<Self>` (all three
+first-wins, #1439, mirroring the React adapter's #1220). `assignFallbackSlot`
+guards NotFound with a `notFoundFound` flag (the twin of `selfFound`), so
+subsequent NotFound elements are ignored. Prefer a single
+`<RouteView.NotFound>` per RouteView anyway.
 
 ```tsx
 <RouteView nodeName="">
   <RouteView.NotFound>
-    <div data-testid="first-nf">First</div> {/* not rendered */}
+    <div data-testid="first-nf">First</div> {/* renders on UNKNOWN_ROUTE */}
   </RouteView.NotFound>
   <RouteView.Match segment="users">
     <UsersPage />
   </RouteView.Match>
   <RouteView.NotFound>
-    <div data-testid="last-nf">Last</div> {/* renders on UNKNOWN_ROUTE */}
+    <div data-testid="last-nf">Last</div> {/* ignored (first-wins) */}
   </RouteView.NotFound>
 </RouteView>
 ```
 
-Lock: `RouteView.test.tsx` "should use last NotFound when multiple are present".
+Lock: `RouteView.test.tsx` "should use the FIRST NotFound when multiple are present".
 
 ### `RouteView.Match` `segment` Rejects URL-Special Characters
 
