@@ -194,7 +194,6 @@ export class Router<
     this.#eventBus = new EventBusNamespace({
       routerFSM,
       emitter,
-      onListenerError: logListenerError,
       // The FSM CANCEL action aborts the in-flight
       // navigation controller via this injected effect — "FSM CANCEL ⟹
       // controller aborted" in one place. `#navigation` is constructed above.

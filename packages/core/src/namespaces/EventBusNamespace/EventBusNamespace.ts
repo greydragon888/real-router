@@ -101,7 +101,6 @@ function settleLeavePromises(
 export class EventBusNamespace {
   readonly #fsm: FSM<RouterState, RouterEvent, null, RouterPayloads>;
   readonly #emitter: EventEmitter<RouterEventMap>;
-  readonly #onListenerError: (eventName: string, error: unknown) => void;
   // Effect of the FSM CANCEL action: aborts the in-flight navigation's
   // controller. Wired to NavigationNamespace.
   readonly #abortController: (reason?: unknown) => void;
@@ -134,7 +133,6 @@ export class EventBusNamespace {
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
-    this.#onListenerError = options.onListenerError;
     this.#abortController = options.abortController;
     this.#currentToState = undefined;
     this.#setupFSMActions();
@@ -483,42 +481,29 @@ export class EventBusNamespace {
 
     this.#checkListenerThreshold(events.TRANSITION_SUCCESS, "subscribe");
 
+    // `subscribe` is fire-and-forget; the listener's return value is ignored at
+    // the type level (`SubscribeFn` is `=> void`). A void-typed async listener
+    // still returns a rejecting Promise at runtime, so return it to the emitter,
+    // whose central isolation routes the rejection to the same `onListenerError`
+    // sink a sync throw flows through — instead of leaking an `unhandledRejection`
+    // (fatal under `--unhandled-rejections=strict`, the Node 22+ default). This
+    // is #944, now folded into the emitter's central #1412 async isolation — the
+    // former per-site `.catch` here is redundant (symmetric with `subscribeLeave`,
+    // which isolates via `Promise.allSettled`).
     return this.#emitter.on(
       events.TRANSITION_SUCCESS,
       (toState: State, fromState?: State) => {
-        // `subscribe` is fire-and-forget — the listener's return value is
-        // intentionally ignored. But the EventEmitter's per-listener try/catch
-        // isolates only SYNC throws: an async listener returns a Promise whose
-        // rejection would otherwise surface as a Node `unhandledRejection`
-        // (fatal under `--unhandled-rejections=strict`, the Node 22+ default).
-        // `SubscribeFn` is publicly typed `=> void` (fire-and-forget), but an
-        // async listener returns a Promise at runtime that must be isolated
-        // (#944). A cast to a `=> unknown` view is auto-stripped by
-        // `no-unnecessary-type-assertion` (`=> void` is assignable to
-        // `=> unknown`), so read the value as `unknown` and disable the
-        // void-expression rule for this single deliberate divergence.
-        // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- read the runtime Promise of a void-typed async listener (#944)
+        // Return the listener's runtime value to the emitter so its central
+        // isolation catches an async listener's rejection (#944/#1412). Read the
+        // void-typed result into `unknown` first — a returned `void` expression
+        // is forbidden, but returning the read `unknown` is fine.
+        // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- read the void-typed listener's runtime value so it can be returned for central async isolation (#944/#1412)
         const result: unknown = listener({
           route: toState,
           previousRoute: fromState,
         });
 
-        if (
-          result !== null &&
-          result !== undefined &&
-          typeof (result as PromiseLike<unknown>).then === "function"
-        ) {
-          // Route the rejection to the same `onListenerError` sink a sync throw
-          // flows through (#944) — symmetric with `subscribeLeave`, which
-          // isolates rejections via `Promise.allSettled`. `.catch(handler)`
-          // terminates the chain (not a floating promise — mirrors
-          // `Router.#suppressUnhandledRejection`).
-          Promise.resolve(result as PromiseLike<unknown>).catch(
-            (error: unknown) => {
-              this.#onListenerError(events.TRANSITION_SUCCESS, error);
-            },
-          );
-        }
+        return result;
       },
     );
   }

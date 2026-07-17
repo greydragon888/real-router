@@ -102,6 +102,45 @@ describe("router.start() - error handling", () => {
         errorSpy.mockRestore();
       });
 
+      // #1412: a Plugin.onStart that rejects ASYNCHRONOUSLY must be isolated too.
+      // Plugin hooks are raw EventEmitter listeners; the emitter previously caught
+      // only SYNC throws, so an async rejection leaked as a Node unhandledRejection
+      // (fatal under --unhandled-rejections=strict). The emitter now isolates a
+      // returned thenable's rejection centrally, routing it to the same
+      // logger.error sink a sync throw flows through — symmetric with subscribe/#944.
+      it("isolates an async (rejecting) Plugin.onStart — router still starts, rejection logged (#1412)", async () => {
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+        let onStartCalled = false;
+
+        router.usePlugin(() => ({
+          // eslint-disable-next-line @typescript-eslint/no-misused-promises -- deliberately model an async (rejecting) plugin hook misuse (#1412)
+          async onStart() {
+            onStartCalled = true;
+
+            throw new Error("async onStart boom");
+          },
+        }));
+
+        const state = await router.start("/home");
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(onStartCalled).toBe(true);
+        expect(state.name).toBe("home");
+        expect(router.isActive()).toBe(true);
+
+        // The async rejection surfaced via logger.error (central isolation), not
+        // as a leaked unhandledRejection.
+        expect(errorSpy).toHaveBeenCalledWith(
+          "Router",
+          expect.stringMatching(/Error in listener for/),
+          expect.any(Error),
+        );
+
+        errorSpy.mockRestore();
+      });
+
       it("should catch and log exception from TRANSITION_SUCCESS event listener", async () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
