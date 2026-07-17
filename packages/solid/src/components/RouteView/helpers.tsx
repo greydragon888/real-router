@@ -202,7 +202,7 @@ function matchesCandidates(
 //
 // Precedence is unchanged (locked by `tests/property/routeView.properties.ts`,
 // 35+ PBT): Match first-matching-wins > Self first-wins (only when
-// `routeName === nodeName`) > NotFound last-wins (only when
+// `routeName === nodeName`) > NotFound first-wins (only when
 // `routeName === UNKNOWN_ROUTE`). Self/NotFound accumulate independently of
 // Match, so their position relative to Match markers cannot change the
 // verdict — only the order of Match markers among themselves matters.
@@ -224,7 +224,7 @@ export function pickWinner(
 
   for (const child of elements) {
     if (isNotFoundMarker(child)) {
-      notFoundMarker = child; // last-wins
+      notFoundMarker ??= child; // first-wins (#1439)
     } else if (isSelfMarker(child)) {
       selfMarker ??= child; // first-wins
     } else if (
