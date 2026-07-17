@@ -4,6 +4,7 @@
 //   node cross-router/run.mjs <scenario> <engine> [framework=react] [runs]
 // Path-convention: app at apps/<framework>/<engine>/, scenario in scenarios/.
 import { existsSync } from "node:fs";
+import { cpus } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -61,7 +62,7 @@ const out = {
   engine,
   framework,
   ...result,
-  env: { date: new Date().toISOString(), ...provenance },
+  env: { date: new Date().toISOString(), cpu: cpus()[0]?.model ?? "unknown", runner: process.env.BENCH_RUNNER ?? "local", ...provenance },
 };
 
 console.log(JSON.stringify(out.metrics, null, 2));

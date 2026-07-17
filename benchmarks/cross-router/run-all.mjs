@@ -2,7 +2,7 @@
 // Run the full matrix (every scenario × engine, per cohort) to populate results/
 // (the source the infographic deck is rebuilt from; text REPORT-*.md are retired).
 //   node cross-router/run-all.mjs [runs=15] [framework]
-// No framework arg → all cohorts (react + vue + solid + svelte) = the full matrix.
+// No framework arg → all cohorts (react + vue + solid + svelte + angular) = the full matrix.
 // A framework arg restricts to that cohort, using its OWN engine roster.
 //
 // INTERLEAVED (#1460): for each scenario, all of a cohort's engines are built + served,
@@ -12,6 +12,7 @@
 // left open. Cells are written via the shared writeCell (smoke-grade guard, #1455) with
 // the shared provenance stamp (#1459).
 import { existsSync } from "node:fs";
+import { cpus } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -124,7 +125,7 @@ const runScenario = async (framework, scenarioName, engineList) => {
       engine,
       framework,
       ...results[engine],
-      env: { date: new Date().toISOString(), ...provenance },
+      env: { date: new Date().toISOString(), cpu: cpus()[0]?.model ?? "unknown", runner: process.env.BENCH_RUNNER ?? "local", ...provenance },
     };
     if (writeCell(`${here}/results`, out, Number(runs))) ok += 1;
   }

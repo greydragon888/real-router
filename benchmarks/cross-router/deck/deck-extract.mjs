@@ -108,7 +108,22 @@ for (const [co, engines] of Object.entries(ENG)) {
     }
   }
 }
-writeFileSync(`${HERE}/deck-data.json`, JSON.stringify({ DATA, GRID, SWEEP }, null, 0));
+// O-10б: machine/provenance stamp — env of the first cell that carries it. Base cells written
+// before O-10 lack cpu/runner → "unknown" fallback, so a rebuild on an old base renders a header
+// instead of crashing/lying. build-deck renders it in the deck header; ci-summary prints the same.
+let META = { cpu: "unknown", runner: "unknown", commit: "unknown", date: "unknown", runs: "unknown" };
+outer: for (const [co, engines] of Object.entries(ENG)) {
+  for (const sc of Object.keys(SCEN)) {
+    for (const eng of engines) {
+      const f = `${ROOT}/${co}/${sc}/${eng}.json`;
+      if (!existsSync(f)) continue;
+      const c = JSON.parse(readFileSync(f, "utf8")), e = c.env ?? {};
+      META = { cpu: e.cpu ?? "unknown", runner: e.runner ?? "unknown", commit: e.commit ?? "unknown", date: e.date ?? "unknown", runs: c.runs ?? "unknown" };
+      break outer;
+    }
+  }
+}
+writeFileSync(`${HERE}/deck-data.json`, JSON.stringify({ META, DATA, GRID, SWEEP }, null, 0));
 // quick sanity print
 console.log("react active-links (sweep):", JSON.stringify(DATA.react["active-links"]));
 console.log("react GRID:", JSON.stringify(GRID.react));

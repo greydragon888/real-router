@@ -61,4 +61,5 @@
     svelte:{name:"Svelte",matchup:"<b>real-router</b> vs sv-router vs mateo-router",sub:"The hardest crowd: sv-router is compiled into Svelte itself. real-router leads most navigations you feel, but its component &lt;Link&gt; and eager trie cost more on link-heavy mounts and deep trees — where use:link and the immutable-state trade-off explain the gap."},
     angular:{name:"Angular",matchup:"<b>real-router</b> vs @angular/router",sub:"@angular/router is the heavyweight incumbent. Once booted, real-router is faster on every navigation — several times over — and its trie stays flat where Angular's matcher climbs O(N) as routes grow, ceding only the one-time cold start."},
   };
+  const META=__META__;
   const DATA=__DATA__;
