@@ -95,7 +95,15 @@ export function serializeRouterState(
   let context = state.context;
 
   if (exclude?.length) {
-    const filtered: Record<string, unknown> = {};
+    // Null-proto target so a literal "__proto__" namespace (a real own key on
+    // state.context, e.g. written by claimContextNamespace) is copied as a
+    // genuine own entry by the plain assignment below — a `{}` target would
+    // instead dispatch into the inherited Object.prototype.__proto__ setter and
+    // silently drop the data (#1191, same hazard the write path guards).
+    const filtered: Record<string, unknown> = Object.create(null) as Record<
+      string,
+      unknown
+    >;
     const source = state.context;
 
     for (const [key, value] of Object.entries(source)) {

@@ -130,6 +130,36 @@ describe("serializeRouterState", () => {
       });
     });
 
+    it("preserves an own __proto__ namespace through the exclude filter (#1191)", () => {
+      const context: Record<string, unknown> = { data: { x: 1 } };
+
+      // Simulate what claimContextNamespace.write now creates: an own
+      // "__proto__" key (not a prototype swap).
+      Object.defineProperty(context, "__proto__", {
+        value: { secret: 42 },
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+
+      const state: State = {
+        name: "page",
+        params: {},
+        path: "/page",
+        context,
+        transition: baseTransition,
+      };
+
+      const json = serializeRouterState(state, { excludeContext: ["rsc"] });
+      const parsed = JSON.parse(json) as { context: Record<string, unknown> };
+
+      // Pre-fix: the exclude path rebuilds via `filtered[key] = value` on a
+      // plain {}, so `filtered["__proto__"] = value` swaps the prototype and
+      // the data is silently dropped from the serialized output.
+      expect(Object.keys(parsed.context)).toContain("__proto__");
+      expect(parsed.context.__proto__).toStrictEqual({ secret: 42 });
+    });
+
     it("is a no-op when excludeContext is empty array", () => {
       const state: State = {
         name: "page",

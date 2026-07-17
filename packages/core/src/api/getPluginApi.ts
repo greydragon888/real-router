@@ -213,6 +213,18 @@ export function getPluginApi<
     claimContextNamespace: (namespace: string) => {
       throwIfDisposed(ctx.isDisposed);
 
+      // Input-shape guard, symmetric with the other always-on invariant guards
+      // (subscribe / start / navigateToNotFound each typeof-check their input).
+      // A non-string namespace coerces to an inconsistent key ("42"); an empty
+      // string is a meaningless namespace (#1191 N4).
+      if (typeof namespace !== "string" || namespace === "") {
+        throw new TypeError(
+          `[claimContextNamespace] namespace must be a non-empty string, got ${
+            typeof namespace === "string" ? "an empty string" : typeof namespace
+          }`,
+        );
+      }
+
       if (ctx.contextClaimRecords.has(namespace)) {
         throw new RouterError(errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED, {
           message: `Cannot claim context namespace: "${namespace}" is already claimed by another plugin`,
@@ -223,7 +235,22 @@ export function getPluginApi<
 
       return {
         write(state: State, value: unknown) {
-          state.context[namespace] = value;
+          // `state.context[namespace] = value` dispatches into the inherited
+          // Object.prototype.__proto__ setter for the literal key "__proto__",
+          // swapping the prototype instead of creating an own entry — the data
+          // then vanishes from Object.keys / serializeRouterState (#1191 N3).
+          // Mirror search-params' assignParam: defineProperty writes a genuine
+          // own property; normal names keep the plain-assignment fast path.
+          if (namespace === "__proto__") {
+            Object.defineProperty(state.context, namespace, {
+              value,
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            });
+          } else {
+            state.context[namespace] = value;
+          }
         },
         release() {
           ctx.contextClaimRecords.delete(namespace);
