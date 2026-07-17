@@ -53,6 +53,8 @@ const unsubscribe = source.subscribe(() => {
 
 Plus utilities: `DEFAULT_ACTIVE_OPTIONS`, `normalizeActiveOptions(opts?)`, `canonicalJson(value)`, and the `ActiveNameSelector` type.
 
+Plus the framework-agnostic route-window guards (#1435) — **not sources** (no `router`, no cache, no subscription): `createRouteEnterGate()` returns a stateful `(route, previousRoute, skipSameRoute) => RouteEnterContext | null` decision closure, and `guardLeaveListener(handler, { skipSameRoute? })` wraps a handler into a core `subscribeLeave` listener. Every adapter's `useRouteEnter` / `useRouteExit` delegates to these so the guard logic lives (and is tested) in one place.
+
 All factories return a `RouterSource<T>` **except `createActiveNameSelector`**, which returns an `ActiveNameSelector` (see Source Factories table above):
 
 ```typescript
