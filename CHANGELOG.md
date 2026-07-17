@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-17]
 
+### @real-router/angular@0.15.0
+
+### Minor Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Internalize the route-enter/exit window guards: `injectRouteEnter` / `injectRouteExit` now delegate to the shared `createRouteEnterGate` / `guardLeaveListener` primitives from `@real-router/sources` ([#1435](https://github.com/greydragon888/real-router/issues/1435)). The public function signatures are unchanged.
+
+  This also **fixes a spurious `injectRouteEnter` re-fire** unique to Angular: because Angular's `effect()` tracks signals read inside the handler, a handler-read signal changing _without_ a navigation previously re-ran the effect and re-invoked the enter handler for the same route — contrary to the documented "fire once per nav-driven mount" contract. The enter dispatch is now wrapped in `untracked(...)` so the effect depends only on the route source and no longer re-runs (nor re-fires the handler) on a handler-read signal change — bringing Angular to once-per-mount parity with the other five adapters (minor bump: an observable runtime behavior change, though it only affects handlers that both read a signal and relied on the out-of-contract re-fire).
+
+  Also corrects the exit-hook JSDoc: a rejected handler Promise surfaces the original error + `TRANSITION_ERROR`, not `TRANSITION_CANCELLED`.
+
+### Patch Changes
+
+- Updated dependencies [[`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c)]:
+  - @real-router/sources@0.12.0
+
+### @real-router/sources@0.12.0
+
+### Minor Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `createRouteEnterGate()` and `guardLeaveListener()` — the framework-agnostic route-enter/exit window-guard primitives shared by every adapter ([#1435](https://github.com/greydragon888/real-router/issues/1435)).
+
+  - `createRouteEnterGate()` returns a stateful decision closure owning the canonical enter-guard set (skip-initial, same-route, StrictMode dedupe, and the `!previousRoute` non-nullable-contract guard). `skipSameRoute` is a per-call argument so a React ref-held gate survives StrictMode effect re-runs without resetting its dedupe state.
+  - `guardLeaveListener(handler, { skipSameRoute? })` returns a core `subscribeLeave` listener owning the same-route + reentrant-abort guards and passing the handler's Promise through (so it blocks the transition).
+
+  Both consume only `State` / `AbortSignal` — zero framework types.
+
+### @real-router/preact@0.16.23
+
+### Patch Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Internalize the route-enter/exit window guards: `useRouteEnter`/`useRouteExit` (`injectRouteEnter`/`injectRouteExit`) now delegate to the shared `createRouteEnterGate` / `guardLeaveListener` primitives from `@real-router/sources` ([#1435](https://github.com/greydragon888/real-router/issues/1435)). Behavior-neutral — the public hook signatures are unchanged. It also closes the [#1218](https://github.com/greydragon888/real-router/issues/1218)-class test gap on the fused `!previousRoute` guard, which was reachable at runtime but hidden under a v8-ignore — the guard is now exercised at 100% in `@real-router/sources`. No runtime behavior change. Also corrects the exit-hook JSDoc: a rejected handler Promise surfaces the original error + `TRANSITION_ERROR`, not `TRANSITION_CANCELLED`.
+
+- Updated dependencies [[`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c)]:
+  - @real-router/sources@0.12.0
+
+### @real-router/react@0.29.4
+
+### Patch Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Internalize the route-enter/exit window guards: `useRouteEnter`/`useRouteExit` (`injectRouteEnter`/`injectRouteExit`) now delegate to the shared `createRouteEnterGate` / `guardLeaveListener` primitives from `@real-router/sources` ([#1435](https://github.com/greydragon888/real-router/issues/1435)). Behavior-neutral — the public hook signatures are unchanged. Also corrects the exit-hook JSDoc: a rejected handler Promise surfaces the original error + `TRANSITION_ERROR`, not `TRANSITION_CANCELLED`.
+
+- Updated dependencies [[`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c)]:
+  - @real-router/sources@0.12.0
+
+### @real-router/solid@0.17.4
+
+### Patch Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Internalize the route-enter/exit window guards: `useRouteEnter`/`useRouteExit` (`injectRouteEnter`/`injectRouteExit`) now delegate to the shared `createRouteEnterGate` / `guardLeaveListener` primitives from `@real-router/sources` ([#1435](https://github.com/greydragon888/real-router/issues/1435)). Behavior-neutral — the public hook signatures are unchanged. It also closes the [#1218](https://github.com/greydragon888/real-router/issues/1218)-class test gap on the fused `!previousRoute` guard, which was reachable at runtime but hidden under a v8-ignore — the guard is now exercised at 100% in `@real-router/sources`. No runtime behavior change. Also corrects the exit-hook JSDoc: a rejected handler Promise surfaces the original error + `TRANSITION_ERROR`, not `TRANSITION_CANCELLED`.
+
+- Updated dependencies [[`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c)]:
+  - @real-router/sources@0.12.0
+
+### @real-router/svelte@0.16.4
+
+### Patch Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Internalize the route-enter/exit window guards: `useRouteEnter`/`useRouteExit` (`injectRouteEnter`/`injectRouteExit`) now delegate to the shared `createRouteEnterGate` / `guardLeaveListener` primitives from `@real-router/sources` ([#1435](https://github.com/greydragon888/real-router/issues/1435)). Behavior-neutral — the public hook signatures are unchanged. It also closes the [#1218](https://github.com/greydragon888/real-router/issues/1218)-class test gap on the fused `!previousRoute` guard, which was reachable at runtime but hidden under a v8-ignore — the guard is now exercised at 100% in `@real-router/sources`. No runtime behavior change. Also corrects the exit-hook JSDoc: a rejected handler Promise surfaces the original error + `TRANSITION_ERROR`, not `TRANSITION_CANCELLED`.
+
+- Updated dependencies [[`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c)]:
+  - @real-router/sources@0.12.0
+
+### @real-router/vue@0.17.3
+
+### Patch Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Internalize the route-enter/exit window guards: `useRouteEnter`/`useRouteExit` (`injectRouteEnter`/`injectRouteExit`) now delegate to the shared `createRouteEnterGate` / `guardLeaveListener` primitives from `@real-router/sources` ([#1435](https://github.com/greydragon888/real-router/issues/1435)). Behavior-neutral — the public hook signatures are unchanged. Also corrects the exit-hook JSDoc: a rejected handler Promise surfaces the original error + `TRANSITION_ERROR`, not `TRANSITION_CANCELLED`.
+
+- Updated dependencies [[`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c)]:
+  - @real-router/sources@0.12.0
+
+
 ### @real-router/core@0.77.2
 
 ### Patch Changes

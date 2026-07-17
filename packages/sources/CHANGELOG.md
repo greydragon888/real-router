@@ -1,5 +1,16 @@
 # @real-router/sources
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `createRouteEnterGate()` and `guardLeaveListener()` — the framework-agnostic route-enter/exit window-guard primitives shared by every adapter ([#1435](https://github.com/greydragon888/real-router/issues/1435)).
+
+  - `createRouteEnterGate()` returns a stateful decision closure owning the canonical enter-guard set (skip-initial, same-route, StrictMode dedupe, and the `!previousRoute` non-nullable-contract guard). `skipSameRoute` is a per-call argument so a React ref-held gate survives StrictMode effect re-runs without resetting its dedupe state.
+  - `guardLeaveListener(handler, { skipSameRoute? })` returns a core `subscribeLeave` listener owning the same-route + reentrant-abort guards and passing the handler's Promise through (so it blocks the transition).
+
+  Both consume only `State` / `AbortSignal` — zero framework types.
+
 ## 0.11.5
 
 ### Patch Changes

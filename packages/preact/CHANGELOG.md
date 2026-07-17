@@ -1,5 +1,14 @@
 # @real-router/preact
 
+## 0.16.23
+
+### Patch Changes
+
+- [#1506](https://github.com/greydragon888/real-router/pull/1506) [`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c) Thanks [@greydragon888](https://github.com/greydragon888)! - Internalize the route-enter/exit window guards: `useRouteEnter`/`useRouteExit` (`injectRouteEnter`/`injectRouteExit`) now delegate to the shared `createRouteEnterGate` / `guardLeaveListener` primitives from `@real-router/sources` ([#1435](https://github.com/greydragon888/real-router/issues/1435)). Behavior-neutral — the public hook signatures are unchanged. It also closes the [#1218](https://github.com/greydragon888/real-router/issues/1218)-class test gap on the fused `!previousRoute` guard, which was reachable at runtime but hidden under a v8-ignore — the guard is now exercised at 100% in `@real-router/sources`. No runtime behavior change. Also corrects the exit-hook JSDoc: a rejected handler Promise surfaces the original error + `TRANSITION_ERROR`, not `TRANSITION_CANCELLED`.
+
+- Updated dependencies [[`fb55d10`](https://github.com/greydragon888/real-router/commit/fb55d10215a73eff485fa29f4ea6b776b2fcd12c)]:
+  - @real-router/sources@0.12.0
+
 ## 0.16.22
 
 ### Patch Changes
