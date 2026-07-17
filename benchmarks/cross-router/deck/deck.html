@@ -1,0 +1,394 @@
+<title>real-router — benchmarked against each popular router in every framework</title>
+<style>
+  :root{
+    --ground:#f5f6f8;--surface:#fff;--ink:#14171d;--muted:#59616e;--faint:#8b939f;
+    --accent:#2f3bd4;--accent-ink:#2530a8;--accent-soft:#e7e9fb;--hair:#e3e6ec;--hair2:#cfd4dd;
+    --win:#1a7a47;--win-bg:#e8f3ec;--tie:#916013;--tie-bg:#f6eeda;--trail:#b23a2c;--trail-bg:#f8e8e5;
+    --sg:#2f9c62;--sy:#c99b3c;--sr:#cf5a4c;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+  section.cohort{scroll-margin-top:16px}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1140px;margin:0 auto;padding:0 32px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);font-weight:600;display:flex;align-items:center;gap:10px}
+  .eyebrow::before{content:"";width:26px;height:2px;background:var(--accent)}
+  h1{font-size:clamp(2.3rem,5.4vw,3.8rem);line-height:1.03;letter-spacing:-.028em;font-weight:780;margin:20px 0 0;text-wrap:balance;max-width:17ch}
+  h1 .hl{color:var(--accent)}
+  .lede{font-size:1.16rem;color:var(--muted);max-width:62ch;margin:20px 0 0;line-height:1.5}
+  .lede b{color:var(--ink);font-weight:600}
+  .readout{margin-top:38px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--hair);border:1px solid var(--hair);border-radius:5px;overflow:hidden}
+  .stat{background:var(--surface);padding:20px 22px}
+  .stat .k{font-family:var(--mono);font-size:2rem;font-weight:640;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--accent-ink)}
+  .stat .l{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.4}.stat .l b{color:var(--ink);font-weight:600}
+  .field{margin-top:16px;display:flex;flex-wrap:wrap;gap:1px;background:var(--hair);border:1px solid var(--hair);border-radius:5px;overflow:hidden}
+  .fw{background:var(--surface);padding:12px 16px;flex:1 1 180px;text-decoration:none;color:inherit;cursor:pointer;position:relative;transition:background .13s}
+  a.fw:hover{background:var(--accent-soft)}
+  a.fw:hover .n{color:var(--accent-ink)}
+  a.fw::after{content:"\2193";position:absolute;top:9px;right:12px;font-family:var(--mono);font-size:12px;color:var(--accent);opacity:0;transition:opacity .13s}
+  a.fw:hover::after{opacity:.75}
+  .fw .n{font-weight:640;font-size:14px;display:flex;align-items:center;gap:7px}
+  .fw .n::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--accent)}
+  .fw .vs{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.55}
+  .fw .vs .ver{color:var(--ink);font-weight:600}
+  .fw .vs .me{color:var(--accent-ink);font-weight:600}
+
+  section{padding:58px 0;border-top:1px solid var(--hair)}
+  section.hero{padding:70px 0 52px;border-top:none}
+  h2{font-size:1.65rem;letter-spacing:-.014em;font-weight:700;margin:0}
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .sec-note{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .sec-sub{color:var(--muted);max-width:66ch;margin:8px 0 26px}
+
+  /* board */
+  .board{overflow-x:auto}
+  table.grid{border-collapse:collapse;width:100%;min-width:680px;font-size:13px;border-bottom:2px solid var(--hair2)}
+  table.grid td,table.grid th{padding:0;text-align:center}
+  table.grid td.rowlab{text-align:left;padding:3px 14px 3px 0;white-space:nowrap}
+  tr.grp > td.rowlab{padding:26px 14px 10px 0;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);font-weight:600;vertical-align:baseline}
+  tr.grp > th{padding:26px 0 10px;font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:600;vertical-align:baseline;border-left:1px solid #eef1f5}
+  .scn{font-weight:560;font-size:13.5px}.scn small{display:block;font-size:11px;color:var(--faint);font-weight:400}
+  .cell{display:block;margin:3px;border-radius:4px;padding:8px 4px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;font-size:12.5px}
+  .cell.g{background:var(--win-bg);color:var(--win)}.cell.y{background:var(--tie-bg);color:var(--tie)}.cell.r{background:var(--trail-bg);color:var(--trail)}
+  .cell::before{font-size:8.5px;margin-right:3px;vertical-align:1px}
+  .cell.g::before{content:"\25B2"}.cell.y::before{content:"\2248"}.cell.r::before{content:"\25BD"}
+  .mstrip{display:flex;gap:8px;justify-content:center;margin:3px;padding:5px 2px}
+  .mseg{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .box{width:20px;height:11px;border-radius:3px}
+  .box.g{background:var(--sg)}.box.y{background:var(--sy)}.box.r{background:var(--sr)}.box.n{background:var(--hair2)}
+  .mseg .rt{font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums;line-height:1;font-weight:600}
+  .mseg .rt.g{color:var(--win)}.mseg .rt.y{color:var(--tie)}.mseg .rt.r{color:var(--trail)}
+  /* diverging magnitude bars — per-scenario scale; win → green right, loss → red left, tie → centre */
+  table.grid td{vertical-align:middle}
+  tr.srow > td{border-top:1px solid var(--hair);padding-top:8px;padding-bottom:8px}
+  tr.srow > td:not(.rowlab){border-left:1px solid #eef1f5}
+  tr.grp > td,tr.grp > th{border-top:2px solid var(--hair2)}
+  .dcell{display:grid;grid-template-columns:36px 1fr 1px 1fr 36px;align-items:center;column-gap:4px;padding:2px 6px}
+  .numL,.numR{font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .numL{text-align:right;color:var(--trail)}.numR{text-align:left;color:var(--win)}
+  .trk{position:relative;height:12px;background:#f1f2f5;border-radius:2px}
+  .axis{width:1px;height:16px;background:#c9cfd8;justify-self:center;position:relative}
+  .axis.tie::after{content:"";position:absolute;left:-2px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:var(--sy)}
+  .dbar{position:absolute;top:0;bottom:0;border-radius:2px}
+  .dstack{display:flex;flex-direction:column;gap:5px;padding:4px 0}
+  .rl{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}
+  .ptstack{display:flex;flex-direction:column;gap:5px;padding:4px 0}
+  .ptstack .pt{height:20px;display:flex;align-items:center;justify-content:flex-end;min-width:26px;font-family:var(--mono);font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums;line-height:1}
+  td.na{text-align:center;color:var(--faint);font-family:var(--mono);font-size:13px}
+  .key{margin-top:16px;font-size:12.5px;color:var(--muted);line-height:1.7}
+  .key b{color:var(--ink)}.key .gl{font-family:var(--mono);font-weight:700}
+  .key .gl.g{color:var(--win)}.key .gl.y{color:var(--tie)}.key .gl.r{color:var(--trail)}
+
+  /* cohort */
+  .cohort-head{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+  .matchup{font-family:var(--mono);font-size:13.5px;color:var(--muted);margin:8px 0 0}.matchup b{color:var(--accent-ink);font-weight:700}
+  .field-lab{margin-top:26px;font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .badge{font-family:var(--mono);font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--win) 35%,var(--hair));color:var(--win);background:var(--win-bg)}
+  .grp-lab{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);font-weight:600;margin:34px 0 14px;display:flex;align-items:center;gap:12px}
+  .grp-lab::after{content:"";flex:1;height:1px;background:var(--hair)}
+
+  .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .card{background:var(--surface);border:1px solid var(--hair);border-radius:8px;padding:17px 19px;display:flex;flex-direction:column;gap:11px;break-inside:avoid}
+  .card-head{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .card-title{font-weight:680;font-size:15px}
+  .card-key{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .chip{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--muted);background:var(--ground);border:1px solid var(--hair);padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .what{font-size:12.5px;color:var(--muted);line-height:1.46;margin:-2px 0 2px}
+  .why{font-size:12.5px;color:var(--ink);line-height:1.46;background:var(--accent-soft);border-radius:6px;padding:9px 11px}
+  .why::before{content:"Why ";font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--accent-ink)}
+  .why a{color:var(--accent-ink);font-weight:600;text-decoration:none;border-bottom:1px solid var(--hair2)}
+
+  .bars{display:flex;flex-direction:column;gap:7px}
+  .bar{display:grid;grid-template-columns:82px 1fr auto;align-items:center;gap:10px}
+  .bar .en{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;white-space:nowrap}
+  .bar.rr .en{color:var(--ink);font-weight:700}
+  .track{height:13px;background:var(--hair);border-radius:3px;overflow:hidden}
+  .fill{display:block;height:100%;border-radius:3px}
+  .val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--muted);white-space:nowrap;min-width:60px;text-align:right}
+  .bar.rr .val{color:var(--ink);font-weight:600}
+  .podium{display:flex;gap:15px;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:1px}
+  .podium span{display:inline-flex;align-items:center;gap:5px}.podium i{width:10px;height:10px;border-radius:2px}
+
+  .chart svg{width:100%;height:auto;display:block}
+  .clgd{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:4px}
+  .clgd span{display:inline-flex;align-items:center;gap:6px}.clgd i{width:14px;height:3px;border-radius:2px}
+  .clgd .lgi{cursor:pointer;user-select:none;padding:2px 4px;border-radius:4px;transition:opacity .12s,background .12s}
+  .clgd .lgi:hover{background:var(--accent-soft);color:var(--accent-ink)}
+  .clgd .lgi.off{opacity:.38;text-decoration:line-through}
+  .clgd .lghint{opacity:.5;font-style:italic;margin-left:2px}
+  #tt{position:fixed;display:none;pointer-events:none;z-index:200;background:#14171d;color:#fff;font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums;padding:5px 8px;border-radius:5px;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.22)}
+
+  .foot{color:var(--muted);font-size:13px}
+  .foot code{font-family:var(--mono);background:var(--surface);border:1px solid var(--hair);padding:1px 6px;border-radius:4px;font-size:12px}
+  .slice-note{margin-top:18px;font-family:var(--mono);font-size:12px;color:var(--faint);border-left:2px solid var(--accent);padding-left:12px}
+
+  @media (max-width:820px){.readout{grid-template-columns:1fr}.field{flex-direction:column}.cards{grid-template-columns:1fr}}
+  @media print{
+    body{background:#fff}section{break-inside:avoid;padding:24px 0}.cohort{break-before:page}
+    .readout,.field,.card,.cell,.fill,.badge,.why{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+
+<div class="wrap">
+  <section class="hero">
+    <div class="eyebrow">Cross-framework router benchmark &middot; real Chromium</div>
+    <h1>real-router, against each popular router in <span class="hl">every framework</span>.</h1>
+    <p class="lede">One core across five ecosystems, timed in a real browser from click to painted DOM — the same scenarios for every router.</p>
+    <div class="readout">
+      <div class="stat"><div class="k">up to 13&times;</div><div class="l"><b>faster per navigation</b> — ahead on every click in all 5 ecosystems, far ahead on link-heavy pages</div></div>
+      <div class="stat"><div class="k">flat</div><div class="l"><b>constant-time route matching</b> — just as fast at 10 routes or 1,000+, while most rivals slow down</div></div>
+      <div class="stat"><div class="k">5</div><div class="l"><b>ecosystems with a serious rival</b> — one framework-agnostic router, benchmarked head-to-head in each</div></div>
+    </div>
+    <div class="field-lab">routers under test, by ecosystem</div>
+    <div class="field" id="field"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The whole board</h2></div>
+    <p class="sec-sub">Each cell is real-router versus the <em>fastest</em> competing router in that ecosystem, grouped by what the scenario stresses.</p>
+    <div class="board"><table class="grid" id="grid"></table></div>
+    <div class="key">
+      real-router vs the fastest rival: <b>real-router faster → green, right</b> · <b>rival faster → red, left</b> · tie sits on the centre line. Bars are scaled <b>within each scenario</b> (the widest in a row = that scenario's biggest gap), so lengths compare <b>down a row</b>, not across rows.<br>
+      At-scale rows stack <b>one bar per size</b> (small → large) — bars reaching further right down the stack = real-router's lead <b>widens with scale</b>. Full curves in <b>How it scales</b> below — where a <b>bold, white-ringed dot</b> marks the fastest router at each point (the leader can change as the app grows).
+    </div>
+  </section>
+
+  <div id="cohorts"></div>
+
+  <section>
+    <p class="foot">Measured with Playwright + Chrome DevTools Protocol — felt wall-clock for navigations, CPU task-time for the scale sweeps, retained heap for memory; median over many runs, one navigation per fresh browser context. <b>Lower is better throughout.</b> Full method &rarr; <code>benchmarks/cross-router/README</code>.</p>
+    <p class="slice-note">Next in this deck: a capability matrix (features &times; routers) and the honest &ldquo;where we trail &amp; why&rdquo; map. The whole page regenerates from every benchmark run.</p>
+  </section>
+</div>
+
+<script>
+  const FIELD=[["React",[["@real-router/react","0.29.3"],["react-router","8.2.0"],["@tanstack/react-router","1.170.17"]]],["Vue",[["@real-router/vue","0.17.2"],["vue-router","5.1.0"],["@tanstack/vue-router","1.170.16"]]],["Solid",[["@real-router/solid","0.17.3"],["@solidjs/router","0.16.1"],["@tanstack/solid-router","1.170.17"]]],["Svelte",[["@real-router/svelte","0.16.3"],["sv-router","0.17.0"],["@mateothegreat/svelte5-router","2.16.19"]]],["Angular",[["@real-router/angular","0.14.2"],["@angular/router","22.0.6"]]]];
+  const COHORTS=[["react","React"],["vue","Vue"],["solid","Solid"],["svelte","Svelte"],["angular","Angular"]];
+  const GROUPS=[
+    ["Per navigation",[
+      ["nav-latency","Navigation latency","click → painted"],
+      ["param-nav","Param change","same-route param"],
+      ["back-forward","Back / forward","history replay"],
+      ["active-links","Active-link nav","links 4 → 256",1],
+      ["nested-switch","Sibling switch","depth 1 → 32",1]]],
+    ["At scale",[
+      ["wide-config","Wide table match","routes 4 → 256",1],
+      ["deep-config","Deep tree match","depth 3 → 90",1],
+      ["search-param-scaling","Query-param scaling","params 1 → 256",1]]],
+    ["Memory & startup",[
+      ["table-heap","Route memory","100 routes"],
+      ["nav-churn","Heap per navigation","200 navs"],
+      ["gc-per-nav","GC per navigation","256 params"],
+      ["cold-start","Cold start","10 routes"],
+      ["link-build","Link mounting","links 4 → 256",1]]],
+  ];
+  const SWEEP={"react":{"active-links":[["g",2.2],["g",2.83],["g",3.49],["g",4.26],["g",5.59],["g",7.99],["g",10.31]],"nested-switch":[["g",1.63],["g",1.91],["g",1.91],["g",2.33],["g",2.75],["g",3.41]],"link-build":[["g",1.33],["g",1.67],["g",1.25],["g",1.2],["g",1.29],["g",1.33],["g",1.4]],"wide-config":[["g",1.66],["g",1.71],["g",1.68],["g",1.62]],"deep-config":[["g",2.91],["g",11.11],["g",18.55],["g",25.41]],"search-param-scaling":[["g",1.44],["g",1.34],["g",2.41],["g",1.25],["g",1.23],["g",1.17],["y",1],["y",1],["r",1.48]]},"vue":{"active-links":[["g",1.9],["g",1.9],["g",2.18],["g",2.38],["g",3],["g",4.6],["g",4.61]],"nested-switch":[["g",1.75],["g",2.06],["g",2.13],["g",2.4],["g",2.58],["g",3.11]],"link-build":[["y",1],["y",1],["y",1],["y",1],["y",1],["y",1],["g",1.49]],"wide-config":[["g",1.32],["g",1.68],["g",1.68],["g",1.67]],"deep-config":[["g",2.85],["g",2.05],["g",1.8],["g",1.72]],"search-param-scaling":[["g",2.46],["g",2.15],["g",2.64],["g",2.27],["g",2.48],["g",2.43],["g",2.06],["g",1.75],["g",1.35]]},"solid":{"active-links":[["g",1.6],["g",2.01],["g",2.26],["g",2.15],["g",2.78],["g",4.05],["g",4.68]],"nested-switch":[["g",1.76],["g",1.51],["g",1.56],["g",1.56],["g",1.82],["g",2.34]],"link-build":[["y",1],["g",1.33],["y",1],["y",1],["g",1.13],["g",1.13],["y",1]],"wide-config":[["y",1],["g",1.61],["g",1.64],["g",1.58]],"deep-config":[["g",2.81],["g",10.92],["g",18.21],["g",26.15]],"search-param-scaling":[["g",2.16],["g",2.65],["g",3.15],["g",4.06],["g",6.46],["g",6.95],["g",19.53],["g",17.5],["g",17.28]]},"svelte":{"active-links":[["y",1],["y",1],["g",1.31],["g",1.41],["g",1.47],["g",2.73],["g",3.46]],"nested-switch":[["y",1],["y",1],["y",1],["g",1.2],["g",1.29],["g",1.8]],"link-build":[["r",2.5],["r",2.5],["r",3],["r",2.67],["r",3.5],["r",5.6],["r",3.2]],"wide-config":[["g",1.47],["g",4.05],["g",22.06],["g",120.99]],"deep-config":[["g",4.29],["g",28.42],["g",50.84],["g",72.14]],"search-param-scaling":[["y",1],["y",1],["y",1],["g",1.22],["g",1.13],["g",1.35],["g",1.59],["g",1.96],["g",1.74]]},"angular":{"active-links":[["g",5.07],["g",5.14],["g",5.67],["g",6.09],["g",7.4],["g",11.37],["g",12.57]],"nested-switch":[["g",3.15],["g",3.34],["g",3.24],["g",3.72],["g",4.85],["g",8.94]],"link-build":[["g",1.17],["g",1.17],["g",1.14],["g",1.33],["g",1.4],["g",1.29],["y",1]],"wide-config":[["r",1.19],["g",3.14],["g",11.9],["g",46.27]],"deep-config":[["g",2.26],["g",2.17],["g",3.73],["g",3.34]],"search-param-scaling":[["g",9.26],["g",9.01],["g",9.2],["g",9.83],["g",8.96],["g",10.32],["g",9.22],["g",8.57],["g",8.61]]}};
+  const GRID={"react":{"nav-latency":[1.88,"g"],"param-nav":[1.61,"g"],"back-forward":[1.2,"g"],"nav-churn":[1.24,"g"],"gc-per-nav":[2.71,"r"],"active-links":[10.31,"g"],"nested-switch":[3.41,"g"],"link-build":[1.4,"g"],"cold-start":[1,"y"],"wide-config":[1.62,"g"],"deep-config":[25.41,"g"],"search-param-scaling":[1.48,"r"],"table-heap":[1,"y"]},"vue":{"nav-latency":[2,"g"],"param-nav":[1.37,"g"],"back-forward":[1,"y"],"nav-churn":[1,"y"],"gc-per-nav":[1.19,"g"],"active-links":[4.61,"g"],"nested-switch":[3.11,"g"],"link-build":[1.49,"g"],"cold-start":[1.76,"r"],"wide-config":[1.67,"g"],"deep-config":[1.72,"g"],"search-param-scaling":[1.35,"g"],"table-heap":[1,"y"]},"solid":{"nav-latency":[1.74,"g"],"param-nav":[1.53,"g"],"back-forward":[1,"y"],"nav-churn":[1.28,"r"],"gc-per-nav":[10.38,"g"],"active-links":[4.68,"g"],"nested-switch":[2.34,"g"],"link-build":[1,"y"],"cold-start":[2.23,"r"],"wide-config":[1.58,"g"],"deep-config":[26.15,"g"],"search-param-scaling":[17.28,"g"],"table-heap":[1.17,"r"]},"svelte":{"nav-latency":[1.14,"g"],"param-nav":[1.19,"r"],"back-forward":[1,"y"],"nav-churn":[1.54,"r"],"gc-per-nav":[1.31,"g"],"active-links":[3.46,"g"],"nested-switch":[1.8,"g"],"link-build":[3.2,"r"],"cold-start":[1.53,"r"],"wide-config":[120.99,"g"],"deep-config":[72.14,"g"],"search-param-scaling":[1.74,"g"],"table-heap":[1.19,"r"]},"angular":{"nav-latency":[3.17,"g"],"param-nav":[8.95,"g"],"back-forward":[1.96,"g"],"nav-churn":[1.96,"g"],"gc-per-nav":[24.72,"g"],"active-links":[12.57,"g"],"nested-switch":[8.94,"g"],"link-build":[1,"y"],"cold-start":[2.93,"r"],"wide-config":[46.27,"g"],"deep-config":[3.34,"g"],"search-param-scaling":[8.61,"g"],"table-heap":[1,"y"]}};
+  const RANK=["#2f3bd4","#7a84c0","#bcc2e0"];
+  const SER={"real-router":"#2f3bd4","react-router":"#c07b2e","vue-router":"#c07b2e","solid-router":"#c07b2e","sv-router":"#c07b2e","angular-router":"#c07b2e","tanstack":"#8a93a3","mateo-router":"#8a93a3"};
+  const PN_S=["nav-latency","param-nav","back-forward","active-links","nested-switch"];
+  const MEM_S=["nav-churn","gc-per-nav","table-heap","cold-start","link-build"];
+  const SCALE_S=["wide-config","deep-config","search-param-scaling"];
+  const SCEN={
+    "nav-latency":{t:"Navigation latency",c:"3 routes · 40 navs",u:"ms",kind:"bar",what:"A plain link click — from the click until the new route's DOM is on screen. The cost you feel on every navigation."},
+    "param-nav":{t:"Param change",c:"1 param route · 20 navs",u:"ms",kind:"bar",what:"Navigating within the same route to a different parameter (/users/1 → /users/2). Not a route change — only the value changes."},
+    "back-forward":{t:"Back / forward",c:"3 routes · 40 navs",u:"ms",kind:"bar",what:"Browser Back and Forward — replaying history entries through the router."},
+    "nav-churn":{t:"Heap per navigation",c:"200 navs",u:"KB",kind:"bar",what:"200 rapid back-to-back navigations — the heap retained per navigation in steady state."},
+    "gc-per-nav":{t:"GC per navigation",c:"256 query params",u:"KB",kind:"bar",what:"Navigating to a 256-parameter query URL and reading every value — the transient memory a router allocates per navigation, counting even the garbage it immediately throws away."},
+    "active-links":{t:"Active-link navigation",c:"4 → 256 links",u:"ms",kind:"sweep",p:[4,8,16,32,64,128,256],what:"A page of N links that each highlight when active — recomputing “is this link active?” across all N on every navigation, swept 4 → 256 links (log-uniform ×2)."},
+    "nested-switch":{t:"Sibling switch",c:"depth 1 → 32",u:"ms",kind:"sweep",p:[1,2,4,8,16,32],what:"Switching sibling routes under a shared layout chain, swept 1 → 32 levels deep (log-uniform ×2) — does the swap cost grow with nesting, or stay flat (ancestor reuse)?"},
+    "link-build":{t:"Link mounting",c:"4 → 256 links",u:"ms",kind:"sweep",p:[4,8,16,32,64,128,256],what:"Mounting N Link components at once — building N hrefs and rendering, swept 4 → 256 links (log-uniform ×2)."},
+    "cold-start":{t:"Cold start",c:"10 routes",u:"ms",kind:"bar",what:"First load — router boot (parse, build the route tree, first match) + first paint, at a realistic small app of 10 routes."},
+    "table-heap":{t:"Route memory",c:"100 routes",u:"MB",kind:"bar",what:"The JS heap a router uses just to hold its routes — at a realistic app of 100 routes."},
+    "wide-config":{t:"Wide table match",c:"4 → 256 routes",u:"ms",kind:"sweep",p:[4,16,64,256],what:"One URL matched against a wide config: N sibling routes side by side (breadth, vs deep nesting). The matcher alone, in isolation, no render — the true O(1)-vs-O(N) (log-uniform ×4)."},
+    "deep-config":{t:"Deep tree match",c:"depth 3 → 90",u:"ms",kind:"sweep",p:[3,30,60,90],what:"One URL matched against a deep config: a nested chain N levels deep (depth, vs wide siblings; linear steps) — the pure matcher in isolation, except Angular, whose recognizer stays a browser full-nav."},
+    "search-param-scaling":{t:"Query-param scaling",c:"1 → 256 params",u:"ms",kind:"sweep",p:[1,2,4,8,16,32,64,128,256],what:"Reading a query string as its parameter count grows from 1 to 256 (log-uniform ×2) — every value is read."},
+  };
+  const WHY={
+    "nav-latency":{_:"real-router shows the new route as soon as you click — one step, nothing deferred. The routers it beats defer some work or re-render more first, so their route lands a beat later."},
+    "param-nav":{_:"A param change touches nothing structural, so real-router flows out just the new value — no re-render of what didn't change — where the routers it beats re-run more of their pipeline (re-match, re-validate, re-render the subtree).",svelte:"real-router pays twice here: its &lt;Link&gt; rebuilds on a param change, and it makes a fresh immutable snapshot each nav where sv-router just mutates its state in place. use:link drops the &lt;Link&gt; cost; the immutable snapshot is the irreducible minimum."},
+    "back-forward":{_:"Back/forward just replays a stored navigation — real-router runs it through the same fast path as a forward nav, no history penalty. A near-wash with the lean framework-native routers; ahead of the ones that re-run a full transition on replay."},
+    "nav-churn":{_:"real-router's per-navigation state is a small, self-contained snapshot, so its heap grows slowly over a run of navigations — where routers that hold onto more per nav grow faster.",solid:"real-router leaves a fresh, frozen snapshot per navigation, so each navigation stays independent; solid-router just updates a signal and derives the rest, so it retains less.",svelte:"real-router leaves a fresh, frozen snapshot per navigation, so each navigation stays independent; sv-router mutates its state in place, so it retains less — mateo also comes in lighter.",vue:"real-router and vue-router retain almost the same per navigation — a wash; TanStack holds onto ~2× more."},
+    "gc-per-nav":{_:"real-router references the URL's parsed strings, so it stays lean whatever the query size; lazy routers materialize each value into fresh objects and TanStack churns 12× more garbage. react-router is eager too — its native URLSearchParams even leaner (~2.7×) than real-router's immutable state.",solid:"real-router references URL-parsed strings (immutable), allocating almost nothing; solid-router's lazy signals churn ~10× more and TanStack ~17× — the O(count) materialization garbage.",angular:"real-router allocates almost nothing per nav; @angular/router churns 25× the garbage materializing the query.",svelte:"real-router stays lightest as params scale — sv-router allocates a bit more, mateo ~7×.",vue:"real-router allocates the least of the three — vue-router is close, TanStack ~24× more."},
+    "nested-switch":{_:"real-router swaps only the outlet that changed and keeps the layers above it, so its cost stays flat however deep the nesting. Routers that re-walk the whole chain grow with depth.",svelte:"The one crossover in the suite: sv-router's compiled-native switch is a touch lighter at depth 1, but its cost climbs with nesting while real-router's stays flat — so real-router overtakes within a few levels and holds a widening lead as the tree deepens (~1.8× lighter by depth 32). Constant-cost sibling switching, however deep the tree.",angular:"real-router swaps only the outlet that changed and keeps the layers above it, so its cost stays low however deep the nesting; @angular/router re-walks the whole chain — growing with depth to ~9× real-router at depth 32."},
+    "active-links":{_:"real-router figures out the active link once for the whole page; per-link routers re-check every link, so their cost climbs with the count.",solid:"Solid's fine-grained updates touch only the two links that change — real-router stays near-flat, solid-router's per-link checks climb to ~5× real-router by 256, and TanStack climbs hardest: a ~55× gap.",svelte:"real-router works out the active link once for the whole page, so its render stays flat where sv-router and mateo re-check each link — their cost climbs with the count.",angular:"real-router works the active link out once and its zoneless render stays light — an order of magnitude under @angular/router at 256 links (~13×).",vue:"real-router works out the active link once for the whole page, so its render stays tight where vue-router's per-link reactivity climbs: a ~4.5× gap."},
+    "link-build":{_:"real-router sets up the active state once for the whole page; the component routers it beats set it up per link, paying that tax on every link — ~1.3–1.9× heavier at every count.",vue:"real-router and vue-router mount neck-and-neck up to ~128 links — vue-router's per-link cost stays low, so real-router's shared active-state setup barely shows. Only at 256 does vue-router climb faster, and real-router pulls ~1.5× ahead.",solid:"real-router and @solidjs/router both mount light — real-router leads from 8 to 128 links, @solidjs/router drawing level only at the 256-link endpoint. TanStack builds each href separately and runs a couple of times heavier.",svelte:"sv-router mounts plain &lt;a&gt;, several times lighter than real-router's component &lt;Link&gt; (~3× at 256 links). use:link is the plain-&lt;a&gt; fast path for link-heavy pages.",angular:"real-router's shared active-state setup pulls it ahead of @angular/router through the middle of the sweep — up to ~1.35× lighter by 128 links. At 256 Angular's raw per-component mount cost dominates for both, so the two draw nearly level."},
+    "cold-start":{_:"real-router loads its full engine and builds its route trie up front, so its cold start runs on the heavier side — a one-time cost that buys constant-time route matching afterward. This is startup, not per-navigation.",angular:"@angular/router lazy-resolves routes and boots featherweight; real-router loads its full engine and builds its trie up front — ~3× heavier at boot. The one axis where real-router's eager design costs — paid once, at boot."},
+    "table-heap":{_:"Every router uses about the same memory to hold 100 routes — route memory isn't where they differ. real-router's prefix-trie sits right in the mix: it's built for O(1) matching (the wide test), not for saving memory."},
+    "wide-config":{_:"real-router and TanStack are <b>O(1)</b> — matching stays flat however many routes there are. react-router scans and ranks every route on each match — <b>O(N)</b>, climbing ~45× by 256.",vue:"real-router and TanStack are <b>O(1)</b> — flat at any width. vue-router scans its routes on each match — <b>O(N)</b>, lighter than react-router but the same class.",solid:"real-router and TanStack are <b>O(1)</b> — flat at any width. solid-router scans its routes on each match — <b>O(N)</b>, ~61× by 256.",svelte:"real-router is <b>O(1)</b> — flat at any width. sv-router re-sorts and scans its routes on every match — <b>O(N·log N)</b>, ~83× by 256. (mateo also scans, but its matcher only runs inside Svelte, so it isn't on this chart.)",angular:"real-router is <b>O(1)</b> — flat at any width. @angular/router scans its route config — <b>O(N)</b>: a touch faster at a handful of routes, but ~56× heavier by 256 (a floor; the full recognizer does more)."},
+    "deep-config":{react:"real-router walks the path once — <b>O(depth), the lightest, and it wins the deep match</b>. react-router re-processes the whole nested config every time (<a href='https://github.com/remix-run/react-router/issues/15249'>react-router#15249</a>) — a <b>parabola</b>, ~2000× real-router. TanStack is <b>also O(depth)</b>, ~25×.",vue:"real-router and vue-router both walk the path once — <b>O(depth)</b>, both tiny, real-router ~1.7× lighter. TanStack is <b>also O(depth)</b>, heavier.",solid:"real-router walks the path once — <b>O(depth)</b>, the lightest. solid-router's scan grows steeply with depth — ~99× by depth 90. TanStack is <b>also O(depth)</b>, ~26×.",svelte:"real-router walks the path once — <b>O(depth)</b>, the lightest. sv-router's matcher grows steeply with nesting — ~72× by depth 90. (mateo's matcher only runs inside Svelte, so it isn't on this chart.)",angular:"@angular/router can't be isolated headless, so this card is the full browser navigation (match + render). real-router walks the path once; @angular/router re-resolves more at each level — ~3.3× heavier by depth 90."},
+    "search-param-scaling":{_:"Eager routers like real-router read the whole query string at once, so 256 params cost barely more than a handful. Lazy routers materialize each value on access, so their cost climbs steeply with the count.",react:"Both real-router and react-router read params eagerly, so both stay flat as the count grows — real-router even a touch ahead until high counts, where react-router's native URLSearchParams overtakes real-router's growing immutable state. TanStack parses each lazily and explodes — over 20× heavier by 256.",solid:"real-router reads all 256 params in one pass; solid-router's lazy signals materialize each, blowing up ~40× — the O(count) tax at full scale.",angular:"Both parse the query eagerly — real-router reads it in one pass and stays light; @angular/router runs it through its heavier navigation pipeline, ~9× real-router's cost across the whole sweep.",svelte:"sv-router starts a hair lighter at one or two params, but its cost climbs ~7× by 256 where real-router's one-pass read climbs far less — real-router ends ~1.7× lighter than sv-router and ~2.2× lighter than mateo."},
+  };
+  function why(sc,co){const w=WHY[sc]||{};return w[co]||w._||"";}
+  const CO={
+    react:{name:"React",matchup:"<b>real-router</b> vs react-router vs @tanstack/react-router",sub:"The largest ecosystem, the most popular rivals. real-router leads the navigations you feel, and its matching stays flat where the others grow — while doing <em>more</em> per pass (guards, validated search, immutable state)."},
+    vue:{name:"Vue",matchup:"<b>real-router</b> vs vue-router vs @tanstack/vue-router",sub:"vue-router is fast and framework-native, but real-router leads every navigation you feel — active links included — and scales flatter on wide configs and query strings, ceding a little only at the one-time cold start."},
+    solid:{name:"Solid",matchup:"<b>real-router</b> vs @solidjs/router vs @tanstack/solid-router",sub:"Solid's fine-grained reactivity makes for lean routers. real-router leads every navigation you feel — often by multiples — and its active-link handling stays near-flat where TanStack explodes ~70×."},
+    svelte:{name:"Svelte",matchup:"<b>real-router</b> vs sv-router vs mateo-router",sub:"The hardest crowd: sv-router is compiled into Svelte itself. real-router leads most navigations you feel, but its component &lt;Link&gt; and eager trie cost more on link-heavy mounts and deep trees — where use:link and the immutable-state trade-off explain the gap."},
+    angular:{name:"Angular",matchup:"<b>real-router</b> vs @angular/router",sub:"@angular/router is the heavyweight incumbent. Once booted, real-router is faster on every navigation — several times over — and its trie stays flat where Angular's matcher climbs O(N) as routes grow, ceding only the one-time cold start."},
+  };
+  const DATA={"react":{"nav-latency":[["real-router",0.088],["react-router",0.165],["tanstack",0.23]],"param-nav":[["real-router",0.14],["react-router",0.225],["tanstack",0.31]],"back-forward":[["real-router",0.215],["react-router",0.257],["tanstack",0.313]],"nav-churn":[["real-router",713.539],["react-router",887.648],["tanstack",1140.021]],"gc-per-nav":[["real-router",237.331],["react-router",87.483],["tanstack",2867.533]],"active-links":[["real-router",[0.108,0.094,0.097,0.1,0.108,0.117,0.154]],["react-router",[0.238,0.266,0.339,0.426,0.636,1.035,2.012]],["tanstack",[0.303,0.286,0.347,0.446,0.604,0.935,1.588]]],"nested-switch":[["real-router",[0.123,0.106,0.107,0.113,0.119,0.132]],["react-router",[0.201,0.202,0.204,0.263,0.327,0.45]],["tanstack",[0.295,0.263,0.31,0.358,0.49,0.713]]],"link-build":[["real-router",[0.3,0.3,0.4,0.5,0.7,1.2,2]],["react-router",[0.4,0.5,0.5,0.6,0.9,1.6,2.8]],["tanstack",[0.4,0.5,0.6,0.8,1.3,2.3,3.5]]],"cold-start":[["real-router",11.268],["react-router",10.387],["tanstack",13.391]],"wide-config":[["real-router",[0.456,0.445,0.447,0.461]],["react-router",[12.763,40.319,147.099,569.024]],["tanstack",[0.757,0.761,0.749,0.749]]],"deep-config":[["real-router",[0.582,1.3,2.044,2.78]],["react-router",[6083.918,8534.554,9331.004,5843.201]],["tanstack",[1.695,14.437,37.915,70.641]]],"search-param-scaling":[["real-router",[0.183,0.198,0.188,0.223,0.21,0.228,0.253,0.353,0.532]],["react-router",[0.263,0.265,0.453,0.279,0.258,0.266,0.281,0.312,0.36]],["tanstack",[4.098,3.739,3.75,3.909,4.297,5.042,5.809,8.13,12.462]]],"table-heap":[["real-router",2.386],["react-router",2.263],["tanstack",2.63]]},"vue":{"nav-latency":[["real-router",0.075],["vue-router",0.15],["tanstack",0.263]],"param-nav":[["real-router",0.113],["vue-router",0.155],["tanstack",0.42]],"back-forward":[["real-router",0.213],["vue-router",0.232],["tanstack",0.375]],"nav-churn":[["real-router",516.563],["vue-router",523.855],["tanstack",1066.162]],"gc-per-nav":[["real-router",112.791],["vue-router",134.267],["tanstack",2753.847]],"active-links":[["real-router",[0.08,0.077,0.073,0.08,0.082,0.08,0.12]],["vue-router",[0.152,0.146,0.159,0.19,0.246,0.368,0.553]],["tanstack",[0.347,0.342,0.39,0.461,0.642,0.964,1.59]]],"nested-switch":[["real-router",[0.105,0.083,0.085,0.089,0.092,0.097]],["vue-router",[0.184,0.171,0.181,0.214,0.237,0.302]],["tanstack",[0.326,0.285,0.313,0.384,0.588,0.789]]],"link-build":[["real-router",[0.5,0.55,0.7,0.9,1.55,3.1,3.9]],["vue-router",[0.5,0.5,0.7,0.9,1.6,2.8,5.8]],["tanstack",[0.65,0.9,1.2,2.1,4.5,7.3,12.9]]],"cold-start":[["real-router",6.002],["vue-router",3.41],["tanstack",6.698]],"wide-config":[["real-router",[0.458,0.455,0.45,0.461]],["vue-router",[0.606,0.766,1.361,4.992]],["tanstack",[0.755,0.763,0.757,0.769]]],"deep-config":[["real-router",[0.589,1.299,2.069,2.773]],["vue-router",[1.863,2.669,3.718,4.782]],["tanstack",[1.677,14.314,38.169,70.501]]],"search-param-scaling":[["real-router",[0.161,0.179,0.152,0.175,0.166,0.166,0.204,0.259,0.38]],["vue-router",[0.396,0.384,0.401,0.397,0.411,0.404,0.421,0.452,0.514]],["tanstack",[3.125,2.7,2.719,2.901,3.104,3.39,4.197,5.741,8.764]]],"table-heap":[["real-router",2.292],["vue-router",2.093],["tanstack",2.491]]},"solid":{"nav-latency":[["real-router",0.065],["solid-router",0.113],["tanstack",0.393]],"param-nav":[["real-router",0.075],["solid-router",0.115],["tanstack",0.515]],"back-forward":[["real-router",0.205],["solid-router",0.205],["tanstack",0.465]],"nav-churn":[["real-router",309.938],["solid-router",241.98],["tanstack",644.43]],"gc-per-nav":[["real-router",160.212],["solid-router",1662.928],["tanstack",2687.974]],"active-links":[["real-router",[0.078,0.073,0.073,0.073,0.076,0.08,0.103]],["solid-router",[0.125,0.147,0.165,0.157,0.211,0.324,0.482]],["tanstack",[0.464,0.545,0.76,1.05,1.779,3.02,5.637]]],"nested-switch":[["real-router",[0.087,0.077,0.078,0.08,0.085,0.095]],["solid-router",[0.153,0.116,0.122,0.125,0.155,0.222]],["tanstack",[0.493,0.585,0.838,1.498,3.7,12.366]]],"link-build":[["real-router",[0.3,0.3,0.4,0.6,0.8,1.5,3]],["solid-router",[0.3,0.4,0.4,0.6,0.9,1.7,2.8]],["tanstack",[0.6,0.7,0.9,1.5,2.5,3.9,7.1]]],"cold-start":[["real-router",4.708],["solid-router",2.115],["tanstack",4.024]],"wide-config":[["real-router",[0.476,0.472,0.466,0.484]],["solid-router",[0.523,1.99,7.789,32.194]],["tanstack",[0.757,0.761,0.764,0.765]]],"deep-config":[["real-router",[0.598,1.311,2.09,2.749]],["solid-router",[11.931,77.131,165.135,273.102]],["tanstack",[1.682,14.317,38.056,71.879]]],"search-param-scaling":[["real-router",[0.154,0.154,0.151,0.165,0.167,0.296,0.199,0.262,0.369]],["solid-router",[0.332,0.408,0.476,0.67,1.078,2.056,3.886,7.527,14.763]],["tanstack",[3.463,3.117,3.263,3.137,3.176,3.499,3.935,4.586,6.376]]],"table-heap":[["real-router",2.085],["solid-router",1.777],["tanstack",2.243]]},"svelte":{"nav-latency":[["real-router",0.072],["sv-router",0.082],["mateo-router",0.09]],"param-nav":[["real-router",0.095],["sv-router",0.08],["mateo-router",0.14]],"back-forward":[["real-router",0.21],["sv-router",0.202],["mateo-router",0.213]],"nav-churn":[["real-router",381.117],["sv-router",247.457],["mateo-router",302.816]],"gc-per-nav":[["real-router",111.787],["sv-router",146.998],["mateo-router",826.004]],"active-links":[["real-router",[0.085,0.082,0.081,0.085,0.112,0.082,0.101]],["sv-router",[0.09,0.091,0.106,0.12,0.165,0.238,0.371]],["mateo-router",[0.098,0.099,0.128,0.132,0.184,0.224,0.349]]],"nested-switch":[["real-router",[0.107,0.095,0.098,0.102,0.108,0.113]],["sv-router",[0.095,0.093,0.101,0.122,0.139,0.203]],["mateo-router",[null,null,null,null,null,null]]],"link-build":[["real-router",[0.5,0.5,0.6,0.8,1.4,2.8,3.2]],["sv-router",[0.2,0.2,0.2,0.3,0.4,0.5,1]],["mateo-router",[0.3,0.3,0.3,0.4,0.6,0.9,1.9]]],"cold-start":[["real-router",5.021],["sv-router",3.292],["mateo-router",3.729]],"wide-config":[["real-router",[0.484,0.484,0.485,0.488]],["sv-router",[0.711,1.959,10.697,59.045]],["mateo-router",[null,null,null,null]]],"deep-config":[["real-router",[0.612,1.315,2.068,2.8]],["sv-router",[2.623,37.373,105.134,201.987]],["mateo-router",[null,null,null,null]]],"search-param-scaling":[["real-router",[0.161,0.164,0.159,0.158,0.165,0.172,0.2,0.246,0.566]],["sv-router",[0.148,0.16,0.171,0.193,0.186,0.232,0.318,0.482,0.985]],["mateo-router",[0.176,0.196,0.207,0.223,0.246,0.497,0.423,0.677,1.237]]],"table-heap":[["real-router",2.178],["sv-router",1.832],["mateo-router",1.974]]},"angular":{"nav-latency":[["real-router",0.072],["angular-router",0.228]],"param-nav":[["real-router",0.095],["angular-router",0.85]],"back-forward":[["real-router",0.202],["angular-router",0.396]],"nav-churn":[["real-router",462.219],["angular-router",906.277]],"gc-per-nav":[["real-router",106.119],["angular-router",2623.565]],"active-links":[["real-router",[0.075,0.071,0.073,0.078,0.083,0.083,0.12]],["angular-router",[0.38,0.365,0.414,0.475,0.614,0.944,1.508]]],"nested-switch":[["real-router",[0.115,0.105,0.115,0.125,0.141,0.177]],["angular-router",[0.362,0.351,0.373,0.465,0.684,1.583]]],"link-build":[["real-router",[0.6,0.6,0.7,0.9,1.5,2.4,4.8]],["angular-router",[0.7,0.7,0.8,1.2,2.1,3.1,5.1]]],"cold-start":[["real-router",6.175],["angular-router",2.108]],"wide-config":[["real-router",[0.503,0.498,0.507,0.514]],["angular-router",[0.422,1.565,6.033,23.782]]],"deep-config":[["real-router",[0.51,0.962,1.42,1.64]],["angular-router",[1.151,2.086,5.294,5.475]]],"search-param-scaling":[["real-router",[0.146,0.155,0.157,0.155,0.162,0.155,0.184,0.255,0.362]],["angular-router",[1.352,1.396,1.444,1.523,1.451,1.599,1.696,2.185,3.117]]],"table-heap":[["real-router",2.439],["angular-router",2.534]]}};
+
+  // board
+  let g="<tbody>";
+  function rowMax(k,swept){
+    let m=1.05;
+    for(const [co] of COHORTS){
+      if(swept){const st=SWEEP[co]&&SWEEP[co][k];if(st)for(const [cl,ra] of st){if(cl!=="y"&&ra>m)m=ra;}}
+      else{const c=GRID[co][k];if(c&&c[1]!=="y"&&c[0]>m)m=c[0];}
+    }
+    return m;
+  }
+  function dcell(cls,ratio,rmax){
+    if(cls==="y")
+      return "<span class='dcell'><span class='numL'></span><span class='trk'></span><span class='axis tie'></span><span class='trk'></span><span class='numR' style='color:var(--faint)'>≈</span></span>";
+    const w=Math.max(4,Math.min(100,ratio/rmax*100)).toFixed(0);
+    const num=(cls==="g"?"▲":"▽")+ratio.toFixed(ratio>=10?0:1)+"×";
+    if(cls==="g")
+      return "<span class='dcell'><span class='numL'></span><span class='trk'></span><span class='axis'></span><span class='trk'><span class='dbar' style='left:0;width:"+w+"%;background:var(--sg)'></span></span><span class='numR'>"+num+"</span></span>";
+    return "<span class='dcell'><span class='numL'>"+num+"</span><span class='trk'><span class='dbar' style='right:0;width:"+w+"%;background:var(--sr)'></span></span><span class='axis'></span><span class='trk'></span><span class='numR'></span></span>";
+  }
+  for(const [gn,scns] of GROUPS){
+    g+="<tr class='grp'><td class='rowlab'>"+gn+"</td>"+COHORTS.map(([,n])=>"<th>"+n+"</th>").join("")+"</tr>";
+    for(const [k,title,sub,swept] of scns){
+      const rmax=rowMax(k,swept);
+      const pts=swept&&SCEN[k]?SCEN[k].p:null;
+      const ptlab=pts?"<span class='ptstack'>"+pts.map(n=>"<span class='pt'>"+n+"</span>").join("")+"</span>":"";
+      g+="<tr class='srow'><td class='rowlab'><span class='rl'><span class='scn'>"+title+"<small>"+sub+"</small></span>"+ptlab+"</span></td>";
+      for(const [co] of COHORTS){
+        if(swept){
+          const st=SWEEP[co]&&SWEEP[co][k];
+          if(!st){g+="<td class='na'>&mdash;</td>";continue;}
+          g+="<td><span class='dstack'>"+st.map(([cl,ra])=>dcell(cl,ra,rmax)).join("")+"</span></td>";
+        }else{
+          const c=GRID[co][k];
+          if(!c){g+="<td class='na'>&mdash;</td>";continue;}
+          g+="<td>"+dcell(c[1],c[0],rmax)+"</td>";
+        }
+      }
+      g+="</tr>";
+    }
+  }
+  document.getElementById("grid").innerHTML=g+"</tbody>";
+  document.getElementById("field").innerHTML=FIELD.map(([f,rs])=>"<a class='fw' href='#cohort-"+f.toLowerCase()+"'><div class='n'>"+f+"</div><div class='vs'>"+rs.map(([nm,ver])=>"<span"+(nm.startsWith("@real-router/")?" class='me'":"")+">"+nm+" <span class='ver'>"+ver+"</span></span>").join("<br>")+"</div></a>").join("");
+  function fmt(v,u){if(v==null)return "—";let s;if(u==="KB")s=Math.round(v).toString();else if(u==="MB")s=v.toFixed(2);else s=(v<1?v.toFixed(3):v<10?v.toFixed(2):v.toFixed(1));if(s.indexOf(".")>=0)s=s.replace(/0+$/,"").replace(/\.$/,"");return s;}
+
+  function head(s){return "<div class='card-head'><span class='card-title'>"+s.t+"</span><span class='card-key'>"+s.k+"</span><span class='chip'>"+s.c+"</span></div><div class='what'>"+s.what+"</div>";}
+  function barCard(s){
+    const E=s.e.filter(x=>x[1]!=null);
+    const max=Math.max(...E.map(x=>x[1]));
+    const sorted=[...E.map(x=>x[1])].sort((a,b)=>a-b);
+    const rank=v=>Math.min(2,sorted.indexOf(v));
+    const bars=E.map(([n,v])=>{
+      const rr=n==="real-router",w=Math.max(3,(v/max)*100),col=RANK[rank(v)];
+      return "<div class='bar"+(rr?" rr":"")+"'><span class='en'>"+n+"</span><span class='track'><span class='fill' style='width:"+w.toFixed(1)+"%;background:"+col+"'></span></span><span class='val'>"+fmt(v,s.u)+" "+s.u+"</span></div>";
+    }).join("");
+    const pod=["1st","2nd","3rd"].slice(0,Math.min(3,E.length)).map((lbl,i)=>"<span><i style='background:"+RANK[i]+"'></i>"+lbl+"</span>").join("");
+    return "<div class='card'>"+head(s)+"<div class='bars'>"+bars+"</div>"
+      +"<div class='podium'>"+pod+"</div>"
+      +"<div class='why'>"+s.why+"</div></div>";
+  }
+  function smoothPath(pts){
+    if(pts.length<2) return pts.length?("M"+pts[0][0].toFixed(1)+","+pts[0][1].toFixed(1)):"";
+    let d="M"+pts[0][0].toFixed(1)+","+pts[0][1].toFixed(1);
+    for(let i=0;i<pts.length-1;i++){
+      const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||pts[i+1];
+      const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6;
+      const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
+      d+="C"+c1x.toFixed(1)+","+c1y.toFixed(1)+" "+c2x.toFixed(1)+","+c2y.toFixed(1)+" "+p2[0].toFixed(1)+","+p2[1].toFixed(1);
+    }
+    return d;
+  }
+  function chart(p,ser,u,log){
+    const W=560,H=170,pl=8,pr=52,pt=16,pb=24,iw=W-pl-pr,ih=H-pt-pb;
+    const xa=i=>pl+(p.length===1?iw/2:iw*i/(p.length-1));
+    let o="",ya;
+    if(log){
+      // log-Y: an O(1) matcher reads as a flat line, an O(N) scanner as a straight rise —
+      // the honest axis for isolated match cost spanning sub-µs to thousands of µs.
+      const pos=ser.flatMap(x=>x[1]).filter(v=>v!=null&&v>0);
+      let loL=Math.log10(Math.min(...pos)),hiL=Math.log10(Math.max(...pos));
+      // Floor the visible domain to ≥1 decade. An O(1) matcher's ~2% run-to-run jitter
+      // must read as a FLAT line — otherwise, when a series is isolated, its own tiny
+      // min–max becomes the whole axis and the noise stretches to full height (a fake
+      // "wave"). 1 decade also guarantees ≥1 reference gridline. The full multi-series
+      // view spans ≫1 decade (0.5→560 µs), so this only affects near-flat isolated views.
+      if(hiL-loL<1){const mid=(loL+hiL)/2;loL=mid-0.5;hiL=mid+0.5;}
+      const span=(hiL-loL)||1;
+      const dL=loL-span*0.06,uL=hiL+span*0.12,rng=uL-dL;
+      ya=v=>pt+ih-((Math.log10(v)-dL)/rng)*ih;
+      o+="<line x1='"+pl+"' y1='"+pt+"' x2='"+(pl+iw)+"' y2='"+pt+"' stroke='#eceef2'/>";
+      for(let d=Math.ceil(dL);d<=Math.floor(uL);d++){const gv=Math.pow(10,d),gy=ya(gv);if(gy<pt+11)continue;o+="<line x1='"+pl+"' y1='"+gy.toFixed(1)+"' x2='"+(pl+iw)+"' y2='"+gy.toFixed(1)+"' stroke='#eceef2'/>";o+="<text x='"+pl+"' y='"+(gy-2.5).toFixed(1)+"' font-size='8.5' fill='#b3b9c2' font-family='ui-monospace,Menlo,monospace'>"+fmt(gv,u)+"</text>";}
+      o+="<text x='"+pl+"' y='"+(pt-4)+"' font-size='9.5' fill='#b3b9c2' font-family='ui-monospace,Menlo,monospace'>"+u+" · log</text>";
+    }else{
+      const maxv=Math.max(...ser.flatMap(x=>x[1]).filter(v=>v!=null))*1.08;
+      ya=v=>pt+ih-(v/maxv)*ih;
+      for(let k=0;k<=2;k++){const y=pt+ih*k/2;o+="<line x1='"+pl+"' y1='"+y+"' x2='"+(pl+iw)+"' y2='"+y+"' stroke='#eceef2'/>";}
+      o+="<text x='"+pl+"' y='"+(pt-4)+"' font-size='9.5' fill='#b3b9c2' font-family='ui-monospace,Menlo,monospace'>"+maxv.toFixed(maxv<10?1:0)+" "+u+"</text>";
+    }
+    p.forEach((pp,i)=>o+="<text x='"+xa(i).toFixed(1)+"' y='"+(H-7)+"' font-size='10' fill='#8b939f' text-anchor='middle' font-family='ui-monospace,Menlo,monospace'>"+pp+"</text>");
+    // winner (lowest, since lower is better) at each swept point
+    const winIdx=p.map((_,i)=>{let best=Infinity,bn=null;for(const [n,vals] of ser){const v=vals[i];if(v!=null&&v<best){best=v;bn=n;}}return bn;});
+    // pass 1 — all lines
+    for(const [n,vals] of ser){
+      if(vals.every(v=>v==null))continue;
+      const col=SER[n],rr=n==="real-router";
+      const pts=vals.map((v,i)=>v==null?null:[xa(i),ya(v)]).filter(Boolean);
+      o+="<path d='"+smoothPath(pts)+"' fill='none' stroke='"+col+"' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/>";
+    }
+    // pass 2a — non-winner nodes
+    for(const [n,vals] of ser){if(vals.every(v=>v==null))continue;const rr=n==="real-router";
+      vals.forEach((v,i)=>{if(v==null||winIdx[i]===n)return;o+="<circle cx='"+xa(i).toFixed(1)+"' cy='"+ya(v).toFixed(1)+"' r='2.4' fill='"+SER[n]+"'/>";});}
+    // pass 2b — winner node at each point, drawn last so it sits on top even at a near-tie (bold, white halo)
+    for(const [n,vals] of ser){if(vals.every(v=>v==null))continue;const rr=n==="real-router";
+      vals.forEach((v,i)=>{if(v==null||winIdx[i]!==n)return;const cx=xa(i),cy=ya(v),d=6.4;o+="<path d='M"+cx.toFixed(1)+","+(cy-d).toFixed(1)+"L"+(cx+d).toFixed(1)+","+cy.toFixed(1)+"L"+cx.toFixed(1)+","+(cy+d).toFixed(1)+"L"+(cx-d).toFixed(1)+","+cy.toFixed(1)+"Z' fill='"+SER[n]+"' stroke='#fff' stroke-width='1.9' stroke-linejoin='round'/>";});}
+    // endpoint labels
+    for(const [n,vals] of ser){if(vals.every(v=>v==null))continue;const col=SER[n],rr=n==="real-router";
+      let li=vals.length-1;while(li>=0&&vals[li]==null)li--;
+      if(li>=0)o+="<text x='"+(xa(li)+6).toFixed(1)+"' y='"+(ya(vals[li])+3.5).toFixed(1)+"' font-size='10' fill='"+col+"' font-family='ui-monospace,Menlo,monospace' font-weight='600'>"+fmt(vals[li],u)+"</text>";}
+    // pass 3 — invisible enlarged hover targets → value tooltip (drawn last = on top)
+    for(const [hn,hv] of ser){if(hv.every(v=>v==null))continue;
+      hv.forEach((v,i)=>{if(v==null)return;o+="<circle cx='"+xa(i).toFixed(1)+"' cy='"+ya(v).toFixed(1)+"' r='9' fill='none' pointer-events='all' style='cursor:crosshair' data-tip='"+hn+" · "+fmt(v,u)+" "+u+"'/>";});}
+    return "<svg viewBox='0 0 "+W+" "+H+"' role='img'>"+o+"</svg>";
+  }
+  const CHARTS=[];
+  function swCard(s){
+    const id=CHARTS.length;CHARTS.push({p:s.p,ser:s.s,u:s.u,log:s.log});
+    const lg=s.s.filter(x=>x[1].some(v=>v!=null)).map(([n])=>"<span class='lgi' data-s=\""+n+"\"><i style='background:"+SER[n]+"'></i>"+n+"</span>").join("")+"<span class='lghint'>click to isolate</span>";
+    return "<div class='card' data-chart='"+id+"'>"+head(s)+"<div class='chart'>"+chart(s.p,s.s,s.u,s.log)+"<div class='clgd'>"+lg+"</div></div><div class='why'>"+s.why+"</div></div>";
+  }
+  function mk(sc,co){const m=SCEN[sc],o={t:m.t,k:sc,c:m.c,u:m.u,what:m.what,why:why(sc,co)};if(m.kind==="sweep"){o.p=m.p;o.s=DATA[co][sc];}else{o.e=DATA[co][sc];}if(sc==="wide-config"||(sc==="deep-config"&&co!=="angular")){o.u="µs";o.log=1;}return o;}
+  function tally(co){let g=0,y=0,r=0;for(const sc in GRID[co]){const c=GRID[co][sc][1];if(c==="g")g++;else if(c==="y")y++;else r++;}return g+" lead · "+y+" tie · "+r+" trail";}
+  function cohortSection(co){const M=CO[co];
+    const card=(sc)=>{const o=mk(sc,co);return SCEN[sc].kind==="sweep"?swCard(o):barCard(o);};
+    const pn=PN_S.map(card).join("");
+    const mem=MEM_S.map(card).join("");
+    const scale=SCALE_S.map(card).join("");
+    return "<section class='cohort' id='cohort-"+co+"'><div class='cohort-head'><h2>"+M.name+"</h2><span class='badge'>"+tally(co)+"</span></div>"
+      +"<p class='matchup'>"+M.matchup+"</p><p class='sec-sub'>"+M.sub+"</p>"
+      +"<div class='grp-lab'>Per navigation — the cost of a click</div><div class='cards'>"+pn+"</div>"
+      +"<div class='grp-lab'>Memory &amp; startup</div><div class='cards'>"+mem+"</div>"
+      +"<div class='grp-lab'>How it scales — cost vs. the size of the app</div><div class='cards'>"+scale+"</div></section>";
+  }
+  document.getElementById("cohorts").innerHTML=COHORTS.map(([co])=>cohortSection(co)).join("");
+  // interactive legend — click a series to hide it; the Y-axis rescales to the visible ones
+  // (so a fast-growing rival stops squashing the flat/slow curves into the floor).
+  document.querySelectorAll(".card[data-chart]").forEach(card=>{
+    const d=CHARTS[+card.dataset.chart],hidden=new Set(),cd=card.querySelector(".chart");
+    card.querySelectorAll(".lgi").forEach(lgi=>lgi.addEventListener("click",()=>{
+      const n=lgi.dataset.s;
+      hidden.has(n)?hidden.delete(n):hidden.add(n);
+      const vis=d.ser.filter(([nm])=>!hidden.has(nm));
+      if(!vis.length){hidden.delete(n);return;}
+      lgi.classList.toggle("off",hidden.has(n));
+      cd.querySelector("svg").outerHTML=chart(d.p,vis,d.u,d.log);
+    }));
+  });
+  // point tooltip — one global element + event delegation (survives chart re-renders)
+  const TT=document.createElement("div");TT.id="tt";document.body.appendChild(TT);
+  document.addEventListener("mouseover",e=>{const t=e.target.dataset&&e.target.dataset.tip;if(t){TT.textContent=t;TT.style.display="block";}});
+  document.addEventListener("mousemove",e=>{if(TT.style.display==="block"){TT.style.left=(e.clientX+13)+"px";TT.style.top=(e.clientY+13)+"px";}});
+  document.addEventListener("mouseout",e=>{if(e.target.dataset&&e.target.dataset.tip)TT.style.display="none";});
+</script>
