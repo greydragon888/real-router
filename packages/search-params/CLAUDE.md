@@ -93,3 +93,13 @@ For `arrayFormat: "comma"`, the raw value is split on `,` before individual elem
 ### `sliceParamName` scans for `=` or `[`
 
 Parameter name extraction stops at the first `=` (value separator) or `[` (bracket notation). This avoids creating intermediate substrings.
+
+## Testing
+
+### Unit tests exercise the PUBLIC API (white-box guardrail)
+
+`tests/functional/**` import ONLY from the package index (`import { parse, parseQuery, build } from "search-params"`), never `../../src/*`. The internals — `decode`/`decodeValue`, `encode`/`encodeValue`/`makeOptions`, `getSearch`/`safeEncode`, and every per-format `strategies/*` object — are all reachable through `parse`/`build` under the matching format option, so a unit test that reaches inside would kill a mutant without strengthening the public contract AND hide any publicly-unreachable (dead) code from the 100% coverage gate. A `no-restricted-imports` block in `eslint.config.mjs` enforces this; the allowlist holds ONE documented KEEP-narrow exception:
+
+- **`makeOptions.singleton.test.ts`** — the allocation-free cached-singleton identity of `DEFAULT_OPTIONS` (a hot-path memory/perf invariant, the premise of `parse-scale.stress.ts`). The resolved default VALUES and the partial-override precedence ARE public (asserted in `search-params.test.ts` "option resolution"); only the object-identity — never handed back through `parse`/`build`, so publicly indistinguishable — is pinned directly. Twin of path-matcher's `createSegmentNode.test.ts`.
+
+`tests/property/**` and `tests/stress/**` are NOT constrained — they legitimately drive `build`/`parse` over generated/scaled inputs (round-trip invariants, leak guards). A pure internal function that cannot be reached through the public surface belongs in `tests/property/` (exempt); a genuinely unreachable branch gets a documented `ignores:` entry, not a src import in a unit test.

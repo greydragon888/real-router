@@ -1,353 +1,294 @@
-// Tests for search-params strategies
+/**
+ * Format strategies — exercised through the PUBLIC `parse`/`build`.
+ *
+ * Migrated off direct `src/strategies/*` imports (white-box guardrail,
+ * eslint.config.mjs): every strategy's encode/decode arm is observable in
+ * parse/build output under the matching format option, so a strategy branch that
+ * were dead through the public surface would surface as an uncovered line rather
+ * than being exercised from the inside. Organised per format axis so a per-arm
+ * mutant (a strategy returning the wrong token / failing to coerce) is killed by
+ * an observable param, not an internal-object assertion.
+ */
 import { describe, it, expect } from "vitest";
 
-import {
-  noneArrayStrategy,
-  bracketsArrayStrategy,
-  indexArrayStrategy,
-  commaArrayStrategy,
-} from "../../src/strategies/array";
-import {
-  noneBooleanStrategy,
-  autoBooleanStrategy,
-  emptyTrueBooleanStrategy,
-} from "../../src/strategies/boolean";
-import {
-  defaultNullStrategy,
-  hiddenNullStrategy,
-} from "../../src/strategies/null";
-import {
-  noneNumberStrategy,
-  autoNumberStrategy,
-} from "../../src/strategies/number";
+import { build, parse } from "search-params";
 
-describe("search-params strategies", () => {
-  describe("boolean strategies", () => {
-    describe("noneBooleanStrategy", () => {
-      it("should encode boolean as string", () => {
-        expect(noneBooleanStrategy.encode("flag", true)).toBe("flag=true");
-        expect(noneBooleanStrategy.encode("flag", false)).toBe("flag=false");
-      });
+describe("format strategies (through parse/build)", () => {
+  // ===========================================================================
+  // Boolean strategies
+  // ===========================================================================
 
-      it("should return null for undefined", () => {
-        expect(noneBooleanStrategy.decodeUndefined()).toBeNull();
-      });
+  describe("boolean: none", () => {
+    it("encodes booleans as plain =true/=false", () => {
+      expect(build({ flag: true }, { booleanFormat: "none" })).toBe(
+        "flag=true",
+      );
+      expect(build({ flag: false }, { booleanFormat: "none" })).toBe(
+        "flag=false",
+      );
+    });
 
-      it("should return null for decodeRaw (no raw matching)", () => {
-        expect(noneBooleanStrategy.decodeRaw("anything")).toBeNull();
-      });
-
-      it("should return value as-is for decodeValue", () => {
-        expect(noneBooleanStrategy.decodeValue("hello")).toBe("hello");
+    it("decodes a key-only param to null (decodeUndefined)", () => {
+      expect(parse("flag", { booleanFormat: "none" })).toStrictEqual({
+        flag: null,
       });
     });
 
-    describe("autoBooleanStrategy", () => {
-      it("should encode boolean as string", () => {
-        expect(autoBooleanStrategy.encode("flag", true)).toBe("flag=true");
-        expect(autoBooleanStrategy.encode("flag", false)).toBe("flag=false");
-      });
-
-      it("should return null for undefined", () => {
-        expect(autoBooleanStrategy.decodeUndefined()).toBeNull();
-      });
-
-      it("should parse true/false strings in decodeRaw", () => {
-        expect(autoBooleanStrategy.decodeRaw("true")).toBe(true);
-        expect(autoBooleanStrategy.decodeRaw("false")).toBe(false);
-        expect(autoBooleanStrategy.decodeRaw("other")).toBeNull();
-      });
-
-      it("should return value as-is for decodeValue", () => {
-        expect(autoBooleanStrategy.decodeValue("hello")).toBe("hello");
-      });
-    });
-
-    describe("emptyTrueBooleanStrategy", () => {
-      it("should encode true as key-only, false with value", () => {
-        expect(emptyTrueBooleanStrategy.encode("flag", true)).toBe("flag");
-        expect(emptyTrueBooleanStrategy.encode("flag", false)).toBe(
-          "flag=false",
-        );
-      });
-
-      it("should return true for undefined (key-only)", () => {
-        expect(emptyTrueBooleanStrategy.decodeUndefined()).toBe(true);
-      });
-
-      it("should decode raw 'true'/'false' to booleans, null otherwise", () => {
-        expect(emptyTrueBooleanStrategy.decodeRaw("true")).toBe(true);
-        expect(emptyTrueBooleanStrategy.decodeRaw("false")).toBe(false);
-        expect(emptyTrueBooleanStrategy.decodeRaw("anything")).toBeNull();
-      });
-
-      it("should return value as-is for decodeValue", () => {
-        expect(emptyTrueBooleanStrategy.decodeValue("hello")).toBe("hello");
-      });
+    it("never coerces 'true'/'false' — they stay strings (decodeRaw→null, decodeValue as-is)", () => {
+      // `none` does no raw matching and returns the decoded value verbatim.
+      expect(
+        parse("a=true&b=false", {
+          booleanFormat: "none",
+          numberFormat: "none",
+        }),
+      ).toStrictEqual({ a: "true", b: "false" });
     });
   });
 
-  describe("null strategies", () => {
-    describe("defaultNullStrategy", () => {
-      it("should encode as key-only", () => {
-        expect(defaultNullStrategy.encode("key")).toBe("key");
-      });
+  describe("boolean: auto (default)", () => {
+    it("encodes booleans as plain =true/=false", () => {
+      expect(build({ flag: true, off: false })).toBe("flag=true&off=false");
     });
 
-    describe("hiddenNullStrategy", () => {
-      it("should encode as empty string", () => {
-        expect(hiddenNullStrategy.encode("key")).toBe("");
-      });
-    });
-  });
-
-  describe("number strategies", () => {
-    describe("noneNumberStrategy", () => {
-      it("should return null (passthrough)", () => {
-        expect(noneNumberStrategy.decode("123")).toBeNull();
-        expect(noneNumberStrategy.decode("abc")).toBeNull();
-      });
+    it("decodes 'true'/'false' to booleans and leaves other strings alone", () => {
+      expect(
+        parse("a=true&b=false&c=other", { numberFormat: "none" }),
+      ).toStrictEqual({ a: true, b: false, c: "other" });
     });
 
-    describe("autoNumberStrategy", () => {
-      it("should decode integer strings as numbers", () => {
-        expect(autoNumberStrategy.decode("0")).toBe(0);
-        expect(autoNumberStrategy.decode("42")).toBe(42);
-        expect(autoNumberStrategy.decode("12345")).toBe(12_345);
-      });
-
-      it("should decode decimal strings as numbers", () => {
-        expect(autoNumberStrategy.decode("12.5")).toBe(12.5);
-        expect(autoNumberStrategy.decode("0.99")).toBe(0.99);
-        expect(autoNumberStrategy.decode("100.0")).toBe(100);
-      });
-
-      it("should return null for non-numeric strings", () => {
-        expect(autoNumberStrategy.decode("abc")).toBeNull();
-        expect(autoNumberStrategy.decode("12abc")).toBeNull();
-        expect(autoNumberStrategy.decode("")).toBeNull();
-        expect(autoNumberStrategy.decode(".5")).toBeNull();
-        expect(autoNumberStrategy.decode("1.")).toBeNull();
-        expect(autoNumberStrategy.decode("1.2.3")).toBeNull();
-      });
-
-      it("should decode negative numbers (round-trips with build/navigate)", () => {
-        expect(autoNumberStrategy.decode("-1")).toBe(-1);
-        expect(autoNumberStrategy.decode("-42")).toBe(-42);
-        expect(autoNumberStrategy.decode("-5.5")).toBe(-5.5);
-      });
-
-      it("should return null for a bare minus or non-canonical negatives", () => {
-        expect(autoNumberStrategy.decode("-")).toBeNull();
-        expect(autoNumberStrategy.decode("-007")).toBeNull(); // leading zero
-        expect(autoNumberStrategy.decode("-.5")).toBeNull(); // dot right after sign
-        expect(autoNumberStrategy.decode("-5.")).toBeNull(); // trailing dot
-      });
-
-      it("should return null for negative zero (not round-trippable)", () => {
-        // `-0` is a valid number, but build(-0) emits "0" and String(-0) === "0",
-        // so it can't round-trip; "-0"/"-0.0" must stay strings. (#898)
-        expect(autoNumberStrategy.decode("-0")).toBeNull();
-        expect(autoNumberStrategy.decode("-0.0")).toBeNull();
-      });
-
-      it("should preserve leading zeros as strings (not parse as numbers)", () => {
-        expect(autoNumberStrategy.decode("01")).toBeNull();
-        expect(autoNumberStrategy.decode("007")).toBeNull();
-        expect(autoNumberStrategy.decode("00")).toBeNull();
-      });
-
-      it("should preserve unsafe integers as strings (not parse as numbers)", () => {
-        expect(autoNumberStrategy.decode("99999999999999999")).toBeNull();
-        expect(autoNumberStrategy.decode("9007199254740992")).toBeNull(); // MAX_SAFE_INTEGER + 1
-        expect(autoNumberStrategy.decode("-9007199254740992")).toBeNull(); // MIN_SAFE_INTEGER - 1
-      });
-
-      it("should parse safe integers", () => {
-        expect(autoNumberStrategy.decode("9007199254740991")).toBe(
-          Number.MAX_SAFE_INTEGER,
-        );
-      });
+    it("decodes a key-only param to null (decodeUndefined)", () => {
+      expect(parse("flag")).toStrictEqual({ flag: null });
     });
   });
 
-  describe("array strategies", () => {
-    describe("noneArrayStrategy", () => {
-      it("should encode as repeated keys", () => {
-        expect(
-          noneArrayStrategy.encodeArray(
-            "items",
-            ["a", "b"],
-            defaultNullStrategy,
-          ),
-        ).toBe("items=a&items=b");
-      });
+  describe("boolean: empty-true", () => {
+    it("encodes true as key-only and false as =false", () => {
+      expect(
+        build({ on: true, off: false }, { booleanFormat: "empty-true" }),
+      ).toBe("on&off=false");
+    });
 
-      it("should return empty string for empty array", () => {
-        expect(
-          noneArrayStrategy.encodeArray("items", [], defaultNullStrategy),
-        ).toBe("");
-      });
-
-      it("should encode a null element as the bare key (#1155)", () => {
-        expect(
-          noneArrayStrategy.encodeArray(
-            "items",
-            [null, "a"],
-            defaultNullStrategy,
-          ),
-        ).toBe("items&items=a");
-      });
-
-      it("should drop a null element under hidden null format (#1155)", () => {
-        expect(
-          noneArrayStrategy.encodeArray(
-            "items",
-            [null, "a"],
-            hiddenNullStrategy,
-          ),
-        ).toBe("items=a");
+    it("decodes a key-only param to true (decodeUndefined)", () => {
+      expect(parse("flag", { booleanFormat: "empty-true" })).toStrictEqual({
+        flag: true,
       });
     });
 
-    describe("bracketsArrayStrategy", () => {
-      it("should encode with empty brackets", () => {
-        expect(
-          bracketsArrayStrategy.encodeArray(
-            "items",
-            ["a", "b"],
-            defaultNullStrategy,
-          ),
-        ).toBe("items[]=a&items[]=b");
-      });
+    it("decodes explicit 'true'/'false' to booleans, other strings verbatim", () => {
+      expect(
+        parse("a=true&b=false&c=anything", {
+          booleanFormat: "empty-true",
+          numberFormat: "none",
+        }),
+      ).toStrictEqual({ a: true, b: false, c: "anything" });
+    });
+  });
 
-      it("should return empty string for empty array", () => {
-        expect(
-          bracketsArrayStrategy.encodeArray("items", [], defaultNullStrategy),
-        ).toBe("");
-      });
+  // ===========================================================================
+  // Null strategies
+  // ===========================================================================
 
-      it("should encode a null element as the bare bracket key (#1155)", () => {
-        expect(
-          bracketsArrayStrategy.encodeArray(
-            "items",
-            [null],
-            defaultNullStrategy,
-          ),
-        ).toBe("items[]");
-      });
+  describe("null: default vs hidden", () => {
+    it("default encodes null as a bare key", () => {
+      expect(build({ key: null })).toBe("key");
     });
 
-    describe("indexArrayStrategy", () => {
-      it("should encode with indexed brackets", () => {
-        expect(
-          indexArrayStrategy.encodeArray(
-            "items",
-            ["a", "b", "c"],
-            defaultNullStrategy,
-          ),
-        ).toBe("items[0]=a&items[1]=b&items[2]=c");
-      });
+    it("hidden drops null entirely", () => {
+      expect(build({ key: null }, { nullFormat: "hidden" })).toBe("");
+      expect(build({ a: null, b: "x" }, { nullFormat: "hidden" })).toBe("b=x");
+    });
+  });
 
-      it("should return empty string for empty array", () => {
-        expect(
-          indexArrayStrategy.encodeArray("items", [], defaultNullStrategy),
-        ).toBe("");
-      });
+  // ===========================================================================
+  // Number strategies
+  // ===========================================================================
 
-      it("should encode a null element as the bare indexed key (#1155)", () => {
-        expect(
-          indexArrayStrategy.encodeArray(
-            "items",
-            [null, "a"],
-            defaultNullStrategy,
-          ),
-        ).toBe("items[0]&items[1]=a");
-      });
+  describe("number: none", () => {
+    it("leaves numeric strings as strings (passthrough decode)", () => {
+      expect(
+        parse("a=123&b=abc", { numberFormat: "none", booleanFormat: "none" }),
+      ).toStrictEqual({ a: "123", b: "abc" });
+    });
+  });
 
-      it("should drop a null element under hidden null format (#1155)", () => {
-        expect(
-          indexArrayStrategy.encodeArray(
-            "items",
-            [null, "a"],
-            hiddenNullStrategy,
-          ),
-        ).toBe("items[1]=a");
-      });
+  describe("number: auto", () => {
+    const num = (raw: string): unknown =>
+      parse(`x=${raw}`, { numberFormat: "auto", booleanFormat: "none" }).x;
+
+    it("decodes plain integers", () => {
+      expect(num("0")).toBe(0);
+      expect(num("42")).toBe(42);
+      expect(num("12345")).toBe(12_345);
     });
 
-    describe("commaArrayStrategy", () => {
-      it("should encode as comma-separated values", () => {
-        expect(
-          commaArrayStrategy.encodeArray(
-            "items",
-            ["a", "b", "c"],
-            defaultNullStrategy,
-          ),
-        ).toBe("items=a,b,c");
-      });
+    it("decodes decimals", () => {
+      expect(num("12.5")).toBe(12.5);
+      expect(num("0.99")).toBe(0.99);
+      expect(num("100.0")).toBe(100);
+    });
 
-      it("should return empty string for empty array", () => {
-        expect(
-          commaArrayStrategy.encodeArray("items", [], defaultNullStrategy),
-        ).toBe("");
-      });
+    it("keeps non-numeric / malformed-decimal forms as strings", () => {
+      expect(num("abc")).toBe("abc");
+      expect(num("12abc")).toBe("12abc");
+      expect(num("")).toBe(""); // empty value → not a number
+      expect(num(".5")).toBe(".5"); // dot at position 0
+      expect(num("1.")).toBe("1."); // trailing dot
+      expect(num("1.2.3")).toBe("1.2.3"); // second dot
+    });
 
-      it("should drop null elements (unrepresentable in comma) (#1155)", () => {
-        expect(
-          commaArrayStrategy.encodeArray(
-            "items",
-            [null, "a"],
-            defaultNullStrategy,
-          ),
-        ).toBe("items=a");
-        expect(
-          commaArrayStrategy.encodeArray("items", [null], defaultNullStrategy),
-        ).toBe("");
-      });
+    it("decodes negatives (round-trips with build/navigate)", () => {
+      expect(num("-1")).toBe(-1);
+      expect(num("-42")).toBe(-42);
+      expect(num("-5.5")).toBe(-5.5);
+    });
 
-      it("should encode special characters", () => {
-        expect(
-          commaArrayStrategy.encodeArray(
-            "items",
-            ["a b", "c&d"],
-            defaultNullStrategy,
-          ),
-        ).toBe("items=a%20b,c%26d");
-      });
+    it("keeps a bare minus and non-canonical negatives as strings", () => {
+      expect(num("-")).toBe("-"); // bare minus, no magnitude
+      expect(num("-007")).toBe("-007"); // leading zero
+      expect(num("-.5")).toBe("-.5"); // dot right after sign
+      expect(num("-5.")).toBe("-5."); // trailing dot
+    });
 
-      describe("decodeValue", () => {
-        it("should split comma-separated raw values", () => {
-          expect(commaArrayStrategy.decodeValue!("a,b,c")).toStrictEqual([
-            "a",
-            "b",
-            "c",
-          ]);
-        });
+    it("keeps negative zero as a string (not round-trippable)", () => {
+      expect(num("-0")).toBe("-0");
+      expect(num("-0.0")).toBe("-0.0");
+    });
 
-        it("should return null for single value (no comma)", () => {
-          expect(commaArrayStrategy.decodeValue!("single")).toBeNull();
-        });
+    it("keeps leading-zero integers as strings", () => {
+      expect(num("01")).toBe("01");
+      expect(num("007")).toBe("007");
+      expect(num("00")).toBe("00");
+    });
 
-        it("should return null for empty string", () => {
-          expect(commaArrayStrategy.decodeValue!("")).toBeNull();
-        });
+    it("keeps unsafe integers as strings, decodes safe ones", () => {
+      expect(num("99999999999999999")).toBe("99999999999999999");
+      expect(num("9007199254740992")).toBe("9007199254740992"); // MAX_SAFE + 1
+      expect(num("-9007199254740992")).toBe("-9007199254740992"); // MIN_SAFE - 1
+      expect(num("9007199254740991")).toBe(Number.MAX_SAFE_INTEGER);
+    });
+  });
 
-        it("should preserve encoded values (raw, before URI decode)", () => {
-          expect(commaArrayStrategy.decodeValue!("a%20b,c%26d")).toStrictEqual([
-            "a%20b",
-            "c%26d",
-          ]);
-        });
+  // ===========================================================================
+  // Array strategies
+  // ===========================================================================
 
-        it("should handle empty elements between commas", () => {
-          expect(commaArrayStrategy.decodeValue!("a,,b")).toStrictEqual([
-            "a",
-            "",
-            "b",
-          ]);
-        });
-      });
+  describe("array: none", () => {
+    it("encodes as repeated keys", () => {
+      expect(build({ items: ["a", "b"] })).toBe("items=a&items=b");
+    });
+
+    it("erases an empty array", () => {
+      expect(build({ items: [] })).toBe("");
+    });
+
+    it("encodes a null element as the bare key, dropping it under hidden null", () => {
+      expect(build({ items: [null, "a"] })).toBe("items&items=a");
+      expect(build({ items: [null, "a"] }, { nullFormat: "hidden" })).toBe(
+        "items=a",
+      );
+    });
+  });
+
+  describe("array: brackets", () => {
+    it("encodes with empty brackets", () => {
+      expect(build({ items: ["a", "b"] }, { arrayFormat: "brackets" })).toBe(
+        "items[]=a&items[]=b",
+      );
+    });
+
+    it("erases an empty array", () => {
+      expect(build({ items: [] }, { arrayFormat: "brackets" })).toBe("");
+    });
+
+    it("encodes a null element as the bare bracket key", () => {
+      expect(build({ items: [null] }, { arrayFormat: "brackets" })).toBe(
+        "items[]",
+      );
+    });
+
+    it("round-trips a bracketed array through parse", () => {
+      expect(
+        parse("items[]=a&items[]=b", { arrayFormat: "brackets" }),
+      ).toStrictEqual({ items: ["a", "b"] });
+    });
+  });
+
+  describe("array: index", () => {
+    it("encodes with indexed brackets", () => {
+      expect(build({ items: ["a", "b", "c"] }, { arrayFormat: "index" })).toBe(
+        "items[0]=a&items[1]=b&items[2]=c",
+      );
+    });
+
+    it("erases an empty array", () => {
+      expect(build({ items: [] }, { arrayFormat: "index" })).toBe("");
+    });
+
+    it("encodes a null element as the bare indexed key", () => {
+      expect(build({ items: [null, "a"] }, { arrayFormat: "index" })).toBe(
+        "items[0]&items[1]=a",
+      );
+    });
+
+    it("drops a null element under hidden null, keeping the index of the rest", () => {
+      expect(
+        build(
+          { items: [null, "a"] },
+          { arrayFormat: "index", nullFormat: "hidden" },
+        ),
+      ).toBe("items[1]=a");
+    });
+  });
+
+  describe("array: comma", () => {
+    it("encodes as comma-separated values", () => {
+      expect(build({ items: ["a", "b", "c"] }, { arrayFormat: "comma" })).toBe(
+        "items=a,b,c",
+      );
+    });
+
+    it("erases an empty array (empty parts → empty string)", () => {
+      expect(build({ items: [] }, { arrayFormat: "comma" })).toBe("");
+    });
+
+    it("drops null elements — down to empty string when all are null", () => {
+      // A [null] array leaves zero parts → `parts.length === 0` returns "".
+      expect(build({ items: [null] }, { arrayFormat: "comma" })).toBe("");
+      expect(build({ items: [null, "a"] }, { arrayFormat: "comma" })).toBe(
+        "items=a",
+      );
+    });
+
+    it("percent-encodes special characters in elements", () => {
+      expect(build({ items: ["a b", "c&d"] }, { arrayFormat: "comma" })).toBe(
+        "items=a%20b,c%26d",
+      );
+    });
+
+    it("splits a comma value into an array on parse", () => {
+      expect(
+        parse("items=a,b,c", { arrayFormat: "comma", numberFormat: "none" }),
+      ).toStrictEqual({ items: ["a", "b", "c"] });
+    });
+
+    it("treats a comma-less value as a scalar (decodeValue→null), incl. empty", () => {
+      expect(
+        parse("q=single", { arrayFormat: "comma", numberFormat: "none" }),
+      ).toStrictEqual({ q: "single" });
+      // Empty value: no comma → decodeValue returns null → scalar empty string.
+      expect(parse("q=", { arrayFormat: "comma" })).toStrictEqual({ q: "" });
+    });
+
+    it("preserves encoded values across the split (raw split, then decode)", () => {
+      expect(
+        parse("items=a%20b,c%26d", { arrayFormat: "comma" }),
+      ).toStrictEqual({ items: ["a b", "c&d"] });
+    });
+
+    it("keeps empty elements between commas", () => {
+      expect(
+        parse("items=a,,b", { arrayFormat: "comma", numberFormat: "none" }),
+      ).toStrictEqual({ items: ["a", "", "b"] });
     });
   });
 });
