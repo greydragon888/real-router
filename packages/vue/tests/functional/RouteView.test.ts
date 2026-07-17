@@ -782,7 +782,7 @@ describe("RouteView", () => {
       expect(wrapper.html()).toBe("");
     });
 
-    it("should work with last NotFound when multiple are present", async () => {
+    it("should work with the FIRST NotFound when multiple are present (first-wins) (#1439)", async () => {
       const notFoundRouter2 = createRouter(
         [
           { name: "test", path: "/" },
@@ -819,8 +819,8 @@ describe("RouteView", () => {
         ),
       );
 
-      expect(wrapper.find("[data-testid='first-nf']").exists()).toBe(false);
-      expect(wrapper.find("[data-testid='last-nf']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='first-nf']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='last-nf']").exists()).toBe(false);
 
       notFoundRouter2.stop();
     });

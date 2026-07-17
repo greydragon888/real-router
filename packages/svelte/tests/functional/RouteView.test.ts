@@ -202,6 +202,31 @@ describe("RouteView", () => {
     });
   });
 
+  // #1439 — Svelte's structural exemption from the duplicate-<NotFound>
+  // first-vs-last question. A RouteView marker is a named snippet, which
+  // compiles to a lexical binding, so two same-named snippets are a duplicate
+  // declaration — a COMPILE error, never a runtime last-wins/first-wins choice.
+  // The other five adapters resolve duplicates in JS (React/Preact/Solid/Vue
+  // first-wins via a guard, #1439); Svelte cannot express the duplicate at all.
+  describe("duplicate marker exemption (#1439)", () => {
+    it("two identically-named marker snippets fail to compile (declaration_duplicate)", async () => {
+      const { compile } = await import("svelte/compiler");
+      const duplicate =
+        "{#snippet notFound()}first{/snippet}{#snippet notFound()}second{/snippet}";
+
+      expect(() => compile(duplicate, { generate: "client" })).toThrow(
+        /already been declared/,
+      );
+    });
+
+    it("a single marker snippet compiles cleanly (control)", async () => {
+      const { compile } = await import("svelte/compiler");
+      const single = "{#snippet notFound()}only{/snippet}";
+
+      expect(() => compile(single, { generate: "client" })).not.toThrow();
+    });
+  });
+
   // #1252 — F3: RouteView must PRESERVE the winning segment's rendered subtree
   // (and its component state) across an in-winner navigation (a route change
   // where the same top-level segment stays active). Remounting would lose local

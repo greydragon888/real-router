@@ -394,7 +394,8 @@ el.type === RouteView.Match; // false — this is a marker object
 
 1. `<Match>` first-wins — if any `<Match>` activates, both `<Self>` and `<NotFound>` are suppressed
 2. `<Self>` first-wins — only the first `<RouteView.Self>` contributes; later instances are ignored
-3. `<Self>` wins over `<NotFound>` if no `<Match>` activates (rare edge — applies only when `nodeName === UNKNOWN_ROUTE`)
+3. `<NotFound>` first-wins — only the first `<RouteView.NotFound>` contributes; later instances are ignored (#1439, symmetric with `<Self>`)
+4. `<Self>` wins over `<NotFound>` if no `<Match>` activates (rare edge — applies only when `nodeName === UNKNOWN_ROUTE`)
 
 Accepts an optional `fallback` prop (`JSX.Element`) — symmetric with `<Match fallback>`, wraps children in `<Suspense>`. Use with `lazy()` to defer the index chunk.
 

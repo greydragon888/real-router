@@ -28,9 +28,9 @@
  * - Vue's `buildRenderList` pushes the ORIGINAL child VNodes into `rendered`
  *   — not synthetic key-tagged wrappers. Marker identification is by
  *   `element.type === Match / Self / NotFound`, not by `element.key`.
- * - `appendFallback` for NotFound picks the LAST NotFound element (`elements.at(-1)`
- *   filtered by type), so a Match-followed-by-multiple-NotFounds-with-UNKNOWN_ROUTE
- *   path is captured as "last NotFound wins" rather than first-wins.
+ * - `recordFallback` stores the FIRST NotFound VNode (`slots.notFoundVNode ??= child`),
+ *   so a Match-followed-by-multiple-NotFounds-with-UNKNOWN_ROUTE path is captured
+ *   as "first NotFound wins" — symmetric with first-wins for Self/Match (#1439).
  */
 
 import { test, fc } from "@fast-check/vitest";
@@ -337,6 +337,22 @@ describe("RouteView pipeline — Property Tests (Vue)", () => {
       expect(rendered[0].type).toBe(Self);
     });
 
+    test("strict collision — Self wins over NotFound when nodeName === UNKNOWN_ROUTE (#1439)", () => {
+      // Genuine collision the weak routeName===nodeName cases above miss:
+      // nodeName === UNKNOWN_ROUTE AND active route === UNKNOWN_ROUTE → BOTH Self
+      // and NotFound qualify; appendFallback checks Self first → Self wins.
+      // Mirror of the Solid adapter's Invariant 12.
+      const elements: VNode[] = [makeSelf("S"), makeNotFound("NF")];
+      const { rendered } = buildRenderList(
+        elements,
+        UNKNOWN_ROUTE,
+        UNKNOWN_ROUTE,
+      );
+
+      expect(rendered).toHaveLength(1);
+      expect(rendered[0].type).toBe(Self);
+    });
+
     test("NotFound order is irrelevant: [NotFound, Self], routeName === nodeName → still Self wins", () => {
       // `recordFallback` records both slots before `appendFallback` runs;
       // appendFallback then picks Self first regardless of source order.
@@ -412,15 +428,15 @@ describe("RouteView pipeline — Property Tests (Vue)", () => {
   });
 
   // =============================================================================
-  // Invariant 9 — appendFallback: last NotFound wins (Vue-specific)
+  // Invariant 9 — appendFallback: first NotFound wins (cross-adapter, #1439)
   // =============================================================================
 
-  describe("Invariant 9: last NotFound wins when multiple NotFounds present", () => {
-    // Vue's `appendFallback` uses `elements.filter(...NotFound).at(-1)` — so if
-    // a consumer accidentally renders two `<RouteView.NotFound>` blocks, the
-    // SECOND one wins (first-wins for Self, last-wins for NotFound).
-    // This asymmetry is intentional and documented here.
-    test("two NotFounds with UNKNOWN_ROUTE → only the last is rendered", () => {
+  describe("Invariant 9: first NotFound wins when multiple NotFounds present", () => {
+    // Vue's `recordFallback` stores the FIRST `<RouteView.NotFound>` VNode
+    // (`slots.notFoundVNode ??= child`) — so if a consumer accidentally renders
+    // two `<RouteView.NotFound>` blocks, the FIRST one wins, symmetric with
+    // first-wins for Self/Match and the React/Preact/Solid adapters (#1439).
+    test("two NotFounds with UNKNOWN_ROUTE → only the first is rendered", () => {
       const first = makeNotFound("first");
       const second = makeNotFound("second");
       const elements: VNode[] = [first, second];
@@ -428,8 +444,8 @@ describe("RouteView pipeline — Property Tests (Vue)", () => {
       const { rendered } = buildRenderList(elements, UNKNOWN_ROUTE, "");
 
       expect(rendered).toHaveLength(1);
-      // The rendered vnode must be the SECOND of the two — locked by identity.
-      expect(rendered[0]).toBe(second);
+      // The rendered vnode must be the FIRST of the two — locked by identity.
+      expect(rendered[0]).toBe(first);
     });
   });
 

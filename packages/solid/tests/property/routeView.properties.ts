@@ -1114,12 +1114,16 @@ function referenceBuildRenderList(
   nodeName: string,
 ): JSX.Element[] {
   let selfMarker: RouteViewMarker | null = null;
-  let notFoundChildren: JSX.Element | null = null;
+  let notFoundMarker: RouteViewMarker | null = null;
   let matchRendered: JSX.Element | null = null;
 
   for (const child of elements) {
     if (child.$$type === NOT_FOUND_MARKER) {
-      notFoundChildren = (child as { children: JSX.Element }).children;
+      // first-wins (#1439) — latch the FIRST NotFound MARKER (never null),
+      // structurally mirroring production `pickWinner`'s `notFoundMarker ??= child`.
+      // Guarding on the marker (not its children) keeps the oracle faithful even
+      // if the NotFound arbitrary is later widened to emit childless markers.
+      notFoundMarker ??= child;
     } else if (child.$$type === SELF_MARKER) {
       selfMarker ??= child;
     } else if (matchRendered === null) {
@@ -1133,8 +1137,8 @@ function referenceBuildRenderList(
     rendered.push(matchRendered);
   } else if (selfMarker !== null && routeName === nodeName) {
     rendered.push((selfMarker as { children: JSX.Element }).children);
-  } else if (routeName === UNKNOWN_ROUTE && notFoundChildren !== null) {
-    rendered.push(notFoundChildren);
+  } else if (routeName === UNKNOWN_ROUTE && notFoundMarker !== null) {
+    rendered.push((notFoundMarker as { children: JSX.Element }).children);
   }
 
   return rendered;
@@ -1173,6 +1177,10 @@ describe("buildRenderList — Sprint G behavior equivalence (audit-8 §8b HIGH #
       fallback: undefined,
     }));
 
+  // NOTE (#1439): children is always a truthy `N:<sentinel>` string (never
+  // nullish), so a childless-first-NotFound duplicate is not exercised here. The
+  // marker-based oracle above does not depend on this — widen to `fc.option(...)`
+  // if that edge ever needs explicit first-wins coverage.
   const arbNotFoundMarkerForEq: fc.Arbitrary<RouteViewMarker> = fc
     .string({ minLength: 1, maxLength: 8 })
     .map((sentinel): RouteViewMarker => ({

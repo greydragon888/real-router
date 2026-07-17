@@ -335,6 +335,22 @@ describe("RouteView pipeline — Property Tests", () => {
       expect(rendered[0].key).toBe("__route-view-self__");
     });
 
+    test("strict collision — Self wins over NotFound when nodeName === UNKNOWN_ROUTE (#1439)", () => {
+      // Genuine collision the weak routeName===nodeName cases above miss:
+      // nodeName === UNKNOWN_ROUTE AND active route === UNKNOWN_ROUTE → BOTH Self
+      // and NotFound qualify; appendFallback checks Self first → Self wins.
+      // Mirror of the Solid adapter's Invariant 12.
+      const elements: VNode[] = [makeSelf("S"), makeNotFound("NF")];
+      const { rendered } = buildRenderList(
+        elements,
+        UNKNOWN_ROUTE,
+        UNKNOWN_ROUTE,
+      );
+
+      expect(rendered).toHaveLength(1);
+      expect(rendered[0].key).toBe("__route-view-self__");
+    });
+
     test("NotFound order is irrelevant: [NotFound, Self], routeName === nodeName → still Self wins", () => {
       // `recordFallback` records both slots before `appendFallback` runs;
       // appendFallback then picks Self first regardless of source order.
