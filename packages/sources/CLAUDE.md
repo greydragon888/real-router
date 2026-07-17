@@ -27,6 +27,15 @@
 | `normalizeActiveOptions(opts?)` | Fills missing fields with defaults |
 | `canonicalJson(value)` | Key-order-stable JSON serialization (cache-key builder) |
 
+### Guard primitives (#1435)
+
+Framework-agnostic route-window guards shared by every adapter's `useRouteEnter` / `useRouteExit` (and the Angular `injectRoute*` equivalents). **Not sources** — no `router` arg, no cache, no subscription; the adapter owns the reactive effect wiring + dispatch and calls these for the guard decision.
+
+| Export | Purpose |
+|--------|---------|
+| `createRouteEnterGate()` | Returns a stateful decision closure `(route, previousRoute, skipSameRoute) => RouteEnterContext \| null`. Owns the canonical enter-guard superset (`!route` → skip-initial → same-route → `lastHandledRoute` dedupe → `!previousRoute`) + the dedupe state. Returns the context to dispatch, or `null` to skip. `skipSameRoute` is **per-call** (not a factory option) so a React ref-held gate honors an options flip without resetting dedupe. |
+| `guardLeaveListener(handler, { skipSameRoute? })` | Pure HOF returning a core `subscribeLeave` listener: same-route skip → reentrant-abort pre-check → **passthrough** (`return handler(ctx)`, so the returned Promise blocks the transition). The `LeaveFn` return type is derived via `Parameters<Router["subscribeLeave"]>[0]` (core doesn't re-export it). |
+
 ### Types
 
 | Export | Purpose |
@@ -38,6 +47,8 @@
 | `DismissableErrorSnapshot` | Same as above + `resetError: () => void` |
 | `ActiveRouteSourceOptions` | `{ strict?, ignoreQueryParams?, hash? }` |
 | `ActiveNameSelector` | Interface of `createActiveNameSelector` return (`subscribe`, `isActive`, `destroy`) |
+| `RouteEnterContext` / `RouteEnterGate` | `createRouteEnterGate` context (`{ route, previousRoute }`, both non-nullable `State`) + the returned gate closure type |
+| `RouteExitContext` / `UseRouteExitOptions` | `guardLeaveListener` context (`{ route, nextRoute, signal }`) + options (`{ skipSameRoute? }`). Deliberately re-state core `LeaveState`'s shape under the adapter-canonical names so adapters can re-export them verbatim |
 
 All factories return `RouterSource<T>` **except `createActiveNameSelector`**, which returns an `ActiveNameSelector` (see the row above — the `subscribe` accepts a route-name argument and there is no `getSnapshot()`):
 
@@ -225,6 +236,8 @@ src/
 ├── createErrorSource.ts         — eager error snapshot + cached getErrorSource
 ├── createDismissableError.ts    — derived source: getErrorSource + dismissedVersion state
 ├── createActiveNameSelector.ts  — shared O(1) active-name selector (Link fast-path)
+├── createRouteEnterGate.ts      — route-enter guard gate (stateful decision closure, #1435)
+├── guardLeaveListener.ts        — route-exit guard HOF (subscribeLeave listener wrapper, #1435)
 ├── canonicalJson.ts             — key-order-stable JSON (for cache keys)
 ├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizer
 ├── computeSnapshot.ts           — shared node-snapshot builder

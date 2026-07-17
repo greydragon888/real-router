@@ -1,3 +1,4 @@
+import { guardLeaveListener } from "@real-router/sources";
 import { onActivated, onDeactivated, onScopeDispose } from "vue";
 
 import { useRouter } from "./useRouter";
@@ -47,8 +48,10 @@ export type RouteExitHandler = (
  * Cleanup is bound to the component's effect scope via `onScopeDispose`.
  *
  * If the handler returns a Promise, the router blocks on it. If the
- * Promise resolves, navigation proceeds. If it rejects, the router emits
- * `TRANSITION_CANCELLED`.
+ * Promise resolves, navigation proceeds. If it **rejects**, the router
+ * rejects `navigate()` with the handler's **original error** and emits
+ * `TRANSITION_ERROR` — it is NOT re-coded to `TRANSITION_CANCELLED` (that
+ * arises only when the navigation's `signal` aborts).
  *
  * **Handler reactivity (Vue):** Vue composables run **once** during
  * `setup()`; `handler` is captured in closure at the call site. To vary
@@ -122,20 +125,21 @@ export function useRouteExit(
     isDeactivated = true;
   });
 
-  const off = router.subscribeLeave(({ route, nextRoute, signal }) => {
+  // The same-route + reentrant-abort guards and the Promise passthrough live in
+  // the shared listener (@real-router/sources, #1435); the handler is captured
+  // at init (Vue's setup runs once).
+  const guardedLeave = guardLeaveListener(handler, { skipSameRoute });
+
+  const off = router.subscribeLeave((leaveState) => {
+    // The #1221 KeepAlive pre-gate stays adapter-side and composes BEFORE the
+    // shared guards — a deactivated (sleeping) page must never enter the leave
+    // cycle (its async exit would otherwise be spliced into every navigation and
+    // block it).
     if (isDeactivated) {
       return;
     }
 
-    if (skipSameRoute && route.name === nextRoute.name) {
-      return;
-    }
-
-    if (signal.aborted) {
-      return;
-    }
-
-    return handler({ route, nextRoute, signal });
+    return guardedLeave(leaveState);
   });
 
   onScopeDispose(off);

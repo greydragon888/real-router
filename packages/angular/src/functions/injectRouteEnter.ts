@@ -1,4 +1,5 @@
-import { assertInInjectionContext, effect } from "@angular/core";
+import { assertInInjectionContext, effect, untracked } from "@angular/core";
+import { createRouteEnterGate } from "@real-router/sources";
 
 import { injectRoute } from "./injectRoute";
 
@@ -87,31 +88,34 @@ export function injectRouteEnter(
 
   const { routeState } = injectRoute();
   const skipSameRoute = options?.skipSameRoute ?? true;
+  // The canonical enter-guard set lives in the shared gate (@real-router/
+  // sources, #1435). Angular `inject*` runs once at construction, so a plain
+  // const holds the gate. The gate owns skip-initial / same-route / the
+  // `!previousRoute` guard (the sole defense of the non-nullable
+  // `RouteEnterContext.previousRoute` contract) plus a StrictMode dedupe arm —
+  // a defensive no-op in Angular (the effect below only re-runs on a fresh
+  // `route` reference; see the `untracked` note), kept for parity with React and
+  // tested once in sources, so no per-adapter v8-ignore is needed.
+  const gate = createRouteEnterGate();
 
   effect(() => {
     const { route, previousRoute } = routeState();
+    const context = gate(route, previousRoute, skipSameRoute);
 
-    // Early-exit guards, top-down:
-    //
-    //   - **Skip-initial**: `state.transition.from` is undefined only
-    //     for the very first state committed by `router.start()`.
-    //   - **Skip-same-route**: query-only navigations have
-    //     `transition.from === route.name`. Opt-out via
-    //     `skipSameRoute: false`.
-    if (!route.transition.from) {
-      return;
+    if (context) {
+      // `untracked`: scope this effect's dependencies to `routeState()` alone.
+      // Angular's `effect()` tracks signals read inside a synchronously-called
+      // function, so WITHOUT this a handler-read signal changing (no navigation)
+      // would re-run the effect and — pre-#1435 — re-fire the enter handler (a
+      // spurious re-fire vs the "fire once per nav-driven mount" contract). With
+      // the dispatch untracked the effect re-runs only on real navigations (a
+      // fresh `route` reference each time), so the handler fires once per mount —
+      // Angular parity with the other five adapters (empirically confirmed
+      // 2026-07-17). A small beneficial BEHAVIOR change, not behavior-neutral
+      // (hence the `minor` bump).
+      untracked(() => {
+        handler(context);
+      });
     }
-    if (skipSameRoute && route.transition.from === route.name) {
-      return;
-    }
-    // `previousRoute` is guaranteed populated whenever `route.transition.from`
-    // is set — core writes them together. The dead-code throw-guard that used
-    // to live here (review §8a LOW) is removed; the narrowing below is the
-    // type-safe equivalent and avoids the no-non-null-assertion lint.
-    if (!previousRoute) {
-      return;
-    }
-
-    handler({ route, previousRoute });
   });
 }

@@ -1,3 +1,5 @@
+import { createRouteEnterGate } from "@real-router/sources";
+
 import { useRoute } from "./useRoute.svelte";
 
 import type { State } from "@real-router/core";
@@ -77,44 +79,21 @@ export function useRouteEnter(
 ): void {
   const { route, previousRoute } = useRoute();
   const skipSameRoute = options?.skipSameRoute ?? true;
-  let lastHandledRoute: State | null = null;
+  // The canonical enter-guard set + `lastHandledRoute` dedupe live in the
+  // shared gate (@real-router/sources, #1435). Svelte composables run once, so
+  // a plain const holds the gate across `$effect` re-runs. The gate's leading
+  // `!route` arm folds in svelte's SSR / pre-start guard (`route.current` may
+  // be `undefined`), and the gate owns skip-initial / same-route / dedupe / the
+  // `!previousRoute` guard — the sole defense of the non-nullable
+  // `RouteEnterContext.previousRoute` contract (#1218), now tested once in
+  // sources rather than v8-ignored per adapter.
+  const gate = createRouteEnterGate();
 
   $effect(() => {
-    const currentRoute = route.current;
-    const prev = previousRoute.current;
+    const context = gate(route.current, previousRoute.current, skipSameRoute);
 
-    // Early-exit guards, top-down:
-    //
-    //   - **Defensive**: `route.current` may be undefined during SSR or
-    //     pre-start hydration. Not testable from vitest, v8-ignored.
-    //   - **Skip-initial**: `state.transition.from` is undefined only
-    //     for the very first state committed by `router.start()`.
-    //   - **Skip-same-route**: query-only navigations have
-    //     `transition.from === route.name`. Opt-out via
-    //     `skipSameRoute: false`.
-    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
-    //     ref between `$effect` re-runs is unexpected (createSubscriber
-    //     only fires on real reference changes); `!prev` is unreachable
-    //     once `transition.from` is set (core populates them together).
-    //     Both kept for parity with React; v8-ignored.
-    /* v8 ignore start */
-    if (!currentRoute) {
-      return;
+    if (context) {
+      handler(context);
     }
-    /* v8 ignore stop */
-    if (!currentRoute.transition.from) {
-      return;
-    }
-    if (skipSameRoute && currentRoute.transition.from === currentRoute.name) {
-      return;
-    }
-    /* v8 ignore start */
-    if (lastHandledRoute === currentRoute || !prev) {
-      return;
-    }
-    /* v8 ignore stop */
-
-    lastHandledRoute = currentRoute;
-    handler({ route: currentRoute, previousRoute: prev });
   });
 }

@@ -48,6 +48,27 @@ describe("useRouteEnter", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("does not fire on a mount AFTER a navigation — previousRoute is undefined although transition.from is truthy (#1218)", async () => {
+    const handler = vi.fn();
+
+    await act(async () => {
+      await router.navigate("about"); // transition.from = "test" (truthy)
+    });
+
+    // The Provider (and the source) mount AFTER the navigation, so the source's
+    // initial snapshot carries previousRoute: undefined. The mount-firing effect
+    // reaches the gate with transition.from truthy but previousRoute undefined →
+    // the shared gate's !previousRoute guard skips (skipSameRoute: false rules
+    // out the same-route arm as the cause). #1435 delegates this to sources.
+    render(
+      <RouterProvider router={router}>
+        <Probe handler={handler} options={{ skipSameRoute: false }} />
+      </RouterProvider>,
+    );
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it("fires once after a navigation when component is already mounted", async () => {
     const handler = vi.fn();
 
