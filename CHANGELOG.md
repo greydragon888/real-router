@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-17]
 
+### @real-router/core@0.77.1
+
+### Patch Changes
+
+- [#1501](https://github.com/greydragon888/real-router/pull/1501) [`898b44f`](https://github.com/greydragon888/real-router/commit/898b44fe8ccdabc327aeacbe4a41c0ee85909fbb) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject cleanly when a `start` interceptor never calls next() ([#1411](https://github.com/greydragon888/real-router/issues/1411))
+
+  A `start` interceptor that returned without calling `next()` (a non-thenable, typically `undefined`) made `Router.start()` throw a raw synchronous `TypeError: Cannot read properties of undefined (reading 'catch')` — the returned promise never settled and the FSM stuck in `STARTING` (`isActive()` stayed `true`), pointing the crash at internal code instead of the offending plugin. `Router.start()` now detects a non-thenable interceptor-chain result and rejects with an actionable `TypeError` (`a \`start\` interceptor returned without calling next()`), so the router unwinds through the existing failed-start recovery and `start()`honors its`Promise<State>` contract. Same deferred-crash class as the [#939](https://github.com/greydragon888/real-router/issues/939) start-path guard.
+
+
 ### @real-router/core@0.77.0
 
 ### Minor Changes
