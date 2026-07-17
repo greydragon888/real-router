@@ -89,7 +89,7 @@ src/
 │   ├── useIsActiveRoute.tsx        # Delegates to shared createActiveSource builder (#1427): default opts + non-empty name → createActiveNameSelector fast path (#1248), else cached createActiveRouteSource; useMemo-wrapped
 │   ├── useRouteUtils.tsx
 │   ├── useRouterTransition.tsx     # Uses cached getTransitionSource
-│   ├── useRouteEnter.tsx           # Mount-side window: reentrant abort, same-route skip, latest-ref, StrictMode dedupe
+│   ├── useRouteEnter.tsx           # Nav-driven mount window — delegates guards to createRouteEnterGate (@real-router/sources, #1435)
 │   ├── useRouteExit.tsx            # subscribeLeave wrapper: same guards, handler may return Promise
 │   └── useDeferred.tsx             # /ssr — reads state.context.ssrDataDeferred[key] (ssr-data-plugin)
 ├── components/                     # Shared components
@@ -241,7 +241,7 @@ dist/
 | `useRouteUtils()`                  | Get RouteUtils instance                                                                                                                                                | Never                          |
 | `useRouterTransition()`            | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`                                                                                | On transition start/end        |
 | `useRouteExit(handler, options?)`  | Wrap `router.subscribeLeave` with reentrant abort pre-check, same-route skip, latest-handler ref. Handler can return `Promise` — router blocks on it. Returns `void`.  | Never                          |
-| `useRouteEnter(handler, options?)` | Fire `handler` once on nav-driven mount with `{ route, previousRoute }`. Skip-initial / skip-same-route / StrictMode-immune via `lastHandledRouteRef`. Returns `void`. | Never                          |
+| `useRouteEnter(handler, options?)` | Fire `handler` once on nav-driven mount with `{ route, previousRoute }`. Skip-initial / skip-same-route / StrictMode-immune — guards delegated to the shared `createRouteEnterGate` (`@real-router/sources`, #1435); the gate is held via `useState`'s lazy initializer so its dedupe survives StrictMode effect re-runs. Returns `void`. | Never                          |
 
 > **`/legacy` entry exports 6 hooks** (omits `useRouteExit` and `useRouteEnter`) — those depend on React 19 concurrent-mode scheduling. Use `router.subscribeLeave()` / `useEffect` directly on React 18.
 
@@ -372,7 +372,7 @@ const { navigator, route } = useRoute(); // Re-renders on every navigation
 
 ### useRouteExit / useRouteEnter
 
-Two hooks that wrap the `subscribeLeave` / mount-side route windows with the universal guards baked in (reentrant abort pre-check, same-route skip default, latest-handler ref, StrictMode-dedupe). Both ship in the main entry; both consume `useRoute()` for the route snapshot, so they inherit the post-commit timing guarantee.
+Two hooks that wrap the `subscribeLeave` / mount-side route windows with the universal guards baked in (reentrant abort pre-check, same-route skip default, latest-handler ref, StrictMode-dedupe) — the guard logic itself is the shared `createRouteEnterGate` / `guardLeaveListener` from `@real-router/sources` (#1435), so react keeps only the effect wiring + latest-handler ref. Both ship in the main entry; both consume `useRoute()` for the route snapshot, so they inherit the post-commit timing guarantee.
 
 ```tsx
 useRouteExit(async ({ signal }) => {
