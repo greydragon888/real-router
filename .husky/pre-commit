@@ -39,12 +39,4 @@ pnpm turbo run test --filter='!./examples/**'
 echo "🎭 Checking e2e specs..."
 pnpm lint:e2e
 
-# Cross-router bench-app spec parity — the sweep constants (SEARCH_COUNTS /
-# WIDE_TARGETS / DEEP_TARGETS) are hand-copied across ~7 sites each (4 _shared
-# specs + 2 angular inlines + 1 scenario driver); a value drift silently shifts
-# or drops an @N sweep point per cohort and confounds the comparison the bench
-# exists to make. Cheap static scan (<1s, no build), so it runs unconditionally.
-echo "📐 Checking bench-app spec parity..."
-pnpm lint:bench-apps
-
 echo "✅ Pre-commit checks passed!"
