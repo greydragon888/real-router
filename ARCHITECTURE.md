@@ -45,9 +45,7 @@ real-router/
 │   ├── logger/                    # Isomorphic structured logging
 │   ├── fsm/                       # Finite state machine engine (internal, published by accident)
 │   ├── event-emitter/             # Generic typed event emitter (internal)
-│   ├── route-tree/                # Route tree building, validation, matcher facade (internal)
-│   ├── path-matcher/              # Segment Trie URL matching and path building (internal)
-│   ├── search-params/             # Query string handling (internal)
+│   ├── engine/                    # Routing engine (internal, #1510): route-tree facade at src root + path-matcher & search-params layers under src/
 │   └── type-guards/               # Runtime type validation (internal)
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
 │   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/core + type-guards
@@ -72,7 +70,7 @@ real-router/
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
-**Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`
+**Internal packages** (bundled into consumers, not on npm): `engine` (merged routing engine — route-tree facade + path-matcher + search-params layers, #1510), `type-guards`, `event-emitter`
 
 **Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`, `shared/ssr`
 
@@ -81,8 +79,7 @@ real-router/
 ```mermaid
 graph TD
     subgraph standalone [Standalone — zero deps]
-        PM[path-matcher]
-        SP[search-params]
+        ENGINE["engine (route-tree + path-matcher + search-params)"]
         EE[event-emitter]
         FSM["fsm"]
         LOG["logger"]
@@ -91,8 +88,6 @@ graph TD
 
     subgraph internal [Internal packages]
         TG[type-guards] -->|dep| TYPES
-        RT[route-tree] -->|dep| PM
-        RT -->|dep| SP
     end
 
     subgraph core [Core]
@@ -102,7 +97,7 @@ graph TD
     CORE -->|dep| TYPES
     CORE -->|dep| LOG
     CORE -->|dep| FSM
-    CORE -.->|bundles| RT
+    CORE -.->|bundles| ENGINE
     CORE -.->|bundles| EE
 
     subgraph consumers [Consumer packages]
@@ -456,7 +451,7 @@ These are deliberately designed constraints. Violating them will break the syste
 ├──────────────────────────────────────────────────────────────────┤
 │                     Foundation (internal)                        │
 ├──────────────────────────────────────────────────────────────────┤
-│  route-tree │ path-matcher │ search-params │ event-emitter │ ... │
+│           engine           │ event-emitter │ type-guards │ ... │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -465,7 +460,7 @@ These are deliberately designed constraints. Violating them will break the syste
 - Consumer packages depend on `core` and `core-types`
 - Consumer packages bundle internal packages as needed (`type-guards`)
 - Consumer packages import shared sources via git-tracked symlinks (`src/dom-utils` → `shared/dom-utils`, `src/browser-env` → `shared/browser-env`, `src/shared-ssr` → `shared/ssr`)
-- Foundation packages depend on each other (`route-tree` → `path-matcher`, `search-params`)
+- The `engine` package is self-contained (the former `route-tree` → `path-matcher` / `search-params` dependency is now an internal layer boundary within `engine`, enforced by lint — #1510)
 - `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)
 
 **FORBIDDEN:**

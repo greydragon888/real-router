@@ -1,11 +1,7 @@
 // packages/core/src/namespaces/RoutesNamespace/routesStore.ts
 
 import { logger } from "@real-router/logger";
-import {
-  createMatcher,
-  createRouteTree,
-  routeTreeToDefinitions,
-} from "route-tree";
+import { createMatcher, createRouteTree, routeTreeToDefinitions } from "engine";
 
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
@@ -30,7 +26,7 @@ import type {
   Matcher,
   RouteDefinition,
   RouteTree,
-} from "route-tree";
+} from "engine";
 
 // =============================================================================
 // Interfaces

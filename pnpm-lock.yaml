@@ -6181,14 +6181,16 @@ importers:
         specifier: workspace:^
         version: link:../core-types
     devDependencies:
+      engine:
+        specifier: workspace:^
+        version: link:../engine
       event-emitter:
         specifier: workspace:^
         version: link:../event-emitter
-      route-tree:
-        specifier: workspace:^
-        version: link:../route-tree
 
   packages/core-types: {}
+
+  packages/engine: {}
 
   packages/event-emitter: {}
 
@@ -6254,8 +6256,6 @@ importers:
       type-guards:
         specifier: workspace:^
         version: link:../type-guards
-
-  packages/path-matcher: {}
 
   packages/persistent-params-plugin:
     dependencies:
@@ -6366,24 +6366,15 @@ importers:
         specifier: 1.12.0
         version: 1.12.0(react@19.2.7)(vitest@4.1.10)
 
-  packages/route-tree:
-    dependencies:
-      path-matcher:
-        specifier: workspace:^
-        version: link:../path-matcher
-      search-params:
-        specifier: workspace:^
-        version: link:../search-params
-
   packages/route-utils:
     dependencies:
       '@real-router/types':
         specifier: workspace:^
         version: link:../core-types
     devDependencies:
-      route-tree:
+      engine:
         specifier: workspace:^
-        version: link:../route-tree
+        version: link:../engine
 
   packages/rsc-server-plugin:
     dependencies:
@@ -6409,8 +6400,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-
-  packages/search-params: {}
 
   packages/search-schema-plugin:
     dependencies:

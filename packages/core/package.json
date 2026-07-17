@@ -105,6 +105,6 @@
   },
   "devDependencies": {
     "event-emitter": "workspace:^",
-    "route-tree": "workspace:^"
+    "engine": "workspace:^"
   }
 }

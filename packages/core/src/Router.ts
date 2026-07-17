@@ -50,7 +50,7 @@ import type {
   SubscribeFn,
   Unsubscribe,
 } from "@real-router/types";
-import type { CreateMatcherOptions } from "route-tree";
+import type { CreateMatcherOptions } from "engine";
 
 const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
 

@@ -32,10 +32,9 @@ export default {
       dependencies: [
         "@real-router/*",
         "core-types",
-        "route-tree",
+        "engine",
         "type-guards",
         "logger",
-        "search-params",
       ],
       // No "peer": a @real-router/* peer dep must NOT be forced to workspace:^
       // (on 0.x, ^0.x.y is patch-only → any minor bump triggers a major via
@@ -128,12 +127,10 @@ export default {
       dependencies: [
         "@real-router/*",
         "core-types",
-        "route-tree",
+        "engine",
         "type-guards",
         "logger",
-        "search-params",
         "event-emitter",
-        "path-matcher",
       ],
       // prod/dev only — peer deps must NOT be pinned to workspace:^ (on 0.x,
       // ^0.x.y is patch-only → minor bump → unwanted major via changesets #822;

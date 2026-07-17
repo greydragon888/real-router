@@ -57,4 +57,4 @@ export { getNavigator } from "./getNavigator";
 
 export { resolveForwardChain } from "./namespaces/RoutesNamespace/forwardChain";
 
-export type { RouteTree } from "route-tree";
+export type { RouteTree } from "engine";

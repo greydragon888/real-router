@@ -1,4 +1,4 @@
-import { routeTreeToDefinitions } from "route-tree";
+import { routeTreeToDefinitions } from "engine";
 
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";

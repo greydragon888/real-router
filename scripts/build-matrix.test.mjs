@@ -8,7 +8,7 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets (8/6/3/2/2/8/1 = 30), plus synthetic
+//     reproduce the companion §C buckets (6/6/3/2/2/8/1 = 28), plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
 // Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.
@@ -176,15 +176,15 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 8/6/3/2/2/8/1 = 30", () => {
+test("L2: classify() buckets all real packages/* exactly 6/6/3/2/2/8/1 = 28", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 30, "expected 30 packages/* workspaces");
+  assert.equal(allPackages.length, 28, "expected 28 packages/* workspaces");
   assert.deepEqual(counts, {
-    base: 8,
+    base: 6,
     adapter: 6,
     "url-plugin": 3,
     "ssr-plugin": 2,
@@ -449,7 +449,7 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   );
 });
 
-test("routing: full rebuild (all 30) → base excluded, 11 shards", () => {
+test("routing: full rebuild (all 28) → base excluded, 11 shards", () => {
   const { mode, matrix } = buildPlan(allPackages, realDirOf);
   assert.equal(mode, "sharded");
   const names = matrix.include.map((i) => i.name);

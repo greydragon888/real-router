@@ -48,7 +48,7 @@
   },
   "sideEffects": false,
   "devDependencies": {
-    "route-tree": "workspace:^"
+    "engine": "workspace:^"
   },
   "dependencies": {
     "@real-router/types": "workspace:^"

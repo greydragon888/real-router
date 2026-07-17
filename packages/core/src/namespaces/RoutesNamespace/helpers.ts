@@ -7,7 +7,7 @@ import type {
   ForwardToCallback,
   Params,
 } from "@real-router/types";
-import type { RouteDefinition } from "route-tree";
+import type { RouteDefinition } from "engine";
 
 /**
  * Creates an empty RouteConfig.

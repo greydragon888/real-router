@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 30 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 87 top-level example applications across `examples/web/<framework>/*`, `examples/desktop/{electron,tauri}/*`, and `examples/console/*` (+52 subgroup sub-examples in `web/<framework>/{animation,ssr,hash}-examples/*` → 139 runnable; 145 example workspace packages incl. 6 framework aggregators — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
+pnpm monorepo with 28 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 87 top-level example applications across `examples/web/<framework>/*`, `examples/desktop/{electron,tauri}/*`, and `examples/console/*` (+52 subgroup sub-examples in `web/<framework>/{animation,ssr,hash}-examples/*` → 139 runnable; 145 example workspace packages incl. 6 framework aggregators — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
 
 `shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/`, `shared/dom-utils/`, and `shared/ssr/` that are git-tracked symlink targets. This entry is required for `type-guards` resolution during bundling via symlinks. See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 
@@ -234,8 +234,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/preload-plugin/CLAUDE.md](packages/preload-plugin/CLAUDE.md) — Preload plugin architecture
 - [packages/memory-plugin/CLAUDE.md](packages/memory-plugin/CLAUDE.md) — Memory plugin architecture
 - [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
-- [packages/path-matcher/CLAUDE.md](packages/path-matcher/CLAUDE.md) — Segment trie URL matcher, encoding, constraints
-- [packages/route-tree/CLAUDE.md](packages/route-tree/CLAUDE.md) — Route tree builder, matcher factory, validation
+- [packages/engine/CLAUDE.md](packages/engine/CLAUDE.md) — Routing engine (merged): route-tree facade + path-matcher + search-params layers (#1510)
 - [packages/fsm/CLAUDE.md](packages/fsm/CLAUDE.md) — FSM engine internals
 - [benchmarks/CLAUDE.md](benchmarks/CLAUDE.md) — Benchmark suite
 - [MCP Servers Guide](.claude/mcp-guide.md)

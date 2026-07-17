@@ -18,7 +18,7 @@ import type {
   TreeChangedEvent,
   Unsubscribe,
 } from "@real-router/types";
-import type { RouteTree } from "route-tree";
+import type { RouteTree } from "engine";
 
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,

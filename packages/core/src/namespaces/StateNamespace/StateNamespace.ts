@@ -7,7 +7,7 @@ import { setStateMetaParams } from "../../stateMetaStore";
 
 import type { StateNamespaceDependencies } from "./types";
 import type { Params, State } from "@real-router/types";
-import type { RouteTreeStateMeta } from "route-tree";
+import type { RouteTreeStateMeta } from "engine";
 
 /**
  * Independent namespace for managing router state storage and creation.

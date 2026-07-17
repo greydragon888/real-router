@@ -58,19 +58,16 @@ core/
 ```mermaid
 graph TD
     CORE["core"] -->|dep| FSM["fsm"]
-    CORE -->|dep| RT["route-tree"]
+    CORE -->|dep| ENGINE["engine (route-tree + path-matcher + search-params layers)"]
     CORE -->|dep| EE["event-emitter"]
     CORE -->|dep| LOG["logger"]
     CORE -->|dep| TYPES["core-types"]
-
-    RT -->|dep| PM["path-matcher"]
-    RT -->|dep| SP["search-params"]
 ```
 
 | Dependency        | What it provides            | Used by                                  |
 | ----------------- | --------------------------- | ---------------------------------------- |
 | **fsm**           | `FSM` class                 | `EventBusNamespace` (router lifecycle)   |
-| **route-tree**    | `createMatcher()`, tree ops | `RoutesNamespace` (path matching, build) |
+| **engine**        | `createMatcher()`, tree ops, query parse | `RoutesNamespace` (path matching, build) |
 | **event-emitter** | `EventEmitter` class        | `EventBusNamespace` (event dispatch)     |
 | **logger**        | `logger` singleton          | Warning/error logging across namespaces  |
 | **core-types**    | Shared type definitions     | All modules                              |
@@ -463,6 +460,4 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 - [INVARIANTS.md](INVARIANTS.md) — property-based test invariants (120+ invariants verified via fast-check)
 - [../fsm/ARCHITECTURE.md](../fsm/ARCHITECTURE.md) — FSM engine
 - [../event-emitter/ARCHITECTURE.md](../event-emitter/ARCHITECTURE.md) — event emitter
-- [../route-tree/ARCHITECTURE.md](../route-tree/ARCHITECTURE.md) — route tree and matcher
-- [../path-matcher/ARCHITECTURE.md](../path-matcher/ARCHITECTURE.md) — Segment Trie URL matching
-- [../search-params/ARCHITECTURE.md](../search-params/ARCHITECTURE.md) — query string handling
+- [../engine/ARCHITECTURE.md](../engine/ARCHITECTURE.md) — merged routing engine (route tree + Segment Trie matching + query string handling)
