@@ -34,8 +34,9 @@ name: CodSpeed
 # codspeed.io is unreachable from the RF VPS, so runner-version is pinned to a
 # cargo-git rev (see the action step below).
 #
-# Phase 2 (this state): push:[master] seeds/updates the baseline, pull_request
-# compares against it. The regression threshold / gate semantics live in the
+# Phase 2 (this state): push:[master] seeds/updates the baseline (feature-merge
+# commits only — release-merge commits are skipped, see the job `if`),
+# pull_request compares against it. The regression threshold / gate semantics live in the
 # CodSpeed project settings, not here; CodSpeed is NOT a required status check,
 # so a red comparison informs but does not block merges. SECURITY: the job `if`
 # gates pull_request to same-repo PRs only — fork-PR code never executes on the
@@ -62,15 +63,28 @@ jobs:
     # "<forker>/real-router" != github.repository, so the job is skipped — fork
     # code never executes on the runner.
     #
-    # RELEASE PRs: the changesets "version packages" PR (head branch
-    # changeset-release/*) only bumps versions/CHANGELOGs — runtime code is
-    # identical to master, so the comparison is meaningless and would only
-    # queue the single runner. Skipped. (github.head_ref is empty on push /
-    # workflow_dispatch, so the clause is a no-op for them.)
+    # RELEASE PRs / RELEASE MERGES: the changesets "version packages" PR (head
+    # branch changeset-release/*) only bumps versions/CHANGELOGs — runtime code
+    # is byte-identical to master. So BOTH its pull_request run AND its eventual
+    # push-to-master merge run are redundant, and both are skipped:
+    #   - pull_request side: gated by head_ref (changeset-release/*).
+    #   - push side: gated by the merge commit's message ("release: version
+    #     packages…" — the changesets `commit:` convention, changesets.yml) via
+    #     the third clause below.
+    # This drops the per-release CodSpeed cost from 3 slow runs to 2 on the
+    # single self-hosted runner: feature PR (the gate) + feature-merge push (the
+    # baseline). The feature-merge push already records the baseline — it
+    # carries the REAL code change — so re-measuring byte-identical code at the
+    # release merge would only queue the runner a redundant third time and delay
+    # the release. (github.head_ref is empty on push / workflow_dispatch, so the
+    # changeset-release/* clause is a no-op for them; the head_commit clause is
+    # push-only, so it never affects pull_request or workflow_dispatch.)
     if: >-
       (github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository) &&
-      !startsWith(github.head_ref, 'changeset-release/')
+      !startsWith(github.head_ref, 'changeset-release/') &&
+      !(github.event_name == 'push' &&
+      startsWith(github.event.head_commit.message, 'release: version packages'))
     # Self-hosted VPS runner = consistent hardware, which fixes the #984 cause:
     # GitHub's heterogeneous ubuntu-latest pool put base/head on different CPUs
     # (AMD EPYC vs Intel Xeon) → phantom instruction-count swings.

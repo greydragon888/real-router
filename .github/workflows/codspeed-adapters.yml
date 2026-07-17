@@ -36,12 +36,18 @@ jobs:
     # + workflow_dispatch run unconditionally (no pull_request payload, first
     # clause true); a pull_request runs ONLY when its head is a branch in
     # THIS repo. Fork PRs are skipped, so untrusted fork code never executes
-    # on the VPS. Release PRs (changeset-release/*) are skipped too — version/
-    # CHANGELOG bumps only, identical runtime code (see codspeed.yml).
+    # on the VPS. Release PRs AND release merges are skipped too — the
+    # changeset-release/* PR head (pull_request) and the "release: version
+    # packages…" merge commit (push) both carry byte-identical runtime code, so
+    # the baseline is already recorded by the feature-merge push. This keeps the
+    # per-release cost at 2 runs, not 3 (see codspeed.yml for the full
+    # rationale).
     if: >-
       (github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository) &&
-      !startsWith(github.head_ref, 'changeset-release/')
+      !startsWith(github.head_ref, 'changeset-release/') &&
+      !(github.event_name == 'push' &&
+      startsWith(github.event.head_commit.message, 'release: version packages'))
     # Same self-hosted VPS as the core gate: consistent hardware; runner
     # processes one job at a time, so core/adapters runs queue, never race.
     runs-on: self-hosted
