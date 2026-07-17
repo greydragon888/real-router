@@ -105,6 +105,14 @@ export class RouteView {
 
       const routeName = route.name;
 
+      // The Self/NotFound fallback resolution reads contentChildren(RouteSelf /
+      // RouteNotFound), which Angular 22 JIT / TestBed leaves empty (signal-input
+      // structural directives aren't registered without AOT), so these guarded
+      // `.at(0)` returns are unreachable in the unit suite — they fire only under
+      // AOT (real apps / e2e). Excluded from coverage until AOT tests land (#1512);
+      // see "Coverage Ceiling" in CLAUDE.md. The #1439 first-wins order is verified
+      // structurally (`.at(0)` = first-declared, parity with `selfs().at(0)`).
+      /* v8 ignore start */
       if (routeName === this.nodeName()) {
         const first = this.selfs().at(0);
 
@@ -120,6 +128,7 @@ export class RouteView {
           return first.templateRef;
         }
       }
+      /* v8 ignore stop */
 
       return null;
     },
