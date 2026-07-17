@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-17]
 
+### @real-router/core@0.77.3
+
+### Patch Changes
+
+- [#1508](https://github.com/greydragon888/real-router/pull/1508) [`0f6b98a`](https://github.com/greydragon888/real-router/commit/0f6b98ab267a8f8f93774db2dd7b0eaae9ec7024) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal: remove dead `parse`/`getSearch` and phantom grammar re-exports from the routing engine ([#1505](https://github.com/greydragon888/real-router/issues/1505))
+
+  `search-params.parse` (a path-accepting wrapper orphaned by [#1292](https://github.com/greydragon888/real-router/issues/1292), when `createMatcher` moved to `parseQuery`) and `getSearch` (its only consumer) had no runtime caller; `path-matcher`'s `PARAM_NAME_PATTERN` / `CONSTRAINT_BODY_PATTERN` stayed defined as internal grammar atoms but their package-index re-exports had none. Removed the dead code and migrated the affected tests to `parseQuery` — 100% coverage and mutation score preserved. Pre-step of the engine-merge (A.0). No public API or behavior change: the internal trio bundles into `@real-router/core`.
+
+
 ### @real-router/angular@0.15.0
 
 ### Minor Changes
