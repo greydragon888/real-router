@@ -13,10 +13,10 @@
 ```
 search-params/
 ├── src/
-│   ├── searchParams.ts       — Core functions: parse, parseQuery, build
+│   ├── searchParams.ts       — Core functions: parseQuery, build
 │   ├── encode.ts             — Encoding logic + option resolution (makeOptions)
 │   ├── decode.ts             — Decoding logic (value + strategy dispatch)
-│   ├── utils.ts              — getSearch() — query string extraction
+│   ├── utils.ts              — safeEncode() — total percent-encoding (lone-surrogate safe)
 │   ├── strategies/
 │   │   ├── index.ts          — Strategy factory & resolution (resolveStrategies)
 │   │   ├── array.ts          — Array format strategies (4 implementations)
@@ -37,7 +37,7 @@ search-params/
 graph LR
     RT[route-tree] -->|dep| SP[search-params]
 
-    SP -.->|provides| PARSE[parse]
+    SP -.->|provides| PARSE[parseQuery]
     SP -.->|provides| BUILD[build]
     SP -.->|provides| TYPES[Format types]
 ```
@@ -48,7 +48,7 @@ graph LR
 | **route-tree** | `build()`           | DI into SegmentMatcher as `buildQueryString` |
 | **route-tree** | `ArrayFormat`, etc. | Type re-exports for public API               |
 
-**Key design:** `route-tree` wraps `parse`/`build` with route-specific options at matcher creation time:
+**Key design:** `route-tree` wraps `parseQuery`/`build` with route-specific options at matcher creation time:
 
 ```typescript
 // route-tree/createMatcher.ts
@@ -64,11 +64,11 @@ new SegmentMatcher({
 ### Functions
 
 ```typescript
-parse(path: string, opts?: Options): Record<string, unknown>
-// Parse query string to object. Runs getSearch() first — extracts the "?" portion from a full path.
-
 parseQuery(search: string, opts?: Options): Record<string, unknown>
-// Parse an ALREADY-extracted query string, WITHOUT getSearch (#1292) — route-tree's matcher uses this.
+// Parse an ALREADY-extracted query string (no path prefix, no leading "?") into
+// an object. The caller splits the URL at the first "?" itself — never re-split
+// here, or a "?" inside a query value would drop the param (#1292). route-tree's
+// matcher wires this as parseQueryString.
 
 build(params: Record<string, unknown>, opts?: Options): string
 // Build query string from object. Returns string without leading "?".
@@ -144,7 +144,7 @@ interface NumberStrategy {
 
 interface ArrayStrategy {
   // A `null` element encodes to the bare-key form via `nullStrategy` (the bare
-  // key under `nullFormat: "default"`, dropped under `"hidden"`) so parse's
+  // key under `nullFormat: "default"`, dropped under `"hidden"`) so parseQuery's
   // null-in-array round-trips instead of throwing (#1155).
   encodeArray(
     name: string,
@@ -196,17 +196,11 @@ Encoding is not needed — `encode.ts` handles `typeof value === "number"` via `
 ### Parse Flow
 
 ```
-parse(path, opts?)
+parseQuery(search, opts?)   ← input is already the extracted query (no leading "?")
        │
        ▼
 ┌───────────────┐
-│  getSearch()  │  Extract query string portion (after "?")
-│               │  No "?" → returns entire input as-is
-└──────┬────────┘
-       │
-       ▼
-┌───────────────┐
-│  Fast path    │  Empty string → {}
+│  Fast path    │  Empty string / "?" → {}
 └──────┬────────┘
        │
        ▼
@@ -230,7 +224,7 @@ parse(path, opts?)
 | Mode                       | Trigger          | Behavior                                          |
 | -------------------------- | ---------------- | ------------------------------------------------- |
 | Default strategies         | No options       | Cached `DEFAULT_OPTIONS` (auto) — same as `build` |
-| Full parse with strategies | Options provided | Boolean/null/number conversion, array handling    |
+| Full parseQuery with strategies | Options provided | Boolean/null/number conversion, array handling    |
 
 ### Build Flow
 
@@ -313,7 +307,7 @@ No circular dependencies.
 
 | Operation | Complexity | Notes                                |
 | --------- | ---------- | ------------------------------------ |
-| `parse()` | O(n)       | n = query string length, single pass |
+| `parseQuery()` | O(n)       | n = query string length, single pass |
 | `build()` | O(n)       | n = total value lengths              |
 
 ### Optimizations
@@ -326,13 +320,13 @@ No circular dependencies.
 | Index-based iteration                     | No `split("&")` intermediate array                               |
 | `decodeValue` two-check                   | Most values skip decoding entirely                               |
 | `replaceAll` instead of `split().join()`  | No intermediate array for `+` replacement                        |
-| Inline bracket scan in parse              | No `{ name, hasBrackets }` object allocation                     |
+| Inline bracket scan in parseQuery              | No `{ name, hasBrackets }` object allocation                     |
 | Loop instead of `.map().join()` in arrays | No intermediate array during encoding                            |
 | `codePointAt` scan in numberFormat        | No regex engine overhead                                         |
 
 ### Memory
 
-- No intermediate arrays in parse (index-based iteration)
+- No intermediate arrays in parseQuery (index-based iteration)
 - Strategy objects are singletons (one per format combination)
 - No intermediate arrays in array strategies (loop instead of `.map().join()`)
 - No object allocation for param name extraction (inline index scan)
@@ -344,7 +338,7 @@ No circular dependencies.
 | Invalid array element type | `TypeError` during `build()` for `undefined` / objects only; a `null` element round-trips via the bare-key form per array format (#1155)                                                                  |
 | `undefined` values         | Skipped in `build()` (not serializable)                                                                                                                                                                   |
 | Objects in params          | Fallback to `encodeURIComponent(obj)` → `"%5Bobject%20Object%5D"`                                                                                                                                         |
-| Malformed query string     | Best-effort parse: missing `=` → `null` (scalar or array element — round-trips via the bare-key form, #1155); empty chunks (`&&`, leading/trailing `&`) are skipped, not injected as a `""` param (#1156) |
+| Malformed query string     | Best-effort parseQuery: missing `=` → `null` (scalar or array element — round-trips via the bare-key form, #1155); empty chunks (`&&`, leading/trailing `&`) are skipped, not injected as a `""` param (#1156) |
 
 ## See Also
 

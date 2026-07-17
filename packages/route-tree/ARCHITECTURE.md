@@ -53,7 +53,7 @@ graph LR
 | **path-matcher**  | `SegmentMatcher` class | Segment Trie for URL matching and path building                                                        |
 | **path-matcher**  | `buildParamMeta()`     | Extract param metadata from path patterns                                                              |
 | **path-matcher**  | `ParamMeta` type       | Parameter metadata (urlParams, queryParams, spatParams, constraintPatterns, paramTypeMap, pathPattern) |
-| **search-params** | `parse()`              | Query string parsing (DI into SegmentMatcher)                                                          |
+| **search-params** | `parseQuery()`         | Query string parsing (DI into SegmentMatcher)                                                          |
 | **search-params** | `build()`              | Query string building (DI into SegmentMatcher)                                                         |
 | **search-params** | Type re-exports        | `ArrayFormat`, `BooleanFormat`, `NullFormat`, etc.                                                     |
 

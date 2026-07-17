@@ -2,23 +2,23 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
 import { arbSafeString } from "./helpers";
-import { build, parse } from "../../src";
+import { build, parseQuery } from "../../src";
 
 import type { ArrayFormat, NumberFormat, Options } from "../../src";
 
 /**
- * Inverse-pair contract: `range(parse) ⊆ dom(build)` (#1155/#1156, axis A7).
+ * Inverse-pair contract: `range(parseQuery) ⊆ dom(build)` (#1155/#1156, axis A7).
  *
  * The existing property suite derives every query string from `build(params)`
  * (`helpers.ts` `arbQueryString`/`arbQueryStringWithOpts`), so its domain is the
  * IMAGE of `build`. Any external wire string outside that image — `?a&a=1`,
  * `?a[]`, `x=1&&&x=2` — is structurally invisible, which is why three audit
- * waves + #1037 missed the `parse→build` crash.
+ * waves + #1037 missed the `parseQuery→build` crash.
  *
  * This file closes the blind zone BY CONSTRUCTION: `arbRawQueryString` produces
  * query strings from the WIRE GRAMMAR directly (key-only / `=value` / repeats /
  * brackets / empty chunks), NOT from `build`. It reaches exactly the inputs
- * `parse` accepts but `build` never emits, making the `parse→build` half of the
+ * `parseQuery` accepts but `build` never emits, making the `parseQuery→build` half of the
  * inverse pair testable.
  */
 
@@ -73,58 +73,58 @@ const arbAllOptions: fc.Arbitrary<Options> = fc.record({
 
 describe("inverse-pair contract (#1155/#1156, A7)", () => {
   test.prop([arbRawQueryString, arbAllOptions], { numRuns: 500 })(
-    "totality: build(parse(qs)) never throws — range(parse) ⊆ dom(build)",
+    "totality: build(parseQuery(qs)) never throws — range(parseQuery) ⊆ dom(build)",
     (qs: string, opts: Options) => {
-      const parsed = parse(qs, opts);
+      const parsed = parseQuery(qs, opts);
 
       expect(() => build(parsed, opts)).not.toThrow();
     },
   );
 
-  // NOTE on the closure direction. A naive `parse(build(parse(qs))) ≡ parse(qs)`
-  // (or the wire-fixpoint `build(parse(build(parse(qs)))) === build(parse(qs))`)
+  // NOTE on the closure direction. A naive `parseQuery(build(parseQuery(qs))) ≡ parseQuery(qs)`
+  // (or the wire-fixpoint `build(parseQuery(build(parseQuery(qs)))) === build(parseQuery(qs))`)
   // is NOT a clean universal contract here and is deliberately NOT asserted: it
-  // fails on legitimate, documented behaviour — parse's bracket/repeat
+  // fails on legitimate, documented behaviour — parseQuery's bracket/repeat
   // array-detection is richer than build's per-format emission (a single-element
   // `[x]` collapses to a scalar under `none`/`comma`; an array boolean `[true]`
   // emits `a=true` under `empty-true` where the scalar emits the bare `a`). The
   // params-first roundtrip in `parseBuild.properties.ts` covers the
-  // build→parse→params contract; TOTALITY above is the parse→build half.
+  // build→parseQuery→params contract; TOTALITY above is the parseQuery→build half.
 
   // Named anchors — the exact five wire producers #1155 enumerates plus the
   // #1156 empty-chunk case. Build-throws / junk-params on current code.
   describe("named producers", () => {
     it("#1155: repeated key-only then value (default config)", () => {
-      expect(() => build(parse("a&a=1"))).not.toThrow();
+      expect(() => build(parseQuery("a&a=1"))).not.toThrow();
     });
 
     it("#1155: two key-only chunks", () => {
-      expect(() => build(parse("a&a"))).not.toThrow();
+      expect(() => build(parseQuery("a&a"))).not.toThrow();
     });
 
     it("#1155: brackets key-only", () => {
       const opts = { arrayFormat: "brackets" } as const;
 
-      expect(() => build(parse("a[]", opts), opts)).not.toThrow();
+      expect(() => build(parseQuery("a[]", opts), opts)).not.toThrow();
     });
 
     it("#1155: index key-only", () => {
       const opts = { arrayFormat: "index" } as const;
 
-      expect(() => build(parse("a[0]", opts), opts)).not.toThrow();
+      expect(() => build(parseQuery("a[0]", opts), opts)).not.toThrow();
     });
 
     it("#1155: double empty chunk with values", () => {
-      expect(() => build(parse("x=1&&&x=2"))).not.toThrow();
+      expect(() => build(parseQuery("x=1&&&x=2"))).not.toThrow();
     });
 
     it('#1156: leading empty chunk does not inject a junk "" param', () => {
       // default numberFormat "auto" coerces "1" → 1
-      expect(parse("&a=1")).toStrictEqual({ a: 1 });
+      expect(parseQuery("&a=1")).toStrictEqual({ a: 1 });
     });
 
     it("#1156: interior empty chunks are skipped", () => {
-      expect(parse("x=1&&&x=2")).toStrictEqual({ x: [1, 2] });
+      expect(parseQuery("x=1&&&x=2")).toStrictEqual({ x: [1, 2] });
     });
   });
 });

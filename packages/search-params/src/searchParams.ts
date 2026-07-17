@@ -11,7 +11,6 @@
 
 import { decode, decodeValue } from "./decode";
 import { encode, makeOptions } from "./encode";
-import { getSearch } from "./utils";
 
 import type { ResolvedStrategies } from "./strategies";
 import type { Options } from "./types";
@@ -286,26 +285,23 @@ function processParamChunk(
 // =============================================================================
 
 /**
- * Parse a querystring and return an object of parameters.
+ * Parse an ALREADY-EXTRACTED query string (no path prefix, no leading "?") into
+ * an object of parameters.
+ *
+ * The input must already be split at the first "?" — `SegmentMatcher.#preparePath`
+ * does this before the DI call, so route-tree wires `parseQuery` (not a
+ * path-accepting wrapper) as its query parser: re-splitting the input here would
+ * break at a "?" *inside* a query value (legal per RFC 3986), silently dropping
+ * the param (and unmatching the whole URL under `strictQueryParams`). (#1292)
  *
  * @example
  * ```typescript
- * parse("page=1&sort=name");
- * // => { page: "1", sort: "name" }
+ * parseQuery("page=1&sort=name");
+ * // => { page: 1, sort: "name" }
  *
- * parse("items[]=a&items[]=b", { arrayFormat: "brackets" });
+ * parseQuery("items[]=a&items[]=b", { arrayFormat: "brackets" });
  * // => { items: ["a", "b"] }
  * ```
- */
-/**
- * Parse an ALREADY-EXTRACTED query string (no path prefix, no leading "?").
- *
- * `parse` is `getSearch` + `parseQuery`. A consumer that has already split the
- * URL at the first "?" — e.g. route-tree's matcher, which does so in
- * `SegmentMatcher.#preparePath` before the DI call — MUST use this entry point:
- * routing through `parse` would run `getSearch` a SECOND time and split again at
- * a "?" *inside* a query value (legal per RFC 3986), silently dropping the param
- * (and unmatching the whole URL under `strictQueryParams`). (#1292)
  */
 export const parseQuery = (
   search: string,
@@ -317,7 +313,7 @@ export const parseQuery = (
   }
 
   // makeOptions(undefined) returns the cached DEFAULT_OPTIONS (auto) — the same
-  // defaults `build` uses — so parse(build(x)) === x even without options. (#744)
+  // defaults `build` uses — so parseQuery(build(x)) === x even without options. (#744)
   const params: Record<string, unknown> = {};
 
   parseIntoInternal(search, params, makeOptions(opts).strategies);
@@ -325,12 +321,9 @@ export const parseQuery = (
   return params;
 };
 
-export const parse = (path: string, opts?: Options): Record<string, unknown> =>
-  parseQuery(getSearch(path), opts);
-
 /**
  * Internal function to parse a query string into a target object.
- * The shared parse engine behind `parse`.
+ * The shared parse engine behind `parseQuery`.
  *
  * @internal
  */
@@ -409,7 +402,7 @@ function parseIntoInternal(
 /**
  * Build a querystring from an object of parameters.
  *
- * Note: Empty arrays produce an empty string, so `parse(build({ items: [] }))`
+ * Note: Empty arrays produce an empty string, so `parseQuery(build({ items: [] }))`
  * will not contain the `items` key. This is expected behavior for all array
  * formats including `comma` — the key is erased uniformly (INVARIANTS #9).
  *

@@ -84,8 +84,8 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
       urlParamsEncoding: options.urlParamsEncoding,
     }),
     // qs is ALREADY the query substring (SegmentMatcher split at the first "?");
-    // parseQuery skips the redundant getSearch that would split again inside a
-    // query value and drop the param (#1292).
+    // parseQuery parses it verbatim — a path-accepting wrapper would re-split at a
+    // "?" inside a query value and drop the param (#1292).
     parseQueryString: (qs: string) => parseQuery(qs, qp),
     buildQueryString: (params: Record<string, unknown>) => build(params, qp),
   });

@@ -1,25 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { CONSTRAINT_BODY_PATTERN, isConstraintBalanced } from "path-matcher";
+import { isConstraintBalanced } from "path-matcher";
 
+// `CONSTRAINT_BODY_PATTERN` (the `<...>` body atom) is an internal single-source
+// grammar atom — no longer re-exported from the package index (#1505). Its value
+// and grammar (the canonical `*` quantifier, empty `<>` admitted) are locked in
+// `tests/property/constraint-grammar.properties.ts`, which imports it from src
+// (exempt from the white-box guardrail) and kills the `[^>]+` mutant via the empty
+// `<>` discriminator.
 describe("constraint-grammar (#804)", () => {
-  describe("CONSTRAINT_BODY_PATTERN", () => {
-    it("is the canonical `*`-quantified body atom", () => {
-      expect(CONSTRAINT_BODY_PATTERN).toBe("[^>]*");
-    });
-
-    it("derives a regex that matches a `<...>` delimiter pair (incl. empty)", () => {
-      const rgx = new RegExp(`<${CONSTRAINT_BODY_PATTERN}>`);
-
-      expect(rgx.test(String.raw`<\d+>`)).toBe(true);
-      expect(rgx.test("<[a-z]+>")).toBe(true);
-      // canonical `*` admits the empty body at the grammar level (rejected
-      // later at the gate/backstop, not here).
-      expect(rgx.test("<>")).toBe(true);
-      expect(rgx.test("no-delimiters")).toBe(false);
-    });
-  });
-
   describe("isConstraintBalanced", () => {
     it("returns true for paths with no delimiters", () => {
       expect(isConstraintBalanced("/users/:id")).toBe(true);

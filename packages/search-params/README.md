@@ -18,13 +18,13 @@ Fast, configurable query string operations. Injected into `path-matcher` via `ro
 
 | Function | Description |
 |----------|-------------|
-| `parse(queryString, options?)` | Parse query string to object |
+| `parseQuery(queryString, options?)` | Parse query string to object |
 | `build(params, options?)` | Build query string from object |
 | `omit(path, paramsToOmit, options?)` | Remove specified parameters |
 | `keep(path, paramsToKeep, options?)` | Keep only specified parameters |
 
 ```typescript
-parse("page=1&sort=name");
+parseQuery("page=1&sort=name");
 // → { page: "1", sort: "name" }
 
 build({ page: 1, sort: "name" });
@@ -77,7 +77,7 @@ integers (`"9007199254740992"`) are deliberately kept as strings to preserve the
 exact text — they would otherwise change or lose precision through `Number()`.
 
 ```typescript
-parse("page=1&price=12.5&offset=-10&name=abc", { numberFormat: "auto" });
+parseQuery("page=1&price=12.5&offset=-10&name=abc", { numberFormat: "auto" });
 // → { page: 1, price: 12.5, offset: -10, name: "abc" }
 ```
 
@@ -87,11 +87,11 @@ parse("page=1&price=12.5&offset=-10&name=abc", { numberFormat: "auto" });
 | -------------------------- | -------------------------------------- | -------------------------------------- |
 | `undefined`                | stripped                               | Key absent from URL                    |
 | `null`                     | `?key` (key-only)                      | Via `nullFormat: "default"`            |
-| `""` (empty string)        | `?key=` (explicit empty)               | Distinct from `null` — roundtrip with `parse("?key=") → { key: "" }` |
+| `""` (empty string)        | `?key=` (explicit empty)               | Distinct from `null` — roundtrip with `parseQuery("?key=") → { key: "" }` |
 | `"value"`                  | `?key=value` (URI-encoded)             |                                        |
 | `0`, `false`               | `?key=0`, `?key=false`                 | Falsy-but-defined preserved            |
 
-| URL fragment               | `parse(...)` with default options  |
+| URL fragment               | `parseQuery(...)` with default options  |
 | -------------------------- | ---------------------------------- |
 | `?flag`                    | `{ flag: null }` (key-only → `null`) |
 | `?flag=`                   | `{ flag: "" }` (explicit empty value) |
