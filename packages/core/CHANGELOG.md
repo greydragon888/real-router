@@ -1,5 +1,13 @@
 # @real-router/core
 
+## 0.77.4
+
+### Patch Changes
+
+- [#1513](https://github.com/greydragon888/real-router/pull/1513) [`e50042a`](https://github.com/greydragon888/real-router/commit/e50042ac53276b637f49f709d8f5b9e483bc28e5) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal: merge the routing-engine trio (search-params + path-matcher + route-tree) into a single private `engine` package ([#1510](https://github.com/greydragon888/real-router/issues/1510))
+
+  Iteration 1 of the engine-merge RFC. The three internal foundation packages fold into one zero-dependency `engine` package (former `route-tree` facade at the src root; `path-matcher` and `search-params` as internal layers), which core bundles exactly as it bundled `route-tree` before. No public API or behaviour change — core's exports and dist shape are unchanged (tree-shaking already kept the layers internal to the bundle).
+
 ## 0.77.3
 
 ### Patch Changes
