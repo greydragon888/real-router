@@ -39,3 +39,14 @@ export {
 } from "./normalizeActiveOptions";
 
 export { canonicalJson } from "./canonicalJson";
+
+export { createRouteEnterGate } from "./createRouteEnterGate";
+
+export type { RouteEnterContext, RouteEnterGate } from "./createRouteEnterGate";
+
+export { guardLeaveListener } from "./guardLeaveListener";
+
+export type {
+  RouteExitContext,
+  UseRouteExitOptions,
+} from "./guardLeaveListener";
