@@ -108,7 +108,7 @@ if (!flagged.length) {
 } else {
   flagged.sort((a, b) => b.rme - a.rme);
   out.push(
-    `⚠️ ${flagged.length} metric(s) over threshold — read with caution (shared-runner noise expected; the rme-gate step is report-only unless armed):\n`,
+    `⚠️ ${flagged.length} metric(s) over threshold — read with caution (runner noise expected; the rme-gate step is report-only unless armed):\n`,
   );
   out.push("| RME% | limit | cohort | scenario | engine | metric |");
   out.push("|---|---|---|---|---|---|");

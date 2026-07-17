@@ -47,10 +47,14 @@ jobs:
       - name: Build packages to dist (O-8)
         run: pnpm turbo run bundle --filter='./packages/*'
 
-      # O-9: playwright@1.61.1 has NO install script → browsers don't arrive with `pnpm install` (by design).
-      # `pnpm exec` only resolves playwright inside benchmarks/ (its dep); --with-deps adds system libs (needs sudo — GHA passwordless).
-      - name: Install Chromium (O-9)
-        run: pnpm exec playwright install --with-deps chromium
+      # O-9: playwright@1.61.1 has NO install script → browsers don't arrive with `pnpm install` (by design);
+      # `pnpm exec` resolves playwright only inside benchmarks/ (its dep) → working-directory. On the persistent
+      # self-hosted store (node-cache:"") the pinned Chromium survives between runs, so this is a fast no-op AFTER the
+      # one-time VPS pre-install. NO --with-deps: this VPS's network DPI-throttles the Playwright CDN (examples.yml keeps
+      # Playwright on ubuntu-latest for the same reason) and the gh-runner user has no passwordless sudo — so the browser
+      # revision + system libs are provisioned out-of-band ONCE (see the A-7 prerequisite; re-seed on a playwright bump).
+      - name: Install Chromium (O-9 — expects the one-time VPS pre-install, A-7)
+        run: pnpm exec playwright install chromium
         working-directory: benchmarks
 
       # G-1b: matcher-bench/results.json is gitignored → it is deck-extract's input and absent on a fresh checkout.
@@ -64,11 +68,12 @@ jobs:
       # any real failure (broken adapter / contaminated run) → exit 1 → red job = "0 failed cells" failed.
       - name: Run the full matrix (O-7 / O-12 completeness)
         id: matrix
-        run: node cross-router/run-all.mjs "${{ inputs.runs || '100' }}"
+        run: node cross-router/run-all.mjs "$RUNS"
         working-directory: benchmarks
-        timeout-minutes: 240 # unsharded n=100 ≈ 2–2.8h + matcher-bench (A-2, measure on first run); backstop angular hang/OOM (GHA 6h cap)
+        timeout-minutes: 240 # unsharded n=100 ≈ 2–2.8h + matcher-bench (A-2, measure on first run); self-hosted has NO platform time cap, so this timeout is the SOLE angular-hang/OOM backstop
         env:
           BENCH_RUNNER: "self-hosted" # O-10 machine stamp (env.cpu carries the real CPU model)
+          RUNS: ${{ inputs.runs || '100' }} # via env, not inline in `run:` — a workflow_dispatch input spliced into a run-script is a shell-injection sink (matches the rme-gate step below)
 
       # ── salvage steps: run even on a RED matrix (partial snapshot of the finished cohorts, A-3),
       #    but NOT when it was skipped (preflight/bundle failed → no results/ to publish) ──
@@ -76,6 +81,7 @@ jobs:
       # O-3 / O-10b: rebuild the deck from THIS run in the workspace (META stamp header + G-3 disclaimer).
       # Goes to the artifact/Pages only — the committed deck/ is NEVER overwritten.
       - name: Rebuild deck snapshot (O-3 / O-10b)
+        id: deck
         if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
         run: node cross-router/deck/deck-extract.mjs && node cross-router/deck/build-deck.mjs
         working-directory: benchmarks
@@ -100,13 +106,18 @@ jobs:
 
       # O-2 / O-5 / O-11: stamp + win/loss/parity grid (advisory competitive-ratio) + RME watch, from the fresh deck-data.json.
       - name: Step summary (O-2 / O-5 / O-11)
-        if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
+        # Gate on the deck REBUILD, not the matrix: if deck-extract/build-deck threw, deck-data.json is the
+        # git-clean-restored committed reference (META=null) and ci-summary would render the CURATED deck as
+        # this run's snapshot with no stamp/disclaimer (O-3/O-5/A-5 violation). Only summarize a fresh deck.
+        if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
         run: node cross-router/harness/ci-summary.mjs >> "$GITHUB_STEP_SUMMARY"
         working-directory: benchmarks
 
       # Q5: ONE artifact — raw numbers + matcher input + the rebuilt CI deck.
       - name: Upload results + CI deck (Q5)
-        if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
+        # Same gate as the summary: a failed rebuild leaves the committed reference deck in the workspace;
+        # shipping it as the CI artifact/Pages would misrepresent it as this run's snapshot (O-3).
+        if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: bench-results
@@ -130,20 +141,33 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/download-artifact@v8
+        continue-on-error: true # F6: no artifact when bench failed before upload / deck rebuild failed — degrade, don't hard-fail
         with:
           name: bench-results
           path: site
       - name: Assemble dashboard
+        id: assemble
         # deck.html is self-contained → it IS the dashboard. Keep the raw data alongside for download.
         # NEVER touches the committed deck/ — the CI deck lives only in this artifact/Pages (O-3).
+        # F6: if the bench produced no artifact (early failure / failed rebuild), skip cleanly — a truly-failed
+        # run keeps Pages' last-good deploy instead of a second opaque red job (cp on an empty $deck).
         run: |
+          deck=""
+          [ -d site ] && deck="$(find site -name deck.html 2>/dev/null | head -1 || true)"
+          if [ -z "$deck" ]; then
+            echo "no CI deck in artifact — bench produced no snapshot; skipping Pages deploy" >&2
+            echo "have_deck=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           mkdir -p public
-          deck="$(find site -name deck.html | head -1)"
           cp "$deck" public/index.html
           find site -name deck-data.json -exec cp {} public/deck-data.json \;
           find site -name results.json -path '*matcher-bench*' -exec cp {} public/matcher-results.json \;
+          echo "have_deck=true" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@v5
+        if: steps.assemble.outputs.have_deck == 'true'
         with:
           path: public
       - id: deploy
+        if: steps.assemble.outputs.have_deck == 'true'
         uses: actions/deploy-pages@v5
