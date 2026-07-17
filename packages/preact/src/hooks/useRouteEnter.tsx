@@ -56,9 +56,10 @@ export interface UseRouteEnterOptions {
  * `router.subscribe` directly (which fires before Preact schedules a
  * re-render — the well-known race in distributed components).
  *
- * Note: Preact does not expose a `StrictMode` equivalent, so the
- * `lastHandledRouteRef` guard exists primarily for defensive symmetry
- * with the React implementation. It is harmless in Preact.
+ * Note: Preact does not expose a `StrictMode` equivalent, so the shared
+ * gate's dedupe arm (`createRouteEnterGate`, `@real-router/sources`) is a
+ * defensive no-op here — kept for parity with React and tested once in
+ * sources.
  *
  * @example Direction-aware entry animation
  * ```tsx

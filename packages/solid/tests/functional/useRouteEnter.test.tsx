@@ -238,14 +238,16 @@ describe("useRouteEnter", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  // Mini-sprint F.4 (audit-6 Stage-2 #22) — lastHandledRoute dedup.
-  // The hook keeps a closed-over `lastHandledRoute: State | null` and
-  // checks `if (lastHandledRoute === route) return;` before invoking
-  // the handler. This guards against the (theoretically unreachable
-  // on Solid, kept for parity with React) case where the same route
-  // ref drives a second effect activation. The contract: even if the
-  // same `route` reference appears twice in the effect's run sequence,
-  // the handler fires AT MOST ONCE per unique route ref.
+  // Mini-sprint F.4 (audit-6 Stage-2 #22) — route-reference dedup.
+  // The dedup now lives in the shared `createRouteEnterGate`
+  // (@real-router/sources, #1435) that this hook delegates to: the gate
+  // keeps a closed-over `lastHandledRoute: State | null` and checks
+  // `if (lastHandledRoute === route) return null;` before yielding a
+  // context. This guards against the (theoretically unreachable on Solid,
+  // kept for parity with React) case where the same route ref drives a
+  // second effect activation. The contract: even if the same `route`
+  // reference appears twice in the effect's run sequence, the handler fires
+  // AT MOST ONCE per unique route ref.
   it("dedups by route reference — same route ref never triggers handler twice (Mini-sprint F.4)", async () => {
     const handler = vi.fn();
 

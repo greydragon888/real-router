@@ -84,6 +84,30 @@ describe("guardLeaveListener", () => {
     expect(result).toBe(promise);
   });
 
+  it("passes a rejecting handler's Promise through verbatim — the HOF never re-codes it (#1435 §8)", async () => {
+    const error = new Error("exit boom");
+    const rejected = Promise.reject(error);
+
+    // Attach a catch so the deliberate rejection is not an unhandled rejection;
+    // the returned identity (and the rejection reason) are unaffected.
+    rejected.catch(() => {});
+
+    const listener = guardLeaveListener(() => rejected);
+
+    const result = listener({
+      route: mkState("users"),
+      nextRoute: mkState("about"),
+      signal: freshSignal(),
+    });
+
+    // The listener returns the SAME rejected Promise — the HOF is a pure
+    // passthrough, so core (not the HOF) owns the rejection → TRANSITION_ERROR
+    // contract. Any `.then` / `.catch` / re-wrap here would break identity, and
+    // the rejection carries the handler's ORIGINAL error, never re-coded.
+    expect(result).toBe(rejected);
+    await expect(result).rejects.toBe(error);
+  });
+
   it("returns undefined (does not call the handler) when a guard skips", () => {
     const listener = guardLeaveListener(() => Promise.resolve());
 

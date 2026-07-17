@@ -93,11 +93,16 @@ export function injectRouteEnter(
   // const holds the gate across effect re-runs. The gate owns skip-initial /
   // same-route / the `!previousRoute` guard (the sole defense of the
   // non-nullable `RouteEnterContext.previousRoute` contract), and it *adds* a
-  // StrictMode-style dedupe arm — dead in Angular's signal effect model (which
-  // never re-runs for an identical `route` reference) but tested once in
-  // sources. Because the dedupe lives in the gate, Angular needs no per-adapter
-  // v8-ignore: its own code is just the `if (context)` dispatch (both arms
-  // covered by the enter tests).
+  // dedupe arm that Angular DIDN'T have before. Unlike the other adapters this
+  // arm is NOT dead here: `effect()` tracks signals read INSIDE `handler`, so a
+  // handler-read signal changing WITHOUT a navigation re-runs this effect for
+  // the SAME `route` reference — pre-#1435 that re-fired the handler (a spurious
+  // re-fire, contrary to the "fire once per nav-driven mount" contract); the
+  // dedupe now suppresses it, bringing Angular to once-per-mount parity with the
+  // other five adapters (empirically confirmed 2026-07-17). So this is a small
+  // beneficial BEHAVIOR change, not behavior-neutral. (No per-adapter v8-ignore
+  // is needed: the dedupe lives in the gate, Angular's own code is just the
+  // `if (context)` dispatch, both arms covered by the enter tests.)
   const gate = createRouteEnterGate();
 
   effect(() => {

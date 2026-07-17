@@ -15,8 +15,8 @@
  *      where stale intermediate state was committed last would surface here.
  *   2. **No phantom calls** — every handler invocation maps to a real
  *      `(from, to)` transition (transition.from === previousRoute.name).
- *      A regression where `lastHandledRouteRef` mis-deduped would surface
- *      as a handler call with mismatched (from, to).
+ *      A regression where the shared gate's dedupe (`createRouteEnterGate`)
+ *      mis-deduped would surface as a handler call with mismatched (from, to).
  *   3. **Bounded call count** — handler fires at most once per committed
  *      transition. With N navigations attempted, the handler call count
  *      ≤ N (intermediates may be dropped by React's scheduler — that's
@@ -200,8 +200,8 @@ describe("preact stress — useRouteEnter race (§7.1 MEDIUM)", () => {
 
     // The handler may fire fewer than `succeeded` times when React's
     // scheduler coalesces effects, but it MUST NOT fire MORE. A regression
-    // dropping the `lastHandledRouteRef` dedupe would surface as
-    // `records.length > succeeded`.
+    // dropping the shared gate's dedupe (`createRouteEnterGate`) would surface
+    // as `records.length > succeeded`.
     expect(records.length).toBeLessThanOrEqual(succeeded);
   });
 
