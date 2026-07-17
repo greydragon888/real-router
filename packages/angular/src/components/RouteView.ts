@@ -89,14 +89,12 @@ export class RouteView {
   );
 
   // Fallback chain — only consulted when `matchedTemplate()` returned `null`.
-  // Template priority: Self → NotFound. Selection rules differ on purpose:
-  //   - **Self uses first-wins** (`.at(0)`) for parity with React / Preact /
-  //     Solid / Vue, where the first matching `<Self>` token in declaration
-  //     order wins.
-  //   - **NotFound uses last-wins** (`.at(-1)`) intentionally — the fallback
-  //     should be the most-recently-declared template so that consumers can
-  //     override an inherited `<ng-template routeNotFound>` simply by
-  //     re-declaring it lower in the projected content.
+  // Template priority: Self → NotFound. Both use **first-wins** (`.at(0)`) for
+  // parity with React / Preact / Solid / Vue (#1439): the first matching
+  // `<ng-template routeSelf>` / `<ng-template routeNotFound>` token in
+  // declaration order wins; later duplicates are ignored. `contentChildren`
+  // resolves matched directives in DOM/source order, so `.at(0)` is the
+  // first-declared marker.
   private readonly fallbackTemplate = computed<TemplateRef<unknown> | null>(
     () => {
       const route = this.routeState().route;
@@ -116,10 +114,10 @@ export class RouteView {
       }
 
       if (routeName === UNKNOWN_ROUTE) {
-        const last = this.notFounds().at(-1);
+        const first = this.notFounds().at(0);
 
-        if (last) {
-          return last.templateRef;
+        if (first) {
+          return first.templateRef;
         }
       }
 
