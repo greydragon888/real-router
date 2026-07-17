@@ -1,4 +1,5 @@
 import { assertInInjectionContext, effect } from "@angular/core";
+import { createRouteEnterGate } from "@real-router/sources";
 
 import { injectRoute } from "./injectRoute";
 
@@ -87,31 +88,24 @@ export function injectRouteEnter(
 
   const { routeState } = injectRoute();
   const skipSameRoute = options?.skipSameRoute ?? true;
+  // The canonical enter-guard set lives in the shared gate (@real-router/
+  // sources, #1435). Angular `inject*` runs once at construction, so a plain
+  // const holds the gate across effect re-runs. The gate owns skip-initial /
+  // same-route / the `!previousRoute` guard (the sole defense of the
+  // non-nullable `RouteEnterContext.previousRoute` contract), and it *adds* a
+  // StrictMode-style dedupe arm — dead in Angular's signal effect model (which
+  // never re-runs for an identical `route` reference) but tested once in
+  // sources. Because the dedupe lives in the gate, Angular needs no per-adapter
+  // v8-ignore: its own code is just the `if (context)` dispatch (both arms
+  // covered by the enter tests).
+  const gate = createRouteEnterGate();
 
   effect(() => {
     const { route, previousRoute } = routeState();
+    const context = gate(route, previousRoute, skipSameRoute);
 
-    // Early-exit guards, top-down:
-    //
-    //   - **Skip-initial**: `state.transition.from` is undefined only
-    //     for the very first state committed by `router.start()`.
-    //   - **Skip-same-route**: query-only navigations have
-    //     `transition.from === route.name`. Opt-out via
-    //     `skipSameRoute: false`.
-    if (!route.transition.from) {
-      return;
+    if (context) {
+      handler(context);
     }
-    if (skipSameRoute && route.transition.from === route.name) {
-      return;
-    }
-    // `previousRoute` is guaranteed populated whenever `route.transition.from`
-    // is set — core writes them together. The dead-code throw-guard that used
-    // to live here (review §8a LOW) is removed; the narrowing below is the
-    // type-safe equivalent and avoids the no-non-null-assertion lint.
-    if (!previousRoute) {
-      return;
-    }
-
-    handler({ route, previousRoute });
   });
 }

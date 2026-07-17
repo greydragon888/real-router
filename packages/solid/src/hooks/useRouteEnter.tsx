@@ -1,3 +1,4 @@
+import { createRouteEnterGate } from "@real-router/sources";
 import { createEffect } from "solid-js";
 
 import { useRoute } from "./useRoute";
@@ -86,36 +87,21 @@ export function useRouteEnter(
 ): void {
   const routeState = useRoute();
   const skipSameRoute = options?.skipSameRoute ?? true;
-  let lastHandledRoute: State | null = null;
+  // The canonical enter-guard set + `lastHandledRoute` dedupe live in the
+  // shared gate (@real-router/sources, #1435). Solid composables run once, so a
+  // plain const holds the gate across `createEffect` re-runs — no ref needed.
+  // The gate owns skip-initial / same-route / dedupe / the `!previousRoute`
+  // guard — the sole defense of the non-nullable
+  // `RouteEnterContext.previousRoute` contract (#1218), now tested once in
+  // sources rather than v8-ignored per adapter.
+  const gate = createRouteEnterGate();
 
   createEffect(() => {
     const { route, previousRoute } = routeState();
+    const context = gate(route, previousRoute, skipSameRoute);
 
-    // Early-exit guards, top-down:
-    //
-    //   - **Skip-initial**: `state.transition.from` is undefined only
-    //     for the very first state committed by `router.start()`.
-    //   - **Skip-same-route**: query-only navigations have
-    //     `transition.from === route.name`. Opt-out via
-    //     `skipSameRoute: false`.
-    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
-    //     ref between effect activations is unexpected on Solid (effects
-    //     run once per dependency change); `!previousRoute` is unreachable
-    //     once `transition.from` is set (the two are populated together by
-    //     core). Both kept for parity with React; v8-ignored.
-    if (!route.transition.from) {
-      return;
+    if (context) {
+      handler(context);
     }
-    if (skipSameRoute && route.transition.from === route.name) {
-      return;
-    }
-    /* v8 ignore start */
-    if (lastHandledRoute === route || !previousRoute) {
-      return;
-    }
-    /* v8 ignore stop */
-
-    lastHandledRoute = route;
-    handler({ route, previousRoute });
   });
 }

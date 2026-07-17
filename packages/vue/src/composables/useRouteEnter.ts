@@ -1,3 +1,4 @@
+import { createRouteEnterGate } from "@real-router/sources";
 import { onActivated, onDeactivated, watch } from "vue";
 
 import { useRoute } from "./useRoute";
@@ -85,16 +86,26 @@ export function useRouteEnter(
 ): void {
   const { route, previousRoute } = useRoute();
   const skipSameRoute = options?.skipSameRoute ?? true;
-  let lastHandledRoute: State | null = null;
+  // The canonical enter-guard set + `lastHandledRoute` dedupe live in the shared
+  // gate (@real-router/sources, #1435). Vue's setup runs once, so a plain const
+  // holds the gate across watcher runs. The gate owns skip-initial / same-route
+  // / dedupe / the `!previousRoute` guard — the sole defense of the non-nullable
+  // `RouteEnterContext.previousRoute` contract (#1218), now tested once in
+  // sources rather than v8-ignored per adapter. (In Vue both skip-initial and
+  // `!prev` are in fact unreachable — `watch` defaults to `immediate: false`, so
+  // the initial commit and the undefined-`previousRoute` baseline are never
+  // observed — but the gate arms them uniformly for cross-adapter parity.)
+  const gate = createRouteEnterGate();
 
   // #1221 — under <KeepAlive> a deactivated component keeps its effect scope
   // (and this watcher) alive, so a sleeping page would otherwise fire `handler`
-  // on every unrelated app navigation. Gate on deactivated state. `onActivated` /
-  // `onDeactivated` only fire under KeepAlive; without it the flag stays `false`
-  // and the watcher runs exactly as before. Reactivating a kept-alive page does
-  // NOT re-fire enter (strict-mount): this watcher flushes before `onActivated`,
-  // so the flag is still `true` when the reactivating navigation lands — waking a
-  // never-unmounted page is not a mount.
+  // on every unrelated app navigation. This pre-gate stays adapter-side: the
+  // framework-free gate has no channel to observe Vue's deactivation lifecycle.
+  // `onActivated` / `onDeactivated` only fire under KeepAlive; without it the
+  // flag stays `false` and the watcher runs exactly as before. Reactivating a
+  // kept-alive page does NOT re-fire enter (strict-mount): this watcher flushes
+  // before `onActivated`, so the flag is still `true` when the reactivating
+  // navigation lands — waking a never-unmounted page is not a mount.
   let isDeactivated = false;
 
   onActivated(() => {
@@ -109,37 +120,10 @@ export function useRouteEnter(
       return;
     }
 
-    const prev = previousRoute.value;
+    const context = gate(newRoute, previousRoute.value, skipSameRoute);
 
-    // Early-exit guards, top-down:
-    //
-    //   - **Skip-initial**: `!transition.from` catches the first commit
-    //     from `router.start()`. Vue's `watch` (default `immediate: false`)
-    //     does not fire on the initial state — kept for parity with
-    //     React/Preact and v8-ignored.
-    //   - **Skip-same-route**: query-only navigations have
-    //     `transition.from === route.name`. Opt-out via
-    //     `skipSameRoute: false`.
-    //   - **Defensive dedupe + missing `previousRoute`**: same `route`
-    //     ref between watcher activations is unexpected on Vue (driven
-    //     off ref identity); `!prev` is unreachable once
-    //     `transition.from` is set (core populates them together). Both
-    //     kept for parity with React; v8-ignored.
-    /* v8 ignore start */
-    if (!newRoute.transition.from) {
-      return;
+    if (context) {
+      handler(context);
     }
-    /* v8 ignore stop */
-    if (skipSameRoute && newRoute.transition.from === newRoute.name) {
-      return;
-    }
-    /* v8 ignore start */
-    if (lastHandledRoute === newRoute || !prev) {
-      return;
-    }
-    /* v8 ignore stop */
-
-    lastHandledRoute = newRoute;
-    handler({ route: newRoute, previousRoute: prev });
   });
 }

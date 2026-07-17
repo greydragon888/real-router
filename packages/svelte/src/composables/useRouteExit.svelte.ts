@@ -1,3 +1,4 @@
+import { guardLeaveListener } from "@real-router/sources";
 import { onDestroy } from "svelte";
 
 import { useRouter } from "./useRouter.svelte";
@@ -48,8 +49,10 @@ export type RouteExitHandler = (
  * during component initialization (synchronous in `<script>`).
  *
  * If the handler returns a Promise, the router blocks on it. If the
- * Promise resolves, navigation proceeds. If it rejects, the router emits
- * `TRANSITION_CANCELLED`.
+ * Promise resolves, navigation proceeds. If it **rejects**, the router
+ * rejects `navigate()` with the handler's **original error** and emits
+ * `TRANSITION_ERROR` — it is NOT re-coded to `TRANSITION_CANCELLED` (that
+ * arises only when the navigation's `signal` aborts).
  *
  * **Handler reactivity (Svelte):** Svelte composables run **once** at
  * component init; `handler` is captured in closure at the call site. To
@@ -97,17 +100,12 @@ export function useRouteExit(
   const router = useRouter();
   const skipSameRoute = options?.skipSameRoute ?? true;
 
-  const off = router.subscribeLeave(({ route, nextRoute, signal }) => {
-    if (skipSameRoute && route.name === nextRoute.name) {
-      return;
-    }
-
-    if (signal.aborted) {
-      return;
-    }
-
-    return handler({ route, nextRoute, signal });
-  });
+  // The same-route + reentrant-abort guards and the Promise passthrough live
+  // in the shared listener (@real-router/sources, #1435); the handler is
+  // captured at init (Svelte composables run once).
+  const off = router.subscribeLeave(
+    guardLeaveListener(handler, { skipSameRoute }),
+  );
 
   onDestroy(off);
 }

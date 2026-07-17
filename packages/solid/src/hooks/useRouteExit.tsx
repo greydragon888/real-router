@@ -1,3 +1,4 @@
+import { guardLeaveListener } from "@real-router/sources";
 import { onCleanup } from "solid-js";
 
 import { useRouter } from "./useRouter";
@@ -50,8 +51,10 @@ export type RouteExitHandler = (
  * component via `onCleanup`.
  *
  * If the handler returns a Promise, the router blocks on it. If the
- * Promise resolves, navigation proceeds. If it rejects, the router emits
- * `TRANSITION_CANCELLED`.
+ * Promise resolves, navigation proceeds. If it **rejects**, the router
+ * rejects `navigate()` with the handler's **original error** and emits
+ * `TRANSITION_ERROR` — it is NOT re-coded to `TRANSITION_CANCELLED` (that
+ * arises only when the navigation's `signal` aborts).
  *
  * **Handler reactivity (Solid)**: Solid components run **once** at mount;
  * `handler` is captured in closure at the call site. If you need
@@ -103,21 +106,12 @@ export function useRouteExit(
   const router = useRouter();
   const skipSameRoute = options?.skipSameRoute ?? true;
 
-  const off = router.subscribeLeave(({ route, nextRoute, signal }) => {
-    if (skipSameRoute && route.name === nextRoute.name) {
-      return;
-    }
-
-    // Reentrant abort: signal is already aborted when listener fires
-    // (e.g. a newer navigate superseded this one before subscribeLeave
-    // even ran). addEventListener("abort", ...) does not fire
-    // retroactively, so we skip the handler entirely.
-    if (signal.aborted) {
-      return;
-    }
-
-    return handler({ route, nextRoute, signal });
-  });
+  // The same-route + reentrant-abort guards and the Promise passthrough live
+  // in the shared listener (@real-router/sources, #1435); the handler is
+  // captured at init (Solid composables run once).
+  const off = router.subscribeLeave(
+    guardLeaveListener(handler, { skipSameRoute }),
+  );
 
   onCleanup(off);
 }
