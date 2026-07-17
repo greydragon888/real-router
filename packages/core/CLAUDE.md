@@ -152,6 +152,8 @@ api.addInterceptor("start", (next, path) =>
 
 Multiple interceptors per method execute in LIFO (reverse registration) order — the last-registered interceptor wraps the first, forming an onion-layer chain. Each receives `next` (original or previously-wrapped function) plus the method's arguments. Returns unsubscribe function.
 
+A **`start` interceptor is async** — it must return a `Promise<State>` (either `next(...)`'s result or its own thenable). One that returns without calling `next()` and without returning a thenable (typically `undefined`) is a misuse: `Router.start()` detects the non-thenable chain result and **rejects with an actionable `TypeError`** rather than crashing on `internalStart.catch(undefined)` and leaving the FSM stuck in `STARTING` (#1411). The sync `buildPath` / `forwardState` interceptors have no analogous return-normalization yet — a non-conforming return there surfaces differently (silent `undefined` / destructure crash); same class, tracked as a follow-up.
+
 Internally, `createInterceptable()` in `internals.ts` wraps methods at wiring time via `RouterInternals` WeakMap, ensuring all call paths (facade, wiring, plugins) are intercepted.
 
 **Validation runs on the RAW argument, before interceptors.** `Router.start()` calls `validator?.navigation.validateStartArgs(startPath)` (and `sendStart()`) _before_ `getInternals(this).start(path)` dispatches the interceptor chain. So `validateStartArgs` sees the **caller's** `startPath`, not the value a browser-plugin interceptor substitutes (`path ?? browser.getLocation()`) — the validator deliberately permits `undefined` for exactly this reason (browser-plugin fills it in downstream). A plugin that needs to validate the _post-override_ path must do so inside its own interceptor.

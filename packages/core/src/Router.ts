@@ -523,7 +523,23 @@ export class Router<
     let internalStart: Promise<State>;
 
     try {
-      internalStart = getInternals(this).start(startPath);
+      const chainResult: unknown = getInternals(this).start(startPath);
+
+      // A `start` interceptor that returns without calling next() yields a
+      // non-thenable (typically undefined); the `.catch` below would then throw
+      // a cryptic `TypeError: ...reading 'catch'` and leave the FSM stuck in
+      // STARTING. Reject with an actionable message so recovery unwinds via
+      // #unwindFailedStart — the same deferred-crash class as the #939
+      // start-path guard (#1411).
+      internalStart =
+        typeof (chainResult as { then?: unknown } | null | undefined)?.then ===
+        "function"
+          ? (chainResult as Promise<State>)
+          : Promise.reject(
+              new TypeError(
+                "[router.start] a `start` interceptor returned without calling next(). Every start interceptor must return `next(path)`.",
+              ),
+            );
     } catch (syncError: unknown) {
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided start interceptor
       internalStart = Promise.reject(syncError);
