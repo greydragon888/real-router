@@ -1,4 +1,4 @@
-import { assertInInjectionContext, effect } from "@angular/core";
+import { assertInInjectionContext, effect, untracked } from "@angular/core";
 import { createRouteEnterGate } from "@real-router/sources";
 
 import { injectRoute } from "./injectRoute";
@@ -90,19 +90,12 @@ export function injectRouteEnter(
   const skipSameRoute = options?.skipSameRoute ?? true;
   // The canonical enter-guard set lives in the shared gate (@real-router/
   // sources, #1435). Angular `inject*` runs once at construction, so a plain
-  // const holds the gate across effect re-runs. The gate owns skip-initial /
-  // same-route / the `!previousRoute` guard (the sole defense of the
-  // non-nullable `RouteEnterContext.previousRoute` contract), and it *adds* a
-  // dedupe arm that Angular DIDN'T have before. Unlike the other adapters this
-  // arm is NOT dead here: `effect()` tracks signals read INSIDE `handler`, so a
-  // handler-read signal changing WITHOUT a navigation re-runs this effect for
-  // the SAME `route` reference — pre-#1435 that re-fired the handler (a spurious
-  // re-fire, contrary to the "fire once per nav-driven mount" contract); the
-  // dedupe now suppresses it, bringing Angular to once-per-mount parity with the
-  // other five adapters (empirically confirmed 2026-07-17). So this is a small
-  // beneficial BEHAVIOR change, not behavior-neutral. (No per-adapter v8-ignore
-  // is needed: the dedupe lives in the gate, Angular's own code is just the
-  // `if (context)` dispatch, both arms covered by the enter tests.)
+  // const holds the gate. The gate owns skip-initial / same-route / the
+  // `!previousRoute` guard (the sole defense of the non-nullable
+  // `RouteEnterContext.previousRoute` contract) plus a StrictMode dedupe arm —
+  // a defensive no-op in Angular (the effect below only re-runs on a fresh
+  // `route` reference; see the `untracked` note), kept for parity with React and
+  // tested once in sources, so no per-adapter v8-ignore is needed.
   const gate = createRouteEnterGate();
 
   effect(() => {
@@ -110,7 +103,19 @@ export function injectRouteEnter(
     const context = gate(route, previousRoute, skipSameRoute);
 
     if (context) {
-      handler(context);
+      // `untracked`: scope this effect's dependencies to `routeState()` alone.
+      // Angular's `effect()` tracks signals read inside a synchronously-called
+      // function, so WITHOUT this a handler-read signal changing (no navigation)
+      // would re-run the effect and — pre-#1435 — re-fire the enter handler (a
+      // spurious re-fire vs the "fire once per nav-driven mount" contract). With
+      // the dispatch untracked the effect re-runs only on real navigations (a
+      // fresh `route` reference each time), so the handler fires once per mount —
+      // Angular parity with the other five adapters (empirically confirmed
+      // 2026-07-17). A small beneficial BEHAVIOR change, not behavior-neutral
+      // (hence the `minor` bump).
+      untracked(() => {
+        handler(context);
+      });
     }
   });
 }
