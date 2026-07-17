@@ -1,6 +1,10 @@
-# route-tree
+# engine
 
-Internal package that builds an immutable routing tree from route definitions, provides URL matching via `createMatcher`, and supports tree queries and validation. Not published to npm — consumed **only** by `@real-router/core`, the sole consumer of the routing engine. `@real-router/validation-plugin` reaches `validateRoute` through core's `@real-router/core/validation` subpath (segment lookup / existence via the matcher), never importing this package directly (#1301, enforced by a plugin-level guard test).
+Internal, **zero-dependency** package: the merged routing engine (engine-merge #1510). The former `route-tree` facade lives at the src root; `path-matcher` (segment-trie URL matching) and `search-params` (query-string parse/build) are folded in as internal **layers** under `src/path-matcher/` and `src/search-params/`. Not published to npm — consumed **only** by `@real-router/core`. `@real-router/validation-plugin` reaches `validateRoute` through core's `@real-router/core/validation` subpath (segment lookup / existence via the matcher), never importing this package directly (#1301, enforced by a plugin-level guard test).
+
+> **Transient package.** Iteration 2 of the engine-merge RFC absorbs `engine` into `@real-router/core` (`core/src/engine/`), so docs here are intentionally minimal. Layer boundaries (path-matcher must not import search-params — the DI seam) and the 3 white-box test tiers (facade / path-matcher-layer / search-params-layer) are enforced by `eslint.config.mjs`. The gotchas below describe the route-tree facade layer; each folded-in layer keeps its own semantics (see git history of the pre-merge `path-matcher` / `search-params` packages).
+
+The rest of this file documents the **route-tree facade layer** (the src root — `createRouteTree`, `createMatcher`, `validateRoute`, tree ops).
 
 ## Exports
 
