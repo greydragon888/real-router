@@ -54,18 +54,19 @@ import { join } from "node:path";
 export const K = 10;
 
 /**
- * The 8 packages that form the `base` layer (core + its workspace deps +
+ * The 6 packages that form the `base` layer (core + its workspace deps +
  * tsdown-bundled deps — the package *scope* of `--filter='@real-router/core...'`,
  * verified live against turbo 2.10.0). NOTE: `type-guards` is NOT here — core
- * does not depend on it; it rides the `internal` shard. Topologically Layer
- * 0/1/2 = 9 packages, but `base` = 8 (the difference is exactly `type-guards`).
+ * does not depend on it; it rides the `internal` shard. `engine` folds the former
+ * `path-matcher` + `search-params` + `route-tree` trio into one bundled dep
+ * (engine-merge #1510), so the set dropped from 8 to 6.
  *
  * These are EXCLUDED from the dynamic shards (`buildPlan` never puts the `base`
  * group in `include`) and delegated to the base-test job. base-test imports THIS
  * set to build its filter — running `test` on each member explicitly. It must
  * NOT use `--filter='@real-router/core...'`: turbo's `pkg...` runs the task only
  * on the matched package (core), not its deps (`test` has no `^test`), so the
- * other 7 would be tested nowhere → no lcov → SonarCloud 0% on their changed
+ * other 5 would be tested nowhere → no lcov → SonarCloud 0% on their changed
  * lines (#1030, via event-emitter). Keep this set authoritative: ci.yml's
  * base-test filter is generated from it.
  */
@@ -74,10 +75,8 @@ export const CORE_LAYER = new Set([
   "@real-router/types",
   "@real-router/fsm",
   "@real-router/logger",
-  "path-matcher",
-  "route-tree",
+  "engine",
   "event-emitter",
-  "search-params",
 ]);
 
 /** The seven layer buckets, in a fixed order so the emitted matrix is stable. */

@@ -1,7 +1,7 @@
 import { getPluginApi } from "../api/getPluginApi";
 
 import type { DefaultDependencies, Router } from "@real-router/types";
-import type { RouteTree } from "route-tree";
+import type { RouteTree } from "engine";
 
 export type StaticPathEntries = Record<
   string,

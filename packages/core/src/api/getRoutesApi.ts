@@ -1,5 +1,5 @@
 import { logger } from "@real-router/logger";
-import { nodeToDefinition } from "route-tree";
+import { nodeToDefinition } from "engine";
 
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { guardRouteStructure } from "../guards";
@@ -43,7 +43,7 @@ import type {
   TreeChangedEvent,
   TreeStructuralPatch,
 } from "@real-router/types";
-import type { RouteDefinition, RouteTree } from "route-tree";
+import type { RouteDefinition, RouteTree } from "engine";
 
 // ============================================================================
 // Helpers

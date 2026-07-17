@@ -121,9 +121,6 @@ component_management:
     - component_id: navigation-plugin
       paths:
         - packages/navigation-plugin/src/**
-    - component_id: path-matcher
-      paths:
-        - packages/path-matcher/src/**
     - component_id: persistent-params-plugin
       paths:
         - packages/persistent-params-plugin/src/**
@@ -136,9 +133,9 @@ component_management:
     - component_id: react
       paths:
         - packages/react/src/**
-    - component_id: route-tree
+    - component_id: engine
       paths:
-        - packages/route-tree/src/**
+        - packages/engine/src/**
     - component_id: route-utils
       paths:
         - packages/route-utils/src/**
@@ -148,9 +145,6 @@ component_management:
     - component_id: rx
       paths:
         - packages/rx/src/**
-    - component_id: search-params
-      paths:
-        - packages/search-params/src/**
     - component_id: search-schema-plugin
       paths:
         - packages/search-schema-plugin/src/**

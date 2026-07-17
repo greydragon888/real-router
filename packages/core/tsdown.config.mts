@@ -2,7 +2,7 @@ import { createIsomorphicConfig } from "../../tsdown.base.js";
 
 export default createIsomorphicConfig({
   deps: {
-    alwaysBundle: ["event-emitter", "route-tree"],
+    alwaysBundle: ["event-emitter", "engine"],
   },
   custom: {
     entry: {

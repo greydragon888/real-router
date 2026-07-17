@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/OptionsNamespace/constants.ts
 
-import { DEFAULT_QUERY_PARAMS } from "route-tree";
+import { DEFAULT_QUERY_PARAMS } from "engine";
 
 import type { Options } from "@real-router/types";
 

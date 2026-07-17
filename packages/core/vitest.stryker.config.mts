@@ -17,10 +17,7 @@ export default defineConfig({
       // Main package - resolve to local src
       "@real-router/core": path.resolve(import.meta.dirname, "./src"),
       // Workspace dependencies - resolve through node_modules symlinks
-      "route-tree": path.resolve(
-        import.meta.dirname,
-        "./node_modules/route-tree",
-      ),
+      engine: path.resolve(import.meta.dirname, "./node_modules/engine"),
       logger: path.resolve(import.meta.dirname, "./node_modules/logger"),
     },
   },
