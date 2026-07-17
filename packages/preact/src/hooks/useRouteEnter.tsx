@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { createRouteEnterGate } from "@real-router/sources";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 
 import { useRoute } from "./useRoute";
 
@@ -108,7 +109,16 @@ export function useRouteEnter(
 ): void {
   const { route, previousRoute } = useRoute();
   const handlerRef = useRef(handler);
-  const lastHandledRouteRef = useRef<State | null>(null);
+  // The canonical enter-guard set + `lastHandledRoute` dedupe live in the
+  // shared gate (@real-router/sources, #1435) — created once via useState's
+  // lazy initializer so it stays stable (a ref write during render is
+  // disallowed; the gate is never re-set, so no re-render is triggered).
+  // Preact has no StrictMode double-invoke, so the dedupe arm is a defensive
+  // no-op here (kept for parity with React), now tested once in sources rather
+  // than v8-ignored per adapter. The gate also owns the `!previousRoute`
+  // guard — the sole defense of the non-nullable
+  // `RouteEnterContext.previousRoute` contract (#1218).
+  const [gate] = useState(() => createRouteEnterGate());
   const skipSameRoute = options?.skipSameRoute ?? true;
 
   // Keep the latest handler reference accessible without re-running
@@ -119,29 +129,10 @@ export function useRouteEnter(
   });
 
   useEffect(() => {
-    // Early-exit guards, top-down:
-    //
-    //   - **Skip-initial**: `state.transition.from` is undefined only
-    //     for the very first state committed by `router.start()`.
-    //   - **Skip-same-route**: query-only navigations have
-    //     `transition.from === route.name`. Opt-out via
-    //     `skipSameRoute: false`.
-    //   - **Defensive dedupe**: same `route` ref between effect
-    //     cleanup + re-run. Preact has no StrictMode, but we keep the
-    //     guard for parity with React; v8-ignored.
-    if (!route.transition.from) {
-      return;
-    }
-    if (skipSameRoute && route.transition.from === route.name) {
-      return;
-    }
-    /* v8 ignore start */
-    if (lastHandledRouteRef.current === route || !previousRoute) {
-      return;
-    }
-    /* v8 ignore stop */
+    const context = gate(route, previousRoute, skipSameRoute);
 
-    lastHandledRouteRef.current = route;
-    handlerRef.current({ route, previousRoute });
-  }, [route, previousRoute, skipSameRoute]);
+    if (context) {
+      handlerRef.current(context);
+    }
+  }, [gate, route, previousRoute, skipSameRoute]);
 }

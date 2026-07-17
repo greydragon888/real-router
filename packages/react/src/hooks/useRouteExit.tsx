@@ -1,3 +1,4 @@
+import { guardLeaveListener } from "@real-router/sources";
 import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { useRouter } from "./useRouter";
@@ -53,8 +54,11 @@ export type RouteExitHandler = (
  * component's mount.
  *
  * If the handler returns a Promise, the router blocks on it. If the
- * Promise resolves, navigation proceeds. If it rejects, the router emits
- * `TRANSITION_CANCELLED` (existing core behavior, no change here).
+ * Promise resolves, navigation proceeds. If it **rejects**, the router
+ * rejects `navigate()` with the handler's **original error** and emits
+ * `TRANSITION_ERROR` — it is NOT re-coded to `TRANSITION_CANCELLED`
+ * (that arises only when the navigation's `signal` aborts: a superseding
+ * navigation, `stop()`, `dispose()`, or an external `opts.signal`).
  *
  * **Reentrancy — no synchronous `navigate()` from the handler.** The handler
  * runs inside the transition's leave-dispatch window, so calling
@@ -150,22 +154,14 @@ export function useRouteExit(
   });
 
   useEffect(() => {
-    return router.subscribeLeave(({ route, nextRoute, signal }) => {
-      if (skipSameRoute && route.name === nextRoute.name) {
-        return;
-      }
-
-      // Reentrant abort: signal is already aborted when listener fires
-      // (e.g. a newer navigate superseded this one before subscribeLeave
-      // even ran). addEventListener("abort", ...) does not fire
-      // retroactively, so we skip the handler entirely — any cleanup the
-      // handler would have wired via abort listener must not run because
-      // the corresponding `add` work never happened.
-      if (signal.aborted) {
-        return;
-      }
-
-      return handlerRef.current({ route, nextRoute, signal });
-    });
+    // The same-route + reentrant-abort guards and the Promise passthrough
+    // live in the shared listener (@real-router/sources, #1435). The ref-thunk
+    // keeps the latest handler reachable from the long-lived subscription
+    // without resubscribing on every render.
+    return router.subscribeLeave(
+      guardLeaveListener((context) => handlerRef.current(context), {
+        skipSameRoute,
+      }),
+    );
   }, [router, skipSameRoute]);
 }
