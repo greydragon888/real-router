@@ -235,6 +235,27 @@ describe("EventEmitter", () => {
       expect(secondCb).toHaveBeenCalledTimes(1);
     });
 
+    it("routes an async (rejecting) listener's rejection to onListenerError (#1412)", async () => {
+      const onListenerError = vi.fn();
+      const emitter = createEmitter({ onListenerError });
+      const error = new Error("async boom");
+      const secondCb = vi.fn();
+
+      // A listener typed `=> void` that returns a rejecting Promise at runtime
+      // (async hook / any-cast misuse). Pre-fix the emitter catches only SYNC
+      // throws, so this rejection leaks as an unhandledRejection instead of
+      // routing to the sink.
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises -- deliberately model an async (promise-returning) listener misuse (#1412)
+      emitter.on("reset", () => Promise.reject(error));
+      emitter.on("reset", secondCb);
+
+      emitter.emit("reset");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(onListenerError).toHaveBeenCalledWith("reset", error);
+      expect(secondCb).toHaveBeenCalledTimes(1);
+    });
+
     it("should catch multiple errors independently", () => {
       const onListenerError = vi.fn();
       const emitter = createEmitter({ onListenerError });

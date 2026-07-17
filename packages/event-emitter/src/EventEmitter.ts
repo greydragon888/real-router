@@ -195,20 +195,12 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       if (set.size === 1) {
         const [cb] = set;
 
-        try {
-          this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
-        } catch (error) {
-          this.#onListenerError?.(eventName, error);
-        }
+        this.#invokeIsolated(eventName, cb, argc, arg1, arg2, arg3, arg4);
       } else {
         const listeners = [...set];
 
         for (const cb of listeners) {
-          try {
-            this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
-          } catch (error) {
-            this.#onListenerError?.(eventName, error);
-          }
+          this.#invokeIsolated(eventName, cb, argc, arg1, arg2, arg3, arg4);
         }
       }
     } finally {
@@ -257,7 +249,8 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
    * Calls a listener with the correct number of arguments.
    * Dispatches by argc to preserve exact call semantics.
    */
-  #callListener(
+  #invokeIsolated(
+    eventName: keyof TEventMap & string,
     cb: AnyCallback,
     argc: number,
     arg1: unknown,
@@ -265,34 +258,61 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     arg3: unknown,
     arg4: unknown,
   ): void {
+    try {
+      const result = this.#callListener(cb, argc, arg1, arg2, arg3, arg4);
+
+      // A listener typed `=> void` may still return a Promise at runtime (an
+      // async hook or any-cast misuse). The sync `catch` below cannot see its
+      // rejection, so route it to the same `#onListenerError` sink — otherwise
+      // it escapes as a Node `unhandledRejection` (fatal under
+      // `--unhandled-rejections=strict`, the Node 22+ default). Centralised here
+      // so every listener kind (plugin hooks, `subscribe`, …) is isolated
+      // symmetrically (#1412; `subscribe`'s per-site #944 wrapper folds in).
+      if (
+        result !== null &&
+        result !== undefined &&
+        typeof (result as PromiseLike<unknown>).then === "function"
+      ) {
+        Promise.resolve(result as PromiseLike<unknown>).catch(
+          (error: unknown) => {
+            this.#onListenerError?.(eventName, error);
+          },
+        );
+      }
+    } catch (error) {
+      this.#onListenerError?.(eventName, error);
+    }
+  }
+
+  #callListener(
+    cb: AnyCallback,
+    argc: number,
+    arg1: unknown,
+    arg2: unknown,
+    arg3: unknown,
+    arg4: unknown,
+  ): unknown {
     switch (argc) {
       case 0: {
-        (cb as () => void)();
-
-        break;
+        return (cb as () => unknown)();
       }
       case 1: {
-        (cb as (a: unknown) => void)(arg1);
-
-        break;
+        return (cb as (a: unknown) => unknown)(arg1);
       }
       case 2: {
-        (cb as (a: unknown, b: unknown) => void)(arg1, arg2);
-
-        break;
+        return (cb as (a: unknown, b: unknown) => unknown)(arg1, arg2);
       }
       case 3: {
-        (cb as (a: unknown, b: unknown, c: unknown) => void)(arg1, arg2, arg3);
-
-        break;
-      }
-      default: {
-        (cb as (a: unknown, b: unknown, c: unknown, d: unknown) => void)(
+        return (cb as (a: unknown, b: unknown, c: unknown) => unknown)(
           arg1,
           arg2,
           arg3,
-          arg4,
         );
+      }
+      default: {
+        return (
+          cb as (a: unknown, b: unknown, c: unknown, d: unknown) => unknown
+        )(arg1, arg2, arg3, arg4);
       }
     }
   }

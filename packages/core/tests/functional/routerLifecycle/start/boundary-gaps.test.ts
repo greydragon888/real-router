@@ -1,18 +1,16 @@
 // #1190 — start() boundary gaps found by the start deep-audit (§5/§6): none of
 // these paths were exercised anywhere in the suite. Each pins a *documented but
-// untested* start-lifecycle contract. One cell from the audit list is
-// intentionally NOT green-pinned here, because grounding reclassified it as a
-// bug (filed separately), not a coverage gap:
-//   • async (rejected-promise) onStart → `Plugin.onStart` is typed `() => void`
-//     (sync-only), and an async rejection is NOT isolated (it leaks an
-//     unhandledRejection, unlike `subscribe`/#944) — there is no "async
-//     isolation" contract to pin (#1412). The real contract (sync throw is
-//     isolated) is already covered by error-handling.test.ts:70.
+// untested* start-lifecycle contract.
 //
-// The sibling #1411 cell (interceptor that never calls next() → raw sync
-// TypeError from `internalStart.catch` on undefined) was ALSO a reclassified
-// bug — now FIXED; its clean-rejection contract is green-pinned in the "start
-// interceptor" describe below.
+// Two cells the audit surfaced were reclassified as bugs (filed separately) and
+// are now FIXED + green-pinned:
+//   • interceptor that never calls next() → raw sync TypeError from
+//     `internalStart.catch` on undefined (#1411) — pinned in the "start
+//     interceptor" describe below.
+//   • async (rejected-promise) Plugin.onStart leaked an unhandledRejection
+//     instead of isolating it like `subscribe`/#944 (#1412) — the emitter now
+//     isolates async listener rejections centrally; pinned in
+//     error-handling.test.ts (next to the sync-throw onStart isolation).
 
 import { describe, afterEach, it, expect } from "vitest";
 
