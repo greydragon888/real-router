@@ -1,16 +1,18 @@
 // #1190 — start() boundary gaps found by the start deep-audit (§5/§6): none of
 // these paths were exercised anywhere in the suite. Each pins a *documented but
-// untested* start-lifecycle contract. Two cells from the audit list are
-// intentionally NOT green-pinned here, because grounding reclassified them as
-// bugs (filed separately), not coverage gaps:
-//   • interceptor that never calls next() → Router.start() throws a raw
-//     synchronous TypeError (`internalStart.catch` on undefined), not a clean
-//     rejection (#1411).
+// untested* start-lifecycle contract. One cell from the audit list is
+// intentionally NOT green-pinned here, because grounding reclassified it as a
+// bug (filed separately), not a coverage gap:
 //   • async (rejected-promise) onStart → `Plugin.onStart` is typed `() => void`
 //     (sync-only), and an async rejection is NOT isolated (it leaks an
 //     unhandledRejection, unlike `subscribe`/#944) — there is no "async
 //     isolation" contract to pin (#1412). The real contract (sync throw is
 //     isolated) is already covered by error-handling.test.ts:70.
+//
+// The sibling #1411 cell (interceptor that never calls next() → raw sync
+// TypeError from `internalStart.catch` on undefined) was ALSO a reclassified
+// bug — now FIXED; its clean-rejection contract is green-pinned in the "start
+// interceptor" describe below.
 
 import { describe, afterEach, it, expect } from "vitest";
 
@@ -20,7 +22,7 @@ import { hydrateRouter } from "@real-router/core/utils";
 
 import { captureSyncThrow, createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 
 describe("router.start() - boundary gaps (#1190)", () => {
   describe("path with a hash fragment", () => {
@@ -140,6 +142,26 @@ describe("router.start() - boundary gaps (#1190)", () => {
       // (post-commit failure keeps observed success, #763-shape).
       expect(router.isActive()).toBe(true);
       expect(router.getState()?.name).toBe("home");
+
+      router.dispose();
+    });
+
+    it("returns a cleanly-rejecting promise instead of a raw sync TypeError when an interceptor never calls next() (#1411)", async () => {
+      const router = createRouter([{ name: "home", path: "/home" }]);
+
+      // A start interceptor that returns without calling next() (undefined). The
+      // interceptor is typed Promise<State>, so modelling the misuse needs a
+      // cast. Pre-fix, `internalStart.catch` dereferences the undefined return
+      // and throws a raw synchronous TypeError; the FSM sticks in STARTING.
+      getPluginApi(router).addInterceptor(
+        "start",
+        (): Promise<State> => undefined as unknown as Promise<State>,
+      );
+
+      await expect(router.start("/home")).rejects.toThrow(
+        /returned without calling next/,
+      );
+      expect(router.isActive()).toBe(false);
 
       router.dispose();
     });
