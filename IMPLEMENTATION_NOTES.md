@@ -2,6 +2,43 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## Engine Merge — `search-params` + `path-matcher` + `route-tree` → `engine` (#1510)
+
+**Problem.** The routing engine shipped as three private packages with a strict
+dependency chain (`route-tree` → `path-matcher`, `search-params`), but the boundaries
+were no longer boundaries of *consumption*: `route-tree` was the sole consumer of the
+other two, and `@real-router/core` was the sole consumer of `route-tree`. The split
+cost ~30 config files, three entries in every package-set list (CORE_LAYER, codecov,
+syncpack), and forced grammar single-sources to be cross-package *exports* where an
+internal *import* was meant. This is iteration 1 of 2 (iteration 2 folds `engine` into
+core — a separate RFC).
+
+**Solution.** One zero-dependency `engine` package. The former `route-tree` facade sits
+at the src root (its `index.ts` is the package public API byte-for-byte); `path-matcher`
+and `search-params` fold in as internal **layers** under `src/path-matcher/` and
+`src/search-params/`. What used to be package boundaries are now **lint** boundaries
+(`eslint.config.mjs`, `no-restricted-imports` by `files` block): each lower layer is a
+self-contained leaf (path-matcher must not import search-params — query still reaches
+the matcher through the DI seam), and the root reaches a layer only through its barrel.
+Tests keep their pre-merge discriminating power via **three tiers** — `tests/functional`
+(facade, imports `"engine"`), `tests/unit/{path-matcher,search-params}` (layer barrels),
+`tests/property|stress/<layer>` (exempt) — NOT rewritten to the facade. Integration:
+core `route-tree` → `engine` (devDep, tsdown `alwaysBundle`, 13 src imports); CORE_LAYER
+8 → 6; codecov 3 components → 1 (27 total); syncpack; validation-plugin drops an inert
+`route-tree` `alwaysBundle`.
+
+**Why (empirically verified).** Removing the trio did NOT change core's bundle
+(tree-shaking already kept the layers internal — 0 `getSearch` occurrences in
+`core/dist`, dist byte-identical), so this is a pure structural refactor. Engine holds
+100% coverage (869 unit/functional + 210 property + 42 stress) — but that overall 100%
+would *hide* code the public facade can't reach (the layer tiers keep every line green).
+So a **reachability ratchet** (`scripts/reachability-check.mjs` +
+`packages/engine/ENGINE_REACHABILITY.json`, RFC §5.5) runs a facade-only coverage pass
+and fails on any *new* facade-unreachable file/line. Its baseline confirms the pre-merge
+dead-code sweep (#1505): 16 files / 571 lines facade-unreachable, ALL in the two layers,
+0 in the route-tree facade, none dead (each covered by its own layer tier). Not wired
+into pre-push until the registry is triaged to "empty + KEEP" (Faza 2).
+
 ## Project Rename
 
 Project renamed from `router6` to `real-router`. Updated in:
