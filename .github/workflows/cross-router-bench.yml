@@ -1,0 +1,149 @@
+name: cross-router-bench
+
+# Scheduled snapshot of the cross-router Playwright + CDP benchmark matrix (5 cohorts ×
+# 12 scenarios) → Pages dashboard + step-summary + artifact. GHA runners are shared/noisy,
+# so this is an HONEST SNAPSHOT with RME annotation, NOT a regression gate — see
+# benchmarks/.claude/cross-router-bench-ci-rfc-ru.md. Action majors pinned to the current
+# majors (checkout v7 · upload-artifact v7 · download-artifact v8 · pages v5 — gh api, 2026-07-18).
+
+on:
+  schedule:
+    - cron: "23 5 * * 1" # Mon ~05:23 UTC, weekly (O-1; off the hour — GHA drops/delays peak-minute crons)
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "samples per scenario (weekly default 100 arms the rme-gate; always >= N_MIN 10, #1455)"
+        default: "100"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-router-bench
+  cancel-in-progress: false
+
+env:
+  TURBO_API: ${{ vars.TURBO_API }} # O-8: Remote Cache → bundle ≈ cache-HIT (falls back to full bundle if unavailable, A-6)
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  bench:
+    # O-7 (unsharded): ONE job runs all 5 cohorts — coherent snapshot, one honest machine stamp.
+    runs-on: self-hosted # Q1 escalation: the dedicated consistent VPS (same runner as codspeed/examples) — low-variance hardware, so the rme-gate can arm (CONSISTENT_RUNNER=1 below). schedule/workflow_dispatch only (no fork-PR) → no self-hosted RCE surface.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup # pnpm + Node 24 + pnpm install --frozen-lockfile
+        with:
+          node-cache: "" # persistent self-hosted store survives between runs → skip the ~200 MB cache tarball (as codspeed.yml/codspeed-adapters.yml)
+
+      # O-13: spec-parity preflight — ~2 s static scan, fail-fast BEFORE the ~2.8h build+matrix.
+      # A drifted sweep constant silently drops an @N point per cohort (jagged snapshot); catch it in seconds.
+      - name: Spec-parity preflight (O-13)
+        run: pnpm lint:bench-apps
+
+      # O-8: the harness measures PRODUCTION dist (vite resolves @real-router/* → packages/*/dist/esm).
+      # Remote Cache restore writes FRESH mtime → the provenance freshness gate does not false-fire (verified 07-18).
+      - name: Build packages to dist (O-8)
+        run: pnpm turbo run bundle --filter='./packages/*'
+
+      # O-9: playwright@1.61.1 has NO install script → browsers don't arrive with `pnpm install` (by design).
+      # `pnpm exec` only resolves playwright inside benchmarks/ (its dep); --with-deps adds system libs (needs sudo — GHA passwordless).
+      - name: Install Chromium (O-9)
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: benchmarks
+
+      # G-1b: matcher-bench/results.json is gitignored → it is deck-extract's input and absent on a fresh checkout.
+      # Regenerate it (pure Node; after bundle so engines load from dist). µs absolutes are noisier on a shared VM,
+      # but the O(1)-vs-O(N) matcher-curve SHAPE is hardware-invariant.
+      - name: Isolated matcher microbench (G-1b)
+        run: node --expose-gc cross-router/matcher-bench/run.mjs
+        working-directory: benchmarks
+
+      # O-7 + O-12 completeness: all cohorts (angular last), interleaved. Exit code IS the gate —
+      # any real failure (broken adapter / contaminated run) → exit 1 → red job = "0 failed cells" failed.
+      - name: Run the full matrix (O-7 / O-12 completeness)
+        id: matrix
+        run: node cross-router/run-all.mjs "${{ inputs.runs || '100' }}"
+        working-directory: benchmarks
+        timeout-minutes: 240 # unsharded n=100 ≈ 2–2.8h + matcher-bench (A-2, measure on first run); backstop angular hang/OOM (GHA 6h cap)
+        env:
+          BENCH_RUNNER: "self-hosted" # O-10 machine stamp (env.cpu carries the real CPU model)
+
+      # ── salvage steps: run even on a RED matrix (partial snapshot of the finished cohorts, A-3),
+      #    but NOT when it was skipped (preflight/bundle failed → no results/ to publish) ──
+
+      # O-3 / O-10b: rebuild the deck from THIS run in the workspace (META stamp header + G-3 disclaimer).
+      # Goes to the artifact/Pages only — the committed deck/ is NEVER overwritten.
+      - name: Rebuild deck snapshot (O-3 / O-10b)
+        if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
+        run: node cross-router/deck/deck-extract.mjs && node cross-router/deck/build-deck.mjs
+        working-directory: benchmarks
+
+      # O-12 rme part (S2=B conditional-block): rme BLOCKS only when noise is controlled —
+      # a consistent runner OR N >= RME_BLOCK_MIN_N (1/√N tames shared-runner noise); else report-only (O-4).
+      - name: RME gate (O-12 / S2=B)
+        if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
+        working-directory: benchmarks
+        run: |
+          code=0
+          node cross-router/harness/rme-gate.mjs 15 40 || code=$?
+          if [ "$CONSISTENT_RUNNER" = "1" ] || [ "$RUNS" -ge "$RME_BLOCK_MIN_N" ]; then
+            exit "$code"   # armed → rme PASS required
+          else
+            exit 0         # shared runner + low N → report-only, don't fail the snapshot
+          fi
+        env:
+          RUNS: ${{ inputs.runs || '100' }}
+          RME_BLOCK_MIN_N: "50" # arm threshold (A-1: calibrate on the first real run; weekly n=100 >> 50)
+          CONSISTENT_RUNNER: "1" # self-hosted = consistent hardware → rme-gate armed at ANY N (Q1 escalation, S2); weekly n=100 arms it regardless, this also arms manual low-n runs
+
+      # O-2 / O-5 / O-11: stamp + win/loss/parity grid (advisory competitive-ratio) + RME watch, from the fresh deck-data.json.
+      - name: Step summary (O-2 / O-5 / O-11)
+        if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
+        run: node cross-router/harness/ci-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+        working-directory: benchmarks
+
+      # Q5: ONE artifact — raw numbers + matcher input + the rebuilt CI deck.
+      - name: Upload results + CI deck (Q5)
+        if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-results
+          retention-days: 30
+          path: |
+            benchmarks/cross-router/results
+            benchmarks/cross-router/matcher-bench/results.json
+            benchmarks/cross-router/deck/deck.html
+            benchmarks/cross-router/deck/deck-data.json
+
+  publish:
+    # One snapshot → Pages (O-2 / O-3). The self-contained CI deck.html is the landing page.
+    needs: bench
+    if: always() # publish even if bench went red (A-5: partial snapshot still useful)
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write # Q3 — only on the publish job
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: bench-results
+          path: site
+      - name: Assemble dashboard
+        # deck.html is self-contained → it IS the dashboard. Keep the raw data alongside for download.
+        # NEVER touches the committed deck/ — the CI deck lives only in this artifact/Pages (O-3).
+        run: |
+          mkdir -p public
+          deck="$(find site -name deck.html | head -1)"
+          cp "$deck" public/index.html
+          find site -name deck-data.json -exec cp {} public/deck-data.json \;
+          find site -name results.json -path '*matcher-bench*' -exec cp {} public/matcher-results.json \;
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: public
+      - id: deploy
+        uses: actions/deploy-pages@v5
