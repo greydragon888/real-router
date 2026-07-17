@@ -4,8 +4,9 @@
 
 import { describe, it, expect } from "vitest";
 
+import { createRouteTree } from "route-tree";
+
 import { matchSegments } from "./helpers";
-import { createRouteTree } from "../../../src/builder/createRouteTree";
 
 describe("matchSegments with static index", () => {
   it("should return null when no routes match (empty static index)", () => {

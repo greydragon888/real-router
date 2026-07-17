@@ -8,8 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { createRouteTree } from "../../src/builder";
-import { routeTreeToDefinitions } from "../../src/operations/routeTreeToDefinitions";
+import { createRouteTree, routeTreeToDefinitions } from "route-tree";
 
 describe("routeTreeToDefinitions", () => {
   describe("basic conversion", () => {

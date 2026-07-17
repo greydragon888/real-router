@@ -4,9 +4,9 @@
 
 import { describe, it, expect } from "vitest";
 
+import { createRouteTree, getSegmentsByName } from "route-tree";
+
 import { matchPath } from "./helpers";
-import { createRouteTree } from "../../../src/builder/createRouteTree";
-import { getSegmentsByName } from "../../../src/operations/query";
 
 describe("New API - matchPath", () => {
   it("should match simple path", () => {

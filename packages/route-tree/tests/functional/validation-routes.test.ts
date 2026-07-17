@@ -2,28 +2,42 @@
 
 import { describe, it, expect } from "vitest";
 
-import { validateRoutePath } from "../../src/validation/routes";
-// eslint-disable-next-line vitest/no-mocks-import -- intentional: using mock factory, not vi.mock
-import {
-  createMockRouteNode,
-  createMockParameterizedNode,
-} from "../__mocks__/route-tree-mock";
+import { createRouteTree, validateRoute } from "route-tree";
 
-describe("validateRoutePath", () => {
+import type { RouteTree } from "route-tree";
+
+// White-box audit (whitebox-audit skill): these path-format cases exercise the
+// internal `validateRoutePath` gate through the PUBLIC `validateRoute` entry — the
+// only door core opens to it. `validatePath` wraps `validateRoute({ name, path }, …)`
+// so each `it` reads as a path assertion while the call is a genuine public-API
+// call: a valid `name` clears validateRoute's own name/type guards, so path
+// validation always runs and its thrown TypeError (message-identical to the direct
+// call) surfaces unchanged. The `~`-under-parameterized-parent branch uses a REAL
+// `createRouteTree` param root (not a mock), proven publicly reachable in the audit.
+describe("validateRoutePath (via public validateRoute)", () => {
   const methodName = "testMethod";
   const routeName = "testRoute";
+
+  function validatePath(
+    path: unknown,
+    name: string,
+    method: string,
+    parent?: RouteTree,
+  ): void {
+    validateRoute({ name, path }, method, parent);
+  }
 
   describe("Valid paths", () => {
     describe("Basic paths", () => {
       it("should accept empty string (root/grouping)", () => {
         expect(() => {
-          validateRoutePath("", routeName, methodName);
+          validatePath("", routeName, methodName);
         }).not.toThrow();
       });
 
       it("should accept root path", () => {
         expect(() => {
-          validateRoutePath("/", routeName, methodName);
+          validatePath("/", routeName, methodName);
         }).not.toThrow();
       });
 
@@ -39,7 +53,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -55,7 +69,7 @@ describe("validateRoutePath", () => {
 
         segments.forEach((segment) => {
           expect(() => {
-            validateRoutePath(segment, routeName, methodName);
+            validatePath(segment, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -72,7 +86,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -85,7 +99,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -95,7 +109,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -110,7 +124,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -129,7 +143,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -146,7 +160,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -160,7 +174,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -177,16 +191,16 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
 
       it("should accept absolute paths with non-parameterized parent", () => {
-        const parentNode = createMockRouteNode("parent", "/parent");
+        const parentNode = createRouteTree("parent", "/parent", []);
 
         expect(() => {
-          validateRoutePath("~/absolute", routeName, methodName, parentNode);
+          validatePath("~/absolute", routeName, methodName, parentNode);
         }).not.toThrow();
       });
     });
@@ -202,7 +216,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -227,14 +241,14 @@ describe("validateRoutePath", () => {
 
         invalidValues.forEach((value) => {
           expect(() => {
-            validateRoutePath(value, routeName, methodName);
+            validatePath(value, routeName, methodName);
           }).toThrow(/Route path must be a string/);
         });
       });
 
       it("should include correct type in error message for arrays", () => {
         expect(() => {
-          validateRoutePath([], routeName, methodName);
+          validatePath([], routeName, methodName);
         }).toThrow(/Route path must be a string, got array/);
       });
     });
@@ -242,25 +256,25 @@ describe("validateRoutePath", () => {
     describe("Whitespace errors", () => {
       it("should throw for paths with spaces", () => {
         expect(() => {
-          validateRoutePath("/with space", routeName, methodName);
+          validatePath("/with space", routeName, methodName);
         }).toThrow(/whitespace not allowed/);
       });
 
       it("should throw for paths with tabs", () => {
         expect(() => {
-          validateRoutePath("/with\ttab", routeName, methodName);
+          validatePath("/with\ttab", routeName, methodName);
         }).toThrow(/whitespace not allowed/);
       });
 
       it("should throw for paths with newlines", () => {
         expect(() => {
-          validateRoutePath("/with\nnewline", routeName, methodName);
+          validatePath("/with\nnewline", routeName, methodName);
         }).toThrow(/whitespace not allowed/);
       });
 
       it("should throw for paths with carriage return", () => {
         expect(() => {
-          validateRoutePath("/with\rcarriage", routeName, methodName);
+          validatePath("/with\rcarriage", routeName, methodName);
         }).toThrow(/whitespace not allowed/);
       });
 
@@ -268,7 +282,7 @@ describe("validateRoutePath", () => {
         const pathWithSpace = "/my path";
 
         expect(() => {
-          validateRoutePath(pathWithSpace, routeName, methodName);
+          validatePath(pathWithSpace, routeName, methodName);
         }).toThrow(`whitespace not allowed in "${pathWithSpace}"`);
       });
     });
@@ -279,7 +293,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/double slashes not allowed/);
         });
       });
@@ -294,7 +308,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/invalid path format/);
         });
       });
@@ -316,7 +330,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/constraint/);
         });
       });
@@ -332,7 +346,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/empty constraint/);
         });
       });
@@ -352,10 +366,10 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(TypeError);
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/^\[router\./);
         });
       });
@@ -379,7 +393,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/parameter marker/);
         });
       });
@@ -388,7 +402,7 @@ describe("validateRoutePath", () => {
         // The query portion is not trie'd, so a name-less marker there is not a
         // url-param — must not be falsely rejected (no divergence from matcher).
         expect(() => {
-          validateRoutePath("/x?:", routeName, methodName);
+          validatePath("/x?:", routeName, methodName);
         }).not.toThrow();
       });
     });
@@ -411,7 +425,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/Invalid path for route/u);
         });
       });
@@ -426,7 +440,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/fused to a constraint/u);
         });
       });
@@ -442,7 +456,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -457,7 +471,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/constraint '<\.\.\.>' in a static segment/u);
         });
       });
@@ -471,7 +485,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/duplicate parameter name/u);
         });
       });
@@ -481,7 +495,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -491,7 +505,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/non-ASCII static segment/u);
         });
       });
@@ -506,20 +520,20 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
 
       it("should throw for a constraint leaked into a query name (#1242 §5.1)", () => {
         expect(() => {
-          validateRoutePath(String.raw`/a/:b?<\d+>`, routeName, methodName);
+          validatePath(String.raw`/a/:b?<\d+>`, routeName, methodName);
         }).toThrow(/invalid query-param name/u);
       });
 
       it("should throw for a path-param / query-param name collision (#1242 §5.3)", () => {
         expect(() => {
-          validateRoutePath("/a/:tab?tab", routeName, methodName);
+          validatePath("/a/:tab?tab", routeName, methodName);
         }).toThrow(/declared as both a path param and a query param/u);
       });
 
@@ -534,7 +548,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -547,7 +561,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/optional splat/u);
         });
       });
@@ -556,7 +570,7 @@ describe("validateRoutePath", () => {
         // `?download` is the query separator, `*path` a required splat — the
         // query-stripped pathPattern has no optional marker on the splat.
         expect(() => {
-          validateRoutePath("/files/*path?download", routeName, methodName);
+          validatePath("/files/*path?download", routeName, methodName);
         }).not.toThrow();
       });
 
@@ -565,7 +579,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/unconstrained optional param before a splat/u);
         });
       });
@@ -580,7 +594,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -593,7 +607,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).toThrow(/two optional params directly before a splat/u);
         });
       });
@@ -608,7 +622,7 @@ describe("validateRoutePath", () => {
         // fix — the #1264 "add a constraint" hint is a dead end (`/:a<c>?/:b<c>?/*rest`
         // is still rejected by #1287).
         expect(() => {
-          validateRoutePath("/:a?/:b?/*rest", routeName, methodName);
+          validatePath("/:a?/:b?/*rest", routeName, methodName);
         }).toThrow(/two optional params directly before a splat/u);
       });
 
@@ -620,7 +634,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -634,7 +648,7 @@ describe("validateRoutePath", () => {
 
         paths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName);
+            validatePath(path, routeName, methodName);
           }).not.toThrow();
         });
       });
@@ -643,49 +657,43 @@ describe("validateRoutePath", () => {
         // Same url-path scope as #863: the query portion is not trie'd, so a
         // `:`/`*` there is not a path marker — must not be falsely rejected.
         expect(() => {
-          validateRoutePath("/users?x:y", routeName, methodName);
+          validatePath("/users?x:y", routeName, methodName);
         }).not.toThrow();
       });
     });
 
     describe("Absolute paths with parameterized parent", () => {
       it("should throw when parent has URL parameters", () => {
-        const parentWithParams = createMockParameterizedNode(
-          "parent",
-          "/parent/:id",
-        );
+        const parentWithParams = createRouteTree("parent", "/parent/:id", []);
 
         expect(() => {
-          validateRoutePath(
-            "~/absolute",
-            routeName,
-            methodName,
-            parentWithParams,
-          );
+          validatePath("~/absolute", routeName, methodName, parentWithParams);
         }).toThrow(
           /Absolute path .* cannot be used under parent route with URL parameters/,
         );
       });
 
       it("should throw for various absolute paths under parameterized parent", () => {
-        const parentWithParams = createMockParameterizedNode(
+        const parentWithParams = createRouteTree(
           "parent",
           "/users/:userId",
+          [],
         );
 
         const absolutePaths = ["~/dashboard", "~/admin", "~/users/:id", "~/"];
 
         absolutePaths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName, parentWithParams);
+            validatePath(path, routeName, methodName, parentWithParams);
           }).toThrow(/cannot be used under parent route with URL parameters/);
         });
       });
 
       it("should allow non-tilde paths under parameterized parent", () => {
-        const parentWithParams = createMockParameterizedNode(
+        const parentWithParams = createRouteTree(
           "parent",
           "/users/:userId",
+          [],
         );
 
         // These paths should be allowed (not absolute)
@@ -693,7 +701,7 @@ describe("validateRoutePath", () => {
 
         relativePaths.forEach((path) => {
           expect(() => {
-            validateRoutePath(path, routeName, methodName, parentWithParams);
+            validatePath(path, routeName, methodName, parentWithParams);
           }).not.toThrow();
         });
       });
@@ -705,7 +713,7 @@ describe("validateRoutePath", () => {
       const longPath = `/${"a".repeat(1000)}`;
 
       expect(() => {
-        validateRoutePath(longPath, routeName, methodName);
+        validatePath(longPath, routeName, methodName);
       }).not.toThrow();
     });
 
@@ -713,7 +721,7 @@ describe("validateRoutePath", () => {
       const deepPath = `/${Array.from({ length: 100 }, () => "segment").join("/")}`;
 
       expect(() => {
-        validateRoutePath(deepPath, routeName, methodName);
+        validatePath(deepPath, routeName, methodName);
       }).not.toThrow();
     });
 
@@ -725,7 +733,7 @@ describe("validateRoutePath", () => {
 
       unicodePaths.forEach((path) => {
         expect(() => {
-          validateRoutePath(path, routeName, methodName);
+          validatePath(path, routeName, methodName);
         }).toThrow(/non-ASCII static segment/u);
       });
     });
@@ -742,7 +750,7 @@ describe("validateRoutePath", () => {
 
       specialPaths.forEach((path) => {
         expect(() => {
-          validateRoutePath(path, routeName, methodName);
+          validatePath(path, routeName, methodName);
         }).not.toThrow();
       });
     });
@@ -750,10 +758,13 @@ describe("validateRoutePath", () => {
 
   describe("Error messages", () => {
     it("should include route name in error message", () => {
-      const testRouteName = "users.view";
+      // A dotted name (`users.view`) is rejected by validateRoute's name guard
+      // BEFORE path validation; use a valid name — `routeDef.name` still flows
+      // into validateRoutePath's error, which is what this asserts.
+      const testRouteName = "usersView";
 
       expect(() => {
-        validateRoutePath("//", testRouteName, methodName);
+        validatePath("//", testRouteName, methodName);
       }).toThrow(new RegExp(testRouteName));
     });
 
@@ -761,7 +772,7 @@ describe("validateRoutePath", () => {
       const testMethodName = "addRoute";
 
       expect(() => {
-        validateRoutePath("//", routeName, testMethodName);
+        validatePath("//", routeName, testMethodName);
       }).toThrow(new RegExp(testMethodName));
     });
 
@@ -769,7 +780,7 @@ describe("validateRoutePath", () => {
       const invalidPath = "//invalid//path";
 
       expect(() => {
-        validateRoutePath(invalidPath, routeName, methodName);
+        validatePath(invalidPath, routeName, methodName);
       }).toThrow(
         new RegExp(
           invalidPath.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`),
@@ -779,15 +790,15 @@ describe("validateRoutePath", () => {
 
     it("should provide helpful error message for type errors", () => {
       expect(() => {
-        validateRoutePath(123, routeName, methodName);
+        validatePath(123, routeName, methodName);
       }).toThrow(/Route path must be a string, got number/);
 
       expect(() => {
-        validateRoutePath(null, routeName, methodName);
+        validatePath(null, routeName, methodName);
       }).toThrow(/Route path must be a string, got null/);
 
       expect(() => {
-        validateRoutePath(undefined, routeName, methodName);
+        validatePath(undefined, routeName, methodName);
       }).toThrow(/Route path must be a string, got undefined/);
     });
   });

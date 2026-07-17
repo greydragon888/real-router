@@ -4,8 +4,9 @@
 
 import { describe, it, expect } from "vitest";
 
+import { createRouteTree } from "route-tree";
+
 import { matchPath } from "./helpers";
-import { createRouteTree } from "../../../src/builder/createRouteTree";
 
 describe("Coverage improvement tests", () => {
   describe("matching by segment count", () => {

@@ -1,7 +1,7 @@
 // Tests for the new pure function API - Builder
 import { describe, it, expect } from "vitest";
 
-import { createRouteTree } from "../../src/builder";
+import { createRouteTree } from "route-tree";
 
 describe("createRouteTree", () => {
   describe("basic tree creation", () => {

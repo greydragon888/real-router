@@ -4,8 +4,9 @@
 
 import { describe, it, expect } from "vitest";
 
+import { createRouteTree } from "route-tree";
+
 import { matchPath, matchSegments } from "./helpers";
-import { createRouteTree } from "../../../src/builder/createRouteTree";
 
 describe("strictTrailingSlash behavior", () => {
   it("should NOT strip trailing slash when strictTrailingSlash=true on leaf node", () => {
