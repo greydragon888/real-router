@@ -1,5 +1,13 @@
 # @real-router/preact
 
+## 0.17.0
+
+### Minor Changes
+
+- [#1511](https://github.com/greydragon888/real-router/pull/1511) [`203ffb1`](https://github.com/greydragon888/real-router/commit/203ffb18ea1cf059068d44b01bd410dca8544d9a) Thanks [@greydragon888](https://github.com/greydragon888)! - Align duplicate `<RouteView.NotFound>` to first-wins, matching `<RouteView.Match>` / `<RouteView.Self>` and the React adapter ([#1220](https://github.com/greydragon888/real-router/issues/1220)). Previously, when multiple `<RouteView.NotFound>` siblings were declared in one `RouteView`, the **last** one rendered; now the **first** does — `assignFallbackSlot` guards the slot with a `notFoundFound` flag (the twin of `selfFound`). Prefer a single `<RouteView.NotFound>` per `RouteView`.
+
+  Closes [#1439](https://github.com/greydragon888/real-router/issues/1439).
+
 ## 0.16.23
 
 ### Patch Changes
