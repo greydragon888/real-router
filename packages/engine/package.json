@@ -51,6 +51,8 @@
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
+    "test:reachability": "node ../../scripts/reachability-check.mjs",
+    "test:reachability:update": "node ../../scripts/reachability-check.mjs --update",
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false
