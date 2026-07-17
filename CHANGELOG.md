@@ -5,6 +5,152 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-17]
+
+### @real-router/core@0.77.0
+
+### Minor Changes
+
+- [#1499](https://github.com/greydragon888/real-router/pull/1499) [`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243) Thanks [@greydragon888](https://github.com/greydragon888)! - Harden `claimContextNamespace` against a `"__proto__"` namespace ([#1191](https://github.com/greydragon888/real-router/issues/1191))
+
+  `claim("__proto__").write(state, value)` previously ran `state.context["__proto__"] = value`, which dispatches into the inherited `Object.prototype.__proto__` setter and swaps the prototype of `state.context` instead of creating an own entry — the plugin's data then silently vanished from `Object.keys` and the SSR transport (`serializeRouterState` emitted `context: {}`). The write now uses `Object.defineProperty` for the `"__proto__"` key (mirroring `@real-router/search-params`), so it becomes a genuine own property; normal names keep the plain-assignment fast path with zero behavior change.
+
+  `serializeRouterState`'s `excludeContext` path — exposed by the above fix — now builds its filtered context on a `null`-prototype object so a preserved `"__proto__"` namespace survives the filter too.
+
+  `claimContextNamespace` also now rejects a non-string or empty namespace with a `TypeError`, symmetric with the other always-on invariant guards (`subscribe` / `start` / `navigateToNotFound`). This is a contract tightening — a previously-accepted `claim("")` / `claim(42)` now throws.
+
+### @real-router/angular@0.14.2
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+  - @real-router/sources@0.11.5
+
+### @real-router/browser-plugin@0.18.21
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/hash-plugin@0.8.20
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/lifecycle-plugin@0.7.1
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/logger-plugin@0.5.31
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/memory-plugin@0.4.28
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/navigation-plugin@0.7.30
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/persistent-params-plugin@0.2.31
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/preact@0.16.22
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+  - @real-router/sources@0.11.5
+
+### @real-router/preload-plugin@0.6.21
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/react@0.29.3
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+  - @real-router/sources@0.11.5
+
+### @real-router/rx@0.3.32
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/search-schema-plugin@0.4.19
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/solid@0.17.3
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+  - @real-router/sources@0.11.5
+
+### @real-router/sources@0.11.5
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/svelte@0.16.3
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+  - @real-router/sources@0.11.5
+
+### @real-router/validation-plugin@0.12.2
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+
+### @real-router/vue@0.17.2
+
+### Patch Changes
+
+- Updated dependencies [[`9d1b1b7`](https://github.com/greydragon888/real-router/commit/9d1b1b77a85442cdb46a5ec9dea798a09f6c8243)]:
+  - @real-router/core@0.77.0
+  - @real-router/sources@0.11.5
+
 ## [2026-07-16]
 
 ### @real-router/preact@0.16.21
