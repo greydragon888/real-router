@@ -460,7 +460,7 @@ describe("RouteView", () => {
       expect(container.innerHTML).toBe("");
     });
 
-    it("should use last NotFound when multiple are present", async () => {
+    it("should use the FIRST NotFound when multiple are present (first-wins) (#1439)", async () => {
       await notFoundRouter.start("/non-existent-path");
 
       render(() => (
@@ -479,8 +479,8 @@ describe("RouteView", () => {
         </RouterProvider>
       ));
 
-      expect(screen.queryByTestId("first-nf")).not.toBeInTheDocument();
-      expect(screen.getByTestId("last-nf")).toBeInTheDocument();
+      expect(screen.getByTestId("first-nf")).toBeInTheDocument();
+      expect(screen.queryByTestId("last-nf")).not.toBeInTheDocument();
     });
 
     it("should work with NotFound only (no Match)", async () => {

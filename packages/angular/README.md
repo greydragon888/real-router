@@ -491,7 +491,7 @@ Structural directive used inside `<route-view>`. Marks an `ng-template` as the e
 </route-view>
 ```
 
-**Template priority** inside `<route-view>`: `routeMatch` (segment prefix) → `routeSelf` (exact-match for `routeNode`) → `routeNotFound` (`UNKNOWN_ROUTE` only). First-wins for `routeMatch` and `routeSelf`, last-wins for `routeNotFound`.
+**Template priority** inside `<route-view>`: `routeMatch` (segment prefix) → `routeSelf` (exact-match for `routeNode`) → `routeNotFound` (`UNKNOWN_ROUTE` only). First-wins for all three — `routeMatch`, `routeSelf`, and `routeNotFound` (#1439): the first matching template in declaration order wins, later duplicates are ignored.
 
 ### `routeNotFound`
 

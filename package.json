@@ -24,6 +24,7 @@
     "lint:duplicates": "jscpd packages/*/src/ --no-tips",
     "lint:duplicates:sarif": "jscpd packages/*/src/ --no-tips -t 100 -r sarif -o jscpd-report",
     "lint:e2e": "bash scripts/check-e2e-specs.sh",
+    "lint:bench-apps": "node benchmarks/cross-router/harness/lint-spec-parity.mjs",
     "lint:coverage-scope": "node scripts/check-coverage-scope.mjs",
     "lint:audit": "bash scripts/check-deps-audit.sh",
     "lint:security": "bash scripts/check-semgrep.sh",

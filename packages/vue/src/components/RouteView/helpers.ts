@@ -18,7 +18,7 @@ type FallbackType = VNode | (() => VNode) | undefined;
 interface FallbackSlots {
   selfVNode: VNode | null;
   selfFallback: FallbackType;
-  notFoundChildren: unknown;
+  notFoundVNode: VNode | null;
 }
 
 export function isSegmentMatch(
@@ -80,7 +80,11 @@ export function collectElements(children: unknown, result: VNode[]): void {
 
 function recordFallback(child: VNode, slots: FallbackSlots): boolean {
   if (child.type === NotFound) {
-    slots.notFoundChildren = child.children;
+    // First-wins: store the FIRST NotFound VNode, ignore later ones — symmetric
+    // with <Self> below and the React/Preact/Solid adapters (#1439). Store the
+    // VNode (never null for a real marker), not `child.children` (null for a
+    // childless <NotFound/>), so the assign-once guard cannot be defeated.
+    slots.notFoundVNode ??= child;
 
     return true;
   }
@@ -122,7 +126,6 @@ function appendFallback(
   routeName: string,
   nodeName: string,
   slots: FallbackSlots,
-  elements: VNode[],
 ): FallbackType {
   if (slots.selfVNode !== null && routeName === nodeName) {
     rendered.push(slots.selfVNode);
@@ -130,14 +133,8 @@ function appendFallback(
     return slots.selfFallback;
   }
 
-  if (routeName === UNKNOWN_ROUTE && slots.notFoundChildren !== null) {
-    const nfElements = elements.filter((element) => element.type === NotFound);
-    /* v8 ignore next 3 */
-    const lastNf = nfElements.at(-1);
-
-    if (lastNf) {
-      rendered.push(lastNf);
-    }
+  if (routeName === UNKNOWN_ROUTE && slots.notFoundVNode !== null) {
+    rendered.push(slots.notFoundVNode);
   }
 
   return undefined;
@@ -163,7 +160,7 @@ export function buildRenderList(
   const slots: FallbackSlots = {
     selfVNode: null,
     selfFallback: undefined,
-    notFoundChildren: null,
+    notFoundVNode: null,
   };
   let activeMatchFound = false;
   let fallback: FallbackType;
@@ -200,7 +197,7 @@ export function buildRenderList(
   }
 
   if (!activeMatchFound) {
-    fallback = appendFallback(rendered, routeName, nodeName, slots, elements);
+    fallback = appendFallback(rendered, routeName, nodeName, slots);
   }
 
   return { rendered, activeMatchFound, fallback, hasPerMatchKA };

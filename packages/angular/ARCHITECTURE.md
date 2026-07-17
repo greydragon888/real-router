@@ -193,7 +193,7 @@ RouteView (@Component, selector: route-view)
 └── activeTemplate = computed(() => matchedTemplate() ?? fallbackTemplate())
 ```
 
-**Template priority:** `Match` (segment prefix) → `Self` (exact-match for `nodeName`) → `NotFound` (UNKNOWN_ROUTE only). First-wins for matches/selfs, last-wins for notFounds — mirrors React/Preact/Solid/Vue contentChildren-resolution semantics adapted to Angular.
+**Template priority:** `Match` (segment prefix) → `Self` (exact-match for `nodeName`) → `NotFound` (UNKNOWN_ROUTE only). First-wins for all three — matches, selfs, and notFounds (#1439) — mirroring the React/Preact/Solid/Vue adapters.
 
 Template renders `<ng-container [ngTemplateOutlet]="activeTemplate()">` — only the matched template is instantiated.
 

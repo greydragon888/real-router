@@ -202,7 +202,7 @@ Precedence:
 
 1. `<Match>` first-wins — duplicate segments short-circuit; subsequent `<Match>` with the same segment are not rendered.
 2. `<Self>` first-wins — only the first `<RouteView.Self>` contributes; subsequent ones are ignored.
-3. `<NotFound>` **last-wins** — when multiple `<RouteView.NotFound>` siblings are declared (unusual but legal), only the _last_ one renders. Asymmetric with the other two slots; prefer a single `<NotFound>` per RouteView.
+3. `<NotFound>` **first-wins** — when multiple `<RouteView.NotFound>` siblings are declared (unusual but legal), only the _first_ one renders. Symmetric with the other two slots (#1439); prefer a single `<NotFound>` per RouteView.
 4. An activating `<Match>` suppresses both `<Self>` and `<NotFound>`.
 5. When no `<Match>` activates: `<Self>` wins over `<NotFound>` if both would fire (occurs only when `nodeName === UNKNOWN_ROUTE`, narrow edge case).
 

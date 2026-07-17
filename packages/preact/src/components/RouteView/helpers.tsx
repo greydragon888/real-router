@@ -15,6 +15,7 @@ interface FallbackSlots {
   selfFallback: ComponentChildren | undefined;
   selfFound: boolean;
   notFoundChildren: ComponentChildren;
+  notFoundFound: boolean;
 }
 
 function isSegmentMatch(
@@ -74,7 +75,14 @@ function isFallbackKind(child: VNode): boolean {
 
 function assignFallbackSlot(child: VNode, slots: FallbackSlots): void {
   if (child.type === NotFound) {
-    slots.notFoundChildren = (child.props as NotFoundProps).children;
+    // First-wins: subsequent <NotFound> elements are ignored, symmetric with
+    // <Self> below and the React adapter (#1220 / #1439). A boolean flag, not a
+    // `notFoundChildren === null` sentinel: a first <NotFound>{null}</NotFound>
+    // leaves the slot null, and a sentinel guard would let a later one overwrite.
+    if (!slots.notFoundFound) {
+      slots.notFoundChildren = (child.props as NotFoundProps).children;
+      slots.notFoundFound = true;
+    }
 
     return;
   }
@@ -142,6 +150,7 @@ export function buildRenderList(
     selfFallback: undefined,
     selfFound: false,
     notFoundChildren: null,
+    notFoundFound: false,
   };
   let activeMatchFound = false;
   const rendered: VNode[] = [];
