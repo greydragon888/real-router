@@ -36,10 +36,12 @@ jobs:
     # + workflow_dispatch run unconditionally (no pull_request payload, first
     # clause true); a pull_request runs ONLY when its head is a branch in
     # THIS repo. Fork PRs are skipped, so untrusted fork code never executes
-    # on the VPS.
+    # on the VPS. Release PRs (changeset-release/*) are skipped too — version/
+    # CHANGELOG bumps only, identical runtime code (see codspeed.yml).
     if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository) &&
+      !startsWith(github.head_ref, 'changeset-release/')
     # Same self-hosted VPS as the core gate: consistent hardware; runner
     # processes one job at a time, so core/adapters runs queue, never race.
     runs-on: self-hosted

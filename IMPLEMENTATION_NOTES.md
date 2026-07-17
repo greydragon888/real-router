@@ -4776,6 +4776,14 @@ Build-pipeline landmines (all empirically caught, encoded in `vite/base.mts` + p
 
 The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent core change that shifts allocation counts realigns the deterministic GC schedule by ±1 event ≈ **±4–7 % on unrelated 3–4 ms benches**, so any threshold under ~8–10 % false-flags ordinary PRs; gate-worthy regressions (e.g. the FSM-refactor class) run 15–20 %. CodSpeed's project default of **10 %** is therefore the chosen value — confirmed in effect behaviorally (flags fired at 10.65/12.7/12.9 %, never below) — and per-benchmark overrides (bench page → Actions menu) stay unset until a specific bench proves noisier than the global.
 
+### Release PRs skipped (2026-07-17)
+
+**Problem.** The changesets "version packages" PR (head branch `changeset-release/master`, e.g. #1500) triggered both CodSpeed workflows. That PR only bumps `package.json` versions / CHANGELOGs and deletes consumed `.changeset/*.md` — runtime code is byte-identical to master — so the comparison is definitionally empty, yet the two jobs queue the single self-hosted runner for ~6 min per release.
+
+**Solution.** Both jobs' `if` gates got a third clause: `!startsWith(github.head_ref, 'changeset-release/')`. `github.head_ref` is empty on `push`/`workflow_dispatch`, so the clause is a no-op for baseline seeding and manual dispatches — only the release pull_request is skipped.
+
+**Why a job-`if`, not `paths` filters:** `pull_request.branches` filters the BASE branch only (head-branch filtering doesn't exist at the trigger level), and a `paths` allow-list over the bench's true input set (core src + five foundation deps' src + bench harness + lockfile + the workflow itself) is a maintenance hazard — one missed path silently drops the gate for a real perf change. The head-branch clause is one line and can only ever skip the release PR. The post-merge `push:[master]` run is deliberately kept: it re-seeds the baseline at the new master sha, so every subsequent PR comparison stays anchored to its direct merge-base.
+
 ## vs-tanstack benchmarks — per-scenario layout (2026-06-26)
 
 **Problem.** `benchmarks/vs-tanstack/` was a per-engine layout with a single scenario (the client-nav navigation loop): shared helpers (`jsdom`, `perf-utils`, `setup-helpers`, `memory-utils`, `vitest.setup`) sat at the root, and `real-router/{react,vue,solid}/` + `tanstack/{react,vue,solid}/` each held one app. TanStack's upstream `benchmarks/` had meanwhile grown to 4 sections (`client-nav`, `bundle-size`, `memory`, `ssr`) with **per-scenario isolation** — one app per scenario so route-tree size / IC state of one scenario can't shift another's numbers (same IC-megamorphism class documented for core Section 2). Adding new scenarios (navigation-churn, unique-location-churn, mount-unmount, …) on the flat layout would have polluted the existing bench and required combinatorial new scripts (×2 engine × 3 fw × 3 mode = 18 per scenario).

@@ -61,9 +61,16 @@ jobs:
     # collaborator's branch). A fork PR has head.repo.full_name =
     # "<forker>/real-router" != github.repository, so the job is skipped — fork
     # code never executes on the runner.
+    #
+    # RELEASE PRs: the changesets "version packages" PR (head branch
+    # changeset-release/*) only bumps versions/CHANGELOGs — runtime code is
+    # identical to master, so the comparison is meaningless and would only
+    # queue the single runner. Skipped. (github.head_ref is empty on push /
+    # workflow_dispatch, so the clause is a no-op for them.)
     if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository) &&
+      !startsWith(github.head_ref, 'changeset-release/')
     # Self-hosted VPS runner = consistent hardware, which fixes the #984 cause:
     # GitHub's heterogeneous ubuntu-latest pool put base/head on different CPUs
     # (AMD EPYC vs Intel Xeon) → phantom instruction-count swings.
