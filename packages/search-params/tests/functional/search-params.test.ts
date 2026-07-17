@@ -8,12 +8,9 @@
 
 import { describe, it, expect } from "vitest";
 
-import { build, parse, parseQuery } from "../../src";
-import { decodeValue } from "../../src/decode";
-import { encode, encodeValue, makeOptions } from "../../src/encode";
-import { getSearch } from "../../src/utils";
+import { build, parse, parseQuery } from "search-params";
 
-import type { Options } from "../../src";
+import type { Options } from "search-params";
 
 describe("search-params", () => {
   // ===========================================================================
@@ -476,354 +473,233 @@ describe("search-params", () => {
   });
 
   // ===========================================================================
-  // decodeValue (internal)
+  // Value decoding (decode.ts decodeValue) — through parse
+  //
+  // `decodeValue` is exercised on every parsed VALUE (and name). Migrated off a
+  // direct `decodeValue` import to the public `parse`: each branch of the
+  // `%`/`+` fast-path ladder shows up as an observable decoded param.
   // ===========================================================================
 
-  describe("decodeValue", () => {
-    it("returns value as-is when no encoding needed (fast path)", () => {
-      // Fast path: no % and no + means return as-is
-      const result = decodeValue("simple");
-
-      expect(result).toBe("simple");
-      // Verify it's the exact same value (fast path optimization)
-      expect(result).toHaveLength(6);
-    });
-
-    it("handles only + without %", () => {
-      // + should be converted to space even without %
-      expect(decodeValue("hello+world")).toBe("hello world");
-      expect(decodeValue("a+b+c")).toBe("a b c");
-      // Verify + is specifically handled
-      expect(decodeValue("+")).toBe(" ");
-    });
-
-    it("handles only % without +", () => {
-      // % triggers decodeURIComponent
-      expect(decodeValue("hello%20world")).toBe("hello world");
-      expect(decodeValue("%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82")).toBe(
-        "привет",
-      );
-      // Verify % is specifically handled
-      expect(decodeValue("%21")).toBe("!");
-    });
-
-    it("handles both + and %", () => {
-      // Both + and % should be processed
-      expect(decodeValue("hello+world%21")).toBe("hello world!");
-      expect(decodeValue("%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82+world")).toBe(
-        "привет world",
+  describe("value decoding (%/+ fast-path ladder)", () => {
+    it("fast path returns a value unchanged when it has neither % nor +", () => {
+      // No % and no + → returned as-is (the common case). A `false`-forcing
+      // mutant on the fast-path guard would corrupt a plain value.
+      expect(parse("k=simplevalue123", { numberFormat: "none" })).toStrictEqual(
+        { k: "simplevalue123" },
       );
     });
 
-    it("verifies fast path is skipped when encoding present", () => {
-      // These should NOT use fast path (must process encoding)
-      const withPlus = decodeValue("a+b");
-      const withPercent = decodeValue("a%20b");
+    it("replaces + with space when only + is present (no decodeURIComponent)", () => {
+      expect(parse("name=hello+world")).toStrictEqual({ name: "hello world" });
+      expect(parse("k=a+b+c", { numberFormat: "none" })).toStrictEqual({
+        k: "a b c",
+      });
+      // A bare "+" value decodes to a single space.
+      expect(parse("k=+", { numberFormat: "none" })).toStrictEqual({ k: " " });
+    });
 
-      expect(withPlus).toBe("a b");
-      expect(withPercent).toBe("a b");
-      // Both result in same output but via different paths
-      expect(withPlus).toBe(withPercent);
+    it("percent-decodes when only % is present (no + replacement)", () => {
+      expect(parse("name=hello%20world")).toStrictEqual({
+        name: "hello world",
+      });
+      expect(parse("name=%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82")).toStrictEqual({
+        name: "привет",
+      });
+      expect(parse("k=%21", { numberFormat: "none" })).toStrictEqual({
+        k: "!",
+      });
+    });
+
+    it("processes both + and % together, replacing + BEFORE decoding %", () => {
+      // "hello+world%21": + → space first, then %21 → "!". A wrong order (or a
+      // dropped branch) would mangle the result.
+      expect(parse("k=hello+world%21", { numberFormat: "none" })).toStrictEqual(
+        { k: "hello world!" },
+      );
+      expect(
+        parse("name=%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82+world"),
+      ).toStrictEqual({ name: "привет world" });
     });
   });
 
   // ===========================================================================
-  // makeOptions (internal)
+  // Option resolution (encode.ts makeOptions) — through parse/build
+  //
+  // Migrated off a direct `makeOptions` import. The RESOLVED defaults and the
+  // partial-override precedence are all observable in parse/build behavior; each
+  // partial-options case also exercises one exit of makeOptions' `&& === undefined`
+  // short-circuit (and one `?? DEFAULT` fallback). The allocation-free cached
+  // singleton (an internal, consumer-unobservable perf invariant) is pinned in the
+  // KEEP-narrow makeOptions.singleton.test.ts, not here.
   // ===========================================================================
 
-  describe("makeOptions", () => {
-    it("returns cached default options when no options provided", () => {
-      const opts1 = makeOptions();
-      const opts2 = makeOptions({});
-
-      // Should return same cached object
-      expect(opts1).toBe(opts2);
-      expect(opts1.arrayFormat).toBe("none");
-      expect(opts1.booleanFormat).toBe("auto");
-      expect(opts1.nullFormat).toBe("default");
-      expect(opts1.numberFormat).toBe("auto");
+  describe("option resolution (defaults + partial overrides)", () => {
+    it("no options resolves to the documented defaults (none/auto/default/auto)", () => {
+      // arrayFormat "none": repeated keys, no brackets.
+      expect(build({ a: [1, 2] })).toBe("a=1&a=2");
+      // booleanFormat "auto": "true"/"false" decode to booleans.
+      expect(parse("flag=true")).toStrictEqual({ flag: true });
+      // nullFormat "default": null encodes as a bare key.
+      expect(build({ a: null })).toBe("a");
+      // numberFormat "auto": a numeric string decodes to a number.
+      expect(parse("n=5")).toStrictEqual({ n: 5 });
     });
 
-    it("handles partial options (only arrayFormat)", () => {
-      const opts = makeOptions({ arrayFormat: "brackets" });
-
-      expect(opts.arrayFormat).toBe("brackets");
-      expect(opts.booleanFormat).toBe("auto"); // default
-      expect(opts.nullFormat).toBe("default"); // default
-      expect(opts.numberFormat).toBe("auto"); // default
+    it("only arrayFormat set — other three fall back to defaults", () => {
+      // arrayFormat provided (first `=== undefined` is false → else branch);
+      // boolean/null/number take their `?? DEFAULT`.
+      expect(build({ a: [1, 2] }, { arrayFormat: "brackets" })).toBe(
+        "a[]=1&a[]=2",
+      );
+      expect(
+        parse("flag=true&n=5&x", { arrayFormat: "brackets" }),
+      ).toStrictEqual(
+        { flag: true, n: 5, x: null }, // boolean auto, number auto, null default
+      );
     });
 
-    it("handles partial options (only booleanFormat)", () => {
-      const opts = makeOptions({ booleanFormat: "auto" });
-
-      expect(opts.arrayFormat).toBe("none"); // default
-      expect(opts.booleanFormat).toBe("auto");
-      expect(opts.nullFormat).toBe("default"); // default
-      expect(opts.numberFormat).toBe("auto"); // default
+    it("only booleanFormat set — other three fall back to defaults", () => {
+      // arrayFormat undefined (first `&&` true), booleanFormat defined (second
+      // `&&` false → else branch); array/null/number take `?? DEFAULT`.
+      expect(
+        parse("a=1&a=2&flag&n=5", { booleanFormat: "empty-true" }),
+      ).toStrictEqual({
+        a: [1, 2], // array none (default): repeated keys collapse to an array
+        flag: true, // empty-true: bare key is true
+        n: 5, // number auto (default)
+      });
     });
 
-    it("handles partial options (only nullFormat)", () => {
-      const opts = makeOptions({ nullFormat: "hidden" });
-
-      expect(opts.arrayFormat).toBe("none"); // default
-      expect(opts.booleanFormat).toBe("auto"); // default
-      expect(opts.nullFormat).toBe("hidden");
-      expect(opts.numberFormat).toBe("auto"); // default
+    it("only nullFormat set — other three fall back to defaults", () => {
+      expect(build({ a: null, n: 5 }, { nullFormat: "hidden" })).toBe("n=5");
+      expect(parse("flag=true", { nullFormat: "hidden" })).toStrictEqual({
+        flag: true, // boolean auto (default) still applies
+      });
     });
 
-    it("handles partial options (only numberFormat)", () => {
-      const opts = makeOptions({ numberFormat: "auto" });
-
-      expect(opts.arrayFormat).toBe("none"); // default
-      expect(opts.booleanFormat).toBe("auto"); // default
-      expect(opts.nullFormat).toBe("default"); // default
-      expect(opts.numberFormat).toBe("auto");
+    it("only numberFormat set — other three fall back to defaults", () => {
+      // numberFormat "none": a numeric string stays a string.
+      expect(parse("n=5&flag=true&x", { numberFormat: "none" })).toStrictEqual({
+        n: "5", // number none
+        flag: true, // boolean auto (default)
+        x: null, // null default
+      });
     });
 
-    it("handles all options provided", () => {
-      const opts = makeOptions({
+    it("all four options set — every field takes the provided value", () => {
+      const opts: Options = {
         arrayFormat: "index",
         booleanFormat: "empty-true",
         nullFormat: "hidden",
         numberFormat: "auto",
+      };
+
+      expect(build({ a: [1, 2], b: null, flag: true }, opts)).toBe(
+        "a[0]=1&a[1]=2&flag",
+      );
+      expect(parse("a[0]=1&a[1]=2&flag", opts)).toStrictEqual({
+        a: [1, 2],
+        flag: true,
       });
-
-      expect(opts.arrayFormat).toBe("index");
-      expect(opts.booleanFormat).toBe("empty-true");
-      expect(opts.nullFormat).toBe("hidden");
-      expect(opts.numberFormat).toBe("auto");
     });
   });
 
   // ===========================================================================
-  // getSearch (internal)
+  // Query extraction (utils.ts getSearch) — through parse
+  //
+  // Migrated off a direct `getSearch` import. `parse` = getSearch + parseQuery,
+  // so getSearch's `?`-split shows up in which key/value the parsed param lands
+  // under. `parseQuery` (no getSearch) is the contrast that isolates it.
   // ===========================================================================
 
-  describe("getSearch", () => {
-    it("returns entire path when no ? present", () => {
-      // This tests the pos === -1 branch
-      const result = getSearch("page=1&sort=name");
-
-      expect(result).toBe("page=1&sort=name");
+  describe("query extraction (parse's leading getSearch)", () => {
+    it("parses the whole input when there is no ? (pos === -1 branch)", () => {
+      // No "?" → getSearch returns the input verbatim → params parse from it.
+      expect(parse("page=1&sort=name")).toStrictEqual({
+        page: 1,
+        sort: "name",
+      });
     });
 
-    it("returns everything after ? when present", () => {
-      const result = getSearch("?page=1&sort=name");
-
-      expect(result).toBe("page=1&sort=name");
+    it("parses only what follows a leading ? (slice branch)", () => {
+      expect(parse("?page=1&sort=name")).toStrictEqual({
+        page: 1,
+        sort: "name",
+      });
     });
 
-    it("returns empty string when ? is at the end", () => {
-      const result = getSearch("path?");
-
-      expect(result).toBe("");
+    it("drops everything up to a mid-string ?, leaving an empty query", () => {
+      // "x?" → getSearch slices to "" → parseQuery fast-paths to {}.
+      expect(parse("x?")).toStrictEqual({});
     });
 
-    it("handles ? at position 0 differently from position -1", () => {
-      // This kills the pos === +1 mutation
-      const withQuestionAtStart = getSearch("?a=1");
-      const withoutQuestion = getSearch("a=1");
-
-      // When ? is at position 0, slice(1) returns "a=1"
-      expect(withQuestionAtStart).toBe("a=1");
-      // When no ?, returns entire string
-      expect(withoutQuestion).toBe("a=1");
+    it("splits at the FIRST ? only (kills pos===+1: name would keep the ?)", () => {
+      // getSearch("a?b=1"): "?" at index 1 → slice(2) = "b=1" → { b: 1 }.
+      // A `pos === +1` mutant returns the whole "a?b=1" → parseQuery yields
+      // { "a?b": 1 } (name keeps the "?") — this asserts the correct key.
+      expect(parse("a?b=1")).toStrictEqual({ b: 1 });
+      // Contrast: parseQuery does NOT run getSearch, so it keeps the whole chunk.
+      expect(parseQuery("a?b=1")).toStrictEqual({ "a?b": 1 });
     });
 
-    it("returns content after first ? only", () => {
-      // Test that only the first ? is used as delimiter
-      const result = getSearch("path?a=1?b=2");
-
-      expect(result).toBe("a=1?b=2");
-    });
-
-    it("handles ? at position 1 (kills pos === +1 mutation)", () => {
-      // When ? is at position 1, pos = 1
-      // With mutation pos === +1: condition is TRUE, returns entire path "a?b=1" (WRONG)
-      // With correct pos === -1: condition is FALSE, returns slice(2) = "b=1" (CORRECT)
-      const result = getSearch("a?b=1");
-
-      // Must return "b=1", NOT "a?b=1"
-      expect(result).toBe("b=1");
-      expect(result).not.toBe("a?b=1");
-    });
-
-    it("differentiates pos=-1 from pos=1 scenarios", () => {
-      // No ? in string: pos = -1, should return entire string
-      const noQuestion = getSearch("abc");
-
-      expect(noQuestion).toBe("abc");
-
-      // ? at position 1: pos = 1, should return content after ?
-      const questionAtOne = getSearch("x?y");
-
-      expect(questionAtOne).toBe("y");
-      expect(questionAtOne).not.toBe("x?y");
+    it("uses only the first ? as the delimiter (later ? stays in the value)", () => {
+      // getSearch("q=1?b=2"): "?" at index 3 → "b=2"; but a value's inner "?" is
+      // kept when there is no earlier "?": here the FIRST "?" wins.
+      expect(parse("q=1?b=2", { numberFormat: "none" })).toStrictEqual({
+        b: "2",
+      });
     });
   });
 
   // ===========================================================================
-  // encode (internal)
+  // Scalar encoding (encode.ts encode / encodeValue) — through build
+  //
+  // Migrated off direct `encode`/`encodeValue` imports. Every `typeof value`
+  // switch arm and the percent-encoding are observable in build's output.
   // ===========================================================================
 
-  describe("encode", () => {
-    const defaultOpts = makeOptions();
-
-    it("encodes string values (fast path)", () => {
-      const result = encode("name", "value", defaultOpts);
-
-      expect(result).toBe("name=value");
+  describe("scalar encoding (build's per-type switch)", () => {
+    it("encodes string and number values (fast-path arms)", () => {
+      expect(build({ name: "value", page: 42 })).toBe("name=value&page=42");
+      // A "123" string and a 123 number both emit `=123` (distinct switch arms,
+      // same wire form).
+      expect(build({ s: "123", n: 123 })).toBe("s=123&n=123");
     });
 
-    it("encodes number values (fast path)", () => {
-      const result = encode("page", 42, defaultOpts);
-
-      expect(result).toBe("page=42");
+    it("encodes booleans via the boolean strategy arm", () => {
+      expect(build({ flag: true, off: false })).toBe("flag=true&off=false");
     });
 
-    it("differentiates string from number encoding", () => {
-      // Both use fast path but verify they produce expected output
-      const stringResult = encode("val", "123", defaultOpts);
-      const numberResult = encode("val", 123, defaultOpts);
-
-      expect(stringResult).toBe("val=123");
-      expect(numberResult).toBe("val=123");
+    it("encodes null via the null strategy arm", () => {
+      expect(build({ empty: null })).toBe("empty");
+      expect(build({ empty: null }, { nullFormat: "hidden" })).toBe("");
     });
 
-    it("encodes boolean with default format", () => {
-      const trueResult = encode("flag", true, defaultOpts);
-      const falseResult = encode("flag", false, defaultOpts);
-
-      expect(trueResult).toBe("flag=true");
-      expect(falseResult).toBe("flag=false");
+    it("encodes arrays via the array strategy arm", () => {
+      expect(build({ ids: [1, 2, 3] })).toBe("ids=1&ids=2&ids=3");
     });
 
-    it("encodes boolean with empty-true format", () => {
-      const opts = makeOptions({ booleanFormat: "empty-true" });
-
-      expect(encode("flag", true, opts)).toBe("flag");
-      expect(encode("flag", false, opts)).toBe("flag=false");
+    it("encodes a plain object via the [object Object] fallback arm", () => {
+      expect(build({ data: { key: "value" } })).toBe(
+        "data=%5Bobject%20Object%5D",
+      );
     });
 
-    it("encodes boolean with auto format", () => {
-      const opts = makeOptions({ booleanFormat: "auto" });
-
-      expect(encode("flag", true, opts)).toBe("flag=true");
-      expect(encode("flag", false, opts)).toBe("flag=false");
+    it("encodes a bigint via the default switch arm", () => {
+      // bigint hits neither string/number/boolean/object — the `default` arm.
+      expect(build({ big: 9_007_199_254_740_991n })).toBe(
+        "big=9007199254740991",
+      );
     });
 
-    it("encodes null with default format", () => {
-      const result = encode("empty", null, defaultOpts);
-
-      expect(result).toBe("empty");
+    it("percent-encodes special characters in both key and value", () => {
+      expect(build({ name: "hello world" })).toBe("name=hello%20world");
+      expect(build({ "a&b": "c=d" })).toBe("a%26b=c%3Dd");
     });
 
-    it("encodes null with hidden format returns empty", () => {
-      const opts = makeOptions({ nullFormat: "hidden" });
-
-      expect(encode("empty", null, opts)).toBe("");
-    });
-
-    it("encodes array with default format (none)", () => {
-      const result = encode("ids", [1, 2, 3], defaultOpts);
-
-      expect(result).toBe("ids=1&ids=2&ids=3");
-    });
-
-    it("encodes array with brackets format", () => {
-      const opts = makeOptions({ arrayFormat: "brackets" });
-
-      expect(encode("ids", [1, 2], opts)).toBe("ids[]=1&ids[]=2");
-    });
-
-    it("encodes array with index format", () => {
-      const opts = makeOptions({ arrayFormat: "index" });
-
-      expect(encode("ids", [1, 2], opts)).toBe("ids[0]=1&ids[1]=2");
-    });
-
-    it("encodes array with comma format", () => {
-      const opts = makeOptions({ arrayFormat: "comma" });
-
-      expect(encode("ids", [1, 2, 3], opts)).toBe("ids=1,2,3");
-    });
-
-    it("encodes objects as [object Object] (fallback path)", () => {
-      const result = encode("data", { key: "value" }, defaultOpts);
-
-      expect(result).toBe("data=%5Bobject%20Object%5D");
-    });
-
-    it("encodes bigint values (default switch case)", () => {
-      const result = encode("big", 9_007_199_254_740_991n, defaultOpts);
-
-      expect(result).toBe("big=9007199254740991");
-    });
-  });
-
-  // ===========================================================================
-  // encodeValue (internal)
-  // ===========================================================================
-
-  describe("encodeValue", () => {
-    it("encodes special characters", () => {
-      expect(encodeValue("hello world")).toBe("hello%20world");
-      expect(encodeValue("a&b")).toBe("a%26b");
-      expect(encodeValue("a=b")).toBe("a%3Db");
-    });
-
-    it("passes through safe characters", () => {
-      expect(encodeValue("abc123")).toBe("abc123");
-      expect(encodeValue("_-~.")).toBe("_-~.");
-    });
-  });
-
-  // ===========================================================================
-  // Additional decodeValue tests for mutation coverage
-  // ===========================================================================
-
-  describe("decodeValue (mutation coverage)", () => {
-    it("fast path returns unchanged value when no encoding markers", () => {
-      // Tests that when neither % nor + is present, value returned as-is
-      const input = "simplevalue123";
-      const result = decodeValue(input);
-
-      // If mutation changes condition to "if (false)", decoding would happen
-      expect(result).toBe(input);
-      // Verify no transformation occurred
-      expect(result).toStrictEqual(input);
-    });
-
-    it("handles + replacement without % decoding", () => {
-      // Tests the branch where + is present but % is not
-      const result = decodeValue("hello+world");
-
-      expect(result).toBe("hello world");
-      // Verify + was specifically replaced
-      expect(result).not.toContain("+");
-    });
-
-    it("handles % decoding without + replacement", () => {
-      // Tests the branch where % is present but + is not
-      const result = decodeValue("hello%20world");
-
-      expect(result).toBe("hello world");
-    });
-
-    it("handles both + and % together", () => {
-      // When both present, + should be replaced BEFORE % decoding
-      const result = decodeValue("hello+world%21");
-
-      expect(result).toBe("hello world!");
-    });
-
-    it("only + without any % should not call decodeURIComponent", () => {
-      // This tests the withSpaces.includes("%") branch
-      const result = decodeValue("a+b+c");
-
-      expect(result).toBe("a b c");
-      // Verify the output is correct even without % decoding
-      expect(result).not.toContain("%");
+    it("passes safe characters through unescaped (key and value)", () => {
+      // Unreserved set (letters, digits, `_ - ~ .`) is not percent-encoded.
+      expect(build({ "_-~.": "abc123" })).toBe("_-~.=abc123");
     });
   });
 

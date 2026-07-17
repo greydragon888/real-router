@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { createRouteTree } from "../../src/builder/createRouteTree";
-import { createMatcher } from "../../src/createMatcher";
+import { createMatcher, createRouteTree } from "route-tree";
 
-import type { Matcher } from "../../src/createMatcher";
+import type { Matcher } from "route-tree";
 
 describe("createMatcher", () => {
   it("should create a matcher with no options", () => {

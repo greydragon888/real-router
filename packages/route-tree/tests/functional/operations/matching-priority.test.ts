@@ -4,8 +4,9 @@
 
 import { describe, it, expect } from "vitest";
 
+import { createRouteTree } from "route-tree";
+
 import { matchPath } from "./helpers";
-import { createRouteTree } from "../../../src/builder/createRouteTree";
 
 describe("Matching priority (segment trie)", () => {
   it("should match static routes before dynamic", () => {

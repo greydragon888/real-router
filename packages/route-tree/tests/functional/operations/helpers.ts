@@ -2,14 +2,14 @@
  * Test helpers for operations tests.
  */
 
-import { createMatcher } from "../../../src/createMatcher";
+import { createMatcher } from "route-tree";
 
-import type { CreateMatcherOptions } from "../../../src/createMatcher";
 import type {
+  CreateMatcherOptions,
   MatchResult,
   RouteTree,
   RouteTreeState,
-} from "../../../src/types";
+} from "route-tree";
 
 // Test-only per-call matching options. The matcher-honoured subset is
 // strictTrailingSlash / queryParamsMode / urlParamsEncoding / queryParams;
