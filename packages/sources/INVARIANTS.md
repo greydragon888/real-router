@@ -312,11 +312,32 @@
 
 ---
 
+## createRouteEnterGate — Route-Enter Guard Gate (#1435)
+
+| #   | Invariant                                                                       | Description                                                                                                                              |
+| --- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Same reference dispatches at most once                                           | For a valid route/previousRoute, N consecutive gate calls with the SAME `route` reference dispatch exactly once — the `lastHandledRoute` dedupe arm (guards React StrictMode's dev double-invoke). Generative (`routeEnterGate.properties.ts`). |
+| 2   | A dispatch implies the guards passed                                            | A non-null result implies `route.transition.from` is truthy (skip-initial cleared) AND `previousRoute` is present (the non-nullable-contract guard, #1218); under `skipSameRoute`, additionally `transition.from !== route.name`. |
+| 3   | Per-instance dedupe state                                                       | Each `createRouteEnterGate()` owns an independent `lastHandledRoute`; sibling gates never share dedupe state. |
+
+---
+
+## guardLeaveListener — Route-Exit Guard HOF (#1435)
+
+| #   | Invariant                                                                       | Description                                                                                                                              |
+| --- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Same-name skip (default)                                                        | `route.name === nextRoute.name` with the default `skipSameRoute` skips the handler; `skipSameRoute: false` fires it. Uses **live** `.name`s (pre-commit). |
+| 2   | Reentrant-abort pre-check                                                       | An already-aborted `signal` skips the handler (an `abort` listener would not fire retroactively). Ordered after the same-name skip, before dispatch. |
+| 3   | Passthrough blocks the transition                                               | On a genuine departure the listener returns the handler's value verbatim, so a returned Promise reaches core's `settleLeavePromises` and blocks activation; a skipped guard returns `undefined`. (Verified by the unit truth-table.) |
+
+---
+
 ## Test Files
 
 | File                                                       | Invariants | Category                                                                                                     |
 | ---------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
 | `tests/property/routeSource.properties.ts`                 | 22         | `createRouteSource` snapshot tracking, lazy-connection, subscribe-order (BaseSource pre-onFirstSubscribe), reconnect reconcile (#765), destroy |
+| `tests/property/routeEnterGate.properties.ts`              | 2          | `createRouteEnterGate` same-reference at-most-once dispatch (StrictMode idempotence), dispatch-implies-guards-passed (#1218) |
 | `tests/property/routeNodeSource.properties.ts`             | 23         | `createRouteNodeSource` node scoping, lazy-connection + reconnection, cache identity (per-router × nodeName), destroy |
 | `tests/property/activeRouteSource.properties.ts`           | 19         | `createActiveRouteSource` boolean tracking (hash-aware via `arbActiveOptions`), filter, cache identity (canonicalJson + hash isolation), lazy-connection + reconnection (#766), destroy |
 | `tests/property/transitionSource.properties.ts`            | 20         | `createTransitionSource` state machine, isLeaveApproved monotonicity, concurrent navigation (async-guard cancellation), destroy |

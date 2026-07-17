@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { createRouteEnterGate } from "@real-router/sources";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useRoute } from "./useRoute";
 
@@ -108,7 +109,17 @@ export function useRouteEnter(
 ): void {
   const { route, previousRoute } = useRoute();
   const handlerRef = useRef(handler);
-  const lastHandledRouteRef = useRef<State | null>(null);
+  // The canonical enter-guard set + `lastHandledRoute` dedupe live in the
+  // shared gate (@real-router/sources, #1435). Created once via useState's
+  // lazy initializer so its dedupe state is stable across StrictMode's effect
+  // re-runs — `skipSameRoute` is threaded per-call, so an options flip never
+  // forces a fresh gate (which would reset the dedupe). `useState`, not a ref:
+  // the gate must be created once and stay stable, and a ref write during
+  // render is disallowed (@eslint-react/refs); the gate is never re-set, so no
+  // re-render is triggered. The gate owns skip-initial / same-route /
+  // StrictMode-dedupe / the `!previousRoute` guard — the sole defense of the
+  // non-nullable `RouteEnterContext.previousRoute` contract (#1218 PC1/PC2).
+  const [gate] = useState(() => createRouteEnterGate());
   const skipSameRoute = options?.skipSameRoute ?? true;
 
   // Keep the latest handler reference accessible without re-running
@@ -119,41 +130,10 @@ export function useRouteEnter(
   });
 
   useEffect(() => {
-    // Early-exit guards, top-down:
-    //
-    //   - **Skip-initial**: `state.transition.from` is undefined only
-    //     for the very first state committed by `router.start()`.
-    //   - **Skip-same-route**: query-only navigations have
-    //     `transition.from === route.name`. Opt-out via
-    //     `skipSameRoute: false`.
-    //   - **StrictMode dedupe**: same `route` ref between effect
-    //     cleanup + re-run in dev's strict pass. Not reachable from
-    //     vitest (`NODE_ENV === "test"` disables React's strict-mode
-    //     double-run), so v8-ignored.
-    //   - **No previousRoute**: guards the non-nullable
-    //     `RouteEnterContext.previousRoute` contract — see below.
-    if (!route.transition.from) {
-      return;
-    }
-    if (skipSameRoute && route.transition.from === route.name) {
-      return;
-    }
-    /* v8 ignore start -- StrictMode-only (dev double-run); NODE_ENV==="test" disables it */
-    if (lastHandledRouteRef.current === route) {
-      return;
-    }
-    /* v8 ignore stop */
-    // `previousRoute` is `undefined` even when `transition.from` is truthy for the
-    // first post-start render — the Provider mounted AFTER a navigation, so the
-    // source's initial snapshot carries `previousRoute: undefined` (#1218 PC1) —
-    // and after an `<Activity>` catch-up reconcile (#765) resets it (PC2). This is
-    // the sole guard against invoking the handler with `previousRoute: undefined`,
-    // which `RouteEnterContext.previousRoute` (non-nullable `State`) forbids.
-    if (!previousRoute) {
-      return;
-    }
+    const context = gate(route, previousRoute, skipSameRoute);
 
-    lastHandledRouteRef.current = route;
-    handlerRef.current({ route, previousRoute });
-  }, [route, previousRoute, skipSameRoute]);
+    if (context) {
+      handlerRef.current(context);
+    }
+  }, [gate, route, previousRoute, skipSameRoute]);
 }

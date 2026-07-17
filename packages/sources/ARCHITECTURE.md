@@ -14,6 +14,8 @@ src/
 ├── createErrorSource.ts         — Error lifecycle + cached getErrorSource wrapper
 ├── createDismissableError.ts    — Derived source: getErrorSource wrapped with dismissedVersion state
 ├── createActiveNameSelector.ts  — Shared O(1) active-name selector (Solid-style routeSelector port)
+├── createRouteEnterGate.ts      — Route-enter guard gate: stateful decision closure (#1435, not a source)
+├── guardLeaveListener.ts        — Route-exit guard HOF: subscribeLeave-listener wrapper (#1435, not a source)
 ├── canonicalJson.ts             — Key-order-stable JSON serialization (cache keys for active-route)
 ├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizeActiveOptions helper
 ├── computeSnapshot.ts           — Same-reference snapshot optimization for route nodes

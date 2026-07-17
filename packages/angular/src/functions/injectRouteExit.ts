@@ -1,4 +1,5 @@
 import { DestroyRef, assertInInjectionContext, inject } from "@angular/core";
+import { guardLeaveListener } from "@real-router/sources";
 
 import { injectRouter } from "./injectRouter";
 
@@ -49,8 +50,10 @@ export type RouteExitHandler = (
  * or `runInInjectionContext`).
  *
  * If the handler returns a Promise, the router blocks on it. If the
- * Promise resolves, navigation proceeds. If it rejects, the router emits
- * `TRANSITION_CANCELLED`.
+ * Promise resolves, navigation proceeds. If it **rejects**, the router
+ * rejects `navigate()` with the handler's **original error** and emits
+ * `TRANSITION_ERROR` — it is NOT re-coded to `TRANSITION_CANCELLED` (that
+ * arises only when the navigation's `signal` aborts).
  *
  * **Handler reactivity (Angular):** `inject*` functions run **once**
  * during component construction; `handler` is captured in closure at the
@@ -102,17 +105,12 @@ export function injectRouteExit(
   const destroyRef = inject(DestroyRef);
   const skipSameRoute = options?.skipSameRoute ?? true;
 
-  const off = router.subscribeLeave(({ route, nextRoute, signal }) => {
-    if (skipSameRoute && route.name === nextRoute.name) {
-      return;
-    }
-
-    if (signal.aborted) {
-      return;
-    }
-
-    return handler({ route, nextRoute, signal });
-  });
+  // The same-route + reentrant-abort guards and the Promise passthrough live in
+  // the shared listener (@real-router/sources, #1435); the handler is captured
+  // at injection time (Angular `inject*` runs once at construction).
+  const off = router.subscribeLeave(
+    guardLeaveListener(handler, { skipSameRoute }),
+  );
 
   destroyRef.onDestroy(off);
 }
