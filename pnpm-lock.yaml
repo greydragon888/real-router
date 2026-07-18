@@ -6314,10 +6314,6 @@ importers:
       '@real-router/core':
         specifier: workspace:>=0.1.0
         version: link:../core
-    devDependencies:
-      engine:
-        specifier: workspace:^
-        version: link:../engine
 
   packages/rsc-server-plugin:
     dependencies:

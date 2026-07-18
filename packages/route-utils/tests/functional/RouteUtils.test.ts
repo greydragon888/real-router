@@ -1,7 +1,41 @@
-import { createRouteTree } from "engine";
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { RouteUtils, getRouteUtils } from "@real-router/route-utils";
+
+// Route-tree fixture builder. `RouteUtils` reads only `fullName` / `children` /
+// `nonAbsoluteChildren` from a node, and treats a child as absolute when its path
+// begins with "~" (the engine's absolute-path marker). Building the fixture to
+// route-utils' OWN structural contract here — rather than importing the engine's
+// `createRouteTree` — keeps the package free of any dependency on core's routing
+// engine (#1301: core is the SOLE engine consumer; route-utils is decoupled, and
+// verifying it against a locally-declared compatible shape is exactly its point).
+interface RouteDef {
+  readonly name: string;
+  readonly path: string;
+  readonly children?: readonly RouteDef[];
+}
+interface TreeNode {
+  readonly fullName: string;
+  readonly children: ReadonlyMap<string, TreeNode>;
+  readonly nonAbsoluteChildren: readonly TreeNode[];
+}
+function makeRouteTree(defs: readonly RouteDef[]): TreeNode {
+  const build = (fullName: string, kids: readonly RouteDef[]): TreeNode => {
+    const nodes = kids.map((d) =>
+      build(fullName ? `${fullName}.${d.name}` : d.name, d.children ?? []),
+    );
+
+    return {
+      fullName,
+      children: new Map(kids.map((d, i) => [d.name, nodes[i]] as const)),
+      nonAbsoluteChildren: nodes.filter(
+        (_, i) => !kids[i].path.startsWith("~"),
+      ),
+    };
+  };
+
+  return build("", defs);
+}
 
 // Tree:
 //   "" (root)
@@ -17,7 +51,7 @@ import { RouteUtils, getRouteUtils } from "@real-router/route-utils";
 //       wishlist
 //       quickview  <- absolute: true (parent == shop, NOT root)
 const makeRoot = () =>
-  createRouteTree("", "", [
+  makeRouteTree([
     {
       name: "users",
       path: "/users",
@@ -242,9 +276,7 @@ describe("getRouteUtils", () => {
 
   it("returns different instances for different roots", () => {
     const u1 = getRouteUtils(makeRoot());
-    const u2 = getRouteUtils(
-      createRouteTree("", "", [{ name: "home", path: "/" }]),
-    );
+    const u2 = getRouteUtils(makeRouteTree([{ name: "home", path: "/" }]));
 
     expect(u1).not.toBe(u2);
   });
