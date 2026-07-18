@@ -70,7 +70,7 @@ jobs:
         id: matrix
         run: node cross-router/run-all.mjs "$RUNS"
         working-directory: benchmarks
-        timeout-minutes: 240 # unsharded n=100 ≈ 2–2.8h + matcher-bench (A-2, measure on first run); self-hosted has NO platform time cap, so this timeout is the SOLE angular-hang/OOM backstop
+        timeout-minutes: 600 # first run (07-18) hit the 240min cap mid-svelte, angular never ran → the full n=100 matrix needs ~5–6h on the VPS; 600min headroom (self-hosted has NO platform cap → this timeout is the SOLE hang/OOM backstop)
         env:
           BENCH_RUNNER: "self-hosted" # O-10 machine stamp (env.cpu carries the real CPU model)
           RUNS: ${{ inputs.runs || '100' }} # via env, not inline in `run:` — a workflow_dispatch input spliced into a run-script is a shell-injection sink (matches the rme-gate step below)
