@@ -1,5 +1,13 @@
 # @real-router/angular
 
+## 0.16.1
+
+### Patch Changes
+
+- [#1517](https://github.com/greydragon888/real-router/pull/1517) [`65cfd52`](https://github.com/greydragon888/real-router/commit/65cfd525f217722682280e45257269079022138e) Thanks [@greydragon888](https://github.com/greydragon888)! - Cover RouteView fallback resolution with real AOT unit tests, drop the `v8 ignore` ([#1512](https://github.com/greydragon888/real-router/issues/1512))
+
+  No runtime changes (comment-only edit in `RouteView.ts`). The package's vitest config now runs two projects in one pass — the existing JIT suite plus a new `tests/aot/` project compiled by `@analogjs/vite-plugin-angular` — so the Self/NotFound fallback arms and the [#1439](https://github.com/greydragon888/real-router/issues/1439) first-wins duplicate-marker semantics are executed and asserted for real (mutation-validated), instead of being excluded from coverage.
+
 ## 0.16.0
 
 ### Minor Changes
