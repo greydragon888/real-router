@@ -1,10 +1,8 @@
 // packages/validation-plugin/src/validators/eventBus.ts
 
-import { logger } from "@real-router/logger";
-
 import { computeThresholds } from "../helpers";
 
-import type { Plugin } from "@real-router/core";
+import type { Plugin, RouterLogger } from "@real-router/core";
 
 const DEFAULT_MAX_LISTENERS = 10_000;
 
@@ -69,6 +67,7 @@ export function validateListenerCountThresholds(
   eventName: string,
   methodName: string,
   maxListeners: number = DEFAULT_MAX_LISTENERS,
+  logger: RouterLogger,
 ): void {
   if (maxListeners === 0) {
     return;

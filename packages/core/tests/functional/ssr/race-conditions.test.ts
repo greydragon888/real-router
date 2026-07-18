@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createRouter } from "@real-router/core";
@@ -10,7 +9,7 @@ import {
 
 import type { Route, Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
-import type { LogCallback } from "@real-router/logger";
+import type { LogCallback } from "@real-router/types";
 
 const routes: Route[] = [
   { name: "home", path: "/" },
@@ -126,30 +125,29 @@ describe("SSR race conditions", () => {
 
   describe("runtime protection - concurrent navigation warning", () => {
     let logCallback: ReturnType<typeof vi.fn>;
-    let originalConfig: ReturnType<typeof logger.getConfig>;
     let router: Router;
     let lifecycle: LifecycleApi;
 
     beforeEach(async () => {
-      // Save original config
-      originalConfig = logger.getConfig();
-
-      // Configure logger with callback to capture warnings
+      // Capture this router's log output via its per-router logger callback
+      // (the standalone global logger is gone — each router owns a RouterLogger
+      // built from `options.logger`). The callback receives the RAW
+      // (level, context, message, ...args), so the assertions are unchanged.
       logCallback = vi.fn();
-      logger.configure({
-        level: "all",
-        callback: logCallback as LogCallback,
-      });
 
-      router = createRouter(routes, defaultOptions);
+      router = createRouter(routes, {
+        ...defaultOptions,
+        logger: {
+          level: "all",
+          callback: logCallback as LogCallback,
+        },
+      });
       await router.start("/home");
       lifecycle = getLifecycleApi(router);
     });
 
     afterEach(() => {
       router.stop();
-      // Restore original config
-      logger.configure(originalConfig);
     });
 
     it("should warn when navigate called during active async navigation", async () => {

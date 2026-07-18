@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, it, expect, afterEach, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
@@ -23,7 +22,7 @@ describe("routesStore — forwardTo + guard warnings", () => {
   });
 
   it("warns naming the STRING target when forwardTo + canActivate", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     router = createRouter([
       { name: "target", path: "/target" },
@@ -36,22 +35,19 @@ describe("routesStore — forwardTo + guard warnings", () => {
     ]);
 
     expect(warnSpy).toHaveBeenCalledWith(
-      "real-router",
       expect.stringContaining("forwardTo and canActivate"),
     );
     expect(warnSpy).toHaveBeenCalledWith(
-      "real-router",
       expect.stringContaining("canActivate will be ignored"),
     );
     // string target → the actual name, NOT "[dynamic]"
     expect(warnSpy).toHaveBeenCalledWith(
-      "real-router",
       expect.stringContaining('target route "target"'),
     );
   });
 
   it("warns with [dynamic] when forwardTo is a FUNCTION + canActivate", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     router = createRouter([
       { name: "target", path: "/target" },
@@ -64,13 +60,12 @@ describe("routesStore — forwardTo + guard warnings", () => {
     ]);
 
     expect(warnSpy).toHaveBeenCalledWith(
-      "real-router",
       expect.stringContaining('target route "[dynamic]"'),
     );
   });
 
   it("warns naming the STRING target when forwardTo + canDeactivate", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     router = createRouter([
       { name: "target", path: "/target" },
@@ -83,17 +78,15 @@ describe("routesStore — forwardTo + guard warnings", () => {
     ]);
 
     expect(warnSpy).toHaveBeenCalledWith(
-      "real-router",
       expect.stringContaining("canDeactivate will be ignored"),
     );
     expect(warnSpy).toHaveBeenCalledWith(
-      "real-router",
       expect.stringContaining('target route "target"'),
     );
   });
 
   it("warns with [dynamic] when forwardTo is a FUNCTION + canDeactivate", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     router = createRouter([
       { name: "target", path: "/target" },
@@ -106,7 +99,6 @@ describe("routesStore — forwardTo + guard warnings", () => {
     ]);
 
     expect(warnSpy).toHaveBeenCalledWith(
-      "real-router",
       expect.stringContaining('target route "[dynamic]"'),
     );
   });

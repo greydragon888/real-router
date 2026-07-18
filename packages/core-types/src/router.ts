@@ -16,19 +16,43 @@ import type {
 import type { LimitsConfig } from "./limits";
 import type { QueryParamsMode, QueryParamsOptions } from "./route-node-types";
 
-// Logger types (duplicated from @real-router/logger to avoid dependency)
-type LogLevel = "log" | "warn" | "error";
-type LogLevelConfig = "all" | "warn-error" | "error-only" | "none";
-type LogCallback = (
+// Logger types — CANONICAL home. Formerly duplicated here "to avoid dependency"
+// on @real-router/logger (v1 exception registry #16); that package is now folded
+// into @real-router/core (`src/foundation/logger`), so this is the single source
+// of the logger contract, shared by core's `RouterLogger`, its config validation,
+// and any plugin/consumer that reaches the router's logger.
+export type LogLevel = "log" | "warn" | "error";
+
+export type LogLevelConfig = "all" | "warn-error" | "error-only" | "none";
+
+export type LogCallback = (
   level: LogLevel,
   context: string,
   message: string,
   ...args: unknown[]
 ) => void;
-interface LoggerConfig {
+
+export interface LoggerConfig {
   level: LogLevelConfig;
   callback?: LogCallback | undefined;
   callbackIgnoresLevel?: boolean;
+}
+
+/**
+ * Per-router logging surface — the contract core writes through and plugins
+ * consume.
+ *
+ * Core stores a concrete instance on `RouterInternals.logger` (built from
+ * `options.logger` in the `Router` constructor); plugins and other consumers
+ * reach that same per-instance logger via `getPluginApi(router).logger`. The
+ * concrete `RouterLogger` class lives in core's `foundation/logger` — this
+ * interface is the shared contract, so nothing outside core needs to import the
+ * class (or depend on the former standalone `@real-router/logger` package).
+ */
+export interface RouterLogger {
+  log: (context: string, message: string, ...args: unknown[]) => void;
+  warn: (context: string, message: string, ...args: unknown[]) => void;
+  error: (context: string, message: string, ...args: unknown[]) => void;
 }
 
 /**

@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import {
   describe,
   beforeEach,
@@ -60,7 +59,7 @@ describe("router.navigate() - concurrent navigation", () => {
     });
 
     it("warns with the SSR cloneRouter() hint when a navigation starts mid-flight", async () => {
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       // An async guard pins the first navigation in-flight (FSM transitioning),
       // so the second navigate sees `isTransitioning()` and emits the
@@ -83,7 +82,6 @@ describe("router.navigate() - concurrent navigation", () => {
       // Must carry the actionable SSR hint, not just the heading — the
       // `"For SSR, use cloneRouter()…"` literal.
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.navigate",
         expect.stringContaining("For SSR, use cloneRouter()"),
       );
 

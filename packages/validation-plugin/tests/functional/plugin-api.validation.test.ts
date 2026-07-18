@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
-import { logger } from "@real-router/logger";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -368,15 +367,12 @@ describe("plugins.warnBatchDuplicates — validationPlugin.ts line 157", () => {
   });
 
   it("warns when same factory appears multiple times in batch", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const factory = () => ({});
 
     expect(() => router.usePlugin(factory, factory)).not.toThrow();
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.usePlugin",
-      expect.stringContaining("Duplicate"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Duplicate"));
 
     vi.restoreAllMocks();
   });
@@ -395,16 +391,13 @@ describe("plugins.warnPluginMethodType", () => {
   });
 
   it("warns when plugin has event method that is not a function", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     expect(() =>
       router.usePlugin(() => ({ onStart: "not-a-function" }) as never),
     ).not.toThrow();
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.usePlugin",
-      expect.stringContaining("onStart"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("onStart"));
 
     vi.restoreAllMocks();
   });
@@ -424,14 +417,11 @@ describe("plugins.warnPluginAfterStart", () => {
     router.usePlugin(validationPlugin());
     await router.start("/home");
 
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     expect(() => router.usePlugin(() => ({ onStart: () => {} }))).not.toThrow();
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.usePlugin",
-      expect.stringContaining("onStart"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("onStart"));
 
     vi.restoreAllMocks();
   });

@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes, events } from "@real-router/core";
@@ -36,7 +35,9 @@ describe("router.start() - error handling", () => {
       // This is correct behavior - protects router from user code errors.
 
       it("should catch and log exception from ROUTER_START event listener", async () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         // Add listener that throws
         getPluginApi(router).addEventListener(events.ROUTER_START, () => {
@@ -52,7 +53,6 @@ describe("router.start() - error handling", () => {
 
         // Error should be logged (format: logger.error("Router", "Error in listener for <event>:", Error))
         expect(errorSpy).toHaveBeenCalledWith(
-          "Router",
           expect.stringMatching(/Error in listener for/),
           expect.any(Error),
         );
@@ -68,7 +68,9 @@ describe("router.start() - error handling", () => {
       // router still starts; the plugin error is isolated and logged, never
       // propagated to the start() caller.
       it("isolates a synchronous throw from Plugin.onStart — router still starts", async () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         let onStartCalled = false;
 
@@ -94,7 +96,6 @@ describe("router.start() - error handling", () => {
         // The plugin error surfaced via logger.error (onListenerError), not the
         // start() promise.
         expect(errorSpy).toHaveBeenCalledWith(
-          "Router",
           expect.stringMatching(/Error in listener for/),
           expect.any(Error),
         );
@@ -109,7 +110,9 @@ describe("router.start() - error handling", () => {
       // returned thenable's rejection centrally, routing it to the same
       // logger.error sink a sync throw flows through — symmetric with subscribe/#944.
       it("isolates an async (rejecting) Plugin.onStart — router still starts, rejection logged (#1412)", async () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         let onStartCalled = false;
 
@@ -133,7 +136,6 @@ describe("router.start() - error handling", () => {
         // The async rejection surfaced via logger.error (central isolation), not
         // as a leaked unhandledRejection.
         expect(errorSpy).toHaveBeenCalledWith(
-          "Router",
           expect.stringMatching(/Error in listener for/),
           expect.any(Error),
         );
@@ -142,7 +144,9 @@ describe("router.start() - error handling", () => {
       });
 
       it("should catch and log exception from TRANSITION_SUCCESS event listener", async () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         // Add listener that throws on TRANSITION_SUCCESS
         getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, () => {
@@ -157,7 +161,6 @@ describe("router.start() - error handling", () => {
 
         // Error should be logged
         expect(errorSpy).toHaveBeenCalledWith(
-          "Router",
           expect.stringMatching(/Error in listener for/),
           expect.any(Error),
         );
@@ -166,7 +169,9 @@ describe("router.start() - error handling", () => {
       });
 
       it("should catch and log exception from TRANSITION_ERROR event listener", async () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         router = createTestRouter({ allowNotFound: false });
 
@@ -187,7 +192,6 @@ describe("router.start() - error handling", () => {
 
         // Error should be logged
         expect(errorSpy).toHaveBeenCalledWith(
-          "Router",
           expect.stringMatching(/Error in listener for/),
           expect.any(Error),
         );
@@ -731,7 +735,7 @@ describe("router.start() - error handling", () => {
   describe("#931: unexpected start rejections log under router.start", () => {
     it("logs a post-commit start-interceptor throw as router.start, not router.navigate", async () => {
       const localRouter = createTestRouter();
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const removeInterceptor = getPluginApi(localRouter).addInterceptor(
         "start",
@@ -749,17 +753,23 @@ describe("router.start() - error handling", () => {
       // let the fire-and-forget suppress .catch branch run
       await Promise.resolve();
 
-      const categories = errorSpy.mock.calls.map((c) => c[0]);
+      // The per-router RouterLogger folds the context into the console message
+      // as "[context] message", so category + message land in the single first
+      // console.error argument.
+      const messages = errorSpy.mock.calls.map((c) => String(c[0]));
 
-      expect(categories).toContain("router.start");
-      expect(categories).not.toContain("router.navigate");
+      expect(
+        messages.some((m) =>
+          m.includes("[router.start] Unexpected start error"),
+        ),
+      ).toBe(true);
+      expect(messages.some((m) => m.includes("[router.navigate]"))).toBe(false);
 
-      const startCall = errorSpy.mock.calls.find(
-        (c) => c[0] === "router.start",
+      const startCall = errorSpy.mock.calls.find((c) =>
+        String(c[0]).startsWith("[router.start]"),
       );
 
-      expect(startCall?.[1]).toBe("Unexpected start error");
-      expect(startCall?.[2]).toBeInstanceOf(Error);
+      expect(startCall?.[1]).toBeInstanceOf(Error);
 
       errorSpy.mockRestore();
       removeInterceptor();

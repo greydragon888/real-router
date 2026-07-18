@@ -88,6 +88,59 @@ its own. Remaining follow-ups: rewrite the foundation functional suites onto a p
 surface, fully integrate the co-located docs into core's own docs, and `npm deprecate
 @real-router/fsm` at the 1.0 release.
 
+## `logger` → `core/src/foundation` (per-router `RouterLogger`)
+
+**Problem.** `@real-router/logger` was a standalone package whose only runtime consumers
+were core and `@real-router/validation-plugin`, and it exported a **process-global
+singleton**. `createRouter(routes, { logger })` funnelled into that one shared instance, so
+`configure()` leaked across every router in the process — the last `createRouter` /
+`cloneRouter` won, and two routers could not have independent log levels or callbacks
+(#724). On top of the correctness problem it carried the usual per-package config surface
+(CORE_LAYER, codecov, syncpack) for a single-shape primitive and lingered as a transitive
+dependency on consumers' trees.
+
+**Solution — dissolve into `core/src/foundation/logger/`, one instance per router.** The
+former `Logger` class is renamed `RouterLogger` and `git mv`'d into
+`core/src/foundation/logger/` (src + its co-located docs + functional/property suites →
+`core/tests/*/foundation/logger/`); the **module-level singleton is deleted** and the
+package directory is removed. Each router now **owns** a `RouterLogger`, built from
+`options.logger` in the `Router` constructor and stored on `RouterInternals.logger` (the
+`ctx`). The facade reads `getInternals(this).logger`; namespaces receive it through their
+deps at wiring (`wireNamespaces` injects `getInternals(ns.router).logger` into Navigation /
+Plugins / RouteLifecycle / Routes deps); module-level route-build helpers that log
+(`routesStore.registerForwardTo`, `routeGuards.validate*`) take a `logger: RouterLogger`
+**parameter** threaded from the constructor (`RoutesNamespace` ctor → `createRoutesStore` →
+`buildReplaceArtifacts` → …) or from `ctx.logger` at the `getRoutesApi` call sites. The
+validation plugin's logging validators likewise gained a `logger` parameter, injected from
+`ctx.logger` in `buildValidatorObject(ctx)`.
+
+**Types — canonical home legalized in `core-types`.** The logger contract
+(`RouterLogger`, `LoggerConfig`, `LogLevel`, `LogLevelConfig`, `LogCallback`) moves to
+`@real-router/types` as its single source of truth, re-exported by `@real-router/core` so
+`@real-router/validation-plugin` (which does not depend on `@real-router/types` directly)
+imports `RouterLogger` from core. This **legitimizes duplicate-types exception #16** from
+the v1 registry — the types were duplicated in core-types "to avoid depending on
+`@real-router/logger`"; that package is gone, so core-types is now simply the owner.
+
+**Integration touch-points.** `package.json` (drop `@real-router/logger` from **both**
+core and validation-plugin deps), CORE_LAYER 5 → 4 (`logger` dissolved, like
+`event-emitter`; `build-matrix.test` L2 total 27 → 26 and `base` 5 → 4), codecov (drop the
+`logger` component, keep `logger-plugin`), syncpack (drop the dead bare-`logger` workspace
+entry), the `tests/functional/foundation/**` white-box ignore now also covers the logger
+suites, and the ARCHITECTURE mermaid loses the `LOG` node and its `CORE`/`BP`/`LP` edges.
+
+**Why (empirically verified).** Per-router isolation is the point: `options.logger`
+configures **that** router's logger only, so `cloneRouter` gives each request-scoped clone
+its own log config with no cross-router leak (#724). Behaviour is otherwise unchanged —
+`RouterLogger` still writes to `console` with the same `[context] message` formatting, so
+tests observe output by spying on `console` (a leak/log check) or by installing an
+`options.logger.callback` per router (the callback still receives the raw
+`(level, context, message, …args)`). Core keeps **100% coverage** (functional 2758 tests,
++409 property, +121 stress all green), and validation-plugin stays at 100% (565 tests);
+type-check / lint / knip / syncpack / dedupe / coverage-scope / build-matrix all clean.
+Mirrors the `event-emitter` dissolution above; the co-located docs carry an honest
+"dissolved into core" marker pending full integration.
+
 ## Project Rename
 
 Project renamed from `router6` to `real-router`. Updated in:

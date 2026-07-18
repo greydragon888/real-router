@@ -5,7 +5,6 @@ import {
   getLifecycleApi,
   getPluginApi,
 } from "@real-router/core/api";
-import { logger } from "@real-router/logger";
 import { describe, it, expect, afterEach, vi } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -343,7 +342,7 @@ describe("core/limits — with validationPlugin", () => {
       router = createRouter([], { limits: { maxListeners: 10 } });
       router.usePlugin(validationPlugin());
 
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router.subscribe(() => {}); // count 1 — below warn (2)
 
@@ -352,7 +351,6 @@ describe("core/limits — with validationPlugin", () => {
       router.subscribe(() => {}); // count 2 — warn
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.subscribe",
         expect.stringContaining("listeners registered"),
       );
     });
@@ -361,14 +359,13 @@ describe("core/limits — with validationPlugin", () => {
       router = createRouter([], { limits: { maxListeners: 10 } });
       router.usePlugin(validationPlugin());
 
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       for (let i = 0; i < 5; i++) {
         router.subscribe(() => {}); // 5th subscribe → count 5 → error
       }
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "router.subscribe",
         expect.stringContaining("Hard limit at 10"),
       );
     });
@@ -377,14 +374,13 @@ describe("core/limits — with validationPlugin", () => {
       router = createRouter([], { limits: { maxListeners: 10 } });
       router.usePlugin(validationPlugin());
 
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const api = getPluginApi(router);
 
       api.addEventListener(events.ROUTER_START, () => {}); // count 1
       api.addEventListener(events.ROUTER_START, () => {}); // count 2 → warn
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.addEventListener",
         expect.stringContaining("listeners registered"),
       );
     });
@@ -393,8 +389,8 @@ describe("core/limits — with validationPlugin", () => {
       router = createRouter([], { limits: { maxListeners: 0 } });
       router.usePlugin(validationPlugin());
 
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       for (let i = 0; i < 20; i++) {
         router.subscribe(() => {});

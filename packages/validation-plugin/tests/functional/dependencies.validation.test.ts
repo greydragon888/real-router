@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
 import { cloneRouter, getDependenciesApi } from "@real-router/core/api";
-import { logger } from "@real-router/logger";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -215,21 +214,19 @@ describe("dependencies.validateDependencyCount — threshold logging", () => {
 
     r.usePlugin(validationPlugin());
     const deps = getDependenciesApi(r);
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     for (let i = 0; i < 20; i++) {
       deps.set(`dep${i}`, i);
     }
 
     expect(warnSpy).not.toHaveBeenCalledWith(
-      "router.setDependency",
       expect.stringContaining("dependencies"),
     );
 
     deps.set("dep20", 20);
 
     expect(warnSpy).toHaveBeenCalledWith(
-      "router.setDependency",
       expect.stringContaining("20 dependencies"),
     );
 
@@ -292,14 +289,11 @@ describe("dependencies.warnRemoveNonExistent", () => {
 
     r.usePlugin(validationPlugin());
     const deps = getDependenciesApi(r);
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     deps.remove("bar");
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.removeDependency",
-      expect.stringContaining("bar"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("bar"));
 
     r.stop();
     vi.restoreAllMocks();

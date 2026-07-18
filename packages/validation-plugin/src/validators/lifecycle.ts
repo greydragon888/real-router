@@ -1,11 +1,14 @@
 // packages/validation-plugin/src/validators/lifecycle.ts
 
-import { logger } from "@real-router/logger";
 import { isBoolean, getTypeDescription } from "type-guards";
 
 import { computeThresholds } from "../helpers";
 
-import type { GuardFnFactory, DefaultDependencies } from "@real-router/core";
+import type {
+  GuardFnFactory,
+  DefaultDependencies,
+  RouterLogger,
+} from "@real-router/core";
 
 const DEFAULT_MAX_LIFECYCLE_HANDLERS = 200;
 
@@ -43,6 +46,7 @@ export function validateLifecycleCountThresholds(
   count: number,
   methodName: string,
   maxHandlers: number,
+  logger: RouterLogger,
 ): void {
   if (maxHandlers === 0) {
     return;
@@ -67,6 +71,7 @@ export function warnOverwrite(
   name: string,
   type: string,
   methodName: string,
+  logger: RouterLogger,
 ): void {
   logger.warn(
     `router.${methodName}`,
@@ -74,7 +79,11 @@ export function warnOverwrite(
   );
 }
 
-export function warnAsyncGuardSync(name: string, methodName: string): void {
+export function warnAsyncGuardSync(
+  name: string,
+  methodName: string,
+  logger: RouterLogger,
+): void {
   logger.warn(
     `router.${methodName}`,
     `Guard for "${name}" returned a Promise. Sync check cannot resolve async guards — returning false.`,

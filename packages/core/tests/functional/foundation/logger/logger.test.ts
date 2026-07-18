@@ -1,12 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { LEVEL_CONFIGS, LOG_LEVELS, logger } from "@real-router/logger";
+import {
+  LEVEL_CONFIGS,
+  LOG_LEVELS,
+} from "../../../../src/foundation/logger/constants";
+import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
 
 import type {
   LogCallback,
   LoggerConfig,
   LogLevelConfig,
-} from "@real-router/logger";
+} from "@real-router/types";
+
+// Per-router logger instance under test — the standalone `@real-router/logger`
+// singleton was dissolved into core (`foundation/logger`). A fresh instance is
+// created in the "Logger" describe's beforeEach (replaces the singleton reset).
+let logger: RouterLogger;
 
 const noop = () => {};
 
@@ -33,14 +42,13 @@ describe("exported constants (LEVEL_CONFIGS / LOG_LEVELS)", () => {
   });
 });
 
-describe("fresh singleton default (before any configure())", () => {
+describe("fresh instance default (before any configure())", () => {
   // The #config initializer sets `callbackIgnoresLevel: false`. The main Logger
   // suite's beforeEach overwrites it on every test, masking the initializer
-  // default — so assert it HERE, where the singleton is still pristine (this
-  // block runs first and calls no configure()). A `true` initializer mutant
-  // flips this default.
-  it("defaults callbackIgnoresLevel to false on the untouched singleton", () => {
-    expect(logger.getConfig().callbackIgnoresLevel).toBe(false);
+  // default — so assert it HERE, on a pristine instance that has had no
+  // configure() called. A `true` initializer mutant flips this default.
+  it("defaults callbackIgnoresLevel to false on a fresh RouterLogger", () => {
+    expect(new RouterLogger().getConfig().callbackIgnoresLevel).toBe(false);
   });
 });
 
@@ -51,12 +59,10 @@ describe("Logger", () => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
 
-    // Reset logger to default config
-    logger.configure({
-      level: "all",
-      callback: undefined,
-      callbackIgnoresLevel: false,
-    });
+    // Fresh per-router logger instance per test (defaults: level "all",
+    // callback undefined, callbackIgnoresLevel false) — replaces the former
+    // singleton reset.
+    logger = new RouterLogger();
   });
 
   afterEach(() => {
@@ -861,13 +867,13 @@ describe("Logger", () => {
     });
   });
 
-  describe("singleton behavior", () => {
-    it("should maintain configuration across multiple imports", () => {
+  describe("instance state behavior", () => {
+    it("should maintain configuration across reads on the same instance", () => {
       const callback = vi.fn();
 
       logger.configure({ level: ERROR_ONLY, callback });
 
-      // In real scenario, this would be another import
+      // A later read on the same per-router instance sees the config
       const config = logger.getConfig();
 
       expect(config.level).toBe(ERROR_ONLY);

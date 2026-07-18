@@ -1,7 +1,5 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
-import { logger } from "@real-router/logger";
-
 import type { RouteLifecycleDependencies } from "./types";
 import type { GuardFnFactory } from "../../types";
 import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
@@ -718,7 +716,7 @@ export class RouteLifecycleNamespace<
       // directly. This is an OPERATIONAL signal (the guard crashed — distinct
       // from the opt-in validator DX warnings above for which the validator is
       // the right home): the navigation is still treated as blocked (`false`).
-      logger.warn(
+      this.#deps.logger.warn(
         `router.${methodName}`,
         `Guard for "${name}" threw — treated as navigation-blocking (returned false)`,
         error,

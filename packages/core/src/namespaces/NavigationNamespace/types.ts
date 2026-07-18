@@ -5,6 +5,7 @@ import type {
   NavigationOptions,
   Options,
   Params,
+  RouterLogger,
   State,
 } from "@real-router/types";
 
@@ -25,6 +26,9 @@ export interface NavigationContext {
  * avoiding the need to pass the entire Router object.
  */
 export interface NavigationDependencies {
+  /** Per-router logger instance (from `getInternals(router).logger`) */
+  logger: RouterLogger;
+
   /** Get router options */
   getOptions: () => Options;
 

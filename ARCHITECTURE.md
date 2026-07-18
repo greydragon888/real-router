@@ -42,7 +42,6 @@ real-router/
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
 │   ├── route-utils/               # Route tree queries and segment testing
-│   ├── logger/                    # Isomorphic structured logging
 │   ├── fsm/                       # FROZEN shell (published by mistake; live engine copied to core/src/foundation/fsm)
 │   ├── engine/                    # Routing engine (internal, #1510): route-tree facade at src root + path-matcher & search-params layers under src/
 │   └── type-guards/               # Runtime type validation (internal)
@@ -79,7 +78,6 @@ real-router/
 graph TD
     subgraph standalone [Standalone — zero deps]
         ENGINE["engine (route-tree + path-matcher + search-params)"]
-        LOG["logger"]
         TYPES["core-types"]
     end
 
@@ -92,7 +90,6 @@ graph TD
     end
 
     CORE -->|dep| TYPES
-    CORE -->|dep| LOG
     CORE -.->|bundles| ENGINE
 
     subgraph consumers [Consumer packages]
@@ -112,7 +109,6 @@ graph TD
     SSRSHARED["shared/ssr<br/>(shared sources)"]
 
     BP -->|dep| CORE
-    BP -->|dep| LOG
     BP -.->|bundles| TG
     BP -.->|symlink| BROWSERENV
 
@@ -125,7 +121,6 @@ graph TD
     NP -.->|symlink| BROWSERENV
 
     LP -->|dep| CORE
-    LP -->|dep| LOG
 
     SOURCES -->|dep| ROUTEUTILS
     SOURCES -->|dep| CORE

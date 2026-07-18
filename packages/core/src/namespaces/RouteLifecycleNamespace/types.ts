@@ -2,11 +2,18 @@
 
 import type { GuardFnFactory } from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
-import type { DefaultDependencies, GuardFn } from "@real-router/types";
+import type {
+  DefaultDependencies,
+  GuardFn,
+  RouterLogger,
+} from "@real-router/types";
 
 export interface RouteLifecycleDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
+  /** Per-router logger instance (from `getInternals(router).logger`) */
+  logger: RouterLogger;
+
   compileFactory: (factory: GuardFnFactory<Dependencies>) => GuardFn;
   /**
    * Returns the opt-in DX validator, or `null` when no validation-plugin is

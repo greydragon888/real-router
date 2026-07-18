@@ -3,14 +3,14 @@ import { fc } from "@fast-check/vitest";
 import {
   LEVEL_CONFIGS,
   LOG_LEVELS as LOG_LEVELS_MAP,
-} from "@real-router/logger";
+} from "../../../../src/foundation/logger/constants";
 
 import type {
   LogCallback,
   LoggerConfig,
   LogLevel,
   LogLevelConfig,
-} from "@real-router/logger";
+} from "@real-router/types";
 
 // ============================================================================
 // Constants

@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { getLifecycleApi } from "@real-router/core/api";
@@ -256,7 +255,7 @@ describe("router.navigate() - promise resolve values", () => {
   // getState().name and fail here).
   describe("onTransitionSuccess plugin returning a State (sync) is ignored", () => {
     beforeEach(() => {
-      vi.spyOn(logger, "error").mockImplementation(noop);
+      vi.spyOn(console, "error").mockImplementation(noop);
     });
 
     describe("sync onTransitionSuccess returning State", () => {
@@ -444,7 +443,7 @@ describe("router.navigate() - promise resolve values", () => {
   // `onTransitionSuccess` hook is likewise ignored (plugins are observers).
   describe("onTransitionSuccess plugin returning a State (async) is ignored", () => {
     beforeEach(() => {
-      vi.spyOn(logger, "error").mockImplementation(noop);
+      vi.spyOn(console, "error").mockImplementation(noop);
     });
 
     describe("async onTransitionSuccess returning State", () => {

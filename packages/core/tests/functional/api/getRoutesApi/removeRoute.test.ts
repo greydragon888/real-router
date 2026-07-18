@@ -531,22 +531,19 @@ describe("core/routes/removeRoute", () => {
      */
 
     it("should log warning when removing non-existent route", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.remove("nonexistent");
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Route "nonexistent" not found. No changes made.',
+        '[router.removeRoute] Route "nonexistent" not found. No changes made.',
       );
 
       warnSpy.mockRestore();
     });
 
     it("should log warning when removing non-existent child route", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.add({
         name: "parent",
@@ -557,8 +554,7 @@ describe("core/routes/removeRoute", () => {
       routesApi.remove("parent.nonexistent");
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Route "parent.nonexistent" not found. No changes made.',
+        '[router.removeRoute] Route "parent.nonexistent" not found. No changes made.',
       );
 
       warnSpy.mockRestore();
@@ -631,8 +627,7 @@ describe("core/routes/removeRoute", () => {
      */
 
     it("should block removal of currently active route with warning", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.add({ name: "dashboard", path: "/dashboard" });
       await router.navigate("dashboard");
@@ -645,8 +640,7 @@ describe("core/routes/removeRoute", () => {
 
       // Should warn and NOT remove
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Cannot remove route "dashboard" — it is currently active. Navigate away first.',
+        '[router.removeRoute] Cannot remove route "dashboard" — it is currently active. Navigate away first.',
       );
 
       // Route should still exist
@@ -658,8 +652,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should block removal of parent when child is active", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.add({
         name: "parentRoute",
@@ -676,8 +669,7 @@ describe("core/routes/removeRoute", () => {
 
       // Should warn with current route info
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Cannot remove route "parentRoute" — it is currently active (current: "parentRoute.childRoute"). Navigate away first.',
+        '[router.removeRoute] Cannot remove route "parentRoute" — it is currently active (current: "parentRoute.childRoute"). Navigate away first.',
       );
 
       // Parent and child should still exist
@@ -751,8 +743,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should return undefined when removal blocked", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.add({ name: "blocked", path: "/blocked" });
       await router.navigate("blocked");
@@ -761,7 +752,6 @@ describe("core/routes/removeRoute", () => {
 
       // Should warn when blocked
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
         expect.stringContaining("currently active"),
       );
 
@@ -896,8 +886,7 @@ describe("core/routes/removeRoute", () => {
     // 12.3: Removal during active async navigation
     describe("removal during async navigation (12.3)", () => {
       it("should warn when removing route during active navigation", async () => {
-        const { logger } = await import("@real-router/logger");
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         let resolveCanActivate: () => void;
         const canActivatePromise = new Promise<void>((resolve) => {
@@ -924,7 +913,6 @@ describe("core/routes/removeRoute", () => {
         routesApi.remove("asyncRoute");
 
         expect(warnSpy).toHaveBeenCalledWith(
-          "router.removeRoute",
           expect.stringContaining("navigation is in progress"),
         );
 
@@ -947,8 +935,7 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should prevent removal when async navigation has completed", async () => {
-        const { logger } = await import("@real-router/logger");
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         routesApi.add({
           name: "asyncComplete",
@@ -970,7 +957,6 @@ describe("core/routes/removeRoute", () => {
         routesApi.remove("asyncComplete");
 
         expect(warnSpy).toHaveBeenCalledWith(
-          "router.removeRoute",
           expect.stringContaining("currently active"),
         );
 
@@ -983,8 +969,7 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should warn when removing unrelated route during navigation", async () => {
-        const { logger } = await import("@real-router/logger");
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         let resolveCanActivate: () => void;
         const canActivatePromise = new Promise<void>((resolve) => {
@@ -1012,7 +997,6 @@ describe("core/routes/removeRoute", () => {
         routesApi.remove("unrelated");
 
         expect(warnSpy).toHaveBeenCalledWith(
-          "router.removeRoute",
           expect.stringContaining("navigation is in progress"),
         );
 
@@ -1061,16 +1045,14 @@ describe("core/routes/removeRoute", () => {
 
     // 12.4: Empty string as route name
     it("should handle empty string gracefully with warning", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       // Empty string is technically a valid route name in the type system
       // but no route has empty name in definitions
       routesApi.remove("");
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Route "" not found. No changes made.',
+        '[router.removeRoute] Route "" not found. No changes made.',
       );
 
       warnSpy.mockRestore();
@@ -1081,8 +1063,7 @@ describe("core/routes/removeRoute", () => {
 
     // 12.6: Exact boundary (10000 characters)
     it("should accept name with exactly 10000 characters", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const exactLimit = "a".repeat(10_000);
 
@@ -1093,7 +1074,6 @@ describe("core/routes/removeRoute", () => {
 
       // Route doesn't exist, so graceful handling
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
         expect.stringContaining("not found"),
       );
 
@@ -1102,8 +1082,7 @@ describe("core/routes/removeRoute", () => {
 
     // 12.7: Unicode characters in name
     it("should handle unicode route names gracefully (no throw without plugin)", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       expect(() => {
         routesApi.remove("маршрут");
@@ -1252,16 +1231,14 @@ describe("core/routes/removeRoute", () => {
      */
 
     it("should handle __proto__ as route name gracefully", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       // __proto__ passes pattern validation [a-zA-Z_][a-zA-Z0-9_]*
       // but no such route exists in definitions
       routesApi.remove("__proto__");
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Route "__proto__" not found. No changes made.',
+        '[router.removeRoute] Route "__proto__" not found. No changes made.',
       );
 
       // Verify no prototype pollution occurred
@@ -1271,28 +1248,24 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should handle constructor as route name gracefully", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.remove("constructor");
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Route "constructor" not found. No changes made.',
+        '[router.removeRoute] Route "constructor" not found. No changes made.',
       );
 
       warnSpy.mockRestore();
     });
 
     it("should handle prototype as route name gracefully", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.remove("prototype");
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Route "prototype" not found. No changes made.',
+        '[router.removeRoute] Route "prototype" not found. No changes made.',
       );
 
       warnSpy.mockRestore();
@@ -1308,8 +1281,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should safely handle nested prototype pollution attempts", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       // Try various prototype pollution patterns
       routesApi.remove("__proto__.polluted");
@@ -1317,7 +1289,6 @@ describe("core/routes/removeRoute", () => {
 
       // Should have warnings for not found (may also include navigation warnings)
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
         expect.stringContaining("not found"),
       );
 

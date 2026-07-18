@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { computeThresholds } from "../../src/helpers";
@@ -44,6 +43,12 @@ import {
 } from "../../src/validators/routes";
 import { validateMakeStateArgs } from "../../src/validators/state";
 
+import type { RouterLogger } from "@real-router/core";
+
+// The logger-emitting validators now take the router's per-instance RouterLogger
+// as their last argument (the process-global singleton is gone). These unit
+// tests pass a mock logger and assert on its `warn` / `error` mocks — the mock
+// receives the RAW (context, message, ...args), so the assertions are unchanged.
 describe("options validators", () => {
   describe("validateLimitValue", () => {
     it("throws TypeError for non-integer (string)", () => {
@@ -433,12 +438,18 @@ describe("helpers", () => {
 });
 
 describe("Phase 2 dependency validators", () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.fn>;
+  let errorSpy: ReturnType<typeof vi.fn>;
+  let testLogger: RouterLogger;
 
   beforeEach(() => {
-    warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-    errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    warnSpy = vi.fn();
+    errorSpy = vi.fn();
+    testLogger = {
+      log: vi.fn(),
+      warn: warnSpy,
+      error: errorSpy,
+    } as RouterLogger;
   });
 
   afterEach(() => {
@@ -448,7 +459,7 @@ describe("Phase 2 dependency validators", () => {
   describe("validateDependencyCount", () => {
     it("returns early when maxDependencies is 0 (unlimited)", () => {
       expect(() => {
-        validateDependencyCount(makeStore(999, 0), "test");
+        validateDependencyCount(makeStore(999, 0), "test", testLogger);
       }).not.toThrow();
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
@@ -456,17 +467,25 @@ describe("Phase 2 dependency validators", () => {
 
     it("throws when currentCount >= maxDependencies", () => {
       expect(() => {
-        validateDependencyCount(makeStore(100, 100), "setDependency");
+        validateDependencyCount(
+          makeStore(100, 100),
+          "setDependency",
+          testLogger,
+        );
       }).toThrow("Dependency limit exceeded");
       expect(() => {
-        validateDependencyCount(makeStore(105, 100), "setDependency");
+        validateDependencyCount(
+          makeStore(105, 100),
+          "setDependency",
+          testLogger,
+        );
       }).toThrow("Dependency limit exceeded");
     });
 
     it("calls logger.error when currentCount === error threshold", () => {
       const store = makeStore(50, 100);
 
-      validateDependencyCount(store, "setDependency");
+      validateDependencyCount(store, "setDependency", testLogger);
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.setDependency",
@@ -477,7 +496,7 @@ describe("Phase 2 dependency validators", () => {
     it("calls logger.warn when currentCount === warn threshold", () => {
       const store = makeStore(20, 100);
 
-      validateDependencyCount(store, "setDependency");
+      validateDependencyCount(store, "setDependency", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.setDependency",
@@ -486,7 +505,7 @@ describe("Phase 2 dependency validators", () => {
     });
 
     it("does nothing below thresholds", () => {
-      validateDependencyCount(makeStore(5, 100), "setDependency");
+      validateDependencyCount(makeStore(5, 100), "setDependency", testLogger);
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
@@ -500,7 +519,11 @@ describe("Phase 2 dependency validators", () => {
           deps[`dep${i}`] = i;
         }
 
-        validateDependencyCount({ dependencies: deps }, "setDependency");
+        validateDependencyCount(
+          { dependencies: deps },
+          "setDependency",
+          testLogger,
+        );
       }).toThrow("Dependency limit exceeded");
     });
   });
@@ -570,7 +593,7 @@ describe("Phase 2 dependency validators", () => {
 
   describe("warnOverwrite (dependencies)", () => {
     it("calls logger.warn with dep name and method", () => {
-      warnDepOverwrite("myDep", "setDependency");
+      warnDepOverwrite("myDep", "setDependency", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.setDependency",
@@ -582,7 +605,7 @@ describe("Phase 2 dependency validators", () => {
 
   describe("warnBatchOverwrite", () => {
     it("calls logger.warn with joined keys", () => {
-      warnBatchOverwrite(["dep1", "dep2"], "setDependencies");
+      warnBatchOverwrite(["dep1", "dep2"], "setDependencies", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.setDependencies",
@@ -594,7 +617,7 @@ describe("Phase 2 dependency validators", () => {
 
   describe("warnRemoveNonExistent", () => {
     it("calls logger.warn with dep name string", () => {
-      warnRemoveNonExistent("missingDep");
+      warnRemoveNonExistent("missingDep", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeDependency",
@@ -603,7 +626,7 @@ describe("Phase 2 dependency validators", () => {
     });
 
     it("converts non-string names to string", () => {
-      warnRemoveNonExistent(42);
+      warnRemoveNonExistent(42, testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeDependency",
@@ -614,12 +637,18 @@ describe("Phase 2 dependency validators", () => {
 });
 
 describe("Phase 2 lifecycle validators", () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.fn>;
+  let errorSpy: ReturnType<typeof vi.fn>;
+  let testLogger: RouterLogger;
 
   beforeEach(() => {
-    warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-    errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    warnSpy = vi.fn();
+    errorSpy = vi.fn();
+    testLogger = {
+      log: vi.fn(),
+      warn: warnSpy,
+      error: errorSpy,
+    } as RouterLogger;
   });
 
   afterEach(() => {
@@ -629,14 +658,24 @@ describe("Phase 2 lifecycle validators", () => {
   describe("validateLifecycleCountThresholds", () => {
     it("returns early when maxHandlers is 0 (unlimited)", () => {
       expect(() => {
-        validateLifecycleCountThresholds(999, "addActivateGuard", 0);
+        validateLifecycleCountThresholds(
+          999,
+          "addActivateGuard",
+          0,
+          testLogger,
+        );
       }).not.toThrow();
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
     });
 
     it("calls logger.error at error threshold", () => {
-      validateLifecycleCountThresholds(100, "addActivateGuard", 200);
+      validateLifecycleCountThresholds(
+        100,
+        "addActivateGuard",
+        200,
+        testLogger,
+      );
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.addActivateGuard",
@@ -645,7 +684,7 @@ describe("Phase 2 lifecycle validators", () => {
     });
 
     it("calls logger.warn at warn threshold", () => {
-      validateLifecycleCountThresholds(40, "addActivateGuard", 200);
+      validateLifecycleCountThresholds(40, "addActivateGuard", 200, testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.addActivateGuard",
@@ -654,7 +693,7 @@ describe("Phase 2 lifecycle validators", () => {
     });
 
     it("does nothing below thresholds", () => {
-      validateLifecycleCountThresholds(5, "addActivateGuard", 200);
+      validateLifecycleCountThresholds(5, "addActivateGuard", 200, testLogger);
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
@@ -663,7 +702,12 @@ describe("Phase 2 lifecycle validators", () => {
 
   describe("warnOverwrite (lifecycle)", () => {
     it("calls logger.warn with route name, type, and method", () => {
-      warnLifecycleOverwrite("home", "activate", "addActivateGuard");
+      warnLifecycleOverwrite(
+        "home",
+        "activate",
+        "addActivateGuard",
+        testLogger,
+      );
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.addActivateGuard",
@@ -674,7 +718,7 @@ describe("Phase 2 lifecycle validators", () => {
 
   describe("warnAsyncGuardSync", () => {
     it("calls logger.warn for async guard in sync context", () => {
-      warnAsyncGuardSync("home", "canNavigateTo");
+      warnAsyncGuardSync("home", "canNavigateTo", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.canNavigateTo",
@@ -907,12 +951,18 @@ describe("Phase 2 options validators", () => {
 });
 
 describe("Phase 2 plugins validators", () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.fn>;
+  let errorSpy: ReturnType<typeof vi.fn>;
+  let testLogger: RouterLogger;
 
   beforeEach(() => {
-    warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-    errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    warnSpy = vi.fn();
+    errorSpy = vi.fn();
+    testLogger = {
+      log: vi.fn(),
+      warn: warnSpy,
+      error: errorSpy,
+    } as RouterLogger;
   });
 
   afterEach(() => {
@@ -921,14 +971,14 @@ describe("Phase 2 plugins validators", () => {
 
   describe("validateCountThresholds (plugins)", () => {
     it("returns early when maxPlugins is 0", () => {
-      validatePluginCountThresholds(999, 0);
+      validatePluginCountThresholds(999, 0, testLogger);
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
     });
 
     it("calls logger.error at error threshold", () => {
-      validatePluginCountThresholds(25, 50);
+      validatePluginCountThresholds(25, 50, testLogger);
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.usePlugin",
@@ -937,7 +987,7 @@ describe("Phase 2 plugins validators", () => {
     });
 
     it("calls logger.warn at warn threshold", () => {
-      validatePluginCountThresholds(10, 50);
+      validatePluginCountThresholds(10, 50, testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.usePlugin",
@@ -946,7 +996,7 @@ describe("Phase 2 plugins validators", () => {
     });
 
     it("does nothing below thresholds", () => {
-      validatePluginCountThresholds(5, 50);
+      validatePluginCountThresholds(5, 50, testLogger);
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
@@ -992,7 +1042,7 @@ describe("Phase 2 plugins validators", () => {
 
   describe("warnBatchDuplicates", () => {
     it("calls logger.warn", () => {
-      warnBatchDuplicates();
+      warnBatchDuplicates(testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.usePlugin",
@@ -1003,7 +1053,7 @@ describe("Phase 2 plugins validators", () => {
 
   describe("warnPluginMethodType", () => {
     it("calls logger.warn with method name", () => {
-      warnPluginMethodType("onStart");
+      warnPluginMethodType("onStart", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.usePlugin",
@@ -1014,7 +1064,7 @@ describe("Phase 2 plugins validators", () => {
 
   describe("warnPluginAfterStart", () => {
     it("calls logger.warn when methodName is onStart", () => {
-      warnPluginAfterStart("onStart");
+      warnPluginAfterStart("onStart", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.usePlugin",
@@ -1023,7 +1073,7 @@ describe("Phase 2 plugins validators", () => {
     });
 
     it("does nothing when methodName is not onStart", () => {
-      warnPluginAfterStart("onStop");
+      warnPluginAfterStart("onStop", testLogger);
 
       expect(warnSpy).not.toHaveBeenCalled();
     });

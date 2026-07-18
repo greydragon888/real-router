@@ -1,8 +1,6 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, beforeAll, beforeEach, afterAll, expect } from "vitest";
 
-import { logger } from "@real-router/logger";
-
 import {
   callbackArbitrary,
   contextArbitrary,
@@ -14,10 +12,15 @@ import {
   shouldInvokeCallback,
   throwingCallbackArbitrary,
 } from "./helpers";
+import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
 
-import type { LogCallback } from "@real-router/logger";
+import type { LogCallback } from "@real-router/types";
 
 const noop = () => {};
+
+// Per-router logger instance under test (fresh per test in beforeEach) —
+// replaces the former process-global singleton.
+let logger: RouterLogger;
 
 describe("Logger Callback Properties", () => {
   beforeAll(() => {
@@ -28,20 +31,13 @@ describe("Logger Callback Properties", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    logger.configure({
-      level: "all",
-      callback: undefined,
-      callbackIgnoresLevel: false,
-    });
+    // Fresh instance per test (defaults: level "all", callback undefined,
+    // callbackIgnoresLevel false) — replaces the former singleton reset.
+    logger = new RouterLogger();
   });
 
   afterAll(() => {
     vi.restoreAllMocks();
-    logger.configure({
-      level: "all",
-      callback: undefined,
-      callbackIgnoresLevel: false,
-    });
   });
 
   describe("Callback invocation with correct arguments", () => {

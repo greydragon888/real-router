@@ -1,8 +1,8 @@
 // packages/validation-plugin/src/validators/plugins.ts
 
-import { logger } from "@real-router/logger";
-
 import { computeThresholds } from "../helpers";
+
+import type { RouterLogger } from "@real-router/core";
 
 const DEFAULT_MAX_PLUGINS = 50;
 
@@ -53,6 +53,7 @@ export function validateNoDuplicatePlugins(
 export function validateCountThresholds(
   count: number,
   maxPlugins: number,
+  logger: RouterLogger,
 ): void {
   if (maxPlugins === 0) {
     return;
@@ -83,21 +84,27 @@ export function validatePluginKeys(plugin: unknown): void {
   }
 }
 
-export function warnBatchDuplicates(): void {
+export function warnBatchDuplicates(logger: RouterLogger): void {
   logger.warn(
     LOGGER_CTX,
     "Duplicate factory in batch, will be registered once",
   );
 }
 
-export function warnPluginMethodType(methodName: string): void {
+export function warnPluginMethodType(
+  methodName: string,
+  logger: RouterLogger,
+): void {
   logger.warn(
     LOGGER_CTX,
     `Property '${methodName}' is not a function, skipping`,
   );
 }
 
-export function warnPluginAfterStart(methodName: string): void {
+export function warnPluginAfterStart(
+  methodName: string,
+  logger: RouterLogger,
+): void {
   if (methodName === "onStart") {
     logger.warn(
       LOGGER_CTX,

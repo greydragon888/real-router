@@ -43,6 +43,11 @@ export type {
   PluginFactory,
   GuardFnFactory,
   RouteConfigUpdate,
+  RouterLogger,
+  LoggerConfig,
+  LogLevel,
+  LogLevelConfig,
+  LogCallback,
 } from "./router";
 
 // Limits configuration

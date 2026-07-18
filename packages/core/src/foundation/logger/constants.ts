@@ -1,6 +1,6 @@
 // packages/logger/src/constants.ts
 
-import type { LogLevel, LogLevelConfig } from "./types";
+import type { LogLevel, LogLevelConfig } from "@real-router/types";
 
 /**
  * Numeric mapping for log message severity levels.

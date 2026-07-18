@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { errorCodes } from "@real-router/core";
@@ -248,7 +247,7 @@ describe("core/observable/addEventListener", () => {
     });
 
     it("should log errors from failing listeners", async () => {
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const error = new Error("Test error");
       const cb = vi.fn(() => {
         throw error;
@@ -259,7 +258,6 @@ describe("core/observable/addEventListener", () => {
 
       // Logger format: logger.error(context, message, error)
       expect(errorSpy).toHaveBeenCalledWith(
-        "Router",
         expect.stringContaining("Error in listener"),
         error,
       );

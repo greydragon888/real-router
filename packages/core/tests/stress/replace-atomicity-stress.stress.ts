@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, afterEach, it, expect, vi } from "vitest";
 
 import {
@@ -36,7 +35,7 @@ describe("S25: replace() atomicity under concurrent navigation", () => {
 
     // The blocked replace() logs an error — silence it so the stress run stays
     // clean while still asserting the no-op via the return value.
-    vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     // Park the navigation in an async activation guard so it is genuinely
     // in-flight (isTransitioning() === true) when replace() runs. A guard-free

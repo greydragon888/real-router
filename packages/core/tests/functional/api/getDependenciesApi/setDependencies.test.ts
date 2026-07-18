@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getDependenciesApi } from "@real-router/core/api";
@@ -38,7 +37,7 @@ describe("core/dependencies/setDependencies", () => {
   });
 
   it("should NOT warn via logger when overwriting multiple dependencies (no validation plugin)", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     deps.setAll({ foo: 1, bar: "initial" });
     warnSpy.mockClear();
@@ -51,7 +50,7 @@ describe("core/dependencies/setDependencies", () => {
   });
 
   it("should not warn when no overwrites occur", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     deps.setAll({ foo: 1, bar: "test" });
     warnSpy.mockClear();

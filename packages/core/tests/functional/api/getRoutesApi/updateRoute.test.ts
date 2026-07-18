@@ -1012,8 +1012,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("navigation warnings", () => {
     it("should error when updating route during active navigation", async () => {
-      const { logger } = await import("@real-router/logger");
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       let resolveCanActivate: () => void;
       const canActivatePromise = new Promise<void>((resolve) => {
@@ -1040,7 +1039,6 @@ describe("core/routes/routeTree/updateRoute", () => {
       routesApi.update("ur-async", { defaultParams: { page: 1 } });
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "router.updateRoute",
         expect.stringContaining("navigation is in progress"),
       );
 
@@ -1057,8 +1055,7 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should not log error when updating route without active navigation", async () => {
-      const { logger } = await import("@real-router/logger");
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       routesApi.add({ name: "ur-no-warn", path: "/ur-no-warn" });
 
@@ -1066,8 +1063,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       routesApi.update("ur-no-warn", { defaultParams: { page: 1 } });
 
       expect(errorSpy).not.toHaveBeenCalledWith(
-        "router.updateRoute",
-        expect.any(String),
+        expect.stringContaining("[router.updateRoute]"),
       );
 
       errorSpy.mockRestore();

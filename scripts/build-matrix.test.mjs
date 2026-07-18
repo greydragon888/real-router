@@ -99,7 +99,7 @@ test("L1: rx-only PR derives affected=[rx] WITHOUT the dependency-closure (A5)",
     },
   });
   const { affected } = deriveAffected(queryJson);
-  // The whole point of A5: core/types/fsm/logger are NOT here. If they were,
+  // The whole point of A5: core/types/fsm are NOT here. If they were,
   // touchesCore would always be true and mode=leaf would never fire.
   assert.deepEqual(affected, ["@real-router/rx"]);
   for (const core of CORE_LAYER)
@@ -176,15 +176,15 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 5/6/3/2/2/8/1 = 27", () => {
+test("L2: classify() buckets all real packages/* exactly 4/6/3/2/2/8/1 = 26", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 27, "expected 27 packages/* workspaces");
+  assert.equal(allPackages.length, 26, "expected 26 packages/* workspaces");
   assert.deepEqual(counts, {
-    base: 5,
+    base: 4,
     adapter: 6,
     "url-plugin": 3,
     "ssr-plugin": 2,
@@ -536,7 +536,7 @@ test("leafFilter: END-TO-END #1112 — root-lockfile query JSON → narrow leaf 
 });
 
 test("leafFilter: carries the routing set verbatim — NO dependency-closure", () => {
-  // rx depends on core/types/logger, but leaf runs `--filter=@real-router/rx`
+  // rx depends on core (+ its deps), but leaf runs `--filter=@real-router/rx`
   // ONLY — turbo pulls the deps' ^bundle in via the task graph; they are NOT in
   // the execution filter. This is precisely what `--filter='...[ref]'` failed to
   // keep narrow on a root-file change (it added every workspace). Round-trips

@@ -197,11 +197,19 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
 
         validateDependencyExistsRaw(value, name);
       },
-      validateDependencyCount,
+      validateDependencyCount(store, methodName) {
+        validateDependencyCount(store, methodName, ctx.logger);
+      },
       validateCloneArgs,
-      warnOverwrite: warnDepsOverwrite,
-      warnBatchOverwrite,
-      warnRemoveNonExistent,
+      warnOverwrite(name, methodName) {
+        warnDepsOverwrite(name, methodName, ctx.logger);
+      },
+      warnBatchOverwrite(keys, methodName) {
+        warnBatchOverwrite(keys, methodName, ctx.logger);
+      },
+      warnRemoveNonExistent(name) {
+        warnRemoveNonExistent(name, ctx.logger);
+      },
     },
     plugins: {
       validatePluginLimit(count, limits) {
@@ -216,11 +224,17 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       validateCountThresholds(count) {
         const maxPlugins = ctx.getOptions().limits?.maxPlugins ?? 50;
 
-        validatePluginCountThresholds(count, maxPlugins);
+        validatePluginCountThresholds(count, maxPlugins, ctx.logger);
       },
-      warnBatchDuplicates,
-      warnPluginMethodType,
-      warnPluginAfterStart,
+      warnBatchDuplicates() {
+        warnBatchDuplicates(ctx.logger);
+      },
+      warnPluginMethodType(methodName) {
+        warnPluginMethodType(methodName, ctx.logger);
+      },
+      warnPluginAfterStart(methodName) {
+        warnPluginAfterStart(methodName, ctx.logger);
+      },
       validateAddInterceptorArgs,
     },
     lifecycle: {
@@ -235,10 +249,19 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
         const maxHandlers =
           ctx.getOptions().limits?.maxLifecycleHandlers ?? 200;
 
-        validateLifecycleCountThresholds(count, methodName, maxHandlers);
+        validateLifecycleCountThresholds(
+          count,
+          methodName,
+          maxHandlers,
+          ctx.logger,
+        );
       },
-      warnOverwrite: warnLifecycleOverwrite,
-      warnAsyncGuardSync,
+      warnOverwrite(name, type, methodName) {
+        warnLifecycleOverwrite(name, type, methodName, ctx.logger);
+      },
+      warnAsyncGuardSync(name, methodName) {
+        warnAsyncGuardSync(name, methodName, ctx.logger);
+      },
     },
     navigation: {
       validateNavigateArgs,
@@ -283,6 +306,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
           eventName,
           methodName,
           maxListeners,
+          ctx.logger,
         );
       },
     },

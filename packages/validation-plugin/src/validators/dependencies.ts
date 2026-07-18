@@ -1,9 +1,10 @@
 // packages/validation-plugin/src/validators/dependencies.ts
 
-import { logger } from "@real-router/logger";
 import { getTypeDescription } from "type-guards";
 
 import { computeThresholds } from "../helpers";
+
+import type { RouterLogger } from "@real-router/core";
 
 const DEFAULT_MAX_DEPENDENCIES = 100;
 
@@ -61,6 +62,7 @@ export function validateDependencyExists(
 export function validateDependencyCount(
   store: unknown,
   methodName: string,
+  logger: RouterLogger,
 ): void {
   const typedStore = store as {
     dependencies: Record<string, unknown>;
@@ -118,7 +120,11 @@ export function validateCloneArgs(dependencies: unknown): void {
   }
 }
 
-export function warnOverwrite(name: string, methodName: string): void {
+export function warnOverwrite(
+  name: string,
+  methodName: string,
+  logger: RouterLogger,
+): void {
   logger.warn(
     `router.${methodName}`,
     "Router dependency already exists and is being overwritten:",
@@ -126,11 +132,18 @@ export function warnOverwrite(name: string, methodName: string): void {
   );
 }
 
-export function warnBatchOverwrite(keys: string[], methodName: string): void {
+export function warnBatchOverwrite(
+  keys: string[],
+  methodName: string,
+  logger: RouterLogger,
+): void {
   logger.warn(`router.${methodName}`, "Overwritten:", keys.join(", "));
 }
 
-export function warnRemoveNonExistent(name: unknown): void {
+export function warnRemoveNonExistent(
+  name: unknown,
+  logger: RouterLogger,
+): void {
   logger.warn(
     "router.removeDependency",
     `Attempted to remove non-existent dependency: "${typeof name === "string" ? name : String(name)}"`,

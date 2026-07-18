@@ -1,8 +1,6 @@
 import { test } from "@fast-check/vitest";
 import { describe, beforeAll, beforeEach, afterAll, expect } from "vitest";
 
-import { logger } from "@real-router/logger";
-
 import {
   contextArbitrary,
   formatMessage,
@@ -12,8 +10,13 @@ import {
   messageArbitrary,
   shouldFilterMessage,
 } from "./helpers";
+import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
 
 const noop = () => {};
+
+// Per-router logger instance under test (fresh per test in beforeEach) —
+// replaces the former process-global singleton.
+let logger: RouterLogger;
 
 describe("Logger Level Filtering Properties", () => {
   beforeAll(() => {
@@ -24,20 +27,13 @@ describe("Logger Level Filtering Properties", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    logger.configure({
-      level: "all",
-      callback: undefined,
-      callbackIgnoresLevel: false,
-    });
+    // Fresh instance per test (defaults: level "all", callback undefined,
+    // callbackIgnoresLevel false) — replaces the former singleton reset.
+    logger = new RouterLogger();
   });
 
   afterAll(() => {
     vi.restoreAllMocks();
-    logger.configure({
-      level: "all",
-      callback: undefined,
-      callbackIgnoresLevel: false,
-    });
   });
 
   describe("Filtering determinism", () => {

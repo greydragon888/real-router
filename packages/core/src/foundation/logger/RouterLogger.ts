@@ -1,4 +1,4 @@
-// packages/logger/src/Logger.ts
+// packages/core/src/foundation/logger/RouterLogger.ts
 
 import { LOG_LEVELS, LEVEL_CONFIGS } from "./constants";
 
@@ -7,7 +7,7 @@ import type {
   LoggerConfig,
   LogLevelConfig,
   LogCallback,
-} from "./types";
+} from "@real-router/types";
 
 /**
  * Internal config type with required callbackIgnoresLevel
@@ -41,7 +41,7 @@ interface InternalLoggerConfig {
  * logger.warn('Router', 'Deprecated API used'); // Will show
  * ```
  */
-class Logger {
+export class RouterLogger {
   /** Internal configuration storage using private field */
   readonly #config: InternalLoggerConfig = {
     level: "all",
@@ -58,6 +58,21 @@ class Logger {
    * RangeError, see #791). Console output is unaffected.
    */
   #inCallback = false;
+
+  /**
+   * @param config - Optional initial configuration (level / callback /
+   *   callbackIgnoresLevel), applied once at construction.
+   *
+   * Each router owns its own `RouterLogger` instance, built from
+   * `options.logger` in the `Router` constructor. This replaces the former
+   * process-global singleton whose `configure()` leaked across every router in
+   * the process — the last `createRouter` won (#724).
+   */
+  constructor(config?: Partial<LoggerConfig>) {
+    if (config) {
+      this.configure(config);
+    }
+  }
 
   /**
    * Configures the logger with new settings.
@@ -360,24 +375,3 @@ class Logger {
     }
   }
 }
-
-/**
- * Singleton logger instance for application-wide logging.
- *
- * This is the main export that should be used throughout the application.
- * Using a singleton ensures consistent configuration across all modules.
- *
- * @example
- * ```ts
- * import { logger } from '@real-router/logger';
- *
- * // Configure once at application startup
- * logger.configure({ level: 'warn-error' });
- *
- * // Use anywhere in your app
- * logger.log('MyModule', 'Operation completed');
- * logger.warn('MyModule', 'Deprecated feature used');
- * logger.error('MyModule', 'Operation failed', error);
- * ```
- */
-export const logger = new Logger();

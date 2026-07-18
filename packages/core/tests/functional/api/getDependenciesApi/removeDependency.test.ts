@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getDependenciesApi } from "@real-router/core/api";
@@ -29,7 +28,7 @@ describe("core/dependencies/removeDependency", () => {
   });
 
   it("should NOT warn via logger when removing non-existent dependency (no validation plugin)", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     deps.remove("nonexistent" as "foo");
 
@@ -49,7 +48,7 @@ describe("core/dependencies/removeDependency", () => {
   });
 
   it("should be idempotent - safe to call multiple times", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     deps.remove("foo");
 
@@ -113,7 +112,7 @@ describe("core/dependencies/removeDependency", () => {
   });
 
   it("should allow safe cleanup without existence checks", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const cleanupDeps = ["dep1", "dep2", "dep3"] as const;
 

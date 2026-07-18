@@ -1,8 +1,6 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, beforeEach, expect } from "vitest";
 
-import { logger } from "@real-router/logger";
-
 import {
   callbackArbitrary,
   invalidLevelArbitrary,
@@ -10,17 +8,19 @@ import {
   LOG_LEVEL_CONFIGS,
   protoCallbackConfigArbitrary,
 } from "./helpers";
+import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
 
-import type { LogLevelConfig } from "@real-router/logger";
+import type { LogLevelConfig } from "@real-router/types";
+
+// Per-router logger instance under test (fresh per test in beforeEach) —
+// replaces the former process-global singleton.
+let logger: RouterLogger;
 
 describe("Logger Configuration Properties", () => {
   beforeEach(() => {
-    // Reset logger to default state
-    logger.configure({
-      level: "all",
-      callback: undefined,
-      callbackIgnoresLevel: false,
-    });
+    // Fresh instance per test (defaults: level "all", callback undefined,
+    // callbackIgnoresLevel false) — replaces the former singleton reset.
+    logger = new RouterLogger();
   });
 
   describe("Configuration idempotence", () => {

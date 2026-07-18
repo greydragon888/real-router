@@ -50,13 +50,13 @@ export default [
   // `ignores: [...]` entry here with a one-line justification of why.
   {
     files: ["tests/functional/**/*.test.ts"],
-    // TEMPORARY blackbox exemptions (fsm + event-emitter → core/src/foundation).
+    // TEMPORARY blackbox exemptions (fsm + event-emitter + logger → core/src/foundation).
     ignores: [
       // Folded-in foundation primitives keep their own functional suites, which
       // import the module they OWN via a relative ../../../src/foundation/* path
-      // (frozen fsm copy + dissolved event-emitter). To be rewritten onto a
-      // public surface later — see IMPLEMENTATION_NOTES "fsm + event-emitter →
-      // core/src/foundation".
+      // (frozen fsm copy + dissolved event-emitter + dissolved logger — the
+      // per-router RouterLogger, #724). To be rewritten onto a public surface
+      // later — see IMPLEMENTATION_NOTES "fsm + event-emitter → core/src/foundation".
       "tests/functional/foundation/**/*.test.ts",
       // Structural core-invariant test (#1169): it asserts the FSM engine core
       // ACTUALLY builds on (src/foundation/fsm) exposes no forceState bypass, so

@@ -6172,9 +6172,6 @@ importers:
 
   packages/core:
     dependencies:
-      '@real-router/logger':
-        specifier: workspace:^
-        version: link:../logger
       '@real-router/types':
         specifier: workspace:^
         version: link:../core-types
@@ -6216,8 +6213,6 @@ importers:
       '@real-router/types':
         specifier: workspace:^
         version: link:../core-types
-
-  packages/logger: {}
 
   packages/logger-plugin:
     dependencies:
@@ -6536,9 +6531,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/logger':
-        specifier: workspace:^
-        version: link:../logger
     devDependencies:
       type-guards:
         specifier: workspace:^

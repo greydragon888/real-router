@@ -6,10 +6,9 @@
  * All functionality is now provided by namespace classes.
  */
 
-import { logger } from "@real-router/logger";
-
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import { EventEmitter } from "./foundation/event-emitter";
+import { RouterLogger } from "./foundation/logger";
 import { createRouterFSM } from "./fsm";
 import { guardDependencies, guardRouteStructure } from "./guards";
 import { createLimits, normalizeParams } from "./helpers";
@@ -70,14 +69,6 @@ const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
   errorCodes.CANNOT_DEACTIVATE,
 ]);
 
-// Shared per-listener error sink: the EventEmitter reports synchronous listener
-// throws through it, and the EventBusNamespace.subscribe wrapper routes an async
-// listener's rejected Promise through the SAME sink (#944) so both failure modes
-// land in one place.
-function logListenerError(eventName: string, error: unknown): void {
-  logger.error("Router", `Error in listener for ${eventName}:`, error);
-}
-
 /**
  * Router class with integrated namespace architecture.
  *
@@ -115,6 +106,22 @@ export class Router<
 
   readonly #eventBus: EventBusNamespace;
 
+  /**
+   * Per-instance suppressors for fire-and-forget navigate / start. They log
+   * through THIS router's logger (built in the constructor) — so, unlike the
+   * former static "one allocation per class" closures, they are two closures per
+   * instance. Trade accepted with the per-router logger (#724): the logger is
+   * per-instance, so its suppressors must be too. The #931 category split is
+   * preserved — navigate failures log under "router.navigate", start failures
+   * under "router.start" (a start interceptor throwing a plain Error after
+   * next() committed, #763, or a cryptic path TypeError — neither a suppressed
+   * RouterError). The log line IS reachable: a subscribeLeave listener that
+   * throws rejects navigate() with the original NON-suppressed error, and a
+   * Symbol path-param's stringify TypeError is likewise non-suppressed.
+   */
+  readonly #onSuppressedNavigateError: (error: unknown) => void;
+  readonly #onSuppressedStartError: (error: unknown) => void;
+
   // ============================================================================
   // Constructor
   // ============================================================================
@@ -130,17 +137,37 @@ export class Router<
     dependencies: Dependencies = {} as Dependencies,
   ) {
     // Extract the logger config WITHOUT mutating the caller's `options` object
-    // (#724). NOTE: `logger` (from @real-router/logger) is a process-global
-    // singleton — `configure()` applies process-wide and the last call wins
-    // across every router in the process. `routerOptions` is the logger-stripped
-    // view handed to the options pipeline so `logger` never lands in the frozen
-    // router options.
+    // (#724). `routerOptions` is the logger-stripped view handed to the options
+    // pipeline so `logger` never lands in the frozen router options.
     const { logger: loggerConfig, ...routerOptions } = options;
 
     if (loggerConfig) {
       assertLoggerConfig(loggerConfig);
-      logger.configure(loggerConfig);
     }
+
+    // Per-router logger instance — replaces the former process-global singleton
+    // whose configure() leaked across every router in the process, last
+    // createRouter winning (#724). Stored on ctx (registerInternals below), so
+    // the facade reads getInternals(this).logger; namespaces receive it via
+    // their deps at wiring; plugins reach it through getPluginApi(router).logger.
+    const logger = new RouterLogger(loggerConfig);
+
+    // Per-instance fire-and-forget suppressors (see field declarations): they
+    // log through THIS router's logger, so they are built here, not static.
+    this.#onSuppressedNavigateError = (error: unknown): void => {
+      if (Router.#isExpectedRejection(error)) {
+        return;
+      }
+
+      logger.error("router.navigate", "Unexpected navigation error", error);
+    };
+    this.#onSuppressedStartError = (error: unknown): void => {
+      if (Router.#isExpectedRejection(error)) {
+        return;
+      }
+
+      logger.error("router.start", "Unexpected start error", error);
+    };
 
     // =========================================================================
     // Validate inputs before creating namespaces
@@ -169,6 +196,7 @@ export class Router<
     this.#routes = new RoutesNamespace<Dependencies>(
       routes,
       deriveMatcherOptions(this.#options.get()),
+      logger,
     );
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();
@@ -182,7 +210,12 @@ export class Router<
     const routerFSM = createRouterFSM();
 
     const emitter = new EventEmitter<RouterEventMap>({
-      onListenerError: logListenerError,
+      // Shared per-listener error sink: EventEmitter reports synchronous listener
+      // throws here, and EventBusNamespace.subscribe routes an async listener's
+      // rejected Promise through the SAME sink (#944) — both land in one place.
+      onListenerError: (eventName, error) => {
+        logger.error("Router", `Error in listener for ${eventName}:`, error);
+      },
       onListenerWarn: (eventName, count) => {
         logger.warn(
           "router.addEventListener",
@@ -213,6 +246,7 @@ export class Router<
     const interceptorsMap: RouterInternals["interceptors"] = new Map();
 
     registerInternals(this, {
+      logger,
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
       // `as unknown as` is required: createBinaryInterceptable returns a
@@ -282,7 +316,7 @@ export class Router<
         } else if (this.#navigation.lastSyncRejected) {
           this.#navigation.lastSyncRejected = false;
         } else {
-          Router.#suppressUnhandledRejection(promiseState);
+          this.#suppressUnhandledRejection(promiseState);
         }
 
         return promiseState;
@@ -429,7 +463,7 @@ export class Router<
 
     // Empty string is special case - warn and return false (root node is not a parent)
     if (name === "") {
-      logger.warn(
+      getInternals(this).logger.warn(
         "real-router",
         'isActiveRoute("") called with empty string. Root node is not considered a parent of any route.',
       );
@@ -548,9 +582,9 @@ export class Router<
       this.#unwindFailedStart(error),
     );
 
-    Router.#suppressUnhandledRejection(
+    this.#suppressUnhandledRejection(
       promiseState,
-      Router.#onSuppressedStartError,
+      this.#onSuppressedStartError,
     );
 
     return promiseState;
@@ -791,7 +825,7 @@ export class Router<
       // Cached rejection — already pre-suppressed at module load, skip .catch()
       this.#navigation.lastSyncRejected = false;
     } else {
-      Router.#suppressUnhandledRejection(promiseState);
+      this.#suppressUnhandledRejection(promiseState);
     }
 
     return promiseState;
@@ -818,7 +852,7 @@ export class Router<
     } else if (this.#navigation.lastSyncRejected) {
       this.#navigation.lastSyncRejected = false;
     } else {
-      Router.#suppressUnhandledRejection(promiseState);
+      this.#suppressUnhandledRejection(promiseState);
     }
 
     return promiseState;
@@ -882,49 +916,15 @@ export class Router<
   }
 
   /**
-   * Pre-allocated suppressor for navigate / navigateToDefault / navigateToState.
-   * Avoids creating a new closure on every navigate() call.
-   *
-   * The log line IS reachable (contrary to the pre-#931 "unreachable" comment):
-   * a subscribeLeave listener that throws (sync or async) rejects navigate()
-   * with the original NON-suppressed error — not re-coded to TRANSITION_CANCELLED
-   * — and a Symbol path-param's stringify TypeError is likewise non-suppressed.
-   * Both surface here under "router.navigate". Tested in guard-block-suppression
-   * (negative) and the positive case below.
-   */
-  static readonly #onSuppressedNavigateError = (error: unknown): void => {
-    if (Router.#isExpectedRejection(error)) {
-      return;
-    }
-
-    logger.error("router.navigate", "Unexpected navigation error", error);
-  };
-
-  /**
-   * Pre-allocated suppressor for start(). Its failures must surface under their
-   * own "router.start" category rather than being misattributed to
-   * "router.navigate" (#931). The log line is reachable: a start interceptor
-   * that throws a plain Error after next() committed (the SSR/RSC loader window,
-   * #763) — or a cryptic path TypeError — is not a suppressed RouterError.
-   */
-  static readonly #onSuppressedStartError = (error: unknown): void => {
-    if (Router.#isExpectedRejection(error)) {
-      return;
-    }
-
-    logger.error("router.start", "Unexpected start error", error);
-  };
-
-  /**
    * Fire-and-forget safety: prevents unhandled rejection warnings when
    * navigate/navigateToDefault/start is called without await. Expected errors
    * are silently suppressed; unexpected ones are logged under `onSuppressed`'s
    * category — navigate by default; start() passes #onSuppressedStartError so
    * its failures are logged as "router.start", not "router.navigate" (#931).
    */
-  static #suppressUnhandledRejection(
+  #suppressUnhandledRejection(
     promise: Promise<State>,
-    onSuppressed: (error: unknown) => void = Router.#onSuppressedNavigateError,
+    onSuppressed: (error: unknown) => void = this.#onSuppressedNavigateError,
   ): void {
     promise.catch(onSuppressed);
   }

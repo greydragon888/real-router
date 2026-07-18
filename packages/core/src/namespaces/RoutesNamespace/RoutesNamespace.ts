@@ -1,7 +1,5 @@
 // packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts
 
-import { logger } from "@real-router/logger";
-
 import { DEFAULT_ROUTE_NAME } from "./constants";
 import {
   matchSourceTrailingSlash,
@@ -26,6 +24,7 @@ import type {
   ForwardToCallback,
   Options,
   Params,
+  RouterLogger,
   State,
 } from "@real-router/types";
 import type {
@@ -96,9 +95,10 @@ export class RoutesNamespace<
 
   constructor(
     routes: Route<Dependencies>[] = [],
-    matcherOptions?: CreateMatcherOptions,
+    matcherOptions: CreateMatcherOptions | undefined,
+    logger: RouterLogger,
   ) {
-    this.#store = createRoutesStore(routes, matcherOptions);
+    this.#store = createRoutesStore(routes, matcherOptions, logger);
   }
 
   /**
@@ -554,7 +554,7 @@ export class RoutesNamespace<
     if (this.#cachedBuildPathOpts) {
       /* v8 ignore next 5 -- @preserve: dev assertion guarding a future caller that passes per-call varying options; the sole caller (Router.buildPath, always via this.#options.get()) passes the same immutable, deep-frozen per-instance options, so this branch is unreachable through the public API by construction (#957) */
       if (options !== this.#cachedOptionsSource) {
-        logger.warn(
+        this.#deps.logger.warn(
           "router.buildPath",
           "`options` differs from the cached source reference; router options are immutable per router instance, so the first-cached buildPath options are reused (#957).",
         );

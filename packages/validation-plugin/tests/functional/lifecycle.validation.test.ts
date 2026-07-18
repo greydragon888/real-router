@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
-import { logger } from "@real-router/logger";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -245,30 +244,24 @@ describe("lifecycle.warnOverwrite", () => {
 
   it("warns when adding the same guard twice for the same route", () => {
     const lifecycle = getLifecycleApi(router);
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     lifecycle.addActivateGuard("home", true);
     lifecycle.addActivateGuard("home", false);
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.canActivate",
-      expect.stringContaining("home"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("home"));
 
     vi.restoreAllMocks();
   });
 
   it("warns when overwriting deactivate guard", () => {
     const lifecycle = getLifecycleApi(router);
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     lifecycle.addDeactivateGuard("home", true);
     lifecycle.addDeactivateGuard("home", false);
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.canDeactivate",
-      expect.stringContaining("home"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("home"));
 
     vi.restoreAllMocks();
   });
@@ -293,16 +286,13 @@ describe("lifecycle.warnAsyncGuardSync", () => {
     await router.start("/home");
 
     const lifecycle = getLifecycleApi(router);
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     lifecycle.addActivateGuard("admin", () => async () => true);
 
     router.canNavigateTo("admin");
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.canNavigateTo",
-      expect.stringContaining("admin"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("admin"));
 
     vi.restoreAllMocks();
   });

@@ -1,32 +1,35 @@
-# @real-router/logger
+# RouterLogger (`core/src/foundation/logger`)
 
-[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Dlogger)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=logger)
-[![npm](https://img.shields.io/npm/v/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)
-[![npm downloads](https://img.shields.io/npm/dm/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)
-[![bundle size](https://deno.bundlejs.com/?q=@real-router/logger&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/logger&treeshake=[*])
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
+> [!NOTE]
+> **Dissolved into `@real-router/core` (#724).** The standalone `@real-router/logger`
+> npm package is gone — this code now lives inside core at `core/src/foundation/logger/`.
+> Any badges / `npm install @real-router/logger` phrasing below is historical: there is
+> nothing to install separately. The former process-global **singleton** is replaced by a
+> **per-router `RouterLogger` instance** built from `createRouter(routes, { logger })` and
+> stored on `RouterInternals.logger`.
 
-> Isomorphic structured logger for the [Real-Router](https://github.com/greydragon888/real-router) ecosystem. Level filtering, custom callbacks, works in any JavaScript runtime.
-
-Zero dependencies. Used internally by `@real-router/core` and plugins.
-
-## Installation
-
-```bash
-npm install @real-router/logger
-```
+Structured, per-router logger for [Real-Router](https://github.com/greydragon888/real-router):
+level filtering, custom callbacks, isomorphic. Owned by `@real-router/core`.
 
 ## Quick Start
 
+Configure a router's logger through `createRouter` options (there is no global instance):
+
 ```typescript
-import { logger } from "@real-router/logger";
+import { createRouter } from "@real-router/core";
 
-logger.log("App", "Application started");
-logger.warn("Auth", "Token expires in 5 minutes");
-logger.error("API", "Request failed", error);
-
-logger.configure({ level: "error-only" });
+const router = createRouter(routes, {
+  logger: {
+    level: "error-only",
+    callback: (level, context, message, ...args) => {
+      // forward to your telemetry sink
+    },
+  },
+});
 ```
+
+Internally each router builds its own `RouterLogger` and reaches it via
+`getInternals(router).logger` (`log` / `warn` / `error`, each `(context, message, ...args)`).
 
 ## API
 
@@ -120,7 +123,8 @@ import type {
   LogLevelConfig,    // "all" | "warn-error" | "error-only" | "none"
   LogCallback,       // (level, context, message, ...args) => void
   LoggerConfig,      // { level, callback?, callbackIgnoresLevel? }
-} from "@real-router/logger";
+  RouterLogger,      // { log, warn, error } — the per-router logging surface
+} from "@real-router/types"; // (also re-exported from "@real-router/core")
 ```
 
 ## Related Packages
