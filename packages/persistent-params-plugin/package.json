@@ -54,8 +54,5 @@
   "dependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/types": "workspace:^"
-  },
-  "devDependencies": {
-    "type-guards": "workspace:^"
   }
 }

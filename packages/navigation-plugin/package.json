@@ -56,7 +56,6 @@
     "@real-router/types": "workspace:^"
   },
   "devDependencies": {
-    "jsdom": "29.1.1",
-    "type-guards": "workspace:^"
+    "jsdom": "29.1.1"
   }
 }

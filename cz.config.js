@@ -29,7 +29,6 @@ export default {
       "types",
       "route-tree",
       "search-params",
-      "type-guards",
       "helpers",
       "logger",
       "browser-plugin",

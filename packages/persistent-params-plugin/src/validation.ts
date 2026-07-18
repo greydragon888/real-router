@@ -1,8 +1,7 @@
 // packages/persistent-params-plugin/src/validation.ts
 
-import { isPrimitiveValue } from "type-guards";
-
 import { ERROR_PREFIX } from "./constants";
+import { isPrimitiveValue } from "./is-primitive-value";
 
 import type { PersistentParamsConfig } from "./types";
 

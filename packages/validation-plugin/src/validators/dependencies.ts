@@ -1,8 +1,7 @@
 // packages/validation-plugin/src/validators/dependencies.ts
 
-import { getTypeDescription } from "type-guards";
-
 import { computeThresholds } from "../helpers";
+import { getTypeDescription } from "../type-guards";
 
 import type { RouterLogger } from "@real-router/core";
 

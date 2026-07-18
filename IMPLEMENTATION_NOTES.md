@@ -141,6 +141,66 @@ type-check / lint / knip / syncpack / dedupe / coverage-scope / build-matrix all
 Mirrors the `event-emitter` dissolution above; the co-located docs carry an honest
 "dissolved into core" marker pending full integration.
 
+## `type-guards` → dissolved **by distribution to consumers** (not into core)
+
+**Problem.** `type-guards` was an **internal (unpublished)** workspace package, but unlike
+`fsm` / `event-emitter` / `logger` it has **many** live consumers: `validation-plugin`,
+`shared/browser-env` (→ the 3 URL plugins via symlink), and `persistent-params-plugin`. It
+could not simply die (real consumers), and it could **not** fold into `core` — the owner
+invariant is that **core must export zero guards** (a bare-core consumer pulling `isString`
+off the public surface is a strong DX regression). The only move that satisfies both is to
+dissolve it **by distributing each symbol to the consumer that uses it**, so no guard ever
+reaches core's public surface and no consumer keeps a dependency on a one-file package.
+
+**Solution — distribute along the symbol×family matrix (zero cross-family overlap).** A
+node-scan proved no symbol is shared between two consumer families, so the split is clean:
+
+- **`validation-plugin`** absorbs the bulk → `src/type-guards/` (co-located with the
+  validators that call them): `getTypeDescription`, `isString`, `isBoolean`, `isObjKey`,
+  `isParams` **+ the whole serialization engine**, `isState`, `isNavigationOptions`,
+  `validateRouteName`, `isRouteName` (kept **internal** — `isRequiredFields` calls it), plus
+  `internal/router-error.ts` and `internal/meta-fields.ts`. The 8 `from "type-guards"`
+  imports become relative `./type-guards/*`.
+- **`shared/browser-env`** absorbs `isStateStrict` (+ its twin `isRequiredFields`/
+  `isRouteName`) → `shared/browser-env/state-guard.ts`, reaching the 3 URL plugins through
+  the existing symlink; `popstate-utils.ts` imports it via `./state-guard`.
+- **`persistent-params-plugin`** absorbs `isPrimitiveValue` → `src/is-primitive-value.ts`.
+- **Dead surface deleted** (unreachable through any consumer, ~150–200 LOC): the `isParams`
+  strict branch (`isParamsStrict` / `isValidParamValueStrict` / `isParamsStrictUnsafe`) and
+  the whole `validators/state.ts` (`validateState`).
+
+Tests move **with** the code, file-for-file, into each absorber's functional / property /
+stress suites; the package directory is removed.
+
+**Integration touch-points.** 5 tsdown configs drop `alwaysBundle: ["type-guards"]`
+(browser / hash / navigation / persistent-params / validation); the `type-guards` devDep is
+dropped from those 5 plugins + `shared`; **`@real-router/types` is added to
+`validation-plugin` `dependencies`** — the moved guards `import type` from it and the former
+transitive path (via the now-deleted `type-guards` package) is gone. This bridge is an
+**RFC gap-fill** (§5's M1 codemod only rewrote `from "type-guards"`, silently assuming the
+`@real-router/types` reference kept resolving); M2's types-fold removes it again along with
+the other 12 `@real-router/types` deps and retargets the imports to `@real-router/core/types`.
+`CORE_LAYER` is untouched (type-guards sat in the `internal` bucket, never CORE_LAYER);
+`build-matrix.test` `INTERNAL` → `[]`, L2 total 26 → 25, and the "full rebuild" test loses
+the now-empty `internal` shard (11 → 10); codecov −1 component; syncpack −2 entries; knip;
+CODEOWNERS / commitlint / cz `type-guards` scopes retired; one changeset per absorber (5).
+
+**Why (empirically verified).** Distribution — not absorption into core — is what protects
+the DX invariant: every guard stays behind its consumer's boundary and core's public
+surface gains **nothing**. Zero matrix overlap means no symbol is duplicated across
+absorbers. Gates: the 5 absorbers hold **100% coverage** (functional), property + stress
+green; type-check / lint / knip / syncpack / dedupe / coverage-scope / e2e / build-matrix
+(31/31) all clean. **Mutational hardening — RFC claim corrected:** §2.6 asserted "the
+absorbers' Stryker scope covers the moved code," but `validation-plugin` / `browser-plugin`
+have **no** `stryker.config.mjs` (only core / fsm / logger-plugin / engine / rx do), so the
+moved code has no live mutation gate in its new home. Hardening was instead confirmed
+empirically by a manual mutation spot-check: weakening the `Number.isFinite` guard →
+`return true` (accept NaN/∞ as a valid serializable value) is **killed** by the co-located
+suites in both `validation-plugin` (functional + property) and `shared/browser-env` (via
+`browser-plugin` functional) — the moved tests retained their discriminating power. Ordering
+is deliberate: this M1 lands **before** the `@real-router/types` → core fold (M2) so the
+"type-guards typed upward onto core" layer-inversion never exists in any single commit.
+
 ## Project Rename
 
 Project renamed from `router6` to `real-router`. Updated in:
@@ -2144,6 +2204,23 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 > `shared/browser-env`** (see the measuring-owner table in the #809 owner-only coverage
 > section above). The "tests-only wrappers" subsection and the vitest-coverage
 > "deferred" note below are historical.
+>
+> **Superseded further (wave-2, 2026-07).** The `type-guards` package — the running
+> example of the resolution-anchor mechanism below — has been **dissolved by
+> distribution** (see "`type-guards` → dissolved by distribution to consumers" above).
+> `shared/browser-env` no longer imports it: `isStateStrict` was absorbed into a **local**
+> `shared/browser-env/state-guard.ts`, and `popstate-utils.ts` now imports it via
+> `./state-guard`. Consequently `shared/package.json` no longer carries the `type-guards`
+> devDep (now just `@real-router/core` + `@real-router/sources` + `@real-router/types`),
+> and no consumer lists `type-guards` in `alwaysBundle`. **Every `type-guards` mention in
+> the mechanism narrative below is therefore historical** — it faithfully records the #437
+> era. Crucially, **`type-guards` was the last `alwaysBundle`-inlined import in `shared/`**;
+> after its dissolution nothing in `shared/` is inlined (the only `alwaysBundle` entry left
+> in the repo is core's `engine`). `shared/browser-env/state-guard.ts` imports only the
+> **type-only** `@real-router/types` (erased at build); `shared/dom-utils` imports
+> `@real-router/sources` / `@real-router/core` as **external** (resolved, not inlined). So
+> the anchor's remaining job is purely tsc resolution of those imports from `shared/`'s
+> own location — not the rolldown inline-resolution the narrative below describes.
 
 ### Problem
 

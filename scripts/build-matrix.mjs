@@ -56,8 +56,8 @@ export const K = 10;
 /**
  * The 4 packages that form the `base` layer (core + its workspace deps +
  * tsdown-bundled deps — the package *scope* of `--filter='@real-router/core...'`,
- * verified live against turbo 2.10.0). NOTE: `type-guards` is NOT here — core
- * does not depend on it; it rides the `internal` shard. `engine` folds the former
+ * verified live against turbo 2.10.0). (`type-guards` — formerly the sole `internal`-shard member — is now dissolved
+ * into its consumer plugins, wave-2, so the internal shard is empty.) `engine` folds the former
  * `path-matcher` + `search-params` + `route-tree` trio into one bundled dep
  * (engine-merge #1510), dropping the set from 8 to 6. `event-emitter` then
  * dissolved into core (`core/src/foundation/event-emitter`), dropping it to 5;
@@ -208,9 +208,10 @@ export function classify(pkg, dirOf, readers = defaultReaders) {
   // route-utils/sources fan out to all 6 adapters — their own shard.
   if (pkg === "@real-router/sources" || pkg === "@real-router/route-utils")
     return "adapter-shared";
-  // type-guards — the sole remaining unscoped internal package (bare name; the
-  // former bare browser-env / dom-utils were retired with the shared test node,
-  // #1065/#1086).
+  // Internal shard — bare (non-@real-router/) packages/* with no consumer home.
+  // EMPTY since wave-2: type-guards dissolved into its consumer plugins; the
+  // former bare browser-env / dom-utils were retired with the shared test node
+  // (#1065/#1086). `engine` is bare but rides CORE_LAYER→base above this check.
   if (!pkg.startsWith("@real-router/")) return "internal";
   // depends only on core/types/logger.
   return "leaf";

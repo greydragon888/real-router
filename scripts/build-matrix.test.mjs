@@ -8,7 +8,9 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets (6/6/3/2/2/8/1 = 28), plus synthetic
+//     reproduce the companion §C buckets — now 4/6/3/2/2/8/0 = 25 after the
+//     foundation dissolutions (event-emitter + logger in wave-1, type-guards in
+//     wave-2); §C's original master figure was 6/6/3/2/2/8/1 = 28 — plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
 // Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.
@@ -73,7 +75,7 @@ const LEAVES = [
   "logger-plugin",
   "persistent-params-plugin",
 ].map((p) => `@real-router/${p}`);
-const INTERNAL = ["type-guards"];
+const INTERNAL = [];
 
 // ─── Level 1 — affected derivation (A5, the load-bearing invariant) ──────────
 
@@ -157,7 +159,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
       { package: "@real-router/react", directory: "packages/react" },
       { package: "@real-router/react", directory: "packages/react" }, // dup (bundle+test)
       { package: "@real-router/types", directory: "packages/core-types" },
-      { package: "type-guards", directory: "packages/type-guards" },
+      { package: "engine", directory: "packages/engine" },
       { package: "@real-router/shared-sources", directory: "shared" }, // dropped (not packages/*)
       { package: "router-benchmarks", directory: "benchmarks" }, // dropped
       { package: "//", directory: "" }, // dropped
@@ -166,7 +168,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
   const { members, dirOf } = deriveMembership(dryJson);
   assert.deepEqual(
     [...members].sort(),
-    ["@real-router/react", "@real-router/types", "type-guards"],
+    ["@real-router/react", "@real-router/types", "engine"],
     "membership = deduped packages/* target set",
   );
   // core-types quirk preserved from turbo's own directory (not reconstructed).
@@ -176,13 +178,13 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 4/6/3/2/2/8/1 = 26", () => {
+test("L2: classify() buckets all real packages/* exactly 4/6/3/2/2/8/0 = 25", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 26, "expected 26 packages/* workspaces");
+  assert.equal(allPackages.length, 25, "expected 25 packages/* workspaces");
   assert.deepEqual(counts, {
     base: 4,
     adapter: 6,
@@ -190,7 +192,6 @@ test("L2: classify() buckets all real packages/* exactly 4/6/3/2/2/8/1 = 26", ()
     "ssr-plugin": 2,
     "adapter-shared": 2,
     leaf: 8,
-    internal: 1,
   });
 });
 
@@ -449,22 +450,19 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   );
 });
 
-test("routing: full rebuild (all 28) → base excluded, 11 shards", () => {
+test("routing: full rebuild (all 25) → base excluded, 10 shards", () => {
   const { mode, matrix } = buildPlan(allPackages, realDirOf);
   assert.equal(mode, "sharded");
   const names = matrix.include.map((i) => i.name);
   assert.ok(!names.includes("base"), "base is a separate job, never a shard");
-  // 6 adapters + url-plugin + ssr-plugin + adapter-shared + leaf + internal
-  for (const g of [
-    "url-plugin",
-    "ssr-plugin",
-    "adapter-shared",
-    "leaf",
-    "internal",
-  ]) {
+  // 6 adapters + url-plugin + ssr-plugin + adapter-shared + leaf.
+  // (The `internal` group is empty since wave-2 dissolved type-guards — its
+  // sole member — so it no longer produces a shard; see the L2 buckets test.)
+  for (const g of ["url-plugin", "ssr-plugin", "adapter-shared", "leaf"]) {
     assert.ok(names.includes(g), g);
   }
-  assert.equal(matrix.include.length, 11);
+  assert.ok(!names.includes("internal"), "internal group is empty → no shard");
+  assert.equal(matrix.include.length, 10);
 });
 
 // ─── leafFilter — leaf EXECUTION scope == ROUTING decision (root-lockfile fix) ─

@@ -8,13 +8,13 @@
 
 import { resolveForwardChain } from "@real-router/core";
 import { validateRoute } from "@real-router/core/validation";
+
 import {
   isString,
   validateRouteName,
   isParams,
   getTypeDescription,
-} from "type-guards";
-
+} from "../type-guards";
 import { validateForwardToTargets, validateRouteProperties } from "./forwardTo";
 
 import type {

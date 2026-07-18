@@ -2,13 +2,13 @@
 
 import { RouterError } from "@real-router/core";
 import { getInternals } from "@real-router/core/validation";
+
 import {
   validateRouteName,
   isState,
   isBoolean,
   getTypeDescription,
-} from "type-guards";
-
+} from "./type-guards";
 import {
   validateDependencyName,
   validateSetDependencyArgs as validateSetDependencyArgsRaw,

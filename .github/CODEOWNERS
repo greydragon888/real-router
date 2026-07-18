@@ -24,7 +24,6 @@
 /packages/helpers/ @greydragon888
 /packages/logger/ @greydragon888
 /packages/search-params/ @greydragon888
-/packages/type-guards/ @greydragon888
 
 # Benchmarks
 /benchmarks/ @greydragon888

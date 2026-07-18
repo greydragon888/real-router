@@ -20,7 +20,6 @@ export const SCOPES = [
   "path-matcher",
   "route-tree",
   "search-params",
-  "type-guards",
   "browser-env",
   "helpers",
   "browser-plugin",

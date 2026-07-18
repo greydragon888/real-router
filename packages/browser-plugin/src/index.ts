@@ -16,7 +16,7 @@ export type {
 export type { Browser } from "./browser-env";
 
 // Type guards
-export { isStateStrict as isState } from "type-guards";
+export { isStateStrict as isState } from "./browser-env/state-guard";
 
 /**
  * Module augmentation for real-router.

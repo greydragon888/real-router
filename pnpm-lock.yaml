@@ -6166,9 +6166,6 @@ importers:
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/core:
     dependencies:
@@ -6201,9 +6198,6 @@ importers:
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/lifecycle-plugin:
     dependencies:
@@ -6241,9 +6235,6 @@ importers:
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/persistent-params-plugin:
     dependencies:
@@ -6253,10 +6244,6 @@ importers:
       '@real-router/types':
         specifier: workspace:^
         version: link:../core-types
-    devDependencies:
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/preact:
     dependencies:
@@ -6520,21 +6507,14 @@ importers:
         specifier: 1.8.0
         version: 1.8.0(svelte@5.56.4(@typescript-eslint/types@8.62.0))
 
-  packages/type-guards:
-    dependencies:
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
-
   packages/validation-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
-      type-guards:
+      '@real-router/types':
         specifier: workspace:^
-        version: link:../type-guards
+        version: link:../core-types
 
   packages/vue:
     dependencies:
@@ -6572,9 +6552,6 @@ importers:
       '@real-router/types':
         specifier: workspace:*
         version: link:../packages/core-types
-      type-guards:
-        specifier: workspace:*
-        version: link:../packages/type-guards
 
 packages:
 

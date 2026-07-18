@@ -1,8 +1,7 @@
 // packages/validation-plugin/src/validators/lifecycle.ts
 
-import { isBoolean, getTypeDescription } from "type-guards";
-
 import { computeThresholds } from "../helpers";
+import { isBoolean, getTypeDescription } from "../type-guards";
 
 import type {
   GuardFnFactory,

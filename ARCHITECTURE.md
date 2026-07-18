@@ -43,10 +43,9 @@ real-router/
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── fsm/                       # FROZEN shell (published by mistake; live engine copied to core/src/foundation/fsm)
-│   ├── engine/                    # Routing engine (internal, #1510): route-tree facade at src root + path-matcher & search-params layers under src/
-│   └── type-guards/               # Runtime type validation (internal)
+│   └── engine/                    # Routing engine (internal, #1510): route-tree facade at src root + path-matcher & search-params layers under src/
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
-│   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/core + type-guards
+│   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/{core,sources,types} for transitive symlink resolution
 │   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, scroll spy (#575), view transitions, direction tracker, link helpers
 │   ├── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
 │   └── ssr/                       # Shared SSR plugin scaffolding: createSsrLoaderPlugin generic factory + createLoadersValidator
@@ -68,7 +67,7 @@ real-router/
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
-**Internal packages** (bundled into consumers, not on npm): `engine` (merged routing engine — route-tree facade + path-matcher + search-params layers, #1510), `type-guards`. **Note:** the generic FSM engine and the typed event emitter now live **inside** `core` at `src/foundation/{fsm,event-emitter}` (not standalone packages); the `fsm` package directory remains only as a frozen published-by-mistake shell — not a dependency of anything.
+**Internal packages** (bundled into consumers, not on npm): `engine` (merged routing engine — route-tree facade + path-matcher + search-params layers, #1510). **Note:** the generic FSM engine, typed event emitter, and per-router logger now live **inside** `core` at `src/foundation/{fsm,event-emitter,logger}` (not standalone packages); `type-guards` was dissolved into its plugin consumers (wave-2 — each plugin inlines the guards it uses); the `fsm` package directory remains only as a frozen published-by-mistake shell — not a dependency of anything.
 
 **Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`, `shared/ssr`
 
@@ -79,10 +78,6 @@ graph TD
     subgraph standalone [Standalone — zero deps]
         ENGINE["engine (route-tree + path-matcher + search-params)"]
         TYPES["core-types"]
-    end
-
-    subgraph internal [Internal packages]
-        TG[type-guards] -->|dep| TYPES
     end
 
     subgraph core [Core]
@@ -441,14 +436,14 @@ These are deliberately designed constraints. Violating them will break the syste
 ├──────────────────────────────────────────────────────────────────┤
 │                     Foundation (internal)                        │
 ├──────────────────────────────────────────────────────────────────┤
-│                engine                │   type-guards   │  ...  │
+│                          engine                          │  ...  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 **ALLOWED:**
 
 - Consumer packages depend on `core` and `core-types`
-- Consumer packages bundle internal packages as needed (`type-guards`)
+- Consumer plugins inline the guards they need (formerly bundled from `type-guards`, dissolved into each plugin — wave-2)
 - Consumer packages import shared sources via git-tracked symlinks (`src/dom-utils` → `shared/dom-utils`, `src/browser-env` → `shared/browser-env`, `src/shared-ssr` → `shared/ssr`)
 - The `engine` package is self-contained (the former `route-tree` → `path-matcher` / `search-params` dependency is now an internal layer boundary within `engine`, enforced by lint — #1510)
 - `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)

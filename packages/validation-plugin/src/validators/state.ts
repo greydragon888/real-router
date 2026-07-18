@@ -1,6 +1,6 @@
 // packages/validation-plugin/src/validators/state.ts
 
-import { isString, isParams, getTypeDescription } from "type-guards";
+import { isString, isParams, getTypeDescription } from "../type-guards";
 
 export function validateMakeStateArgs(
   name: unknown,

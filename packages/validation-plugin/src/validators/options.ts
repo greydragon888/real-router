@@ -1,6 +1,6 @@
 // packages/validation-plugin/src/validators/options.ts
 
-import { isObjKey } from "type-guards";
+import { isObjKey } from "../type-guards";
 
 const VALID_OPTION_VALUES = {
   trailingSlash: ["strict", "never", "always", "preserve"] as const,
