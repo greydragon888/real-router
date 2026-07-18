@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import {
   buildHref,
@@ -20,6 +20,40 @@ describe("dom-utils integration (copy from shared/)", () => {
     expect(buildHref(router, "home", {})).toBe("/");
 
     router.stop();
+  });
+
+  it("buildHref passes the normalized hash into router.buildUrl when present", () => {
+    const buildUrl = vi.fn(() => "/users?x=1#sec");
+    const urlRouter = {
+      buildUrl,
+      buildPath: () => "/users",
+    } as unknown as Parameters<typeof buildHref>[0];
+
+    expect(buildHref(urlRouter, "users", {}, "#sec")).toBe("/users?x=1#sec");
+    expect(buildUrl).toHaveBeenCalledWith("users", {}, { hash: "sec" });
+  });
+
+  it("buildHref guards empty-string and non-string buildPath results (defensive arm)", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      // No `buildUrl` on either stub — the call goes straight to `buildPath`.
+      const emptyRouter = {
+        buildPath: () => "",
+      } as unknown as Parameters<typeof buildHref>[0];
+
+      expect(buildHref(emptyRouter, "broken", {})).toBeUndefined();
+
+      const nonStringRouter = {
+        buildPath: () => null,
+      } as unknown as Parameters<typeof buildHref>[0];
+
+      expect(buildHref(nonStringRouter, "broken", {})).toBeUndefined();
+
+      expect(errorSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("shouldNavigate rejects modified clicks", () => {

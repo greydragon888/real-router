@@ -176,6 +176,29 @@ describe("provideRealRouterFactory", () => {
       expect(getDependenciesApi(router).get("currentUser")).toBe("from-client");
       expect(router.getState()?.name).toBe("home");
     });
+
+    it("no REQUEST and no window → deriveStartPath falls back to '/'", async () => {
+      // Discriminating setup: window.location points at /users, so the
+      // client branch would resolve the "users" route — only the final
+      // `return "/"` fallback resolves "home".
+      history.pushState(null, "", "/users");
+      vi.stubGlobal("window", undefined);
+
+      try {
+        TestBed.configureTestingModule({
+          providers: [provideRealRouterFactory({ baseRouter })],
+        });
+
+        await TestBed.inject(ApplicationInitStatus).donePromise;
+
+        const router = TestBed.inject(ROUTER);
+
+        expect(router.getState()?.name).toBe("home");
+      } finally {
+        vi.unstubAllGlobals();
+        history.pushState(null, "", "/");
+      }
+    });
   });
 
   describe("plugin handling", () => {
@@ -413,6 +436,71 @@ describe("provideRealRouterFactory", () => {
       TestBed.resetTestingModule();
 
       expect(history.scrollRestoration).toBe("auto");
+    });
+  });
+
+  describe("scrollSpy option", () => {
+    const ioInstances: { observe: ReturnType<typeof vi.fn> }[] = [];
+
+    beforeEach(() => {
+      ioInstances.length = 0;
+      document.body.innerHTML = "<section id='spy-a'></section>";
+
+      const FakeIO = class {
+        public observe = vi.fn();
+        public unobserve = vi.fn();
+        public disconnect = vi.fn();
+
+        constructor(_cb: IntersectionObserverCallback) {
+          ioInstances.push({ observe: this.observe });
+        }
+
+        public takeRecords(): IntersectionObserverEntry[] {
+          return [];
+        }
+      };
+
+      vi.stubGlobal("IntersectionObserver", FakeIO);
+    });
+
+    afterEach(() => {
+      document.body.innerHTML = "";
+      vi.unstubAllGlobals();
+    });
+
+    it("scrollSpy with selector — environment initializer installs the observer", async () => {
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: REQUEST, useValue: new Request("http://localhost/") },
+          provideRealRouterFactory({
+            baseRouter,
+            scrollSpy: { selector: "[id]" },
+          }),
+        ],
+      });
+
+      await TestBed.inject(ApplicationInitStatus).donePromise;
+      TestBed.inject(EnvironmentInjector);
+
+      expect(ioInstances).toHaveLength(1);
+      expect(ioInstances[0]?.observe).toHaveBeenCalled();
+    });
+
+    it("scrollSpy with empty selector — initializer not registered", async () => {
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: REQUEST, useValue: new Request("http://localhost/") },
+          provideRealRouterFactory({
+            baseRouter,
+            scrollSpy: { selector: "" },
+          }),
+        ],
+      });
+
+      await TestBed.inject(ApplicationInitStatus).donePromise;
+      TestBed.inject(EnvironmentInjector);
+
+      expect(ioInstances).toHaveLength(0);
     });
   });
 
