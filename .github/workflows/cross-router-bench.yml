@@ -1,4 +1,4 @@
-name: cross-router-bench
+name: Cross Routers Benchmarks
 
 # Scheduled snapshot of the cross-router Playwright + CDP benchmark matrix (5 cohorts ×
 # 12 scenarios) → Pages dashboard + step-summary + artifact. GHA runners are shared/noisy,
