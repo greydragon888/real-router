@@ -41,7 +41,6 @@ real-router/
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
 │   ├── route-utils/               # Route tree queries and segment testing
-│   ├── fsm/                       # FROZEN shell (published by mistake; live engine copied to core/src/foundation/fsm)
 │   └── engine/                    # Routing engine (internal, #1510): route-tree facade at src root + path-matcher & search-params layers under src/
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
 │   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/{core,sources} for transitive symlink resolution
@@ -66,7 +65,7 @@ real-router/
 
 **Public packages** (published to npm): `core`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
-**Internal packages** (bundled into consumers, not on npm): `engine` (merged routing engine — route-tree facade + path-matcher + search-params layers, #1510). **Note:** the generic FSM engine, typed event emitter, and per-router logger now live **inside** `core` at `src/foundation/{fsm,event-emitter,logger}` (not standalone packages); `type-guards` was dissolved into its plugin consumers (wave-2 — each plugin inlines the guards it uses); the `fsm` package directory remains only as a frozen published-by-mistake shell — not a dependency of anything.
+**Internal packages** (bundled into consumers, not on npm): `engine` (merged routing engine — route-tree facade + path-matcher + search-params layers, #1510). **Note:** the generic FSM engine, typed event emitter, and per-router logger now live **inside** `core` at `src/foundation/{fsm,event-emitter,logger}` (not standalone packages); `type-guards` was dissolved into its plugin consumers (wave-2 — each plugin inlines the guards it uses); `@real-router/types` folded into `core` (wave-2, exposed at `@real-router/core/types`). The `fsm` package — published to npm by mistake — had its source **deleted** in wave-3 (its live engine had already been copied into `core/src/foundation/fsm`); the orphaned `@real-router/fsm@0.6.1` stays on npm, deprecated.
 
 **Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`, `shared/ssr`
 

@@ -1,12 +1,14 @@
 # @real-router/fsm
 
-> **Folded into core (live source of truth).** This is the LIVE generic FSM
+> **Folded into core (sole source of truth).** This is the LIVE generic FSM
 > engine `@real-router/core` builds on — the router state machine
-> (`../../fsm/routerFSM.ts`) is constructed from it. It was copied here from the
-> standalone `@real-router/fsm` package, which is now a frozen shell
-> published-by-mistake (kept only until 1.0). **Edit HERE, not there.** The docs
-> below are co-located as-is; a few cross-links may still use the old standalone
-> package layout (pending doc integration — see root `IMPLEMENTATION_NOTES.md`).
+> (`../../fsm/routerFSM.ts`) is constructed from it. It was copied here (wave-1a)
+> from the standalone `@real-router/fsm` package, whose source was then **deleted**
+> (wave-3); `@real-router/fsm@0.6.1` remains published-by-mistake on npm
+> (deprecated), but there is no longer a source package — **this is the only copy.**
+> The docs below are co-located as-is; a few cross-links may still use the old
+> standalone package layout (pending doc integration — see root
+> `IMPLEMENTATION_NOTES.md`).
 
 Generic synchronous finite-state-machine engine. Zero runtime dependencies.
 

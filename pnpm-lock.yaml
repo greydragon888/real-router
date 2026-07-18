@@ -6169,8 +6169,6 @@ importers:
 
   packages/engine: {}
 
-  packages/fsm: {}
-
   packages/hash-plugin:
     dependencies:
       '@real-router/core':

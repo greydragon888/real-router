@@ -62,6 +62,15 @@ symmetric:
   to `core/src/foundation/fsm/`; core's router state machine (`src/fsm/routerFSM.ts`) now
   builds on that copy, and core **drops `@real-router/fsm` from its dependencies**. No
   drift risk: a frozen package doesn't evolve, so the copy is the sole live source.
+  - **Superseded (wave-3): the frozen `packages/fsm` source was deleted outright.** The
+    "cannot be deleted" reasoning above conflated two independent things — npm's
+    unpublish block affects the **published** `@real-router/fsm@0.6.1`, not the **source**
+    tree. Keeping the shell on disk never protected the npm package (nothing rebuilds a
+    frozen package), so it was pure clutter: extra CORE_LAYER/codecov/size-limit/commitlint
+    surface for a package with zero consumers. Wave-3 `git rm`'d `packages/fsm` (parity
+    with the `logger` deletion), dropped it from CORE_LAYER (4→… →2), and cleared its
+    config entries. `@real-router/fsm@0.6.1` stays on npm (owner deprecates it); the sole
+    live source remains `core/src/foundation/fsm`.
 
 Chosen location is `src/foundation/` — **not** `src/utils/`, which is already the public
 `@real-router/core/utils` subpath (SSR helpers); foundation primitives are internal and
@@ -1883,7 +1892,7 @@ Each override addresses a known vulnerability in older versions. Version-scoped 
 
 **Solution:** `"fflate": "0.8.2"` in `pnpm.overrides`. Forces a single `fflate` version across the tree, which simultaneously (a) satisfies `pnpm dedupe --check` (one version, nothing left to collapse) and (b) keeps `attw` on the working `0.8.2`. This is the only override that pins to an exact *older* version for compatibility rather than `>=` for security.
 
-**Why:** `0.8.3` is a patch with no public-API change any consumer depends on, so pinning down is safe. Remove this override once `@arethetypeswrong/core` ships a release compatible with `fflate@0.8.3` (or `fflate` patches the tar-read regression) — verify by deleting the line, running `pnpm install && pnpm -F @real-router/fsm lint:types`, and confirming attw stays green.
+**Why:** `0.8.3` is a patch with no public-API change any consumer depends on, so pinning down is safe. Remove this override once `@arethetypeswrong/core` ships a release compatible with `fflate@0.8.3` (or `fflate` patches the tar-read regression) — verify by deleting the line, running `pnpm install && pnpm -F @real-router/core lint:types`, and confirming attw stays green.
 
 ### Dependency License Review
 
@@ -2539,6 +2548,13 @@ Added to pre-commit hook to catch missing specs before push.
 Added `packages/router-benchmarks` (now at `benchmarks/`, `src/` renamed to `core/`) workspace to `knip.json` with `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts (like `isolated-anomalies.ts`) that are not imported from `index.ts`. Later moved to `ignoreWorkspaces` when benchmarks were relocated to root level.
 
 ## FSM Package
+
+> **Historical (superseded — wave-1a fold + wave-3 deletion).** This section records why
+> the FSM was originally extracted as its own package. The live engine now lives at
+> `core/src/foundation/fsm` (copied in wave-1a), and the standalone `packages/fsm` source
+> was **deleted** in wave-3 — see "`fsm` + `event-emitter` → `core/src/foundation`" above.
+> `@real-router/fsm@0.6.1` remains published (deprecated); the text below describes the
+> pre-fold package layout.
 
 ### Why a Separate Package?
 

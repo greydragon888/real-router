@@ -54,7 +54,7 @@ import { join } from "node:path";
 export const K = 10;
 
 /**
- * The 3 packages that form the `base` layer (core + its workspace deps +
+ * The 2 packages that form the `base` layer (core + its workspace deps +
  * tsdown-bundled deps — the package *scope* of `--filter='@real-router/core...'`,
  * verified live against turbo 2.10.0). (`type-guards` — formerly the sole `internal`-shard member — is now dissolved
  * into its consumer plugins, wave-2, so the internal shard is empty.) `engine` folds the former
@@ -65,26 +65,21 @@ export const K = 10;
  * — a per-router `RouterLogger` instance replacing the old process-global
  * singleton, #724), dropping it to 4. Finally `@real-router/types` folded into
  * core as the `/types` subpath (wave-2) — core no longer declares it as a dep —
- * dropping it to 3.
- * `@real-router/fsm` is now FROZEN — core builds on a copy at
- * `core/src/foundation/fsm`; the standalone package was published by mistake and
- * lingers only until 1.0 — but it stays in this set so CI keeps building/testing
- * it even though core no longer declares it as a dependency.
+ * dropping it to 3. Finally `@real-router/fsm`'s frozen shell — published by
+ * mistake, its live engine long since copied to `core/src/foundation/fsm` — was
+ * deleted outright (wave-3; the published `0.6.1` stays on npm, deprecated),
+ * dropping it to 2.
  *
  * These are EXCLUDED from the dynamic shards (`buildPlan` never puts the `base`
  * group in `include`) and delegated to the base-test job. base-test imports THIS
  * set to build its filter — running `test` on each member explicitly. It must
  * NOT use `--filter='@real-router/core...'`: turbo's `pkg...` runs the task only
  * on the matched package (core), not its deps (`test` has no `^test`), so the
- * other 3 would be tested nowhere → no lcov → SonarCloud 0% on their changed
- * lines (#1030, via event-emitter). Keep this set authoritative: ci.yml's
+ * other member (`engine`) would be tested nowhere → no lcov → SonarCloud 0% on
+ * its changed lines (#1030, via event-emitter). Keep this set authoritative: ci.yml's
  * base-test filter is generated from it.
  */
-export const CORE_LAYER = new Set([
-  "@real-router/core",
-  "@real-router/fsm",
-  "engine",
-]);
+export const CORE_LAYER = new Set(["@real-router/core", "engine"]);
 
 /** The seven layer buckets, in a fixed order so the emitted matrix is stable. */
 const GROUP_NAMES = [
