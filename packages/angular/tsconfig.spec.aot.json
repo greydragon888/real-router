@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  // AOT test program for the vitest "aot" project (#1512). Full Ivy emit —
+  // deliberately NOT compilationMode: "partial" from tsconfig.lib.json:
+  // partial declarations require the linker and cannot execute in tests.
+  //
+  // module/moduleResolution OVERRIDE the root's NodeNext on purpose. The
+  // analog plugin emits by tsconfig `module`, and NodeNext resolves this
+  // package's `"type": "commonjs"` to CJS emit — vitest 4 then rejects the
+  // `require("vitest")` with "Vitest cannot be imported in a CommonJS module"
+  // (the #1512-R1 barrier, reproduced 2026-07-18). ES2022 + bundler forces ESM
+  // emit regardless of package type — the exact combination proven by
+  // benchmarks/adapter-bench/apps/angular/tsconfig.json for this same adapter.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "useDefineForClassFields": false
+  },
+  "include": ["src", "tests/aot"]
+}

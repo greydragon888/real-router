@@ -313,7 +313,7 @@ The `nodeName` property collides with `HTMLElement.nodeName` (read-only). Angula
 
 ### JIT mode limitations
 
-Angular 22 JIT mode (used in TestBed without the Angular Vite plugin) does not support signal-based `input()` in template bindings. This affects component/directive testing. The `@analogjs/vite-plugin-angular` is needed for full template compilation support in tests.
+Angular 22 JIT mode (used in TestBed without the Angular Vite plugin) does not support signal-based `input()` in template bindings, and `contentChildren()` queries never populate. This affects component/directive testing in the default **jit** vitest project. Paths that require real template compilation are covered by the **aot** vitest project (`tests/aot/**`, compiled by `@analogjs/vite-plugin-angular`) — see "Coverage Ceiling → AOT test project" below.
 
 ### sourceToSignal requires injection context
 
@@ -419,27 +419,46 @@ Despite the `subscribe` method name and `output()` source, the boundary's `onErr
 
 `createScrollRestoration` toggles `history.scrollRestoration = "manual"` inside a `try { ... } catch { /* ignore */ }`. Some embedded browsers (older Android WebView, certain JSDOM versions) declare the property non-writable; the setter throws `TypeError`. The catch keeps the rest of the scroll-restore wiring functional and falls back to native browser scroll restoration. Pinned by `tests/functional/scroll-restore.test.ts:794-844`.
 
-## Coverage Ceiling (~97%) — JIT Limitation, not Poor Testing
+## Coverage Ceiling (~98%) — JIT Limitation, not Poor Testing
 
-Coverage thresholds are **97%/93%/98%/97%** (statements/branches/functions/lines), not 100%. This is not a gap in test quality — it is a hard limitation of Angular 22 JIT mode used by TestBed without `@analogjs/vite-plugin-angular`. The dropped lines are concentrated in directive subscription callbacks, `RouteView` computed inner callbacks (`matchEntries`), and `updateDom` DOM-side effects that only run with non-empty `contentChildren` or with active-state transitions — both of which require AOT template compilation.
+Coverage thresholds are **98%/94%/98%/98%** (statements/branches/functions/lines), not 100%. This is not a gap in test quality — it is a hard limitation of Angular 22 JIT mode used by TestBed without a compiler transform. The dropped lines are concentrated in directive subscription callbacks and `updateDom` DOM-side effects that only run with active-state transitions — which require AOT template compilation.
 
-The floor sits at ~97% (ratcheted up from the earlier ~94% it held through 2026-06) because the git-tracked `src/dom-utils/` copies are pure logic with no JIT dependency: their suites reach 100% statements (route-announcer + view-transitions 100% branches too), pulling the package aggregate up. The JIT ceiling is now isolated to the directive/component template paths below — keep new directive code honest, but the dom-utils copies are held at 100% in their own config.
+The floor sits at ~98 (ratcheted from ~97 when the **aot test project** below started covering `RouteView`'s fallback resolution for real, #1512; earlier ~94 → ~97 came from the dom-utils suites reaching 100% statements). The JIT ceiling is now isolated to the `RealLink` / `RealLinkActive` paths below — keep new directive code honest, but the dom-utils copies are held at 100% in their own config.
 
-**Root cause:** JIT compilation does not recognize signal-based `input()` as bindable template properties. Any attempt to bind `[routeName]="value"` to a directive with a signal input fails with `NG0303: Can't bind to 'routeName' since it isn't a known property`. Signal inputs only work with AOT compilation.
+**Root cause:** signal-based initializer APIs (`input()`, `contentChildren()`, …) only register through a compiler transform. Under plain vitest+esbuild there is no Angular transform, so `contentChildren` queries stay empty forever and any `[routeName]="value"` binding to a signal input fails with `NG0303: Can't bind to 'routeName' since it isn't a known property`. AOT compilation is the only way these paths execute.
 
-**Concrete consequences:**
+### AOT test project (`tests/aot/`) — #1512
+
+The package's `vitest.config.mts` declares two `test.projects` in ONE run:
+
+- **`jit`** — the whole pre-existing suite, esbuild-transpiled, exactly as before. Tests pinning empty-query behavior (`"JIT: notFounds empty"`) belong here and stay valid.
+- **`aot`** — only `tests/aot/**`, compiled by `@analogjs/vite-plugin-angular` (full Ivy). Hosts the `RouteView` fallback/duplicate-marker fixtures (K0 canary + S1/S2/M1-M4 from RFC #1439 §5) that are structurally unreachable under JIT. Fixtures asserting populated `contentChildren` live ONLY here — added to the jit project they would fail (empty queries), correctly.
+
+Coverage is a root-only vitest option: both projects merge into one report, which is what lets the former `/* v8 ignore */` in `RouteView.ts` stay removed — AOT-only hits count toward the thresholds.
+
+Gotchas baked into the setup (hard-won on 2026-07-18, see RFC `.claude/rfc-1512-aot-unit-coverage-ru.md`):
+
+- **`tsconfig.spec.aot.json` must force `module: ES2022` + `moduleResolution: bundler`.** The analog plugin emits by tsconfig `module`; the root's `NodeNext` + this package's `"type": "commonjs"` produce CJS emit → vitest 4 rejects `require("vitest")`. This was the historical "type: commonjs × vitest ESM" PoC barrier — an emit-format issue, solved entirely inside the spec tsconfig.
+- **`transformFilter` keeps the AOT emit down to the fixtures + `RouteView.ts` + `src/directives/`.** Every file the Angular compiler emits gets DIFFERENT function/statement source-ranges than esbuild, and the jit+aot coverage merge then double-counts that file's entries (a package-wide filter collapsed the functions metric 98.18% → 87.19%). Widen the filter only together with fixtures that actually execute the newly AOT-compiled file.
+- **`esbuild: {}` in the aot project config is load-bearing.** The plugin disables vite's built-in esbuild transform unless the user config sets one — without it, every `.ts` outside the transformFilter reaches the module runner as raw TS and rollup fails on `import type`.
+- **Merge duplicates in the merged report are expected.** A few `RouteView.ts` lines (57-59, 116-118 as of 2026-07-18) show as uncovered because the jit-emit maps them to ranges the aot-emit doesn't share; the aot map alone covers the file at 100% statements/lines/functions — verify with `pnpm test --project aot`. Don't chase these lines with more jit tests; they are unreachable there by construction.
+- **`tests/aot/setup.ts` deliberately does NOT import `@angular/compiler`** — a present JIT compiler could mask a silent AOT-transform failure behind a partial JIT fallback. The K0 canary (`notFounds()` length) fails loudly instead.
+
+**Concrete consequences (remaining JIT-only gaps):**
 
 | File:Lines              | Why unreachable without AOT                                                                                                                                                             |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RouteView.ts:56-60,69` | `contentChildren(RouteMatch/RouteNotFound)` returns empty — structural directives on `ng-template` with signal inputs aren't registered in JIT. Verified: `view.matches().length === 0` |
 | `RealLink.ts:99-102`    | Subscription callback fires only when `isActive` changes. With `routeName=""` (JIT default), `isActiveRoute("")` always returns `false` — no state transitions                          |
 | `RealLink.ts:133`       | `setAttribute("href", href)` skipped because `buildHref(router, "", {})` always returns `undefined` for empty routeName                                                                 |
 | `RealLink.ts:143`       | `classList.remove(prevActiveClass)` requires class transition. `activeClassName` input stays at default `"active"` — `prevActiveClass` never changes                                    |
 | `RealLinkActive.ts:62`  | Same subscription callback pattern as RealLink                                                                                                                                          |
 | `RealLinkActive.ts:80`  | `classList.toggle` early-returns at line 77 because `realLinkActive=""` (JIT default)                                                                                                   |
 
+(Line numbers drift — when editing this table, re-derive them from a fresh per-line report, not from the numbers above.)
+
 **What IS covered:**
 
+- `RouteView` fallback-template resolution (Self/NotFound arms incl. the #1439 first-wins duplicate semantics) — by the **aot project**, mutation-validated (`.at(0)→.at(-1)` REDs exactly {M1, M2})
 - Full `provideRealRouter` / DI wiring
 - `sourceToSignal` bridge including rapid emissions and destroy-during-emission
 - All public `inject*` functions with positive and negative cases
@@ -447,13 +466,13 @@ The floor sits at ~97% (ratcheted up from the earlier ~94% it held through 2026-
 - `buildHref`, `shouldNavigate`, `buildActiveClassName`, `applyLinkA11y` — 100%
 - `createRouteAnnouncer` — 100% lines + branches (the `src/dom-utils/` copy)
 
-**Paths to 100% (all have trade-offs):**
+**Paths to 100% (remaining):**
 
-1. Install `@analogjs/vite-plugin-angular` + `@angular/build` → AOT compilation for tests. Adds ~30 packages, TypeScript version conflicts possible.
+1. Extend the aot project with `RealLink` / `RealLinkActive` fixtures (follow-up of #1512 — same mechanism; widen `transformFilter` together with fixtures that execute those files, and watch the functions-metric duplication gotcha above).
 2. Refactor directives to extract logic into pure functions. Breaks component architecture.
 3. Access private fields via `(directive as any).isActive.set(...)`. Violates "test only public API" principle.
 
-**Design decision:** We prioritize honest test coverage over artificially inflated numbers. The uncovered code IS exercised at runtime (in real Angular apps with AOT), but not in JIT-based TestBed. E2E tests via Playwright would cover the remaining paths end-to-end.
+**Design decision:** We prioritize honest test coverage over artificially inflated numbers. The remaining uncovered code IS exercised at runtime (in real Angular apps with AOT) and by Playwright e2e in the examples, just not in the jit TestBed project.
 
 ## SSR Support
 
