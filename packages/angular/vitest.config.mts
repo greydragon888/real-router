@@ -24,20 +24,22 @@ export default mergeConfig(
   defineConfig({
     test: {
       coverage: {
-        // Ratcheted from 97/93/98/97 after the aot project (#1512) started
-        // covering RouteView's fallback resolution for real (the former
-        // `v8 ignore` block is gone). The remaining ceiling is the RealLink /
-        // RealLinkActive signal-input paths — see CLAUDE.md "Coverage
-        // Ceiling" — plus merge duplicates: the jit (esbuild) and aot
-        // (Angular) emits map a few RouteView statements to different ranges,
-        // so the merged report keeps an uncovered jit-emit twin of lines the
-        // aot map covers at 100% (verify with `pnpm test --project aot`).
+        // Ratcheted again after #1512 layers 1-2: the ordinary non-JIT gaps
+        // (providersFactory, dom-utils) are closed in the jit suite, and the
+        // aot project now exercises RouteView's fallback resolution AND the
+        // RealLink / RealLinkActive signal-input paths for real. What keeps
+        // the floor below 100 is no longer untested code but merge
+        // duplicates: the jit (esbuild) and aot (Angular) emits map some
+        // statements of dual-tested files (RouteView, RealLink,
+        // RealLinkActive) to different ranges, so the merged report keeps
+        // uncovered jit-emit twins of lines the aot map covers (verify with
+        // `pnpm test --project aot`) — plus a few AOT-emit phantom branches.
         // These are the measured floors, locked to catch regressions
-        // (actual: 98.22 / 94.22 / 98.26 / 98.16).
+        // (actual: 98.89 / 94.72 / 99.45 / 98.83).
         thresholds: {
           statements: 98,
           branches: 94,
-          functions: 98,
+          functions: 99,
           lines: 98,
         },
         // `src/dom-utils/direction-tracker.ts` is no longer excluded —

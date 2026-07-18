@@ -337,7 +337,7 @@ Effect cleanup is bound automatically to the host directive's injection-context 
 
 **`routeParams` is content-stabilized before the effect reads it (#988).** Angular re-allocates an inline `[routeParams]="{ id: 1 }"` literal on every change detection, so reading the raw input signal inside the effect would re-create the cached active-route source (`canonicalJson` cache-key churn + sub/unsub) and re-run `buildHref` on every navigation even when the param content is unchanged. `RealLink` / `RealLinkActive` route their `routeParams` through the internal `createStableParams` helper (`computed` + `shallowEqual`), which re-emits a reference-stable value until the param content actually changes — so the source-creation effect and the `href` computed bail on same-content navigations. Binding a stable reference (a component field or signal) already produced zero churn; this closes the gap for inline-literal binds. Mirrors the Vue `<Link>` fix. Behavior is unchanged — the stabilized params are always content-equal to the input. Nested-object param _values_ fall back to per-render recompute (`shallowEqual` compares them by reference) — bind a stable `signal`/`computed` if it matters.
 
-**Consequence for tests**: full reactive-input verification (e.g., changing `[realLink]="signal()"` and asserting `.active` class re-binds) requires AOT compilation — JIT mode rejects signal-input template bindings with `NG0303`. Use `@analogjs/vite-plugin-angular` or e2e via Playwright against a production-mode example app. The content-stabilization is unit-tested via the JIT-safe toy pattern (`tests/functional/createStableParams.test.ts`) — a plain `signal<Params>()` drives the same `createStableParams` helper the directives feed their input signal into (the effect-re-run mechanism is identical for `input()` and `signal()`).
+**Consequence for tests**: full reactive-input verification (e.g., changing `[routeName]="signal()"` on `<a realLink>` and asserting `.active` class re-binds) requires AOT compilation — JIT mode rejects signal-input template bindings with `NG0303`. Use `@analogjs/vite-plugin-angular` or e2e via Playwright against a production-mode example app. The content-stabilization is unit-tested via the JIT-safe toy pattern (`tests/functional/createStableParams.test.ts`) — a plain `signal<Params>()` drives the same `createStableParams` helper the directives feed their input signal into (the effect-re-run mechanism is identical for `input()` and `signal()`).
 
 **Historical — distinct `[routeParams]` / `[realLink]` keys on a reused node once accumulated eternal sources (#766, fixed in sources 0.9.0).** Each effect rebuild creates a `createActiveRouteSource` for the new `(name | params | hash)` key. Before the lazy-connection fix these sources subscribed to the router eagerly and never disconnected (`destroy()` is a no-op; `onCleanup` only tears down the _bridge subscription_), so a node that genuinely cycled through many **distinct** keys — the textbook case a long virtual list / `@for` with **track-identity** reuse, where a single `<a realLink [routeParams]="item().params">` is re-bound to thousands of param values as the user scrolls — left one permanent router listener per unique key and walked monotonically toward the `EventEmitter` `Listener limit (10000)` crash. It was the lowest-threshold path to #766 in the adapter series: one reused directive, no thousands of `RealLink` instances (React/Preact/Vue), no remount workaround (Svelte `{#key}`).
 
@@ -393,8 +393,8 @@ Signal-first approach. No `rxjs` or `@angular/core/rxjs-interop` dependencies.
 - `"value"` — sets the hash; click routes through `navigateWithHash`, which auto-adds `force: true, hashChange: true` when the requested hash differs from `state.context.url.hash` on the same route+params (bypasses core's `SAME_STATES`).
 
 ```html
-<a [realLink]="'settings'" [hash]="'profile'">Profile</a>
-<a [realLink]="'settings'" [hash]="'account'">Account</a>
+<a realLink [routeName]="'settings'" [hash]="'profile'">Profile</a>
+<a realLink [routeName]="'settings'" [hash]="'account'">Account</a>
 ```
 
 `hash` is a signal input — bind a `signal()`/`computed()` to react to changes. **Active state is hash-aware on `<a realLink [hash]="…">` only** — the directive lights up iff route matches AND `state.context.url.hash` equals the expected fragment. `[realLinkActive]` is the styling-only counterpart and does NOT accept a `hash` input: it tracks the route+params combination without fragment disambiguation. For tab-style UIs where each tab must light up its own active class, prefer `<a realLink [hash]>` (one anchor per tab) over `<li [realLinkActive]>` plus a child `<a realLink>` — the latter cannot tell tabs apart. Hash-plugin runtime always returns `false` for hash-aware active checks (consistent with the documented hash-plugin limitation).
@@ -421,9 +421,9 @@ Despite the `subscribe` method name and `output()` source, the boundary's `onErr
 
 ## Coverage Ceiling (~98%) — JIT Limitation, not Poor Testing
 
-Coverage thresholds are **98%/94%/98%/98%** (statements/branches/functions/lines), not 100%. This is not a gap in test quality — it is a hard limitation of Angular 22 JIT mode used by TestBed without a compiler transform. The dropped lines are concentrated in directive subscription callbacks and `updateDom` DOM-side effects that only run with active-state transitions — which require AOT template compilation.
+Coverage thresholds are **98%/94%/99%/98%** (statements/branches/functions/lines), not 100%. Since #1512 layers 1-2 this is **no longer untested code**: the ordinary non-JIT gaps (providersFactory, dom-utils) are closed in the jit suite, and the aot project exercises every previously JIT-unreachable path (`RouteView` fallback resolution, `RealLink` / `RealLinkActive` active flips, href writes, class transitions) with mutation-validated assertions.
 
-The floor sits at ~98 (ratcheted from ~97 when the **aot test project** below started covering `RouteView`'s fallback resolution for real, #1512; earlier ~94 → ~97 came from the dom-utils suites reaching 100% statements). The JIT ceiling is now isolated to the `RealLink` / `RealLinkActive` paths below — keep new directive code honest, but the dom-utils copies are held at 100% in their own config.
+What keeps the floor below 100 is structural: **merge duplicates** (files tested in BOTH projects keep uncovered jit-emit twins of lines the aot map covers — see the gotcha below) and a few **AOT-emit phantom branches** (the angular#64583 class: branch records on lines whose every semantic path executes). Closing those would require evicting each Angular-entity file's tests wholly into the aot project and would still not guarantee 100% branches — measured and deliberately not pursued.
 
 **Root cause:** signal-based initializer APIs (`input()`, `contentChildren()`, …) only register through a compiler transform. Under plain vitest+esbuild there is no Angular transform, so `contentChildren` queries stay empty forever and any `[routeName]="value"` binding to a signal input fails with `NG0303: Can't bind to 'routeName' since it isn't a known property`. AOT compilation is the only way these paths execute.
 
@@ -441,38 +441,27 @@ Gotchas baked into the setup (hard-won on 2026-07-18, see RFC `.claude/rfc-1512-
 - **`tsconfig.spec.aot.json` must force `module: ES2022` + `moduleResolution: bundler`.** The analog plugin emits by tsconfig `module`; the root's `NodeNext` + this package's `"type": "commonjs"` produce CJS emit → vitest 4 rejects `require("vitest")`. This was the historical "type: commonjs × vitest ESM" PoC barrier — an emit-format issue, solved entirely inside the spec tsconfig.
 - **`transformFilter` keeps the AOT emit down to the fixtures + `RouteView.ts` + `src/directives/`.** Every file the Angular compiler emits gets DIFFERENT function/statement source-ranges than esbuild, and the jit+aot coverage merge then double-counts that file's entries (a package-wide filter collapsed the functions metric 98.18% → 87.19%). Widen the filter only together with fixtures that actually execute the newly AOT-compiled file.
 - **`esbuild: {}` in the aot project config is load-bearing.** The plugin disables vite's built-in esbuild transform unless the user config sets one — without it, every `.ts` outside the transformFilter reaches the module runner as raw TS and rollup fails on `import type`.
-- **Merge duplicates in the merged report are expected.** A few `RouteView.ts` lines (57-59, 116-118 as of 2026-07-18) show as uncovered because the jit-emit maps them to ranges the aot-emit doesn't share; the aot map alone covers the file at 100% statements/lines/functions — verify with `pnpm test --project aot`. Don't chase these lines with more jit tests; they are unreachable there by construction.
+- **Merge duplicates in the merged report are expected.** Lines of dual-tested files (as of 2026-07-18: `RouteView.ts` 57-59/116-118, `RealLink.ts` 107-110/141/151, `RealLinkActive.ts` 67/85) show as uncovered because the jit-emit maps them to ranges the aot-emit doesn't share; the aot map covers those same lines — verify with `pnpm test --project aot`. Don't chase these lines with more jit tests; they are unreachable there by construction. (The aot map has its own mirror artifacts — e.g. effect-call argument lines mapped oddly — covered by the jit side; only the UNION matters.)
 - **`tests/aot/setup.ts` deliberately does NOT import `@angular/compiler`** — a present JIT compiler could mask a silent AOT-transform failure behind a partial JIT fallback. The K0 canary (`notFounds()` length) fails loudly instead.
-
-**Concrete consequences (remaining JIT-only gaps):**
-
-| File:Lines              | Why unreachable without AOT                                                                                                                                                             |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RealLink.ts:99-102`    | Subscription callback fires only when `isActive` changes. With `routeName=""` (JIT default), `isActiveRoute("")` always returns `false` — no state transitions                          |
-| `RealLink.ts:133`       | `setAttribute("href", href)` skipped because `buildHref(router, "", {})` always returns `undefined` for empty routeName                                                                 |
-| `RealLink.ts:143`       | `classList.remove(prevActiveClass)` requires class transition. `activeClassName` input stays at default `"active"` — `prevActiveClass` never changes                                    |
-| `RealLinkActive.ts:62`  | Same subscription callback pattern as RealLink                                                                                                                                          |
-| `RealLinkActive.ts:80`  | `classList.toggle` early-returns at line 77 because `realLinkActive=""` (JIT default)                                                                                                   |
-
-(Line numbers drift — when editing this table, re-derive them from a fresh per-line report, not from the numbers above.)
 
 **What IS covered:**
 
 - `RouteView` fallback-template resolution (Self/NotFound arms incl. the #1439 first-wins duplicate semantics) — by the **aot project**, mutation-validated (`.at(0)→.at(-1)` REDs exactly {M1, M2})
-- Full `provideRealRouter` / DI wiring
+- `RealLink` / `RealLinkActive` signal-input paths — by the **aot project** (`tests/aot/directives.aot.test.ts`): href from a real `[routeName]` binding, active-flip class toggles via the source subscription (also covering `subscribeSourceToSignal`'s emission callback), the pure-href-refresh early return, and the stale-`activeClassName` removal (mutation-validated: disabling `classList.remove` REDs exactly that fixture)
+- Full `provideRealRouter` / `provideRealRouterFactory` DI wiring (incl. the scrollSpy initializer and the no-window `deriveStartPath` fallback)
 - `sourceToSignal` bridge including rapid emissions and destroy-during-emission
 - All public `inject*` functions with positive and negative cases
 - `RouterErrorBoundary` 100% coverage via public API access (`boundary.errorContext()`, `boundary.onError.subscribe()`)
-- `buildHref`, `shouldNavigate`, `buildActiveClassName`, `applyLinkA11y` — 100%
-- `createRouteAnnouncer` — 100% lines + branches (the `src/dom-utils/` copy)
+- `src/dom-utils/` — 100% across all four metrics in the jit map (incl. `buildHref` defensive arms, scroll-restore reload/hash edge branches, the #781 stale-timer guard)
 
-**Paths to 100% (remaining):**
+**Paths to true 100% (deliberately not pursued):**
 
-1. Extend the aot project with `RealLink` / `RealLinkActive` fixtures (follow-up of #1512 — same mechanism; widen `transformFilter` together with fixtures that execute those files, and watch the functions-metric duplication gotcha above).
+1. Evict each Angular-entity file's tests wholly into the aot project (removes the jit-emit twin problem) — days of migration, kills the still-valid "JIT: empty" pins, and AOT-emit phantom branches would still block 100% branches.
 2. Refactor directives to extract logic into pure functions. Breaks component architecture.
 3. Access private fields via `(directive as any).isActive.set(...)`. Violates "test only public API" principle.
+4. Re-add targeted `v8 ignore` on merge-duplicate lines. Trades the honesty this whole effort restored for a number.
 
-**Design decision:** We prioritize honest test coverage over artificially inflated numbers. The remaining uncovered code IS exercised at runtime (in real Angular apps with AOT) and by Playwright e2e in the examples, just not in the jit TestBed project.
+**Design decision:** We prioritize honest test coverage over artificially inflated numbers. Every semantic path is executed and asserted somewhere in the two-project run; the residual percentage is a measurement artifact of merging two compiler emits, documented above.
 
 ## SSR Support
 

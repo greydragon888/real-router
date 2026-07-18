@@ -426,8 +426,8 @@ Navigation directive for `<a>` elements. Handles click events, sets `href`, and 
 #### `hash` input — URL fragment / tab-style UIs
 
 ```html
-<a [realLink]="'settings'" [hash]="'profile'">Profile</a>
-<a [realLink]="'settings'" [hash]="'account'">Account</a>
+<a realLink [routeName]="'settings'" [hash]="'profile'">Profile</a>
+<a realLink [routeName]="'settings'" [hash]="'account'">Account</a>
 ```
 
 Active class is hash-aware — only the matching tab lights up. Live demo: [`examples/web/react/hash-examples/link-hash/`](../../examples/web/react/hash-examples/link-hash/) — behavior is identical across adapters, only template syntax differs. See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wiki/Hash) wiki page for the full surface.
