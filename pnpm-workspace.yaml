@@ -35,6 +35,13 @@ overrides:
   axios: '>=1.16.0'
   follow-redirects: '>=1.16.0'
   qs: '>=6.14.2'
+  # Force adm-zip past the path-traversal fix (GHSA-xcpc-8h2w-3j85, High). Its only consumer is
+  # @sonar/scan (root devDep, NOT shipped), which pins adm-zip EXACTLY at 0.5.17 in both 4.3.8 and
+  # the latest 4.4.0 — so an override is the only bump path. Dev-only + trusted-input (the scanner
+  # extracts SonarSource's own zip), so 0.6.0's stricter extract can't break it. Drop when a
+  # @sonar/scan release moves off 0.5.x. (Override, not an osv-scanner.toml allowlist, so a future
+  # regression that drops it re-fails the gate instead of being silently masked.)
+  adm-zip: '>=0.6.0'
   rollup: 4.62.0
   minimatch@3: ~3.1.4
   minimatch@9: ~9.0.7
