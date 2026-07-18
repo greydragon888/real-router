@@ -1,0 +1,659 @@
+// packages/route-node/tests/functional/validation-route-batch.test.ts
+
+import { describe, it, expect } from "vitest";
+
+import { validateRoute } from "../../../src/engine";
+// eslint-disable-next-line vitest/no-mocks-import -- intentional: using mock factory, not vi.mock
+import { createMockRouteNode } from "../__mocks__/route-tree-mock";
+
+describe("validateRoute", () => {
+  const methodName = "add";
+
+  describe("type validation", () => {
+    it("should throw TypeError for null", () => {
+      expect(() => {
+        validateRoute(null, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute(null, methodName);
+      }).toThrow("[router.add] Route must be an object, got null");
+    });
+
+    it("should throw TypeError for undefined", () => {
+      expect(() => {
+        validateRoute(undefined, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute(undefined, methodName);
+      }).toThrow("[router.add] Route must be an object, got undefined");
+    });
+
+    it("should throw TypeError for primitives", () => {
+      expect(() => {
+        validateRoute("string", methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute(123, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute(true, methodName);
+      }).toThrow(TypeError);
+    });
+
+    it("should report 'must be an object' (not 'plain object') for a truthy primitive", () => {
+      // A truthy non-object primitive (string/number/boolean) is rejected by the
+      // `typeof route !== "object"` operand, not by `!route`. The wording must be
+      // the early "Route must be an object", distinct from the downstream
+      // prototype check's "Route must be a plain object".
+      expect(() => {
+        validateRoute("string", methodName);
+      }).toThrow("[router.add] Route must be an object, got string");
+      expect(() => {
+        validateRoute(123, methodName);
+      }).toThrow("[router.add] Route must be an object, got number");
+      expect(() => {
+        validateRoute(true, methodName);
+      }).toThrow("[router.add] Route must be an object, got boolean");
+    });
+
+    it("should throw TypeError for class instances", () => {
+      class RouteClass {
+        name = "class-route";
+        path = "/class";
+      }
+
+      expect(() => {
+        validateRoute(new RouteClass(), methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute(new RouteClass(), methodName);
+      }).toThrow(/must be a plain object/);
+    });
+
+    it("yields the clean 'plain object' error (not the getter's exception) for a route with a throwing inherited `.name` getter (#1052)", () => {
+      // A custom-prototype route reaches the twin getTypeDescription at the
+      // plain-object check (:103) — before the own-key getter scan, which uses
+      // Object.keys and so misses an INHERITED throwing getter. The twin must
+      // yield the clean TypeError, not leak the getter's exception (sibling of
+      // #903's adversarial-constructor-value case).
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- name-carrier ctor; only its throwing `.name` getter matters
+      function EvilName() {}
+      Object.defineProperty(EvilName, "name", {
+        get() {
+          throw new Error("BOOM");
+        },
+      });
+
+      expect(() => {
+        validateRoute(Object.create(EvilName.prototype), methodName);
+      }).toThrow(/must be a plain object/);
+    });
+
+    it("should throw TypeError for route with getter", () => {
+      const routeWithGetter = {
+        get name(): string {
+          return "getter-route";
+        },
+        path: "/getter",
+      };
+
+      expect(() => {
+        validateRoute(routeWithGetter, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute(routeWithGetter, methodName);
+      }).toThrow(/must not have getters or setters/);
+    });
+
+    it("should throw TypeError for route with setter", () => {
+      let _name = "setter-route";
+      const routeWithSetter = {
+        get name(): string {
+          return _name;
+        },
+        set name(value: string) {
+          _name = value;
+        },
+        path: "/setter",
+      };
+
+      expect(() => {
+        validateRoute(routeWithSetter, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute(routeWithSetter, methodName);
+      }).toThrow(/must not have getters or setters/);
+    });
+
+    it("should allow Object.create(null) route", () => {
+      const nullProtoRoute = Object.create(null) as {
+        name: string;
+        path: string;
+      };
+
+      nullProtoRoute.name = "null-proto";
+      nullProtoRoute.path = "/null-proto";
+
+      expect(() => {
+        validateRoute(nullProtoRoute, methodName);
+      }).not.toThrow();
+    });
+
+    it("should allow plain object route", () => {
+      expect(() => {
+        validateRoute({ name: "plain", path: "/plain" }, methodName);
+      }).not.toThrow();
+    });
+  });
+
+  describe("structure validation", () => {
+    it("should throw for missing name", () => {
+      expect(() => {
+        validateRoute({ path: "/test" }, methodName);
+      }).toThrow();
+    });
+
+    it("should keep [method] context for a non-string name with an adversarial own constructor (#903)", () => {
+      // route.name is an object whose own `constructor` is not a real constructor;
+      // the type-description helper used to build the message must not crash, so
+      // the developer still gets the contextual "Route name must be a string".
+      expect(() => {
+        validateRoute(
+          { name: { constructor: null }, path: "/test" },
+          methodName,
+        );
+      }).toThrow(`[router.${methodName}] Route name must be a string`);
+    });
+
+    it("should describe an anonymous-class name as 'object', not '' (#903)", () => {
+      // An anonymous class has an empty constructor name; the message falls back
+      // to "object" rather than an empty "got ".
+      expect(() => {
+        validateRoute(
+          {
+            name: new (class {
+              x = 1;
+            })(),
+            path: "/test",
+          },
+          methodName,
+        );
+      }).toThrow(
+        `[router.${methodName}] Route name must be a string, got object`,
+      );
+    });
+
+    it("should throw for empty name", () => {
+      expect(() => {
+        validateRoute({ name: "", path: "/test" }, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute({ name: "", path: "/test" }, methodName);
+      }).toThrow("[router.add] Route name cannot be empty");
+    });
+
+    it("should throw for whitespace-only name", () => {
+      expect(() => {
+        validateRoute({ name: " ".repeat(3), path: "/test" }, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute({ name: " ".repeat(3), path: "/test" }, methodName);
+      }).toThrow("[router.add] Route name cannot contain only whitespace");
+    });
+
+    it("should throw for name exceeding maximum length", () => {
+      const longName = "a".repeat(10_001);
+
+      expect(() => {
+        validateRoute({ name: longName, path: "/test" }, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute({ name: longName, path: "/test" }, methodName);
+      }).toThrow(/exceeds maximum length of 10000 characters/);
+    });
+
+    it("should accept system routes with @@ prefix", () => {
+      expect(() => {
+        validateRoute(
+          { name: "@@real-router/UNKNOWN", path: "/unknown" },
+          methodName,
+        );
+      }).not.toThrow();
+    });
+
+    it("should throw for invalid route name pattern (non-ASCII)", () => {
+      expect(() => {
+        validateRoute({ name: "café", path: "/cafe" }, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute({ name: "café", path: "/cafe" }, methodName);
+      }).toThrow(/Invalid route name/);
+      // Full message: both concatenated halves (prefix + format hint) must appear.
+      expect(() => {
+        validateRoute({ name: "café", path: "/cafe" }, methodName);
+      }).toThrow(
+        '[router.add] Invalid route name "café". ' +
+          "Name must start with a letter or underscore, " +
+          "followed by letters, numbers, underscores, or hyphens.",
+      );
+    });
+
+    it("should throw for missing path", () => {
+      expect(() => {
+        validateRoute({ name: "test" }, methodName);
+      }).toThrow();
+    });
+
+    it("should accept valid route", () => {
+      expect(() => {
+        validateRoute({ name: "test", path: "/test" }, methodName);
+      }).not.toThrow();
+    });
+  });
+
+  describe("tree duplicate detection", () => {
+    it("should throw when route name exists in tree", () => {
+      const rootNode = createMockRouteNode("", "", [
+        { name: "users", path: "/users" },
+      ]);
+
+      expect(() => {
+        validateRoute({ name: "users", path: "/u" }, methodName, rootNode);
+      }).toThrow('[router.add] Route "users" already exists');
+    });
+
+    it("should throw when nested route name exists", () => {
+      const rootNode = createMockRouteNode("", "", [
+        {
+          name: "users",
+          path: "/users",
+          children: [{ name: "profile", path: "/profile" }],
+        },
+      ]);
+
+      expect(() => {
+        validateRoute(
+          { name: "profile", path: "/p" },
+          methodName,
+          rootNode,
+          "users",
+        );
+      }).toThrow('[router.add] Route "users.profile" already exists');
+    });
+
+    it("should throw when path exists in tree", () => {
+      const rootNode = createMockRouteNode("", "", [
+        { name: "users", path: "/users" },
+      ]);
+
+      expect(() => {
+        validateRoute({ name: "people", path: "/users" }, methodName, rootNode);
+      }).toThrow('[router.add] Path "/users" is already defined');
+    });
+
+    it("should not throw when route does not exist", () => {
+      const rootNode = createMockRouteNode("", "", [
+        { name: "users", path: "/users" },
+      ]);
+
+      expect(() => {
+        validateRoute(
+          { name: "settings", path: "/settings" },
+          methodName,
+          rootNode,
+        );
+      }).not.toThrow();
+    });
+
+    it("should throw when path exists at nested level", () => {
+      const rootNode = createMockRouteNode("", "", [
+        {
+          name: "users",
+          path: "/users",
+          children: [{ name: "profile", path: "/profile" }],
+        },
+      ]);
+
+      expect(() => {
+        validateRoute(
+          { name: "settings", path: "/profile" },
+          methodName,
+          rootNode,
+          "users",
+        );
+      }).toThrow('[router.add] Path "/profile" is already defined');
+    });
+
+    it("should not throw when parent does not exist for path check", () => {
+      const rootNode = createMockRouteNode("", "", [
+        { name: "users", path: "/users" },
+      ]);
+
+      // When validating children, parent "nonexistent" won't be found
+      // This covers the branch where parentNode is undefined
+      expect(() => {
+        validateRoute(
+          { name: "test", path: "/test" },
+          methodName,
+          rootNode,
+          "nonexistent",
+        );
+      }).not.toThrow();
+    });
+  });
+
+  describe("batch duplicate detection", () => {
+    it("should throw when route name exists in batch", () => {
+      const seenNames = new Set(["users"]);
+
+      expect(() => {
+        validateRoute(
+          { name: "users", path: "/u" },
+          methodName,
+          undefined,
+          "",
+          seenNames,
+        );
+      }).toThrow('[router.add] Duplicate route "users" in batch');
+    });
+
+    it("should add name to seenNames set", () => {
+      const seenNames = new Set<string>();
+
+      validateRoute(
+        { name: "users", path: "/users" },
+        methodName,
+        undefined,
+        "",
+        seenNames,
+      );
+
+      expect(seenNames.has("users")).toBe(true);
+    });
+
+    it("should throw when path exists in batch", () => {
+      const seenPaths = new Map<string, Set<string>>([
+        ["", new Set(["/users"])],
+      ]);
+
+      expect(() => {
+        validateRoute(
+          { name: "people", path: "/users" },
+          methodName,
+          undefined,
+          "",
+          undefined,
+          seenPaths,
+        );
+      }).toThrow('[router.add] Path "/users" is already defined');
+    });
+
+    it("should add path to seenPaths map", () => {
+      const seenPaths = new Map<string, Set<string>>();
+
+      validateRoute(
+        { name: "users", path: "/users" },
+        methodName,
+        undefined,
+        "",
+        undefined,
+        seenPaths,
+      );
+
+      expect(seenPaths.get("")?.has("/users")).toBe(true);
+    });
+
+    it("should add multiple paths to same level", () => {
+      const seenPaths = new Map<string, Set<string>>();
+
+      validateRoute(
+        { name: "users", path: "/users" },
+        methodName,
+        undefined,
+        "",
+        undefined,
+        seenPaths,
+      );
+      validateRoute(
+        { name: "settings", path: "/settings" },
+        methodName,
+        undefined,
+        "",
+        undefined,
+        seenPaths,
+      );
+
+      expect(seenPaths.get("")?.has("/users")).toBe(true);
+      expect(seenPaths.get("")?.has("/settings")).toBe(true);
+    });
+  });
+
+  describe("children validation", () => {
+    it("should throw when children is not an array", () => {
+      expect(() => {
+        validateRoute(
+          { name: "test", path: "/test", children: "invalid" },
+          methodName,
+        );
+      }).toThrow(
+        '[router.add] Route "test" children must be an array, got string',
+      );
+    });
+
+    it("should include constructor name in error message for class instances", () => {
+      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+      class CustomClass {}
+
+      expect(() => {
+        validateRoute(
+          { name: "test", path: "/test", children: new CustomClass() },
+          methodName,
+        );
+      }).toThrow(
+        '[router.add] Route "test" children must be an array, got CustomClass',
+      );
+    });
+
+    it("should distinguish plain objects from class instances", () => {
+      expect(() => {
+        validateRoute(
+          { name: "test", path: "/test", children: {} },
+          methodName,
+        );
+      }).toThrow(
+        '[router.add] Route "test" children must be an array, got object',
+      );
+    });
+
+    it("should validate children recursively", () => {
+      expect(() => {
+        validateRoute(
+          {
+            name: "parent",
+            path: "/parent",
+            children: [{ name: "child" }], // missing path
+          },
+          methodName,
+        );
+      }).toThrow();
+    });
+
+    it("should accept valid nested routes", () => {
+      expect(() => {
+        validateRoute(
+          {
+            name: "parent",
+            path: "/parent",
+            children: [
+              {
+                name: "child",
+                path: "/child",
+                children: [{ name: "grandchild", path: "/grandchild" }],
+              },
+            ],
+          },
+          methodName,
+        );
+      }).not.toThrow();
+    });
+
+    it("should detect duplicate names in nested children", () => {
+      const seenNames = new Set<string>();
+
+      expect(() => {
+        validateRoute(
+          {
+            name: "parent",
+            path: "/parent",
+            children: [
+              { name: "child", path: "/child1" },
+              { name: "child", path: "/child2" },
+            ],
+          },
+          methodName,
+          undefined,
+          "",
+          seenNames,
+        );
+      }).toThrow('[router.add] Duplicate route "parent.child" in batch');
+    });
+
+    it("should detect duplicate paths in nested children", () => {
+      const seenPaths = new Map<string, Set<string>>();
+
+      expect(() => {
+        validateRoute(
+          {
+            name: "parent",
+            path: "/parent",
+            children: [
+              { name: "child1", path: "/same" },
+              { name: "child2", path: "/same" },
+            ],
+          },
+          methodName,
+          undefined,
+          "",
+          undefined,
+          seenPaths,
+        );
+      }).toThrow('[router.add] Path "/same" is already defined');
+    });
+  });
+
+  describe("full name building", () => {
+    it("should build full name with parent", () => {
+      const seenNames = new Set<string>();
+
+      validateRoute(
+        { name: "profile", path: "/profile" },
+        methodName,
+        undefined,
+        "users",
+        seenNames,
+      );
+
+      expect(seenNames.has("users.profile")).toBe(true);
+    });
+
+    it("should use simple name when no parent", () => {
+      const seenNames = new Set<string>();
+
+      validateRoute(
+        { name: "users", path: "/users" },
+        methodName,
+        undefined,
+        "",
+        seenNames,
+      );
+
+      expect(seenNames.has("users")).toBe(true);
+    });
+  });
+
+  describe("dot-notation rejection", () => {
+    it("should throw TypeError when route name contains dots", () => {
+      expect(() => {
+        validateRoute({ name: "users.profile", path: "/profile" }, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute({ name: "users.profile", path: "/profile" }, methodName);
+      }).toThrow(/cannot contain dots/);
+      // Full message includes the actionable second sentence.
+      expect(() => {
+        validateRoute({ name: "users.profile", path: "/profile" }, methodName);
+      }).toThrow(
+        '[router.add] Route name "users.profile" cannot contain dots. ' +
+          "Use children array or { parent } option in addRoute() instead.",
+      );
+    });
+
+    it("should throw TypeError for multi-level dot-notation", () => {
+      expect(() => {
+        validateRoute({ name: "a.b.c", path: "/path" }, methodName);
+      }).toThrow(TypeError);
+      expect(() => {
+        validateRoute({ name: "a.b.c", path: "/path" }, methodName);
+      }).toThrow(/cannot contain dots/);
+    });
+
+    it("should accept simple route names without dots", () => {
+      expect(() => {
+        validateRoute({ name: "users", path: "/users" }, methodName);
+      }).not.toThrow();
+    });
+  });
+
+  describe("mutation testing coverage", () => {
+    it("should accept exactly MAX_ROUTE_NAME_LENGTH (10000) characters", () => {
+      // Test exact boundary: 10000 chars should pass, 10001 should fail
+      const exactLengthName = "a".repeat(10_000);
+
+      expect(() => {
+        validateRoute({ name: exactLengthName, path: "/test" }, methodName);
+      }).not.toThrow();
+    });
+  });
+
+  describe("encodeParams/decodeParams validation", () => {
+    it("should throw when encodeParams is not a function", () => {
+      expect(() => {
+        validateRoute(
+          {
+            name: "test",
+            path: "/test",
+            encodeParams: "not-a-function",
+          },
+          methodName,
+        );
+      }).toThrow('[router.add] Route "test" encodeParams must be a function');
+    });
+
+    it("should throw when decodeParams is not a function", () => {
+      expect(() => {
+        validateRoute(
+          {
+            name: "test",
+            path: "/test",
+            decodeParams: 123,
+          },
+          methodName,
+        );
+      }).toThrow('[router.add] Route "test" decodeParams must be a function');
+    });
+
+    it("should accept valid encode/decode functions", () => {
+      expect(() => {
+        validateRoute(
+          {
+            name: "test",
+            path: "/test",
+            encodeParams: (p: unknown) => p,
+            decodeParams: (p: unknown) => p,
+          },
+          methodName,
+        );
+      }).not.toThrow();
+    });
+  });
+});

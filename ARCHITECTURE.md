@@ -19,7 +19,7 @@ Key technical choices:
 ```
 real-router/
 ├── packages/
-│   ├── core/                      # Router implementation (facade + namespaces); public types live in src/types, exposed at @real-router/core/types (folded from @real-router/types, wave-2)
+│   ├── core/                      # Router implementation (facade + namespaces); routing engine folded in at src/engine (#1510 iteration 2); public types live in src/types, exposed at @real-router/core/types (folded from @real-router/types, wave-2)
 │   ├── react/                     # React integration (triple entry: main for 19.2+, /legacy for 18+, /ink for Ink 7+ terminal UIs)
 │   ├── preact/                     # Preact integration (hooks, components, Suspense)
 │   ├── solid/                     # Solid.js integration (hooks, components, directives)
@@ -40,8 +40,7 @@ real-router/
 │   ├── navigation-plugin/         # Navigation API browser synchronization + route-level history
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
-│   ├── route-utils/               # Route tree queries and segment testing
-│   └── engine/                    # Routing engine (internal, #1510): route-tree facade at src root + path-matcher & search-params layers under src/
+│   └── route-utils/               # Route tree queries and segment testing
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
 │   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/{core,sources} for transitive symlink resolution
 │   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, scroll spy (#575), view transitions, direction tracker, link helpers
@@ -65,7 +64,7 @@ real-router/
 
 **Public packages** (published to npm): `core`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
-**Internal packages** (bundled into consumers, not on npm): `engine` (merged routing engine — route-tree facade + path-matcher + search-params layers, #1510). **Note:** the generic FSM engine, typed event emitter, and per-router logger now live **inside** `core` at `src/foundation/{fsm,event-emitter,logger}` (not standalone packages); `type-guards` was dissolved into its plugin consumers (wave-2 — each plugin inlines the guards it uses); `@real-router/types` folded into `core` (wave-2, exposed at `@real-router/core/types`). The `fsm` package — published to npm by mistake — had its source **deleted** in wave-3 (its live engine had already been copied into `core/src/foundation/fsm`); the orphaned `@real-router/fsm@0.6.1` stays on npm, deprecated.
+**Internal subsystems of `core`** (bundled into core, not standalone packages, not on npm): the merged **routing engine** (route-tree facade + path-matcher + search-params layers, #1510) now lives **inside** `core` at `src/engine` — folded in by engine-merge iteration 2 (it is the router's core, so it sits in `src/`, not `src/foundation/`); the former bare `packages/engine` is deleted. **Note:** the generic FSM engine, typed event emitter, and per-router logger likewise live inside `core` at `src/foundation/{fsm,event-emitter,logger}`; `type-guards` was dissolved into its plugin consumers (wave-2 — each plugin inlines the guards it uses); `@real-router/types` folded into `core` (wave-2, exposed at `@real-router/core/types`). The `fsm` package — published to npm by mistake — had its source **deleted** in wave-3 (its live engine had already been copied into `core/src/foundation/fsm`); the orphaned `@real-router/fsm@0.6.1` stays on npm, deprecated. **No standalone internal packages remain.**
 
 **Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`, `shared/ssr`
 
@@ -73,15 +72,9 @@ real-router/
 
 ```mermaid
 graph TD
-    subgraph standalone [Standalone — zero deps]
-        ENGINE["engine (route-tree + path-matcher + search-params)"]
-    end
-
     subgraph core [Core]
-        CORE["core (+ public types at /types)"]
+        CORE["core (+ engine at src/engine + public types at /types)"]
     end
-
-    CORE -.->|bundles| ENGINE
 
     subgraph consumers [Consumer packages]
         BP["browser-plugin"]
@@ -425,9 +418,9 @@ These are deliberately designed constraints. Violating them will break the syste
 ├──────────────────────────────────────────────────────────────────┤
 │                              core                                │
 ├──────────────────────────────────────────────────────────────────┤
-│                     Foundation (internal)                        │
+│                core internals (bundled into core)                │
 ├──────────────────────────────────────────────────────────────────┤
-│                          engine                          │  ...  │
+│    src/engine  ·  src/foundation/{fsm, event-emitter, logger}    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -436,7 +429,7 @@ These are deliberately designed constraints. Violating them will break the syste
 - Consumer packages depend on `core`
 - Consumer plugins inline the guards they need (formerly bundled from `type-guards`, dissolved into each plugin — wave-2)
 - Consumer packages import shared sources via git-tracked symlinks (`src/dom-utils` → `shared/dom-utils`, `src/browser-env` → `shared/browser-env`, `src/shared-ssr` → `shared/ssr`)
-- The `engine` package is self-contained (the former `route-tree` → `path-matcher` / `search-params` dependency is now an internal layer boundary within `engine`, enforced by lint — #1510)
+- The `engine` subsystem (`core/src/engine`) is self-contained (the former `route-tree` → `path-matcher` / `search-params` dependency is now an internal layer boundary within `src/engine`, enforced by core's lint — #1510)
 - `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)
 
 **FORBIDDEN:**

@@ -1,0 +1,85 @@
+{
+  "$about": "Reachability ratchet (engine-merge RFC §5.5). uncovered = src/engine/** lines NOT reachable from the FACADE tier (tests/functional/**) alone. verdict: dead (remove) | gap (add a targeted facade test) | keep (layer-specific by design — covered by the layer unit tier) | TODO-triage (fails the check). Growth of any entry, or a NEW file, fails the ratchet.",
+  "files": {
+    "src/engine/path-matcher/SegmentMatcher.ts": {
+      "uncovered": 158,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the path-matcher unit tier (tests/unit/path-matcher), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/path-matcher/encoding.ts": {
+      "uncovered": 21,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the path-matcher unit tier (tests/unit/path-matcher), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/path-matcher/parseSegment.ts": {
+      "uncovered": 4,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the path-matcher unit tier (tests/unit/path-matcher), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/path-matcher/percentEncoding.ts": {
+      "uncovered": 2,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the path-matcher unit tier (tests/unit/path-matcher), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/path-matcher/registration/buildParts.ts": {
+      "uncovered": 1,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the path-matcher unit tier (tests/unit/path-matcher), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/path-matcher/registration/errors.ts": {
+      "uncovered": 140,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the path-matcher unit tier (tests/unit/path-matcher), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/path-matcher/registration/trie.ts": {
+      "uncovered": 33,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the path-matcher unit tier (tests/unit/path-matcher), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/path-matcher/registration/trieNodes.ts": {
+      "uncovered": 47,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the path-matcher unit tier (tests/unit/path-matcher), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/search-params/decode.ts": {
+      "uncovered": 2,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the search-params unit tier (tests/unit/search-params), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/search-params/encode.ts": {
+      "uncovered": 12,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the search-params unit tier (tests/unit/search-params), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/search-params/searchParams.ts": {
+      "uncovered": 65,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the search-params unit tier (tests/unit/search-params), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/search-params/utils.ts": {
+      "uncovered": 6,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the search-params unit tier (tests/unit/search-params), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/search-params/strategies/array.ts": {
+      "uncovered": 54,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the search-params unit tier (tests/unit/search-params), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/search-params/strategies/boolean.ts": {
+      "uncovered": 16,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the search-params unit tier (tests/unit/search-params), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/search-params/strategies/null.ts": {
+      "uncovered": 2,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the search-params unit tier (tests/unit/search-params), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    },
+    "src/engine/search-params/strategies/number.ts": {
+      "uncovered": 8,
+      "verdict": "keep",
+      "note": "Layer internal — covered by the search-params unit tier (tests/unit/search-params), not reachable through the route-tree facade. The 3-tier structure (RFC §5) covers each layer via its own tier by design; these lines are not dead (engine holds 100% coverage under the unit config)."
+    }
+  }
+}

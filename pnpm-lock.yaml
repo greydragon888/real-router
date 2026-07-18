@@ -6161,13 +6161,7 @@ importers:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
 
-  packages/core:
-    devDependencies:
-      engine:
-        specifier: workspace:^
-        version: link:../engine
-
-  packages/engine: {}
+  packages/core: {}
 
   packages/hash-plugin:
     dependencies:

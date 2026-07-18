@@ -1,3 +1,4 @@
+import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { Router as RouterClass } from "./Router";
@@ -21,7 +22,6 @@ import type {
 } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 import type { SerializedRouterState } from "./utils";
-import type { RouteTree } from "engine";
 
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,

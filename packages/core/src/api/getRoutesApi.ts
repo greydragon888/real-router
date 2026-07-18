@@ -1,5 +1,4 @@
-import { nodeToDefinition } from "engine";
-
+import { nodeToDefinition } from "../engine";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
@@ -28,6 +27,7 @@ import {
 import { getTransitionPath } from "../transitionPath";
 
 import type { RoutesApi } from "./types";
+import type { RouteDefinition, RouteTree } from "../engine";
 import type { RouterInternals } from "../internals";
 import type { RouteLifecycleNamespace, RouteConfig } from "../namespaces";
 import type { RoutesStore } from "../namespaces/RoutesNamespace";
@@ -44,7 +44,6 @@ import type {
   GuardFnFactory,
   Route,
 } from "../types";
-import type { RouteDefinition, RouteTree } from "engine";
 
 // ============================================================================
 // Helpers

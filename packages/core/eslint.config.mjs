@@ -79,4 +79,174 @@ export default [
       ],
     },
   },
+
+  // ── Engine layer-boundary + white-box tiers (ported from the former
+  //    packages/engine/eslint.config.mjs when the routing engine folded into
+  //    core/src/engine, #1510). Globs re-scoped: src/ → src/engine/, tests/ →
+  //    tests/engine/. §4 layer-import patterns match RELATIVE internal imports
+  //    (unchanged by the fold, so no src/engine prefix); §5 whitebox patterns
+  //    match the tests' src/engine paths, so they carry the src/engine/ prefix —
+  //    §5a's facade tier now ALLOWS the src/engine barrel (functional tests can no
+  //    longer import the standalone `engine` package) while still banning deeper.
+
+  // §4 — search-params layer is a leaf: no sibling layer / engine root.
+  {
+    files: ["src/engine/search-params/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/path-matcher",
+                "**/path-matcher/**",
+                "**/createMatcher",
+                "**/builder/**",
+                "**/operations/**",
+                "**/validation/**",
+              ],
+              message:
+                "Layer boundary (§4): the search-params layer is a self-contained leaf — it must not import the path-matcher layer or the engine root. Query reaches the matcher via the DI seam, not a direct import.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // §4 — path-matcher layer is a leaf: no query layer / engine root.
+  {
+    files: ["src/engine/path-matcher/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/search-params",
+                "**/search-params/**",
+                "**/createMatcher",
+                "**/builder/**",
+                "**/operations/**",
+                "**/validation/**",
+              ],
+              message:
+                "Layer boundary (§4): the path-matcher layer is a self-contained leaf — search-params is wired via the DI seam, never imported directly, and the engine root must not be reached upward.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // §4 — route-tree root imports a layer ONLY through its barrel.
+  {
+    files: [
+      "src/engine/*.ts",
+      "src/engine/builder/**/*.ts",
+      "src/engine/operations/**/*.ts",
+      "src/engine/validation/**/*.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/path-matcher/*",
+                "**/path-matcher/**",
+                "**/search-params/*",
+                "**/search-params/**",
+              ],
+              message:
+                "Layer boundary (§4): import a layer only through its barrel (./path-matcher, ../search-params), never deep into its internals.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // §5 — facade tier: engine functional tests exercise the engine public API
+  // (the src/engine barrel), never deeper internals.
+  {
+    files: ["tests/engine/functional/**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/src/engine/*", "**/src/engine/**"],
+              message:
+                "White-box (facade tier, §5): functional tests must exercise the engine public API via the src/engine barrel (createRouteTree, createMatcher, getSegmentsByName, routeTreeToDefinitions, validateRoute, + public types), not internal src/engine/* paths. A test of an internal pure function belongs in tests/engine/property/ (exempt).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // §5 — path-matcher layer unit tier: import the layer BARREL, never internals
+  // or another layer. KEEP-narrow allowlist (documented in-file).
+  {
+    files: ["tests/engine/unit/path-matcher/**/*.test.ts"],
+    ignores: [
+      "tests/engine/unit/path-matcher/createSegmentNode.test.ts",
+      "tests/engine/unit/path-matcher/percentEncoding.test.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/src/engine/path-matcher/*",
+                "**/src/engine/path-matcher/**",
+                "**/src/engine/search-params/**",
+                "**/src/engine/builder/**",
+                "**/src/engine/operations/**",
+                "**/src/engine/validation/**",
+                "**/src/engine/index",
+                "**/src/engine/types",
+                "**/src/engine/createMatcher",
+              ],
+              message:
+                "White-box (path-matcher layer tier, §5): unit tests import the path-matcher layer BARREL (../../../src/engine/path-matcher), never its internal files or another layer. A KEEP-narrow exception goes in the allowlist; a test of a genuinely internal pure function belongs in tests/engine/property/path-matcher/ (exempt).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // §5 — search-params layer unit tier: import the layer BARREL. KEEP-narrow
+  // allowlist (documented in-file).
+  {
+    files: ["tests/engine/unit/search-params/**/*.test.ts"],
+    ignores: ["tests/engine/unit/search-params/makeOptions.singleton.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/src/engine/search-params/*",
+                "**/src/engine/search-params/**",
+                "**/src/engine/path-matcher/**",
+                "**/src/engine/builder/**",
+                "**/src/engine/operations/**",
+                "**/src/engine/validation/**",
+                "**/src/engine/index",
+                "**/src/engine/types",
+                "**/src/engine/createMatcher",
+              ],
+              message:
+                "White-box (search-params layer tier, §5): unit tests import the search-params layer BARREL (../../../src/engine/search-params), never its internal files or another layer. A KEEP-narrow exception goes in the allowlist; a test of a genuinely internal pure function belongs in tests/engine/property/search-params/ (exempt).",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

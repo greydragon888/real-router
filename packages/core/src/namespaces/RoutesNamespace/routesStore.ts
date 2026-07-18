@@ -1,7 +1,5 @@
 // packages/core/src/namespaces/RoutesNamespace/routesStore.ts
 
-import { createMatcher, createRouteTree, routeTreeToDefinitions } from "engine";
-
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
 import {
@@ -9,8 +7,19 @@ import {
   createEmptyConfig,
   sanitizeRoute,
 } from "./helpers";
+import {
+  createMatcher,
+  createRouteTree,
+  routeTreeToDefinitions,
+} from "../../engine";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
+import type {
+  CreateMatcherOptions,
+  Matcher,
+  RouteDefinition,
+  RouteTree,
+} from "../../engine";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -22,12 +31,6 @@ import type {
   Route,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
-import type {
-  CreateMatcherOptions,
-  Matcher,
-  RouteDefinition,
-  RouteTree,
-} from "engine";
 
 // =============================================================================
 // Interfaces

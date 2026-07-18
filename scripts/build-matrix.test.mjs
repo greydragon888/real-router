@@ -8,10 +8,11 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets — now 2/6/3/2/2/8/0 = 23 after the
+//     reproduce the companion §C buckets — now 1/6/3/2/2/8/0 = 22 after the
 //     foundation dissolutions (event-emitter + logger in wave-1; type-guards +
 //     the @real-router/types fold into core in wave-2; @real-router/fsm's frozen
-//     shell deleted in wave-3); §C's original master figure was 6/6/3/2/2/8/1 =
+//     shell deleted in wave-3; engine folded into core/src/engine, engine-merge
+//     iteration 2); §C's original master figure was 6/6/3/2/2/8/1 =
 //     28 — plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
@@ -103,7 +104,7 @@ test("L1: rx-only PR derives affected=[rx] WITHOUT the dependency-closure (A5)",
     },
   });
   const { affected } = deriveAffected(queryJson);
-  // The whole point of A5: core/engine (the base layer) are NOT here. If they were,
+  // The whole point of A5: core (the base layer) is NOT here. If it were,
   // touchesCore would always be true and mode=leaf would never fire.
   assert.deepEqual(affected, ["@real-router/rx"]);
   for (const core of CORE_LAYER)
@@ -164,7 +165,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
     tasks: [
       { package: "@real-router/react", directory: "packages/react" },
       { package: "@real-router/react", directory: "packages/react" }, // dup (bundle+test)
-      { package: "engine", directory: "packages/engine" },
+      { package: "@real-router/vue", directory: "packages/vue" },
       { package: "@real-router/shared-sources", directory: "shared" }, // dropped (not packages/*)
       { package: "router-benchmarks", directory: "benchmarks" }, // dropped
       { package: "//", directory: "" }, // dropped
@@ -173,7 +174,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
   const { members, dirOf } = deriveMembership(dryJson);
   assert.deepEqual(
     [...members].sort(),
-    ["@real-router/react", "engine"],
+    ["@real-router/react", "@real-router/vue"],
     "membership = deduped packages/* target set",
   );
   assert.ok(!dirOf.has("@real-router/shared-sources"));
@@ -181,15 +182,15 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 2/6/3/2/2/8/0 = 23", () => {
+test("L2: classify() buckets all real packages/* exactly 1/6/3/2/2/8/0 = 22", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 23, "expected 23 packages/* workspaces");
+  assert.equal(allPackages.length, 22, "expected 22 packages/* workspaces");
   assert.deepEqual(counts, {
-    base: 2,
+    base: 1,
     adapter: 6,
     "url-plugin": 3,
     "ssr-plugin": 2,
@@ -453,7 +454,7 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   );
 });
 
-test("routing: full rebuild (all 23) → base excluded, 10 shards", () => {
+test("routing: full rebuild (all 22) → base excluded, 10 shards", () => {
   const { mode, matrix } = buildPlan(allPackages, realDirOf);
   assert.equal(mode, "sharded");
   const names = matrix.include.map((i) => i.name);

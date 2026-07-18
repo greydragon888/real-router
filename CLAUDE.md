@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 23 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 87 top-level example applications across `examples/web/<framework>/*`, `examples/desktop/{electron,tauri}/*`, and `examples/console/*` (+52 subgroup sub-examples in `web/<framework>/{animation,ssr,hash}-examples/*` → 139 runnable; 145 example workspace packages incl. 6 framework aggregators — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
+pnpm monorepo with 22 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 87 top-level example applications across `examples/web/<framework>/*`, `examples/desktop/{electron,tauri}/*`, and `examples/console/*` (+52 subgroup sub-examples in `web/<framework>/{animation,ssr,hash}-examples/*` → 139 runnable; 145 example workspace packages incl. 6 framework aggregators — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
 
 `shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/`, `shared/dom-utils/`, and `shared/ssr/` that are git-tracked symlink targets. This entry exists so the symlinked shared sources resolve their workspace imports (`@real-router/core` — including its `/types` subpath — and `@real-router/sources`) from `shared/`'s own filesystem location during type-check and bundling. (Before wave-2 it also anchored the runtime `type-guards` import that `shared/browser-env` inlined via `alwaysBundle` and a direct `@real-router/types` dep; `type-guards` is now dissolved with `isStateStrict` local in `shared/browser-env/state-guard.ts`, and `@real-router/types` folded into `@real-router/core` so the shared sources import types from `@real-router/core`.) See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 
@@ -234,7 +234,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/preload-plugin/CLAUDE.md](packages/preload-plugin/CLAUDE.md) — Preload plugin architecture
 - [packages/memory-plugin/CLAUDE.md](packages/memory-plugin/CLAUDE.md) — Memory plugin architecture
 - [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
-- [packages/engine/CLAUDE.md](packages/engine/CLAUDE.md) — Routing engine (merged): route-tree facade + path-matcher + search-params layers (#1510)
+- [packages/core/src/engine/CLAUDE.md](packages/core/src/engine/CLAUDE.md) — Routing engine (merged): route-tree facade + path-matcher + search-params layers (#1510); folded into core as `src/engine` (engine-merge iteration 2)
 - [packages/core/src/foundation/fsm/CLAUDE.md](packages/core/src/foundation/fsm/CLAUDE.md) — FSM engine internals (the live, sole copy in core; the standalone `@real-router/fsm` package was deleted from source in wave-3, its published `0.6.1` deprecated on npm)
 - [benchmarks/CLAUDE.md](benchmarks/CLAUDE.md) — Benchmark suite
 - [MCP Servers Guide](.claude/mcp-guide.md)

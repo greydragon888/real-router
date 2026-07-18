@@ -22,6 +22,15 @@ export default {
     "!src/index.ts", // Barrel export - skip
     "!src/internals.ts", // Internal re-exports - skip
     "!src/constants.ts", // Constants - skip
+    // Engine (folded in at src/engine, engine-merge iteration 2) — the same
+    // barrel/type-only excludes the standalone engine's stryker config carried,
+    // re-scoped src/ → src/engine/ (mutants on re-export barrels + type-only
+    // files are equivalents; engine held ~90% without them).
+    "!src/engine/index.ts", // Engine barrel - skip
+    "!src/engine/types.ts", // Type re-export hub - skip
+    "!src/engine/builder/index.ts", // Barrel - skip
+    "!src/engine/builder/types.ts", // Type-only - skip
+    "!src/engine/operations/types.ts", // Type-only - skip
   ],
 
   // Vitest runner configuration

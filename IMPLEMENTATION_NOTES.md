@@ -39,6 +39,65 @@ dead-code sweep (#1505): 16 files / 571 lines facade-unreachable, ALL in the two
 0 in the route-tree facade, none dead (each covered by its own layer tier). Not wired
 into pre-push until the registry is triaged to "empty + KEEP" (Faza 2).
 
+## Engine Merge iteration 2 — `engine` → `core/src/engine` (#1510)
+
+**Problem.** Iteration 1 (above) collapsed the three-package routing engine into one
+bare `packages/engine`, but `@real-router/core` was its ONLY consumer and bundled it
+whole (`alwaysBundle`). A standalone package for a single-consumer, never-published
+subsystem still cost its own `package.json` / two `tsconfig`s / `tsdown` / five `vitest`
+configs / `eslint` / stryker, plus an entry in every package-set (CORE_LAYER, codecov,
+syncpack, build-matrix). The engine is not a utility — it is the router's core — so a
+peer directory under `packages/` mis-modeled the layering.
+
+**Solution.** Fold `engine` into core as **`core/src/engine`** — `src/`, not
+`src/foundation/` (owner decision: the engine is the router's core, not a foundation
+utility like fsm/event-emitter/logger). `git mv packages/engine/src/* →
+core/src/engine/` (39 files, self-contained — only relative internal imports), tests →
+`core/tests/engine/` (74 files, import paths codemod'd: bare `"engine"` → the
+`src/engine` barrel, `../src/foundation/engine` depths recomputed). The engine's
+discipline ported into core intact:
+- **6 layer/whitebox eslint rules** appended to `core/eslint.config.mjs` (§4 layer
+  boundaries — search-params leaf, path-matcher leaf, route-tree barrel-only; §5
+  whitebox tiers — facade, path-matcher-unit, search-params-unit). Globs re-scoped
+  `src/`→`src/engine/`, `tests/`→`tests/engine/`; §5 facade now allows the `src/engine`
+  barrel (functional tests can no longer import a standalone `engine` package).
+- **Reachability ratchet** ported: `ENGINE_REACHABILITY.json` (16 keys re-prefixed
+  `src/`→`src/engine/`) + `reachability-check.mjs` (`ENGINE_ROOT`→`packages/core`) +
+  **new** `core/vitest.config.facade.mts` (extends `commonConfig`, NOT `unit` — a
+  `mergeConfig` would CONCATENATE the inherited include and drag core's own + the layer
+  tiers back into the facade-only run; coverage re-scoped to `src/engine/**`, thresholds
+  dropped). `test:reachability` passes: 16 files / 571 facade-unreachable lines, baseline
+  unchanged from iteration 1.
+
+Configs: CORE_LAYER 2→1 (core alone); codecov engine component removed;
+syncpack two `engine` entries removed; `build-matrix.test.mjs` live sweep 23→22 packages,
+base bucket 2→1. Engine's design docs (CLAUDE/ARCHITECTURE/INVARIANTS) preserved at
+`core/src/engine/*.md` (the `foundation/fsm` precedent; README dropped — engine was
+internal-only, never published, so an install-README would mislead). `packages/engine`
+deleted; `pnpm install` deregisters the workspace.
+
+**Why (empirically verified).** Two coverage traps surfaced and were fixed by prog:
+(1) integrating the engine tests dropped core coverage to 94% — the engine's grammar/
+error paths (`path-matcher/registration`, `validation/routes.ts` `errors.ts`) are covered
+**only** by the property tier, so `core/vitest.config.mts` must add all THREE engine tiers
+(`functional` + `unit` + **`property`**) to the coverage `test` run, not just functional+
+unit. (2) even then only 3004 tests ran at 94% — core's `test` script was
+`vitest run functional/`, a positional filter that excluded the engine unit+property
+tiers; dropping the `functional/` filter → `vitest run` → 3819 tests, 100%. Both were
+caught by running the gate, not by reading the config. A third trap in **knip**:
+the engine barrel `src/engine/index.ts` re-exports `MatchResult`, consumed only by
+a functional-test helper (`tests/engine/functional/operations/helpers.ts`, outside
+knip's `project` scope) that correctly imports it from the barrel per the facade
+convention. Pre-fold, engine's `index.ts` was the *package* `exports` entry, so knip
+auto-counted every barrel export as used; folded in, the barrel is internal, so knip
+demanded a real importer and flagged `MatchResult` as unused. Fix: declare
+`src/engine/index.ts` a knip `entry` in the `packages/core` workspace — restoring the
+"this barrel is the engine's public surface" semantic (the whitebox facade tier is
+*required* to import from it). NOT a code removal: `MatchResult` is genuinely used;
+the line-level reachability ratchet independently guards real dead code in `src/engine`.
+The engine's own bundle contribution is unchanged (core already `alwaysBundle`d it) —
+a pure structural move.
+
 ## `fsm` + `event-emitter` → `core/src/foundation`
 
 **Problem.** Two foundation primitives lived as standalone packages consumed only by

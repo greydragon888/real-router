@@ -124,9 +124,6 @@ component_management:
     - component_id: react
       paths:
         - packages/react/src/**
-    - component_id: engine
-      paths:
-        - packages/engine/src/**
     - component_id: route-utils
       paths:
         - packages/route-utils/src/**

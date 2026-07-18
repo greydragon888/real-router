@@ -35,6 +35,7 @@ import { getTransitionPath } from "./transitionPath";
 import { assertLoggerConfig } from "./typeGuards";
 import { wireNamespaces } from "./wiring";
 
+import type { CreateMatcherOptions } from "./engine";
 import type { RouterInternals } from "./internals";
 import type { DependenciesStore } from "./namespaces";
 import type {
@@ -51,7 +52,6 @@ import type {
   Route,
 } from "./types";
 import type { Limits, RouterEventMap } from "./types/internal";
-import type { CreateMatcherOptions } from "engine";
 
 const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
 

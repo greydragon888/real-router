@@ -193,7 +193,8 @@
     "packages/core": {
       "entry": [
         "tests/benchmarks/*.bench.ts",
-        "tests/benchmarks/codspeed.ts"
+        "tests/benchmarks/codspeed.ts",
+        "src/engine/index.ts"
       ],
       "project": [
         "src/**/*.{ts,tsx}",

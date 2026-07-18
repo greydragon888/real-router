@@ -31,7 +31,6 @@ export default {
       packages: ["**"],
       dependencies: [
         "@real-router/*",
-        "engine",
       ],
       // No "peer": a @real-router/* peer dep must NOT be forced to workspace:^
       // (on 0.x, ^0.x.y is patch-only → any minor bump triggers a major via
@@ -123,7 +122,6 @@ export default {
       label: "Workspace packages use workspace:^ protocol",
       dependencies: [
         "@real-router/*",
-        "engine",
       ],
       // prod/dev only — peer deps must NOT be pinned to workspace:^ (on 0.x,
       // ^0.x.y is patch-only → minor bump → unwanted major via changesets #822;

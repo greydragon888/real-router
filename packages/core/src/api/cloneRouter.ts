@@ -1,11 +1,10 @@
-import { routeTreeToDefinitions } from "engine";
-
 import { errorCodes } from "../constants";
+import { routeTreeToDefinitions } from "../engine";
 import { getInternals } from "../internals";
+import { getLifecycleApi } from "./getLifecycleApi";
 import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { Router as RouterClass } from "../Router";
 import { RouterError } from "../RouterError";
-import { getLifecycleApi } from "./getLifecycleApi";
 
 import type {
   DefaultDependencies,

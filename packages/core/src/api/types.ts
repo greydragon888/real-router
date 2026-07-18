@@ -1,5 +1,5 @@
+import type { RouteTree } from "../engine";
 import type { PluginApi as BasePluginApi } from "../types";
-import type { RouteTree } from "engine";
 
 export interface PluginApi extends Omit<BasePluginApi, "getTree"> {
   getTree: () => RouteTree;

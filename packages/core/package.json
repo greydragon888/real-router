@@ -94,9 +94,9 @@
   },
   "homepage": "https://github.com/greydragon888/real-router",
   "scripts": {
-    "test": "vitest run functional/",
+    "test": "vitest run",
     "test:properties": "vitest run --config vitest.config.properties.mts",
-    "test:coverage": "vitest run functional/ --coverage",
+    "test:coverage": "vitest run --coverage",
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
@@ -104,10 +104,9 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --max-warnings 0",
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "bundle": "tsdown --config-loader unrun"
+    "bundle": "tsdown --config-loader unrun",
+    "test:reachability": "node ../../scripts/reachability-check.mjs",
+    "test:reachability:update": "node ../../scripts/reachability-check.mjs --update"
   },
-  "sideEffects": false,
-  "devDependencies": {
-    "engine": "workspace:^"
-  }
+  "sideEffects": false
 }

@@ -18,6 +18,12 @@ import { getTransitionPath } from "../../transitionPath";
 import type { RoutesStore } from "./routesStore";
 import type { RoutesDependencies } from "./types";
 import type {
+  CreateMatcherOptions,
+  RouteParams,
+  RouteTree,
+  RouteTreeState,
+} from "../../engine";
+import type {
   DefaultDependencies,
   ForwardToCallback,
   Options,
@@ -27,12 +33,6 @@ import type {
   Route,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
-import type {
-  CreateMatcherOptions,
-  RouteParams,
-  RouteTree,
-  RouteTreeState,
-} from "engine";
 
 function collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
   const params: string[] = [];

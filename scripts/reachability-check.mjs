@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Reachability ratchet (engine-merge RFC §5.5 / Appendix A): runs the engine's
 // FACADE tier with coverage, extracts the src/** lines NOT reachable from the
-// facade alone, and diffs them against packages/engine/ENGINE_REACHABILITY.json.
+// facade alone, and diffs them against packages/core/ENGINE_REACHABILITY.json.
 // Any drift = fail: growth means new facade-unreachable code appeared; shrinkage
 // means the ratchet can be tightened (--update).
 //
@@ -15,7 +15,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import process from "node:process";
 
-const ENGINE_ROOT = resolve(import.meta.dirname, "../packages/engine");
+const ENGINE_ROOT = resolve(import.meta.dirname, "../packages/core");
 const COVERAGE_JSON = resolve(ENGINE_ROOT, "coverage-facade/coverage-final.json");
 const REGISTRY = resolve(ENGINE_ROOT, "ENGINE_REACHABILITY.json");
 const VERDICTS = new Set(["dead", "gap", "keep"]);
