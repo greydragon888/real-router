@@ -1155,6 +1155,77 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
       sr.destroy();
     });
 
+    it("reload with unserializable params → safeKeyOf null → restores top (0)", () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // BigInt params blow up canonicalization → safeKeyOf returns null →
+      // the reload arm restores the top-of-page fallback.
+      fake.emit(
+        makeState(
+          "home",
+          { big: 1n },
+          { navigation: { navigationType: "reload" } },
+        ),
+      );
+
+      expect(scrollSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+
+      sr.destroy();
+    });
+
+    it("reload with no stored position → `?? 0` fallback scrolls to top", () => {
+      // sessionStorage cleared in beforeEach — loadStore()[key] is undefined.
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState("home", {}, { navigation: { navigationType: "reload" } }),
+      );
+
+      expect(scrollSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("push + hash with NO matching element → falls through to top scroll", () => {
+      globalThis.history.replaceState(null, "", "/#missing-target");
+
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "forward", navigationType: "push" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(scrollSpy).toHaveBeenCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+      globalThis.history.replaceState(null, "", "/");
+    });
+
     it("putPos skips the write when the position is unchanged (skip-same-value)", () => {
       Object.defineProperty(globalThis, "scrollY", {
         value: 100,

@@ -265,7 +265,7 @@ Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSour
 
 **dom-utils prebuild copy:** The `src/dom-utils/` directory is a git-tracked copy of `shared/dom-utils/` — not a symlink (root `CLAUDE.md` calls this out explicitly for the Angular adapter). The `prebundle` script re-materializes the copy before every bundle to keep it in sync with `shared/dom-utils/`. ng-packagr does not follow symlinks the same way tsdown does, so the sources are copied into the package before compilation.
 
-**JIT mode limitation:** Angular 22 JIT mode (used in TestBed without `@analogjs/vite-plugin-angular`) does not support signal-based `input()` in template bindings. Full template compilation in tests requires the Analog Vite plugin.
+**JIT mode limitation:** Angular 22 JIT mode (used in TestBed without a compiler transform) does not support signal-based `input()` in template bindings, and `contentChildren()` queries never populate. Paths that need real template compilation are unit-tested in the dedicated **aot** vitest project (`tests/aot/**`, compiled by `@analogjs/vite-plugin-angular`) — see Testing Strategy below.
 
 ## Data Flow
 
@@ -294,13 +294,21 @@ router emits TRANSITION_SUCCESS
 
 ```
 tests/
-├── functional/           # Unit tests per function/component/directive
-└── setup.ts              # Angular TestBed + JSDOM environment setup
+├── functional/           # Unit tests per function/component/directive (vitest "jit" project)
+├── aot/                  # AOT-compiled fixtures (vitest "aot" project, #1512)
+│   ├── setup.ts          # TestBed setup WITHOUT @angular/compiler (no JIT fallback masking)
+│   ├── routeview-fallback.aot.test.ts  # RouteView Self/NotFound + #1439 first-wins matrix
+│   └── directives.aot.test.ts          # RealLink / RealLinkActive signal-input paths
+├── property/             # Property-based tests (separate config, test:properties)
+├── stress/               # Stress tests (separate config, test:stress)
+└── setup.ts              # Angular TestBed + JSDOM environment setup (jit project)
 ```
 
-**Coverage thresholds:** 94% statements, 84% branches, 94% functions, 94% lines (enforced in `vitest.config.mts`). `src/dom-utils/direction-tracker.ts` is excluded from coverage — coverage for the canonical shared source (`shared/dom-utils/direction-tracker.ts`) lives in `packages/react/` (react is its measuring owner after the node→consumer migration, #1065).
+**Two vitest projects, one run (#1512):** `vitest.config.mts` declares `test.projects` — `jit` (the whole suite, esbuild-transpiled; `contentChildren` queries stay empty there) and `aot` (only `tests/aot/**`, compiled by `@analogjs/vite-plugin-angular` with full Ivy, where the queries populate for real). Coverage is a root-only option, so both projects merge into a single report and AOT-only hits count toward the thresholds — this is what allows `RouteView`'s fallback resolution to be covered without a `v8 ignore`.
 
-**Why not 100%:** Angular 22 JIT mode (TestBed without `@analogjs/vite-plugin-angular`) does not compile signal-based `input()` template bindings. This makes ~15 lines across `RouteView`, `RealLink`, `RealLinkActive` unreachable from tests — specifically the subscription callbacks, DOM update branches, and `contentChildren`-driven template matching. These paths execute correctly at runtime with AOT compilation in real apps, but cannot be triggered in JIT-based unit tests without installing the AOT vite plugin (~30 packages of tooling) or refactoring directives to expose internals. See CLAUDE.md "Coverage Ceiling" section for the full analysis.
+**Coverage thresholds:** 98% statements, 94% branches, 99% functions, 98% lines (enforced in `vitest.config.mts`; measured floors — see the config comment for the actuals and the merge-duplicate caveat).
+
+**Why not 100%:** every semantic path is executed and asserted in the two-project run (#1512 layers 1-2 closed the ordinary gaps in the jit suite and the signal-input paths in the aot project). The residual percentage is a measurement artifact: files tested in BOTH projects keep uncovered jit-emit "twins" of lines the aot map covers (the two compilers map statements to different ranges), plus a few AOT-emit phantom branches (angular#64583 class). See CLAUDE.md "Coverage Ceiling" for the full analysis and why evicting tests into the aot project wholesale is deliberately not pursued.
 
 ## See Also
 

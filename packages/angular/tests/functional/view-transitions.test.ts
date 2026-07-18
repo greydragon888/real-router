@@ -194,6 +194,53 @@ describe("createViewTransitions (Angular copy)", () => {
     vi.restoreAllMocks();
   });
 
+  describe("stale success timer vs newer VT (#781 identity guard)", () => {
+    it("a stale resolver does not null out a VT opened before its timer fired", async () => {
+      // Replace the file-level synchronous setTimeout stub with a MANUAL
+      // queue: the guard branch only exists when a new VT opens in the
+      // task-queue window BEFORE the previous success's timer runs.
+      const queued: (() => void)[] = [];
+
+      vi.stubGlobal("setTimeout", (cb: () => void): number => {
+        queued.push(cb);
+
+        return 0;
+      });
+
+      const { startSpy } = stubStartViewTransitionSync();
+      const fake = makeFakeRouter();
+
+      track(createViewTransitions(fake.router));
+
+      // nav1: VT1 opens, success queues its close-resolver (timer pending).
+      await fake.emitLeave(makeState("a"), makeState("b"));
+      fake.emitSuccess(makeState("b"), makeState("a"));
+
+      expect(queued).toHaveLength(1);
+
+      // nav2 opens VT2 while timer1 is still pending.
+      await fake.emitLeave(makeState("b"), makeState("c"));
+
+      expect(startSpy).toHaveBeenCalledTimes(2);
+
+      // Fire the STALE timer1: currentVT is VT2 → identity guard must skip
+      // the null-out (the uncovered else of `currentVT === scheduledVT`).
+      queued.shift()?.();
+
+      // nav2 then completes and closes cleanly through its own timer.
+      fake.emitSuccess(makeState("c"), makeState("b"));
+      queued.shift()?.();
+
+      expect(queued).toHaveLength(0);
+
+      // The lifecycle stays healthy after the stale-timer episode: a third
+      // navigation still opens a fresh VT.
+      await fake.emitLeave(makeState("c"), makeState("d"));
+
+      expect(startSpy).toHaveBeenCalledTimes(3);
+    });
+  });
+
   describe("feature detection", () => {
     it("returns no-op when document.startViewTransition is undefined", () => {
       const fake = makeFakeRouter();
