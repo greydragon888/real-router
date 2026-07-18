@@ -1,7 +1,7 @@
 import { DEFAULT_LIMITS } from "../../constants";
 
-import type { DefaultDependencies } from "../../public-types";
-import type { Limits } from "../../types";
+import type { DefaultDependencies } from "../../types";
+import type { Limits } from "../../types/internal";
 
 export interface DependenciesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,

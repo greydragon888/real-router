@@ -1,4 +1,4 @@
-import type { PluginApi as BasePluginApi } from "../public-types";
+import type { PluginApi as BasePluginApi } from "../types";
 import type { RouteTree } from "engine";
 
 export interface PluginApi extends Omit<BasePluginApi, "getTree"> {
@@ -9,4 +9,4 @@ export {
   type RoutesApi,
   type LifecycleApi,
   type DependenciesApi,
-} from "../public-types";
+} from "../types";

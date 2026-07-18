@@ -1,29 +1,22 @@
-// packages/core/src/types.ts
+// packages/core/src/types/internal.ts
 
 /**
- * Core-internal types + re-exports from @real-router/types.
+ * Core-internal types. NOT part of the public `@real-router/core/types` surface
+ * (the `./index` barrel deliberately does not re-export these), so they never
+ * leak onto the subpath or the package root. Core modules import them directly
+ * from `./types/internal`.
  *
- * Factory types (PluginFactory, GuardFnFactory) and
- * route config types (Route, RouteConfigUpdate) are canonical in @real-router/types
- * and re-exported here for backward compatibility.
+ * Imports pull from the sibling declaration files (not `./index`) to keep
+ * `internal.ts` off the barrel's re-export cycle (`import-x/no-cycle`).
  */
 
 import type {
-  LimitsConfig,
   NavigationOptions,
   RouterError as RouterErrorType,
   State,
-  TreeChangedEvent,
-} from "./public-types";
-
-// Re-export from @real-router/types (canonical source)
-export type {
-  GuardFnFactory,
-  PluginFactory,
-  Route,
-  RouteConfigUpdate,
-  EventMethodMap,
-} from "./public-types";
+} from "./base";
+import type { LimitsConfig } from "./limits";
+import type { TreeChangedEvent } from "./tree-changed";
 
 /**
  * Event argument tuples for the router's 7 transition events plus the internal

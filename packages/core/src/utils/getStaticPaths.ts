@@ -1,6 +1,6 @@
 import { getPluginApi } from "../api/getPluginApi";
 
-import type { DefaultDependencies, Router } from "../public-types";
+import type { DefaultDependencies, Router } from "../types";
 import type { RouteTree } from "engine";
 
 export type StaticPathEntries = Record<

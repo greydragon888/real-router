@@ -11,8 +11,8 @@ import type {
   DefaultDependencies,
   LoggerConfig,
   Router,
-} from "../public-types";
-import type { Route } from "../types";
+  Route,
+} from "../types";
 
 /**
  * Per-clone overrides beyond dependencies.

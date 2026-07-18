@@ -1,7 +1,7 @@
 import { serializeState } from "./serializeState";
 
 import type { Serialize } from "./serializeState";
-import type { Params, State } from "../public-types";
+import type { Params, State } from "../types";
 
 /**
  * Parsed shape produced by {@link serializeRouterState} (after `JSON.parse`).

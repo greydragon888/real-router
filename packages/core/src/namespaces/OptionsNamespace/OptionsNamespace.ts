@@ -4,7 +4,7 @@ import { defaultOptions } from "./constants";
 import { deepFreeze } from "./helpers";
 import { validateOptionsIsObject } from "./validators";
 
-import type { Options } from "../../public-types";
+import type { Options } from "../../types";
 
 export class OptionsNamespace {
   readonly #options: Readonly<Options>;

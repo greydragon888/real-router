@@ -6,7 +6,7 @@ import { freezeStateInPlace } from "../../helpers";
 import { setStateMetaParams } from "../../stateMetaStore";
 
 import type { StateNamespaceDependencies } from "./types";
-import type { Params, State } from "../../public-types";
+import type { Params, State } from "../../types";
 import type { RouteTreeStateMeta } from "engine";
 
 /**

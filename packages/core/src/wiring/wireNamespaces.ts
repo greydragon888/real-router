@@ -10,8 +10,8 @@ import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
-import type { DefaultDependencies, Params } from "../public-types";
 import type { Router } from "../Router";
+import type { DefaultDependencies, Params } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
 
 /**

@@ -764,8 +764,8 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 
 | Type Kind                | Location                                                                 |
 | ------------------------ | ----------------------------------------------------------------------- |
-| Public API types         | `src/public-types/` (folded from `@real-router/types`, wave-2) — re-exported from the root `@real-router/core`, and exposed at the `@real-router/core/types` subpath (the augmentation declaration-site: `declare module "@real-router/core/types"`). **Gotcha:** the root exports the `Router` / `RouterError` **classes**, which shadow the same-named interfaces; import the `Router` **interface** (factory-param typing) from `@real-router/core/types`, not the root. |
-| Router-dependent types   | `src/types.ts`                                                          |
+| Public API types         | `src/types/` — the `types/index.ts` barrel IS the `@real-router/core/types` subpath (also re-exported from the root `@real-router/core`) and the augmentation declaration-site (`declare module "@real-router/core/types"`). Folded from `@real-router/types` (wave-2, initially as `public-types/`, then consolidated into `types/`). **Gotcha:** the root exports the `Router` / `RouterError` **classes**, which shadow the same-named interfaces; import the `Router` **interface** (factory-param typing) from `@real-router/core/types`, not the root. |
+| Core-internal types      | `src/types/internal.ts` — `RouterEventMap`, `Limits`; deliberately NOT re-exported by `types/index.ts`, so they never reach the subpath / root. Imported by core via `./types/internal`. (Was the old `src/types.ts` reshim, now deleted.) |
 | Namespace-internal types | `namespaces/XxxNamespace/types.ts`                                      |
 
 ### Test Coverage

@@ -6,8 +6,9 @@ import type {
   Plugin,
   RouterLogger,
   Unsubscribe,
-} from "../../public-types";
-import type { EventMethodMap, PluginFactory } from "../../types";
+  EventMethodMap,
+  PluginFactory,
+} from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
 
 export interface PluginsDependencies<

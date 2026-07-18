@@ -5,7 +5,7 @@
  * Called by Router facade before instance methods.
  */
 
-import type { Plugin } from "../../public-types";
+import type { Plugin } from "../../types";
 
 /**
  * Validates that a plugin factory returned a valid plugin object.

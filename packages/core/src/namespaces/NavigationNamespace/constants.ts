@@ -3,7 +3,7 @@
 import { errorCodes } from "../../constants";
 import { RouterError } from "../../RouterError";
 
-import type { State } from "../../public-types";
+import type { State } from "../../types";
 
 // =============================================================================
 // Cached Errors & Rejected Promises (Performance Optimization)

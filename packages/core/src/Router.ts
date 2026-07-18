@@ -47,8 +47,10 @@ import type {
   State,
   SubscribeFn,
   Unsubscribe,
-} from "./public-types";
-import type { Limits, PluginFactory, Route, RouterEventMap } from "./types";
+  PluginFactory,
+  Route,
+} from "./types";
+import type { Limits, RouterEventMap } from "./types/internal";
 import type { CreateMatcherOptions } from "engine";
 
 const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});

@@ -18,8 +18,9 @@ import type {
   Params,
   RouteConfigUpdate,
   RouterLogger,
-} from "../../public-types";
-import type { GuardFnFactory, Route } from "../../types";
+  GuardFnFactory,
+  Route,
+} from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   CreateMatcherOptions,

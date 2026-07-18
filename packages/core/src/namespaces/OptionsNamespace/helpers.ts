@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/OptionsNamespace/helpers.ts
 
-import type { Options, Params } from "../../public-types";
+import type { Options, Params } from "../../types";
 
 /**
  * Recursively freezes an object and all nested objects.

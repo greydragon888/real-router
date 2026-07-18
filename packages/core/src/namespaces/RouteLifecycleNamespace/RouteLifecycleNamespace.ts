@@ -1,8 +1,12 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
 import type { RouteLifecycleDependencies } from "./types";
-import type { DefaultDependencies, GuardFn, State } from "../../public-types";
-import type { GuardFnFactory } from "../../types";
+import type {
+  DefaultDependencies,
+  GuardFn,
+  State,
+  GuardFnFactory,
+} from "../../types";
 
 // Boolean shorthand has only two possible values, so the guard and its factory
 // are module-level singletons — registering `true`/`false` reuses one cached

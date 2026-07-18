@@ -4,8 +4,8 @@ import type {
   DefaultDependencies,
   GuardFn,
   RouterLogger,
-} from "../../public-types";
-import type { GuardFnFactory } from "../../types";
+  GuardFnFactory,
+} from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
 
 export interface RouteLifecycleDependencies<

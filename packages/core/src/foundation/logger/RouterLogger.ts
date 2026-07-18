@@ -7,7 +7,7 @@ import type {
   LoggerConfig,
   LogLevelConfig,
   LogCallback,
-} from "../../public-types";
+} from "../../types";
 
 /**
  * Internal config type with required callbackIgnoresLevel

@@ -19,7 +19,7 @@ Key technical choices:
 ```
 real-router/
 ├── packages/
-│   ├── core/                      # Router implementation (facade + namespaces); public types live in src/public-types, exposed at @real-router/core/types (folded from @real-router/types, wave-2)
+│   ├── core/                      # Router implementation (facade + namespaces); public types live in src/types, exposed at @real-router/core/types (folded from @real-router/types, wave-2)
 │   ├── react/                     # React integration (triple entry: main for 19.2+, /legacy for 18+, /ink for Ink 7+ terminal UIs)
 │   ├── preact/                     # Preact integration (hooks, components, Suspense)
 │   ├── solid/                     # Solid.js integration (hooks, components, directives)
@@ -341,7 +341,7 @@ On error at any step: `emitTransitionError()`, Promise rejects with `RouterError
 
 ### Plugin Interception
 
-Plugins intercept router methods via `addInterceptor()` on `PluginApi`. `InterceptableMethodMap` is fixed at compile time (`core/src/public-types/api.ts`):
+Plugins intercept router methods via `addInterceptor()` on `PluginApi`. `InterceptableMethodMap` is fixed at compile time (`core/src/types/api.ts`):
 
 | Method         | Signature                                                                | Used by                                                                                          |
 | -------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |

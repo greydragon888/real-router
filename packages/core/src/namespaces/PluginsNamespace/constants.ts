@@ -5,7 +5,7 @@ import {
   plugins as PLUGINS_CONST,
 } from "../../constants";
 
-import type { EventName } from "../../public-types";
+import type { EventName } from "../../types";
 
 /**
  * Maps plugin method names to router event names.

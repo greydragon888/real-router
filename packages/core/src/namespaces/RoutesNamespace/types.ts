@@ -8,8 +8,8 @@ import type {
   RouterLogger,
   SimpleState,
   State,
-} from "../../public-types";
-import type { GuardFnFactory } from "../../types";
+  GuardFnFactory,
+} from "../../types";
 
 /**
  * Dependencies injected into RoutesNamespace.

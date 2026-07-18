@@ -41,8 +41,9 @@ import type {
   State,
   TreeChangedEvent,
   TreeStructuralPatch,
-} from "../public-types";
-import type { GuardFnFactory, Route } from "../types";
+  GuardFnFactory,
+  Route,
+} from "../types";
 import type { RouteDefinition, RouteTree } from "engine";
 
 // ============================================================================

@@ -3,7 +3,7 @@
 /**
  * RealRouter-specific assertion for logger configuration.
  */
-import type { LoggerConfig, LogLevelConfig } from "./public-types";
+import type { LoggerConfig, LogLevelConfig } from "./types";
 
 const VALID_LEVELS_SET = new Set<string>([
   "all",

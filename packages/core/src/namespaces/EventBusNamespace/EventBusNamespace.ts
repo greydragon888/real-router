@@ -18,8 +18,9 @@ import type {
   SubscribeFn,
   TreeChangedEvent,
   Unsubscribe,
-} from "../../public-types";
-import type { EventMethodMap, RouterEventMap } from "../../types";
+  EventMethodMap,
+} from "../../types";
+import type { RouterEventMap } from "../../types/internal";
 import type { RouterValidator } from "../../types/RouterValidator";
 
 /**

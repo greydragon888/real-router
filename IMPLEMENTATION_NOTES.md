@@ -275,6 +275,20 @@ functional + property + stress green); the affected plugins + `route-utils` stay
 `build-matrix.test` 31/31; full linters green. Ordering: this M2 lands **after** M1 so
 `type-guards` (which typed *upward* onto the folded types) never has to point at core.
 
+**Follow-up — `public-types/` consolidated into `src/types/`.** `public-types` was only ever
+a name chosen to dodge the pre-existing `src/types.ts`-file-vs-`src/types/`-dir clash (the dir
+then held just `RouterValidator.ts`). The consolidation resolves that: the 8 folded files moved
+into `src/types/` (joining `RouterValidator.ts`), the old `types.ts` reshim was **deleted**, and
+its two core-internal types (`RouterEventMap`, `Limits`) moved to `src/types/internal.ts` —
+deliberately **not** re-exported by `types/index.ts`, so they never leak onto the
+`@real-router/core/types` subpath or the root. Redundant re-exports in the reshim were dropped
+(the `types/index.ts` barrel already provides `Route` / `PluginFactory` / `GuardFnFactory` /
+`RouteConfigUpdate` / `EventMethodMap`). Net: **one** `src/types/` directory (barrel = subpath =
+declaration-site; `internal.ts` = core-only; `RouterValidator.ts` = public core contract),
+52 core `./public-types` imports rewritten to `./types`, package.json + tsdown `./types` entry
+repointed. `internal.ts` imports its deps from the sibling files (`./base` / `./limits` /
+`./tree-changed`), not the barrel, to stay off `import-x/no-cycle`. core 100% coverage held.
+
 ## Project Rename
 
 Project renamed from `router6` to `real-router`. Updated in:

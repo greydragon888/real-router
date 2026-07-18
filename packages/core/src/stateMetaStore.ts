@@ -1,6 +1,6 @@
 // packages/core/src/stateMetaStore.ts
 
-import type { Params, State } from "./public-types";
+import type { Params, State } from "./types";
 
 const store = new WeakMap<State, Params>();
 

@@ -1,11 +1,7 @@
 import { errorCodes, constants } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
-import type {
-  NavigationOptions,
-  State,
-  TransitionMeta,
-} from "../../../public-types";
+import type { NavigationOptions, State, TransitionMeta } from "../../../types";
 import type { NavigationDependencies, NavigationContext } from "../types";
 
 type MutableTransitionMeta = {

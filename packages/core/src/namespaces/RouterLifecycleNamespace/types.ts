@@ -1,11 +1,6 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/types.ts
 
-import type {
-  NavigationOptions,
-  Options,
-  Params,
-  State,
-} from "../../public-types";
+import type { NavigationOptions, Options, Params, State } from "../../types";
 
 export interface RouterLifecycleDependencies {
   getOptions: () => Options;

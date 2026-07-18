@@ -24,8 +24,8 @@ import type {
   Params,
   RouterLogger,
   State,
-} from "../../public-types";
-import type { Route } from "../../types";
+  Route,
+} from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   CreateMatcherOptions,

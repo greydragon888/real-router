@@ -5,8 +5,8 @@ import type {
   DefaultDependencies,
   ForwardToCallback,
   Params,
-} from "../../public-types";
-import type { Route } from "../../types";
+  Route,
+} from "../../types";
 import type { RouteDefinition } from "engine";
 
 /**

@@ -30,7 +30,7 @@
       "require": "./dist/cjs/index.js"
     },
     "./types": {
-      "@real-router/internal-source": "./src/public-types/index.ts",
+      "@real-router/internal-source": "./src/types/index.ts",
       "types": {
         "import": "./dist/esm/types.d.mts",
         "require": "./dist/cjs/types.d.ts"

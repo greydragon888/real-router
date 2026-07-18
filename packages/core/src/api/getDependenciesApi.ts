@@ -3,7 +3,7 @@ import { getInternals } from "../internals";
 
 import type { DependenciesApi } from "./types";
 import type { DependenciesStore } from "../namespaces";
-import type { DefaultDependencies, Router } from "../public-types";
+import type { DefaultDependencies, Router } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
 
 // =============================================================================

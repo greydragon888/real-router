@@ -8,8 +8,8 @@ import type {
   DefaultDependencies,
   Plugin,
   Unsubscribe,
-} from "../../public-types";
-import type { PluginFactory } from "../../types";
+  PluginFactory,
+} from "../../types";
 
 /**
  * Independent namespace for managing plugins.

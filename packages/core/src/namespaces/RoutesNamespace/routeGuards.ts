@@ -1,4 +1,4 @@
-import type { RouterLogger } from "../../public-types";
+import type { RouterLogger } from "../../types";
 
 /**
  * Validates removeRoute constraints.
