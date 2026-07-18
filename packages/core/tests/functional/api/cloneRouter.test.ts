@@ -224,3 +224,54 @@ describe("cloneRouter()", () => {
     clone.dispose();
   });
 });
+
+describe("cloneRouter() — logger inheritance", () => {
+  const routes = [{ name: "home", path: "/home" }];
+
+  it("clone inherits the base router's logger config (regression: M1 per-instance drop)", () => {
+    const baseCallback = vi.fn();
+    const base = createRouter(routes, {
+      logger: {
+        level: "none",
+        callback: baseCallback,
+        callbackIgnoresLevel: true,
+      },
+    });
+    const clone = cloneRouter(base);
+
+    // Empty-string isActiveRoute warns through the router's OWN logger; the clone
+    // must have inherited the base's callback (the singleton used to mask this).
+    clone.isActiveRoute("");
+
+    expect(baseCallback).toHaveBeenCalledWith(
+      "warn",
+      "real-router",
+      expect.stringContaining("empty string"),
+    );
+  });
+
+  it("opts.logger overrides the callback per clone (per-request traceId); level inherited", () => {
+    const baseCallback = vi.fn();
+    const traceCallback = vi.fn();
+    const base = createRouter(routes, {
+      logger: {
+        level: "none",
+        callback: baseCallback,
+        callbackIgnoresLevel: true,
+      },
+    });
+    const clone = cloneRouter(base, undefined, {
+      logger: { callback: traceCallback },
+    });
+
+    clone.isActiveRoute("");
+
+    // Override callback receives the log; the base callback is unused on this clone.
+    expect(traceCallback).toHaveBeenCalledWith(
+      "warn",
+      "real-router",
+      expect.stringContaining("empty string"),
+    );
+    expect(baseCallback).not.toHaveBeenCalled();
+  });
+});

@@ -7,6 +7,7 @@ import type { SerializedRouterState } from "./utils";
 import type {
   DefaultDependencies,
   EventName,
+  LoggerConfig,
   NavigationOptions,
   Options,
   Params,
@@ -146,6 +147,11 @@ export interface RouterInternals<
     options: Options;
     dependencies: Record<string, unknown>;
     pluginFactories: PluginFactory<D>[];
+    // Resolved logger config of the base router, so a clone can build its OWN
+    // logger inheriting the base's level/callback. Frozen `options` do NOT carry
+    // `logger` (stripped in the constructor), so `options` above can't convey it;
+    // cloneRouter merges a per-request override (traceId) over this snapshot.
+    loggerConfig: LoggerConfig;
   };
 
   // Consolidated route data store (issue #174 Phase 2)

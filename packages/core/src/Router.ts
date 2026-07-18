@@ -336,6 +336,10 @@ export class Router<
         options: { ...this.#options.get() },
         dependencies: { ...this.#dependenciesStore.dependencies },
         pluginFactories: this.#plugins.getAll(),
+        // `logger` is a const in this constructor's scope (a RouterLogger class
+        // instance), so getConfig() yields the resolved config a clone inherits
+        // — frozen options don't carry `logger`, so cloneRouter reads it here.
+        loggerConfig: logger.getConfig(),
       }),
       routeGetStore: () => this.#routes.getStore(),
       // Cross-namespace state (issue #174)
