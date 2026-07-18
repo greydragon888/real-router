@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { measureHeapDelta, MB } from "./helpers.js";
-import { EventEmitter } from "../../src/EventEmitter.js";
+import { EventEmitter } from "../../../../src/foundation/event-emitter/EventEmitter.js";
 
 /**
  * Per-event-name record release guards for dynamic event names (#750, #1033).

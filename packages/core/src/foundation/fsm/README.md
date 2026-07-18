@@ -4,15 +4,7 @@
 
 > Synchronous finite state machine engine.
 
-> [!WARNING]
-> **FROZEN — published by mistake, superseded by an in-core copy.** This package
-> was published to npm in error and cannot be unpublished (npm policy). Its live
-> source of truth has moved **into `@real-router/core`** at
-> `packages/core/src/foundation/fsm/`, and core no longer depends on this
-> package. **Do not edit these sources** (edits will not reach core) and **do not
-> depend on `@real-router/fsm`** — it remains only as a frozen shell until the
-> 1.0 release, when it will be marked deprecated on npm. See the root
-> `IMPLEMENTATION_NOTES.md` → "fsm + event-emitter → core/src/foundation".
+**Internal package** — consumed by `@real-router/core`. Published to npm by historical accident — do not depend on it directly.
 
 ## Purpose
 

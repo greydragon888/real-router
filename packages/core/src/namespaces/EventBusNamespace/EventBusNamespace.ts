@@ -5,10 +5,11 @@ import { routerEvents, routerStates } from "../../fsm";
 import { RouterError } from "../../RouterError";
 
 import type { EventBusOptions } from "./types";
+import type { EventEmitter } from "../../foundation/event-emitter";
+import type { FSM } from "../../foundation/fsm";
 import type { RouterEvent, RouterPayloads, RouterState } from "../../fsm";
 import type { EventMethodMap, RouterEventMap } from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
-import type { FSM } from "@real-router/fsm";
 import type {
   EventName,
   LeaveFn,
@@ -20,7 +21,6 @@ import type {
   TreeChangedEvent,
   Unsubscribe,
 } from "@real-router/types";
-import type { EventEmitter } from "event-emitter";
 
 /**
  * Internal-only event key for route-tree mutations. Lives on the same

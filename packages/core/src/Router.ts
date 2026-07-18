@@ -7,9 +7,9 @@
  */
 
 import { logger } from "@real-router/logger";
-import { EventEmitter } from "event-emitter";
 
 import { EMPTY_PARAMS, errorCodes } from "./constants";
+import { EventEmitter } from "./foundation/event-emitter";
 import { createRouterFSM } from "./fsm";
 import { guardDependencies, guardRouteStructure } from "./guards";
 import { createLimits, normalizeParams } from "./helpers";

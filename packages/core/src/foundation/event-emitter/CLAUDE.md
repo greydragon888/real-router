@@ -1,6 +1,13 @@
 # event-emitter
 
-Internal package providing a generic typed event emitter for Real-Router. Not published to npm -- used by core for all internal eventing.
+> **Folded into core (live source of truth).** This is the LIVE typed event
+> emitter `@real-router/core` uses for all internal eventing — formerly the
+> standalone private `event-emitter` package, now dissolved into core (its
+> package directory is gone). **Edit HERE.** The docs below are co-located as-is;
+> a few cross-links may still use the old standalone package layout (pending doc
+> integration — see root `IMPLEMENTATION_NOTES.md`).
+
+Generic typed event emitter for Real-Router, used by core for all internal eventing.
 
 ## Exports
 

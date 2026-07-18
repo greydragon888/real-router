@@ -385,8 +385,8 @@ jobs:
       # (`test`) ONLY on the matched package (core). The deps are pulled into the
       # graph solely via `test`'s `dependsOn` (^bundle, lint, type-check) — and
       # `test` has no `^test`, so the deps' own `test` never runs. Result: only
-      # core was tested here, the other 5 base-layer packages (engine,
-      # event-emitter, fsm, logger) were tested NOWHERE
+      # core was tested here, the other 4 base-layer packages (engine, fsm,
+      # logger) were tested NOWHERE
       # (shards exclude them too), so they emitted no lcov and SonarCloud scored
       # their changed lines as 0% on any PR touching them (#1030 hit it via
       # event-emitter — new_coverage 76.1% < 80%, gate FAILED).

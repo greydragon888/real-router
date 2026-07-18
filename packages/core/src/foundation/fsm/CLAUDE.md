@@ -1,17 +1,14 @@
 # @real-router/fsm
 
-> [!WARNING]
-> **FROZEN — do not edit.** Published to npm by mistake (npm policy blocks
-> unpublish). The live generic engine has moved **into `@real-router/core`** at
-> `packages/core/src/foundation/fsm/`; core's router state machine
-> (`packages/core/src/fsm/routerFSM.ts`) builds on that copy, and core no longer
-> depends on this package. These files remain only as a frozen shell until 1.0
-> (then deprecated on npm). Edit the copy under core, not here. See the root
-> `IMPLEMENTATION_NOTES.md` → "fsm + event-emitter → core/src/foundation".
+> **Folded into core (live source of truth).** This is the LIVE generic FSM
+> engine `@real-router/core` builds on — the router state machine
+> (`../../fsm/routerFSM.ts`) is constructed from it. It was copied here from the
+> standalone `@real-router/fsm` package, which is now a frozen shell
+> published-by-mistake (kept only until 1.0). **Edit HERE, not there.** The docs
+> below are co-located as-is; a few cross-links may still use the old standalone
+> package layout (pending doc integration — see root `IMPLEMENTATION_NOTES.md`).
 
-Generic synchronous finite-state-machine engine. Zero runtime dependencies. This
-document describes the engine for historical reference; the live copy lives at
-`packages/core/src/foundation/fsm/`.
+Generic synchronous finite-state-machine engine. Zero runtime dependencies.
 
 ## Exports
 

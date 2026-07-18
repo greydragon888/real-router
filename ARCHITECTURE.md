@@ -43,8 +43,7 @@ real-router/
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
-│   ├── fsm/                       # Finite state machine engine (internal, published by accident)
-│   ├── event-emitter/             # Generic typed event emitter (internal)
+│   ├── fsm/                       # FROZEN shell (published by mistake; live engine copied to core/src/foundation/fsm)
 │   ├── engine/                    # Routing engine (internal, #1510): route-tree facade at src root + path-matcher & search-params layers under src/
 │   └── type-guards/               # Runtime type validation (internal)
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
@@ -70,7 +69,7 @@ real-router/
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
 
-**Internal packages** (bundled into consumers, not on npm): `engine` (merged routing engine — route-tree facade + path-matcher + search-params layers, #1510), `type-guards`, `event-emitter`
+**Internal packages** (bundled into consumers, not on npm): `engine` (merged routing engine — route-tree facade + path-matcher + search-params layers, #1510), `type-guards`. **Note:** the generic FSM engine and the typed event emitter now live **inside** `core` at `src/foundation/{fsm,event-emitter}` (not standalone packages); the `fsm` package directory remains only as a frozen published-by-mistake shell — not a dependency of anything.
 
 **Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`, `shared/ssr`
 
@@ -80,8 +79,6 @@ real-router/
 graph TD
     subgraph standalone [Standalone — zero deps]
         ENGINE["engine (route-tree + path-matcher + search-params)"]
-        EE[event-emitter]
-        FSM["fsm"]
         LOG["logger"]
         TYPES["core-types"]
     end
@@ -96,9 +93,7 @@ graph TD
 
     CORE -->|dep| TYPES
     CORE -->|dep| LOG
-    CORE -->|dep| FSM
     CORE -.->|bundles| ENGINE
-    CORE -.->|bundles| EE
 
     subgraph consumers [Consumer packages]
         BP["browser-plugin"]
@@ -451,7 +446,7 @@ These are deliberately designed constraints. Violating them will break the syste
 ├──────────────────────────────────────────────────────────────────┤
 │                     Foundation (internal)                        │
 ├──────────────────────────────────────────────────────────────────┤
-│           engine           │ event-emitter │ type-guards │ ... │
+│                engine                │   type-guards   │  ...  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

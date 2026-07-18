@@ -130,7 +130,6 @@ export default {
         "engine",
         "type-guards",
         "logger",
-        "event-emitter",
       ],
       // prod/dev only — peer deps must NOT be pinned to workspace:^ (on 0.x,
       // ^0.x.y is patch-only → minor bump → unwanted major via changesets #822;

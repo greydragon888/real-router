@@ -97,9 +97,6 @@ component_management:
     - component_id: dom-utils
       paths:
         - shared/dom-utils/**
-    - component_id: event-emitter
-      paths:
-        - packages/event-emitter/src/**
     - component_id: fsm
       paths:
         - packages/fsm/src/**

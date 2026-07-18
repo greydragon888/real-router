@@ -21,9 +21,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { FSM } from "@real-router/fsm";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+
+import { FSM } from "../../src/foundation/fsm";
 
 const SRC_DIR = path.resolve(__dirname, "../../src");
 

@@ -6172,9 +6172,6 @@ importers:
 
   packages/core:
     dependencies:
-      '@real-router/fsm':
-        specifier: workspace:^
-        version: link:../fsm
       '@real-router/logger':
         specifier: workspace:^
         version: link:../logger
@@ -6185,15 +6182,10 @@ importers:
       engine:
         specifier: workspace:^
         version: link:../engine
-      event-emitter:
-        specifier: workspace:^
-        version: link:../event-emitter
 
   packages/core-types: {}
 
   packages/engine: {}
-
-  packages/event-emitter: {}
 
   packages/fsm: {}
 

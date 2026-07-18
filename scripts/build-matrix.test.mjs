@@ -157,7 +157,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
       { package: "@real-router/react", directory: "packages/react" },
       { package: "@real-router/react", directory: "packages/react" }, // dup (bundle+test)
       { package: "@real-router/types", directory: "packages/core-types" },
-      { package: "event-emitter", directory: "packages/event-emitter" },
+      { package: "type-guards", directory: "packages/type-guards" },
       { package: "@real-router/shared-sources", directory: "shared" }, // dropped (not packages/*)
       { package: "router-benchmarks", directory: "benchmarks" }, // dropped
       { package: "//", directory: "" }, // dropped
@@ -166,7 +166,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
   const { members, dirOf } = deriveMembership(dryJson);
   assert.deepEqual(
     [...members].sort(),
-    ["@real-router/react", "@real-router/types", "event-emitter"],
+    ["@real-router/react", "@real-router/types", "type-guards"],
     "membership = deduped packages/* target set",
   );
   // core-types quirk preserved from turbo's own directory (not reconstructed).
@@ -176,15 +176,15 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 6/6/3/2/2/8/1 = 28", () => {
+test("L2: classify() buckets all real packages/* exactly 5/6/3/2/2/8/1 = 27", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 28, "expected 28 packages/* workspaces");
+  assert.equal(allPackages.length, 27, "expected 27 packages/* workspaces");
   assert.deepEqual(counts, {
-    base: 6,
+    base: 5,
     adapter: 6,
     "url-plugin": 3,
     "ssr-plugin": 2,

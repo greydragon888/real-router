@@ -39,6 +39,55 @@ dead-code sweep (#1505): 16 files / 571 lines facade-unreachable, ALL in the two
 0 in the route-tree facade, none dead (each covered by its own layer tier). Not wired
 into pre-push until the registry is triaged to "empty + KEEP" (Faza 2).
 
+## `fsm` + `event-emitter` → `core/src/foundation`
+
+**Problem.** Two foundation primitives lived as standalone packages consumed only by
+core: `event-emitter` (private, bare name) and the generic FSM engine. The FSM was
+additionally published to npm **by mistake** as `@real-router/fsm` — and npm's unpublish
+policy makes it impossible to remove. Keeping both as separate packages cost the usual
+per-package config surface (CORE_LAYER, codecov, syncpack, tsdown `alwaysBundle`) for
+code that has exactly one consumer, and left `@real-router/fsm` on consumers' dependency
+trees as a transitive dep of core.
+
+**Solution — asymmetric fold into `core/src/foundation/`.** The two cases are NOT
+symmetric:
+
+- **`event-emitter` — dissolved.** `git mv`'d into `core/src/foundation/event-emitter/`
+  (src + its 4 docs + functional/property/stress suites → `core/tests/*/foundation/event-emitter/`);
+  the package directory is **deleted**. Core imports it via a relative path; it is no
+  longer a workspace package.
+- **`@real-router/fsm` — frozen + copied.** The package **cannot** be deleted (published
+  by mistake, unpublish blocked), so it stays on disk as a **frozen shell** carrying a
+  `[!WARNING]` banner in its `README`/`CLAUDE` (npm-visible). Its live engine is **copied**
+  to `core/src/foundation/fsm/`; core's router state machine (`src/fsm/routerFSM.ts`) now
+  builds on that copy, and core **drops `@real-router/fsm` from its dependencies**. No
+  drift risk: a frozen package doesn't evolve, so the copy is the sole live source.
+
+Chosen location is `src/foundation/` — **not** `src/utils/`, which is already the public
+`@real-router/core/utils` subpath (SSR helpers); foundation primitives are internal and
+must not leak through it. Integration touch-points: `package.json` (drop both deps),
+tsdown (`alwaysBundle` drops `event-emitter`), CORE_LAYER 6 → 5 (`event-emitter` gone;
+`@real-router/fsm` **kept** in the set so CI still builds/tests the frozen shell even
+though core no longer depends on it), codecov (drop `event-emitter` component, keep
+`fsm`), syncpack, 7 core `src` import rewrites + the `fsm-state-authority` invariant test.
+
+**Blackbox test debt (temporary, deliberate).** The folded-in functional suites import
+the module they own via a relative `../../../../src/foundation/*` path, which the core
+white-box guardrail (`eslint.config.mjs`, functional tests → public API only) forbids.
+Rather than rewrite ~all of them onto the public surface now, an `ignores` block exempts
+`tests/functional/foundation/**` (plus the pre-existing `fsm-state-authority` structural
+test, which legitimately reaches the live FSM engine). To be rewritten onto a public
+surface as a follow-up — flagged here so the exemption isn't mistaken for policy.
+
+**Why (empirically verified).** Pure structural move: core keeps **100% coverage**
+(functional 2676 tests, +378 property, +121 stress all green — the folded-in suites cover
+the folded-in code exactly as they did standalone), type-check/lint/knip/syncpack/dedupe/
+coverage-scope all clean. knip needed **no** `src/foundation` ignore (the barrel re-exports
+resolve as used). The frozen `@real-router/fsm` still type-checks/lints/tests at 100% on
+its own. Remaining follow-ups: rewrite the foundation functional suites onto a public
+surface, fully integrate the co-located docs into core's own docs, and `npm deprecate
+@real-router/fsm` at the 1.0 release.
+
 ## Project Rename
 
 Project renamed from `router6` to `real-router`. Updated in:

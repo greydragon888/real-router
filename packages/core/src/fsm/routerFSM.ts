@@ -1,8 +1,8 @@
 // packages/core/src/fsm/routerFSM.ts
 
-import { FSM } from "@real-router/fsm";
+import { FSM } from "../foundation/fsm";
 
-import type { FSMConfig } from "@real-router/fsm";
+import type { FSMConfig } from "../foundation/fsm";
 import type { NavigationOptions, State } from "@real-router/types";
 
 /**
