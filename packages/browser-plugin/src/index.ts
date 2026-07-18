@@ -22,7 +22,7 @@ export { isStateStrict as isState } from "./browser-env/state-guard";
  * Module augmentation for real-router.
  * Extends Router interface with browser plugin methods.
  */
-declare module "@real-router/types" {
+declare module "@real-router/core/types" {
   interface StateContext {
     browser?: import("./types").BrowserContext;
     /**

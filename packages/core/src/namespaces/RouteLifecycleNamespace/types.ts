@@ -1,12 +1,12 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/types.ts
 
-import type { GuardFnFactory } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   DefaultDependencies,
   GuardFn,
   RouterLogger,
-} from "@real-router/types";
+} from "../../public-types";
+import type { GuardFnFactory } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 
 export interface RouteLifecycleDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,

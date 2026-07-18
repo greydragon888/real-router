@@ -16,7 +16,6 @@ export const TYPES = [
 export const SCOPES = [
   "core",
   "fsm",
-  "types",
   "path-matcher",
   "route-tree",
   "search-params",

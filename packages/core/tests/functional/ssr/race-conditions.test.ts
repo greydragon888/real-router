@@ -7,9 +7,8 @@ import {
   getRoutesApi,
 } from "@real-router/core/api";
 
-import type { Route, Router } from "@real-router/core";
+import type { Route, Router, LogCallback } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
-import type { LogCallback } from "@real-router/types";
 
 const routes: Route[] = [
   { name: "home", path: "/" },

@@ -266,9 +266,6 @@ importers:
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../packages/svelte
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../packages/core-types
       '@real-router/vue':
         specifier: workspace:^
         version: link:../packages/vue
@@ -6156,9 +6153,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ~6.9.1
@@ -6168,16 +6162,10 @@ importers:
         version: 29.1.1(@noble/hashes@2.2.0)
 
   packages/core:
-    dependencies:
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       engine:
         specifier: workspace:^
         version: link:../engine
-
-  packages/core-types: {}
 
   packages/engine: {}
 
@@ -6188,9 +6176,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ~6.9.1
@@ -6204,9 +6189,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
 
   packages/logger-plugin:
     dependencies:
@@ -6219,18 +6201,12 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
 
   packages/navigation-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       jsdom:
         specifier: 29.1.1
@@ -6241,9 +6217,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
 
   packages/preact:
     dependencies:
@@ -6284,9 +6257,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       jsdom:
         specifier: 29.1.1
@@ -6343,9 +6313,9 @@ importers:
 
   packages/route-utils:
     dependencies:
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
+      '@real-router/core':
+        specifier: workspace:>=0.1.0
+        version: link:../core
     devDependencies:
       engine:
         specifier: workspace:^
@@ -6356,9 +6326,6 @@ importers:
       '@real-router/core':
         specifier: workspace:>=0.1.0
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
@@ -6457,9 +6424,6 @@ importers:
       '@real-router/core':
         specifier: workspace:>=0.1.0
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
 
   packages/svelte:
     dependencies:
@@ -6512,9 +6476,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
 
   packages/vue:
     dependencies:
@@ -6549,9 +6510,6 @@ importers:
       '@real-router/sources':
         specifier: workspace:*
         version: link:../packages/sources
-      '@real-router/types':
-        specifier: workspace:*
-        version: link:../packages/core-types
 
 packages:
 

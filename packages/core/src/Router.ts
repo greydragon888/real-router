@@ -37,7 +37,6 @@ import { wireNamespaces } from "./wiring";
 
 import type { RouterInternals } from "./internals";
 import type { DependenciesStore } from "./namespaces";
-import type { Limits, PluginFactory, Route, RouterEventMap } from "./types";
 import type {
   DefaultDependencies,
   LeaveFn,
@@ -48,7 +47,8 @@ import type {
   State,
   SubscribeFn,
   Unsubscribe,
-} from "@real-router/types";
+} from "./public-types";
+import type { Limits, PluginFactory, Route, RouterEventMap } from "./types";
 import type { CreateMatcherOptions } from "engine";
 
 const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});

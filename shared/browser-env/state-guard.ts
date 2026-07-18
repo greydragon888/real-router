@@ -1,6 +1,6 @@
 // shared/browser-env/state-guard.ts
 
-import type { Params, State } from "@real-router/types";
+import type { Params, State } from "@real-router/core";
 
 /**
  * `isStateStrict` — the `history.state` shape guard, re-exported as `isState` by

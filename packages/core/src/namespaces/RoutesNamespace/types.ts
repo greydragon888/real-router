@@ -1,6 +1,5 @@
 // packages/core/src/namespaces/RoutesNamespace/types.ts
 
-import type { GuardFnFactory } from "../../types";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -9,7 +8,8 @@ import type {
   RouterLogger,
   SimpleState,
   State,
-} from "@real-router/types";
+} from "../../public-types";
+import type { GuardFnFactory } from "../../types";
 
 /**
  * Dependencies injected into RoutesNamespace.

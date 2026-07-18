@@ -13,14 +13,8 @@ import type {
   SsrMode,
   SsrModeConfig,
 } from "./types.js";
-import type {
-  ContextNamespaceClaim,
-  DefaultDependencies,
-  Plugin,
-  PluginFactory,
-  Router,
-  State,
-} from "@real-router/types";
+import type { ContextNamespaceClaim, DefaultDependencies, Plugin, PluginFactory, State } from "@real-router/core";
+import type { Router } from "@real-router/core/types";
 
 interface CompiledEntry<T> {
   /**

@@ -14,7 +14,7 @@ import type {
   RouterError as RouterErrorType,
   State,
   TreeChangedEvent,
-} from "@real-router/types";
+} from "./public-types";
 
 // Re-export from @real-router/types (canonical source)
 export type {
@@ -23,7 +23,7 @@ export type {
   Route,
   RouteConfigUpdate,
   EventMethodMap,
-} from "@real-router/types";
+} from "./public-types";
 
 /**
  * Event argument tuples for the router's 7 transition events plus the internal

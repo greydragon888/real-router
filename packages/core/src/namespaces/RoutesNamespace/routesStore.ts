@@ -11,8 +11,6 @@ import {
 } from "./helpers";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
-import type { GuardFnFactory, Route } from "../../types";
-import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -20,7 +18,9 @@ import type {
   Params,
   RouteConfigUpdate,
   RouterLogger,
-} from "@real-router/types";
+} from "../../public-types";
+import type { GuardFnFactory, Route } from "../../types";
+import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   CreateMatcherOptions,
   Matcher,

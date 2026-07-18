@@ -31,7 +31,6 @@ import type { RoutesApi } from "./types";
 import type { RouterInternals } from "../internals";
 import type { RouteLifecycleNamespace, RouteConfig } from "../namespaces";
 import type { RoutesStore } from "../namespaces/RoutesNamespace";
-import type { GuardFnFactory, Route } from "../types";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -42,7 +41,8 @@ import type {
   State,
   TreeChangedEvent,
   TreeStructuralPatch,
-} from "@real-router/types";
+} from "../public-types";
+import type { GuardFnFactory, Route } from "../types";
 import type { RouteDefinition, RouteTree } from "engine";
 
 // ============================================================================

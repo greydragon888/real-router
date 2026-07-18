@@ -7,7 +7,7 @@ import {
 } from "./constants";
 
 import type { SegmentTestFunction } from "./types";
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 /**
  * `.` as a char code — the boundary the flat comparisons test for. Matching is

@@ -10,7 +10,7 @@ import type {
   LoggerConfig,
   LogLevel,
   LogLevelConfig,
-} from "@real-router/types";
+} from "@real-router/core";
 
 // ============================================================================
 // Constants

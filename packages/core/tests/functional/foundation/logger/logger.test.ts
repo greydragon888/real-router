@@ -10,7 +10,7 @@ import type {
   LogCallback,
   LoggerConfig,
   LogLevelConfig,
-} from "@real-router/types";
+} from "@real-router/core";
 
 // Per-router logger instance under test — the standalone `@real-router/logger`
 // singleton was dissolved into core (`foundation/logger`). A fresh instance is

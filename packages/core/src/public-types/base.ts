@@ -45,7 +45,7 @@ export interface TransitionMeta {
  * Plugins add typed context namespaces by augmenting this interface:
  *
  * ```typescript
- * declare module "@real-router/types" {
+ * declare module "@real-router/core/types" {
  *   interface StateContext {
  *     navigation: { direction: "forward" | "back" | "navigate" };
  *   }

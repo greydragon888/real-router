@@ -2,7 +2,7 @@
 
 import { DEFAULT_QUERY_PARAMS } from "engine";
 
-import type { Options } from "@real-router/types";
+import type { Options } from "../../public-types";
 
 /**
  * Default options for the router.

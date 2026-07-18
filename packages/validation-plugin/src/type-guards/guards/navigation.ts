@@ -1,6 +1,6 @@
 // packages/validation-plugin/src/type-guards/guards/navigation.ts
 
-import type { NavigationOptions } from "@real-router/types";
+import type { NavigationOptions } from "@real-router/core";
 
 // Constant in module scope - created once, not on every call
 const NAVIGATION_OPTIONS_FIELDS = [

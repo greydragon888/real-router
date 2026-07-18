@@ -201,6 +201,71 @@ suites in both `validation-plugin` (functional + property) and `shared/browser-e
 is deliberate: this M1 lands **before** the `@real-router/types` → core fold (M2) so the
 "type-guards typed upward onto core" layer-inversion never exists in any single commit.
 
+## `@real-router/types` → folded into `core` as the `/types` subpath
+
+**Problem.** `@real-router/types` was a standalone types-only package declared as a
+`workspace:^` dependency in **13** manifests. Because it was independently versioned, a
+minor drift could nest **two copies** in a consumer's tree — and module augmentation merges
+into whichever copy a file resolves, so a split-brain `StateContext` silently drops a
+plugin's typed namespace. It also left a class of consumers ("types without core":
+`type-guards`, `route-utils`) whose existence blocked treating core as the single identity
+anchor. Folding types **into** core ties the types' identity to the core version — the count
+of `StateContext` instances in any tree is now exactly the count of `core` copies, no more.
+
+**Solution — `git mv core-types/src → core/src/public-types`, exposed at the subpath
+`@real-router/core/types`.** The types files move verbatim (they are the augmentation
+**declaration-site**); the package is deleted. core's package.json + tsdown gain a `./types`
+entry (`src/public-types/index.ts`), and `core/src/index.ts` re-exports the whole surface
+with `export type * from "./public-types"` so consumers import types from the **root**
+`@real-router/core` (owner decision — the "synthesis" — over the RFC's original uniform-
+subpath). The 7 augmentor plugins retarget `declare module "@real-router/types"` →
+`"@real-router/core/types"` (the subpath). Consumer type imports move `@real-router/types`
+→ `@real-router/core`; core's own src uses relative `./public-types`; core tests use the
+public root (whitebox guardrail bans `**/src/**`).
+
+**The `Router` / `RouterError` class-vs-interface duality (load-bearing).** core exports
+`Router` and `RouterError` as **classes** at the root (`export { Router } from "./Router"`),
+which — by TS's "explicit named export shadows `export *`" rule — shadow the same-named
+**interfaces** the star would re-export. So `import { Router } from "@real-router/core"`
+resolves to the **class**. But every `PluginFactory` / `GuardFnFactory` types its `router`
+param as the **interface** (`public-types/router.ts`), and the class is not assignable from
+the interface (private fields). Consequence (**Path A**, the shipped shape): all regular
+types import from the root `@real-router/core`, **except `Router`**, whose interface-typed
+consumers (factory-param sites: `createSsrLoaderPlugin`, `staleRegistry`, a few core tests —
+~12 files) import it from `@real-router/core/types`. `RouterError` stays at the root: it is
+used as a **value** (`throw` / `instanceof`) and its public-types entry is a forward
+declaration that matches the class, so the class-at-root is correct for it.
+
+**Why the subpath for augmentation, not the root (verified on tsc 6.0).** Interface module
+augmentation does **not** propagate through a *type-only* re-export: `declare module
+"@real-router/core" { interface StateContext … }` against a root that merely
+`export type *`-re-exports `StateContext` creates a phantom interface — the namespace never
+reaches the real `state.context`. It merges only at the **declaration-site** (the subpath)
+or through a **value** re-export (which is exactly why `memory-plugin` augments the `Router`
+**class** via `@real-router/core` and it works). Making the root `Router` the *interface*
+(dropping the class export) was tried and reverted: `browser-plugin` overrides `start` as a
+**method** in its augmentation, but the interface declares `start` as a **property**, so the
+merge is a `Duplicate identifier` — plus generic-variance ripples in `cloneRouter`. The
+class-at-root + interface-at-subpath split (Path A) sidesteps all of it.
+
+**Integration touch-points.** Deps: drop `@real-router/types` from all 13 manifests + the
+M1 bridge in `validation-plugin`; `route-utils` gains `@real-router/core` as a **peer**
+(`workspace:>=0.1.0`, not `workspace:^` — 0.x peer convention). Configs: `CORE_LAYER` 4→3
+(`build-matrix.mjs`); `build-matrix.test` L2 total 25→24 (`base` 4→3) + the L1 name≠dir
+"quirk" fixtures retargeted from the deleted `core-types` to `@real-router/shared-sources` →
+`shared`; codecov unchanged (core-types had no component); syncpack −2; knip loses 5
+`@real-router/types` `ignoreDependencies`; `check-coverage-scope` (size-limit exception),
+`sonar` (coverage-exclusion), `smoke-test` (SKIP_IMPORT), CODEOWNERS, commitlint/cz (`types`
+scope), dangerfile (arch-pattern → `core/src/public-types/`), `ci.yml` comment. Docs: root
+CLAUDE (count 24), ARCHITECTURE (Package Map / public list / mermaid TYPES node + the
+stale-since-M1 `TG` bundle edges / layer diagram), and the JSDoc augmentation example in
+`public-types/base.ts` (`@real-router/types` → `@real-router/core/types`).
+
+**Why (empirically verified).** All packages type-check; core keeps **100% coverage** (2760
+functional + property + stress green); the affected plugins + `route-utils` stay at 100%;
+`build-matrix.test` 31/31; full linters green. Ordering: this M2 lands **after** M1 so
+`type-guards` (which typed *upward* onto the folded types) never has to point at core.
+
 ## Project Rename
 
 Project renamed from `router6` to `real-router`. Updated in:

@@ -16,8 +16,8 @@ import type {
   Params,
   RouteConfigUpdate,
   RouterError,
+  RoutesApi,
 } from "@real-router/core";
-import type { RoutesApi } from "@real-router/types";
 
 let router: Router;
 let routesApi: RoutesApi;

@@ -5,8 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ssrDataPluginFactory } from "../../src";
 import { createSsrLoaderPlugin } from "../../src/shared-ssr";
 
-import type { Router } from "@real-router/core";
-import type { PluginFactory } from "@real-router/types";
+import type { Router, PluginFactory } from "@real-router/core";
 
 /**
  * Smoke test for the canonical side-by-side composition of

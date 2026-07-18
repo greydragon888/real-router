@@ -9,7 +9,7 @@
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import type { EventName } from "@real-router/types";
+import type { EventName } from "@real-router/core";
 
 void (async () => {
   // --- (a) ban inside each of the five transition-event windows ---

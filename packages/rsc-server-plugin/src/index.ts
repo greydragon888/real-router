@@ -19,7 +19,7 @@ export { getSsrRscMode } from "./getSsrRscMode";
 
 export { invalidate } from "./invalidate";
 
-declare module "@real-router/types" {
+declare module "@real-router/core/types" {
   interface StateContext {
     rsc?: import("react").ReactNode;
     rscAction?: import("./types").RscActionResult;

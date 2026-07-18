@@ -2,8 +2,8 @@
 
 import { DEFAULT_LIMITS, EMPTY_PARAMS } from "./constants";
 
+import type { Params, State, LimitsConfig } from "./public-types";
 import type { Limits } from "./types";
-import type { Params, State, LimitsConfig } from "@real-router/types";
 
 // =============================================================================
 // State Helpers

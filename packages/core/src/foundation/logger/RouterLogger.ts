@@ -7,7 +7,7 @@ import type {
   LoggerConfig,
   LogLevelConfig,
   LogCallback,
-} from "@real-router/types";
+} from "../../public-types";
 
 /**
  * Internal config type with required callbackIgnoresLevel

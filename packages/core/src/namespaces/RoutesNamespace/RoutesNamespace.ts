@@ -17,8 +17,6 @@ import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
 import type { RoutesDependencies } from "./types";
-import type { Route } from "../../types";
-import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -26,7 +24,9 @@ import type {
   Params,
   RouterLogger,
   State,
-} from "@real-router/types";
+} from "../../public-types";
+import type { Route } from "../../types";
+import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   CreateMatcherOptions,
   RouteParams,

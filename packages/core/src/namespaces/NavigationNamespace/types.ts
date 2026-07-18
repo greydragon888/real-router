@@ -7,7 +7,7 @@ import type {
   Params,
   RouterLogger,
   State,
-} from "@real-router/types";
+} from "../../public-types";
 
 export interface NavigationContext {
   toState: State;

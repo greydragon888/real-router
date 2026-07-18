@@ -31,7 +31,6 @@ export default {
       packages: ["**"],
       dependencies: [
         "@real-router/*",
-        "core-types",
         "engine",
       ],
       // No "peer": a @real-router/* peer dep must NOT be forced to workspace:^
@@ -124,7 +123,6 @@ export default {
       label: "Workspace packages use workspace:^ protocol",
       dependencies: [
         "@real-router/*",
-        "core-types",
         "engine",
       ],
       // prod/dev only — peer deps must NOT be pinned to workspace:^ (on 0.x,

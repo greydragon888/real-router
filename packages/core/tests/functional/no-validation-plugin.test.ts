@@ -11,9 +11,8 @@ import {
 
 import { createTestRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, EventName } from "@real-router/core";
 import type { DependenciesApi, RoutesApi } from "@real-router/core/api";
-import type { EventName } from "@real-router/types";
 
 describe("core/without validation plugin", () => {
   describe("router works without plugin (graceful behavior)", () => {

@@ -11,9 +11,9 @@ import type {
   StateNamespace,
 } from "../namespaces";
 import type { DependenciesStore } from "../namespaces/DependenciesNamespace/dependenciesStore";
+import type { DefaultDependencies } from "../public-types";
 import type { Router } from "../Router";
 import type { Limits } from "../types";
-import type { DefaultDependencies } from "@real-router/types";
 
 /**
  * Shared bag of namespaces + accessors passed to {@link wireNamespaces} and its

@@ -4,7 +4,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/types";
+import type { Router } from "@real-router/core/types";
 
 let router: Router;
 

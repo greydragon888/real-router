@@ -30,8 +30,8 @@
  *      silent fail-open.
  *   4. `.size-limit.js` — every **npm-public** package (`private !== true`) has
  *      a bundle-size entry, unless it is in SIZE_LIMIT_EXCEPTIONS with a reason
- *      (svelte: no single ESM bundle; core-types: types-only, nothing to
- *      measure). Both directions are asserted. This closes the "list-drift"
+ *      (svelte: no single ESM bundle). Both directions are asserted. This
+ *      closes the "list-drift"
  *      class the codecov/sonar checks address — the SAME question "is this
  *      package public?" must be answered consistently by every per-package list,
  *      not independently (a package can otherwise be public on npm + a codecov
@@ -255,7 +255,6 @@ const SIZE_LIMIT_EXCEPTIONS = new Map([
     "svelte",
     "svelte-package emits individual compiled files, not a single ESM bundle measurable by size-limit/esbuild",
   ],
-  ["core-types", "types-only package — no runtime entry to measure"],
 ]);
 
 const sizeLimitSrc = read(".size-limit.js");

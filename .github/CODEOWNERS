@@ -9,7 +9,6 @@
 
 # Core packages
 /packages/core/ @greydragon888
-/packages/core-types/ @greydragon888
 /packages/route-tree/ @greydragon888
 
 # Plugins

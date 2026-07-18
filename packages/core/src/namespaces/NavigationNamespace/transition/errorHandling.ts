@@ -3,8 +3,8 @@
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
+import type { State } from "../../../public-types";
 import type { NavigationDependencies } from "../types";
-import type { State } from "@real-router/types";
 
 export function routeTransitionError(
   deps: NavigationDependencies,

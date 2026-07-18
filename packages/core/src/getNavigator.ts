@@ -1,8 +1,4 @@
-import type {
-  Navigator,
-  DefaultDependencies,
-  Router,
-} from "@real-router/types";
+import type { Navigator, DefaultDependencies, Router } from "./public-types";
 
 const cache = new WeakMap<Router, Navigator>();
 

@@ -10,7 +10,7 @@ import {
 } from "./helpers";
 import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
 
-import type { LogLevelConfig } from "@real-router/types";
+import type { LogLevelConfig } from "@real-router/core";
 
 // Per-router logger instance under test (fresh per test in beforeEach) —
 // replaces the former process-global singleton.

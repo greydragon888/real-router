@@ -7,12 +7,12 @@ import { Router as RouterClass } from "../Router";
 import { RouterError } from "../RouterError";
 import { getLifecycleApi } from "./getLifecycleApi";
 
-import type { Route } from "../types";
 import type {
   DefaultDependencies,
   LoggerConfig,
   Router,
-} from "@real-router/types";
+} from "../public-types";
+import type { Route } from "../types";
 
 /**
  * Per-clone overrides beyond dependencies.

@@ -5,7 +5,7 @@ import type {
   Options,
   Params,
   State,
-} from "@real-router/types";
+} from "../../public-types";
 
 export interface RouterLifecycleDependencies {
   getOptions: () => Options;

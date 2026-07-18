@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/OptionsNamespace/helpers.ts
 
-import type { Options, Params } from "@real-router/types";
+import type { Options, Params } from "../../public-types";
 
 /**
  * Recursively freezes an object and all nested objects.

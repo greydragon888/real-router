@@ -29,6 +29,15 @@
       "import": "./dist/esm/index.mjs",
       "require": "./dist/cjs/index.js"
     },
+    "./types": {
+      "@real-router/internal-source": "./src/public-types/index.ts",
+      "types": {
+        "import": "./dist/esm/types.d.mts",
+        "require": "./dist/cjs/types.d.ts"
+      },
+      "import": "./dist/esm/types.mjs",
+      "require": "./dist/cjs/types.js"
+    },
     "./api": {
       "@real-router/internal-source": "./src/api/index.ts",
       "types": {
@@ -98,9 +107,6 @@
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
-  "dependencies": {
-    "@real-router/types": "workspace:^"
-  },
   "devDependencies": {
     "engine": "workspace:^"
   }

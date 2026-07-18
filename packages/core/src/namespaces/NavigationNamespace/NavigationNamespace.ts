@@ -14,14 +14,14 @@ import { getStateMetaParams, setStateMetaParams } from "../../stateMetaStore";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
 import type { NavigationContext, NavigationDependencies } from "./types";
-import type { TransitionPath } from "../../transitionPath";
 import type {
   GuardFn,
   NavigationOptions,
   Params,
   State,
   TransitionMeta,
-} from "@real-router/types";
+} from "../../public-types";
+import type { TransitionPath } from "../../transitionPath";
 
 const FROZEN_ACTIVATED: string[] = Object.freeze([
   constants.UNKNOWN_ROUTE,

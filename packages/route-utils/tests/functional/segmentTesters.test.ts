@@ -8,7 +8,7 @@ import {
   areRoutesRelated,
 } from "@real-router/route-utils";
 
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 describe("segmentTesters", () => {
   describe("startsWithSegment", () => {

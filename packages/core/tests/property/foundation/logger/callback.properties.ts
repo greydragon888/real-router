@@ -14,7 +14,7 @@ import {
 } from "./helpers";
 import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
 
-import type { LogCallback } from "@real-router/types";
+import type { LogCallback } from "@real-router/core";
 
 const noop = () => {};
 

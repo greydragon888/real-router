@@ -4,7 +4,7 @@ export type { PersistentParamsConfig } from "./types";
 
 export { persistentParamsPluginFactory } from "./factory";
 
-declare module "@real-router/types" {
+declare module "@real-router/core/types" {
   interface StateContext {
     persistentParams?: import("@real-router/core").Params;
   }

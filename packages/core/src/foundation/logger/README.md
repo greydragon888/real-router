@@ -124,7 +124,7 @@ import type {
   LogCallback,       // (level, context, message, ...args) => void
   LoggerConfig,      // { level, callback?, callbackIgnoresLevel? }
   RouterLogger,      // { log, warn, error } — the per-router logging surface
-} from "@real-router/types"; // (also re-exported from "@real-router/core")
+} from "@real-router/core";
 ```
 
 ## Related Packages

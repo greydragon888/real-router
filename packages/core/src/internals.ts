@@ -1,9 +1,5 @@
 import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
-import type { Router as RouterClass } from "./Router";
-import type { EventMethodMap, PluginFactory } from "./types";
-import type { RouterValidator } from "./types/RouterValidator";
-import type { SerializedRouterState } from "./utils";
 import type {
   DefaultDependencies,
   EventName,
@@ -19,7 +15,11 @@ import type {
   State,
   TreeChangedEvent,
   Unsubscribe,
-} from "@real-router/types";
+} from "./public-types";
+import type { Router as RouterClass } from "./Router";
+import type { EventMethodMap, PluginFactory } from "./types";
+import type { RouterValidator } from "./types/RouterValidator";
+import type { SerializedRouterState } from "./utils";
 import type { RouteTree } from "engine";
 
 export interface RouterInternals<

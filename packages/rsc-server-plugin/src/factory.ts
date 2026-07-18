@@ -2,7 +2,7 @@ import { ALLOWED_RSC_MODES, ERROR_PREFIX } from "./constants";
 import { createLoadersValidator, createSsrLoaderPlugin } from "./shared-ssr";
 
 import type { RscLoaderFactoryMap } from "./types";
-import type { DefaultDependencies, PluginFactory } from "@real-router/types";
+import type { DefaultDependencies, PluginFactory } from "@real-router/core";
 import type { ReactNode } from "react";
 
 // Inlined from the deleted validation.ts — single 7-line consumer was

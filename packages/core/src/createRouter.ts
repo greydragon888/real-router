@@ -2,8 +2,8 @@
 
 import { Router } from "./Router";
 
+import type { DefaultDependencies, Options } from "./public-types";
 import type { Route } from "./types";
-import type { DefaultDependencies, Options } from "@real-router/types";
 
 /**
  * Creates a new router instance.

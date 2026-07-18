@@ -5,8 +5,7 @@ import { getDependenciesApi } from "@real-router/core/api";
 import { createDependenciesTestRouter } from "./setup";
 
 import type { TestDependencies } from "./setup";
-import type { Router } from "@real-router/core";
-import type { DependenciesApi } from "@real-router/types";
+import type { Router, DependenciesApi } from "@real-router/core";
 
 let router: Router<TestDependencies>;
 let deps: DependenciesApi<TestDependencies>;

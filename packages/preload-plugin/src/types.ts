@@ -1,4 +1,5 @@
-import type { DefaultDependencies, Params, Router } from "@real-router/types";
+import type { DefaultDependencies, Params } from "@real-router/core";
+import type { Router } from "@real-router/core/types";
 
 export interface PreloadPluginOptions {
   /** Hover debounce delay in ms. @default 65 */

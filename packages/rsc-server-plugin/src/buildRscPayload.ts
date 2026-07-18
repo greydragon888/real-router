@@ -1,5 +1,5 @@
 import type { RscActionResult, RscPayload } from "./types";
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 import type { ReactNode } from "react";
 
 /**

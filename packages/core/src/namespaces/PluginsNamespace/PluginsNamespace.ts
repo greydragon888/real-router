@@ -4,12 +4,12 @@ import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
 import { validatePlugin } from "./validators";
 
 import type { PluginsDependencies } from "./types";
-import type { PluginFactory } from "../../types";
 import type {
   DefaultDependencies,
   Plugin,
   Unsubscribe,
-} from "@real-router/types";
+} from "../../public-types";
+import type { PluginFactory } from "../../types";
 
 /**
  * Independent namespace for managing plugins.

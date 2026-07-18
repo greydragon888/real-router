@@ -8,9 +8,10 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets — now 4/6/3/2/2/8/0 = 25 after the
-//     foundation dissolutions (event-emitter + logger in wave-1, type-guards in
-//     wave-2); §C's original master figure was 6/6/3/2/2/8/1 = 28 — plus synthetic
+//     reproduce the companion §C buckets — now 3/6/3/2/2/8/0 = 24 after the
+//     foundation dissolutions (event-emitter + logger in wave-1, type-guards +
+//     the @real-router/types fold into core in wave-2); §C's original master
+//     figure was 6/6/3/2/2/8/1 = 28 — plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
 // Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.
@@ -129,18 +130,22 @@ test("L1: '//' root, shared workspace and benchmarks are filtered out", () => {
   assert.ok(dirOf.has("@real-router/shared-sources"));
 });
 
-test("L1: dirOf uses turbo's path verbatim (core-types quirk, not reconstructed)", () => {
+test("L1: dirOf uses turbo's path verbatim (shared-sources quirk, not reconstructed)", () => {
+  // core-types was the packages/* name≠dir quirk until wave-2 folded it into
+  // core; `@real-router/shared-sources` → `shared` is the surviving example.
   const queryJson = JSON.stringify({
     data: {
       affectedPackages: {
-        items: [{ name: "@real-router/types", path: "packages/core-types" }],
+        items: [{ name: "@real-router/shared-sources", path: "shared" }],
       },
     },
   });
   const { affected, dirOf } = deriveAffected(queryJson);
-  assert.deepEqual(affected, ["@real-router/types"]);
-  // packages/<name> reconstruction would have produced packages/types → ENOENT.
-  assert.equal(dirOf.get("@real-router/types"), "packages/core-types");
+  // shared-sources is a fanout amplifier — recorded in dirOf (verbatim path) but
+  // not itself a shardable affected package, so `affected` stays empty.
+  assert.deepEqual(affected, []);
+  // packages/<name> reconstruction would have produced packages/shared-sources → ENOENT.
+  assert.equal(dirOf.get("@real-router/shared-sources"), "shared");
 });
 
 test("L1: docs/empty affected derives to []", () => {
@@ -158,7 +163,6 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
     tasks: [
       { package: "@real-router/react", directory: "packages/react" },
       { package: "@real-router/react", directory: "packages/react" }, // dup (bundle+test)
-      { package: "@real-router/types", directory: "packages/core-types" },
       { package: "engine", directory: "packages/engine" },
       { package: "@real-router/shared-sources", directory: "shared" }, // dropped (not packages/*)
       { package: "router-benchmarks", directory: "benchmarks" }, // dropped
@@ -168,25 +172,23 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
   const { members, dirOf } = deriveMembership(dryJson);
   assert.deepEqual(
     [...members].sort(),
-    ["@real-router/react", "@real-router/types", "engine"],
+    ["@real-router/react", "engine"],
     "membership = deduped packages/* target set",
   );
-  // core-types quirk preserved from turbo's own directory (not reconstructed).
-  assert.equal(dirOf.get("@real-router/types"), "packages/core-types");
   assert.ok(!dirOf.has("@real-router/shared-sources"));
 });
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 4/6/3/2/2/8/0 = 25", () => {
+test("L2: classify() buckets all real packages/* exactly 3/6/3/2/2/8/0 = 24", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 25, "expected 25 packages/* workspaces");
+  assert.equal(allPackages.length, 24, "expected 24 packages/* workspaces");
   assert.deepEqual(counts, {
-    base: 4,
+    base: 3,
     adapter: 6,
     "url-plugin": 3,
     "ssr-plugin": 2,
@@ -450,7 +452,7 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   );
 });
 
-test("routing: full rebuild (all 25) → base excluded, 10 shards", () => {
+test("routing: full rebuild (all 24) → base excluded, 10 shards", () => {
   const { mode, matrix } = buildPlan(allPackages, realDirOf);
   assert.equal(mode, "sharded");
   const names = matrix.include.map((i) => i.name);

@@ -8,8 +8,6 @@ import type { EventBusOptions } from "./types";
 import type { EventEmitter } from "../../foundation/event-emitter";
 import type { FSM } from "../../foundation/fsm";
 import type { RouterEvent, RouterPayloads, RouterState } from "../../fsm";
-import type { EventMethodMap, RouterEventMap } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   EventName,
   LeaveFn,
@@ -20,7 +18,9 @@ import type {
   SubscribeFn,
   TreeChangedEvent,
   Unsubscribe,
-} from "@real-router/types";
+} from "../../public-types";
+import type { EventMethodMap, RouterEventMap } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 
 /**
  * Internal-only event key for route-tree mutations. Lives on the same

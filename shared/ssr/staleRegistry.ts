@@ -1,4 +1,4 @@
-import type { Router } from "@real-router/types";
+import type { Router } from "@real-router/core/types";
 
 const staleByRouter = new WeakMap<Router, Set<string>>();
 

@@ -782,9 +782,8 @@ jobs:
       # packages/*/src dirs + shared/* (sonar-scanner does not index files under
       # symlinked directories, so browser-env/dom-utils src symlinks are skipped
       # and the shared code is analysed at its real location, coverage-excluded
-      # via `shared/**`). reportPaths = every produced lcov; core-types has none
-      # → it stays in sources but is coverage-excluded so Sonar doesn't score
-      # it 0%. Runs on the runner's system node — fs-only, no install needed.
+      # via `shared/**`). reportPaths = every produced lcov. Runs on the
+      # runner's system node — fs-only, no install needed.
       - name: Compute Sonar scope
         id: scope
         run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"

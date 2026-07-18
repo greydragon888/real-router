@@ -1,14 +1,14 @@
 // packages/core/src/namespaces/PluginsNamespace/types.ts
 
-import type { EventMethodMap, PluginFactory } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   DefaultDependencies,
   EventName,
   Plugin,
   RouterLogger,
   Unsubscribe,
-} from "@real-router/types";
+} from "../../public-types";
+import type { EventMethodMap, PluginFactory } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 
 export interface PluginsDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,

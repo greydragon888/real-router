@@ -54,7 +54,7 @@ import { join } from "node:path";
 export const K = 10;
 
 /**
- * The 4 packages that form the `base` layer (core + its workspace deps +
+ * The 3 packages that form the `base` layer (core + its workspace deps +
  * tsdown-bundled deps — the package *scope* of `--filter='@real-router/core...'`,
  * verified live against turbo 2.10.0). (`type-guards` — formerly the sole `internal`-shard member — is now dissolved
  * into its consumer plugins, wave-2, so the internal shard is empty.) `engine` folds the former
@@ -63,7 +63,9 @@ export const K = 10;
  * dissolved into core (`core/src/foundation/event-emitter`), dropping it to 5;
  * `@real-router/logger` likewise dissolved into core (`core/src/foundation/logger`
  * — a per-router `RouterLogger` instance replacing the old process-global
- * singleton, #724), dropping it to 4.
+ * singleton, #724), dropping it to 4. Finally `@real-router/types` folded into
+ * core as the `/types` subpath (wave-2) — core no longer declares it as a dep —
+ * dropping it to 3.
  * `@real-router/fsm` is now FROZEN — core builds on a copy at
  * `core/src/foundation/fsm`; the standalone package was published by mistake and
  * lingers only until 1.0 — but it stays in this set so CI keeps building/testing
@@ -80,7 +82,6 @@ export const K = 10;
  */
 export const CORE_LAYER = new Set([
   "@real-router/core",
-  "@real-router/types",
   "@real-router/fsm",
   "engine",
 ]);
@@ -123,8 +124,8 @@ export const defaultReaders = {
  * A5-correct affected derivation. Takes the raw stdout of
  * `turbo query affected --base origin/master --head HEAD --packages` and returns
  * the package-level target set plus a name→directory map (turbo's own `path`,
- * so we never reconstruct `packages/<name>` — which breaks on `@real-router/types`
- * → `packages/core-types` and `@real-router/shared-sources` → `shared`).
+ * so we never reconstruct `packages/<name>` — which breaks on
+ * `@real-router/shared-sources` → `shared`).
  *
  * @param {string} queryJson raw JSON from `turbo query affected … --packages`
  * @returns {{ affected: string[], dirOf: Map<string,string> }}

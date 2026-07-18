@@ -3,7 +3,7 @@
 import { FSM } from "../foundation/fsm";
 
 import type { FSMConfig } from "../foundation/fsm";
-import type { NavigationOptions, State } from "@real-router/types";
+import type { NavigationOptions, State } from "../public-types";
 
 /**
  * Router FSM states.

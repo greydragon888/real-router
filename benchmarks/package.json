@@ -28,7 +28,6 @@
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/solid": "workspace:^",
     "@real-router/svelte": "workspace:^",
-    "@real-router/types": "workspace:^",
     "@real-router/vue": "workspace:^",
     "@solidjs/router": "~0.16.1",
     "@tanstack/react-router": "~1.170.17",

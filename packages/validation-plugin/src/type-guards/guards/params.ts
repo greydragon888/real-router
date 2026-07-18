@@ -1,6 +1,6 @@
 // packages/validation-plugin/src/type-guards/guards/params.ts
 
-import type { Params } from "@real-router/types";
+import type { Params } from "@real-router/core";
 
 /**
  * Is `value` an array, or a plain object (`Object.prototype` / `null` prototype)?

@@ -7,7 +7,7 @@ import type {
   DefaultDependencies,
   Plugin,
   PluginFactory,
-} from "@real-router/types";
+} from "@real-router/core";
 
 /**
  * Per-start runtime validator for `getResult()` return values.
