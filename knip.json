@@ -233,6 +233,9 @@
     "examples/**",
     "benchmarks"
   ],
+  "ignore": [
+    "benchmarks/**"
+  ],
   "ignoreDependencies": [
     "@stryker-mutator/api",
     "playwright"

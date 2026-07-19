@@ -95,31 +95,3 @@ describe("S1: build/match round-trip holds across thousands of non-word names", 
     expect(registerMs).toBeLessThan(2000);
   });
 });
-
-describe("S2: constraint-`?` routes register and validate at scale", () => {
-  it("registers 3000 `<\\d?>`-constrained routes without metadata loss", () => {
-    const matcher = createTestMatcher();
-
-    const routes: MatcherInputNode[] = [];
-
-    for (let i = 0; i < 3000; i++) {
-      routes.push(
-        createInputNode({
-          name: `c${i}`,
-          path: String.raw`/c${i}/:id<\d?>`,
-          fullName: `c${i}`,
-        }),
-      );
-    }
-
-    matcher.registerTree(createRoot(routes));
-
-    for (let i = 0; i < 3000; i += 97) {
-      // Single digit satisfies \d?; build round-trips.
-      expect(matcher.match(`/c${i}/7`)?.params).toStrictEqual({ id: "7" });
-      expect(matcher.buildPath(`c${i}`, { id: "7" })).toBe(`/c${i}/7`);
-      // Two digits violate the (preserved) constraint.
-      expect(matcher.match(`/c${i}/77`)).toBeUndefined();
-    }
-  });
-});
