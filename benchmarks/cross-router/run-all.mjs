@@ -34,6 +34,16 @@ const BASELINE_SCENARIOS = ["cold-start", "nav-latency", "link-build"];
 const runs = process.argv[2] ?? "15";
 const fwArg = process.argv[3];
 const frameworks = fwArg ? [fwArg] : Object.keys(COHORT_ENGINES);
+const multiCohort = frameworks.length > 1;
+
+// Cohort separator banner. CI runs the whole matrix in ONE process (run-all.mjs "$RUNS"),
+// so run-all prints its own cohort banners + timings; bench-cross-router.sh does this
+// locally instead, driving cohorts one-per-invocation — so run-all only banners when a
+// single invocation actually spans multiple cohorts, else the wrapper's banner would double.
+function banner(text) {
+  const bar = "═".repeat(50);
+  console.error(`\n╔${bar}╗\n║ ${text.padEnd(48)} ║\n╚${bar}╝`);
+}
 
 // BENCH_SMOKE=1 — measure-only dry matrix (the orchestrator's Step-5 smoke and CI-style
 // fail-fast checks): every app must BUILD + DRIVE, nothing is persisted, and a
@@ -100,8 +110,12 @@ const runScenario = async (framework, scenarioName, engineList) => {
   }
   if (apps.length === 0) return;
 
+  // n is shown once per cohort in the banner; annotate a scenario only when its effective
+  // n differs from the base (the sweep-halving policy at base > 50 — runsFor).
+  const nNote = effRuns !== Number(runs) ? ` · n=${effRuns}` : "";
+  const fwPrefix = multiCohort ? "" : `${framework} · `;
   console.error(
-    `\n=== ${framework} · ${scenarioName} × [${apps.map((a) => a.engine).join(", ")}] interleaved (n=${effRuns}) ===`,
+    `\n  ▸ ${fwPrefix}${scenarioName} × [${apps.map((a) => a.engine).join(", ")}]${nNote}`,
   );
   let results;
   try {
@@ -150,6 +164,9 @@ const runScenario = async (framework, scenarioName, engineList) => {
   );
 };
 
+const matrixStart = Date.now();
+if (multiCohort) console.error(`\nCross-router matrix — ${frameworks.length} cohorts · base n=${runs}`);
+
 for (const framework of frameworks) {
   const engines = COHORT_ENGINES[framework];
   if (!engines) {
@@ -159,6 +176,9 @@ for (const framework of frameworks) {
     );
     continue;
   }
+  const cohortStart = Date.now();
+  const ok0 = ok, failed0 = failed, skipped0 = skipped;
+  if (multiCohort) banner(`${framework}   ·   n=${runs}   ·   ${engines.length} engines`);
   for (const scenarioName of SCENARIO_NAMES) {
     const participants = engines.filter((engine) => {
       if (isKnownNA(framework, scenarioName, engine)) {
@@ -178,9 +198,16 @@ for (const framework of frameworks) {
   for (const scenarioName of BASELINE_SCENARIOS) {
     await runScenario(framework, scenarioName, ["_baseline"]);
   }
+  if (multiCohort) {
+    const dur = ((Date.now() - cohortStart) / 1000).toFixed(1);
+    console.error(
+      `  ✓ ${framework} — ${ok - ok0} cells · ${failed - failed0} failed · ${skipped - skipped0} n/a · ${dur}s`,
+    );
+  }
 }
 
+const totalDur = ((Date.now() - matrixStart) / 1000).toFixed(1);
 console.error(
-  `\nmatrix done: ${ok} ok, ${failed} failed, ${skipped} n/a (documented)`,
+  `\nmatrix done: ${ok} ok, ${failed} failed, ${skipped} n/a (documented) · ${totalDur}s`,
 );
 process.exit(failed > 0 ? 1 : 0);
