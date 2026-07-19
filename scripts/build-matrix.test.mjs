@@ -417,6 +417,32 @@ test("routing: sharded with an empty membership set throws — empty matrix is a
   );
 });
 
+test("routing: ≥2 affected adapters force sharded even at N ≤ K (composition trigger)", () => {
+  // Adapters are the only per-package shards — the sharded win exists exactly
+  // when ≥2 of them are affected (+29s at 2, +143s at 6, measured 2026-07-19);
+  // a pure count cannot see it ("2 adapters + 1 plugin" is N=3). The K=10
+  // constant stays as the wide-set backstop — see its doc comment.
+  const twoAdapters = ADAPTERS.slice(0, 2); // N=2 ≤ K
+  const plan = buildPlan(twoAdapters, realDirOf);
+  assert.equal(plan.mode, "sharded");
+  const names = plan.matrix.include.map((i) => i.name);
+  for (const a of twoAdapters) {
+    assert.ok(names.includes(a.replace(/^@real-router\//, "")), a);
+  }
+
+  // Mixed set from the measured model: 2 adapters + 1 plugin (N=3) — the exact
+  // shape K would mis-route to leaf (−59s class).
+  const mixed = [...twoAdapters, ...LEAVES.slice(0, 1)];
+  assert.equal(buildPlan(mixed, realDirOf).mode, "sharded");
+});
+
+test("routing: a SINGLE affected adapter stays leaf (trigger is ≥2, not ≥1)", () => {
+  // One adapter measured ~6s BETTER on the leaf path — the trigger must not
+  // over-fire on the single-adapter PR (the most common adapter edit).
+  const plan = buildPlan(ADAPTERS.slice(0, 1), realDirOf);
+  assert.equal(plan.mode, "leaf");
+});
+
 test("routing: a multi-package edit WITHOUT a shared source stays leaf (≤ K)", () => {
   // Distinguishes a shared-source fanout from an unrelated multi-package edit:
   // two url-plugins edited directly (no shared/* touched) → shared-sources NOT

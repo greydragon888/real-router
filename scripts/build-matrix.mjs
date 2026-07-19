@@ -48,8 +48,15 @@ import { join } from "node:path";
  * distribution of the last 30 master commits (companion doc §D): bimodal —
  * small leaf edits cluster at 1-2, core fanouts at 21-32, the [6..10] band holds
  * 2 PRs whose mis-shard cost is just the ~2m monolith. K=10 catches that band
- * cheaply. Re-calibrate on a feature-phase PR sample (current window is
- * release/foundation-skewed).
+ * cheaply.
+ *
+ * RE-MEASURED 2026-07-19 (cold per-task timings from the #1521 full-execution
+ * run, cross-checked against two historical leaf runs): K is deliberately KEPT
+ * at 10 — count is the wrong axis. Non-adapter groups are batched into single
+ * shards, so same-group sets tie leaf-vs-sharded at ANY count; the entire
+ * sharded win comes from the per-package ADAPTER shards. That is handled by the
+ * `multiAdapter` composition trigger in `buildPlan` (≥2 affected adapters →
+ * force sharded); K stays as the generic wide-set backstop.
  */
 export const K = 10;
 
@@ -305,12 +312,22 @@ export function buildPlan(
   // direct multi-package edit that does NOT touch a shared source stays on the
   // count path (the K-boundary leaf set with two url-plugins is unaffected).
   const touchesSharedSources = dirOf.has("@real-router/shared-sources");
+  // Composition trigger (K re-measure, 2026-07-19): adapters are the ONLY
+  // per-package shards — every other group is batched into a single shard, so
+  // for same-group sets the sharded path equals the leaf path at ANY count
+  // (measured tie). The win exists exactly when ≥2 adapters are affected:
+  // cold per-task CI timings give sharded +29s at 2 adapters, +59s at 3,
+  // +143s at 6 (the historical 371s leaf run), while a SINGLE adapter is ~6s
+  // better on leaf. A pure count (K) cannot see this — "2 adapters + 1 plugin"
+  // is N=3 and would stay leaf. Same force pattern as touchesAdapterShared.
+  const multiAdapter = routing.adapter.length >= 2;
 
   if (
     affected.length <= K &&
     !touchesCore &&
     !touchesAdapterShared &&
-    !touchesSharedSources
+    !touchesSharedSources &&
+    !multiAdapter
   ) {
     // Explicit per-package filter from the routing set, so leaf EXECUTION scope
     // equals the ROUTING decision (see the leafFilter note above): a root
