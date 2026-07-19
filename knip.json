@@ -234,7 +234,8 @@
     "benchmarks"
   ],
   "ignoreDependencies": [
-    "@stryker-mutator/api"
+    "@stryker-mutator/api",
+    "playwright"
   ],
   "ignoreBinaries": [
     "tree",
