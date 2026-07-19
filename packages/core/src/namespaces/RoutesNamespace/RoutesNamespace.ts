@@ -94,7 +94,10 @@ export class RoutesNamespace<
   }
 
   constructor(
-    routes: Route<Dependencies>[] = [],
+    // No `= []` default: the sole caller (Router's ctor) always passes its own
+    // already-defaulted `routes` — a namespace-level default would be dead code
+    // and a default-before-required-params smell (S1788).
+    routes: Route<Dependencies>[],
     matcherOptions: CreateMatcherOptions | undefined,
     logger: RouterLogger,
   ) {

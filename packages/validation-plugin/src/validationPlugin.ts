@@ -305,8 +305,8 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
           count,
           eventName,
           methodName,
-          maxListeners,
           ctx.logger,
+          maxListeners,
         );
       },
     },
