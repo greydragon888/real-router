@@ -2,7 +2,7 @@
 
 import type { EventEmitter } from "../../foundation/event-emitter";
 import type { FSM } from "../../foundation/fsm";
-import type { RouterEvent, RouterPayloads, RouterState } from "../../fsm";
+import type { RouterEvent, RouterPayloads, RouterState } from "../../routerFSM";
 import type { RouterEventMap } from "../../types/internal";
 
 export interface EventBusOptions {

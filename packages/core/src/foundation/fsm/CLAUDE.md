@@ -2,7 +2,7 @@
 
 > **Folded into core (sole source of truth).** This is the LIVE generic FSM
 > engine `@real-router/core` builds on — the router state machine
-> (`../../fsm/routerFSM.ts`) is constructed from it. It was copied here (wave-1a)
+> (`../../routerFSM.ts`) is constructed from it. It was copied here (wave-1a)
 > from the standalone `@real-router/fsm` package, whose source was then **deleted**
 > (wave-3); `@real-router/fsm@0.6.1` remains published-by-mistake on npm
 > (deprecated), but there is no longer a source package — **this is the only copy.**
@@ -93,4 +93,4 @@ src/
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — engine internals and design decisions
 - [INVARIANTS.md](INVARIANTS.md) — invariant catalogue (basis for property tests)
-- [packages/core/src/fsm/routerFSM.ts](../core/src/fsm/routerFSM.ts) — the router's state machine built on this engine
+- [packages/core/src/routerFSM.ts](../../routerFSM.ts) — the router's state machine built on this engine

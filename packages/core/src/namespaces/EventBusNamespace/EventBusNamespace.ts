@@ -1,13 +1,13 @@
 // packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts
 
 import { errorCodes, events } from "../../constants";
-import { routerEvents, routerStates } from "../../fsm";
 import { RouterError } from "../../RouterError";
+import { routerEvents, routerStates } from "../../routerFSM";
 
 import type { EventBusOptions } from "./types";
 import type { EventEmitter } from "../../foundation/event-emitter";
 import type { FSM } from "../../foundation/fsm";
-import type { RouterEvent, RouterPayloads, RouterState } from "../../fsm";
+import type { RouterEvent, RouterPayloads, RouterState } from "../../routerFSM";
 import type {
   EventName,
   LeaveFn,
