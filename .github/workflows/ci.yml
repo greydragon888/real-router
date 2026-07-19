@@ -375,25 +375,25 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
-      # base-test OWNS the "base" layer: build-matrix.mjs classifies these 8
-      # packages (CORE_LAYER) as the `base` group and EXCLUDES them from the
-      # dynamic shards, delegating their test+coverage to this job. The filter
-      # must therefore run `test` on EACH of them.
+      # base-test OWNS the "base" layer: build-matrix.mjs classifies the
+      # CORE_LAYER set as the `base` group and EXCLUDES it from the dynamic
+      # shards, delegating its test+coverage to this job. Today the set is
+      # `@real-router/core` alone — the fold-into-core waves dissolved every
+      # other former member (engine, fsm, logger, types, event-emitter,
+      # type-guards) into core itself.
       #
-      # `--filter='@real-router/core...'` does NOT do that: turbo's `pkg...`
-      # expands the package *scope* to core+deps, but runs the requested task
-      # (`test`) ONLY on the matched package (core). The deps are pulled into the
-      # graph solely via `test`'s `dependsOn` (^bundle, lint, type-check) — and
-      # `test` has no `^test`, so the deps' own `test` never runs. Result: only
-      # core was tested here, the other 4 base-layer packages (engine, fsm,
-      # logger) were tested NOWHERE
-      # (shards exclude them too), so they emitted no lcov and SonarCloud scored
-      # their changed lines as 0% on any PR touching them (#1030 hit it via
-      # event-emitter — new_coverage 76.1% < 80%, gate FAILED).
-      #
-      # Fix: filter each base-layer package explicitly. The list is sourced from
-      # build-matrix.mjs CORE_LAYER (the single source of truth that also decides
-      # shard exclusion), so the two cannot drift. $FILTERS is intentionally
+      # The filter still enumerates CORE_LAYER members EXPLICITLY rather than
+      # using `--filter='@real-router/core...'`: turbo's `pkg...` expands the
+      # package *scope* to core+deps but runs the requested task (`test`) ONLY
+      # on the matched package, and `test` has no `^test` — so when the base
+      # layer had multiple members, every non-core member was tested NOWHERE
+      # (shards exclude them too), emitted no lcov, and SonarCloud scored its
+      # changed lines 0% (#1030 hit exactly this via event-emitter —
+      # new_coverage 76.1% < 80%, gate FAILED). With core alone the two forms
+      # coincide, but the explicit-member form stays: the list is sourced from
+      # build-matrix.mjs CORE_LAYER (the single source of truth that also
+      # decides shard exclusion), so a future base-layer member is tested here
+      # automatically instead of resurrecting #1030. $FILTERS is intentionally
       # unquoted (bash word-splitting into separate --filter=<pkg> tokens) —
       # same pattern as the shards' $SHARD_FILTER.
       - name: Test core layer

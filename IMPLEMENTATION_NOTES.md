@@ -2,7 +2,39 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
-## Engine Merge — `search-params` + `path-matcher` + `route-tree` → `engine` (#1510)
+## test/lint tiers dropped `^bundle` — hooks and shards no longer build upstream dists
+
+**Problem.** `test` / `test:properties` / `test:stress` / `lint` / `lint:fix` carried
+`dependsOn: ["^bundle", …]`, so the pre-commit hook (`turbo run test
+--filter='!./examples/**'`) rebuilt every upstream `dist/` on every commit, and CI
+shards bundled upstream deps before testing. The documented rationale ("Why `^bundle`
+instead of `^build`" below) was *upstream dist for import resolution* — written before
+the resolution stack went dist-free. Worse, the built dists were actively harmful in
+worktrees: a stale `dist/` flips vitest's alias resolution and breaks test runs (the
+`rm -rf packages/*/dist && pnpm install` ritual documented in memory), i.e. the
+dependency produced artifacts the depending tasks not only don't need but can be
+broken by.
+
+**Solution.** Removed `^bundle` from all five tasks in `turbo.json`. Kept it where
+dist is genuinely consumed: `test:e2e` (Playwright runs built example apps), `bundle`
+itself (attw resolves a package's `.d.ts` against upstream *published* entry points →
+upstream dist required for artifact validation), and the `build` orchestrator /
+pre-push (`turbo run build lint:package lint:types`) which exists to validate
+artifacts and still builds everything in dependency order.
+
+**Why (empirically verified, not assumed).** Every resolver in the test/lint path is
+dist-free: `tsc` and typed-ESLint resolve `@real-router/*` → `src` via the
+`@real-router/internal-source` custom condition (the same mechanism that already let
+`type-check` drop its bundle dependency, #431), and vitest resolves via auto-generated
+src aliases (`vitest.config.common.mts`). Proof at zero dists on disk: the four
+exotic-compiler adapters ran green directly — svelte 366, vue 471, solid 457/458,
+angular 28 files — tests AND lint, plus core's 3819 @ 100% coverage; then the exact
+pre-commit invocation `turbo run test --filter='!./examples/**'` with the new graph:
+66/66 tasks green, **zero `dist/` directories created**. Dry-run graph shows only
+`lint`/`test`/`type-check` tasks — no `bundle` nodes. Consequences: commits skip ~20
+bundles; CI shards (`turbo run test test:properties bundle` in one invocation) now run
+bundle ∥ test instead of bundle → test; the stale-dist footgun class is gone from
+pre-commit (only pre-push still builds dists — deliberately, for artifact validation).
 
 **Problem.** The routing engine shipped as three private packages with a strict
 dependency chain (`route-tree` → `path-matcher`, `search-params`), but the boundaries
@@ -1618,7 +1650,7 @@ lint:types → depends on bundle (attw validates .d.ts across module variants)
 
 **Cache sharing:** `turbo run build` triggers `bundle` as a dependency → caches `bundle:*`. Subsequent `turbo run bundle` gets cache hits. CI Pipeline uses this: step 1 (test) triggers `^bundle` for upstream, step 2 (`turbo run bundle`) gets cache hits for upstream and only runs bundle for leaf affected packages.
 
-**Why `^bundle` instead of `^build`:** Test/lint tasks only need upstream `dist/` (for import resolution), not upstream test results. Depending on `^build` would run upstream tests before downstream tests — unnecessary serialization. Upstream tests run via their own `turbo run build` in pre-push hooks and CI.
+**Why `^bundle` instead of `^build`:** Test/lint tasks only need upstream `dist/` (for import resolution), not upstream test results. Depending on `^build` would run upstream tests before downstream tests — unnecessary serialization. Upstream tests run via their own `turbo run build` in pre-push hooks and CI. **(Superseded: test/lint no longer depend on `^bundle` at all — the "import resolution needs dist" premise became false once `@real-router/internal-source` + vitest src-aliases covered every resolver; see "test/lint tiers dropped `^bundle`" at the top of this file.)**
 
 **Why type-check has no dependencies:** After the `@real-router/internal-source` custom export condition was added (#431 root fix), monorepo `tsc --noEmit` resolves workspace packages directly to `src/*.ts` via `tsconfig.json` `customConditions`. No `dist/` is required. See "Custom `@real-router/internal-source` Export Condition" below for the full saga.
 

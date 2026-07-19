@@ -37,8 +37,10 @@ const ARCHITECTURE_PATTERNS = [
   /^packages\/[^/]+\/package\.json$/,         // Package dependencies
   /^packages\/[^/]+\/CLAUDE\.md$/,            // Package documentation
   /^packages\/core\/src\/createRouter\.ts$/,  // Router factory
-  /^packages\/core\/src\/types\.ts$/,         // Core types
-  /^packages\/core\/src\/public-types\//,     // Public types (folded from @real-router/types, wave-2)
+  // Public types — src/types/ IS the @real-router/core/types surface (folded
+  // from @real-router/types in wave-2 as public-types/ + the old types.ts
+  // reshim, then consolidated into one src/types/ dir — 4701e64a).
+  /^packages\/core\/src\/types\//,
 ];
 
 const BIG_PR_THRESHOLD = 500;
