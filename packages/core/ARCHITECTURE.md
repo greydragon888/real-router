@@ -21,11 +21,9 @@ core/
 │   ├── internals.ts                 — WeakMap registry for API functions
 │   ├── transitionPath.ts            — Transition path calculation
 │   ├── helpers.ts                   — Utility functions
-│   ├── typeGuards.ts                — Runtime type guards
+│   ├── guards.ts                    — Input guards (deps, routes) + logger-config assertion
+│   ├── routerFSM.ts                 — Router FSM config (states, events, payloads)
 │   ├── types.ts                     — Router-dependent types
-│   │
-│   ├── fsm/
-│   │   └── routerFSM.ts            — FSM config (states, events, payloads)
 │   │
 │   ├── namespaces/
 │   │   ├── RoutesNamespace/         — Route tree, path operations, forwarding

@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/StateNamespace/types.ts
 
-import type { Params } from "@real-router/types";
+import type { Params } from "../../types";
 
 /**
  * Dependencies injected from Router for state creation.

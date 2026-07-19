@@ -2,7 +2,7 @@ import { throwIfDisposed } from "./helpers";
 import { getInternals } from "../internals";
 
 import type { LifecycleApi } from "./types";
-import type { DefaultDependencies, Router } from "@real-router/types";
+import type { DefaultDependencies, Router } from "../types";
 
 export function getLifecycleApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,

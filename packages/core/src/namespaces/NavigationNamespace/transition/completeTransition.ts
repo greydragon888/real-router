@@ -1,12 +1,8 @@
 import { errorCodes, constants } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
+import type { NavigationOptions, State, TransitionMeta } from "../../../types";
 import type { NavigationDependencies, NavigationContext } from "../types";
-import type {
-  NavigationOptions,
-  State,
-  TransitionMeta,
-} from "@real-router/types";
 
 type MutableTransitionMeta = {
   -readonly [K in keyof TransitionMeta]: TransitionMeta[K];

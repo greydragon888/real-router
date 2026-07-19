@@ -1,7 +1,7 @@
 import { getInternals } from "../internals";
 
 import type { SerializedRouterState } from "./serializeRouterState";
-import type { Router, State } from "@real-router/types";
+import type { Router, State } from "../types";
 
 /**
  * Custom deserializer signature for {@link hydrateRouter} (#606). Compatible

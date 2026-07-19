@@ -5,7 +5,7 @@ import { RouterError, errorCodes } from "@real-router/core";
 
 import { errorCodeArbitrary } from "./helpers";
 
-import type { ErrorCodeKeys } from "@real-router/types";
+import type { ErrorCodeKeys } from "@real-router/core";
 
 describe("RouterError Message Formatting Properties", () => {
   describe("Default message formatting", () => {

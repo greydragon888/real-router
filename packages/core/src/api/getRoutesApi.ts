@@ -1,6 +1,4 @@
-import { logger } from "@real-router/logger";
-import { nodeToDefinition } from "engine";
-
+import { nodeToDefinition } from "../engine";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
@@ -29,21 +27,23 @@ import {
 import { getTransitionPath } from "../transitionPath";
 
 import type { RoutesApi } from "./types";
+import type { RouteDefinition, RouteTree } from "../engine";
 import type { RouterInternals } from "../internals";
 import type { RouteLifecycleNamespace, RouteConfig } from "../namespaces";
 import type { RoutesStore } from "../namespaces/RoutesNamespace";
-import type { GuardFnFactory, Route } from "../types";
 import type {
   DefaultDependencies,
   ForwardToCallback,
   NavigationOptions,
   Params,
   Router,
+  RouterLogger,
   State,
   TreeChangedEvent,
   TreeStructuralPatch,
-} from "@real-router/types";
-import type { RouteDefinition, RouteTree } from "engine";
+  GuardFnFactory,
+  Route,
+} from "../types";
 
 // ============================================================================
 // Helpers
@@ -399,7 +399,8 @@ function addRoutes<
 >(
   store: RoutesStore<Dependencies>,
   routes: Route<Dependencies>[],
-  parentName?: string,
+  parentName: string | undefined,
+  logger: RouterLogger,
 ): void {
   // Prepare-then-commit (issue #698): reject the silent-corruption cases
   // up front (dup name vs existing, missing parent), build the merged tree /
@@ -407,7 +408,7 @@ function addRoutes<
   // here), then swap atomically. A rejected add leaves the store untouched.
   assertAddable(store, routes, parentName);
 
-  const artifacts = buildAddArtifacts(store, routes, parentName);
+  const artifacts = buildAddArtifacts(store, routes, parentName, logger);
 
   // Pre-flight the #961 handler-limit into PREPARE so a limit-exceeding batch
   // aborts before the swap (#1046). `add` does not clear guards, so the
@@ -470,6 +471,7 @@ function replaceRoutes<
     routes,
     store.rootPath,
     store.matcherOptions,
+    ctx.logger,
   );
 
   // Pre-flight the #961 handler-limit BEFORE clearDefinitionGuards mutates, so a
@@ -676,7 +678,7 @@ export function getRoutesApi<
       ctx.validator?.routes.validateAddRouteArgs(routeArray);
       ctx.validator?.routes.validateRoutes(routeArray, store, parentName);
 
-      addRoutes(store, routeArray, parentName);
+      addRoutes(store, routeArray, parentName, ctx.logger);
 
       // Built from the post-commit store (О-1), only when someone is listening.
       if (ctx.treeChanged.listenerCount() > 0) {
@@ -704,6 +706,7 @@ export function getRoutesApi<
         name,
         ctx.getStateName(),
         ctx.isTransitioning(),
+        ctx.logger,
       );
 
       if (!canRemove) {
@@ -718,7 +721,7 @@ export function getRoutesApi<
       const wasRemoved = removeRoute(store, name);
 
       if (!wasRemoved) {
-        logger.warn(
+        ctx.logger.warn(
           "router.removeRoute",
           `Route "${name}" not found. No changes made.`,
         );
@@ -745,7 +748,7 @@ export function getRoutesApi<
 
       /* v8 ignore next 6 -- @preserve: race condition guard, mirrors Router.updateRoute() same-path guard tested via Router.ts unit tests */
       if (ctx.isTransitioning()) {
-        logger.error(
+        ctx.logger.error(
           "router.updateRoute",
           `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
         );
@@ -788,7 +791,7 @@ export function getRoutesApi<
       throwIfDisposed(ctx.isDisposed);
       throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
-      const canClear = validateClearRoutes(ctx.isTransitioning());
+      const canClear = validateClearRoutes(ctx.isTransitioning(), ctx.logger);
 
       /* v8 ignore next 3 -- @preserve: race condition guard, mirrors Router.clearRoutes() same-path guard tested via validateClearRoutes unit tests */
       if (!canClear) {
@@ -830,7 +833,7 @@ export function getRoutesApi<
 
       const routeArray = Array.isArray(routes) ? routes : [routes];
 
-      const canReplace = validateClearRoutes(ctx.isTransitioning());
+      const canReplace = validateClearRoutes(ctx.isTransitioning(), ctx.logger);
 
       if (!canReplace) {
         return;

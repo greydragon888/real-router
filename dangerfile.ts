@@ -37,8 +37,10 @@ const ARCHITECTURE_PATTERNS = [
   /^packages\/[^/]+\/package\.json$/,         // Package dependencies
   /^packages\/[^/]+\/CLAUDE\.md$/,            // Package documentation
   /^packages\/core\/src\/createRouter\.ts$/,  // Router factory
-  /^packages\/core\/src\/types\.ts$/,         // Core types
-  /^packages\/core-types\/src\//,             // Shared types
+  // Public types — src/types/ IS the @real-router/core/types surface (folded
+  // from @real-router/types in wave-2 as public-types/ + the old types.ts
+  // reshim, then consolidated into one src/types/ dir — 4701e64a).
+  /^packages\/core\/src\/types\//,
 ];
 
 const BIG_PR_THRESHOLD = 500;
@@ -122,9 +124,7 @@ function checkArchitecturalChanges() {
 
   if (changedArchFiles.length > 0 && !hasImplNotesChanges && !hasClaudeMdChanges) {
     const apiChanges = changedArchFiles.filter((f) => f.endsWith("index.ts"));
-    const typeChanges = changedArchFiles.filter(
-      (f) => f.includes("types") || f.includes("core-types")
-    );
+    const typeChanges = changedArchFiles.filter((f) => f.includes("types"));
 
     const reasons: string[] = [];
     if (apiChanges.length > 0) {

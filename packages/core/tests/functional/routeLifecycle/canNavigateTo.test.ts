@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
@@ -203,7 +202,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
 
   it("logs a warning and returns false when a sync guard throws (#959)", async () => {
     const warnSpy = vi
-      .spyOn(logger, "warn")
+      .spyOn(console, "warn")
       .mockImplementation(() => undefined);
 
     lifecycle.addActivateGuard("admin", () => () => {
@@ -219,7 +218,6 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     // (`false`). navigate() surfaces the same throw via TRANSITION_ERROR; the
     // sync predicate has no error channel, so core logs it directly.
     expect(warnSpy).toHaveBeenCalledWith(
-      "router.canNavigateTo",
       expect.stringContaining("admin"),
       expect.any(Error),
     );

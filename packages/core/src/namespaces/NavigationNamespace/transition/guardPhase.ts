@@ -2,7 +2,7 @@ import { handleGuardError } from "./errorHandling";
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
-import type { GuardFn, State } from "@real-router/types";
+import type { GuardFn, State } from "../../../types";
 
 async function resolveAsyncGuard(
   promise: Promise<boolean>,

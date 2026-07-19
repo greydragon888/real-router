@@ -1,14 +1,15 @@
 // packages/core/src/namespaces/RoutesNamespace/types.ts
 
-import type { GuardFnFactory } from "../../types";
 import type {
   DefaultDependencies,
   ForwardToCallback,
   GuardFn,
   Params,
+  RouterLogger,
   SimpleState,
   State,
-} from "@real-router/types";
+  GuardFnFactory,
+} from "../../types";
 
 /**
  * Dependencies injected into RoutesNamespace.
@@ -19,6 +20,9 @@ import type {
 export interface RoutesDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
+  /** Per-router logger instance (from `getInternals(router).logger`) */
+  logger: RouterLogger;
+
   /**
    * Register a canActivate handler for a route. `precompiledFn` installs an
    * already-compiled `GuardFn` (from {@link compileGuard}) without re-invoking

@@ -3,8 +3,8 @@ import { vi, type Mock } from "vitest";
 
 import { getInternals } from "@real-router/core/validation";
 
-import type { RouterValidator } from "@real-router/core";
-import type { DefaultDependencies, Router } from "@real-router/types";
+import type { RouterValidator, DefaultDependencies } from "@real-router/core";
+import type { Router } from "@real-router/core/types";
 
 /**
  * A `RouterValidator` whose every namespace method is a `vi.fn()` spy.

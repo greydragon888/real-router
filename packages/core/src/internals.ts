@@ -1,24 +1,27 @@
+import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { Router as RouterClass } from "./Router";
-import type { EventMethodMap, PluginFactory } from "./types";
-import type { RouterValidator } from "./types/RouterValidator";
-import type { SerializedRouterState } from "./utils";
 import type {
   DefaultDependencies,
   EventName,
+  LoggerConfig,
   NavigationOptions,
   Options,
   Params,
   Plugin,
   Router as RouterInterface,
+  RouterLogger,
   RouteTreeState,
   SimpleState,
   State,
   TreeChangedEvent,
   Unsubscribe,
-} from "@real-router/types";
-import type { RouteTree } from "engine";
+  EventMethodMap,
+  PluginFactory,
+} from "./types";
+import type { RouterValidator } from "./types/RouterValidator";
+import type { SerializedRouterState } from "./utils";
 
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,
@@ -126,6 +129,14 @@ export interface RouterInternals<
 
   validator: RouterValidator | null;
 
+  // Per-router logger instance (built from `options.logger` in the Router
+  // constructor). The facade reads it as `getInternals(this).logger`; namespaces
+  // receive it via their deps at wiring; plugins reach it through
+  // `getPluginApi(router).logger`. Replaces the former process-global singleton
+  // from the standalone `@real-router/logger` package (now folded into
+  // `foundation/logger`), whose `configure()` leaked across routers (#724).
+  readonly logger: RouterLogger;
+
   // Dependencies (issue #172)
   readonly dependenciesGetStore: () => DependenciesStore<D>;
 
@@ -137,6 +148,11 @@ export interface RouterInternals<
     options: Options;
     dependencies: Record<string, unknown>;
     pluginFactories: PluginFactory<D>[];
+    // Resolved logger config of the base router, so a clone can build its OWN
+    // logger inheriting the base's level/callback. Frozen `options` do NOT carry
+    // `logger` (stripped in the constructor), so `options` above can't convey it;
+    // cloneRouter merges a per-request override (traceId) over this snapshot.
+    loggerConfig: LoggerConfig;
   };
 
   // Consolidated route data store (issue #174 Phase 2)

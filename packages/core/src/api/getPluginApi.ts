@@ -10,7 +10,7 @@ import type {
   Params,
   Router,
   State,
-} from "@real-router/types";
+} from "../types";
 
 // Cache the assembled PluginApi per router — mirrors getNavigator() (#525):
 // avoids re-allocating the closure-bag on each call (plugins call this once

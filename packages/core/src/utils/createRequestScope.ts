@@ -1,7 +1,7 @@
 import { cloneRouter } from "../api/cloneRouter";
 
 import type { Router as RouterClass } from "../Router";
-import type { DefaultDependencies, Router } from "@real-router/types";
+import type { DefaultDependencies, Router } from "../types";
 
 /**
  * Subset of Node's `http.IncomingMessage` that `createRequestScope` relies on:

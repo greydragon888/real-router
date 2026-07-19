@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getLifecycleApi } from "@real-router/core/api";
@@ -218,7 +217,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
   describe("overwriting guards", () => {
     it("should NOT log warning when overwriting existing guard (no validation plugin)", () => {
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
       lifecycle.addDeactivateGuard("route", true);
 

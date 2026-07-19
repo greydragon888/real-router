@@ -18,6 +18,6 @@ export type { RouterInternals } from "./internals";
 // `RouteTree` are the node/matcher types the plugin's validators operate on
 // (segment lookup + existence come from the matcher itself: getSegmentsByName /
 // hasRoute). Kept on this plugin-facing subpath, off the main public index.
-export { validateRoute } from "engine";
+export { validateRoute } from "./engine";
 
-export type { Matcher, RouteTree } from "engine";
+export type { Matcher, RouteTree } from "./engine";

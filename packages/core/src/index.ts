@@ -1,48 +1,16 @@
 // packages/core/src/index.ts
 
-// Router-dependent types (re-exported from @real-router/types)
-
-export type {
-  GuardFnFactory,
-  PluginFactory,
-  Route,
-  RouteConfigUpdate,
-} from "./types";
+// Public types — folded from the former @real-router/types package into
+// core/src/types, re-exported from the root. The Router / RouterError
+// CLASS exports below shadow the same-named type-only star entries (an explicit
+// named export wins over `export *`), so `Router` / `RouterError` at the root
+// resolve to the classes.
+export type * from "./types";
 
 export type { RouterValidator } from "./types/RouterValidator";
 
-// Router class (replaces Router interface from core-types)
+// Router class (replaces the Router interface from types)
 export { Router } from "./Router";
-
-// Types (re-exported from core-types - no Router dependency)
-export type {
-  Config,
-  DefaultDependencies,
-  GuardFn,
-  Listener,
-  Navigator,
-  NavigationOptions,
-  Options,
-  Params,
-  Plugin,
-  SimpleState,
-  State,
-  SubscribeFn,
-  SubscribeState,
-  Subscription,
-  Unsubscribe,
-} from "@real-router/types";
-
-// Route-tree mutation event payloads (observed via getRoutesApi().subscribeChanges)
-export type {
-  TreeChangedEvent,
-  TreeChangedAdd,
-  TreeChangedRemove,
-  TreeChangedUpdate,
-  TreeChangedReplace,
-  TreeChangedClear,
-  TreeStructuralPatch,
-} from "@real-router/types";
 
 export type { ErrorCodes, Constants } from "./constants";
 
@@ -57,4 +25,4 @@ export { getNavigator } from "./getNavigator";
 
 export { resolveForwardChain } from "./namespaces/RoutesNamespace/forwardChain";
 
-export type { RouteTree } from "engine";
+export type { RouteTree } from "./engine";

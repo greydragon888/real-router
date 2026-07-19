@@ -97,21 +97,12 @@ component_management:
     - component_id: dom-utils
       paths:
         - shared/dom-utils/**
-    - component_id: event-emitter
-      paths:
-        - packages/event-emitter/src/**
-    - component_id: fsm
-      paths:
-        - packages/fsm/src/**
     - component_id: hash-plugin
       paths:
         - packages/hash-plugin/src/**
     - component_id: lifecycle-plugin
       paths:
         - packages/lifecycle-plugin/src/**
-    - component_id: logger
-      paths:
-        - packages/logger/src/**
     - component_id: logger-plugin
       paths:
         - packages/logger-plugin/src/**
@@ -133,9 +124,6 @@ component_management:
     - component_id: react
       paths:
         - packages/react/src/**
-    - component_id: engine
-      paths:
-        - packages/engine/src/**
     - component_id: route-utils
       paths:
         - packages/route-utils/src/**
@@ -163,9 +151,6 @@ component_management:
     - component_id: svelte
       paths:
         - packages/svelte/src/**
-    - component_id: type-guards
-      paths:
-        - packages/type-guards/src/**
     - component_id: validation-plugin
       paths:
         - packages/validation-plugin/src/**

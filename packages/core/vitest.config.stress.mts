@@ -6,7 +6,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: "node",
-      include: ["./tests/stress/**/*.stress.ts"],
+      include: ["./tests/stress/**/*.stress.ts", "./tests/engine/stress/**/*.stress.ts"],
       setupFiles: ["./tests/setup.ts"],
       coverage: { enabled: false },
       pool: "forks",

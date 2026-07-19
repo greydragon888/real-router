@@ -2,7 +2,7 @@ import { ERROR_PREFIX } from "./constants";
 import { createLoadersValidator, createSsrLoaderPlugin } from "./shared-ssr";
 
 import type { DataLoaderFactoryMap } from "./types";
-import type { DefaultDependencies, PluginFactory } from "@real-router/types";
+import type { DefaultDependencies, PluginFactory } from "@real-router/core";
 
 // Inlined binding — symmetric with rsc-server-plugin's same merge.
 const validateLoaders = createLoadersValidator(ERROR_PREFIX);

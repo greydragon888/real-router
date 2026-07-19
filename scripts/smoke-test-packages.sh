@@ -19,7 +19,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # - svelte: .svelte files require Svelte compiler
 # - angular: needs @angular/compiler + DI context at import time
 #            (e.g. PlatformLocation triggers JIT compilation of injectables)
-SKIP_IMPORT="@real-router/types @real-router/solid @real-router/svelte @real-router/angular"
+SKIP_IMPORT="@real-router/solid @real-router/svelte @real-router/angular"
 TEMP_DIR="$(mktemp -d)"
 TARBALLS_DIR="$TEMP_DIR/tarballs"
 PROJECT_DIR="$TEMP_DIR/consumer"

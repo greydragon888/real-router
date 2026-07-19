@@ -1,8 +1,5 @@
 // packages/core/src/namespaces/RoutesNamespace/routesStore.ts
 
-import { logger } from "@real-router/logger";
-import { createMatcher, createRouteTree, routeTreeToDefinitions } from "engine";
-
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
 import {
@@ -10,23 +7,30 @@ import {
   createEmptyConfig,
   sanitizeRoute,
 } from "./helpers";
+import {
+  createMatcher,
+  createRouteTree,
+  routeTreeToDefinitions,
+} from "../../engine";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
-import type { GuardFnFactory, Route } from "../../types";
-import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
+import type {
+  CreateMatcherOptions,
+  Matcher,
+  RouteDefinition,
+  RouteTree,
+} from "../../engine";
 import type {
   DefaultDependencies,
   ForwardToCallback,
   GuardFn,
   Params,
   RouteConfigUpdate,
-} from "@real-router/types";
-import type {
-  CreateMatcherOptions,
-  Matcher,
-  RouteDefinition,
-  RouteTree,
-} from "engine";
+  RouterLogger,
+  GuardFnFactory,
+  Route,
+} from "../../types";
+import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
 // =============================================================================
 // Interfaces
@@ -199,6 +203,7 @@ function registerForwardTo<Dependencies extends DefaultDependencies>(
   route: Route<Dependencies>,
   fullName: string,
   config: RouteConfig,
+  logger: RouterLogger,
 ): void {
   if (route.canActivate) {
     /* v8 ignore next -- @preserve: edge case, both string and function tested separately */
@@ -244,6 +249,7 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   routeCustomFields: Record<string, Record<string, unknown>>,
   pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>,
   pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
+  logger: RouterLogger,
 ): void {
   const customFields = Object.fromEntries(
     Object.entries(route).filter(([key]) => !STANDARD_ROUTE_KEYS.has(key)),
@@ -266,7 +272,7 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   }
 
   if (route.forwardTo) {
-    registerForwardTo(route, fullName, config);
+    registerForwardTo(route, fullName, config, logger);
   }
 
   if (route.decodeParams) {
@@ -290,6 +296,7 @@ function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
   routeCustomFields: Record<string, Record<string, unknown>>,
   pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>,
   pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
+  logger: RouterLogger,
   parentName = "",
 ): void {
   for (const route of routes) {
@@ -302,6 +309,7 @@ function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
       routeCustomFields,
       pendingCanActivate,
       pendingCanDeactivate,
+      logger,
     );
 
     if (route.children) {
@@ -311,6 +319,7 @@ function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
         routeCustomFields,
         pendingCanActivate,
         pendingCanDeactivate,
+        logger,
         fullName,
       );
     }
@@ -570,16 +579,30 @@ export function assertAddable<Dependencies extends DefaultDependencies>(
  * collected into the returned pending maps (depsStore is intentionally omitted
  * so nothing compiles or touches the lifecycle here). THROWS on async/circular
  * forwardTo and invalid path constraint — before the caller mutates the store.
+ *
+ * Takes a single args object: the positional list hit 8 parameters (S107) when
+ * the per-router `logger` (#724) joined it, and named fields read better at the
+ * two call sites anyway.
  */
-function buildArtifacts<Dependencies extends DefaultDependencies>(
-  definitions: readonly RouteDefinition[],
-  routesForHandlers: readonly Route<Dependencies>[],
-  config: RouteConfig,
-  routeCustomFields: Record<string, Record<string, unknown>>,
-  handlerParentName: string,
-  rootPath: string,
-  matcherOptions: CreateMatcherOptions | undefined,
-): RouteArtifacts<Dependencies> {
+function buildArtifacts<Dependencies extends DefaultDependencies>({
+  definitions,
+  routesForHandlers,
+  config,
+  routeCustomFields,
+  handlerParentName,
+  rootPath,
+  matcherOptions,
+  logger,
+}: {
+  definitions: readonly RouteDefinition[];
+  routesForHandlers: readonly Route<Dependencies>[];
+  config: RouteConfig;
+  routeCustomFields: Record<string, Record<string, unknown>>;
+  handlerParentName: string;
+  rootPath: string;
+  matcherOptions: CreateMatcherOptions | undefined;
+  logger: RouterLogger;
+}): RouteArtifacts<Dependencies> {
   const pendingCanActivate = new Map<string, GuardFnFactory<Dependencies>>();
   const pendingCanDeactivate = new Map<string, GuardFnFactory<Dependencies>>();
 
@@ -589,6 +612,7 @@ function buildArtifacts<Dependencies extends DefaultDependencies>(
     routeCustomFields,
     pendingCanActivate,
     pendingCanDeactivate,
+    logger,
     handlerParentName,
   );
 
@@ -611,6 +635,7 @@ export function buildAddArtifacts<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   routes: readonly Route<Dependencies>[],
   parentName: string | undefined,
+  logger: RouterLogger,
 ): RouteArtifacts<Dependencies> {
   const definitions = insertAddedDefinitions(
     store.definitions,
@@ -618,18 +643,19 @@ export function buildAddArtifacts<Dependencies extends DefaultDependencies>(
     parentName === undefined ? [] : parentName.split("."),
   );
 
-  return buildArtifacts(
+  return buildArtifacts({
     definitions,
-    routes,
-    cloneConfig(store.config),
-    Object.assign(
+    routesForHandlers: routes,
+    config: cloneConfig(store.config),
+    routeCustomFields: Object.assign(
       Object.create(null) as Record<string, Record<string, unknown>>,
       store.routeCustomFields,
     ),
-    parentName ?? "",
-    store.rootPath,
-    store.matcherOptions,
-  );
+    handlerParentName: parentName ?? "",
+    rootPath: store.rootPath,
+    matcherOptions: store.matcherOptions,
+    logger,
+  });
 }
 
 /** Builds the fresh artifacts for a full `replace` (standalone new set). */
@@ -637,16 +663,21 @@ export function buildReplaceArtifacts<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
   rootPath: string,
   matcherOptions: CreateMatcherOptions | undefined,
+  logger: RouterLogger,
 ): RouteArtifacts<Dependencies> {
-  return buildArtifacts(
-    routes.map((route) => sanitizeRoute(route)),
-    routes,
-    createEmptyConfig(),
-    Object.create(null) as Record<string, Record<string, unknown>>,
-    "",
+  return buildArtifacts({
+    definitions: routes.map((route) => sanitizeRoute(route)),
+    routesForHandlers: routes,
+    config: createEmptyConfig(),
+    routeCustomFields: Object.create(null) as Record<
+      string,
+      Record<string, unknown>
+    >,
+    handlerParentName: "",
     rootPath,
     matcherOptions,
-  );
+    logger,
+  });
 }
 
 /**
@@ -1061,7 +1092,8 @@ export function createRoutesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   routes: Route<Dependencies>[],
-  matcherOptions?: CreateMatcherOptions,
+  matcherOptions: CreateMatcherOptions | undefined,
+  logger: RouterLogger,
 ): RoutesStore<Dependencies> {
   // Initial routes are a standalone set at rootPath "" — same build the
   // prepare-then-commit `replace` path uses. Guards land in the pending maps,
@@ -1080,7 +1112,7 @@ export function createRoutesStore<
   assertNoInternalNamesInBatch(routes, "addRoute");
   assertNoDuplicateNamesInBatch(routes, "", "addRoute");
 
-  const artifacts = buildReplaceArtifacts(routes, "", matcherOptions);
+  const artifacts = buildReplaceArtifacts(routes, "", matcherOptions, logger);
 
   const store: RoutesStore<Dependencies> = {
     // Deferred access: the getter runs only after `store` is initialized.

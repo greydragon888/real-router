@@ -1,5 +1,5 @@
-import type { State } from "@real-router/core";
-import type { DefaultDependencies, Router } from "@real-router/types";
+import type { State, DefaultDependencies } from "@real-router/core";
+import type { Router } from "@real-router/core/types";
 
 /**
  * Lifecycle hook callback for route transitions.

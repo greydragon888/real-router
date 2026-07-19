@@ -5,7 +5,7 @@ import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
 
-import type { Router } from "@real-router/types";
+import type { Router } from "@real-router/core/types";
 
 describe("core/crash guards (always enforced, no plugin required)", () => {
   describe("guardDependencies", () => {

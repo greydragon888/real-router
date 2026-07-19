@@ -1,4 +1,4 @@
-import { isStateStrict as isState } from "type-guards";
+import { isStateStrict as isState } from "./state-guard";
 
 import type { Browser } from "./types.js";
 import type { State, Params } from "@real-router/core";

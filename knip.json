@@ -1,7 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "syncpack": {
-    "config": ["syncpack.config.{mjs,cjs,js}"]
+    "config": [
+      "syncpack.config.{mjs,cjs,js}"
+    ]
   },
   "workspaces": {
     ".": {
@@ -11,125 +13,234 @@
         "cz.config.js",
         ".changeset/*.md"
       ],
-      "project": ["*.{ts,mts,js,mjs}"],
-      "ignoreDependencies": []
+      "project": [
+        "*.{ts,mts,js,mjs}"
+      ]
     },
     "packages/react": {
-      "project": ["src/**/*.{ts,tsx}"],
-      "ignore": ["src/dom-utils/**"],
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ],
+      "ignore": [
+        "src/dom-utils/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/preact": {
-      "project": ["src/**/*.{ts,tsx}"],
-      "ignore": ["src/dom-utils/**"],
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ],
+      "ignore": [
+        "src/dom-utils/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/vue": {
-      "project": ["src/**/*.ts"],
-      "ignore": ["src/dom-utils/**"],
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignore": [
+        "src/dom-utils/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts"]
+        "config": [
+          "vitest.config.mts"
+        ]
       }
     },
     "packages/solid": {
-      "project": ["src/**/*.{ts,tsx}"],
-      "ignore": ["src/dom-utils/**"],
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ],
+      "ignore": [
+        "src/dom-utils/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts"]
+        "config": [
+          "vitest.config.mts"
+        ]
       },
-      "ignoreDependencies": ["@babel/preset-typescript", "babel-preset-solid"]
+      "ignoreDependencies": [
+        "@babel/preset-typescript",
+        "babel-preset-solid"
+      ]
     },
     "packages/svelte": {
-      "project": ["src/**/*.{ts,svelte,svelte.ts}"],
-      "ignore": ["src/dom-utils/**"],
+      "project": [
+        "src/**/*.{ts,svelte,svelte.ts}"
+      ],
+      "ignore": [
+        "src/dom-utils/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts"]
+        "config": [
+          "vitest.config.mts"
+        ]
       }
     },
     "packages/browser-plugin": {
-      "project": ["src/**/*.ts"],
-      "ignore": ["src/browser-env/**"],
-      "ignoreDependencies": ["@real-router/types"],
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignore": [
+        "src/browser-env/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/hash-plugin": {
-      "project": ["src/**/*.ts"],
-      "ignore": ["src/browser-env/**"],
-      "ignoreDependencies": ["@real-router/types"],
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignore": [
+        "src/browser-env/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/navigation-plugin": {
-      "project": ["src/**/*.ts"],
-      "ignore": ["src/browser-env/**"],
-      "ignoreDependencies": ["type-guards", "@real-router/types"],
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignore": [
+        "src/browser-env/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/memory-plugin": {
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["@real-router/types"],
+      "project": [
+        "src/**/*.ts"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/persistent-params-plugin": {
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["@real-router/types"],
+      "project": [
+        "src/**/*.ts"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/ssr-data-plugin": {
-      "project": ["src/**/*.ts"],
-      "ignore": ["src/shared-ssr/**"],
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignore": [
+        "src/shared-ssr/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/rsc-server-plugin": {
-      "project": ["src/**/*.ts"],
-      "ignore": ["src/shared-ssr/**"],
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignore": [
+        "src/shared-ssr/**"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       }
     },
     "packages/angular": {
-      "project": ["src/**/*.ts"],
+      "project": [
+        "src/**/*.ts"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts"]
+        "config": [
+          "vitest.config.mts"
+        ]
       }
     },
     "packages/core": {
-      "entry": ["tests/benchmarks/*.bench.ts", "tests/benchmarks/codspeed.ts"],
-      "project": ["src/**/*.{ts,tsx}", "tests/benchmarks/*.ts"],
+      "entry": [
+        "tests/benchmarks/*.bench.ts",
+        "tests/benchmarks/codspeed.ts",
+        "src/engine/index.ts"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "tests/benchmarks/*.ts"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       },
       "stryker": {
-        "config": ["stryker.config.mjs"]
+        "config": [
+          "stryker.config.mjs"
+        ]
       }
     },
     "packages/*": {
-      "project": ["src/**/*.{ts,tsx}"],
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ],
       "vitest": {
-        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.*.mts"
+        ]
       },
       "stryker": {
-        "config": ["stryker.config.mjs"]
+        "config": [
+          "stryker.config.mjs"
+        ]
       }
     }
   },
-  "ignoreWorkspaces": ["examples/**", "benchmarks"],
-  "ignoreDependencies": ["@stryker-mutator/api"],
-  "ignoreBinaries": ["tree", "open", "view", "playwright"],
+  "ignoreWorkspaces": [
+    "examples/**",
+    "benchmarks"
+  ],
+  "ignoreDependencies": [
+    "@stryker-mutator/api"
+  ],
+  "ignoreBinaries": [
+    "tree",
+    "open",
+    "view",
+    "playwright"
+  ],
   "ignoreExportsUsedInFile": true
 }

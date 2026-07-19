@@ -1,17 +1,15 @@
 // packages/core/src/namespaces/PluginsNamespace/PluginsNamespace.ts
 
-import { logger } from "@real-router/logger";
-
 import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
 import { validatePlugin } from "./validators";
 
 import type { PluginsDependencies } from "./types";
-import type { PluginFactory } from "../../types";
 import type {
   DefaultDependencies,
   Plugin,
   Unsubscribe,
-} from "@real-router/types";
+  PluginFactory,
+} from "../../types";
 
 /**
  * Independent namespace for managing plugins.
@@ -90,7 +88,11 @@ export class PluginsNamespace<
         try {
           cleanup();
         } catch (error) {
-          logger.error(LOGGER_CONTEXT, "Error during cleanup:", error);
+          this.#deps.logger.error(
+            LOGGER_CONTEXT,
+            "Error during cleanup:",
+            error,
+          );
         }
       };
 
@@ -121,7 +123,11 @@ export class PluginsNamespace<
         try {
           cleanup();
         } catch (cleanupError) {
-          logger.error(LOGGER_CONTEXT, "Cleanup error:", cleanupError);
+          this.#deps.logger.error(
+            LOGGER_CONTEXT,
+            "Cleanup error:",
+            cleanupError,
+          );
         }
       }
 
@@ -152,7 +158,11 @@ export class PluginsNamespace<
         try {
           cleanup();
         } catch (error) {
-          logger.error(LOGGER_CONTEXT, "Error during cleanup:", error);
+          this.#deps.logger.error(
+            LOGGER_CONTEXT,
+            "Error during cleanup:",
+            error,
+          );
         }
       }
     };

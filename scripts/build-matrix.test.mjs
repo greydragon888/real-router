@@ -8,7 +8,13 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets (6/6/3/2/2/8/1 = 28), plus synthetic
+//     reproduce the companion §C buckets — now 1/6/3/2/2/8 = 22 after the
+//     foundation dissolutions (event-emitter + logger in wave-1; type-guards +
+//     the @real-router/types fold into core in wave-2; @real-router/fsm's frozen
+//     shell deleted in wave-3; engine folded into core/src/engine, engine-merge
+//     iteration 2 — and the then-empty `internal` bucket dropped from
+//     GROUP_NAMES, so 6 buckets now, not 7); §C's original master figure was
+//     6/6/3/2/2/8/1 = 28 — plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
 // Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.
@@ -73,7 +79,6 @@ const LEAVES = [
   "logger-plugin",
   "persistent-params-plugin",
 ].map((p) => `@real-router/${p}`);
-const INTERNAL = ["type-guards"];
 
 // ─── Level 1 — affected derivation (A5, the load-bearing invariant) ──────────
 
@@ -99,7 +104,7 @@ test("L1: rx-only PR derives affected=[rx] WITHOUT the dependency-closure (A5)",
     },
   });
   const { affected } = deriveAffected(queryJson);
-  // The whole point of A5: core/types/fsm/logger are NOT here. If they were,
+  // The whole point of A5: core (the base layer) is NOT here. If it were,
   // touchesCore would always be true and mode=leaf would never fire.
   assert.deepEqual(affected, ["@real-router/rx"]);
   for (const core of CORE_LAYER)
@@ -127,18 +132,22 @@ test("L1: '//' root, shared workspace and benchmarks are filtered out", () => {
   assert.ok(dirOf.has("@real-router/shared-sources"));
 });
 
-test("L1: dirOf uses turbo's path verbatim (core-types quirk, not reconstructed)", () => {
+test("L1: dirOf uses turbo's path verbatim (shared-sources quirk, not reconstructed)", () => {
+  // core-types was the packages/* name≠dir quirk until wave-2 folded it into
+  // core; `@real-router/shared-sources` → `shared` is the surviving example.
   const queryJson = JSON.stringify({
     data: {
       affectedPackages: {
-        items: [{ name: "@real-router/types", path: "packages/core-types" }],
+        items: [{ name: "@real-router/shared-sources", path: "shared" }],
       },
     },
   });
   const { affected, dirOf } = deriveAffected(queryJson);
-  assert.deepEqual(affected, ["@real-router/types"]);
-  // packages/<name> reconstruction would have produced packages/types → ENOENT.
-  assert.equal(dirOf.get("@real-router/types"), "packages/core-types");
+  // shared-sources is a fanout amplifier — recorded in dirOf (verbatim path) but
+  // not itself a shardable affected package, so `affected` stays empty.
+  assert.deepEqual(affected, []);
+  // packages/<name> reconstruction would have produced packages/shared-sources → ENOENT.
+  assert.equal(dirOf.get("@real-router/shared-sources"), "shared");
 });
 
 test("L1: docs/empty affected derives to []", () => {
@@ -156,8 +165,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
     tasks: [
       { package: "@real-router/react", directory: "packages/react" },
       { package: "@real-router/react", directory: "packages/react" }, // dup (bundle+test)
-      { package: "@real-router/types", directory: "packages/core-types" },
-      { package: "event-emitter", directory: "packages/event-emitter" },
+      { package: "@real-router/vue", directory: "packages/vue" },
       { package: "@real-router/shared-sources", directory: "shared" }, // dropped (not packages/*)
       { package: "router-benchmarks", directory: "benchmarks" }, // dropped
       { package: "//", directory: "" }, // dropped
@@ -166,31 +174,28 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
   const { members, dirOf } = deriveMembership(dryJson);
   assert.deepEqual(
     [...members].sort(),
-    ["@real-router/react", "@real-router/types", "event-emitter"],
+    ["@real-router/react", "@real-router/vue"],
     "membership = deduped packages/* target set",
   );
-  // core-types quirk preserved from turbo's own directory (not reconstructed).
-  assert.equal(dirOf.get("@real-router/types"), "packages/core-types");
   assert.ok(!dirOf.has("@real-router/shared-sources"));
 });
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 6/6/3/2/2/8/1 = 28", () => {
+test("L2: classify() buckets all real packages/* exactly 1/6/3/2/2/8 = 22", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 28, "expected 28 packages/* workspaces");
+  assert.equal(allPackages.length, 22, "expected 22 packages/* workspaces");
   assert.deepEqual(counts, {
-    base: 6,
+    base: 1,
     adapter: 6,
     "url-plugin": 3,
     "ssr-plugin": 2,
     "adapter-shared": 2,
     leaf: 8,
-    internal: 1,
   });
 });
 
@@ -203,7 +208,6 @@ test("L2: each named package lands in its expected bucket", () => {
   for (const p of SSR_PLUGINS) expect(p, "ssr-plugin");
   for (const p of ADAPTER_SHARED) expect(p, "adapter-shared");
   for (const p of LEAVES) expect(p, "leaf");
-  for (const p of INTERNAL) expect(p, "internal");
 });
 
 // ─── Level 2 — classify() edge cases via injected readers (no disk/turbo) ────
@@ -425,7 +429,7 @@ test("routing: a multi-package edit WITHOUT a shared source stays leaf (≤ K)",
 
 test("routing: sharded matrix — adapter shards + non-empty groups only, empties omitted", () => {
   // Synthetic >K non-core set exercising the sharded matrix shape: 6 adapters +
-  // 2 adapter-shared + 3 url-plugins = 11 > K. ssr-plugin/leaf/internal stay
+  // 2 adapter-shared + 3 url-plugins = 11 > K. ssr-plugin/leaf stay
   // empty and must NOT spawn runners; base is a separate job, never a shard.
   const affected = [...ADAPTERS, ...ADAPTER_SHARED, ...URL_PLUGINS]; // 11
   const { mode, matrix } = buildPlan(affected, realDirOf);
@@ -435,7 +439,7 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
     assert.ok(names.includes(a), a);
   assert.ok(names.includes("adapter-shared"));
   assert.ok(names.includes("url-plugin"));
-  for (const empty of ["ssr-plugin", "leaf", "internal", "base"]) {
+  for (const empty of ["ssr-plugin", "leaf", "base"]) {
     assert.ok(
       !names.includes(empty),
       `empty/base group ${empty} leaked into matrix`,
@@ -449,22 +453,16 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   );
 });
 
-test("routing: full rebuild (all 28) → base excluded, 11 shards", () => {
+test("routing: full rebuild (all 22) → base excluded, 10 shards", () => {
   const { mode, matrix } = buildPlan(allPackages, realDirOf);
   assert.equal(mode, "sharded");
   const names = matrix.include.map((i) => i.name);
   assert.ok(!names.includes("base"), "base is a separate job, never a shard");
-  // 6 adapters + url-plugin + ssr-plugin + adapter-shared + leaf + internal
-  for (const g of [
-    "url-plugin",
-    "ssr-plugin",
-    "adapter-shared",
-    "leaf",
-    "internal",
-  ]) {
+  // 6 adapters + url-plugin + ssr-plugin + adapter-shared + leaf.
+  for (const g of ["url-plugin", "ssr-plugin", "adapter-shared", "leaf"]) {
     assert.ok(names.includes(g), g);
   }
-  assert.equal(matrix.include.length, 11);
+  assert.equal(matrix.include.length, 10);
 });
 
 // ─── leafFilter — leaf EXECUTION scope == ROUTING decision (root-lockfile fix) ─
@@ -536,7 +534,7 @@ test("leafFilter: END-TO-END #1112 — root-lockfile query JSON → narrow leaf 
 });
 
 test("leafFilter: carries the routing set verbatim — NO dependency-closure", () => {
-  // rx depends on core/types/logger, but leaf runs `--filter=@real-router/rx`
+  // rx depends on core (+ its deps), but leaf runs `--filter=@real-router/rx`
   // ONLY — turbo pulls the deps' ^bundle in via the task graph; they are NOT in
   // the execution filter. This is precisely what `--filter='...[ref]'` failed to
   // keep narrow on a root-file change (it added every workspace). Round-trips

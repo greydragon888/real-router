@@ -13,7 +13,7 @@ export type { HashPluginOptions } from "./types";
 export type { Browser } from "./browser-env";
 
 // Type guards
-export { isStateStrict as isState } from "type-guards";
+export { isStateStrict as isState } from "./browser-env/state-guard";
 
 /**
  * Module augmentation for real-router.
@@ -23,7 +23,7 @@ export { isStateStrict as isState } from "type-guards";
  * known to TypeScript even when only hash-plugin is installed — runtime
  * silently ignores them with a one-time warn.
  */
-declare module "@real-router/types" {
+declare module "@real-router/core/types" {
   interface NavigationOptions {
     /**
      * URL fragment override (decoded, no leading "#"). Ignored by hash-plugin

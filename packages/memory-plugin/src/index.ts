@@ -6,7 +6,7 @@ export type {
   MemoryDirection,
 } from "./types";
 
-declare module "@real-router/types" {
+declare module "@real-router/core/types" {
   interface StateContext {
     memory?: import("./types").MemoryContext;
   }

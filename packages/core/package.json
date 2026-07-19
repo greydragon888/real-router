@@ -8,6 +8,9 @@
   "types": "./dist/esm/index.d.mts",
   "typesVersions": {
     "*": {
+      "types": [
+        "./dist/cjs/types.d.ts"
+      ],
       "api": [
         "./dist/cjs/api.d.ts"
       ],
@@ -28,6 +31,15 @@
       },
       "import": "./dist/esm/index.mjs",
       "require": "./dist/cjs/index.js"
+    },
+    "./types": {
+      "@real-router/internal-source": "./src/types/index.ts",
+      "types": {
+        "import": "./dist/esm/types.d.mts",
+        "require": "./dist/cjs/types.d.ts"
+      },
+      "import": "./dist/esm/types.mjs",
+      "require": "./dist/cjs/types.js"
     },
     "./api": {
       "@real-router/internal-source": "./src/api/index.ts",
@@ -85,9 +97,9 @@
   },
   "homepage": "https://github.com/greydragon888/real-router",
   "scripts": {
-    "test": "vitest run functional/",
+    "test": "vitest run",
     "test:properties": "vitest run --config vitest.config.properties.mts",
-    "test:coverage": "vitest run functional/ --coverage",
+    "test:coverage": "vitest run --coverage",
     "test:stress": "vitest run --config vitest.config.stress.mts",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
@@ -97,14 +109,5 @@
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "bundle": "tsdown --config-loader unrun"
   },
-  "sideEffects": false,
-  "dependencies": {
-    "@real-router/fsm": "workspace:^",
-    "@real-router/logger": "workspace:^",
-    "@real-router/types": "workspace:^"
-  },
-  "devDependencies": {
-    "event-emitter": "workspace:^",
-    "engine": "workspace:^"
-  }
+  "sideEffects": false
 }

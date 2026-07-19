@@ -13,7 +13,7 @@ export type {
   NavigationDirection,
 } from "./types";
 
-declare module "@real-router/types" {
+declare module "@real-router/core/types" {
   interface StateContext {
     navigation?: import("./types").NavigationMeta;
     /**

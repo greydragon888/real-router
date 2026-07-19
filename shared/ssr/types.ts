@@ -1,9 +1,5 @@
-import type {
-  DefaultDependencies,
-  Params,
-  Router,
-  State,
-} from "@real-router/types";
+import type { DefaultDependencies, Params, State } from "@real-router/core";
+import type { Router } from "@real-router/core/types";
 
 export type SsrMode = "full" | "data-only" | "client-only";
 

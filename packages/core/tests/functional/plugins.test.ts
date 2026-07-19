@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import {
   describe,
   beforeEach,
@@ -254,7 +253,9 @@ describe("core/plugins", () => {
       });
 
       it("should log error when cleanup throws during rollback (line 148)", () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         // Create a plugin whose teardown throws - teardown is called during cleanup
         const teardownThatThrows = vi.fn(() => {
@@ -283,8 +284,7 @@ describe("core/plugins", () => {
         // Error should have been logged (line 148-152)
         // Logger format: logger.error(context, message, error)
         expect(errorSpy).toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Cleanup error:",
+          "[router.usePlugin] Cleanup error:",
           expect.any(Error),
         );
 
@@ -313,7 +313,7 @@ describe("core/plugins", () => {
       });
 
       it("should deduplicate factory in same batch (without validation plugin, no warn)", async () => {
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         const tracker = createTrackingPlugin();
         const factory = tracker.factory;
@@ -323,8 +323,7 @@ describe("core/plugins", () => {
         const unsub = router.usePlugin(factory, factory);
 
         expect(warnSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Duplicate factory in batch, will be registered once",
+          "[router.usePlugin] Duplicate factory in batch, will be registered once",
         );
 
         await router.start("/home");
@@ -336,15 +335,14 @@ describe("core/plugins", () => {
       });
 
       it("without validation plugin, duplicates in batch do NOT log warn", () => {
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         const factory = () => ({});
 
         router.usePlugin(factory, factory, factory);
 
         expect(warnSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Duplicate factory in batch, will be registered once",
+          "[router.usePlugin] Duplicate factory in batch, will be registered once",
         );
 
         warnSpy.mockRestore();
@@ -863,7 +861,7 @@ describe("core/plugins", () => {
     // 🟡 IMPORTANT: Non-function plugin methods (warning + skip)
     describe("non-function plugin methods", () => {
       it("should skip non-function onStart property (without validation plugin, no warn)", async () => {
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         const factory = () => ({ onStart: "not a function" }) as any;
 
@@ -872,8 +870,7 @@ describe("core/plugins", () => {
         }).not.toThrow();
 
         expect(warnSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Property 'onStart' is not a function, skipping",
+          "[router.usePlugin] Property 'onStart' is not a function, skipping",
         );
 
         warnSpy.mockRestore();
@@ -882,7 +879,7 @@ describe("core/plugins", () => {
       it("without validation plugin, non-function methods do NOT log warn", async () => {
         router.stop();
 
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         const factory = () =>
           ({
@@ -894,8 +891,7 @@ describe("core/plugins", () => {
         router.usePlugin(factory);
 
         expect(warnSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Property 'onStart' is not a function, skipping",
+          "[router.usePlugin] Property 'onStart' is not a function, skipping",
         );
 
         router.start("/home").catch(() => {});
@@ -907,7 +903,7 @@ describe("core/plugins", () => {
       it("should subscribe only function methods (without validation plugin, no warn for non-functions)", async () => {
         router.stop();
 
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         const onStartFn = vi.fn();
         const factory = () =>
@@ -922,8 +918,7 @@ describe("core/plugins", () => {
         expect(onStartFn).toHaveBeenCalled();
 
         expect(warnSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Property 'onStop' is not a function, skipping",
+          "[router.usePlugin] Property 'onStop' is not a function, skipping",
         );
 
         warnSpy.mockRestore();
@@ -933,7 +928,7 @@ describe("core/plugins", () => {
     // 🟡 IMPORTANT: Warning messages
     describe("warning messages", () => {
       it("without validation plugin, registering 10+ plugins does NOT log warn", () => {
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         // Register 10 plugins (would cross WARN threshold with plugin)
         const factories = Array.from({ length: 10 }, () => () => ({}));
@@ -942,7 +937,6 @@ describe("core/plugins", () => {
 
         // Without validation plugin, no threshold warning is emitted
         expect(warnSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
           expect.stringContaining("plugins registered"),
         );
 
@@ -950,7 +944,9 @@ describe("core/plugins", () => {
       });
 
       it("without validation plugin, registering 25+ plugins does NOT log error", () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         // Register 25 plugins (would cross ERROR threshold with plugin)
         const factories = Array.from({ length: 25 }, () => () => ({}));
@@ -959,7 +955,6 @@ describe("core/plugins", () => {
 
         // Without validation plugin, no threshold error is emitted
         expect(errorSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
           expect.stringContaining("plugins registered"),
         );
 
@@ -967,7 +962,7 @@ describe("core/plugins", () => {
       });
 
       it("without validation plugin, registering onStart after start does NOT log warn", () => {
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         // Router is already started in beforeEach
         expect(router.isActive()).toBe(true);
@@ -977,15 +972,14 @@ describe("core/plugins", () => {
         router.usePlugin(factory);
 
         expect(warnSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Router already started, onStart will not be called",
+          "[router.usePlugin] Router already started, onStart will not be called",
         );
 
         warnSpy.mockRestore();
       });
 
       it("should not warn about onStart if router is not started", () => {
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
         router.stop();
 
@@ -995,7 +989,6 @@ describe("core/plugins", () => {
 
         // Logger format: logger.warn(context, message)
         expect(warnSpy).not.toHaveBeenCalledWith(
-          "router.usePlugin",
           expect.stringContaining("onStart will not be called"),
         );
 
@@ -1006,7 +999,9 @@ describe("core/plugins", () => {
     // 🟡 IMPORTANT: Cleanup error logging
     describe("cleanup error logging", () => {
       it("should log error when teardown throws during unsubscribe", () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         const teardownError = new Error("Teardown failed");
         const factory = () => ({
@@ -1025,8 +1020,7 @@ describe("core/plugins", () => {
         // Should log the error
         // Logger format: logger.error(context, message, error)
         expect(errorSpy).toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Error during cleanup:",
+          "[router.usePlugin] Error during cleanup:",
           teardownError,
         );
 
@@ -1037,7 +1031,9 @@ describe("core/plugins", () => {
         // The single-plugin fast path and the multi-plugin (>=2 factories) path
         // have separate cleanup loops. The test above exercises the fast path;
         // this one drives the multi-plugin loop's try/catch + error message.
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         const teardownError = new Error("Teardown failed");
         const aTeardown = vi.fn(() => {
@@ -1060,8 +1056,7 @@ describe("core/plugins", () => {
 
         // The logged message must survive (blanked StringLiteral mutant).
         expect(errorSpy).toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Error during cleanup:",
+          "[router.usePlugin] Error during cleanup:",
           teardownError,
         );
 

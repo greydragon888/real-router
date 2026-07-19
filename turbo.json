@@ -35,7 +35,7 @@
       "cache": true
     },
     "build": {
-      "dependsOn": ["bundle", "test", "test:properties"],
+      "dependsOn": ["^bundle", "bundle", "test", "test:properties"],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte,html,css}",
         "index.html",
@@ -63,7 +63,7 @@
       "cache": true
     },
     "test:stress": {
-      "dependsOn": ["^bundle", "test:properties", "test", "lint", "type-check"],
+      "dependsOn": ["test:properties", "test", "lint", "type-check"],
       "outputs": [],
       "inputs": [
         "tests/stress/**/*.{ts,tsx}",
@@ -74,7 +74,7 @@
       "cache": true
     },
     "test:properties": {
-      "dependsOn": ["^bundle", "test", "lint", "type-check"],
+      "dependsOn": ["test", "lint", "type-check"],
       "outputs": [],
       "inputs": [
         "tests/property/**/*.{ts,tsx}",
@@ -85,7 +85,7 @@
       "cache": true
     },
     "test": {
-      "dependsOn": ["^bundle", "lint", "type-check"],
+      "dependsOn": ["lint", "type-check"],
       "outputs": ["coverage/**"],
       "inputs": [
         "src/**/*.{ts,tsx}",
@@ -102,7 +102,6 @@
       "cache": true
     },
     "lint": {
-      "dependsOn": ["^bundle"],
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,js,jsx}",
@@ -116,7 +115,6 @@
       "cache": true
     },
     "lint:fix": {
-      "dependsOn": ["^bundle"],
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,js,jsx}",

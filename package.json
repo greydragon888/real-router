@@ -14,7 +14,6 @@
     "test:agent": "turbo run test -- --reporter=agent",
     "test:leaks": "turbo run test -- --detect-async-leaks",
     "test:changed": "turbo run test -- --coverage.changed",
-    "test:mutation": "stryker run",
     "mutation:analyze": "node scripts/mutation-analyze.mjs",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",

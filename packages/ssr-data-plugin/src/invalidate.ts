@@ -1,6 +1,6 @@
 import { markStale } from "./shared-ssr";
 
-import type { Router } from "@real-router/types";
+import type { Router } from "@real-router/core/types";
 
 /**
  * Mark the `"data"` namespace as stale on the given router. The next

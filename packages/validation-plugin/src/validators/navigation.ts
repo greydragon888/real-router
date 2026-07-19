@@ -5,7 +5,7 @@ import {
   isNavigationOptions,
   isParams,
   isString,
-} from "type-guards";
+} from "../type-guards";
 
 import type { NavigationOptions } from "@real-router/core";
 

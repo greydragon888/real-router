@@ -11,8 +11,8 @@ import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNam
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
 import type { Router } from "../Router";
+import type { DefaultDependencies, Params } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
-import type { DefaultDependencies, Params } from "@real-router/types";
 
 /**
  * Compiles a guard/plugin factory against the router + a cached `getDependency`
@@ -108,6 +108,7 @@ function wireRouteLifecycle<Dependencies extends DefaultDependencies>(
   getValidator: () => RouterValidator | null,
 ): void {
   const deps: RouteLifecycleDependencies<Dependencies> = {
+    logger: getInternals(ns.router).logger,
     compileFactory,
     getValidator,
   };
@@ -119,6 +120,7 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
 ): void {
   const deps: RoutesDependencies<Dependencies> = {
+    logger: getInternals(ns.router).logger,
     addActivateGuard: (name, handler, precompiledFn) => {
       ns.routeLifecycle.addCanActivate(name, handler, true, precompiledFn);
     },
@@ -157,6 +159,7 @@ function wirePlugins<Dependencies extends DefaultDependencies>(
   getValidator: () => RouterValidator | null,
 ): void {
   const deps: PluginsDependencies<Dependencies> = {
+    logger: getInternals(ns.router).logger,
     addEventListener: (eventName, cb) =>
       ns.eventBus.addEventListener(eventName, cb),
     canNavigate: () => ns.eventBus.canBeginTransition(),
@@ -171,6 +174,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
 ): void {
   const deps: NavigationDependencies = {
+    logger: getInternals(ns.router).logger,
     getOptions: () => ns.options.get(),
     hasRoute: (name) => ns.routes.hasRoute(name),
     getState: () => ns.state.get(),

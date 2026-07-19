@@ -1,5 +1,3 @@
-import { logger } from "@real-router/logger";
-
 import {
   CACHED_NOT_STARTED_REJECTION,
   CACHED_ROUTE_NOT_FOUND_ERROR,
@@ -23,7 +21,7 @@ import type {
   Params,
   State,
   TransitionMeta,
-} from "@real-router/types";
+} from "../../types";
 
 const FROZEN_ACTIVATED: string[] = Object.freeze([
   constants.UNKNOWN_ROUTE,
@@ -748,7 +746,7 @@ export class NavigationNamespace {
 
   #abortPreviousNavigation(externalSignal?: AbortSignal): void {
     if (this.#deps.isTransitioning()) {
-      logger.warn(
+      this.#deps.logger.warn(
         "router.navigate",
         "Concurrent navigation detected on shared router instance. " +
           "For SSR, use cloneRouter() to create isolated instance per request.",

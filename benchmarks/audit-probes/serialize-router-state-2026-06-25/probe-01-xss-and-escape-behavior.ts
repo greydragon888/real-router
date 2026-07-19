@@ -18,7 +18,7 @@ import {
   serializeRouterState,
 } from "../../../../packages/core/src/utils/index";
 
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 const DEFAULT_TRANSITION = {
   phase: "activating" as const,

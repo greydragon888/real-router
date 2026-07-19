@@ -1,6 +1,6 @@
 import { ALL_SSR_MODES, type SsrMode } from "./shared-ssr";
 
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 /**
  * Returns the SSR mode resolved by `ssr-data-plugin` for the current state.

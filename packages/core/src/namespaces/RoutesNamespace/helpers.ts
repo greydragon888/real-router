@@ -1,13 +1,13 @@
 // packages/core/src/namespaces/RoutesNamespace/helpers.ts
 
 import type { RouteConfig } from "./types";
-import type { Route } from "../../types";
+import type { RouteDefinition } from "../../engine";
 import type {
   DefaultDependencies,
   ForwardToCallback,
   Params,
-} from "@real-router/types";
-import type { RouteDefinition } from "engine";
+  Route,
+} from "../../types";
 
 /**
  * Creates an empty RouteConfig.

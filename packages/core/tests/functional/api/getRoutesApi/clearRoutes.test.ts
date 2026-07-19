@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
@@ -466,7 +465,7 @@ describe("core/routes/clearRoutes", () => {
     let errorSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(async () => {
-      errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -501,7 +500,6 @@ describe("core/routes/clearRoutes", () => {
 
       // Should log error
       expect(errorSpy).toHaveBeenCalledWith(
-        "router.clearRoutes",
         expect.stringContaining("navigation is in progress"),
       );
 
@@ -633,7 +631,6 @@ describe("core/routes/clearRoutes", () => {
       routesApi.clear();
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "router.clearRoutes",
         expect.stringContaining("navigation is in progress"),
       );
 

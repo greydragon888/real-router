@@ -4,7 +4,7 @@ import type {
   SsrMode,
   SsrRouteEntry,
 } from "./shared-ssr";
-import type { DefaultDependencies } from "@real-router/types";
+import type { DefaultDependencies } from "@real-router/core";
 
 export type DataLoaderFn = SsrLoaderFn<unknown>;
 

@@ -1,4 +1,4 @@
-import { logger } from "@real-router/logger";
+import type { RouterLogger } from "../../types";
 
 /**
  * Validates removeRoute constraints.
@@ -8,12 +8,14 @@ import { logger } from "@real-router/logger";
  * @param name - Route name to remove
  * @param currentStateName - Current active route name (or undefined)
  * @param isNavigating - Whether navigation is in progress
+ * @param logger - Per-router logger instance (from `getInternals(router).logger`)
  * @returns true if removal can proceed, false if blocked
  */
 export function validateRemoveRoute(
   name: string,
   currentStateName: string | undefined,
   isNavigating: boolean,
+  logger: RouterLogger,
 ): boolean {
   if (currentStateName) {
     const isExactMatch = currentStateName === name;
@@ -46,9 +48,13 @@ export function validateRemoveRoute(
  * Returns false if operation should be blocked (navigation in progress).
  *
  * @param isNavigating - Whether navigation is in progress
+ * @param logger - Per-router logger instance (from `getInternals(router).logger`)
  * @returns true if clearRoutes can proceed, false if blocked
  */
-export function validateClearRoutes(isNavigating: boolean): boolean {
+export function validateClearRoutes(
+  isNavigating: boolean,
+  logger: RouterLogger,
+): boolean {
   if (isNavigating) {
     logger.error(
       "router.clearRoutes",

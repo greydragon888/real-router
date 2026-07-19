@@ -54,30 +54,40 @@ import { join } from "node:path";
 export const K = 10;
 
 /**
- * The 6 packages that form the `base` layer (core + its workspace deps +
- * tsdown-bundled deps — the package *scope* of `--filter='@real-router/core...'`,
- * verified live against turbo 2.10.0). NOTE: `type-guards` is NOT here — core
- * does not depend on it; it rides the `internal` shard. `engine` folds the former
- * `path-matcher` + `search-params` + `route-tree` trio into one bundled dep
- * (engine-merge #1510), so the set dropped from 8 to 6.
+ * The single package that forms the `base` layer: `@real-router/core` alone.
+ * (Historically core + its workspace deps + tsdown-bundled deps — the package
+ * *scope* of `--filter='@real-router/core...'`, verified live against turbo
+ * 2.10.0 — but the fold-into-core waves below emptied that dep set.)
  *
- * These are EXCLUDED from the dynamic shards (`buildPlan` never puts the `base`
- * group in `include`) and delegated to the base-test job. base-test imports THIS
- * set to build its filter — running `test` on each member explicitly. It must
- * NOT use `--filter='@real-router/core...'`: turbo's `pkg...` runs the task only
- * on the matched package (core), not its deps (`test` has no `^test`), so the
- * other 5 would be tested nowhere → no lcov → SonarCloud 0% on their changed
- * lines (#1030, via event-emitter). Keep this set authoritative: ci.yml's
- * base-test filter is generated from it.
+ * Evolution: `type-guards` (the former sole `internal`-shard member) dissolved
+ * into its consumer plugins (wave-2), emptying the internal shard (since removed
+ * entirely from GROUP_NAMES / classify — no bare packages remain). `engine`
+ * folded the former `path-matcher` + `search-params` + `route-tree` trio into
+ * one bundled dep (engine-merge #1510), dropping the set from 8 to 6.
+ * `event-emitter` then dissolved into core (`core/src/foundation/event-emitter`),
+ * dropping it to 5; `@real-router/logger` likewise dissolved into core
+ * (`core/src/foundation/logger` — a per-router `RouterLogger` instance replacing
+ * the old process-global singleton, #724), dropping it to 4. `@real-router/types`
+ * folded into core as the `/types` subpath (wave-2) — core no longer declares it
+ * as a dep — dropping it to 3. `@real-router/fsm`'s frozen shell — published by
+ * mistake, its live engine long since copied to `core/src/foundation/fsm` — was
+ * deleted outright (wave-3; the published `0.6.1` stays on npm, deprecated),
+ * dropping it to 2. Finally `engine` itself folded into core as `core/src/engine`
+ * (engine-merge iteration 2) — core no longer declares it as a workspace dep —
+ * dropping the set to 1: core alone.
+ *
+ * This member is EXCLUDED from the dynamic shards (`buildPlan` never puts the
+ * `base` group in `include`) and delegated to the base-test job. base-test
+ * imports THIS set to build its filter — running `test` on core explicitly. It
+ * deliberately does NOT use `--filter='@real-router/core...'`: turbo's `pkg...`
+ * runs the task only on the matched package, not its deps (`test` has no
+ * `^test`). With core alone that would still run core (no gap today), but the
+ * explicit-member form stays authoritative — if a bundled workspace dep is ever
+ * re-added to base it would otherwise be tested nowhere → no lcov → SonarCloud
+ * 0% on its changed lines (the #1030 failure mode, via the former event-emitter).
+ * Keep this set authoritative: ci.yml's base-test filter is generated from it.
  */
-export const CORE_LAYER = new Set([
-  "@real-router/core",
-  "@real-router/types",
-  "@real-router/fsm",
-  "@real-router/logger",
-  "engine",
-  "event-emitter",
-]);
+export const CORE_LAYER = new Set(["@real-router/core"]);
 
 /** The seven layer buckets, in a fixed order so the emitted matrix is stable. */
 const GROUP_NAMES = [
@@ -87,7 +97,6 @@ const GROUP_NAMES = [
   "ssr-plugin",
   "adapter-shared",
   "leaf",
-  "internal",
 ];
 
 /**
@@ -117,8 +126,8 @@ export const defaultReaders = {
  * A5-correct affected derivation. Takes the raw stdout of
  * `turbo query affected --base origin/master --head HEAD --packages` and returns
  * the package-level target set plus a name→directory map (turbo's own `path`,
- * so we never reconstruct `packages/<name>` — which breaks on `@real-router/types`
- * → `packages/core-types` and `@real-router/shared-sources` → `shared`).
+ * so we never reconstruct `packages/<name>` — which breaks on
+ * `@real-router/shared-sources` → `shared`).
  *
  * @param {string} queryJson raw JSON from `turbo query affected … --packages`
  * @returns {{ affected: string[], dirOf: Map<string,string> }}
@@ -173,7 +182,7 @@ export function deriveMembership(dryRunJson) {
  * @param {string} pkg package name
  * @param {Map<string,string>} dirOf name→directory (from turbo)
  * @param {typeof defaultReaders} readers injectable fs accessors
- * @returns {'base'|'adapter'|'url-plugin'|'ssr-plugin'|'adapter-shared'|'leaf'|'internal'}
+ * @returns {'base'|'adapter'|'url-plugin'|'ssr-plugin'|'adapter-shared'|'leaf'}
  */
 export function classify(pkg, dirOf, readers = defaultReaders) {
   if (CORE_LAYER.has(pkg)) return "base";
@@ -202,11 +211,12 @@ export function classify(pkg, dirOf, readers = defaultReaders) {
   // route-utils/sources fan out to all 6 adapters — their own shard.
   if (pkg === "@real-router/sources" || pkg === "@real-router/route-utils")
     return "adapter-shared";
-  // type-guards — the sole remaining unscoped internal package (bare name; the
-  // former bare browser-env / dom-utils were retired with the shared test node,
-  // #1065/#1086).
-  if (!pkg.startsWith("@real-router/")) return "internal";
-  // depends only on core/types/logger.
+  // Everything else is a leaf — depends only on core (+ its /types, /validation,
+  // /api subpaths). There is no separate "internal" shard for bare
+  // (non-@real-router/) packages anymore: type-guards dissolved into its
+  // consumers (wave-2), the shared browser-env / dom-utils were retired
+  // (#1065/#1086), and `engine` folded into core/src/engine (engine-merge
+  // iteration 2) — no bare packages remain. A future bare package would fall here.
   return "leaf";
 }
 

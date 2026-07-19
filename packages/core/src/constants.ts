@@ -7,7 +7,7 @@ import type {
   ErrorCodeKeys,
   ErrorCodeValues,
   TransitionMeta,
-} from "@real-router/types";
+} from "./types";
 
 export type ConstantsKeys = "UNKNOWN_ROUTE";
 

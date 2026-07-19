@@ -14,7 +14,7 @@
 // Structural probe — battery-safe.
 import { createRouter } from "@real-router/core";
 
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 void (async () => {
   // --- (a) payload identity & mutability ---

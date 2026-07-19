@@ -6,9 +6,8 @@ import { serializeRouterState } from "@real-router/core/utils";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
-import type { State } from "@real-router/types";
 
 let router: Router;
 let api: PluginApi;

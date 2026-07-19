@@ -3,8 +3,8 @@ import { getInternals } from "../internals";
 
 import type { DependenciesApi } from "./types";
 import type { DependenciesStore } from "../namespaces";
+import type { DefaultDependencies, Router } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
-import type { DefaultDependencies, Router } from "@real-router/types";
 
 // =============================================================================
 // Module-private CRUD functions

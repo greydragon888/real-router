@@ -51,12 +51,10 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/core": "workspace:^",
-    "@real-router/types": "workspace:^"
+    "@real-router/core": "workspace:^"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "~6.9.1",
-    "jsdom": "29.1.1",
-    "type-guards": "workspace:^"
+    "jsdom": "29.1.1"
   }
 }

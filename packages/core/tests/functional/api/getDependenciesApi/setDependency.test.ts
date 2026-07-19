@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getDependenciesApi } from "@real-router/core/api";
@@ -6,8 +5,7 @@ import { getDependenciesApi } from "@real-router/core/api";
 import { createDependenciesTestRouter } from "./setup";
 
 import type { TestDependencies } from "./setup";
-import type { Router } from "@real-router/core";
-import type { DependenciesApi } from "@real-router/types";
+import type { Router, DependenciesApi } from "@real-router/core";
 
 let router: Router<TestDependencies>;
 let deps: DependenciesApi<TestDependencies>;
@@ -60,7 +58,7 @@ describe("core/dependencies/setDependency", () => {
   });
 
   it("should NOT warn via logger when overwriting existing dependency (no validation plugin)", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     deps.set("foo", 1);
     warnSpy.mockClear();
@@ -73,7 +71,7 @@ describe("core/dependencies/setDependency", () => {
   });
 
   it("should not warn when setting new dependency", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     // @ts-expect-error: testing new key
     deps.set("newDep", "value");
@@ -85,7 +83,7 @@ describe("core/dependencies/setDependency", () => {
 
   // 🟡 IMPORTANT: Idempotency
   it("should not warn when setting same value repeatedly", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     deps.set("foo", 42);
     warnSpy.mockClear();
@@ -99,7 +97,7 @@ describe("core/dependencies/setDependency", () => {
   });
 
   it("should handle NaN idempotency correctly", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     deps.set("foo", Number.NaN);
     warnSpy.mockClear();

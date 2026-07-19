@@ -10,7 +10,7 @@
 import { createRouter } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 
-import type { PluginFactory } from "@real-router/types";
+import type { PluginFactory } from "@real-router/core";
 
 void (async () => {
   let runs = 0;

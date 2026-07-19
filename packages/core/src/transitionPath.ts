@@ -2,7 +2,7 @@
 
 import { getStateMetaParams } from "./stateMetaStore";
 
-import type { State } from "@real-router/types";
+import type { State } from "./types";
 
 /**
  * Parameters extracted from a route segment.

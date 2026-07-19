@@ -16,9 +16,9 @@ export default defineConfig({
     alias: {
       // Main package - resolve to local src
       "@real-router/core": path.resolve(import.meta.dirname, "./src"),
-      // Workspace dependencies - resolve through node_modules symlinks
-      engine: path.resolve(import.meta.dirname, "./node_modules/engine"),
-      logger: path.resolve(import.meta.dirname, "./node_modules/logger"),
+      // (Former `engine` / `logger` workspace aliases removed — both folded into
+      // core: engine → src/engine (engine-merge iteration 2), logger →
+      // src/foundation/logger (wave-1b). Nothing imports them bare anymore.)
     },
   },
 

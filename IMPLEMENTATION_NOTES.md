@@ -2,7 +2,117 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
-## Engine Merge — `search-params` + `path-matcher` + `route-tree` → `engine` (#1510)
+## CI runtime: base-bundle no longer gates base-test/shards; sonarcloud off the CI Result path
+
+**Problem.** Job-timing data from real runs (e.g. the engine-merge PR run) showed the
+sharded path's critical chain as: Check ~31s → **base-bundle 44s, with base-test AND
+all 10 shards waiting on it** → shards 31–53s → **SonarCloud 94s** → CI Result ≈ 4min.
+Both `needs: base-bundle` edges existed "purely for the upstream ^bundle Remote-Cache
+HIT" (the old in-file comment) — a premise that died when turbo `test` dropped
+`^bundle` (see the test/lint entry below): tests need no dists at all, so the heaviest
+test jobs idled ~47s behind a bundle they never consume. And `sonarcloud` sat in CI
+Result's `needs`, making a third-party scanner the longest serial tail of the
+merge-gating check.
+
+**Solution.**
+- `base-test` and `pipeline-sharded` now `needs: [check]` — they start immediately,
+  parallel to base-bundle.
+- The shard step is split into two turbo invocations: `test test:properties` first
+  (starts with no dist prerequisites), then `bundle`. By the time a shard's tests
+  finish, the parallel base-bundle has published core#bundle to the Remote Cache, so
+  the shard's `bundle` (its `^bundle` chain reaches core) resolves as a HIT; a lost
+  race merely re-executes the upstream bundle in that shard — benign duplicate, never
+  a failure. base-bundle's remaining jobs: dist-base artifact (bundle-size/smoke),
+  core publint/attw, the cache warm, and the angular dom-utils sync check.
+- `sonarcloud` removed from CI Result's `needs` (and its `ok "$SONAR"` arm from the
+  verdict): the scan still runs and reports its own PR status, but the required check
+  no longer waits ~90s for it. Expected wall-clock: ~4min → ~2.5min on core PRs.
+
+**⚠ Gating consequence (owner action required).** The master ruleset's
+`required_status_checks` lists only `CI Result` (+ `Require Changeset`,
+`Validate Changesets`, `Dependency Review`) — SonarCloud was gating merges ONLY via
+CI Result's needs. With this change a red quality gate is **advisory, not blocking**,
+until the "SonarCloud" context is added to the ruleset's required checks (Settings →
+Rules → ruleset for master → Require status checks → add). The one-line revert is
+documented next to the `needs` list in ci.yml.
+
+**Why (measured, not assumed).** PR runs: ~4min sharded / 1.5–8min leaf; post-merge
+1min hot (remote cache working) vs 14min cold. Shards are balanced (31–53s spread).
+The two dropped edges and the Sonar tail were the only structural latency left; setup
+composite (pnpm store cache) and Check Changes (minimal install) were already lean.
+The old matrix's empty "internal" shard — 31s of pure setup per sharded run — had
+already been removed with the bucket itself.
+
+## `build` gained `^bundle` — the examples dist-closure hole; `bundle`'s own `^bundle` re-probed and KEPT
+
+**Problem.** `examples.yml`'s build job ran `turbo run build --filter='./examples/**'`
+with **no graph edge to any library bundle**. Examples resolve `@real-router/*` as
+external consumers — their tsconfigs don't extend the root (no `customConditions`),
+so `tsc -b` / vite go through package `exports` → `dist/`. From a clean state the job
+cannot succeed (repro: zero dists → `TS2307: Cannot find module '@real-router/core'`);
+it stayed green only via self-hosted runner residue (gitignored `dist/` survives
+`actions/checkout` between runs) + turbo remote cache. Same failure class as #499
+("dist/ not restored across jobs") and the #833 episode.
+
+**Solution.** `build.dependsOn` gains `"^bundle"`. For an example:
+`example#build → ^bundle (its direct @real-router deps) → each lib's bundle →
+its ^bundle → core/sources/route-utils` — full transitive dist closure (verified:
+the dry-run graph of `react-combined-example#build` contains all 11 lib bundle
+tasks, and the real run from zero dists is green). For `packages/*` the edge is
+redundant-but-harmless: their own `bundle` (which already chains `^bundle`) is in
+`build`'s graph, and pre-push builds the full set anyway. Pre-commit is untouched —
+it runs `test`, which no longer depends on bundling at all (entry below).
+
+**Why `bundle` KEEPS its `^bundle` (re-probed).** The previous entry's premise-check
+was extended to bundling itself: at zero dists, tsdown (react; browser-plugin incl.
+the symlinked browser-env), rollup (solid), and svelte-package (svelte) all emit
+fine — inline publint passes and attw reports "No problems found" — so the old
+assumption "attw needs upstream `.d.ts`" is **false**. The edge stays for two real
+reasons: (1) **ng-packagr (angular) genuinely fails** without upstream dists
+(`TS2307` — it resolves via standard conditions and knows nothing of
+`internal-source`); (2) a chained `^bundle` is turbo's only way to express the
+**transitive dist closure** that `build` (examples) and `test:e2e` rely on — with
+the post-fold graph only 2 deep, removing it would buy ~2 sync points of bundle
+parallelism and break closure. Rejected; recorded so a future audit doesn't remove
+the edge on the strength of the same emission probe.
+
+Also removed the dead root `test:mutation` script (`stryker run` at the repo root,
+where no stryker config exists — mutation testing runs from package dirs;
+`mutation:analyze` stays).
+
+## test/lint tiers dropped `^bundle` — hooks and shards no longer build upstream dists
+
+**Problem.** `test` / `test:properties` / `test:stress` / `lint` / `lint:fix` carried
+`dependsOn: ["^bundle", …]`, so the pre-commit hook (`turbo run test
+--filter='!./examples/**'`) rebuilt every upstream `dist/` on every commit, and CI
+shards bundled upstream deps before testing. The documented rationale ("Why `^bundle`
+instead of `^build`" below) was *upstream dist for import resolution* — written before
+the resolution stack went dist-free. Worse, the built dists were actively harmful in
+worktrees: a stale `dist/` flips vitest's alias resolution and breaks test runs (the
+`rm -rf packages/*/dist && pnpm install` ritual documented in memory), i.e. the
+dependency produced artifacts the depending tasks not only don't need but can be
+broken by.
+
+**Solution.** Removed `^bundle` from all five tasks in `turbo.json`. Kept it where
+dist is genuinely consumed: `test:e2e` (Playwright runs built example apps), `bundle`
+itself (attw resolves a package's `.d.ts` against upstream *published* entry points →
+upstream dist required for artifact validation), and the `build` orchestrator /
+pre-push (`turbo run build lint:package lint:types`) which exists to validate
+artifacts and still builds everything in dependency order.
+
+**Why (empirically verified, not assumed).** Every resolver in the test/lint path is
+dist-free: `tsc` and typed-ESLint resolve `@real-router/*` → `src` via the
+`@real-router/internal-source` custom condition (the same mechanism that already let
+`type-check` drop its bundle dependency, #431), and vitest resolves via auto-generated
+src aliases (`vitest.config.common.mts`). Proof at zero dists on disk: the four
+exotic-compiler adapters ran green directly — svelte 366, vue 471, solid 457/458,
+angular 28 files — tests AND lint, plus core's 3819 @ 100% coverage; then the exact
+pre-commit invocation `turbo run test --filter='!./examples/**'` with the new graph:
+66/66 tasks green, **zero `dist/` directories created**. Dry-run graph shows only
+`lint`/`test`/`type-check` tasks — no `bundle` nodes. Consequences: commits skip ~20
+bundles; CI shards (`turbo run test test:properties bundle` in one invocation) now run
+bundle ∥ test instead of bundle → test; the stale-dist footgun class is gone from
+pre-commit (only pre-push still builds dists — deliberately, for artifact validation).
 
 **Problem.** The routing engine shipped as three private packages with a strict
 dependency chain (`route-tree` → `path-matcher`, `search-params`), but the boundaries
@@ -37,7 +147,324 @@ So a **reachability ratchet** (`scripts/reachability-check.mjs` +
 and fails on any *new* facade-unreachable file/line. Its baseline confirms the pre-merge
 dead-code sweep (#1505): 16 files / 571 lines facade-unreachable, ALL in the two layers,
 0 in the route-tree facade, none dead (each covered by its own layer tier). Not wired
-into pre-push until the registry is triaged to "empty + KEEP" (Faza 2).
+into pre-push until the registry is triaged to "empty + KEEP" (Faza 2). **(The ratchet
+was later removed when the engine folded into core — iteration 2 below: a non-gated
+meta-guard on a now-internal subsystem, inconsistent with how the rest of core is
+tested. The 3-tier tests + eslint whitebox rules + the 100% coverage gate remain.)**
+
+## Engine Merge iteration 2 — `engine` → `core/src/engine` (#1510)
+
+**Problem.** Iteration 1 (above) collapsed the three-package routing engine into one
+bare `packages/engine`, but `@real-router/core` was its ONLY consumer and bundled it
+whole (`alwaysBundle`). A standalone package for a single-consumer, never-published
+subsystem still cost its own `package.json` / two `tsconfig`s / `tsdown` / five `vitest`
+configs / `eslint` / stryker, plus an entry in every package-set (CORE_LAYER, codecov,
+syncpack, build-matrix). The engine is not a utility — it is the router's core — so a
+peer directory under `packages/` mis-modeled the layering.
+
+**Solution.** Fold `engine` into core as **`core/src/engine`** — `src/`, not
+`src/foundation/` (owner decision: the engine is the router's core, not a foundation
+utility like fsm/event-emitter/logger). `git mv packages/engine/src/* →
+core/src/engine/` (39 files, self-contained — only relative internal imports), tests →
+`core/tests/engine/` (74 files, import paths codemod'd: bare `"engine"` → the
+`src/engine` barrel, `../src/foundation/engine` depths recomputed). The engine's
+discipline ported into core intact:
+- **6 layer/whitebox eslint rules** appended to `core/eslint.config.mjs` (§4 layer
+  boundaries — search-params leaf, path-matcher leaf, route-tree barrel-only; §5
+  whitebox tiers — facade, path-matcher-unit, search-params-unit). Globs re-scoped
+  `src/`→`src/engine/`, `tests/`→`tests/engine/`; §5 facade now allows the `src/engine`
+  barrel (functional tests can no longer import a standalone `engine` package).
+- **Reachability ratchet — ported, then removed.** The fold first carried the engine's
+  RFC §5.5 ratchet into core (`ENGINE_REACHABILITY.json` re-prefixed `src/`→`src/engine/`,
+  `reachability-check.mjs` `ENGINE_ROOT`→`packages/core`, a `core/vitest.config.facade.mts`
+  facade-only run). A **follow-up deleted it entirely** — all three files plus the
+  `test:reachability` scripts. Rationale: it is a non-gated meta-guard (never in
+  pre-push/CI), and once the engine is internal core code the "reachable from the facade"
+  question no longer maps to a package public boundary. Decisively, core's OWN code is
+  covered by functional+unit with no such ratchet — a line covered only by `tests/unit`
+  is fine everywhere else in core, so holding `src/engine` to a stricter facade-reachable
+  bar was inconsistent. The real guards stay: the 3 test tiers (still run, still 100%),
+  the eslint §5 whitebox rules, and the 100% coverage gate.
+
+Configs: CORE_LAYER 2→1 (core alone); codecov engine component removed;
+syncpack two `engine` entries removed; `build-matrix.test.mjs` live sweep 23→22 packages,
+base bucket 2→1. Engine's design docs (CLAUDE/ARCHITECTURE/INVARIANTS) preserved at
+`core/src/engine/*.md` (the `foundation/fsm` precedent; README dropped — engine was
+internal-only, never published, so an install-README would mislead). `packages/engine`
+deleted; `pnpm install` deregisters the workspace.
+
+**Why (empirically verified).** Two coverage traps surfaced and were fixed by prog:
+(1) integrating the engine tests dropped core coverage to 94% — the engine's grammar/
+error paths (`path-matcher/registration`, `validation/routes.ts` `errors.ts`) are covered
+**only** by the property tier, so `core/vitest.config.mts` must add all THREE engine tiers
+(`functional` + `unit` + **`property`**) to the coverage `test` run, not just functional+
+unit. (2) even then only 3004 tests ran at 94% — core's `test` script was
+`vitest run functional/`, a positional filter that excluded the engine unit+property
+tiers; dropping the `functional/` filter → `vitest run` → 3819 tests, 100%. Both were
+caught by running the gate, not by reading the config. A third trap in **knip**:
+the engine barrel `src/engine/index.ts` re-exports `MatchResult`, consumed only by
+a functional-test helper (`tests/engine/functional/operations/helpers.ts`, outside
+knip's `project` scope) that correctly imports it from the barrel per the facade
+convention. Pre-fold, engine's `index.ts` was the *package* `exports` entry, so knip
+auto-counted every barrel export as used; folded in, the barrel is internal, so knip
+demanded a real importer and flagged `MatchResult` as unused. Fix: declare
+`src/engine/index.ts` a knip `entry` in the `packages/core` workspace — restoring the
+"this barrel is the engine's public surface" semantic (the whitebox facade tier is
+*required* to import from it). NOT a code removal: `MatchResult` is genuinely used (the
+operations test helper imports it from the barrel), and the 100% line-coverage gate
+independently catches any genuinely dead line in `src/engine` — declaring the barrel a
+knip entry only relaxes knip's export-level check, not coverage. The engine's own bundle
+contribution is unchanged (core already `alwaysBundle`d it) — a pure structural move.
+
+## `fsm` + `event-emitter` → `core/src/foundation`
+
+**Problem.** Two foundation primitives lived as standalone packages consumed only by
+core: `event-emitter` (private, bare name) and the generic FSM engine. The FSM was
+additionally published to npm **by mistake** as `@real-router/fsm` — and npm's unpublish
+policy makes it impossible to remove. Keeping both as separate packages cost the usual
+per-package config surface (CORE_LAYER, codecov, syncpack, tsdown `alwaysBundle`) for
+code that has exactly one consumer, and left `@real-router/fsm` on consumers' dependency
+trees as a transitive dep of core.
+
+**Solution — asymmetric fold into `core/src/foundation/`.** The two cases are NOT
+symmetric:
+
+- **`event-emitter` — dissolved.** `git mv`'d into `core/src/foundation/event-emitter/`
+  (src + its 4 docs + functional/property/stress suites → `core/tests/*/foundation/event-emitter/`);
+  the package directory is **deleted**. Core imports it via a relative path; it is no
+  longer a workspace package.
+- **`@real-router/fsm` — frozen + copied.** The package **cannot** be deleted (published
+  by mistake, unpublish blocked), so it stays on disk as a **frozen shell** carrying a
+  `[!WARNING]` banner in its `README`/`CLAUDE` (npm-visible). Its live engine is **copied**
+  to `core/src/foundation/fsm/`; core's router state machine (`src/fsm/routerFSM.ts`) now
+  builds on that copy, and core **drops `@real-router/fsm` from its dependencies**. No
+  drift risk: a frozen package doesn't evolve, so the copy is the sole live source.
+  - **Superseded (wave-3): the frozen `packages/fsm` source was deleted outright.** The
+    "cannot be deleted" reasoning above conflated two independent things — npm's
+    unpublish block affects the **published** `@real-router/fsm@0.6.1`, not the **source**
+    tree. Keeping the shell on disk never protected the npm package (nothing rebuilds a
+    frozen package), so it was pure clutter: extra CORE_LAYER/codecov/size-limit/commitlint
+    surface for a package with zero consumers. Wave-3 `git rm`'d `packages/fsm` (parity
+    with the `logger` deletion), dropped it from CORE_LAYER (4→… →2), and cleared its
+    config entries. `@real-router/fsm@0.6.1` stays on npm (owner deprecates it); the sole
+    live source remains `core/src/foundation/fsm`.
+
+Chosen location is `src/foundation/` — **not** `src/utils/`, which is already the public
+`@real-router/core/utils` subpath (SSR helpers); foundation primitives are internal and
+must not leak through it. Integration touch-points: `package.json` (drop both deps),
+tsdown (`alwaysBundle` drops `event-emitter`), CORE_LAYER 6 → 5 (`event-emitter` gone;
+`@real-router/fsm` **kept** in the set so CI still builds/tests the frozen shell even
+though core no longer depends on it), codecov (drop `event-emitter` component, keep
+`fsm`), syncpack, 7 core `src` import rewrites + the `fsm-state-authority` invariant test.
+
+**Blackbox test debt (temporary, deliberate).** The folded-in functional suites import
+the module they own via a relative `../../../../src/foundation/*` path, which the core
+white-box guardrail (`eslint.config.mjs`, functional tests → public API only) forbids.
+Rather than rewrite ~all of them onto the public surface now, an `ignores` block exempts
+`tests/functional/foundation/**` (plus the pre-existing `fsm-state-authority` structural
+test, which legitimately reaches the live FSM engine). To be rewritten onto a public
+surface as a follow-up — flagged here so the exemption isn't mistaken for policy.
+
+**Why (empirically verified).** Pure structural move: core keeps **100% coverage**
+(functional 2676 tests, +378 property, +121 stress all green — the folded-in suites cover
+the folded-in code exactly as they did standalone), type-check/lint/knip/syncpack/dedupe/
+coverage-scope all clean. knip needed **no** `src/foundation` ignore (the barrel re-exports
+resolve as used). The frozen `@real-router/fsm` still type-checks/lints/tests at 100% on
+its own. Remaining follow-ups: rewrite the foundation functional suites onto a public
+surface, fully integrate the co-located docs into core's own docs, and `npm deprecate
+@real-router/fsm` at the 1.0 release.
+
+## `logger` → `core/src/foundation` (per-router `RouterLogger`)
+
+**Problem.** `@real-router/logger` was a standalone package whose only runtime consumers
+were core and `@real-router/validation-plugin`, and it exported a **process-global
+singleton**. `createRouter(routes, { logger })` funnelled into that one shared instance, so
+`configure()` leaked across every router in the process — the last `createRouter` /
+`cloneRouter` won, and two routers could not have independent log levels or callbacks
+(#724). On top of the correctness problem it carried the usual per-package config surface
+(CORE_LAYER, codecov, syncpack) for a single-shape primitive and lingered as a transitive
+dependency on consumers' trees.
+
+**Solution — dissolve into `core/src/foundation/logger/`, one instance per router.** The
+former `Logger` class is renamed `RouterLogger` and `git mv`'d into
+`core/src/foundation/logger/` (src + its co-located docs + functional/property suites →
+`core/tests/*/foundation/logger/`); the **module-level singleton is deleted** and the
+package directory is removed. Each router now **owns** a `RouterLogger`, built from
+`options.logger` in the `Router` constructor and stored on `RouterInternals.logger` (the
+`ctx`). The facade reads `getInternals(this).logger`; namespaces receive it through their
+deps at wiring (`wireNamespaces` injects `getInternals(ns.router).logger` into Navigation /
+Plugins / RouteLifecycle / Routes deps); module-level route-build helpers that log
+(`routesStore.registerForwardTo`, `routeGuards.validate*`) take a `logger: RouterLogger`
+**parameter** threaded from the constructor (`RoutesNamespace` ctor → `createRoutesStore` →
+`buildReplaceArtifacts` → …) or from `ctx.logger` at the `getRoutesApi` call sites. The
+validation plugin's logging validators likewise gained a `logger` parameter, injected from
+`ctx.logger` in `buildValidatorObject(ctx)`.
+
+**Types — canonical home legalized in `core-types`.** The logger contract
+(`RouterLogger`, `LoggerConfig`, `LogLevel`, `LogLevelConfig`, `LogCallback`) moves to
+`@real-router/types` as its single source of truth, re-exported by `@real-router/core` so
+`@real-router/validation-plugin` (which does not depend on `@real-router/types` directly)
+imports `RouterLogger` from core. This **legitimizes duplicate-types exception #16** from
+the v1 registry — the types were duplicated in core-types "to avoid depending on
+`@real-router/logger`"; that package is gone, so core-types is now simply the owner.
+
+**Integration touch-points.** `package.json` (drop `@real-router/logger` from **both**
+core and validation-plugin deps), CORE_LAYER 5 → 4 (`logger` dissolved, like
+`event-emitter`; `build-matrix.test` L2 total 27 → 26 and `base` 5 → 4), codecov (drop the
+`logger` component, keep `logger-plugin`), syncpack (drop the dead bare-`logger` workspace
+entry), the `tests/functional/foundation/**` white-box ignore now also covers the logger
+suites, and the ARCHITECTURE mermaid loses the `LOG` node and its `CORE`/`BP`/`LP` edges.
+
+**Why (empirically verified).** Per-router isolation is the point: `options.logger`
+configures **that** router's logger only, so `cloneRouter` gives each request-scoped clone
+its own log config with no cross-router leak (#724). Behaviour is otherwise unchanged —
+`RouterLogger` still writes to `console` with the same `[context] message` formatting, so
+tests observe output by spying on `console` (a leak/log check) or by installing an
+`options.logger.callback` per router (the callback still receives the raw
+`(level, context, message, …args)`). Core keeps **100% coverage** (functional 2758 tests,
++409 property, +121 stress all green), and validation-plugin stays at 100% (565 tests);
+type-check / lint / knip / syncpack / dedupe / coverage-scope / build-matrix all clean.
+Mirrors the `event-emitter` dissolution above; the co-located docs carry an honest
+"dissolved into core" marker pending full integration.
+
+## `type-guards` → dissolved **by distribution to consumers** (not into core)
+
+**Problem.** `type-guards` was an **internal (unpublished)** workspace package, but unlike
+`fsm` / `event-emitter` / `logger` it has **many** live consumers: `validation-plugin`,
+`shared/browser-env` (→ the 3 URL plugins via symlink), and `persistent-params-plugin`. It
+could not simply die (real consumers), and it could **not** fold into `core` — the owner
+invariant is that **core must export zero guards** (a bare-core consumer pulling `isString`
+off the public surface is a strong DX regression). The only move that satisfies both is to
+dissolve it **by distributing each symbol to the consumer that uses it**, so no guard ever
+reaches core's public surface and no consumer keeps a dependency on a one-file package.
+
+**Solution — distribute along the symbol×family matrix (zero cross-family overlap).** A
+node-scan proved no symbol is shared between two consumer families, so the split is clean:
+
+- **`validation-plugin`** absorbs the bulk → `src/type-guards/` (co-located with the
+  validators that call them): `getTypeDescription`, `isString`, `isBoolean`, `isObjKey`,
+  `isParams` **+ the whole serialization engine**, `isState`, `isNavigationOptions`,
+  `validateRouteName`, `isRouteName` (kept **internal** — `isRequiredFields` calls it), plus
+  `internal/router-error.ts` and `internal/meta-fields.ts`. The 8 `from "type-guards"`
+  imports become relative `./type-guards/*`.
+- **`shared/browser-env`** absorbs `isStateStrict` (+ its twin `isRequiredFields`/
+  `isRouteName`) → `shared/browser-env/state-guard.ts`, reaching the 3 URL plugins through
+  the existing symlink; `popstate-utils.ts` imports it via `./state-guard`.
+- **`persistent-params-plugin`** absorbs `isPrimitiveValue` → `src/is-primitive-value.ts`.
+- **Dead surface deleted** (unreachable through any consumer, ~150–200 LOC): the `isParams`
+  strict branch (`isParamsStrict` / `isValidParamValueStrict` / `isParamsStrictUnsafe`) and
+  the whole `validators/state.ts` (`validateState`).
+
+Tests move **with** the code, file-for-file, into each absorber's functional / property /
+stress suites; the package directory is removed.
+
+**Integration touch-points.** 5 tsdown configs drop `alwaysBundle: ["type-guards"]`
+(browser / hash / navigation / persistent-params / validation); the `type-guards` devDep is
+dropped from those 5 plugins + `shared`; **`@real-router/types` is added to
+`validation-plugin` `dependencies`** — the moved guards `import type` from it and the former
+transitive path (via the now-deleted `type-guards` package) is gone. This bridge is an
+**RFC gap-fill** (§5's M1 codemod only rewrote `from "type-guards"`, silently assuming the
+`@real-router/types` reference kept resolving); M2's types-fold removes it again along with
+the other 12 `@real-router/types` deps and retargets the imports to `@real-router/core/types`.
+`CORE_LAYER` is untouched (type-guards sat in the `internal` bucket, never CORE_LAYER);
+`build-matrix.test` `INTERNAL` → `[]`, L2 total 26 → 25, and the "full rebuild" test loses
+the now-empty `internal` shard (11 → 10); codecov −1 component; syncpack −2 entries; knip;
+CODEOWNERS / commitlint / cz `type-guards` scopes retired; one changeset per absorber (5).
+
+**Why (empirically verified).** Distribution — not absorption into core — is what protects
+the DX invariant: every guard stays behind its consumer's boundary and core's public
+surface gains **nothing**. Zero matrix overlap means no symbol is duplicated across
+absorbers. Gates: the 5 absorbers hold **100% coverage** (functional), property + stress
+green; type-check / lint / knip / syncpack / dedupe / coverage-scope / e2e / build-matrix
+(31/31) all clean. **Mutational hardening — RFC claim corrected:** §2.6 asserted "the
+absorbers' Stryker scope covers the moved code," but `validation-plugin` / `browser-plugin`
+have **no** `stryker.config.mjs` (only core / fsm / logger-plugin / engine / rx do), so the
+moved code has no live mutation gate in its new home. Hardening was instead confirmed
+empirically by a manual mutation spot-check: weakening the `Number.isFinite` guard →
+`return true` (accept NaN/∞ as a valid serializable value) is **killed** by the co-located
+suites in both `validation-plugin` (functional + property) and `shared/browser-env` (via
+`browser-plugin` functional) — the moved tests retained their discriminating power. Ordering
+is deliberate: this M1 lands **before** the `@real-router/types` → core fold (M2) so the
+"type-guards typed upward onto core" layer-inversion never exists in any single commit.
+
+## `@real-router/types` → folded into `core` as the `/types` subpath
+
+**Problem.** `@real-router/types` was a standalone types-only package declared as a
+`workspace:^` dependency in **13** manifests. Because it was independently versioned, a
+minor drift could nest **two copies** in a consumer's tree — and module augmentation merges
+into whichever copy a file resolves, so a split-brain `StateContext` silently drops a
+plugin's typed namespace. It also left a class of consumers ("types without core":
+`type-guards`, `route-utils`) whose existence blocked treating core as the single identity
+anchor. Folding types **into** core ties the types' identity to the core version — the count
+of `StateContext` instances in any tree is now exactly the count of `core` copies, no more.
+
+**Solution — `git mv core-types/src → core/src/public-types`, exposed at the subpath
+`@real-router/core/types`.** The types files move verbatim (they are the augmentation
+**declaration-site**); the package is deleted. core's package.json + tsdown gain a `./types`
+entry (`src/public-types/index.ts`), and `core/src/index.ts` re-exports the whole surface
+with `export type * from "./public-types"` so consumers import types from the **root**
+`@real-router/core` (owner decision — the "synthesis" — over the RFC's original uniform-
+subpath). The 7 augmentor plugins retarget `declare module "@real-router/types"` →
+`"@real-router/core/types"` (the subpath). Consumer type imports move `@real-router/types`
+→ `@real-router/core`; core's own src uses relative `./public-types`; core tests use the
+public root (whitebox guardrail bans `**/src/**`).
+
+**The `Router` / `RouterError` class-vs-interface duality (load-bearing).** core exports
+`Router` and `RouterError` as **classes** at the root (`export { Router } from "./Router"`),
+which — by TS's "explicit named export shadows `export *`" rule — shadow the same-named
+**interfaces** the star would re-export. So `import { Router } from "@real-router/core"`
+resolves to the **class**. But every `PluginFactory` / `GuardFnFactory` types its `router`
+param as the **interface** (`public-types/router.ts`), and the class is not assignable from
+the interface (private fields). Consequence (**Path A**, the shipped shape): all regular
+types import from the root `@real-router/core`, **except `Router`**, whose interface-typed
+consumers (factory-param sites: `createSsrLoaderPlugin`, `staleRegistry`, a few core tests —
+~12 files) import it from `@real-router/core/types`. `RouterError` stays at the root: it is
+used as a **value** (`throw` / `instanceof`) and its public-types entry is a forward
+declaration that matches the class, so the class-at-root is correct for it.
+
+**Why the subpath for augmentation, not the root (verified on tsc 6.0).** Interface module
+augmentation does **not** propagate through a *type-only* re-export: `declare module
+"@real-router/core" { interface StateContext … }` against a root that merely
+`export type *`-re-exports `StateContext` creates a phantom interface — the namespace never
+reaches the real `state.context`. It merges only at the **declaration-site** (the subpath)
+or through a **value** re-export (which is exactly why `memory-plugin` augments the `Router`
+**class** via `@real-router/core` and it works). Making the root `Router` the *interface*
+(dropping the class export) was tried and reverted: `browser-plugin` overrides `start` as a
+**method** in its augmentation, but the interface declares `start` as a **property**, so the
+merge is a `Duplicate identifier` — plus generic-variance ripples in `cloneRouter`. The
+class-at-root + interface-at-subpath split (Path A) sidesteps all of it.
+
+**Integration touch-points.** Deps: drop `@real-router/types` from all 13 manifests + the
+M1 bridge in `validation-plugin`; `route-utils` gains `@real-router/core` as a **peer**
+(`workspace:>=0.1.0`, not `workspace:^` — 0.x peer convention). Configs: `CORE_LAYER` 4→3
+(`build-matrix.mjs`); `build-matrix.test` L2 total 25→24 (`base` 4→3) + the L1 name≠dir
+"quirk" fixtures retargeted from the deleted `core-types` to `@real-router/shared-sources` →
+`shared`; codecov unchanged (core-types had no component); syncpack −2; knip loses 5
+`@real-router/types` `ignoreDependencies`; `check-coverage-scope` (size-limit exception),
+`sonar` (coverage-exclusion), `smoke-test` (SKIP_IMPORT), CODEOWNERS, commitlint/cz (`types`
+scope), dangerfile (arch-pattern → `core/src/public-types/`), `ci.yml` comment. Docs: root
+CLAUDE (count 24), ARCHITECTURE (Package Map / public list / mermaid TYPES node + the
+stale-since-M1 `TG` bundle edges / layer diagram), and the JSDoc augmentation example in
+`public-types/base.ts` (`@real-router/types` → `@real-router/core/types`).
+
+**Why (empirically verified).** All packages type-check; core keeps **100% coverage** (2760
+functional + property + stress green); the affected plugins + `route-utils` stay at 100%;
+`build-matrix.test` 31/31; full linters green. Ordering: this M2 lands **after** M1 so
+`type-guards` (which typed *upward* onto the folded types) never has to point at core.
+
+**Follow-up — `public-types/` consolidated into `src/types/`.** `public-types` was only ever
+a name chosen to dodge the pre-existing `src/types.ts`-file-vs-`src/types/`-dir clash (the dir
+then held just `RouterValidator.ts`). The consolidation resolves that: the 8 folded files moved
+into `src/types/` (joining `RouterValidator.ts`), the old `types.ts` reshim was **deleted**, and
+its two core-internal types (`RouterEventMap`, `Limits`) moved to `src/types/internal.ts` —
+deliberately **not** re-exported by `types/index.ts`, so they never leak onto the
+`@real-router/core/types` subpath or the root. Redundant re-exports in the reshim were dropped
+(the `types/index.ts` barrel already provides `Route` / `PluginFactory` / `GuardFnFactory` /
+`RouteConfigUpdate` / `EventMethodMap`). Net: **one** `src/types/` directory (barrel = subpath =
+declaration-site; `internal.ts` = core-only; `RouterValidator.ts` = public core contract),
+52 core `./public-types` imports rewritten to `./types`, package.json + tsdown `./types` entry
+repointed. `internal.ts` imports its deps from the sibling files (`./base` / `./limits` /
+`./tree-changed`), not the barrel, to stay off `import-x/no-cycle`. core 100% coverage held.
 
 ## Project Rename
 
@@ -1301,7 +1728,7 @@ lint:types → depends on bundle (attw validates .d.ts across module variants)
 
 **Cache sharing:** `turbo run build` triggers `bundle` as a dependency → caches `bundle:*`. Subsequent `turbo run bundle` gets cache hits. CI Pipeline uses this: step 1 (test) triggers `^bundle` for upstream, step 2 (`turbo run bundle`) gets cache hits for upstream and only runs bundle for leaf affected packages.
 
-**Why `^bundle` instead of `^build`:** Test/lint tasks only need upstream `dist/` (for import resolution), not upstream test results. Depending on `^build` would run upstream tests before downstream tests — unnecessary serialization. Upstream tests run via their own `turbo run build` in pre-push hooks and CI.
+**Why `^bundle` instead of `^build`:** Test/lint tasks only need upstream `dist/` (for import resolution), not upstream test results. Depending on `^build` would run upstream tests before downstream tests — unnecessary serialization. Upstream tests run via their own `turbo run build` in pre-push hooks and CI. **(Superseded: test/lint no longer depend on `^bundle` at all — the "import resolution needs dist" premise became false once `@real-router/internal-source` + vitest src-aliases covered every resolver; see "test/lint tiers dropped `^bundle`" at the top of this file.)**
 
 **Why type-check has no dependencies:** After the `@real-router/internal-source` custom export condition was added (#431 root fix), monorepo `tsc --noEmit` resolves workspace packages directly to `src/*.ts` via `tsconfig.json` `customConditions`. No `dist/` is required. See "Custom `@real-router/internal-source` Export Condition" below for the full saga.
 
@@ -1656,7 +2083,7 @@ Each override addresses a known vulnerability in older versions. Version-scoped 
 
 **Solution:** `"fflate": "0.8.2"` in `pnpm.overrides`. Forces a single `fflate` version across the tree, which simultaneously (a) satisfies `pnpm dedupe --check` (one version, nothing left to collapse) and (b) keeps `attw` on the working `0.8.2`. This is the only override that pins to an exact *older* version for compatibility rather than `>=` for security.
 
-**Why:** `0.8.3` is a patch with no public-API change any consumer depends on, so pinning down is safe. Remove this override once `@arethetypeswrong/core` ships a release compatible with `fflate@0.8.3` (or `fflate` patches the tar-read regression) — verify by deleting the line, running `pnpm install && pnpm -F @real-router/fsm lint:types`, and confirming attw stays green.
+**Why:** `0.8.3` is a patch with no public-API change any consumer depends on, so pinning down is safe. Remove this override once `@arethetypeswrong/core` ships a release compatible with `fflate@0.8.3` (or `fflate` patches the tar-read regression) — verify by deleting the line, running `pnpm install && pnpm -F @real-router/core lint:types`, and confirming attw stays green.
 
 ### Dependency License Review
 
@@ -2042,6 +2469,23 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 > `shared/browser-env`** (see the measuring-owner table in the #809 owner-only coverage
 > section above). The "tests-only wrappers" subsection and the vitest-coverage
 > "deferred" note below are historical.
+>
+> **Superseded further (wave-2, 2026-07).** The `type-guards` package — the running
+> example of the resolution-anchor mechanism below — has been **dissolved by
+> distribution** (see "`type-guards` → dissolved by distribution to consumers" above).
+> `shared/browser-env` no longer imports it: `isStateStrict` was absorbed into a **local**
+> `shared/browser-env/state-guard.ts`, and `popstate-utils.ts` now imports it via
+> `./state-guard`. Consequently `shared/package.json` no longer carries the `type-guards`
+> devDep (now just `@real-router/core` + `@real-router/sources` + `@real-router/types`),
+> and no consumer lists `type-guards` in `alwaysBundle`. **Every `type-guards` mention in
+> the mechanism narrative below is therefore historical** — it faithfully records the #437
+> era. Crucially, **`type-guards` was the last `alwaysBundle`-inlined import in `shared/`**;
+> after its dissolution nothing in `shared/` is inlined (the only `alwaysBundle` entry left
+> in the repo is core's `engine`). `shared/browser-env/state-guard.ts` imports only the
+> **type-only** `@real-router/types` (erased at build); `shared/dom-utils` imports
+> `@real-router/sources` / `@real-router/core` as **external** (resolved, not inlined). So
+> the anchor's remaining job is purely tsc resolution of those imports from `shared/`'s
+> own location — not the rolldown inline-resolution the narrative below describes.
 
 ### Problem
 
@@ -2295,6 +2739,13 @@ Added to pre-commit hook to catch missing specs before push.
 Added `packages/router-benchmarks` (now at `benchmarks/`, `src/` renamed to `core/`) workspace to `knip.json` with `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts (like `isolated-anomalies.ts`) that are not imported from `index.ts`. Later moved to `ignoreWorkspaces` when benchmarks were relocated to root level.
 
 ## FSM Package
+
+> **Historical (superseded — wave-1a fold + wave-3 deletion).** This section records why
+> the FSM was originally extracted as its own package. The live engine now lives at
+> `core/src/foundation/fsm` (copied in wave-1a), and the standalone `packages/fsm` source
+> was **deleted** in wave-3 — see "`fsm` + `event-emitter` → `core/src/foundation`" above.
+> `@real-router/fsm@0.6.1` remains published (deprecated); the text below describes the
+> pre-fold package layout.
 
 ### Why a Separate Package?
 

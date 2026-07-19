@@ -9,8 +9,6 @@
 
 # Core packages
 /packages/core/ @greydragon888
-/packages/core-types/ @greydragon888
-/packages/route-tree/ @greydragon888
 
 # Plugins
 /packages/browser-plugin/ @greydragon888
@@ -19,12 +17,6 @@
 
 # Framework bindings
 /packages/react/ @greydragon888
-
-# Utilities
-/packages/helpers/ @greydragon888
-/packages/logger/ @greydragon888
-/packages/search-params/ @greydragon888
-/packages/type-guards/ @greydragon888
 
 # Benchmarks
 /benchmarks/ @greydragon888
@@ -41,4 +33,4 @@
 /turbo.json @greydragon888
 /vitest.config.* @greydragon888
 /eslint.config.* @greydragon888
-/tsup.base.* @greydragon888
+/tsdown.base.* @greydragon888

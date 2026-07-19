@@ -17,16 +17,6 @@ export interface CreateConfigOptions {
   platform?: "neutral" | "browser" | "node";
 
   /**
-   * Dependency bundling configuration
-   */
-  deps?: {
-    /** Dependencies to always bundle (replaces tsup's noExternal) */
-    alwaysBundle?: string[];
-    /** Whitelist of allowed bundled deps (suppresses warnings) */
-    onlyBundle?: string[];
-  };
-
-  /**
    * Enable minification
    *
    * @default true
@@ -66,7 +56,6 @@ export interface CreateConfigOptions {
 export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
   const {
     platform = "neutral",
-    deps,
     minify = true,
     sourcemap = true,
     custom = {},
@@ -109,16 +98,6 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // keep their own validation. See IMPLEMENTATION_NOTES "Release-pipeline...".
     publint: true,
     attw: true,
-
-    // Bundle specific dependencies
-    ...(deps?.alwaysBundle || deps?.onlyBundle
-      ? {
-          deps: {
-            ...(deps.alwaysBundle && { alwaysBundle: deps.alwaysBundle }),
-            ...(deps.onlyBundle && { onlyBundle: deps.onlyBundle }),
-          },
-        }
-      : {}),
   };
 
   // Generate separate configs for ESM and CJS (matching tsup's per-format outDir)

@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes } from "@real-router/core";
@@ -93,7 +92,7 @@ describe("router.navigate() - transitions and cancellation", () => {
   });
 
   it("should call middleware, activate, and deactivate hooks during navigation", async () => {
-    vi.spyOn(logger, "error").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
 
     const middlewareMock1 = vi.fn().mockReturnValue(true);
     const middlewareMock2 = vi.fn().mockReturnValue(true);

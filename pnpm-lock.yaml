@@ -266,9 +266,6 @@ importers:
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../packages/svelte
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../packages/core-types
       '@real-router/vue':
         specifier: workspace:^
         version: link:../packages/vue
@@ -6162,9 +6159,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ~6.9.1
@@ -6172,45 +6166,14 @@ importers:
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
-  packages/core:
-    dependencies:
-      '@real-router/fsm':
-        specifier: workspace:^
-        version: link:../fsm
-      '@real-router/logger':
-        specifier: workspace:^
-        version: link:../logger
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
-    devDependencies:
-      engine:
-        specifier: workspace:^
-        version: link:../engine
-      event-emitter:
-        specifier: workspace:^
-        version: link:../event-emitter
-
-  packages/core-types: {}
-
-  packages/engine: {}
-
-  packages/event-emitter: {}
-
-  packages/fsm: {}
+  packages/core: {}
 
   packages/hash-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ~6.9.1
@@ -6218,20 +6181,12 @@ importers:
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/lifecycle-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
-
-  packages/logger: {}
 
   packages/logger-plugin:
     dependencies:
@@ -6244,38 +6199,22 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
 
   packages/navigation-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/persistent-params-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
-    devDependencies:
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/preact:
     dependencies:
@@ -6316,9 +6255,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       jsdom:
         specifier: 29.1.1
@@ -6375,22 +6311,15 @@ importers:
 
   packages/route-utils:
     dependencies:
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
-    devDependencies:
-      engine:
-        specifier: workspace:^
-        version: link:../engine
+      '@real-router/core':
+        specifier: workspace:>=0.1.0
+        version: link:../core
 
   packages/rsc-server-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:>=0.1.0
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
@@ -6489,9 +6418,6 @@ importers:
       '@real-router/core':
         specifier: workspace:>=0.1.0
         version: link:../core
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
 
   packages/svelte:
     dependencies:
@@ -6539,24 +6465,11 @@ importers:
         specifier: 1.8.0
         version: 1.8.0(svelte@5.56.4(@typescript-eslint/types@8.62.0))
 
-  packages/type-guards:
-    dependencies:
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
-
   packages/validation-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/logger':
-        specifier: workspace:^
-        version: link:../logger
-    devDependencies:
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/vue:
     dependencies:
@@ -6591,12 +6504,6 @@ importers:
       '@real-router/sources':
         specifier: workspace:*
         version: link:../packages/sources
-      '@real-router/types':
-        specifier: workspace:*
-        version: link:../packages/core-types
-      type-guards:
-        specifier: workspace:*
-        version: link:../packages/type-guards
 
 packages:
 

@@ -6,8 +6,8 @@ import { freezeStateInPlace } from "../../helpers";
 import { setStateMetaParams } from "../../stateMetaStore";
 
 import type { StateNamespaceDependencies } from "./types";
-import type { Params, State } from "@real-router/types";
-import type { RouteTreeStateMeta } from "engine";
+import type { RouteTreeStateMeta } from "../../engine";
+import type { Params, State } from "../../types";
 
 /**
  * Independent namespace for managing router state storage and creation.

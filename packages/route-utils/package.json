@@ -47,10 +47,7 @@
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
-  "devDependencies": {
-    "engine": "workspace:^"
-  },
-  "dependencies": {
-    "@real-router/types": "workspace:^"
+  "peerDependencies": {
+    "@real-router/core": "workspace:>=0.1.0"
   }
 }

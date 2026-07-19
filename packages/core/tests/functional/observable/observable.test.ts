@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { errorCodes, events, UNKNOWN_ROUTE } from "@real-router/core";
@@ -141,7 +140,7 @@ describe("core/observable", () => {
       });
 
       it("should not break other listeners if one throws", async () => {
-        vi.spyOn(logger, "error").mockImplementation(noop);
+        vi.spyOn(console, "error").mockImplementation(noop);
 
         const freshRouter = createTestRouter();
         const goodCb = vi.fn();
@@ -303,7 +302,7 @@ describe("core/observable", () => {
       // per-listener try/catch → onListenerError → logger.error. Other
       // listeners still run and navigate() resolves normally.
       it("should isolate a synchronously-throwing listener and keep emitting", async () => {
-        vi.spyOn(logger, "error").mockImplementation(noop);
+        vi.spyOn(console, "error").mockImplementation(noop);
 
         const before = vi.fn();
         const bad = vi.fn(() => {
@@ -323,7 +322,7 @@ describe("core/observable", () => {
         expect(bad).toHaveBeenCalledTimes(1);
         expect(after).toHaveBeenCalledTimes(1);
         // error routed to onListenerError → logger.error (not re-thrown)
-        expect(logger.error).toHaveBeenCalled();
+        expect(console.error).toHaveBeenCalled();
 
         // router is not broken — a subsequent navigation still works
         const next = await router.navigate("orders");
@@ -339,7 +338,7 @@ describe("core/observable", () => {
       // via the repo's captureUnhandledRejections helper. Symmetric with
       // subscribeLeave, which isolates rejections via `Promise.allSettled`.
       it("should isolate an async listener's rejection instead of leaking it (#944)", async () => {
-        vi.spyOn(logger, "error").mockImplementation(noop);
+        vi.spyOn(console, "error").mockImplementation(noop);
 
         // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fire-and-forget async listener under test
         router.subscribe(async () => {
@@ -355,8 +354,7 @@ describe("core/observable", () => {
 
         // The rejection was routed to onListenerError → logger.error (the same
         // sink a synchronous listener throw flows through).
-        expect(logger.error).toHaveBeenCalledWith(
-          "Router",
+        expect(console.error).toHaveBeenCalledWith(
           expect.stringContaining("Error in listener for"),
           expect.objectContaining({ message: "async-subscribe-boom" }),
         );
@@ -373,7 +371,7 @@ describe("core/observable", () => {
       // The self-feed never starts, so the old #945 `RecursionDepthError` ceiling
       // is unreachable and nothing leaks as a process `unhandledRejection`.
       it("bans a reentrant subscribe-navigate (REENTRANT_NAVIGATION via onListenerError); no self-feed, no leak", async () => {
-        vi.spyOn(logger, "error").mockImplementation(noop);
+        vi.spyOn(console, "error").mockImplementation(noop);
 
         const chain = ["users", "orders"] as const;
         let depth = 0;
@@ -392,8 +390,7 @@ describe("core/observable", () => {
         expect(leaked).toStrictEqual([]);
 
         // The reentrant throw was routed to onListenerError → logger.error.
-        expect(logger.error).toHaveBeenCalledWith(
-          "Router",
+        expect(console.error).toHaveBeenCalledWith(
           expect.stringContaining("Error in listener for"),
           expect.objectContaining({ code: errorCodes.REENTRANT_NAVIGATION }),
         );
@@ -520,7 +517,7 @@ describe("core/observable", () => {
       // means the remaining listeners of the CURRENT cycle still run, and
       // navigate() resolves. The router is disposed afterwards.
       it("should run remaining listeners when one disposes the router mid-emit", async () => {
-        vi.spyOn(logger, "error").mockImplementation(noop);
+        vi.spyOn(console, "error").mockImplementation(noop);
 
         const freshRouter = createTestRouter();
 

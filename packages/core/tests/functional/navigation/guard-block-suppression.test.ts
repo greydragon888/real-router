@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
@@ -15,10 +14,13 @@ import type { LifecycleApi } from "@real-router/core/api";
  * net's `logger.error("router.navigate", "Unexpected navigation error", …)`
  * for `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE` — that noise is what the
  * memory-plugin `back()` audit surfaced under #721.
+ *
+ * The per-router `RouterLogger` writes to `console.error` with the context
+ * folded into the message as `[context] message`, so the spy (on `console`)
+ * sees a single merged first argument.
  */
 const UNEXPECTED_ERROR_LOG = [
-  "router.navigate",
-  "Unexpected navigation error",
+  "[router.navigate] Unexpected navigation error",
 ] as const;
 
 let router: Router;
@@ -37,7 +39,7 @@ describe("fire-and-forget guard-block suppression (#721)", () => {
   });
 
   it("does not log an unexpected-error when a canActivate guard blocks fire-and-forget navigate()", async () => {
-    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     // `admin-protected` is defined with `canActivate: () => () => false`.
     void router.navigate("admin-protected");
@@ -51,7 +53,7 @@ describe("fire-and-forget guard-block suppression (#721)", () => {
 
   it("does not log an unexpected-error when a canDeactivate guard blocks fire-and-forget navigate()", async () => {
     lifecycle.addDeactivateGuard("home", () => () => false);
-    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     void router.navigate("users");
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -65,7 +67,7 @@ describe("fire-and-forget guard-block suppression (#721)", () => {
   it("does not log an unexpected-error when a guard blocks fire-and-forget navigateToState()", async () => {
     lifecycle.addActivateGuard("users", () => () => false);
     const matched = getPluginApi(router).matchPath("/users");
-    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     void getPluginApi(router).navigateToState(matched!);
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -86,7 +88,7 @@ describe("fire-and-forget guard-block suppression (#721)", () => {
     router.subscribeLeave(() => {
       throw new Error("leave boom");
     });
-    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     void router.navigate("users");
 

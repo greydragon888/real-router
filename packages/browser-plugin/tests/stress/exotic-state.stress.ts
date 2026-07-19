@@ -13,7 +13,7 @@ import { createStressRouter, noop, waitForTransitions } from "./helpers";
 /**
  * B7.6 — Exotic popstate.state stress
  *
- * `isStateStrict` from `type-guards` filters `history.state` shape:
+ * `isStateStrict` from `browser-env/state-guard` filters `history.state` shape:
  * - plain object with `name: string` and `params: Record<string, string>`
  *
  * Anything else must fall through the validator silently and trigger the

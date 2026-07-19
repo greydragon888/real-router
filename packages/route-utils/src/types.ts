@@ -1,6 +1,6 @@
 // packages/route-utils/src/types.ts
 
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 /**
  * Minimal interface for route tree nodes used by RouteUtils.

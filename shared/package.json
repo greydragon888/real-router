@@ -3,11 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
-  "description": "Shared source modules (browser-env, dom-utils, ssr) — symlinked into consumer packages. Inert workspace entry (no scripts): exists only so pnpm materializes shared/node_modules for transitive type-guards resolution during consumer bundling. Type-check / lint / tests + 100% coverage are owned by the consumers via the symlinks.",
+  "description": "Shared source modules (browser-env, dom-utils, ssr) — symlinked into consumer packages. Inert workspace entry (no scripts): exists only so pnpm materializes shared/node_modules for transitive @real-router/* (core, sources) resolution during consumer bundling. Type-check / lint / tests + 100% coverage are owned by the consumers via the symlinks.",
   "devDependencies": {
     "@real-router/core": "workspace:*",
-    "@real-router/sources": "workspace:*",
-    "@real-router/types": "workspace:*",
-    "type-guards": "workspace:*"
+    "@real-router/sources": "workspace:*"
   }
 }

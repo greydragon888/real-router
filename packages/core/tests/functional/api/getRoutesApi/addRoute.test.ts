@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
@@ -826,7 +825,7 @@ describe("core/routes/addRoute", () => {
 
     it("should warn when route has both forwardTo and canActivate", async () => {
       // Spy on console.warn
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.add([
         {
@@ -839,15 +838,12 @@ describe("core/routes/addRoute", () => {
       ]);
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "real-router",
         expect.stringContaining("forwardTo and canActivate"),
       );
       expect(warnSpy).toHaveBeenCalledWith(
-        "real-router",
         expect.stringContaining("redirectWithGuard"),
       );
       expect(warnSpy).toHaveBeenCalledWith(
-        "real-router",
         expect.stringContaining('target route "target"'),
       );
 
@@ -855,7 +851,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should not warn when route has only forwardTo without canActivate", async () => {
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.add([
         { name: "redirect", path: "/redirect", forwardTo: "target" },
@@ -1420,7 +1416,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should warn when route has both forwardTo and canDeactivate", async () => {
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       routesApi.add([
         {
@@ -1433,13 +1429,9 @@ describe("core/routes/addRoute", () => {
       ]);
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "real-router",
         expect.stringContaining("forwardTo and canDeactivate"),
       );
-      expect(warnSpy).toHaveBeenCalledWith(
-        "real-router",
-        expect.stringContaining("old-page"),
-      );
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("old-page"));
 
       warnSpy.mockRestore();
     });
@@ -1576,7 +1568,7 @@ describe("core/routes/addRoute", () => {
         allowNotFound: false, // a miss REJECTS, so resolving to 'lazy' is load-bearing
       });
       const lazyApi = getRoutesApi(lazyRouter);
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       getPluginApi(lazyRouter).addInterceptor("start", async (next, path) => {
         lazyApi.add({ name: "lazy", path: "/lazy" }); // FSM is STARTING here

@@ -97,5 +97,3 @@ tools/
 # RFC spikes (transient — deleted after corresponding Stage gate passes)
 .spike/
 
-# Reachability-ratchet facade coverage (engine-merge §5.5)
-packages/engine/coverage-facade/

@@ -12,7 +12,7 @@
 import { createRouter } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
 
-import type { Route } from "@real-router/types";
+import type { Route } from "@real-router/core";
 
 const N = 1000;
 const routes: Route[] = Array.from({ length: 50 }, (_, i) => ({

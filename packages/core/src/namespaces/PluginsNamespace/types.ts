@@ -1,17 +1,22 @@
 // packages/core/src/namespaces/PluginsNamespace/types.ts
 
-import type { EventMethodMap, PluginFactory } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   DefaultDependencies,
   EventName,
   Plugin,
+  RouterLogger,
   Unsubscribe,
-} from "@real-router/types";
+  EventMethodMap,
+  PluginFactory,
+} from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 
 export interface PluginsDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
+  /** Per-router logger instance (from `getInternals(router).logger`) */
+  logger: RouterLogger;
+
   addEventListener: <E extends EventName>(
     eventName: E,
     cb: Plugin[EventMethodMap[E]],

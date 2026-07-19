@@ -4,7 +4,7 @@ import { errorCodes } from "../../constants";
 import { RouterError } from "../../RouterError";
 
 import type { RouterLifecycleDependencies } from "./types";
-import type { NavigationOptions, State } from "@real-router/types";
+import type { NavigationOptions, State } from "../../types";
 
 const REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 

@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
@@ -699,7 +698,7 @@ describe("core/routes/replaceRoutes", () => {
         allowNotFound: false, // a miss REJECTS, so resolving to 'lazy' is load-bearing
       });
       const lazyApi = getRoutesApi(lazyRouter);
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       getPluginApi(lazyRouter).addInterceptor("start", async (next, path) => {
         lazyApi.replace([
@@ -730,7 +729,7 @@ describe("core/routes/replaceRoutes", () => {
     let errorSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -781,7 +780,7 @@ describe("core/routes/replaceRoutes", () => {
     let errorSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     });
 
     afterEach(() => {

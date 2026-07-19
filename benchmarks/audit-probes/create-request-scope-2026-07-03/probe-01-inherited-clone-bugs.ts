@@ -18,7 +18,7 @@ import {
 } from "@real-router/core/api";
 import { createRequestScope } from "@real-router/core/utils";
 
-import type { PluginFactory } from "@real-router/types";
+import type { PluginFactory } from "@real-router/core";
 
 const fakeReq = () => ({
   on: () => {},

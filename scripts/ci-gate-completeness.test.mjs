@@ -49,6 +49,15 @@ export const OUTSIDE_GATE = new Map([
     "informational size-limit PR comment — 'not a gate' by design " +
       "(infra-review W4 §3.4); its latency/failure must not move the merge point",
   ],
+  [
+    "sonarcloud",
+    "taken off the CI Result critical path (its ~90s scan was the longest " +
+      "serial tail of the required check); the job still runs and posts its " +
+      "own PR status. Gating moves to the master ruleset's required checks — " +
+      "adding the 'SonarCloud' context there is a tracked follow-up in #1520; " +
+      "until then the quality gate is advisory. Revert = re-add `sonarcloud` " +
+      "to the ci job's needs + the SONAR arm in 'Determine result'.",
+  ],
 ]);
 
 /**

@@ -1,14 +1,34 @@
-import { routeTreeToDefinitions } from "engine";
-
 import { errorCodes } from "../constants";
+import { routeTreeToDefinitions } from "../engine";
 import { getInternals } from "../internals";
+import { getLifecycleApi } from "./getLifecycleApi";
 import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { Router as RouterClass } from "../Router";
 import { RouterError } from "../RouterError";
-import { getLifecycleApi } from "./getLifecycleApi";
 
-import type { Route } from "../types";
-import type { DefaultDependencies, Router } from "@real-router/types";
+import type {
+  DefaultDependencies,
+  LoggerConfig,
+  Router,
+  Route,
+} from "../types";
+
+/**
+ * Per-clone overrides beyond dependencies.
+ */
+export interface CloneOptions {
+  /**
+   * Per-clone logger config override, merged **over** the base router's resolved
+   * logger config. Primary use: per-request `traceId` in SSR — a fresh
+   * `callback` closed over the request id, while `level` inherits the base.
+   * Omitted keys inherit the base (level / callback / callbackIgnoresLevel).
+   *
+   * Override is by **config**, not a logger instance: `RouterLogger` is
+   * core-internal (only its `{ log, warn, error }` interface is public), so
+   * nothing outside core constructs one — configuration is the whole surface.
+   */
+  logger?: Partial<LoggerConfig>;
+}
 
 /**
  * Build an independent router instance that shares the route tree, options,
@@ -78,6 +98,7 @@ export function cloneRouter<
 >(
   router: Router<Dependencies>,
   dependencies?: Dependencies,
+  opts?: CloneOptions,
 ): RouterClass<Dependencies> {
   const ctx = getInternals(router);
 
@@ -98,6 +119,7 @@ export function cloneRouter<
     options,
     dependencies: sourceDeps,
     pluginFactories,
+    loggerConfig,
   } = ctx.getCloneState();
   // Origin-aware factory snapshot — definition guards are re-registered with
   // `isFromDefinition=true` on the clone so `replace()` can still strip them
@@ -113,9 +135,18 @@ export function cloneRouter<
     ...dependencies,
   } as Dependencies;
 
+  // The clone builds its OWN logger (isolation, #724) but INHERITS the base's
+  // resolved config — frozen options don't carry `logger`, so without this the
+  // clone would fall back to the default logger and lose the base's
+  // callback/level (an M1 regression the singleton used to mask). A per-request
+  // `opts.logger` override (e.g. a traceId-bound callback) merges on top.
+  const clonedLoggerConfig: Partial<LoggerConfig> = opts?.logger
+    ? { ...loggerConfig, ...opts.logger }
+    : loggerConfig;
+
   const newRouter = new RouterClass<Dependencies>(
     routes as Route<Dependencies>[],
-    options,
+    { ...options, logger: clonedLoggerConfig },
     mergedDeps,
   );
 

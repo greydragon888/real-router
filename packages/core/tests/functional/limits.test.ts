@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, it, expect, vi } from "vitest";
 
 import { createRouter, events } from "@real-router/core";
@@ -77,7 +76,7 @@ describe("core/limits (integration via public API)", () => {
     });
 
     it("warns (without throwing) when an event's listener count exceeds warnListeners", () => {
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       // warnListeners below maxListeners (default 10000): exceeding it warns,
       // it does not throw. Drives the EventEmitter onListenerWarn callback +
@@ -90,7 +89,6 @@ describe("core/limits (integration via public API)", () => {
       api.addEventListener(events.ROUTER_START, () => {}); // exceeds 2 → warns
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router.addEventListener",
         expect.stringContaining("possible memory leak"),
       );
 
@@ -182,9 +180,8 @@ describe("core/limits (integration via public API)", () => {
   // 🟡 IMPORTANT: Warn/error threshold logging for dependencies
   describe("dependency thresholds", () => {
     it("should NOT log warning at warn threshold without validation plugin", async () => {
-      const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const router = createRouter<Record<string, number>>([], {
         limits: { maxDependencies: 100 },
@@ -202,9 +199,8 @@ describe("core/limits (integration via public API)", () => {
     });
 
     it("should NOT log error at error threshold without validation plugin", async () => {
-      const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const router = createRouter<Record<string, number>>([], {
         limits: { maxDependencies: 100 },
@@ -225,9 +221,8 @@ describe("core/limits (integration via public API)", () => {
   // 🟡 IMPORTANT: Warn/error threshold logging for lifecycle handlers
   describe("lifecycle handler thresholds", () => {
     it("should NOT log warning at warn threshold without validation plugin", async () => {
-      const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const router = createRouter([], {
         limits: { maxLifecycleHandlers: 100 },
@@ -243,9 +238,8 @@ describe("core/limits (integration via public API)", () => {
     });
 
     it("should NOT log error at error threshold without validation plugin", async () => {
-      const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
-      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const router = createRouter([], {
         limits: { maxLifecycleHandlers: 100 },

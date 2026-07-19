@@ -1,7 +1,7 @@
 import { ALLOWED_RSC_MODES } from "./constants";
 
 import type { RscSsrMode } from "./types";
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 /**
  * Returns the SSR mode resolved by `rsc-server-plugin` for the current state.
