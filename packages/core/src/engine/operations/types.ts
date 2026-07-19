@@ -1,5 +1,3 @@
-// packages/route-tree/modules/operations/types.ts
-
 /**
  * Operations Module Type Definitions.
  *

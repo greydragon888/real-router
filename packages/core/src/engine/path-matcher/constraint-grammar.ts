@@ -1,5 +1,3 @@
-// packages/path-matcher/src/constraint-grammar.ts
-
 /**
  * Single source of truth for the constraint-delimiter `<...>` grammar (#804).
  *

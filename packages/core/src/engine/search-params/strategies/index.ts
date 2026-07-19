@@ -1,5 +1,3 @@
-// packages/route-node/modules/search-params/strategies/index.ts
-
 /**
  * Search Params Strategies - Factory and Types.
  *

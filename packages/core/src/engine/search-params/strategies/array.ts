@@ -1,5 +1,3 @@
-// packages/route-node/modules/search-params/strategies/array.ts
-
 /**
  * Array encoding strategies.
  *

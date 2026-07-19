@@ -1,5 +1,3 @@
-// packages/route-node/modules/search-params/strategies/boolean.ts
-
 /**
  * Boolean encoding/decoding strategies.
  *

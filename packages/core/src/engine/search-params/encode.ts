@@ -1,5 +1,3 @@
-// packages/route-node/modules/search-params/encode.ts
-
 /**
  * Encoding functions for search-params.
  *

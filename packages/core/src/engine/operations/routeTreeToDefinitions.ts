@@ -1,5 +1,3 @@
-// packages/route-tree/modules/operations/routeTreeToDefinitions.ts
-
 /**
  * RouteTree to RouteDefinition Converter.
  *

@@ -1,5 +1,3 @@
-// packages/path-matcher/src/parseSegment.ts
-
 /**
  * Canonical route-segment tokenizer.
  *

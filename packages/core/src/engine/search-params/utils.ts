@@ -1,5 +1,3 @@
-// packages/route-node/modules/search-params/utils.ts
-
 /**
  * Utility functions for search-params.
  *

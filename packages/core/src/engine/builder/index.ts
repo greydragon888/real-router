@@ -1,5 +1,3 @@
-// packages/route-tree/modules/builder/index.ts
-
 /**
  * Route Tree Builder.
  *

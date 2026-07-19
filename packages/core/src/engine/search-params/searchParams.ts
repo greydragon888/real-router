@@ -1,5 +1,3 @@
-// packages/route-node/modules/search-params/searchParams.ts
-
 /**
  * Search Params - Query String Parsing and Building.
  *

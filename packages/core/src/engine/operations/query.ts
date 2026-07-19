@@ -1,5 +1,3 @@
-// packages/route-node/modules/operations/query.ts
-
 /**
  * Route Query Operations.
  *

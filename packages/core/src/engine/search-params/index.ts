@@ -1,5 +1,3 @@
-// packages/search-params/modules/index.ts
-
 /**
  * Search Params Module.
  *

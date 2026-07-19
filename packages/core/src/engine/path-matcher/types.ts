@@ -1,5 +1,3 @@
-// packages/path-matcher/src/types.ts
-
 /**
  * Path Matcher Type Definitions.
  *

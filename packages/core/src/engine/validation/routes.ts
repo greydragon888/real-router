@@ -1,5 +1,3 @@
-// packages/route-node/modules/validation/routes.ts
-
 import {
   buildParamMeta,
   findSegmentGrammarError,

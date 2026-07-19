@@ -1,5 +1,3 @@
-// packages/route-tree/modules/index.ts
-
 /**
  * Route Tree - Public API
  *

@@ -1,5 +1,3 @@
-// packages/route-tree/modules/builder/types.ts
-
 /**
  * Builder Module Type Definitions.
  *

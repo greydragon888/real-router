@@ -1,5 +1,3 @@
-// packages/route-node/modules/search-params/decode.ts
-
 /**
  * Decoding functions for search-params.
  *

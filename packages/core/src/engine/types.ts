@@ -1,5 +1,3 @@
-// packages/route-tree/modules/types.ts
-
 /**
  * Route Tree Type Definitions.
  *

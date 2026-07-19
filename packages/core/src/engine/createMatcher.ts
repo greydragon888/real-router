@@ -1,5 +1,3 @@
-// packages/route-tree/src/createMatcher.ts
-
 /**
  * Matcher Factory.
  *

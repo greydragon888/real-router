@@ -1,5 +1,3 @@
-// packages/path-matcher/src/encoding.ts
-
 /**
  * URL Parameter Encoding.
  *

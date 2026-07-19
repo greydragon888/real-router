@@ -1,5 +1,3 @@
-// packages/route-node/modules/search-params/strategies/null.ts
-
 /**
  * Null encoding/decoding strategies.
  *

@@ -1,5 +1,3 @@
-// packages/route-node/modules/validation/route-batch.ts
-
 /**
  * Batch route validation utilities.
  *

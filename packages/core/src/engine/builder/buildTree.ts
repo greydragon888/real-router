@@ -1,5 +1,3 @@
-// packages/route-node/modules/builder/buildTree.ts
-
 /**
  * Tree Building.
  *
