@@ -64,7 +64,4 @@ export default [
 
   // ── Utilities ─────────────────────────────────────────────────────
   esm("route-utils", "1 kB"),
-
-  // ── Standalone (zero deps) ────────────────────────────────────────
-  esm("logger", "0.5 kB"),
 ];
