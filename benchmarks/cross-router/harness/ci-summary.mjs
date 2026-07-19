@@ -17,28 +17,38 @@ import { RME_NOISY_DEFAULT, RME_STABLE_DEFAULT, familyOf } from "./rme-policy.mj
 const CR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const RESULTS = join(CR, "results");
 const FW = ["react", "vue", "solid", "svelte", "angular"];
-// Scenario order + labels (the headline metric per scenario is already baked into GRID
-// by deck-extract, so this view is metric-agnostic — it renders the verdict, not the number).
-const SCEN = [
-  ["nav-latency", "Navigation latency"],
-  ["param-nav", "Param change"],
-  ["back-forward", "Back / forward"],
-  ["active-links", "Active-link nav"],
-  ["nested-switch", "Sibling switch"],
-  ["wide-config", "Wide table match"],
-  ["deep-config", "Deep tree match"],
-  ["search-param-scaling", "Query-param scaling"],
-  ["table-heap", "Route memory"],
-  ["nav-churn", "Heap per nav"],
-  ["gc-per-nav", "GC per nav"],
-  ["cold-start", "Cold start"],
-  ["link-build", "Link mounting"],
+// Scenarios grouped exactly like the deck's board (Per navigation / At scale / Memory &
+// startup), with the deck's CURRENT labels. ⚠ Keep in sync with deck-config.js GROUPS — the
+// labels are display-only (the headline metric per scenario is already baked into GRID by
+// deck-extract, so this view renders the verdict, not the number), but a drift here means the
+// CI table names scenarios differently from the deck (that's how "Route memory"/"Cold start"
+// went stale after the K1/K2 renames). gc-per-nav is a derived card (search-param alloc).
+const GROUPS = [
+  ["Per navigation", [
+    ["nav-latency", "Navigation latency"],
+    ["param-nav", "Param change"],
+    ["back-forward", "Back / forward"],
+    ["active-links", "Active-link nav"],
+    ["nested-switch", "Sibling switch"],
+  ]],
+  ["At scale", [
+    ["wide-config", "Wide table match"],
+    ["deep-config", "Deep tree match"],
+    ["search-param-scaling", "Query-param scaling"],
+  ]],
+  ["Memory & startup", [
+    ["table-heap", "App heap"],
+    ["nav-churn", "Heap growth"],
+    ["gc-per-nav", "GC per navigation"],
+    ["cold-start", "Cold start CPU"],
+    ["link-build", "Link mounting"],
+  ]],
 ];
 
 // ── fresh deck-data.json (this run's snapshot, written by deck-extract; gitignored, not committed) ──
-const ddPath = join(CR, "deck", "deck-data.json");
+const ddPath = join(CR, "deck", "out", "deck-data.json");
 if (!existsSync(ddPath)) {
-  console.error("ci-summary: deck/deck-data.json not found — run deck-extract first (workflow order).");
+  console.error("ci-summary: deck/out/deck-data.json not found — run deck-extract first (workflow order).");
   process.exit(2);
 }
 const { META = null, GRID = {} } = JSON.parse(readFileSync(ddPath, "utf8"));
@@ -71,17 +81,20 @@ out.push("## real-router vs the fastest rival — headline metric per scenario\n
 out.push(`| scenario | ${FW.join(" | ")} |`);
 out.push(`|---|${FW.map(() => "---").join("|")}|`);
 let g = 0, y = 0, r = 0;
-for (const [sc, label] of SCEN) {
-  const cells = FW.map((co) => {
-    const cell = GRID[co]?.[sc];
-    if (!cell) return "—";
-    const [ratio, cls] = cell; // deck-extract writes [ratio, class]
-    if (cls === "g") g++;
-    else if (cls === "y") y++;
-    else r++;
-    return cls === "y" ? "🟡 tie" : `${EM[cls] ?? "?"} ${ratio}×`;
-  });
-  out.push(`| ${label} | ${cells.join(" | ")} |`);
+for (const [groupName, scns] of GROUPS) {
+  out.push(`| **${groupName}** |${" |".repeat(FW.length)}`); // group separator row
+  for (const [sc, label] of scns) {
+    const cells = FW.map((co) => {
+      const cell = GRID[co]?.[sc];
+      if (!cell) return "—";
+      const [ratio, cls] = cell; // deck-extract writes [ratio, class]
+      if (cls === "g") g++;
+      else if (cls === "y") y++;
+      else r++;
+      return cls === "y" ? "🟡 tie" : `${EM[cls] ?? "?"} ${ratio}×`;
+    });
+    out.push(`| ${label} | ${cells.join(" | ")} |`);
+  }
 }
 out.push(
   `\n_Tally: ${g} 🟢 lead · ${y} 🟡 tie · ${r} 🔴 trail — real-router vs the nearest competitor at each scenario's headline metric; lower is better. Advisory competitive signal (drift-invariant ratio), never a gate._\n`,

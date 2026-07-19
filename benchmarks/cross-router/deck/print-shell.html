@@ -1,0 +1,143 @@
+<title>real-router — cross-router benchmark report</title>
+<style>
+  /* Print / PDF edition of the deck: A4 landscape, paginated (cover → summary → one cohort
+     per page), static (no hover, isolate, or in-page anchors). Same data + render as the
+     interactive deck; build-deck splices the same config and inlines the same deck-render.js.
+     Rendered to cross-router-report.pdf by render-pdf.mjs (Playwright page.pdf). */
+  @page { size: A4 landscape; margin: 11mm 13mm; }
+  :root{
+    --ground:#f5f6f8;--surface:#fff;--ink:#14171d;--muted:#59616e;--faint:#8b939f;
+    --accent:#2f3bd4;--accent-ink:#2530a8;--accent-soft:#e7e9fb;--hair:#e3e6ec;--hair2:#cfd4dd;
+    --win:#1a7a47;--win-bg:#e8f3ec;--tie:#916013;--tie-bg:#f6eeda;--trail:#b23a2c;--trail-bg:#f8e8e5;
+    --sg:#2f9c62;--sy:#facc15;--sr:#cf5a4c;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#fff;color:var(--ink);font-family:var(--sans);font-size:9.2pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+  section{break-inside:auto}
+  .overview{break-before:page}
+  .cohort{break-before:page}
+
+  /* cover */
+  .cover{padding-top:6mm}
+  .eyebrow{font-family:var(--mono);font-size:8pt;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);font-weight:600;display:flex;align-items:center;gap:10px}
+  .eyebrow::before{content:"";width:26px;height:2px;background:var(--accent)}
+  h1{font-size:30pt;line-height:1.04;letter-spacing:-.028em;font-weight:780;margin:6mm 0 0;max-width:20ch}
+  h1 .hl{color:var(--accent)}
+  .lede{font-size:12pt;color:var(--muted);max-width:70ch;margin:5mm 0 0;line-height:1.45}
+  .lede b{color:var(--ink);font-weight:600}
+  .stamp{font-family:var(--mono);font-size:8pt;color:var(--faint);margin:7mm 0 0;letter-spacing:.01em}.stamp b{color:var(--muted);font-weight:600}
+  .stamp .ci-note{display:block;margin-top:6px;font-family:inherit;font-size:8.5pt;color:var(--muted);max-width:100ch;line-height:1.4;letter-spacing:0}
+  .field{margin-top:6mm;display:flex;flex-wrap:wrap;gap:1px;background:var(--hair);border:1px solid var(--hair);border-radius:5px;overflow:hidden}
+  .fw{background:var(--surface);padding:10px 12px;flex:1 1 0;min-width:0}
+  .fw .n{font-weight:640;font-size:11pt;display:flex;align-items:center;gap:7px}
+  .fw .n::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--accent)}
+  .fw .vs{font-family:var(--mono);font-size:8pt;color:var(--muted);margin-top:4px;line-height:1.5}
+  .fw .vs .ver{color:var(--ink);font-weight:600}
+  .fw .vs .me{color:var(--accent-ink);font-weight:600}
+
+  h2{font-size:16pt;letter-spacing:-.014em;font-weight:700;margin:0 0 5mm}
+
+  /* board (summary) */
+  .board{width:100%}
+  table.grid{border-collapse:collapse;width:100%;font-size:8.4pt;border-bottom:2px solid var(--hair2)}
+  table.grid td,table.grid th{padding:0;text-align:center}
+  table.grid td.rowlab{text-align:left;padding:3px 12px 3px 0;white-space:nowrap}
+  tr.grp > td.rowlab{padding:16px 12px 8px 0;font-family:var(--mono);font-size:7.5pt;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);font-weight:600;vertical-align:baseline}
+  tr.grp > th{padding:16px 0 8px;font-family:var(--mono);font-size:9pt;color:var(--muted);font-weight:600;vertical-align:baseline;border-left:1px solid #eef1f5}
+  .scn{font-weight:560;font-size:9pt}.scn small{display:block;font-size:7.5pt;color:var(--faint);font-weight:400}
+  table.grid td{vertical-align:middle}
+  tr.srow > td{border-top:1px solid var(--hair);padding-top:6px;padding-bottom:6px}
+  tr.srow > td:not(.rowlab){border-left:1px solid #eef1f5}
+  tr.grp > td,tr.grp > th{border-top:2px solid var(--hair2)}
+  .dcell{display:grid;grid-template-columns:30px 1fr 1px 1fr 30px;align-items:center;column-gap:4px;padding:2px 5px}
+  .numL,.numR{font-family:var(--mono);font-size:8pt;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .numL{text-align:right;color:var(--trail)}.numR{text-align:left;color:var(--win)}
+  .trk{position:relative;height:11px;background:#f1f2f5;border-radius:2px}
+  .axis{width:1px;height:15px;background:#c9cfd8;justify-self:center;position:relative}
+  .axis.tie::after{content:"";position:absolute;left:-4px;top:50%;width:9px;height:9px;transform:translateY(-50%) rotate(45deg);border-radius:1.5px;background:var(--sy);z-index:5}
+  .dbar{position:absolute;top:0;bottom:0;border-radius:2px}
+  .dstack{display:flex;flex-direction:column;gap:4px;padding:3px 0}
+  .rl{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
+  .ptstack{display:flex;flex-direction:column;gap:4px;padding:3px 0}
+  .ptstack .pt{height:18px;display:flex;align-items:center;justify-content:flex-end;min-width:24px;font-family:var(--mono);font-size:7.5pt;color:var(--faint);font-variant-numeric:tabular-nums;line-height:1}
+  td.na{text-align:center;color:var(--faint);font-family:var(--mono);font-size:9pt}
+
+  /* cohort */
+  .cohort-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:2mm}
+  .cohort-head h2{margin:0}  /* CRUCIAL: the h2 rule's `margin:0 0 5mm` is for the Summary headings; that 5mm below the text made align-items:center push the badge upward (it centred against text+5mm). Zeroed here, center matches the interactive deck's alignment. */
+  .matchup{font-family:var(--mono);font-size:9.5pt;color:var(--muted);margin:2mm 0 0}.matchup b{color:var(--accent-ink);font-weight:700}
+  .sec-sub{color:var(--muted);max-width:130ch;margin:2mm 0 3mm;font-size:9.5pt}
+  .badge{font-family:var(--mono);font-size:8pt;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--win) 35%,var(--hair));color:var(--win);background:var(--win-bg)}
+  .grp-lab{font-family:var(--mono);font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);font-weight:600;margin:5mm 0 3mm;display:flex;align-items:center;gap:12px;break-after:avoid}
+  .grp-lab::after{content:"";flex:1;height:1px;background:var(--hair)}
+  /* Each row-group after the first (Memory & startup, then How it scales) starts a fresh
+     page — the same group-per-page split as the summary board; the first group (Per
+     navigation) keeps the cohort intro. break-after:avoid keeps a label with its cards. */
+  .grp-lab ~ .grp-lab{break-before:page}
+
+  .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5mm}
+  .card{background:var(--surface);border:1px solid var(--hair);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;break-inside:avoid}
+  .card-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .card-title{font-weight:680;font-size:11pt}
+  .card-key{font-family:var(--mono);font-size:8pt;color:var(--faint)}
+  .chip{margin-left:auto;font-family:var(--mono);font-size:7.5pt;color:var(--muted);background:var(--ground);border:1px solid var(--hair);padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .what{font-size:8.6pt;color:var(--muted);line-height:1.4;margin:-2px 0 2px}
+  .why{font-size:8.6pt;color:var(--ink);line-height:1.42;background:var(--accent-soft);border-radius:6px;padding:8px 10px}
+  .why::before{content:"Why ";font-family:var(--mono);font-size:7pt;font-weight:700;letter-spacing:.08em;color:var(--accent-ink)}
+  .why a{color:var(--accent-ink);font-weight:600;text-decoration:none;border-bottom:1px solid var(--hair2)}
+
+  .bars{display:flex;flex-direction:column;gap:6px}
+  .bar{display:grid;grid-template-columns:78px 1fr auto;align-items:center;gap:9px}
+  .bar .en{font-family:var(--mono);font-size:8pt;color:var(--muted);text-align:right;white-space:nowrap}
+  .bar.rr .en{color:var(--ink);font-weight:700}
+  .track{height:12px;background:var(--hair);border-radius:3px;overflow:hidden}
+  .fill{display:block;height:100%;border-radius:3px}
+  .val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:8pt;color:var(--muted);white-space:nowrap;min-width:58px;text-align:right}
+  .bar.rr .val{color:var(--ink);font-weight:600}
+  .podium{display:flex;gap:14px;font-family:var(--mono);font-size:7.5pt;color:var(--muted);margin-top:1px}
+  .podium span{display:inline-flex;align-items:center;gap:5px}.podium i{width:9px;height:9px;border-radius:2px}
+
+  .chart svg{width:100%;height:auto;display:block}
+  .clgd{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:7.5pt;color:var(--muted);margin-top:3px}
+  .clgd span{display:inline-flex;align-items:center;gap:6px}.clgd i{width:14px;height:3px;border-radius:2px}
+</style>
+
+<div id="doc"></div>
+<script>
+  // FIELD + COHORTS + the config block come from the splice below (shared with deck-shell.html).
+  const GROUPS=[];
+  const DATA=[];
+  //__RENDER__
+
+  // A static sweep card — the shared chart() with interactive=false (no hover targets) and a
+  // static legend (colour ↔ router), no "click to isolate".
+  function printSwCard(s){
+    const lg=s.s.filter(x=>x[1].some(v=>v!=null)).map(([n])=>"<span translate='no'><i style='background:"+SER[n]+"'></i>"+n+"</span>").join("");
+    return "<div class='card'>"+head(s)+"<div class='chart'>"+chart(s.p,s.s,s.u,s.log,s.sw,false)+"<div class='clgd'>"+lg+"</div></div><div class='why'>"+s.why+"</div></div>";
+  }
+  function cohortPage(co){
+    const M=CO[co];
+    const card=(sc)=>{const o=mk(sc,co);return SCEN[sc].kind==="sweep"?printSwCard(o):barCard(o);};
+    return "<section class='cohort'><div class='cohort-head'><h2>"+NT(M.name)+"</h2><span class='badge'>"+tally(co)+"</span></div>"
+      +"<p class='matchup'>"+NT(M.matchup)+"</p><p class='sec-sub'>"+NT(M.sub)+"</p>"
+      +"<div class='grp-lab'>Per navigation — the cost of a click</div><div class='cards'>"+PN_S.map(card).join("")+"</div>"
+      +"<div class='grp-lab'>Memory &amp; startup</div><div class='cards'>"+MEM_S.map(card).join("")+"</div>"
+      +"<div class='grp-lab'>How it scales — cost vs. the size of the app</div><div class='cards'>"+SCALE_S.map(card).join("")+"</div></section>";
+  }
+  const cover="<section class='cover'>"
+    +"<div class='eyebrow'>Cross-framework router benchmark &middot; real Chromium</div>"
+    +"<h1>real-router, against each popular router in <span class='hl'>every framework</span></h1>"
+    +"<p class='lede'>One core across five ecosystems, timed in a real browser from click to settled DOM — the same scenarios for every router. Cards are static snapshots of the interactive deck.</p>"
+    +"<div class='field'>"+fieldHTML(false)+"</div>"
+    +"<div class='stamp'>"+stampHTML()+"</div></section>";
+  // Summary board split by row-group — one group per page (Per navigation / At scale /
+  // Memory & startup), so a landscape page isn't overloaded with all 13 rows at once.
+  const overview=GROUPS.map(([gn,scns])=>
+    "<section class='overview'><h2>Summary &mdash; "+gn+"</h2>"
+    +"<div class='board'><table class='grid'>"+boardHTML([[gn,scns]])+"</table></div></section>"
+  ).join("");
+  document.getElementById("doc").innerHTML=cover+overview+COHORTS.map(([co])=>cohortPage(co)).join("");
+</script>

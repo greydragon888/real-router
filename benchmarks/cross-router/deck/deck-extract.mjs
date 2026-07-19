@@ -1,9 +1,13 @@
-import { readFileSync, existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { enginePkg } from "../harness/engine-versions.mjs";
 import { isKnownNA } from "../harness/known-na.mjs";
 
 const HERE = import.meta.dirname;
+// Generated artifacts (deck-data.json / deck.html / print.html / the PDF) live in a gitignored
+// deck/out/ — kept apart from the tracked source (shells, config, render, scripts) in deck/.
+const OUT = `${HERE}/out`;
+mkdirSync(OUT, { recursive: true });
 const ROOT = `${HERE}/../results`;
 // Isolated-matcher microbench (pure Node) — the honest instrument for wide-config's
 // "matcher scaling" claim. Browser navMsTask buries the sub-ms matcher in render/settle
@@ -229,7 +233,7 @@ if (!mEnv)
 else if (mEnv.commit && META.commit !== "unknown" && mEnv.commit !== META.commit)
   console.warn(`⚠ matcher-bench results epoch (${mEnv.commit}) ≠ browser cells epoch (${META.commit}) — wide/deep cards would mix epochs under one stamp; re-run matcher-bench (audit 07-18 K12/G1o).`);
 
-writeFileSync(`${HERE}/deck-data.json`, JSON.stringify({ META, DATA, GRID, SWEEP, VERSIONS }, null, 0));
+writeFileSync(`${OUT}/deck-data.json`, JSON.stringify({ META, DATA, GRID, SWEEP, VERSIONS }, null, 0));
 // quick sanity print
 console.log("react active-links (sweep):", JSON.stringify(DATA.react["active-links"]));
 console.log("react GRID:", JSON.stringify(GRID.react));

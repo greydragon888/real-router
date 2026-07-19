@@ -36,9 +36,12 @@
   .fw .vs{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.55}
   .fw .vs .ver{color:var(--ink);font-weight:600}
   .fw .vs .me{color:var(--accent-ink);font-weight:600}
+  .pdf-btn{position:absolute;top:60px;right:0;display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent-ink);text-decoration:none;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 25%,var(--hair));padding:9px 16px;border-radius:7px;transition:background .13s}
+  .pdf-btn:hover{background:#dde0fb}
+  @media print{.pdf-btn{display:none}}
 
   section{padding:58px 0;border-top:1px solid var(--hair)}
-  section.hero{padding:70px 0 52px;border-top:none}
+  section.hero{padding:70px 0 52px;border-top:none;position:relative}
   h2{font-size:1.65rem;letter-spacing:-.014em;font-weight:700;margin:0}
   .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap}
   .sec-note{font-family:var(--mono);font-size:12px;color:var(--faint)}
@@ -72,7 +75,7 @@
   .numL{text-align:right;color:var(--trail)}.numR{text-align:left;color:var(--win)}
   .trk{position:relative;height:12px;background:#f1f2f5;border-radius:2px}
   .axis{width:1px;height:16px;background:#c9cfd8;justify-self:center;position:relative}
-  .axis.tie::after{content:"";position:absolute;left:-2px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:var(--sy)}
+  .axis.tie::after{content:"";position:absolute;left:-4px;top:50%;width:9px;height:9px;transform:translateY(-50%) rotate(45deg);border-radius:1.5px;background:var(--sy);z-index:5}
   .dbar{position:absolute;top:0;bottom:0;border-radius:2px}
   .dstack{display:flex;flex-direction:column;gap:5px;padding:4px 0}
   .rl{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}
@@ -126,7 +129,7 @@
   .foot code{font-family:var(--mono);background:var(--surface);border:1px solid var(--hair);padding:1px 6px;border-radius:4px;font-size:12px}
   .slice-note{margin-top:18px;font-family:var(--mono);font-size:12px;color:var(--faint);border-left:2px solid var(--accent);padding-left:12px}
 
-  @media (max-width:820px){.readout{grid-template-columns:1fr}.field{flex-direction:column}.cards{grid-template-columns:1fr}}
+  @media (max-width:820px){.readout{grid-template-columns:1fr}.field{flex-direction:column}.cards{grid-template-columns:1fr}.pdf-btn{position:static;margin-top:20px}}
   @media print{
     body{background:#fff}section{break-inside:avoid;padding:24px 0}.cohort{break-before:page}
     .readout,.field,.card,.cell,.fill,.badge,.why{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -138,6 +141,7 @@
     <div class="eyebrow">Cross-framework router benchmark &middot; real Chromium</div>
     <h1>real-router, against each popular router in <span class="hl">every framework</span>.</h1>
     <p class="lede">One core across five ecosystems, timed in a real browser from click to settled DOM — the same scenarios for every router.</p>
+    <a class="pdf-btn" href="cross-router-report.pdf" target="_blank" rel="noopener">Open the full report &mdash; PDF &#8599;</a>
     <div class="readout">
       <div class="stat"><div class="k">up to 11&times;</div><div class="l"><b>faster per navigation</b> — ahead or level on every click in all 5 ecosystems, far ahead on link-heavy pages</div></div>
       <div class="stat"><div class="k">flat</div><div class="l"><b>constant-time route matching</b> — just as fast however wide the route table grows, while most rivals slow down</div></div>
@@ -167,163 +171,22 @@
 </div>
 
 <script>
-  // FIELD = the "routers under test" panel: [cohort, [[npmName, seedVersion], …]]. The
-  // versions here are SEED/FALLBACK only — the live deck shows VERSIONS[npmName] (measured
-  // at run time, folded into deck-data by deck-extract) and falls back to the seed when a
-  // package has no stamped version yet (pre-version cells). Keep the seeds roughly current
-  // so a data-less rebuild isn't wildly stale, but the measured value is the source of truth.
-  const FIELD=[["React",[["@real-router/react","0.29.5"],["react-router","8.2.0"],["@tanstack/react-router","1.170.17"]]],["Vue",[["@real-router/vue","0.18.1"],["vue-router","5.1.0"],["@tanstack/vue-router","1.170.16"]]],["Solid",[["@real-router/solid","0.18.1"],["@solidjs/router","0.16.1"],["@tanstack/solid-router","1.170.17"]]],["Svelte",[["@real-router/svelte","0.16.5"],["sv-router","0.17.0"],["@mateothegreat/svelte5-router","2.16.19"]]],["Angular",[["@real-router/angular","0.16.2"],["@angular/router","22.0.6"]]]];
-  const COHORTS=[["react","React"],["vue","Vue"],["solid","Solid"],["svelte","Svelte"],["angular","Angular"]];
+  // FIELD + COHORTS come from the config block spliced in below (shared with print-shell.html).
   const GROUPS=[];
   const DATA=[];
+  //__RENDER__
 
-  // board
-  let g="<tbody>";
-  function rowMax(k,swept){
-    let m=1.05;
-    for(const [co] of COHORTS){
-      if(swept){const st=SWEEP[co]&&SWEEP[co][k];if(st)for(const p of st){if(!p)continue;const [cl,ra]=p;if(cl!=="y"&&ra>m)m=ra;}}
-      else{const c=GRID[co][k];if(c&&c[1]!=="y"&&c[0]>m)m=c[0];}
-    }
-    return m;
-  }
-  function dcell(cls,ratio,rmax){
-    if(cls==="y")
-      return "<span class='dcell'><span class='numL'></span><span class='trk'></span><span class='axis tie'></span><span class='trk'></span><span class='numR' style='color:var(--faint)'>≈</span></span>";
-    const w=Math.max(4,Math.min(100,ratio/rmax*100)).toFixed(0);
-    const num=(cls==="g"?"▲":"▽")+ratio.toFixed(ratio>=10?0:1)+"×";
-    if(cls==="g")
-      return "<span class='dcell'><span class='numL'></span><span class='trk'></span><span class='axis'></span><span class='trk'><span class='dbar' style='left:0;width:"+w+"%;background:var(--sg)'></span></span><span class='numR'>"+num+"</span></span>";
-    return "<span class='dcell'><span class='numL'>"+num+"</span><span class='trk'><span class='dbar' style='right:0;width:"+w+"%;background:var(--sr)'></span></span><span class='axis'></span><span class='trk'></span><span class='numR'></span></span>";
-  }
-  for(const [gn,scns] of GROUPS){
-    g+="<tr class='grp'><td class='rowlab'>"+gn+"</td>"+COHORTS.map(([,n])=>"<th>"+n+"</th>").join("")+"</tr>";
-    for(const [k,title,sub,swept] of scns){
-      const rmax=rowMax(k,swept);
-      const pts=swept&&SCEN[k]?SCEN[k].p:null;
-      const ptlab=pts?"<span class='ptstack'>"+pts.map(n=>"<span class='pt'>"+n+"</span>").join("")+"</span>":"";
-      g+="<tr class='srow'><td class='rowlab'><span class='rl'><span class='scn'>"+title+"<small>"+sub+"</small></span>"+ptlab+"</span></td>";
-      for(const [co] of COHORTS){
-        if(swept){
-          const st=SWEEP[co]&&SWEEP[co][k];
-          if(!st){g+="<td class='na'>&mdash;</td>";continue;}
-          g+="<td><span class='dstack'>"+st.map((p)=>p?dcell(p[0],p[1],rmax):"<span class='dcell'><span class='numL'></span><span class='trk'></span><span class='axis tie'></span><span class='trk'></span><span class='numR' style='color:var(--faint)'>n/a</span></span>").join("")+"</span></td>";
-        }else{
-          const c=GRID[co][k];
-          if(!c){g+="<td class='na'>&mdash;</td>";continue;}
-          g+="<td>"+dcell(c[1],c[0],rmax)+"</td>";
-        }
-      }
-      g+="</tr>";
-    }
-  }
-  document.getElementById("grid").innerHTML=g+"</tbody>";
-  document.getElementById("field").innerHTML=FIELD.map(([f,rs])=>"<a class='fw' translate='no' href='#cohort-"+f.toLowerCase()+"'><div class='n'>"+f+"</div><div class='vs'>"+rs.map(([nm,ver])=>{const v=(typeof VERSIONS!=="undefined"&&VERSIONS&&VERSIONS[nm])||ver;return "<span"+(nm.startsWith("@real-router/")?" class='me'":"")+">"+nm+" <span class='ver'>"+v+"</span></span>";}).join("<br>")+"</div></a>").join("");
-  // O-10б: machine/provenance stamp from META (guarded — null/absent on the committed reference
-  // deck → nothing renders; CI's fresh extract carries a real META and shows it + a G-3 disclaimer).
-  // META.date = the write-moment of the first stamped cell (≈ matrix start, UTC day).
-  // Audit 07-18 K13/K12 publication side: the stamp also carries the completeness count
-  // ("matrix W/E") with a loud partial-snapshot note (the salvage cascade publishes partial
-  // runs to Pages by design), and a mixed-epoch note when the isolated matcher curves were
-  // measured at a different commit than the browser cells — previously both markers lived
-  // only in the CI step-summary, so the PUBLISHED page could pass a partial/mixed snapshot
-  // off as complete.
-  if(typeof META!=="undefined"&&META){const ci=META.runner&&META.runner!=="local"&&META.runner!=="unknown";const d=String(META.date||"").slice(0,10);const cells=META.cells&&typeof META.cells.written==="number"?META.cells:null;const partial=cells&&cells.written<cells.expected;const mEpoch=META.matcher&&META.matcher.commit&&META.matcher.commit!=="unknown"&&META.commit&&META.commit!=="unknown"&&META.matcher.commit!==META.commit;document.getElementById("stamp").innerHTML="<b>"+META.cpu+"</b> &middot; "+META.runner+" &middot; commit "+META.commit+" &middot; "+d+" &middot; n="+META.runs+(cells?" &middot; matrix "+cells.written+"/"+cells.expected:"")+(partial?"<span class='ci-note'>⚠ Partial snapshot — only "+cells.written+" of "+cells.expected+" matrix cells are present (failed/salvaged run); missing cells render as —.</span>":"")+(mEpoch?"<span class='ci-note'>⚠ Mixed epochs — the isolated wide/deep matcher curves were measured at commit "+META.matcher.commit+", the browser cells at "+META.commit+".</span>":"")+(ci?"<span class='ci-note'>Cards = this run's fresh snapshot (CI runner — see stamp above). The <b>Why</b> blurbs are curated analysis; their figures are anchored to the committed reference snapshot, not necessarily this run.</span>":"");}
-  function fmt(v,u){if(v==null)return "—";let s;if(u==="KB")s=Math.round(v).toString();else if(u==="MB")s=v.toFixed(2);else s=(v<1?v.toFixed(3):v<10?v.toFixed(2):v.toFixed(1));if(s.indexOf(".")>=0)s=s.replace(/0+$/,"").replace(/\.$/,"");return s;}
-
-  function head(s){return "<div class='card-head'><span class='card-title'>"+s.t+"</span><span class='card-key'>"+s.k+"</span><span class='chip'>"+s.c+"</span></div><div class='what'>"+s.what+"</div>";}
-  function barCard(s){
-    const E=s.e.filter(x=>x[1]!=null);
-    const max=Math.max(...E.map(x=>x[1]));
-    const sorted=[...E.map(x=>x[1])].sort((a,b)=>a-b);
-    const rank=v=>Math.min(2,sorted.indexOf(v));
-    const bars=E.map(([n,v])=>{
-      const rr=n==="real-router",w=Math.max(3,(v/max)*100),col=RANK[rank(v)];
-      return "<div class='bar"+(rr?" rr":"")+"'><span class='en'>"+n+"</span><span class='track'><span class='fill' style='width:"+w.toFixed(1)+"%;background:"+col+"'></span></span><span class='val'>"+fmt(v,s.u)+" "+s.u+"</span></div>";
-    }).join("");
-    const pod=["1st","2nd","3rd"].slice(0,Math.min(3,E.length)).map((lbl,i)=>"<span><i style='background:"+RANK[i]+"'></i>"+lbl+"</span>").join("");
-    return "<div class='card'>"+head(s)+"<div class='bars'>"+bars+"</div>"
-      +"<div class='podium'>"+pod+"</div>"
-      +"<div class='why'>"+s.why+"</div></div>";
-  }
-  function smoothPath(pts){
-    if(pts.length<2) return pts.length?("M"+pts[0][0].toFixed(1)+","+pts[0][1].toFixed(1)):"";
-    let d="M"+pts[0][0].toFixed(1)+","+pts[0][1].toFixed(1);
-    for(let i=0;i<pts.length-1;i++){
-      const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||pts[i+1];
-      const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6;
-      const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
-      d+="C"+c1x.toFixed(1)+","+c1y.toFixed(1)+" "+c2x.toFixed(1)+","+c2y.toFixed(1)+" "+p2[0].toFixed(1)+","+p2[1].toFixed(1);
-    }
-    return d;
-  }
-  function chart(p,ser,u,log,sw){
-    const W=560,H=170,pl=8,pr=52,pt=16,pb=24,iw=W-pl-pr,ih=H-pt-pb;
-    const TIE="#facc15"; // tie colour for winner diamonds — kept in sync with the board's --sy (also #facc15) so table and chart speak ONE tie yellow. A bright, pure yellow, pushed well off the rival line's orange-brown (#c07b2e) so it stops merging into the curve; a winner diamond turns yellow at a tie point (per-point verdict "y" — rr within the margin of the fastest rival) + a thicker white halo (below) so it detaches from whatever line it sits on. (If --sy changes, change this too — SVG fill attributes can't read the CSS var.)
-    const xa=i=>pl+(p.length===1?iw/2:iw*i/(p.length-1));
-    let o="",ya;
-    if(log){
-      // log-Y: an O(1) matcher reads as a flat line, an O(N) scanner as a straight rise —
-      // the honest axis for isolated match cost spanning sub-µs to thousands of µs.
-      const pos=ser.flatMap(x=>x[1]).filter(v=>v!=null&&v>0);
-      let loL=Math.log10(Math.min(...pos)),hiL=Math.log10(Math.max(...pos));
-      // Floor the visible domain to ≥1 decade. An O(1) matcher's ~2% run-to-run jitter
-      // must read as a FLAT line — otherwise, when a series is isolated, its own tiny
-      // min–max becomes the whole axis and the noise stretches to full height (a fake
-      // "wave"). 1 decade also guarantees ≥1 reference gridline. The full multi-series
-      // view spans ≫1 decade (0.5→560 µs), so this only affects near-flat isolated views.
-      if(hiL-loL<1){const mid=(loL+hiL)/2;loL=mid-0.5;hiL=mid+0.5;}
-      const span=(hiL-loL)||1;
-      const dL=loL-span*0.06,uL=hiL+span*0.12,rng=uL-dL;
-      ya=v=>pt+ih-((Math.log10(v)-dL)/rng)*ih;
-      o+="<line x1='"+pl+"' y1='"+pt+"' x2='"+(pl+iw)+"' y2='"+pt+"' stroke='#eceef2'/>";
-      for(let d=Math.ceil(dL);d<=Math.floor(uL);d++){const gv=Math.pow(10,d),gy=ya(gv);if(gy<pt+11)continue;o+="<line x1='"+pl+"' y1='"+gy.toFixed(1)+"' x2='"+(pl+iw)+"' y2='"+gy.toFixed(1)+"' stroke='#eceef2'/>";o+="<text x='"+pl+"' y='"+(gy-2.5).toFixed(1)+"' font-size='8.5' fill='#b3b9c2' font-family='ui-monospace,Menlo,monospace'>"+fmt(gv,u)+"</text>";}
-      o+="<text x='"+pl+"' y='"+(pt-4)+"' font-size='9.5' fill='#b3b9c2' font-family='ui-monospace,Menlo,monospace'>"+u+" · log</text>";
-    }else{
-      const maxv=Math.max(...ser.flatMap(x=>x[1]).filter(v=>v!=null))*1.08;
-      ya=v=>pt+ih-(v/maxv)*ih;
-      for(let k=0;k<=2;k++){const y=pt+ih*k/2;o+="<line x1='"+pl+"' y1='"+y+"' x2='"+(pl+iw)+"' y2='"+y+"' stroke='#eceef2'/>";}
-      o+="<text x='"+pl+"' y='"+(pt-4)+"' font-size='9.5' fill='#b3b9c2' font-family='ui-monospace,Menlo,monospace'>"+maxv.toFixed(maxv<10?1:0)+" "+u+"</text>";
-    }
-    p.forEach((pp,i)=>o+="<text x='"+xa(i).toFixed(1)+"' y='"+(H-7)+"' font-size='10' fill='#8b939f' text-anchor='middle' font-family='ui-monospace,Menlo,monospace'>"+pp+"</text>");
-    // winner (lowest, since lower is better) at each swept point
-    const winIdx=p.map((_,i)=>{let best=Infinity,bn=null;for(const [n,vals] of ser){const v=vals[i];if(v!=null&&v<best){best=v;bn=n;}}return bn;});
-    // pass 1 — all lines
-    for(const [n,vals] of ser){
-      if(vals.every(v=>v==null))continue;
-      const col=SER[n],rr=n==="real-router";
-      const pts=vals.map((v,i)=>v==null?null:[xa(i),ya(v)]).filter(Boolean);
-      o+="<path d='"+smoothPath(pts)+"' fill='none' stroke='"+col+"' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/>";
-    }
-    // pass 2a — non-winner nodes
-    for(const [n,vals] of ser){if(vals.every(v=>v==null))continue;const rr=n==="real-router";
-      vals.forEach((v,i)=>{if(v==null||winIdx[i]===n)return;o+="<circle cx='"+xa(i).toFixed(1)+"' cy='"+ya(v).toFixed(1)+"' r='2.4' fill='"+SER[n]+"'/>";});}
-    // pass 2b — winner node at each point, drawn last so it sits on top even at a near-tie (bold, white halo)
-    for(const [n,vals] of ser){if(vals.every(v=>v==null))continue;const rr=n==="real-router";
-      vals.forEach((v,i)=>{if(v==null||winIdx[i]!==n)return;const cx=xa(i),cy=ya(v),d=6.4,tie=sw&&sw[i]&&sw[i][0]==="y";o+="<path d='M"+cx.toFixed(1)+","+(cy-d).toFixed(1)+"L"+(cx+d).toFixed(1)+","+cy.toFixed(1)+"L"+cx.toFixed(1)+","+(cy+d).toFixed(1)+"L"+(cx-d).toFixed(1)+","+cy.toFixed(1)+"Z' fill='"+(tie?TIE:SER[n])+"' stroke='#fff' stroke-width='"+(tie?2.7:1.9)+"' stroke-linejoin='round'/>";});}
-    // endpoint labels
-    for(const [n,vals] of ser){if(vals.every(v=>v==null))continue;const col=SER[n],rr=n==="real-router";
-      let li=vals.length-1;while(li>=0&&vals[li]==null)li--;
-      if(li>=0)o+="<text x='"+(xa(li)+6).toFixed(1)+"' y='"+(ya(vals[li])+3.5).toFixed(1)+"' font-size='10' fill='"+col+"' font-family='ui-monospace,Menlo,monospace' font-weight='600'>"+fmt(vals[li],u)+"</text>";}
-    // pass 3 — invisible enlarged hover targets → value tooltip (drawn last = on top)
-    for(const [hn,hv] of ser){if(hv.every(v=>v==null))continue;
-      hv.forEach((v,i)=>{if(v==null)return;o+="<circle cx='"+xa(i).toFixed(1)+"' cy='"+ya(v).toFixed(1)+"' r='9' fill='none' pointer-events='all' style='cursor:crosshair' data-tip='"+hn+" · "+fmt(v,u)+" "+u+"'/>";});}
-    return "<svg viewBox='0 0 "+W+" "+H+"' role='img'>"+o+"</svg>";
-  }
+  // Board / field panel / provenance stamp — built by the shared deck-render.js inlined
+  // above. The interactive layer (isolate + tooltips) is deck-only, below.
+  document.getElementById("grid").innerHTML=boardHTML();
+  document.getElementById("field").innerHTML=fieldHTML(true);
+  document.getElementById("stamp").innerHTML=stampHTML();
   const CHARTS=[];
   function swCard(s){
     const id=CHARTS.length;CHARTS.push({p:s.p,ser:s.s,u:s.u,log:s.log,sw:s.sw});
     const lg=s.s.filter(x=>x[1].some(v=>v!=null)).map(([n])=>"<span class='lgi' translate='no' data-s=\""+n+"\"><i style='background:"+SER[n]+"'></i>"+n+"</span>").join("")+"<span class='lghint'>click to isolate</span>";
     return "<div class='card' data-chart='"+id+"'>"+head(s)+"<div class='chart'>"+chart(s.p,s.s,s.u,s.log,s.sw)+"<div class='clgd'>"+lg+"</div></div><div class='why'>"+s.why+"</div></div>";
   }
-  // translate="no": shield router/brand/framework names + code identifiers from machine
-  // translation (Google Translate etc.) — else "real-router"→"настоящий роутер",
-  // "Solid"→"твёрдый". Wraps matches ONLY inside text nodes, never inside tags/attributes.
-  const NO_TR=["@mateothegreat/svelte5-router","@tanstack/react-router","@tanstack/vue-router","@tanstack/solid-router","@solidjs/router","@angular/router","real-router","react-router","vue-router","solid-router","sv-router","mateo-router","TanStack","mateo","use:link","React","Vue","Solid","Svelte","Angular"].sort((a,b)=>b.length-a.length);
-  const NT_RE=new RegExp("("+NO_TR.join("|")+")","g");
-  function NT(h){return String(h).replace(/(<[^>]*>)|([^<]+)/g,(m,tag,txt)=>txt==null?m:txt.replace(NT_RE,"<span translate='no'>$1</span>"));}
-  function mk(sc,co){const m=SCEN[sc],o={t:m.t,k:sc,c:m.c,u:m.u,what:m.what,why:NT(why(sc,co))};if(m.kind==="sweep"){o.p=m.p;o.s=DATA[co][sc];o.sw=(SWEEP[co]&&SWEEP[co][sc])||null;}else{o.e=DATA[co][sc];}if(sc==="wide-config"||(sc==="deep-config"&&co!=="angular")){o.u="µs";o.log=1;}return o;}
-  function tally(co){let g=0,y=0,r=0;for(const sc in GRID[co]){const c=GRID[co][sc][1];if(c==="g")g++;else if(c==="y")y++;else r++;}return g+" lead · "+y+" tie · "+r+" trail";}
   function cohortSection(co){const M=CO[co];
     const card=(sc)=>{const o=mk(sc,co);return SCEN[sc].kind==="sweep"?swCard(o):barCard(o);};
     const pn=PN_S.map(card).join("");

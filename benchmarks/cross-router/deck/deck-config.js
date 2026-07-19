@@ -61,6 +61,13 @@
     svelte:{name:"Svelte",matchup:"<b>real-router</b> vs sv-router vs mateo-router",sub:"The hardest crowd: sv-router is compiled into Svelte itself. real-router holds level or leads on the navigations you feel, but its component &lt;Link&gt; and eager trie cost more on link-heavy mounts and route memory — where use:link and the immutable-state trade-off explain the gap."},
     angular:{name:"Angular",matchup:"<b>real-router</b> vs @angular/router",sub:"@angular/router is the heavyweight incumbent. Once booted, real-router is faster on every navigation — several times over — and its trie stays flat where Angular's matcher climbs O(N) as routes grow, ceding only one-time boot CPU (a gap that dissolves by first paint)."},
   };
+  // FIELD = the "routers under test" panel, shared by both shells via this splice:
+  // [cohort, [[npmName, seedVersion], …]]. Versions here are SEED/FALLBACK only — the built
+  // page shows VERSIONS[npmName] (measured at run time, folded into deck-data by deck-extract)
+  // and falls back to the seed when a package has no stamped version yet. Keep the seeds
+  // roughly current; the measured value is the source of truth.
+  const FIELD=[["React",[["@real-router/react","0.29.5"],["react-router","8.2.0"],["@tanstack/react-router","1.170.17"]]],["Vue",[["@real-router/vue","0.18.1"],["vue-router","5.1.0"],["@tanstack/vue-router","1.170.16"]]],["Solid",[["@real-router/solid","0.18.1"],["@solidjs/router","0.16.1"],["@tanstack/solid-router","1.170.17"]]],["Svelte",[["@real-router/svelte","0.16.5"],["sv-router","0.17.0"],["@mateothegreat/svelte5-router","2.16.19"]]],["Angular",[["@real-router/angular","0.16.2"],["@angular/router","22.0.6"]]]];
+  const COHORTS=[["react","React"],["vue","Vue"],["solid","Solid"],["svelte","Svelte"],["angular","Angular"]];
   const META=__META__;
   const DATA=__DATA__;
   const VERSIONS=__VERSIONS__;

@@ -7,7 +7,7 @@ name: Cross Routers Benchmarks
 
 on:
   schedule:
-    - cron: "23 5 * * 1" # Mon ~05:23 UTC, weekly (off the hour — GHA drops/delays peak-minute crons)
+    - cron: "0 21 * * 0" # Mon 00:00 Moscow time (MSK = UTC+3, no DST → Sun 21:00 UTC), weekly
   workflow_dispatch:
     inputs:
       runs:
@@ -74,35 +74,44 @@ jobs:
           BENCH_RUNNER: "self-hosted" # machine stamp (env.cpu carries the real CPU model)
           RUNS: ${{ inputs.runs || '100' }} # via env, not inline in `run:` — a workflow_dispatch input spliced into a run-script is a shell-injection sink (matches the rme-gate step below)
 
-      # ── salvage steps: run even on a RED matrix (partial snapshot of the finished cohorts),
-      #    but NOT when it was skipped (preflight/bundle failed → no results/ to publish) ──
+      # ── TRANSACTIONAL publish: deck / PDF / upload run ONLY after a fully-green matrix. They use
+      #    default step gating (no `if:`) — any prior failure skips them and the job goes red, so a
+      #    failed/partial run publishes NOTHING and the previous Pages deploy stays live. (This
+      #    replaces the old salvage cascade that shipped partial snapshots "in any case".) A failed
+      #    scheduled run also opens a tracking issue — see the notify-failure job. ──
 
       # rebuild the deck from THIS run in the workspace (META stamp header + disclaimer).
-      # Writes the gitignored deck.html/deck-data.json artifacts; the tracked source
-      # (deck-shell.html + deck-config.js) is read-only — build-deck never mutates it.
+      # build-deck writes the gitignored deck.html + print.html (PDF edition source) + deck-data.json;
+      # the tracked source (deck-shell.html + print-shell.html + deck-config.js + deck-render.js) is
+      # read-only — build-deck never mutates it.
       - name: Rebuild deck snapshot
         id: deck
-        if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
         run: node cross-router/deck/deck-extract.mjs && node cross-router/deck/build-deck.mjs
         working-directory: benchmarks
 
-      # rme BLOCKS only when noise is controlled — a consistent runner OR N >= RME_BLOCK_MIN_N
-      # (1/√N tames shared-runner noise); else report-only.
-      - name: RME gate
-        if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
+      # render the print/PDF edition (deck/print.html) → cross-router-report.pdf via Playwright's
+      # Chromium page.pdf (the same browser the matrix already drives). Non-fatal: a PDF failure
+      # degrades to "deck without a PDF link" — it must not red the run or block the deck publish.
+      - name: Render PDF report
+        id: pdf
+        if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
+        continue-on-error: true
+        run: node cross-router/deck/render-pdf.mjs
         working-directory: benchmarks
-        run: |
-          code=0
-          node cross-router/harness/rme-gate.mjs 15 40 || code=$?
-          if [ "$CONSISTENT_RUNNER" = "1" ] || [ "$RUNS" -ge "$RME_BLOCK_MIN_N" ]; then
-            exit "$code"   # armed → rme PASS required
-          else
-            exit 0         # shared runner + low N → report-only, don't fail the snapshot
-          fi
-        env:
-          RUNS: ${{ inputs.runs || '100' }}
-          RME_BLOCK_MIN_N: "50" # arm threshold (calibrate on the first real run; weekly n=100 >> 50)
-          CONSISTENT_RUNNER: "1" # self-hosted = consistent hardware → rme-gate armed at ANY N; weekly n=100 arms it regardless, this also arms manual low-n runs
+
+      # RME watch — REPORT-ONLY, never fails the run. Breaches surface here (the offenders in
+      # this step's log) and in the step summary's RME watch section, but the workflow indicator
+      # stays green. Rationale (was an armed gate until 07-19): this is an honest weekly snapshot
+      # on a shared/noisy VM, and the 07-18/19 harness audit showed the armed gate mostly flagged
+      # TRANSIENT co-tenancy flares — medians healthy across sessions, not real regressions. Real
+      # breakage (broken adapter / contaminated run) is already caught by the completeness gate
+      # (run-all's exit code = "0 failed cells" → red job). So RME adds only false-reds as a hard
+      # gate; as a watch it's still useful. continue-on-error: a breach shows as a tolerated step
+      # failure, the run stays green.
+      - name: RME watch (report-only)
+        continue-on-error: true
+        working-directory: benchmarks
+        run: node cross-router/harness/rme-gate.mjs 15 40
 
       # stamp + win/loss/parity grid (advisory competitive-ratio) + RME watch, from the fresh deck-data.json.
       - name: Step summary
@@ -126,13 +135,17 @@ jobs:
           path: |
             benchmarks/cross-router/results
             benchmarks/cross-router/matcher-bench/results.json
-            benchmarks/cross-router/deck/deck.html
-            benchmarks/cross-router/deck/deck-data.json
+            benchmarks/cross-router/deck/out/deck.html
+            benchmarks/cross-router/deck/out/deck-data.json
+            benchmarks/cross-router/deck/out/cross-router-report.pdf
 
   publish:
     # One snapshot → Pages. The self-contained CI deck.html is the landing page.
+    # TRANSACTIONAL: deploy ONLY a fully-successful bench run. A failed/partial bench (any red step)
+    # skips this job entirely — the previous Pages deploy is left untouched, and notify-failure
+    # opens a tracking issue. No more "publish in any case".
     needs: bench
-    if: always() # publish even if bench went red (partial snapshot still useful)
+    if: needs.bench.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       pages: write # only on the publish job
@@ -164,6 +177,9 @@ jobs:
           cp "$deck" public/index.html
           find site -name deck-data.json -exec cp {} public/deck-data.json \;
           find site -name results.json -path '*matcher-bench*' -exec cp {} public/matcher-results.json \;
+          # PDF edition next to index.html so the deck's "Open the full report — PDF" link resolves
+          # (a no-op if render-pdf failed → the button 404s but the deck still publishes).
+          find site -name cross-router-report.pdf -exec cp {} public/cross-router-report.pdf \;
           echo "have_deck=true" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@v5
         if: steps.assemble.outputs.have_deck == 'true'
@@ -172,3 +188,57 @@ jobs:
       - id: deploy
         if: steps.assemble.outputs.have_deck == 'true'
         uses: actions/deploy-pages@v5
+
+  # Loudly surface a failed scheduled run — open (or refresh) a tracking issue, the same pattern
+  # as examples.yml, so a broken weekly benchmark can't rot unnoticed (the only other signal is an
+  # email to the workflow-file author). Skipped on manual workflow_dispatch to avoid noise during
+  # verification runs. needs both jobs, so it fires when the bench failed (publish then skipped) OR
+  # the publish deploy itself failed.
+  notify-failure:
+    name: Open issue on failure
+    runs-on: ubuntu-latest
+    needs: [bench, publish]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update tracking issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = '<!-- cross-router-bench-failure-tracker -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = '🔴 Cross-router benchmark workflow failing';
+            const body = [
+              marker,
+              'The scheduled **Cross Routers Benchmarks** workflow failed — the Pages snapshot was NOT updated (transactional publish); the previous page stays live.',
+              '',
+              `- Run: ${runUrl}`,
+              `- Commit: ${context.sha}`,
+              '',
+              '_Auto-filed by `cross-router-bench.yml`. This comment updates on each subsequent failure; close the issue once green._',
+            ].join('\n');
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'area: ci/cd',
+              per_page: 100,
+            });
+            const existing = issues.find(i => (i.body || '').includes(marker));
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Still failing — ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['bug', 'area: ci/cd'],
+              });
+            }
