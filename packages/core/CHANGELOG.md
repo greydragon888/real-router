@@ -1,5 +1,18 @@
 # @real-router/core
 
+## 0.79.0
+
+### Minor Changes
+
+- [#1527](https://github.com/greydragon888/real-router/pull/1527) [`9b7e541`](https://github.com/greydragon888/real-router/commit/9b7e541f12a2a65148a777eb57ed0212821ab1e0) Thanks [@greydragon888](https://github.com/greydragon888)! - Simplify the route-path grammar to three tokens — `static`, `:param`, `*splat` ([#1516](https://github.com/greydragon888/real-router/issues/1516), URL model v2 / milestone 1)
+
+  Optional params (`:tab?`, `*rest?`) and regex constraints (`:id<\d+>`) are **removed** from the path grammar. A path using either form is now rejected at registration with an actionable replacement recipe:
+
+  - **Optional params** → declare two sibling routes instead (the route hierarchy already expresses optionality): `"/profile/:tab?"` becomes `"/profile"` + `"/profile/:tab"`.
+  - **Regex constraints** (`<`/`>` are now reserved in path segments) → match the segment as a plain string and validate the value in a guard (`canActivate`) or app code.
+
+  The demolition collapses this axis's largest cluster of grammar edge-cases (unbalanced/empty/fused constraints, optional-before-splat, optional-splat) into two clear rejections. Bare core carries a short recipe; `@real-router/validation-plugin` surfaces the rich, route-contextual recipe (with computed sibling paths) — the heavy validation stays plugin-gated, off the hot path.
+
 ## 0.78.0
 
 ### Minor Changes
