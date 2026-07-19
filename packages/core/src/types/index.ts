@@ -34,7 +34,6 @@ export type {
   DefaultParamsCallback,
   GuardFn,
   DefaultDependencies,
-  Config,
   SubscribeState,
   SubscribeFn,
   LeaveState,

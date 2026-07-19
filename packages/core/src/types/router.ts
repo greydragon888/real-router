@@ -201,13 +201,6 @@ export type GuardFn = (
 
 export type DefaultDependencies = object;
 
-export interface Config {
-  decoders: Record<string, (params: Params) => Params>;
-  encoders: Record<string, (params: Params) => Params>;
-  defaultParams: Record<string, Params>;
-  forwardMap: Record<string, string>;
-}
-
 export interface Plugin {
   onStart?: () => void;
   onStop?: () => void;
