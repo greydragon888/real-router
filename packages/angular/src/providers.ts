@@ -1,10 +1,9 @@
 import {
-  InjectionToken,
   makeEnvironmentProviders,
   provideEnvironmentInitializer,
   type EnvironmentProviders,
 } from "@angular/core";
-import { getNavigator, type Router, type Navigator } from "@real-router/core";
+import { getNavigator, type Router } from "@real-router/core";
 import { createRouteSource, primeErrorSource } from "@real-router/sources";
 
 import {
@@ -13,15 +12,15 @@ import {
   installViewTransitions,
 } from "./internal/install";
 import { sourceToSignal } from "./sourceToSignal";
+import { ROUTER, NAVIGATOR, ROUTE } from "./tokens";
 
 import type { ScrollRestorationOptions, ScrollSpyOptions } from "./dom-utils";
 import type { RouteSignals } from "./types";
 
-export const ROUTER = new InjectionToken<Router>("ROUTER");
-
-export const NAVIGATOR = new InjectionToken<Navigator>("NAVIGATOR");
-
-export const ROUTE = new InjectionToken<RouteSignals>("ROUTE");
+// Declared in ./tokens (a leaf module) and re-exported here so the public
+// surface is unchanged — declaring them in THIS file formed a value cycle
+// with internal/install.ts, which injects ROUTER back (#1525).
+export { ROUTER, NAVIGATOR, ROUTE } from "./tokens";
 
 export interface RealRouterOptions {
   scrollRestoration?: ScrollRestorationOptions;

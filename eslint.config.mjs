@@ -467,6 +467,31 @@ export default tsEslint.config(
       "import-x": importX,
     },
     settings: {
+      // Graph-building rules (no-cycle & co.) silently no-op without these
+      // (#1525): import-x's ignore.js defaults valid extensions to
+      // ['.js','.mjs','.cjs'], so every `.ts` import TARGET failed the
+      // extension check, no module graph was ever built, and the error-level
+      // no-cycle below linted a textbook cycle clean. These three settings are
+      // verbatim from importX.flatConfigs.typescript (kept inline so the
+      // resolver block stays the single settings home). Guarded by
+      // scripts/no-cycle-guard.test.mjs — a fixture cycle must keep failing.
+      "import-x/extensions": [
+        ".ts",
+        ".tsx",
+        ".cts",
+        ".mts",
+        ".js",
+        ".jsx",
+        ".cjs",
+        ".mjs",
+      ],
+      "import-x/parsers": {
+        "@typescript-eslint/parser": [".ts", ".tsx", ".cts", ".mts"],
+      },
+      "import-x/external-module-folders": [
+        "node_modules",
+        "node_modules/@types",
+      ],
       "import-x/resolver-next": [
         createTypeScriptImportResolver({
           alwaysTryTypes: true,

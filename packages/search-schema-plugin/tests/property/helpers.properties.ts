@@ -1,4 +1,4 @@
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { describe, it, expect } from "vitest";
 
 import { getInvalidKeys, omitKeys } from "../../src/helpers";

@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { describe, it, expect, vi } from "vitest";
 
 import { searchSchemaPlugin } from "../../src/index";

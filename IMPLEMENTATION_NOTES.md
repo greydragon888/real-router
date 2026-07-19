@@ -2,6 +2,52 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## import-x graph rules were silently inert — revived via the typescript settings trio (#1525)
+
+**Problem.** `import-x/no-cycle` sat at error level (universal `**/*.ts` block) while
+being **completely inert**: a textbook value↔value two-file cycle linted clean.
+Root cause, from the installed source (`eslint-plugin-import-x/lib/utils/ignore.js`):
+valid extensions default to `['.js','.mjs','.cjs']` when
+`settings["import-x/extensions"]` is absent — so every `.ts` import TARGET failed
+the extension check, no module graph was ever built, and every graph-building rule
+(`no-cycle`, `no-named-as-default-member`, `import-x/export`, …) silently no-op'd.
+The config had `import-x/resolver-next` but neither `extensions` nor `parsers` —
+non-graph rules kept working, which masked the death. Discovered by the #1519
+research's control probe (the probe that was SUPPOSED to fail didn't).
+
+**Solution.** Three settings added next to the resolver, verbatim from
+`importX.flatConfigs.typescript`: `import-x/extensions` (+`.ts/.tsx/.cts/.mts`),
+`import-x/parsers` (`@typescript-eslint/parser` for TS extensions),
+`import-x/external-module-folders`. Guarded against silent re-death by
+**`scripts/no-cycle-guard.test.mjs`** (the ci-gate-completeness pattern): writes a
+transient two-file cycle into `packages/core/src`, lints it with the REAL repo
+config, asserts the cycle is reported (with a vacuity check that eslint actually
+linted the fixture), cleans up in `finally`. Auto-runs in repo-lints via the
+`node --test scripts/*.test.mjs` glob.
+
+**Fallout triage (the revived rules' first sweep, all 22 packages):**
+- **2 REAL value cycles in angular** — `providers.ts` declared the DI tokens AND
+  imported the install helpers, while `internal/install.ts` injected `ROUTER`
+  back (`providers → install → providers`); it only worked because the helpers
+  run lazily inside environment initializers. Fixed structurally: the three
+  tokens moved to the new leaf `src/tokens.ts`; `providers.ts` re-exports them
+  (public surface unchanged — barrel/`providersFactory`/`injectRouter` untouched).
+- **`no-named-as-default-member` style debt**: `import ts from "typescript"`
+  (3 static-scan tests) and `import fc from "fast-check"` (3 search-schema
+  property suites) switched to namespace imports (`import * as`) — runtime
+  identical, canonical for `export =`-shaped packages.
+- **`import-x/export` false positive on the deliberate Path A shadow**
+  (`export type * from "./types"` + explicit `Router`/`RouterError` class
+  exports of the same names): TS resolves the precedence (explicit wins), the
+  rule can't model shadowing — three targeted `eslint-disable` lines with the
+  rationale, one per flagged side.
+
+**Why.** A dead error-level gate is worse than no gate — it certifies what it
+doesn't check. The layered architecture kept real cycles rare (exactly why nobody
+noticed), but the very first live sweep still found two genuine ones. Rule docs
+note for posterity: `no-cycle` *ignores type-only imports by design* — the #1519
+type-only-cycle question stays answered even with the rule alive.
+
 ## CI runtime: base-bundle no longer gates base-test/shards; sonarcloud off the CI Result path
 
 **Problem.** Job-timing data from real runs (e.g. the engine-merge PR run) showed the

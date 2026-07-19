@@ -65,7 +65,8 @@ src/                            # Main entry — client API
 │   ├── install.ts              # installScrollRestoration + installScrollSpy + installViewTransitions — shared by providers + providersFactory
 │   ├── subscribeSourceToSignal.ts  # subscribe → setState → cleanup pattern (RealLink, RealLinkActive, RouteView)
 │   └── createStableParams.ts   # shallowEqual content-stabilization for routeParams (RealLink, RealLinkActive) — #988
-├── providers.ts                # ROUTER, NAVIGATOR, ROUTE tokens + provideRealRouter
+├── tokens.ts                   # ROUTER, NAVIGATOR, ROUTE InjectionTokens (leaf module — providers.ts re-exports them; declaring them in providers formed a value cycle with internal/install.ts, #1525)
+├── providers.ts                # provideRealRouter (re-exports the tokens from ./tokens)
 ├── providersFactory.ts         # provideRealRouterFactory (SSR/SSG per-request clones)
 ├── sourceToSignal.ts           # RouterSource → Signal bridge
 ├── types.ts                    # RouteSignals, ErrorContext interfaces

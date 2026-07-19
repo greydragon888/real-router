@@ -5,7 +5,7 @@ import {
   createScrollSpy,
   createViewTransitions,
 } from "../dom-utils";
-import { ROUTER } from "../providers";
+import { ROUTER } from "../tokens";
 
 import type { ScrollRestorationOptions, ScrollSpyOptions } from "../dom-utils";
 

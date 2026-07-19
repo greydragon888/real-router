@@ -20,7 +20,10 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 
-import ts from "typescript";
+// Namespace import — the canonical TS compiler-API form (typescript ships
+// `export = ts`); also what import-x/no-named-as-default-member expects now
+// that the graph analysis is alive (#1525).
+import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 // `__dirname` (not `import.meta.url`): this package is `type: commonjs` under
