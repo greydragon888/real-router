@@ -1,5 +1,12 @@
 # @real-router/logger-plugin
 
+## 0.5.32
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
 ## 0.5.31
 
 ### Patch Changes

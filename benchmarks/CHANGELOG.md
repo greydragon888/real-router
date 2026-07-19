@@ -1,5 +1,22 @@
 # router-benchmarks
 
+## 0.3.97
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/browser-plugin@0.18.22
+  - @real-router/core@0.78.0
+  - @real-router/lifecycle-plugin@0.7.2
+  - @real-router/memory-plugin@0.4.29
+  - @real-router/angular@0.16.2
+  - @real-router/preact@0.17.1
+  - @real-router/react@0.29.5
+  - @real-router/search-schema-plugin@0.4.20
+  - @real-router/solid@0.18.1
+  - @real-router/svelte@0.16.5
+  - @real-router/vue@0.18.1
+
 ## 0.3.96
 
 ### Patch Changes

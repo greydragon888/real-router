@@ -1,6 +1,6 @@
 {
   "name": "@real-router/rsc-server-plugin",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "type": "commonjs",
   "description": "RSC per-route ReactNode loading plugin for Real-Router (server-side, bundler-agnostic)",
   "main": "./dist/cjs/index.js",

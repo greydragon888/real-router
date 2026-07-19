@@ -1,5 +1,22 @@
 # @real-router/persistent-params-plugin
 
+## 0.2.32
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Inline `isPrimitiveValue` locally ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The `isPrimitiveValue` helper now lives in `src/is-primitive-value.ts` instead of the dissolved `type-guards` package. Internal refactor — no public API or validation-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
 ## 0.2.31
 
 ### Patch Changes

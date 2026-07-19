@@ -1,5 +1,22 @@
 # @real-router/navigation-plugin
 
+## 0.7.31
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Bundle the browser-env state guard directly (dissolved `type-guards`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The symlinked `shared/browser-env` now carries `isStateStrict` as a local `state-guard.ts` twin, so navigation-plugin no longer force-bundles the dissolved `type-guards` package. Internal refactor — no public API or runtime-behaviour change.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
 ## 0.7.30
 
 ### Patch Changes
