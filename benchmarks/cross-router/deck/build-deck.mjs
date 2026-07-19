@@ -1,14 +1,15 @@
 import { readFileSync, writeFileSync } from "node:fs";
 const DIR = import.meta.dirname;
 const tpl = readFileSync(`${DIR}/deck-config.js`, "utf8");
-const { META, DATA, GRID, SWEEP } = JSON.parse(readFileSync(`${DIR}/deck-data.json`, "utf8"));
+const { META, DATA, GRID, SWEEP, VERSIONS } = JSON.parse(readFileSync(`${DIR}/deck-data.json`, "utf8"));
 let cfg = tpl
   .replace("__META__", JSON.stringify(META ?? null))   // O-10б: machine/provenance stamp (null on pre-META data)
   .replace("__SWEEP__", JSON.stringify(SWEEP))
   .replace("__GRID__", JSON.stringify(GRID))
   .replace("__DATA__", JSON.stringify(DATA))
+  .replace("__VERSIONS__", JSON.stringify(VERSIONS ?? {}))   // measured router versions (empty {} on pre-version data → deck falls back to its seed FIELD labels)
   .trimEnd();
-if (["__META__", "__SWEEP__", "__GRID__", "__DATA__"].some((p) => cfg.includes(p)))
+if (["__META__", "__SWEEP__", "__GRID__", "__DATA__", "__VERSIONS__"].some((p) => cfg.includes(p)))
   throw new Error("unreplaced placeholder remains");
 
 // Template is the TRACKED deck-shell.html (HTML + render JS, no data); the built

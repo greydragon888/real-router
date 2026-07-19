@@ -63,3 +63,4 @@
   };
   const META=__META__;
   const DATA=__DATA__;
+  const VERSIONS=__VERSIONS__;

@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import { build, preview } from "vite";
 
+import { resolveEngineVersion } from "./harness/engine-versions.mjs";
 import { isKnownNA } from "./harness/known-na.mjs";
 import { measureInterleaved } from "./harness/measure.mjs";
 import { envStamp, freshnessGateAndProvenance } from "./harness/provenance.mjs";
@@ -62,7 +63,7 @@ const runScenario = async (framework, scenarioName, engineList) => {
   finally { await Promise.all(servers.map((s) => s.close())); }
   for (const { engine } of apps) {
     if (!results[engine]) { failed += 1; continue; }
-    const out = { scenario: scenarioName, engine, framework, ...results[engine], env: envStamp(provenance) };
+    const out = { scenario: scenarioName, engine, framework, ...results[engine], version: resolveEngineVersion(appRoot(here, framework, engine, scenarioName), framework, engine), env: envStamp(provenance) };
     if (writeCell(`${here}/results`, out, effRuns)) { ok += 1; console.error(`✔ ${framework}·${scenarioName}×${engine}`); }
     else { failed += 1; console.error(`!! cell not persisted: ${framework}·${scenarioName}×${engine} (writeCell refused)`); }
   }

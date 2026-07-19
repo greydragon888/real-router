@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
 
+import { enginePkg } from "../harness/engine-versions.mjs";
 import { isKnownNA } from "../harness/known-na.mjs";
 
 const HERE = import.meta.dirname;
@@ -161,6 +162,13 @@ let cellsWritten = 0, cellsExpected = 0;
 const epochCommits = new Set();
 let minDate = null, maxDate = null;
 let minRuns = null, maxRuns = null;
+// VERSIONS: the router version each cell actually measured (the harness stamps cell.version
+// via engine-versions.mjs). Folded into deck-data so the deck's FIELD panel shows the real
+// benchmarked versions instead of a hand-maintained label that drifts as competitors float
+// ~patch. Keyed by npm package name to match FIELD; first stamped cell per engine wins
+// (version is identical across an engine's scenarios). Pre-version cells leave it absent →
+// the deck keeps its hardcoded seed label for that router.
+const VERSIONS = {};
 for (const [co, engines] of Object.entries(ENG)) {
   for (const [sc, [, , , dir]] of Object.entries(SCEN)) {
     if (dir) continue; // alias card — reads another scenario's files
@@ -172,6 +180,8 @@ for (const [co, engines] of Object.entries(ENG)) {
       cellsWritten += 1;
       const cellJson = JSON.parse(readFileSync(f, "utf8"));
       const env = cellJson.env ?? {};
+      const pkg = enginePkg(co, eng);
+      if (pkg && cellJson.version && !VERSIONS[pkg]) VERSIONS[pkg] = cellJson.version;
       if (Number.isFinite(cellJson.runs)) {
         minRuns = minRuns == null ? cellJson.runs : Math.min(minRuns, cellJson.runs);
         maxRuns = maxRuns == null ? cellJson.runs : Math.max(maxRuns, cellJson.runs);
@@ -219,7 +229,7 @@ if (!mEnv)
 else if (mEnv.commit && META.commit !== "unknown" && mEnv.commit !== META.commit)
   console.warn(`⚠ matcher-bench results epoch (${mEnv.commit}) ≠ browser cells epoch (${META.commit}) — wide/deep cards would mix epochs under one stamp; re-run matcher-bench (audit 07-18 K12/G1o).`);
 
-writeFileSync(`${HERE}/deck-data.json`, JSON.stringify({ META, DATA, GRID, SWEEP }, null, 0));
+writeFileSync(`${HERE}/deck-data.json`, JSON.stringify({ META, DATA, GRID, SWEEP, VERSIONS }, null, 0));
 // quick sanity print
 console.log("react active-links (sweep):", JSON.stringify(DATA.react["active-links"]));
 console.log("react GRID:", JSON.stringify(GRID.react));

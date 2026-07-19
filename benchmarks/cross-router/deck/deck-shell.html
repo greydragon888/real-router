@@ -167,7 +167,12 @@
 </div>
 
 <script>
-  const FIELD=[["React",[["@real-router/react","0.29.3"],["react-router","8.2.0"],["@tanstack/react-router","1.170.17"]]],["Vue",[["@real-router/vue","0.17.2"],["vue-router","5.1.0"],["@tanstack/vue-router","1.170.16"]]],["Solid",[["@real-router/solid","0.17.3"],["@solidjs/router","0.16.1"],["@tanstack/solid-router","1.170.17"]]],["Svelte",[["@real-router/svelte","0.16.3"],["sv-router","0.17.0"],["@mateothegreat/svelte5-router","2.16.19"]]],["Angular",[["@real-router/angular","0.14.2"],["@angular/router","22.0.6"]]]];
+  // FIELD = the "routers under test" panel: [cohort, [[npmName, seedVersion], …]]. The
+  // versions here are SEED/FALLBACK only — the live deck shows VERSIONS[npmName] (measured
+  // at run time, folded into deck-data by deck-extract) and falls back to the seed when a
+  // package has no stamped version yet (pre-version cells). Keep the seeds roughly current
+  // so a data-less rebuild isn't wildly stale, but the measured value is the source of truth.
+  const FIELD=[["React",[["@real-router/react","0.29.5"],["react-router","8.2.0"],["@tanstack/react-router","1.170.17"]]],["Vue",[["@real-router/vue","0.18.1"],["vue-router","5.1.0"],["@tanstack/vue-router","1.170.16"]]],["Solid",[["@real-router/solid","0.18.1"],["@solidjs/router","0.16.1"],["@tanstack/solid-router","1.170.17"]]],["Svelte",[["@real-router/svelte","0.16.5"],["sv-router","0.17.0"],["@mateothegreat/svelte5-router","2.16.19"]]],["Angular",[["@real-router/angular","0.16.2"],["@angular/router","22.0.6"]]]];
   const COHORTS=[["react","React"],["vue","Vue"],["solid","Solid"],["svelte","Svelte"],["angular","Angular"]];
   const GROUPS=[];
   const DATA=[];
@@ -213,7 +218,7 @@
     }
   }
   document.getElementById("grid").innerHTML=g+"</tbody>";
-  document.getElementById("field").innerHTML=FIELD.map(([f,rs])=>"<a class='fw' translate='no' href='#cohort-"+f.toLowerCase()+"'><div class='n'>"+f+"</div><div class='vs'>"+rs.map(([nm,ver])=>"<span"+(nm.startsWith("@real-router/")?" class='me'":"")+">"+nm+" <span class='ver'>"+ver+"</span></span>").join("<br>")+"</div></a>").join("");
+  document.getElementById("field").innerHTML=FIELD.map(([f,rs])=>"<a class='fw' translate='no' href='#cohort-"+f.toLowerCase()+"'><div class='n'>"+f+"</div><div class='vs'>"+rs.map(([nm,ver])=>{const v=(typeof VERSIONS!=="undefined"&&VERSIONS&&VERSIONS[nm])||ver;return "<span"+(nm.startsWith("@real-router/")?" class='me'":"")+">"+nm+" <span class='ver'>"+v+"</span></span>";}).join("<br>")+"</div></a>").join("");
   // O-10б: machine/provenance stamp from META (guarded — null/absent on the committed reference
   // deck → nothing renders; CI's fresh extract carries a real META and shows it + a G-3 disclaimer).
   // META.date = the write-moment of the first stamped cell (≈ matrix start, UTC day).

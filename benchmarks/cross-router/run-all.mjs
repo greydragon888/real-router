@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import { build, preview } from "vite";
 
+import { resolveEngineVersion } from "./harness/engine-versions.mjs";
 import { isKnownNA } from "./harness/known-na.mjs";
 import { measureInterleaved } from "./harness/measure.mjs";
 import { envStamp, freshnessGateAndProvenance } from "./harness/provenance.mjs";
@@ -131,6 +132,7 @@ const runScenario = async (framework, scenarioName, engineList) => {
       engine,
       framework,
       ...results[engine],
+      version: resolveEngineVersion(appRoot(here, framework, engine, scenarioName), framework, engine),
       env: envStamp(provenance),
     };
     if (writeCell(`${here}/results`, out, effRuns)) {

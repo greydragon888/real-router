@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { build, preview } from "vite";
 
+import { resolveEngineVersion } from "./harness/engine-versions.mjs";
 import { isKnownNA } from "./harness/known-na.mjs";
 import { measure } from "./harness/measure.mjs";
 import { envStamp, freshnessGateAndProvenance } from "./harness/provenance.mjs";
@@ -72,6 +73,7 @@ const out = {
   engine,
   framework,
   ...result,
+  version: resolveEngineVersion(root, framework, engine),
   env: envStamp(provenance),
 };
 
