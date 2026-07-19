@@ -4,7 +4,7 @@
     --ground:#f5f6f8;--surface:#fff;--ink:#14171d;--muted:#59616e;--faint:#8b939f;
     --accent:#2f3bd4;--accent-ink:#2530a8;--accent-soft:#e7e9fb;--hair:#e3e6ec;--hair2:#cfd4dd;
     --win:#1a7a47;--win-bg:#e8f3ec;--tie:#916013;--tie-bg:#f6eeda;--trail:#b23a2c;--trail-bg:#f8e8e5;
-    --sg:#2f9c62;--sy:#c99b3c;--sr:#cf5a4c;
+    --sg:#2f9c62;--sy:#facc15;--sr:#cf5a4c;
     --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
@@ -139,8 +139,8 @@
     <h1>real-router, against each popular router in <span class="hl">every framework</span>.</h1>
     <p class="lede">One core across five ecosystems, timed in a real browser from click to settled DOM — the same scenarios for every router.</p>
     <div class="readout">
-      <div class="stat"><div class="k">up to 13&times;</div><div class="l"><b>faster per navigation</b> — ahead on every click in all 5 ecosystems, far ahead on link-heavy pages</div></div>
-      <div class="stat"><div class="k">flat</div><div class="l"><b>constant-time route matching</b> — just as fast at 10 routes or 1,000+, while most rivals slow down</div></div>
+      <div class="stat"><div class="k">up to 11&times;</div><div class="l"><b>faster per navigation</b> — ahead or level on every click in all 5 ecosystems, far ahead on link-heavy pages</div></div>
+      <div class="stat"><div class="k">flat</div><div class="l"><b>constant-time route matching</b> — just as fast however wide the route table grows, while most rivals slow down</div></div>
       <div class="stat"><div class="k">5</div><div class="l"><b>ecosystems with a serious rival</b> — one framework-agnostic router, benchmarked head-to-head in each</div></div>
     </div>
     <div class="field-lab">routers under test, by ecosystem</div>
@@ -252,8 +252,9 @@
     }
     return d;
   }
-  function chart(p,ser,u,log){
+  function chart(p,ser,u,log,sw){
     const W=560,H=170,pl=8,pr=52,pt=16,pb=24,iw=W-pl-pr,ih=H-pt-pb;
+    const TIE="#facc15"; // tie colour for winner diamonds — kept in sync with the board's --sy (also #facc15) so table and chart speak ONE tie yellow. A bright, pure yellow, pushed well off the rival line's orange-brown (#c07b2e) so it stops merging into the curve; a winner diamond turns yellow at a tie point (per-point verdict "y" — rr within the margin of the fastest rival) + a thicker white halo (below) so it detaches from whatever line it sits on. (If --sy changes, change this too — SVG fill attributes can't read the CSS var.)
     const xa=i=>pl+(p.length===1?iw/2:iw*i/(p.length-1));
     let o="",ya;
     if(log){
@@ -294,7 +295,7 @@
       vals.forEach((v,i)=>{if(v==null||winIdx[i]===n)return;o+="<circle cx='"+xa(i).toFixed(1)+"' cy='"+ya(v).toFixed(1)+"' r='2.4' fill='"+SER[n]+"'/>";});}
     // pass 2b — winner node at each point, drawn last so it sits on top even at a near-tie (bold, white halo)
     for(const [n,vals] of ser){if(vals.every(v=>v==null))continue;const rr=n==="real-router";
-      vals.forEach((v,i)=>{if(v==null||winIdx[i]!==n)return;const cx=xa(i),cy=ya(v),d=6.4;o+="<path d='M"+cx.toFixed(1)+","+(cy-d).toFixed(1)+"L"+(cx+d).toFixed(1)+","+cy.toFixed(1)+"L"+cx.toFixed(1)+","+(cy+d).toFixed(1)+"L"+(cx-d).toFixed(1)+","+cy.toFixed(1)+"Z' fill='"+SER[n]+"' stroke='#fff' stroke-width='1.9' stroke-linejoin='round'/>";});}
+      vals.forEach((v,i)=>{if(v==null||winIdx[i]!==n)return;const cx=xa(i),cy=ya(v),d=6.4,tie=sw&&sw[i]&&sw[i][0]==="y";o+="<path d='M"+cx.toFixed(1)+","+(cy-d).toFixed(1)+"L"+(cx+d).toFixed(1)+","+cy.toFixed(1)+"L"+cx.toFixed(1)+","+(cy+d).toFixed(1)+"L"+(cx-d).toFixed(1)+","+cy.toFixed(1)+"Z' fill='"+(tie?TIE:SER[n])+"' stroke='#fff' stroke-width='"+(tie?2.7:1.9)+"' stroke-linejoin='round'/>";});}
     // endpoint labels
     for(const [n,vals] of ser){if(vals.every(v=>v==null))continue;const col=SER[n],rr=n==="real-router";
       let li=vals.length-1;while(li>=0&&vals[li]==null)li--;
@@ -306,9 +307,9 @@
   }
   const CHARTS=[];
   function swCard(s){
-    const id=CHARTS.length;CHARTS.push({p:s.p,ser:s.s,u:s.u,log:s.log});
+    const id=CHARTS.length;CHARTS.push({p:s.p,ser:s.s,u:s.u,log:s.log,sw:s.sw});
     const lg=s.s.filter(x=>x[1].some(v=>v!=null)).map(([n])=>"<span class='lgi' translate='no' data-s=\""+n+"\"><i style='background:"+SER[n]+"'></i>"+n+"</span>").join("")+"<span class='lghint'>click to isolate</span>";
-    return "<div class='card' data-chart='"+id+"'>"+head(s)+"<div class='chart'>"+chart(s.p,s.s,s.u,s.log)+"<div class='clgd'>"+lg+"</div></div><div class='why'>"+s.why+"</div></div>";
+    return "<div class='card' data-chart='"+id+"'>"+head(s)+"<div class='chart'>"+chart(s.p,s.s,s.u,s.log,s.sw)+"<div class='clgd'>"+lg+"</div></div><div class='why'>"+s.why+"</div></div>";
   }
   // translate="no": shield router/brand/framework names + code identifiers from machine
   // translation (Google Translate etc.) — else "real-router"→"настоящий роутер",
@@ -316,7 +317,7 @@
   const NO_TR=["@mateothegreat/svelte5-router","@tanstack/react-router","@tanstack/vue-router","@tanstack/solid-router","@solidjs/router","@angular/router","real-router","react-router","vue-router","solid-router","sv-router","mateo-router","TanStack","mateo","use:link","React","Vue","Solid","Svelte","Angular"].sort((a,b)=>b.length-a.length);
   const NT_RE=new RegExp("("+NO_TR.join("|")+")","g");
   function NT(h){return String(h).replace(/(<[^>]*>)|([^<]+)/g,(m,tag,txt)=>txt==null?m:txt.replace(NT_RE,"<span translate='no'>$1</span>"));}
-  function mk(sc,co){const m=SCEN[sc],o={t:m.t,k:sc,c:m.c,u:m.u,what:m.what,why:NT(why(sc,co))};if(m.kind==="sweep"){o.p=m.p;o.s=DATA[co][sc];}else{o.e=DATA[co][sc];}if(sc==="wide-config"||(sc==="deep-config"&&co!=="angular")){o.u="µs";o.log=1;}return o;}
+  function mk(sc,co){const m=SCEN[sc],o={t:m.t,k:sc,c:m.c,u:m.u,what:m.what,why:NT(why(sc,co))};if(m.kind==="sweep"){o.p=m.p;o.s=DATA[co][sc];o.sw=(SWEEP[co]&&SWEEP[co][sc])||null;}else{o.e=DATA[co][sc];}if(sc==="wide-config"||(sc==="deep-config"&&co!=="angular")){o.u="µs";o.log=1;}return o;}
   function tally(co){let g=0,y=0,r=0;for(const sc in GRID[co]){const c=GRID[co][sc][1];if(c==="g")g++;else if(c==="y")y++;else r++;}return g+" lead · "+y+" tie · "+r+" trail";}
   function cohortSection(co){const M=CO[co];
     const card=(sc)=>{const o=mk(sc,co);return SCEN[sc].kind==="sweep"?swCard(o):barCard(o);};
@@ -340,7 +341,7 @@
       const vis=d.ser.filter(([nm])=>!hidden.has(nm));
       if(!vis.length){hidden.delete(n);return;}
       lgi.classList.toggle("off",hidden.has(n));
-      cd.querySelector("svg").outerHTML=chart(d.p,vis,d.u,d.log);
+      cd.querySelector("svg").outerHTML=chart(d.p,vis,d.u,d.log,d.sw);
     }));
   });
   // point tooltip — one global element + event delegation (survives chart re-renders)
