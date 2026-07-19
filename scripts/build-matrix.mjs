@@ -60,7 +60,8 @@ export const K = 10;
  * 2.10.0 — but the fold-into-core waves below emptied that dep set.)
  *
  * Evolution: `type-guards` (the former sole `internal`-shard member) dissolved
- * into its consumer plugins (wave-2), emptying the internal shard. `engine`
+ * into its consumer plugins (wave-2), emptying the internal shard (since removed
+ * entirely from GROUP_NAMES / classify — no bare packages remain). `engine`
  * folded the former `path-matcher` + `search-params` + `route-tree` trio into
  * one bundled dep (engine-merge #1510), dropping the set from 8 to 6.
  * `event-emitter` then dissolved into core (`core/src/foundation/event-emitter`),
@@ -96,7 +97,6 @@ const GROUP_NAMES = [
   "ssr-plugin",
   "adapter-shared",
   "leaf",
-  "internal",
 ];
 
 /**
@@ -182,7 +182,7 @@ export function deriveMembership(dryRunJson) {
  * @param {string} pkg package name
  * @param {Map<string,string>} dirOf name→directory (from turbo)
  * @param {typeof defaultReaders} readers injectable fs accessors
- * @returns {'base'|'adapter'|'url-plugin'|'ssr-plugin'|'adapter-shared'|'leaf'|'internal'}
+ * @returns {'base'|'adapter'|'url-plugin'|'ssr-plugin'|'adapter-shared'|'leaf'}
  */
 export function classify(pkg, dirOf, readers = defaultReaders) {
   if (CORE_LAYER.has(pkg)) return "base";
@@ -211,13 +211,12 @@ export function classify(pkg, dirOf, readers = defaultReaders) {
   // route-utils/sources fan out to all 6 adapters — their own shard.
   if (pkg === "@real-router/sources" || pkg === "@real-router/route-utils")
     return "adapter-shared";
-  // Internal shard — bare (non-@real-router/) packages/* with no consumer home.
-  // EMPTY since wave-2: type-guards dissolved into its consumer plugins; the
-  // former bare browser-env / dom-utils were retired with the shared test node
-  // (#1065/#1086); the bare `engine` folded into core as core/src/engine
-  // (engine-merge iteration 2). No bare packages remain today.
-  if (!pkg.startsWith("@real-router/")) return "internal";
-  // depends only on core/types/logger.
+  // Everything else is a leaf — depends only on core (+ its /types, /validation,
+  // /api subpaths). There is no separate "internal" shard for bare
+  // (non-@real-router/) packages anymore: type-guards dissolved into its
+  // consumers (wave-2), the shared browser-env / dom-utils were retired
+  // (#1065/#1086), and `engine` folded into core/src/engine (engine-merge
+  // iteration 2) — no bare packages remain. A future bare package would fall here.
   return "leaf";
 }
 

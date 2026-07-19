@@ -8,12 +8,13 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets — now 1/6/3/2/2/8/0 = 22 after the
+//     reproduce the companion §C buckets — now 1/6/3/2/2/8 = 22 after the
 //     foundation dissolutions (event-emitter + logger in wave-1; type-guards +
 //     the @real-router/types fold into core in wave-2; @real-router/fsm's frozen
 //     shell deleted in wave-3; engine folded into core/src/engine, engine-merge
-//     iteration 2); §C's original master figure was 6/6/3/2/2/8/1 =
-//     28 — plus synthetic
+//     iteration 2 — and the then-empty `internal` bucket dropped from
+//     GROUP_NAMES, so 6 buckets now, not 7); §C's original master figure was
+//     6/6/3/2/2/8/1 = 28 — plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
 // Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.
@@ -78,7 +79,6 @@ const LEAVES = [
   "logger-plugin",
   "persistent-params-plugin",
 ].map((p) => `@real-router/${p}`);
-const INTERNAL = [];
 
 // ─── Level 1 — affected derivation (A5, the load-bearing invariant) ──────────
 
@@ -182,7 +182,7 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 1/6/3/2/2/8/0 = 22", () => {
+test("L2: classify() buckets all real packages/* exactly 1/6/3/2/2/8 = 22", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
@@ -208,7 +208,6 @@ test("L2: each named package lands in its expected bucket", () => {
   for (const p of SSR_PLUGINS) expect(p, "ssr-plugin");
   for (const p of ADAPTER_SHARED) expect(p, "adapter-shared");
   for (const p of LEAVES) expect(p, "leaf");
-  for (const p of INTERNAL) expect(p, "internal");
 });
 
 // ─── Level 2 — classify() edge cases via injected readers (no disk/turbo) ────
@@ -430,7 +429,7 @@ test("routing: a multi-package edit WITHOUT a shared source stays leaf (≤ K)",
 
 test("routing: sharded matrix — adapter shards + non-empty groups only, empties omitted", () => {
   // Synthetic >K non-core set exercising the sharded matrix shape: 6 adapters +
-  // 2 adapter-shared + 3 url-plugins = 11 > K. ssr-plugin/leaf/internal stay
+  // 2 adapter-shared + 3 url-plugins = 11 > K. ssr-plugin/leaf stay
   // empty and must NOT spawn runners; base is a separate job, never a shard.
   const affected = [...ADAPTERS, ...ADAPTER_SHARED, ...URL_PLUGINS]; // 11
   const { mode, matrix } = buildPlan(affected, realDirOf);
@@ -440,7 +439,7 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
     assert.ok(names.includes(a), a);
   assert.ok(names.includes("adapter-shared"));
   assert.ok(names.includes("url-plugin"));
-  for (const empty of ["ssr-plugin", "leaf", "internal", "base"]) {
+  for (const empty of ["ssr-plugin", "leaf", "base"]) {
     assert.ok(
       !names.includes(empty),
       `empty/base group ${empty} leaked into matrix`,
@@ -460,12 +459,9 @@ test("routing: full rebuild (all 22) → base excluded, 10 shards", () => {
   const names = matrix.include.map((i) => i.name);
   assert.ok(!names.includes("base"), "base is a separate job, never a shard");
   // 6 adapters + url-plugin + ssr-plugin + adapter-shared + leaf.
-  // (The `internal` group is empty since wave-2 dissolved type-guards — its
-  // sole member — so it no longer produces a shard; see the L2 buckets test.)
   for (const g of ["url-plugin", "ssr-plugin", "adapter-shared", "leaf"]) {
     assert.ok(names.includes(g), g);
   }
-  assert.ok(!names.includes("internal"), "internal group is empty → no shard");
   assert.equal(matrix.include.length, 10);
 });
 

@@ -15,15 +15,11 @@ export const TYPES = [
 
 export const SCOPES = [
   "core",
-  "path-matcher",
-  "route-tree",
-  "search-params",
   "browser-env",
   "helpers",
   "browser-plugin",
   "hash-plugin",
   "lifecycle-plugin",
-  "logger",
   "logger-plugin",
   "persistent-params-plugin",
   "ssr-data-plugin",
@@ -41,7 +37,6 @@ export const SCOPES = [
   "svelte",
   "angular",
   "rx",
-  "event-emitter",
   "route-utils",
   "sources",
   "dom-utils",

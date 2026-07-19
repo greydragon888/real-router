@@ -26,10 +26,7 @@ export default {
   scopeOverrides: {
     fix: [
       "core",
-      "route-tree",
-      "search-params",
       "helpers",
-      "logger",
       "browser-plugin",
       "logger-plugin",
       "persistent-params-plugin",
