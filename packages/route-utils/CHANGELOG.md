@@ -1,5 +1,17 @@
 # @real-router/route-utils
 
+## 0.3.0
+
+### Minor Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Depend on `@real-router/core` as a peer and source types from it ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  `route-utils` previously took a direct dependency on the standalone `@real-router/types`
+  package. With types folded into `@real-router/core` (wave-2), it now declares
+  `@real-router/core` as a **peer** dependency (`workspace:>=0.1.0`) and imports its types from
+  `@real-router/core`. Consumers must have `@real-router/core` installed (they already do in
+  practice — `route-utils` is only useful alongside a router).
+
 ## 0.2.8
 
 ### Patch Changes

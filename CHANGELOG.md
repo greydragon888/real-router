@@ -5,6 +5,315 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-19]
+
+### @real-router/core@0.78.0
+
+### Minor Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Fold `@real-router/types` into `@real-router/core` ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The standalone `@real-router/types` package is dissolved: its types now ship **with**
+  `@real-router/core`. Import them from the package root (`import type { State, Params } from
+"@real-router/core"`), and augment typed `state.context` namespaces via the new
+  `@real-router/core/types` subpath:
+
+  ```ts
+  declare module "@real-router/core/types" {
+    interface StateContext {
+      myPlugin: { … };
+    }
+  }
+  ```
+
+  **Breaking for external augmentors:** retarget `declare module "@real-router/types"` →
+  `declare module "@real-router/core/types"`. Note the root exports the `Router` / `RouterError`
+  **classes**; import the `Router` **interface** (e.g. for typing a `PluginFactory` param) from
+  `@real-router/core/types`. Folding types into core also ties their identity to the core
+  version, eliminating the two-copies / split-brain-augmentation drift class.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the unused public `Config` type ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The `Config` interface (exported from `@real-router/core/types`) is removed. It was a
+  vestigial public export consumed by nothing — not `@real-router/core` internally, and not
+  a single adapter, plugin, or example across the monorepo — and merely duplicated four
+  fields of the internal `RouteConfig` (which additionally carries `forwardFnMap`).
+
+  **Breaking only for external code that imported `Config` from `@real-router/core/types`.**
+  There is no public replacement: the per-route config shape (decoders / encoders /
+  `defaultParams` / `forwardMap`) is an internal concern with no supported public type.
+  Nothing needs it — the export never had a consumer.
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal: fold the FSM engine and the `event-emitter` primitive into `@real-router/core` at `src/foundation/` — no public API or behavior change. ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  `event-emitter` (private) is dissolved and its package removed. `@real-router/fsm` (published to npm by mistake, unpublish blocked) is frozen and no longer a dependency of core — core now builds its router state machine on an in-tree copy, so consumers no longer receive `@real-router/fsm` as a transitive dependency.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Dissolve `@real-router/logger` into core as a per-router `RouterLogger` ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The standalone `@real-router/logger` package has been folded into `@real-router/core`
+  (`core/src/foundation/logger/`). The former process-global **singleton** logger is
+  replaced by a **per-router `RouterLogger` instance**, built from `options.logger` in the
+  `Router` constructor and stored on the router's internal context. So
+  `createRouter(routes, { logger })` now configures **only that router's** logger and its
+  `configure()` no longer leaks across routers (previously the last `createRouter` /
+  `cloneRouter` in the process won). The public API is unchanged — the `options.logger`
+  shape and the `log` / `warn` / `error` / callback semantics are identical, and
+  `RouterLogger` still writes to `console`.
+
+  The `@real-router/logger` package is deleted and is no longer a (transitive) dependency of
+  `@real-router/core`. The logger contract types (`RouterLogger`, `LoggerConfig`, `LogLevel`,
+  `LogLevelConfig`, `LogCallback`) now live in `@real-router/types` and are re-exported from
+  `@real-router/core`.
+
+### @real-router/route-utils@0.3.0
+
+### Minor Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Depend on `@real-router/core` as a peer and source types from it ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  `route-utils` previously took a direct dependency on the standalone `@real-router/types`
+  package. With types folded into `@real-router/core` (wave-2), it now declares
+  `@real-router/core` as a **peer** dependency (`workspace:>=0.1.0`) and imports its types from
+  `@real-router/core`. Consumers must have `@real-router/core` installed (they already do in
+  practice — `route-utils` is only useful alongside a router).
+
+### @real-router/angular@0.16.2
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+  - @real-router/route-utils@0.3.0
+  - @real-router/sources@0.12.1
+
+### @real-router/browser-plugin@0.18.22
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source the `isState` re-export from the local browser-env state guard ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The `isStateStrict as isState` re-export now comes from `shared/browser-env/state-guard.ts` (a byte-identical twin) instead of the dissolved `type-guards` package. Internal refactor — the public `isState` export and its `history.state` validation behaviour are unchanged.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/hash-plugin@0.8.21
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source the `isState` re-export from the local browser-env state guard ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The `isStateStrict as isState` re-export now comes from `shared/browser-env/state-guard.ts` (a byte-identical twin) instead of the dissolved `type-guards` package. Internal refactor — the public `isState` export and its `history.state` validation behaviour are unchanged.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/lifecycle-plugin@0.7.2
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/logger-plugin@0.5.32
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/memory-plugin@0.4.29
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/navigation-plugin@0.7.31
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Bundle the browser-env state guard directly (dissolved `type-guards`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The symlinked `shared/browser-env` now carries `isStateStrict` as a local `state-guard.ts` twin, so navigation-plugin no longer force-bundles the dissolved `type-guards` package. Internal refactor — no public API or runtime-behaviour change.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/persistent-params-plugin@0.2.32
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Inline `isPrimitiveValue` locally ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The `isPrimitiveValue` helper now lives in `src/is-primitive-value.ts` instead of the dissolved `type-guards` package. Internal refactor — no public API or validation-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/preact@0.17.1
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+  - @real-router/route-utils@0.3.0
+  - @real-router/sources@0.12.1
+
+### @real-router/preload-plugin@0.6.22
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/react@0.29.5
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+  - @real-router/route-utils@0.3.0
+  - @real-router/sources@0.12.1
+
+### @real-router/rsc-server-plugin@0.2.14
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+### @real-router/rx@0.3.33
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/search-schema-plugin@0.4.20
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/solid@0.18.1
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+  - @real-router/route-utils@0.3.0
+  - @real-router/sources@0.12.1
+
+### @real-router/sources@0.12.1
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+  - @real-router/route-utils@0.3.0
+
+### @real-router/ssr-data-plugin@0.4.14
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+### @real-router/svelte@0.16.5
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+  - @real-router/route-utils@0.3.0
+  - @real-router/sources@0.12.1
+
+### @real-router/validation-plugin@0.12.3
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the `@real-router/logger` dependency ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The standalone `@real-router/logger` package was dissolved into `@real-router/core`. The
+  plugin's threshold/overwrite validators now emit through the router's per-instance logger
+  (injected via `ctx.logger` in `buildValidatorObject`) instead of the former process-global
+  singleton, and `@real-router/logger` is removed from the plugin's dependencies. No public
+  API or behavior change — the `RouterValidator` surface core calls into is unchanged.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Absorb the dissolved `type-guards` package into `src/type-guards/` ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The former private `type-guards` package was dissolved into its consumers. validation-plugin now owns the guards it used (`getTypeDescription`, `isString`, `isBoolean`, `isObjKey`, `isParams`, `isState`, `isNavigationOptions`, `validateRouteName`) as a local `src/type-guards/` subtree behind a barrel. Internal refactor — no public API or behaviour change.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Source types from `@real-router/core` (was the now-folded `@real-router/types`) ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  Type imports move `@real-router/types` → `@real-router/core`, and the `StateContext`
+  module augmentation retargets `declare module "@real-router/types"` → `"@real-router/core/types"`
+  (wave-2 fold). Internal repackaging — no public API or runtime-behaviour change.
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+
+### @real-router/vue@0.18.1
+
+### Patch Changes
+
+- Updated dependencies [[`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122), [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122)]:
+  - @real-router/core@0.78.0
+  - @real-router/route-utils@0.3.0
+  - @real-router/sources@0.12.1
+
 ## [2026-07-18]
 
 ### @real-router/angular@0.16.1

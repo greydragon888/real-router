@@ -1,5 +1,65 @@
 # @real-router/core
 
+## 0.78.0
+
+### Minor Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Fold `@real-router/types` into `@real-router/core` ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The standalone `@real-router/types` package is dissolved: its types now ship **with**
+  `@real-router/core`. Import them from the package root (`import type { State, Params } from
+"@real-router/core"`), and augment typed `state.context` namespaces via the new
+  `@real-router/core/types` subpath:
+
+  ```ts
+  declare module "@real-router/core/types" {
+    interface StateContext {
+      myPlugin: { … };
+    }
+  }
+  ```
+
+  **Breaking for external augmentors:** retarget `declare module "@real-router/types"` →
+  `declare module "@real-router/core/types"`. Note the root exports the `Router` / `RouterError`
+  **classes**; import the `Router` **interface** (e.g. for typing a `PluginFactory` param) from
+  `@real-router/core/types`. Folding types into core also ties their identity to the core
+  version, eliminating the two-copies / split-brain-augmentation drift class.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the unused public `Config` type ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The `Config` interface (exported from `@real-router/core/types`) is removed. It was a
+  vestigial public export consumed by nothing — not `@real-router/core` internally, and not
+  a single adapter, plugin, or example across the monorepo — and merely duplicated four
+  fields of the internal `RouteConfig` (which additionally carries `forwardFnMap`).
+
+  **Breaking only for external code that imported `Config` from `@real-router/core/types`.**
+  There is no public replacement: the per-route config shape (decoders / encoders /
+  `defaultParams` / `forwardMap`) is an internal concern with no supported public type.
+  Nothing needs it — the export never had a consumer.
+
+### Patch Changes
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal: fold the FSM engine and the `event-emitter` primitive into `@real-router/core` at `src/foundation/` — no public API or behavior change. ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  `event-emitter` (private) is dissolved and its package removed. `@real-router/fsm` (published to npm by mistake, unpublish blocked) is frozen and no longer a dependency of core — core now builds its router state machine on an in-tree copy, so consumers no longer receive `@real-router/fsm` as a transitive dependency.
+
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Dissolve `@real-router/logger` into core as a per-router `RouterLogger` ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+
+  The standalone `@real-router/logger` package has been folded into `@real-router/core`
+  (`core/src/foundation/logger/`). The former process-global **singleton** logger is
+  replaced by a **per-router `RouterLogger` instance**, built from `options.logger` in the
+  `Router` constructor and stored on the router's internal context. So
+  `createRouter(routes, { logger })` now configures **only that router's** logger and its
+  `configure()` no longer leaks across routers (previously the last `createRouter` /
+  `cloneRouter` in the process won). The public API is unchanged — the `options.logger`
+  shape and the `log` / `warn` / `error` / callback semantics are identical, and
+  `RouterLogger` still writes to `console`.
+
+  The `@real-router/logger` package is deleted and is no longer a (transitive) dependency of
+  `@real-router/core`. The logger contract types (`RouterLogger`, `LoggerConfig`, `LogLevel`,
+  `LogLevelConfig`, `LogCallback`) now live in `@real-router/types` and are re-exported from
+  `@real-router/core`.
+
 ## 0.77.4
 
 ### Patch Changes
