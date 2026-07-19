@@ -643,40 +643,45 @@ export async function run(): Promise<void> {
       url: deepPath(10),
     },
     {
+      // Was `matchPath/constraints` (5 regex-constrained params). M1 removed
+      // regex constraints — matching a plain 5-param path carries no per-segment
+      // validation cost, so this now pins the multi-param capture path itself.
       batch: 256,
-      name: "matchPath/constraints",
-      routes: [
-        {
-          name: "r",
-          path: String.raw`/a/:p1<\d+>/:p2<[a-z]+>/:p3<\d+>/:p4<[a-z]+>/:p5<\d+>`,
-        },
-      ],
+      name: "matchPath/params-5",
+      routes: [{ name: "r", path: "/a/:p1/:p2/:p3/:p4/:p5" }],
       start: "/a/1/abc/2/def/3",
       url: "/a/1/abc/2/def/3",
     },
     {
+      // Was `matchPath/constraints-uuid` (a UUID regex constraint). M1 removed
+      // constraints; a plain `:id` captures the UUID-length value with no regex
+      // check — pins the single-param, long-value capture cost.
       batch: 384,
-      name: "matchPath/constraints-uuid",
-      routes: [
-        {
-          name: "entity",
-          path: "/entities/:id<[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}>",
-        },
-      ],
+      name: "matchPath/param-long-value",
+      routes: [{ name: "entity", path: "/entities/:id" }],
       start: "/entities/550e8400-e29b-41d4-a716-446655440000",
       url: "/entities/550e8400-e29b-41d4-a716-446655440000",
     },
     {
+      // M1 replaced optional params (`/profiles/:id?`) with two sibling routes.
+      // These two pin the cost of matching the DEEP vs the SHALLOW sibling of
+      // such a pair (the former optional-present / optional-absent cases).
       batch: 512,
-      name: "matchPath/optional-present",
-      routes: [{ name: "profile", path: "/profiles/:id?" }],
+      name: "matchPath/sibling-deep",
+      routes: [
+        { name: "profiles", path: "/profiles" },
+        { name: "profile", path: "/profiles/:id" },
+      ],
       start: "/profiles",
       url: "/profiles/456",
     },
     {
       batch: 512,
-      name: "matchPath/optional-absent",
-      routes: [{ name: "profile", path: "/profiles/:id?" }],
+      name: "matchPath/sibling-shallow",
+      routes: [
+        { name: "profiles", path: "/profiles" },
+        { name: "profile", path: "/profiles/:id" },
+      ],
       start: "/profiles/seed",
       url: "/profiles",
     },

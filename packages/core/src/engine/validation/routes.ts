@@ -1,12 +1,11 @@
 import {
   buildParamMeta,
+  describeRemovedForm,
   findSegmentGrammarError,
-  hasMultipleOptionalsBeforeSplat,
   INVALID_QUERY_NAME_RGX,
-  isConstraintBalanced,
 } from "../path-matcher";
 
-import type { SegmentErrorCode } from "../path-matcher";
+import type { RemovedForm, SegmentErrorCode } from "../path-matcher";
 import type { RouteTree } from "../types";
 
 /**
@@ -19,36 +18,6 @@ import type { RouteTree } from "../types";
  */
 function createRouterError(methodName: string, message: string): TypeError {
   return new TypeError(`[router.${methodName}] ${message}`);
-}
-
-/**
- * Validates constraint-delimiter `<...>` syntax: delimiters must be balanced
- * (#749) and the body non-empty (#804). An unbalanced `<`/`>` truncates the
- * param name and leaves the constraint as a trie literal (`buildPath` then
- * throws `Missing required param`); an empty `<>` compiles to a never-matching
- * `^()$`. `isConstraintBalanced` is path-matcher's single balance predicate,
- * which also backstops both at `registerTree` — this gate adds the
- * route-contextual message. Extracted so `validateRoutePath` stays within the
- * cognitive-complexity budget.
- */
-function validateConstraintSyntax(
-  path: string,
-  routeName: string,
-  methodName: string,
-): void {
-  if (!isConstraintBalanced(path)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": unbalanced constraint delimiter ('<' or '>') in "${path}"`,
-    );
-  }
-
-  if (path.includes("<>")) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": empty constraint '<>' in "${path}" (a constraint body must be non-empty, e.g. '<[0-9]+>')`,
-    );
-  }
 }
 
 /**
@@ -86,11 +55,13 @@ function validateUniqueParamNames(
 
 /**
  * #1242 §5.1/§5.3: rejects a malformed query-param declaration — a query name
- * carrying `<`/`>` (a constraint leaked in via a reverse-order modifier typo
- * `:id?<c>`), or one that collides with a path-param name (`/a/:tab?tab`, where
- * buildPath emits the value twice). Narrow to `<>`: a `=` in the declaration
- * (`?tab=1`, §5.2) is tolerated today and left as a separate call. path-matcher's
- * `registerTree` backstops both; this gate adds the route-contextual message.
+ * carrying `<`/`>` (`/a?fil<ter` — a `<` in a plain query tail; never round-trips),
+ * or one that collides with a path-param name (`/a/:tab?tab`, where buildPath emits
+ * the value twice). Narrow to `<>`: a `=` in the declaration (`?tab=1`, §5.2) is
+ * tolerated today and left as a separate call. (Under M1 a reverse-order typo
+ * `/a/:b?<c>` is caught earlier as optional-removed — the `?<` keeps it in the
+ * path, §3.3.) path-matcher's `registerTree` backstops both; this gate adds the
+ * route-contextual message.
  */
 function validateQueryParamDeclarations(
   urlParams: readonly string[],
@@ -105,7 +76,7 @@ function validateQueryParamDeclarations(
     if (INVALID_QUERY_NAME_RGX.test(name)) {
       throw createRouterError(
         methodName,
-        `Invalid path for route "${routeName}": invalid query-param name "${name}" in "${path}" (a query-param name cannot contain '<' or '>' — a reverse-order modifier typo that leaked a constraint into the query; put the optional '?' after the constraint, ':id<...>?')`,
+        `Invalid path for route "${routeName}": invalid query-param name "${name}" in "${path}" (a query-param name cannot contain '<' or '>' — it would never round-trip; rename the query param)`,
       );
     }
 
@@ -124,28 +95,15 @@ function validateQueryParamDeclarations(
  * (`#scanPath`) and compares static trie keys raw, so such a route registers but
  * is unmatchable — `buildPath` emits `/café`, which its own `match` rejects. Only
  * static text is flagged: a marker-led segment (`:café`, a non-ASCII param NAME)
- * and a constraint body (`:id<[а-я]+>`, matched against the DECODED value) are
- * skipped. A `for…of` code-point scan tracking segment start + constraint depth
- * (constraints may contain `/`, so no split).
+ * is skipped. A `for…of` code-point scan tracking segment start. Runs AFTER the
+ * removed-form / grammar rejections, so no `<`/`>` (a former constraint) can
+ * reach it — the 3-token grammar has no constraint body to skip (M1, #1516).
  */
 function hasNonAsciiStatic(path: string): boolean {
   let atSegmentStart = true;
   let segmentIsMarker = false;
-  let inConstraint = false;
 
   for (const char of path) {
-    if (inConstraint) {
-      inConstraint = char !== ">";
-
-      continue;
-    }
-
-    if (char === "<") {
-      inConstraint = true;
-
-      continue;
-    }
-
     if (char === "/") {
       atSegmentStart = true;
 
@@ -167,83 +125,13 @@ function hasNonAsciiStatic(path: string): boolean {
 }
 
 /**
- * Reports whether a path has an UNCONSTRAINED optional param directly before a
- * splat (`/:v?/*rest`, #1264). Without a constraint there is no validity signal to
- * disambiguate "take the optional" from "let the splat capture" — every
- * multi-segment value has two readings, so support would silently reshape half the
- * input space. Rejected with a hint (product decision); a CONSTRAINED
- * optional→splat (`/:v<c>?/*rest`) IS supported. path-matcher backstops at
- * `registerTree`; this gate adds the route-contextual message.
- *
- * A linear scan (constraints may contain
- * `/`, so no split/regex): an optional marker `?` whose preceding char is NOT `>`
- * (a constrained optional ends `<…>?`) and which is immediately followed by `/*`.
- * A `?` inside a constraint (`<\d?>`) is followed by `>`, not `/*`, so it is not
- * flagged.
- */
-function hasUnconstrainedOptionalBeforeSplat(path: string): boolean {
-  for (let i = 1; i < path.length; i++) {
-    if (
-      path[i] === "?" &&
-      path[i - 1] !== ">" &&
-      path[i + 1] === "/" &&
-      path[i + 2] === "*"
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * Rejects an optional param placed directly before a splat, in both shapes: TWO
- * optionals (`/:a?/:b?/*rest`, #1287 — one trie slot carries a single fork) and a
- * single UNCONSTRAINED optional (`/:v?/*rest`, #1264 — no validity signal to
- * disambiguate take-vs-skip). Both silently reshape multi-segment input.
- *
- * #1287 is checked FIRST — matching the backstop, which runs
- * `hasMultipleOptionalsBeforeSplat` in `registerNode` BEFORE `markOptionalFork`'s
- * unconstrained-splat throw. A path that triggers BOTH (`/:a?/:b?/*rest`: two
- * optionals, the inner one unconstrained before the splat) therefore reports the
- * #1287 reason on the gate AND the backstop — not #1264 on the gate and #1287 on the
- * backstop (a reject-reason divergence the parity property, which checks only the
- * boolean, would miss). #1287's "split / drop the '?'" is the actionable fix; the
- * #1264 "add a constraint" hint is a dead end here — `/:a<c>?/:b<c>?/*rest` is still
- * rejected by #1287. Only `hasMultipleOptionalsBeforeSplat` is single-sourced from
- * `parseSegment.ts` (shared with the backstop, can't drift by construction);
- * `hasUnconstrainedOptionalBeforeSplat` is a gate-local char-scan backstopped
- * separately by `throwUnconstrainedOptionalSplat`. This adds the route-contextual message.
- */
-function validateOptionalBeforeSplat(
-  pathPattern: string,
-  routeName: string,
-  path: string,
-  methodName: string,
-): void {
-  if (hasMultipleOptionalsBeforeSplat(pathPattern)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": two optional params directly before a splat are not supported in "${path}" — a single trie slot carries one optional→splat fork, so the omit-outer/take-inner form would silently reshape into the splat. Split into two routes, or drop the '?' on one`,
-    );
-  }
-
-  if (hasUnconstrainedOptionalBeforeSplat(pathPattern)) {
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": an unconstrained optional param before a splat is not supported in "${path}" — it is ambiguous (every multi-segment value has two readings). Add a constraint (e.g. ':lang<[a-z]+>?') or model it as two routes`,
-    );
-  }
-}
-
-/**
- * Maps a per-segment grammar error code (from `findSegmentGrammarError`) to the
- * gate's route-contextual message. The messages are the ones the removed per-check
- * scans threw, verbatim (#1324). `trailing-marker` reuses the name-less message —
- * the gate previously lumped `:y*` there via `EMPTY_PARAM_MARKER_RGX`.
+ * Maps a SURVIVING per-segment grammar error code (from `findSegmentGrammarError`)
+ * to the gate's route-contextual message. The removed-form codes (`optional-removed`
+ * / `constraint-removed`) are NOT handled here — they carry a richer replacement
+ * recipe built by `removedFormMessage` from `describeRemovedForm`.
  */
 function gateGrammarMessage(
-  code: SegmentErrorCode,
+  code: Exclude<SegmentErrorCode, "optional-removed" | "constraint-removed">,
   routeName: string,
   path: string,
 ): string {
@@ -255,53 +143,22 @@ function gateGrammarMessage(
     case "fused-marker": {
       return `Invalid path for route "${routeName}": parameter marker (':' or '*') must begin a segment, but "${path}" fuses one to a static prefix (use a boundary marker like "/a/:b")`;
     }
-    case "fused-constraint-suffix": {
-      return `Invalid path for route "${routeName}": text fused to a constraint '>' in "${path}" (a '<...>' must end its segment or be followed by '/' or an optional '?' — use "/:id<...>/rest", not "/:id<...>rest")`;
-    }
-    case "constraint-in-static": {
-      return `Invalid path for route "${routeName}": constraint '<...>' in a static segment in "${path}" (a '<...>' must follow a parameter marker ':' or '*' — attach it to a param like "/:id<...>", or drop it)`;
-    }
-    case "optional-splat": {
-      return `Invalid path for route "${routeName}": optional splat ('*name?') is not supported in "${path}" — a splat cannot be optional (use a required splat '*name')`;
-    }
-    /* v8 ignore start -- unbalanced/empty `<>` are pre-rejected by validateConstraintSyntax above; unreachable here */
-    case "unbalanced-constraint":
-    case "empty-constraint": {
-      return `Invalid path for route "${routeName}": invalid constraint in "${path}"`;
-    }
-    /* v8 ignore stop */
   }
 }
 
 /**
- * Calls `buildParamMeta`, re-throwing ITS own errors as the gate's
- * route-contextual `TypeError`. `buildParamMeta` compiles each constraint body to
- * a `RegExp`, so an invalid body — `<*x>`, `<(>`, `<[>` (balanced and non-empty, so
- * `validateConstraintSyntax` above lets it through, but not a valid regular
- * expression, path-matcher #1324) — throws a plain `Error` (`[buildParamMeta] …`)
- * there. Without this wrapper that single malformed class would escape the gate's
- * `[router.<method>]` contract with no route context — the one input the gate
- * rejected inconsistently with every other malformed path. path-matcher backstops
- * the same body at `registerTree`; this keeps the gate's message shape uniform.
+ * Builds the route-contextual replacement recipe for a removed form (M1) — the
+ * RICH tier (the matcher backstop uses a shorter, path-free recipe). For an
+ * optional it names the offending segment and the two concrete sibling paths that
+ * replace it (computed from the actual path by `describeRemovedForm`); for a
+ * constraint it names the offending segment and points to a guard.
  */
-function safeBuildParamMeta(
-  path: string,
-  routeName: string,
-  methodName: string,
-): ReturnType<typeof buildParamMeta> {
-  try {
-    return buildParamMeta(path);
-  } catch (error) {
-    /* v8 ignore start -- `buildParamMeta` always throws an `Error`; the `String()` arm is an unreachable defensive narrow for the `unknown` catch binding */
-    const raw = error instanceof Error ? error.message : String(error);
-    /* v8 ignore stop */
-    const detail = raw.replace(/^\[buildParamMeta] /, "");
-
-    throw createRouterError(
-      methodName,
-      `Invalid path for route "${routeName}": ${detail} (in "${path}")`,
-    );
+function removedFormMessage(removed: RemovedForm, routeName: string): string {
+  if (removed.code === "optional-removed") {
+    return `Invalid path for route "${routeName}": optional params are not supported — "${removed.segment}". Declare two sibling routes instead: "${removed.withoutSegment}" and "${removed.requiredForm}" (the route hierarchy already expresses optionality)`;
   }
+
+  return `Invalid path for route "${routeName}": regex constraints are not supported — '<' and '>' are reserved in path segments ("${removed.segment}"). Match the segment as a plain string and validate the value in a guard (canActivate) or app code`;
 }
 
 /**
@@ -339,9 +196,10 @@ function safeBuildParamMeta(
  * validateRoutePath("~dash", "dash", "add", paramParent);           // throws (~ under parameterized parent)
  */
 // A format-validation gate: a flat sequence of INDEPENDENT guard clauses (type,
-// whitespace, format, double-slash, constraint syntax, name-less / fused /
-// optional-splat / unconstrained-opt-before-splat markers, absolute-under-param).
-// Each is a simple early throw; extracting them would only scatter one checklist.
+// whitespace, format, double-slash, dup-param, query-decl, the M1 removed-form
+// recipe, surviving grammar markers (name-less / fused / trailing), non-ASCII
+// static, absolute-under-param). Each is a simple early throw; extracting them
+// would only scatter one checklist.
 
 export function validateRoutePath(
   path: unknown,
@@ -397,28 +255,17 @@ export function validateRoutePath(
     );
   }
 
-  // Constraint delimiter syntax: balanced (#749) and non-empty (#804). Both
-  // desync match vs build downstream; path-matcher backstops them at
-  // `registerTree`. Extracted to a helper to keep this function within the
-  // cognitive-complexity budget.
-  validateConstraintSyntax(path, routeName, methodName);
-
-  // Both marker checks below scan only the URL-path portion: `buildParamMeta`
+  // The grammar checks below scan only the URL-path portion: `buildParamMeta`
   // strips the query the same way the trie does, so a `:`/`*` inside a query
-  // declaration is not falsely flagged. Wrapped so an invalid-regex constraint
-  // body (`<*x>`) — which `buildParamMeta`'s RegExp compile throws on — surfaces as
-  // this gate's route-contextual `TypeError`, not a bare `[buildParamMeta]` Error.
-  const { pathPattern, urlParams, queryParams } = safeBuildParamMeta(
-    path,
-    routeName,
-    methodName,
-  );
+  // declaration is not falsely flagged. (`buildParamMeta` is total — the 3-token
+  // grammar has no constraint body to compile, so it never throws — M1, #1516.)
+  const { pathPattern, urlParams, queryParams } = buildParamMeta(path);
 
   // Duplicate param name within this route's own path (`/:id/:id`, `/:x/*x`, #1151).
   validateUniqueParamNames(urlParams, routeName, methodName, path);
 
   // Malformed query-param declarations (#1242 §5.1/§5.2/§5.3): a query name with
-  // `<>=&?#/`, or one that collides with a path-param name.
+  // `<>`, or one that collides with a path-param name.
   validateQueryParamDeclarations(
     urlParams,
     queryParams,
@@ -427,26 +274,36 @@ export function validateRoutePath(
     path,
   );
 
-  // Per-segment grammar rejections via the canonical `parseSegment` tokenizer
-  // (#1324): `findSegmentGrammarError` runs the same split+parse the matcher uses,
-  // so the gate cannot drift. Replaces the five per-check scans (name-less
-  // #858/#863, fused-marker #1050, fused-constraint-suffix #1150,
-  // constraint-in-static #1311, optional-splat #1149) and adds the trailing-marker
-  // case (`:y*`, previously mis-diagnosed as name-less). Unbalanced/empty `<>` are
-  // pre-rejected by validateConstraintSyntax above, so those codes never reach here.
+  // Removed-form (M1) rejection first — a `:x?` optional or a `<re>` constraint —
+  // with the RICH route-contextual replacement recipe (the offending segment plus,
+  // for an optional, the two computed sibling paths). Returns undefined when the
+  // path's first grammar error is a SURVIVING code, so the fall-through below runs.
+  const removed = describeRemovedForm(pathPattern);
+
+  if (removed !== undefined) {
+    throw createRouterError(methodName, removedFormMessage(removed, routeName));
+  }
+
+  // Surviving per-segment grammar rejections via the canonical `parseSegment`
+  // tokenizer: name-less (#858/#863), fused-marker (#1050), trailing-marker
+  // (#1324). `findSegmentGrammarError` runs the same split+parse the matcher uses,
+  // so the gate cannot drift. (Only removed-form codes reach `removed` above; the
+  // first error here is therefore always a surviving code.)
   const grammarError = findSegmentGrammarError(pathPattern);
 
   if (grammarError !== undefined) {
     throw createRouterError(
       methodName,
-      gateGrammarMessage(grammarError, routeName, path),
+      gateGrammarMessage(
+        grammarError as Exclude<
+          SegmentErrorCode,
+          "optional-removed" | "constraint-removed"
+        >,
+        routeName,
+        path,
+      ),
     );
   }
-
-  // Reject an optional param placed directly before a splat — a single
-  // UNCONSTRAINED optional (#1264) or TWO optionals (#1287). Both predicates are
-  // shared verbatim with path-matcher's `registerTree` backstop.
-  validateOptionalBeforeSplat(pathPattern, routeName, path, methodName);
 
   // Raw non-ASCII in a STATIC segment (`/café`, `/меню`, #1154). match rejects
   // non-ASCII input and compares static keys raw, so the route registers but never

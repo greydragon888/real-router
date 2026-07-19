@@ -231,16 +231,18 @@ const arbNonAsciiStaticPath = fc
 
 /**
  * A malformed query-param declaration — either a query-param name containing
- * `<`/`>` (a constraint leaked in via a reverse-order modifier typo, `/a/:b?<abc>`,
- * #1242 §5.1) or a query name colliding with a path-param name (`/a/:tab?tab`,
- * where buildPath would emit the value twice, #1242 §5.3). Both must be rejected by
- * `validateRoute` (path-matcher backstops at `registerTree`).
+ * `<`/`>` (`/a?filter<x`, #1242 §5.1) or a query name colliding with a path-param
+ * name (`/a/:tab?tab`, where buildPath would emit the value twice, #1242 §5.3).
+ * Both must be rejected by `validateRoute` (path-matcher backstops at
+ * `registerTree`). (Under M1 the `<` lives directly in the query name — the former
+ * `:b?<abc>` reverse-typo form is now caught as an optional, removed, before the
+ * query check.)
  */
 const arbMalformedQueryDeclarationPath = fc.oneof(
-  // §5.1: reverse-order typo leaks a constraint into the query name
+  // §5.1: a '<' in the query name (never round-trips)
   fc
     .tuple(arbSafeSegment, arbSafeSegment, arbSafeSegment)
-    .map(([seg, param, body]) => `/${seg}/:${param}?<${body}>`),
+    .map(([seg, qname, body]) => `/${seg}?${qname}<${body}`),
   // §5.3: query name collides with a path-param name
   fc
     .tuple(arbSafeSegment, arbSafeSegment)
@@ -406,13 +408,13 @@ describe("Route Path Validation", () => {
     );
   });
 
-  describe("6: unbalanced constraint rejection — stray < or > throws TypeError (high)", () => {
+  describe("6: constraint removed — any stray < or > throws the constraint recipe (M1) (high)", () => {
     test.prop([arbUnbalancedConstraintPath], { numRuns: NUM_RUNS.fast })(
-      "path with an unbalanced constraint delimiter throws with a constraint message",
+      "a path carrying a former constraint delimiter throws the removed-constraint recipe",
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).toThrow(/constraint/);
+        }).toThrow(/regex constraints are not supported/u);
       },
     );
   });
@@ -439,35 +441,35 @@ describe("Route Path Validation", () => {
     );
   });
 
-  describe("9: fused constraint suffix rejection — text fused after a constraint '>' throws (high)", () => {
+  describe("9: constraint removed — text fused after a former constraint '>' throws the constraint recipe (M1) (high)", () => {
     test.prop([arbFusedConstraintSuffixPath], { numRuns: NUM_RUNS.fast })(
-      "static text fused to a constraint's '>' throws (gate-level, consistent with path-matcher #1150)",
+      "a segment carrying a `<...>` throws the removed-constraint recipe regardless of a fused suffix",
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).toThrow(/text fused to a constraint/u);
+        }).toThrow(/regex constraints are not supported/u);
       },
     );
   });
 
-  describe("10: optional splat rejection — '*name?' throws (high)", () => {
+  describe("10: optional removed — '*name?' throws the optional recipe (M1) (high)", () => {
     test.prop([arbOptionalSplatPath], { numRuns: NUM_RUNS.fast })(
-      "an optional splat throws (gate-level, consistent with path-matcher #1149)",
+      "an optional splat throws the removed-optional recipe (declare two sibling routes)",
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).toThrow(/optional splat/u);
+        }).toThrow(/optional params are not supported/u);
       },
     );
   });
 
-  describe("11: unconstrained optional-before-splat rejection — '/:v?/*rest' throws (high)", () => {
+  describe("11: optional removed — '/:v?/*rest' throws the optional recipe (M1) (high)", () => {
     test.prop([arbUnconstrainedOptBeforeSplatPath], { numRuns: NUM_RUNS.fast })(
-      "an unconstrained optional directly before a splat throws (gate-level, consistent with path-matcher #1264)",
+      "an optional param before a splat throws the removed-optional recipe",
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).toThrow(/unconstrained optional param before a splat/u);
+        }).toThrow(/optional params are not supported/u);
       },
     );
   });
@@ -505,23 +507,22 @@ describe("Route Path Validation", () => {
     );
   });
 
-  describe("15: constraint in a static segment rejection — '<...>' with no marker throws (high)", () => {
+  describe("15: constraint removed — '<...>' filling a static segment throws the constraint recipe (M1) (high)", () => {
     test.prop([arbConstraintInStaticPath], { numRuns: NUM_RUNS.fast })(
-      "a '<...>' constraint filling a static segment throws (gate-level, consistent with path-matcher #1311)",
+      "a '<...>' filling a static segment throws the removed-constraint recipe",
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).toThrow(/constraint.*in a static segment/u);
+        }).toThrow(/regex constraints are not supported/u);
       },
     );
   });
 
-  describe("16: invalid-regex constraint body — '<*x>' throws the gate's route-contextual TypeError (high)", () => {
+  describe("16: constraint removed — a former `<...>` body throws the gate's route-contextual TypeError (M1) (high)", () => {
     test.prop([arbInvalidRegexConstraintPath], { numRuns: NUM_RUNS.fast })(
-      "a constraint body that is not a valid regex re-throws as the gate's route-contextual TypeError, not a bare [buildParamMeta] Error (F1-residual, consistent with path-matcher #1324)",
+      "a `<...>` segment (whatever the former regex body) re-throws as the gate's route-contextual TypeError, carrying the route context",
       (path: string) => {
-        // Must be the gate's own error type (TypeError), not the plain Error
-        // `buildParamMeta` throws — and must carry the route context.
+        // Must be the gate's own error type (TypeError) and carry the route context.
         expect(() => {
           validateRoutePath(path, "myroute", "add");
         }).toThrow(TypeError);

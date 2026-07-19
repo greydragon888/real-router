@@ -125,7 +125,6 @@ function processNode(
     freshParamMeta.urlParams.length === 0 &&
     freshParamMeta.queryParams.length === 0 &&
     freshParamMeta.spatParams.length === 0 &&
-    freshParamMeta.constraintPatterns.size === 0 &&
     freshParamMeta.pathPattern === mutable.path
       ? EMPTY_PARAM_META
       : freshParamMeta;
@@ -169,9 +168,7 @@ function processNode(
   // Close the immutability contract on the nested paramMeta (#747): the node
   // is frozen, but its paramMeta object and arrays were left mutable, so a
   // tree reachable from the public API could be mutated. paramTypeMap is the
-  // same ref frozen just above. constraintPatterns is a Map — intentionally
-  // not frozen here (Object.freeze can't lock Map entries); it is protected
-  // at the type level via ReadonlyMap (CC2 documents this exception).
+  // same ref frozen just above.
   Object.freeze(paramMeta.urlParams);
   Object.freeze(paramMeta.queryParams);
   Object.freeze(paramMeta.spatParams);

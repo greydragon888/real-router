@@ -30,7 +30,6 @@ function makeBuildParamSlot(
 
   return {
     paramName: token.name,
-    isOptional: token.kind === "param" ? token.optional : false,
     encoder: isSplat
       ? (value: string): string => encodeParam(value, encoding)
       : ENCODING_METHODS[encoding],

@@ -165,17 +165,9 @@ export class SegmentMatcher {
       return undefined;
     }
 
-    // Decode BEFORE validating constraints: a constraint describes the logical
-    // (decoded) value, not the raw URL segment. Validating the raw segment let an
-    // over-encoded valid value be rejected (`/%35` vs `<\d+>`) and a raw form that
-    // satisfied the constraint but decoded to a value that did not slip through
-    // (`/%41` vs `<.{3}>` → returned "A", violating Matching #9, and crashing
-    // start() via rewritePathOnMatch → buildPath). (#857)
+    // Decode the captured params. `match()` must never throw — a malformed
+    // percent sequence (#737) makes this return false → the URL is unmatched.
     if (!this.#decodeParams(params)) {
-      return undefined;
-    }
-
-    if (route.hasConstraints && !this.#validateConstraints(params, route)) {
       return undefined;
     }
 
@@ -191,10 +183,6 @@ export class SegmentMatcher {
 
     if (!route) {
       throw new Error(`[SegmentMatcher.buildPath] '${name}' is not defined`);
-    }
-
-    if (route.hasConstraints && params) {
-      this.#validateBuildConstraints(route, name, params);
     }
 
     const path = this.#buildUrlPath(route, params);
@@ -225,28 +213,6 @@ export class SegmentMatcher {
     return this.#routesByName.has(name);
   }
 
-  #validateBuildConstraints(
-    route: CompiledRoute,
-    name: string,
-    params: Record<string, unknown>,
-  ): void {
-    for (const [paramName, constraint] of route.constraintPatterns) {
-      const value = params[paramName];
-
-      if (value !== undefined && value !== null) {
-        const stringValue =
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string -- route params are typed `unknown` but contractually primitive
-          typeof value === "object" ? JSON.stringify(value) : String(value);
-
-        if (!constraint.pattern.test(stringValue)) {
-          throw new Error(
-            `[SegmentMatcher.buildPath] '${name}' — param '${paramName}' value '${stringValue}' does not match constraint '${constraint.constraint}'`,
-          );
-        }
-      }
-    }
-  }
-
   #buildUrlPath(
     route: CompiledRoute,
     params: Record<string, unknown> | undefined,
@@ -264,36 +230,18 @@ export class SegmentMatcher {
     for (const [i, slot] of slots.entries()) {
       const value = params?.[slot.paramName];
 
+      // 3-token grammar (M1): every param slot is required — no optional-omit
+      // branch. A missing param is an error.
       if (value === undefined || value === null) {
-        if (!slot.isOptional) {
-          throw new Error(
-            `[SegmentMatcher.buildPath] Missing required param '${slot.paramName}'`,
-          );
-        }
-
-        // At an optional-omit point `result` always ends in "/" (the separator
-        // before the omitted segment) — trim it so `parts[i + 1]` re-supplies
-        // exactly one separator, not two.
-        if (result.length > 1) {
-          result = result.slice(0, -1);
-        } else if (parts[i + 1].startsWith("/")) {
-          // Leading optional omitted (`result === "/"`): a naive append yields
-          // "//" — a URL the matcher itself rejects (double slash), which
-          // `rewritePathOnMatch` then writes into `state.path`. Drop the lone
-          // leading slash so `parts[i + 1]` re-supplies exactly one. (#1147)
-          result = "";
-        }
-
-        result += parts[i + 1];
-
-        continue;
+        throw new Error(
+          `[SegmentMatcher.buildPath] Missing required param '${slot.paramName}'`,
+        );
       }
 
-      // #740 item 3: an empty value for a REQUIRED param would collapse the
-      // segment, silently producing a path that matches the parent route
-      // (`buildPath("u.p", {id:""})` → `/users/` → matches `u`). Reject it like
-      // a missing param. Optional params keep their existing behavior.
-      if (value === "" && !slot.isOptional) {
+      // #740 item 3: an empty value collapses the segment, silently producing a
+      // path that matches the parent route (`buildPath("u.p", {id:""})` →
+      // `/users/` → matches `u`). Reject it like a missing param.
+      if (value === "") {
         throw new Error(
           `[SegmentMatcher.buildPath] Missing required param '${slot.paramName}' (empty string)`,
         );
@@ -542,12 +490,10 @@ export class SegmentMatcher {
     return this.#traverseFrom(this.#root, path, 1, params);
   }
 
-  // The core match hot loop. The #1263/#1264 fork branches (A2 rename) and the
-  // #1288 param+splat junction are inlined here rather than extracted into
-  // helpers, because a per-param helper call regresses the common single-param
-  // path ~5% (spike-measured); decode/constraint detail still lives in
-  // #tryTakeFork / #branchConstraintsHold.
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- inlined fork branches (see above)
+  // The core match hot loop. The #1288 param+splat junction is inlined here
+  // rather than extracted into a helper, because a per-param helper call
+  // regresses the common single-param path ~5% (spike-measured).
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- inlined #1288 junction (see above): the static/param/splat dispatch is deliberately one function for the hot path
   #traverseFrom(
     startNode: SegmentNode,
     path: string,
@@ -570,33 +516,15 @@ export class SegmentMatcher {
         next = node.staticChildren[lookupKey];
       } else if (node.paramChild) {
         const pc = node.paramChild;
-        const fork = pc.fork;
 
         // #1288: validated sub-traverse on a param+splat junction. The param
         // branch is tried on a scratch object and commits ONLY if it structurally
-        // completes AND its route's constraints hold on the decoded scratch
-        // values (#branchConstraintsHold); otherwise the splat sibling captures.
-        // "Param wins if its branch can complete" — the uniform INVARIANTS #8
-        // rule that subsumes the former per-signal carve-outs: the #1264 A1
-        // constraint-skip (kept below as an allocation-free fast-reject), the
-        // #1283 last-segment dead-end (a sub-traverse past the end returns the
-        // take-node's terminal or nothing), the deep dead-end of #1288 itself,
-        // and the constraint-failing branch that used to kill the whole match
-        // post-traverse. Junction-free param hops (no splat sibling) never enter
-        // this block — the common single-param path is untouched.
+        // completes ("param wins if its branch can complete", INVARIANTS Matching #8);
+        // otherwise the splat sibling captures. Junction-free param hops (no splat
+        // sibling) never enter this block — the common single-param path below is
+        // untouched.
         if (node.splatChild !== undefined) {
-          if (
-            fork?.constraint !== undefined &&
-            !this.#tryTakeFork(fork.constraint, segment)
-          ) {
-            return this.#matchSplat(node.splatChild, path, start, params);
-          }
-
-          const bindName =
-            fork?.skipName !== undefined && segmentEnd >= length
-              ? fork.skipName
-              : pc.name;
-          const childParams: Record<string, string> = { [bindName]: segment };
+          const childParams: Record<string, string> = { [pc.name]: segment };
 
           const taken = this.#traverseFrom(
             pc.node,
@@ -605,11 +533,7 @@ export class SegmentMatcher {
             childParams,
           );
 
-          if (
-            taken !== undefined &&
-            (!taken.hasConstraints ||
-              this.#branchConstraintsHold(taken, childParams))
-          ) {
+          if (taken !== undefined) {
             Object.assign(params, childParams);
 
             return taken;
@@ -619,15 +543,7 @@ export class SegmentMatcher {
         }
 
         next = pc.node;
-        // #1263 A2 (opt→required-param): on the LAST segment the optional is
-        // omitted → bind under the successor's name. The common non-fork param is
-        // fast-pathed inline (no helper call — spike: extraction cost ~5% on
-        // single-param).
-        if (fork?.skipName !== undefined && segmentEnd >= length) {
-          params[fork.skipName] = segment;
-        } else {
-          params[pc.name] = segment;
-        }
+        params[pc.name] = segment;
       } else if (node.splatChild) {
         return this.#matchSplat(node.splatChild, path, start, params);
       } else {
@@ -659,18 +575,9 @@ export class SegmentMatcher {
     const childParams: Record<string, string> = {};
     const specific = this.#traverseFrom(sn, path, start, childParams);
 
-    // #1288: a structurally-complete specific child whose OWN constraints fail on
-    // the scratch values must fall back to the wildcard capture, not kill the
-    // whole match post-traverse. Before this check, `/files/*any` + child
-    // `/:id<\d+>` made `match("/files/xx")` return undefined while
-    // `buildPath("blob", { any: "xx" })` emitted exactly that URL — the specific
-    // branch won structurally, then died in `#validateConstraints` where no
-    // fallback exists (the constraint-blind spot of INVARIANTS Matching #24).
-    if (
-      specific &&
-      (!specific.hasConstraints ||
-        this.#branchConstraintsHold(specific, childParams))
-    ) {
+    // #1288: a structurally-complete specific child wins over the wildcard
+    // capture; otherwise the splat captures the rest of the path.
+    if (specific) {
       Object.assign(params, childParams);
 
       return specific;
@@ -679,22 +586,6 @@ export class SegmentMatcher {
     params[splatChild.name] = path.slice(start);
 
     return sn.route;
-  }
-
-  /**
-   * #1263/#1264 try-take-if-valid: whether a `segment` at a constrained-optional
-   * fork should be TAKEN as the optional (its DECODED value, #857, satisfies the
-   * constraint) rather than skipped to the splat. Inline-decodes because the
-   * decision happens during traverse, before `#decodeParams`; a malformed-percent
-   * segment cannot be the decoded optional → not taken (→ skip, and the splat then
-   * carries it into `#decodeParams`, which rejects it, #737).
-   */
-  #tryTakeFork(constraint: RegExp, segment: string): boolean {
-    try {
-      return constraint.test(this.#decode ? this.#decode(segment) : segment);
-    } catch {
-      return false;
-    }
   }
 
   #decodeParams(params: Record<string, string>): boolean {
@@ -725,66 +616,6 @@ export class SegmentMatcher {
         // `%C0%80`, `%FF`) still makes `decodeURIComponent`/`decodeURI` throw a
         // URIError. `match()` must never throw — reject the path so the router
         // resolves to UNKNOWN_ROUTE instead of crashing on start() (#737).
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * #1288: constraints of a sub-traverse CANDIDATE route, checked on the RAW
-   * scratch params with on-the-fly decode — a constraint describes the decoded
-   * value (#857), but the branch decision happens during traverse, before
-   * `#decodeParams`. A failing (or undecodable, #737) branch falls back to the
-   * splat capture instead of killing the whole match post-traverse. Absent
-   * params are skipped (#1148). The scratch values themselves stay raw — the
-   * committed winner is decoded once, later, by `#decodeParams`.
-   */
-  #branchConstraintsHold(
-    route: CompiledRoute,
-    params: Record<string, string>,
-  ): boolean {
-    const decode = this.#decode;
-
-    for (const [paramName, constraint] of route.constraintPatterns) {
-      if (!Object.hasOwn(params, paramName)) {
-        continue;
-      }
-
-      let value = params[paramName];
-
-      if (decode && value.includes("%")) {
-        try {
-          value = decode(value);
-        } catch {
-          return false;
-        }
-      }
-
-      if (!constraint.pattern.test(value)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  #validateConstraints(
-    params: Record<string, string>,
-    route: CompiledRoute,
-  ): boolean {
-    for (const [paramName, constraint] of route.constraintPatterns) {
-      // An omitted optional param is ABSENT from `params` — nothing to validate.
-      // Testing the missing value would coerce `undefined` to the string
-      // "undefined" and reject the omit form (`/search/:query<\d+>?` matching
-      // "/search"). Presence check via `Object.hasOwn` (params is typed
-      // `Record<string, string>`, so the runtime-absent key is a type-lie);
-      // symmetric with the build side's absent-param skip. (#1148)
-      if (
-        Object.hasOwn(params, paramName) &&
-        !constraint.pattern.test(params[paramName])
-      ) {
         return false;
       }
     }

@@ -2,15 +2,10 @@ import { fc, test } from "@fast-check/vitest";
 
 import {
   arbEncoding,
-  arbNonNumericParam,
-  arbNumericParam,
-  createConstrainedMatcher,
-  createConstraintMatcher,
   createInputNode,
   createParamMatcher,
   createRootWithChildren,
   NUM_RUNS,
-  percentEncodeAscii,
 } from "./helpers";
 import { createTestMatcher } from "../../helpers/createTestMatcher";
 
@@ -76,81 +71,6 @@ describe("strictTrailingSlash matching", () => {
 
       expect(matcher.match(`/${seg}`)).toBeDefined();
       expect(matcher.match(`/${seg}/`)).toBeDefined();
-    },
-  );
-});
-
-// =============================================================================
-// P3.5 — constraint filtering at match time
-// =============================================================================
-
-describe("constraint filtering at match time", () => {
-  test.prop([arbNonNumericParam], { numRuns: NUM_RUNS.standard })(
-    "a value violating the constraint is rejected (route filtered → undefined)",
-    (id) => {
-      const matcher = createConstrainedMatcher(); // /users/:id<\d+>
-
-      expect(matcher.match(`/users/${id}`)).toBeUndefined();
-    },
-  );
-
-  test.prop([arbNumericParam], { numRuns: NUM_RUNS.standard })(
-    "a value satisfying the constraint is admitted and captured",
-    (id) => {
-      const matcher = createConstrainedMatcher();
-
-      expect(matcher.match(`/users/${id}`)?.params).toStrictEqual({ id });
-    },
-  );
-
-  test.prop([arbNumericParam], { numRuns: NUM_RUNS.standard })(
-    "an over-encoded value matches when its DECODED form satisfies the constraint (#857)",
-    (id) => {
-      const matcher = createConstrainedMatcher(); // /users/:id<\d+>
-
-      // Percent-encode every digit ("5" → "%35"); the raw form does NOT match
-      // \d+, but it decodes back to `id`, which does. The constraint is checked
-      // on the decoded value, so the route must match and recover `id`. With the
-      // old pre-decode order the raw "%3X…" was rejected → undefined.
-      const overEncoded = percentEncodeAscii(id);
-
-      expect(matcher.match(`/users/${overEncoded}`)?.params).toStrictEqual({
-        id,
-      });
-    },
-  );
-
-  // Manifestation B (#859): a length constraint where the RAW over-encoded form
-  // satisfies the regex but the DECODED value does not. The constraint describes
-  // the decoded value, so the route must be filtered out. The validate-before-
-  // decode mutant validates the raw `%XX` (3 chars ⊨ `.{3}`) then returns the
-  // 1-char decoded value, capturing a value that violates its own constraint.
-  test.prop([fc.stringMatching(/^[A-Za-z0-9]$/)], {
-    numRuns: NUM_RUNS.standard,
-  })(
-    "an over-encoded value is rejected when its DECODED form violates a length constraint (#857 manifestation B)",
-    (ch) => {
-      const matcher = createConstraintMatcher("<.{3}>");
-
-      // A single char over-encodes to exactly 3 raw chars ("A" → "%41").
-      expect(matcher.match(`/${percentEncodeAscii(ch)}`)).toBeUndefined();
-    },
-  );
-
-  // Complement of B: a value whose DECODED form satisfies the same length
-  // constraint matches, even though the raw over-encoded form (3× longer) does
-  // not. Locks both directions of Matching #9/#23 on over-encoded length inputs.
-  test.prop([fc.stringMatching(/^[A-Za-z0-9]{3}$/)], {
-    numRuns: NUM_RUNS.standard,
-  })(
-    "an over-encoded value matches a length constraint when its DECODED form satisfies it (#859)",
-    (value) => {
-      const matcher = createConstraintMatcher("<.{3}>");
-
-      // 3-char value → 9 raw chars (⊭ `.{3}`) that decode to exactly 3 (⊨).
-      expect(
-        matcher.match(`/${percentEncodeAscii(value)}`)?.params,
-      ).toStrictEqual({ n: value });
     },
   );
 });

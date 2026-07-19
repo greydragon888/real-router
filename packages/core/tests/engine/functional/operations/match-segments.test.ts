@@ -76,13 +76,13 @@ describe("matchSegments with static index", () => {
         path: "/users",
         children: [
           // Only dynamic children - staticIndex will be empty
-          { name: "dynamic", path: String.raw`/:id<\d+>` }, // only digits
+          { name: "dynamic", path: "/:id" },
         ],
       },
     ]);
 
-    // "/users/abc" - "abc" won't match /:id<\d+> regex
-    const result = matchSegments(tree, "/users/abc");
+    // "/users/abc/deep" — :id captures "abc", but "deep" has no child → no match
+    const result = matchSegments(tree, "/users/abc/deep");
 
     expect(result).toBeNull();
   });
@@ -117,14 +117,14 @@ describe("matchSegments with static index", () => {
         path: "/api",
         children: [
           { name: "users", path: "/users" },
-          { name: "versioned", path: String.raw`/:version<v\d+>` }, // only v1, v2, etc.
+          { name: "versioned", path: "/:version" },
         ],
       },
     ]);
 
-    // "/api/unknown" - not in static index (not "users")
-    // and doesn't match /:version<v\d+> pattern
-    const result = matchSegments(tree, "/api/unknown");
+    // "/api/unknown/deeper" — not "users" (static miss); :version captures
+    // "unknown" but "deeper" has no child → the dynamic route also fails.
+    const result = matchSegments(tree, "/api/unknown/deeper");
 
     expect(result).toBeNull();
   });

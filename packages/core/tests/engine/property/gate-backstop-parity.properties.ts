@@ -15,12 +15,13 @@ import { validateRoutePath } from "../../../src/engine/validation/routes";
  * path-matcher `registerTree` BACKSTOP (per-segment, during trie insertion)
  * independently reject the same malformed single-path shapes — at DIFFERENT
  * granularities and, for these scans, with SEPARATE implementations (gate
- * char-scan vs backstop regex/embedded fork logic). Tier 1 of #1320 single-
- * sourced the whole-path scans the two layers could literally share
- * (`hasFusedConstraintSuffix`, `hasConstraintInStaticSegment`,
- * `isConstraintBalanced`); the scans below cannot be merged without restructuring
- * the perf-sensitive (#1285) / trie-interleaved backstop, so a fix to one could
- * silently drift from the other.
+ * char-scan vs backstop regex/embedded logic). The per-segment grammar (name-less,
+ * fused/trailing marker, and the two M1 removed forms — optional-removed /
+ * constraint-removed, #1516) is single-sourced in the shared `parseSegment`
+ * tokenizer, so it cannot drift by construction. The scans below (non-ASCII #1154,
+ * dup-param #1151) are still implemented separately on the two layers and cannot be
+ * merged without restructuring the perf-sensitive (#1285) / trie-interleaved
+ * backstop, so a fix to one could silently drift from the other.
  *
  * This property is the CONTRACT that makes the parallel code safe: for every
  * generated single-path shape, the gate verdict and the backstop verdict must
@@ -124,26 +125,6 @@ const SCANS: readonly ScanClass[] = [
     valid: arbSafeSegment.map((s) => `/${s}`),
   },
   {
-    name: "optional splat (#1149)",
-    // a splat carrying the optional marker — /*path?
-    malformed: arbSafeSegment.map((n) => `/*${n}?`),
-    // a plain required splat — /*rest
-    valid: arbSafeSegment.map((n) => `/*${n}`),
-  },
-  {
-    name: "unconstrained optional before splat (#1264)",
-    // an unconstrained optional directly before a splat — /:v?/*rest
-    malformed: fc
-      .tuple(arbSafeSegment, arbSafeSegment)
-      .map(([v, r]) => `/:${v}?/*${r}`),
-    // a REQUIRED param before a splat carries a validity signal — /:id/*rest
-    // (distinct names, else /:c/*c is a param+splat dup, a DIFFERENT reject)
-    valid: fc
-      .tuple(arbSafeSegment, arbSafeSegment)
-      .filter(([v, r]) => v !== r)
-      .map(([v, r]) => `/:${v}/*${r}`),
-  },
-  {
     name: "duplicate param name (#1151)",
     // the same param name twice within one path — /:id/:id
     malformed: arbSafeSegment.map((n) => `/:${n}/:${n}`),
@@ -154,19 +135,33 @@ const SCANS: readonly ScanClass[] = [
       .map(([a, b]) => `/:${a}/:${b}`),
   },
   {
-    name: "two optionals before splat (#1287)",
-    // two CONSTRAINED optionals directly before a splat — /:a<c>?/:b<c>?/*rest.
-    // Constrained so #1264's single-unconstrained-optional scan doesn't fire first;
-    // all three names distinct so it isn't a #1151 dup / param+splat clash instead.
-    malformed: fc
-      .tuple(arbSafeSegment, arbSafeSegment, arbSafeSegment)
-      .filter(([a, b, r]) => new Set([a, b, r]).size === 3)
-      .map(([a, b, r]) => `/:${a}<[a-z]+>?/:${b}<[a-z]+>?/*${r}`),
-    // a SINGLE constrained optional before a splat IS supported (#1264 A1) — both accept
-    valid: fc
-      .tuple(arbSafeSegment, arbSafeSegment)
-      .filter(([v, r]) => v !== r)
-      .map(([v, r]) => `/:${v}<[a-z]+>?/*${r}`),
+    name: "optional param removed (M1)",
+    // a `:x?`/`*x?` optional modifier — /:v?, /:v?/x, /*v? — all `optional-removed`
+    malformed: fc.oneof(
+      arbSafeSegment.map((v) => `/:${v}?`),
+      fc.tuple(arbSafeSegment, arbSafeSegment).map(([v, x]) => `/:${v}?/${x}`),
+      arbSafeSegment.map((v) => `/*${v}?`),
+    ),
+    // the same shapes without the trailing `?`
+    valid: fc.oneof(
+      arbSafeSegment.map((v) => `/:${v}`),
+      fc.tuple(arbSafeSegment, arbSafeSegment).map(([v, x]) => `/:${v}/${x}`),
+      arbSafeSegment.map((v) => `/*${v}`),
+    ),
+  },
+  {
+    name: "regex constraint removed (M1)",
+    // a `<re>` constraint (also a stray `<`/`>`) — /:v<\d+>, /a<b>, /a>b
+    malformed: fc.oneof(
+      arbSafeSegment.map((v) => `/:${v}<[a-z]+>`),
+      fc.tuple(arbSafeSegment, arbSafeSegment).map(([a, b]) => `/${a}<${b}>`),
+      fc.tuple(arbSafeSegment, arbSafeSegment).map(([a, b]) => `/${a}>${b}`),
+    ),
+    // the same pieces without the `<`/`>`
+    valid: fc.oneof(
+      arbSafeSegment.map((v) => `/:${v}`),
+      arbSafeSegment.map((s) => `/${s}`),
+    ),
   },
 ];
 

@@ -4,12 +4,8 @@ import {
   arbEncoding,
   arbMatchSafeEncodableSplatValue,
   arbMatchSafeEncodableValue,
-  arbNonNumericParam,
-  arbNumericParam,
   arbSafeParamValue,
   arbSplatValue,
-  createConstrainedMatcher,
-  createOptionalParamMatcher,
   createParamMatcher,
   createParamSplatMatcher,
   createSplatMatcher,
@@ -44,31 +40,6 @@ describe("Matching Properties", () => {
 
         expect(result).toBeDefined();
         expect(result!.params).toStrictEqual({ id });
-      },
-    );
-  });
-
-  describe("roundtrip — optional param: both with and without produce same route", () => {
-    const matcher = createOptionalParamMatcher();
-
-    test.prop([arbSafeParamValue], { numRuns: NUM_RUNS.standard })(
-      "route with optional param present matches the same route name",
-      (query: string) => {
-        const pathWith = matcher.buildPath("search", { query });
-        const pathWithout = matcher.buildPath("search", {});
-
-        const resultWith = matcher.match(pathWith);
-        const resultWithout = matcher.match(pathWithout);
-
-        expect(resultWith).toBeDefined();
-        expect(resultWithout).toBeDefined();
-
-        const nameWith = resultWith!.segments.at(-1)!.fullName;
-        const nameWithout = resultWithout!.segments.at(-1)!.fullName;
-
-        expect(nameWith).toBe("search");
-        expect(nameWithout).toBe("search");
-        expect(nameWith).toBe(nameWithout);
       },
     );
   });
@@ -143,42 +114,6 @@ describe("Matching Properties", () => {
     );
   });
 
-  describe("constraint satisfaction — matched params satisfy constraint regex", () => {
-    const matcher = createConstrainedMatcher();
-
-    // Match a RAW path with an arbitrary (numeric OR non-numeric) segment. The
-    // invariant: *if* it matches the constrained route, the captured value
-    // satisfies the constraint. Feeding only numeric values (as before) made the
-    // assertion tautological — it passed even with constraint validation
-    // disabled, since the input was always numeric. A non-numeric value that
-    // matched would only happen if filtering were broken — which this catches.
-    test.prop([fc.oneof(arbNumericParam, arbNonNumericParam)], {
-      numRuns: NUM_RUNS.standard,
-    })(
-      "any value that matches the constrained route satisfies the constraint",
-      (seg: string) => {
-        const result = matcher.match(`/users/${seg}`);
-
-        if (result?.segments.at(-1)!.fullName === "users.profile") {
-          expect(/^\d+$/.test(String(result.params.id))).toBe(true);
-        }
-      },
-    );
-  });
-
-  describe("constraint rejection — buildPath throws for violating params", () => {
-    const matcher = createConstrainedMatcher();
-
-    test.prop([arbNonNumericParam], { numRuns: NUM_RUNS.standard })(
-      "buildPath throws when param value violates the constraint",
-      (id: string) => {
-        expect(() => {
-          matcher.buildPath("users.profile", { id });
-        }).toThrow();
-      },
-    );
-  });
-
   describe("case insensitivity — match(path) same as match(path.toLowerCase())", () => {
     const matcher = createParamMatcher({ caseSensitive: false });
 
@@ -211,7 +146,6 @@ describe("Matching Properties", () => {
   describe("format — buildPath always returns a string starting with /", () => {
     const paramMatcher = createParamMatcher();
     const splatMatcher = createSplatMatcher();
-    const optMatcher = createOptionalParamMatcher();
 
     test.prop([arbSafeParamValue], { numRuns: NUM_RUNS.standard })(
       "param route buildPath starts with /",
@@ -228,17 +162,6 @@ describe("Matching Properties", () => {
         const builtPath = splatMatcher.buildPath("files", { path });
 
         expect(builtPath.startsWith("/")).toBe(true);
-      },
-    );
-
-    test.prop([arbSafeParamValue], { numRuns: NUM_RUNS.standard })(
-      "optional param route buildPath starts with /",
-      (query: string) => {
-        const builtWith = optMatcher.buildPath("search", { query });
-        const builtWithout = optMatcher.buildPath("search", {});
-
-        expect(builtWith.startsWith("/")).toBe(true);
-        expect(builtWithout.startsWith("/")).toBe(true);
       },
     );
   });
@@ -379,34 +302,6 @@ describe("Matching Properties", () => {
         const path = `/users/v%${h1}${h2}`;
 
         expect(matcher.match(path)).toBeUndefined();
-      },
-    );
-  });
-
-  describe("roundtrip — optional param values preserved through build→match", () => {
-    // Strengthened: was a fixpoint generator (arbSafeParamValue) with no
-    // anti-identity, so an under-encoding stub on the optional path survived.
-    // Now an encode-requiring value across all 4 strategies + anti-identity,
-    // mirroring the required-param test below.
-    test.prop([arbEncoding, arbMatchSafeEncodableValue], {
-      numRuns: NUM_RUNS.standard,
-    })(
-      "optional param value survives build→match, and non-none encodes it in the URL",
-      (enc, query: string) => {
-        const matcher = createOptionalParamMatcher({ urlParamsEncoding: enc });
-        const path = matcher.buildPath("search", { query });
-        const result = matcher.match(path);
-
-        expect(result).toBeDefined();
-        expect(result!.params).toStrictEqual({ query });
-
-        // anti-identity: space is raw under `none`, percent-encoded otherwise.
-        if (enc === "none") {
-          expect(path).toContain(" ");
-        } else {
-          expect(path).not.toContain(" ");
-          expect(path).toContain("%");
-        }
       },
     );
   });

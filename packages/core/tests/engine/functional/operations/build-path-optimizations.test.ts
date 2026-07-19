@@ -427,19 +427,16 @@ describe("hasDynamicFirstSegment edge cases", () => {
     );
   });
 
-  it("should detect route with regex constraint starting with parenthesis", () => {
-    // Constraint route with parenthesized regex is detected as dynamic
-    // Regex constraint in path
+  it("should detect a dynamic (param) first segment alongside a static one", () => {
     const tree = createRouteTree("", "", [
       { name: "static", path: "/static" },
-      { name: "numeric", path: String.raw`/:id<\d+>` }, // Has regex constraint
+      { name: "id", path: "/:id" },
     ]);
 
+    // a static first segment wins its literal; any other falls to the param route
     expect(matchSegments(tree, "/static")?.segments[0].name).toBe("static");
-    // Constrained routes are detected as dynamic
-    expect(matchSegments(tree, "/123")?.segments[0].name).toBe("numeric");
-    // Non-matching constraint means no match
-    expect(matchSegments(tree, "/abc")).toBeNull();
+    expect(matchSegments(tree, "/123")?.segments[0].name).toBe("id");
+    expect(matchSegments(tree, "/abc")?.segments[0].name).toBe("id");
   });
 
   it("should handle empty path correctly", () => {

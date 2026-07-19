@@ -7,21 +7,16 @@ import {
 import { createMatcher } from "../../helpers/buildTree";
 
 /**
- * PUBLIC-CONTRACT unit tests for the segment tokenizer (#1324).
+ * PUBLIC-CONTRACT unit tests for the segment tokenizer (3-token grammar, M1:
+ * `static | :param | *splat` — optional `:x?` and `<re>` constraints removed).
  *
  * The tokenizer (`parseSegment` / `splitPathSegments`) is INTERNAL — these tests
- * exercise it only through the surface a CONSUMER actually observes, so every green
- * assertion is a real guarantee (white-box audit; see `packages/path-matcher/eslint.config.mjs`):
+ * exercise it only through the surface a CONSUMER actually observes:
  *   - `findSegmentGrammarError(path)` — the validation entry route-tree's gate calls
  *     (returns the exact rejection code);
- *   - `buildParamMeta(path)` — the metadata a consumer reads (names / splat / constraints);
- *   - `createMatcher([...]).match(...)` — runtime behaviour (optional take/omit,
- *     constraint filtering, static / splat matching).
- *
- * The INTERNAL token-tuple equivalence (`parseSegment` ≡ the parsers, exact tuples /
- * exact segment arrays) is pinned separately in the exempt
- * `tests/property/parseSegment.properties.ts` (gate 2) — that is its own, deliberate
- * white-box channel, not this file's job.
+ *   - `buildParamMeta(path)` — the metadata a consumer reads (names / splat);
+ *   - `createMatcher([...]).match(...)` — runtime behaviour (static / param / splat)
+ *     and the registration backstop (which throws on a removed form).
  */
 
 const meta = (path: string): ReturnType<typeof buildParamMeta> =>
@@ -75,40 +70,6 @@ describe("accepted segment shapes (buildParamMeta + match behaviour)", () => {
       expect(meta("/*rest").spatParams).toStrictEqual(["rest"]);
       expect(mk("/*rest").match("/a/b")?.params).toStrictEqual({ rest: "a/b" });
     });
-
-    it("a constrained param — constraint recorded AND filters the match", () => {
-      expect(
-        meta(String.raw`/:id<\d+>`).constraintPatterns.get("id")?.constraint,
-      ).toBe(String.raw`<\d+>`);
-
-      const m = mk(String.raw`/:id<\d+>`);
-
-      expect(m.match("/5")?.params).toStrictEqual({ id: "5" });
-      expect(m.match("/abc")).toBeUndefined(); // constraint rejects non-digits
-    });
-
-    it("an optional param — matches BOTH the take and the omit form", () => {
-      // `optional` is observable only as runtime behaviour: the route resolves WITH
-      // and WITHOUT the segment. (buildParamMeta exposes no `optional` field —
-      // asserting one would pin an internal shape.)
-      const m = mk("/users/:id?");
-
-      expect(m.match("/users/5")?.params).toStrictEqual({ id: "5" }); // take
-      expect(m.match("/users")?.params).toStrictEqual({}); // omit
-    });
-
-    it("a constrained + optional param — both signals together", () => {
-      const path = String.raw`/users/:id<\d+>?`;
-
-      expect(meta(path).constraintPatterns.get("id")?.constraint).toBe(
-        String.raw`<\d+>`,
-      );
-
-      const m = mk(path);
-
-      expect(m.match("/users/5")?.params).toStrictEqual({ id: "5" });
-      expect(m.match("/users")?.params).toStrictEqual({}); // omit works
-    });
   });
 
   describe("mid-marker names are preserved (#1324 boundary)", () => {
@@ -124,54 +85,103 @@ describe("accepted segment shapes (buildParamMeta + match behaviour)", () => {
     });
   });
 
-  describe("§8 behaviour-preservation edges", () => {
-    it("a lazy `?` INSIDE a constraint is not the optional marker (param stays required)", () => {
-      const path = String.raw`/x/:id<\d?>`;
+  describe("query separator `?` disambiguation (M1 §3.3)", () => {
+    it("`/:id?format` — the `?` starts the query (param `id` + query `format`)", () => {
+      const m = meta("/:id?format");
 
-      expect(meta(path).constraintPatterns.get("id")?.constraint).toBe(
-        String.raw`<\d?>`,
-      );
-
-      const m = mk(path);
-
-      expect(m.match("/x")).toBeUndefined(); // required — the `?` did NOT make it optional
-      expect(m.match("/x/5")?.params).toStrictEqual({ id: "5" });
-    });
-
-    it("a constraint's lazy `?` PLUS a trailing optional `?`", () => {
-      const path = String.raw`/x/:id<\d?>?`;
-
-      expect(meta(path).constraintPatterns.get("id")?.constraint).toBe(
-        String.raw`<\d?>`,
-      );
-
-      const m = mk(path);
-
-      expect(m.match("/x/5")?.params).toStrictEqual({ id: "5" });
-      expect(m.match("/x")?.params).toStrictEqual({}); // the OUTER `?` IS the optional marker
+      expect(m.pathPattern).toBe("/:id");
+      expect(m.urlParams).toStrictEqual(["id"]);
+      expect(m.queryParams).toStrictEqual(["format"]);
     });
 
     it("`/a:?b` — the `?` is the query separator, `a:` a static literal", () => {
-      // A `?` in a route path starts the query (not a mid-segment char): "/a:?b" is
-      // the static "a:" with a query param "b" — the honest reading a consumer gets.
       const m = meta("/a:?b");
 
       expect(m.pathPattern).toBe("/a:");
       expect(m.queryParams).toStrictEqual(["b"]);
       expect(m.urlParams).toStrictEqual([]);
     });
+
+    it("`/?role` — a query on the root path", () => {
+      const m = meta("/?role");
+
+      expect(m.pathPattern).toBe("/");
+      expect(m.queryParams).toStrictEqual(["role"]);
+    });
   });
 });
 
-describe("rejected segment shapes (findSegmentGrammarError — the gate's entry)", () => {
-  it("name-less marker (#858)", () => {
-    for (const p of ["/x/:", "/x/*", "/x/:?", String.raw`/x/:<\d+>`]) {
-      expect(findSegmentGrammarError(p)).toBe("name-less");
+describe("removed forms — optional `:x?` (M1)", () => {
+  it("a trailing `?` on a param is `optional-removed`", () => {
+    for (const p of ["/:id?", "/users/:id?", "/:id?/edit"]) {
+      expect(findSegmentGrammarError(p)).toBe("optional-removed");
     }
   });
 
-  it("an optional modifier on a marker-less segment is name-less (#1241, `/faq?`)", () => {
+  it("an optional splat `*x?` is `optional-removed` (was #1149)", () => {
+    expect(findSegmentGrammarError("/files/*path?")).toBe("optional-removed");
+  });
+
+  it("a reverse-order `?` before a former constraint keeps the optional reading", () => {
+    // `/:id??tab` — the LATER `?` is the query separator, the leading `?` an
+    // optional; `/a/:b?<x>` — the `<` tail keeps the `?` an optional. Neither
+    // silently becomes a query declaration.
+    expect(findSegmentGrammarError("/:id??tab")).toBe("optional-removed");
+    expect(findSegmentGrammarError("/a/:b?<x>")).toBe("optional-removed");
+  });
+
+  it("the registration backstop rejects it with the optional recipe", () => {
+    expect(() => mk("/users/:id?")).toThrow(
+      /Optional params are not supported/u,
+    );
+  });
+
+  it("a trailing `?` on a MARKER-LESS segment is still name-less (#1241, `/faq?`)", () => {
     for (const p of ["/faq?", "/a-b?", "/x/?"]) {
+      expect(findSegmentGrammarError(p)).toBe("name-less");
+    }
+  });
+});
+
+describe("removed forms — regex constraints `<re>` (M1)", () => {
+  it("a `<...>` on a param is `constraint-removed`", () => {
+    for (const p of [
+      String.raw`/:id<\d+>`,
+      String.raw`/users/:id<\d+>`,
+      String.raw`/:id<\d+>?`, // constrained + optional → the `<` is hit first
+      String.raw`/:year<\d+>-archive`, // was fused-constraint-suffix (#1150)
+    ]) {
+      expect(findSegmentGrammarError(p)).toBe("constraint-removed");
+    }
+  });
+
+  it("a `<...>` in a marker-less static segment is `constraint-removed` (was #1311)", () => {
+    for (const p of ["/foo<bar>", "/a<b>"]) {
+      expect(findSegmentGrammarError(p)).toBe("constraint-removed");
+    }
+  });
+
+  it("an unbalanced / empty `<>` is `constraint-removed` (was #804)", () => {
+    expect(findSegmentGrammarError(String.raw`/:id<\d+`)).toBe(
+      "constraint-removed",
+    );
+    expect(findSegmentGrammarError("/:id<>")).toBe("constraint-removed");
+  });
+
+  it("a stray `>` alone is `constraint-removed` (В1.3: reserved delimiter)", () => {
+    expect(findSegmentGrammarError("/a>b")).toBe("constraint-removed");
+  });
+
+  it("the registration backstop rejects it with the constraint recipe", () => {
+    expect(() => mk(String.raw`/:id<\d+>`)).toThrow(
+      /Regex constraints are not supported/u,
+    );
+  });
+});
+
+describe("surviving rejections (findSegmentGrammarError — the gate's entry)", () => {
+  it("name-less marker (#858)", () => {
+    for (const p of ["/x/:", "/x/*", "/x/:?", String.raw`/x/:<\d+>`]) {
       expect(findSegmentGrammarError(p)).toBe("name-less");
     }
   });
@@ -190,73 +200,24 @@ describe("rejected segment shapes (findSegmentGrammarError — the gate's entry)
       expect(findSegmentGrammarError(p)).toBe("fused-marker");
     }
   });
-
-  it("static text fused to a constraint's `>` (#1150)", () => {
-    for (const p of [
-      String.raw`/:year<\d+>-archive`,
-      String.raw`/:id<\d+>.html`,
-    ]) {
-      expect(findSegmentGrammarError(p)).toBe("fused-constraint-suffix");
-    }
-  });
-
-  it("a constraint in a marker-less static segment (#1311)", () => {
-    for (const p of ["/foo<bar>", "/a<b>"]) {
-      expect(findSegmentGrammarError(p)).toBe("constraint-in-static");
-    }
-  });
-
-  it("an optional splat (#1149)", () => {
-    expect(findSegmentGrammarError("/files/*path?")).toBe("optional-splat");
-    // end-to-end: the registration backstop rejects it too
-    expect(() => mk("/files/*path?")).toThrow(/Optional splat/u);
-  });
-
-  it("an unbalanced / empty constraint (#804)", () => {
-    expect(findSegmentGrammarError(String.raw`/:id<\d+`)).toBe(
-      "unbalanced-constraint",
-    );
-    expect(findSegmentGrammarError("/:id<>")).toBe("empty-constraint");
-  });
 });
 
-describe("constraint-aware path segmentation (buildParamMeta + match)", () => {
-  it("splits on `/` outside constraints — every param extracted in order", () => {
+describe("path segmentation (buildParamMeta + match)", () => {
+  it("splits on `/` — every param extracted in order", () => {
     expect(meta("/users/:id/posts/:pid").urlParams).toStrictEqual([
       "id",
       "pid",
     ]);
-  });
-
-  it("does NOT split on `/` INSIDE a `<...>` constraint (body may hold `/`)", () => {
-    // Observable guarantee: the constraint body keeps its `/`, so the segment was not
-    // broken at it — and the surrounding statics stay statics.
-    expect(meta("/:v<a|b/c>").constraintPatterns.get("v")?.constraint).toBe(
-      "<a|b/c>",
-    );
-    expect(meta("/x/:id<a/b>/y").constraintPatterns.get("id")?.constraint).toBe(
-      "<a/b>",
-    );
-    expect(meta("/x/:id<a/b>/y").urlParams).toStrictEqual(["id"]);
-  });
-
-  it("first-`>` semantics — `/` splits again after the constraint closes", () => {
-    const path = String.raw`/:id<\d+>/y`;
-
-    expect(meta(path).urlParams).toStrictEqual(["id"]); // only :id is a param; y is static
-    expect(meta(path).constraintPatterns.get("id")?.constraint).toBe(
-      String.raw`<\d+>`,
-    );
-    expect(mk(path).match("/5/y")?.params).toStrictEqual({ id: "5" });
+    expect(
+      mk("/users/:id/posts/:pid").match("/users/5/posts/7")?.params,
+    ).toStrictEqual({ id: "5", pid: "7" });
   });
 });
 
 describe("findSegmentGrammarError (validation entry over the tokenizer)", () => {
-  it("returns undefined for a clean path (incl. constraint-with-`/`)", () => {
-    expect(
-      findSegmentGrammarError(String.raw`/users/:id<\d+>/posts/:pid?`),
-    ).toBeUndefined();
-    expect(findSegmentGrammarError("/x/:id<a/b>/y")).toBeUndefined();
+  it("returns undefined for a clean 3-token path (incl. query)", () => {
+    expect(findSegmentGrammarError("/users/:id/posts/:pid")).toBeUndefined();
+    expect(findSegmentGrammarError("/x/*rest")).toBeUndefined();
     expect(findSegmentGrammarError("/")).toBeUndefined();
   });
 

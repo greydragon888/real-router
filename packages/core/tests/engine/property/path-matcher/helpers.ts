@@ -105,84 +105,6 @@ export function createParamMatcher(
 }
 
 /**
- * Matcher with a constrained param route.
- *
- * Tree: root > users(/users) > profile(/:id<\d+>)
- * Routes: "users", "users.profile"
- * Constraint: id must match \d+
- */
-export function createConstrainedMatcher(
-  options?: Partial<SegmentMatcherOptions>,
-): SegmentMatcher {
-  const matcher = createTestMatcher(options);
-
-  const profileNode = createInputNode({
-    name: "profile",
-    path: String.raw`/:id<\d+>`,
-    fullName: "users.profile",
-  });
-
-  const usersNode = createInputNode({
-    name: "users",
-    path: "/users",
-    fullName: "users",
-    children: new Map([["profile", profileNode]]),
-    nonAbsoluteChildren: [profileNode],
-  });
-
-  matcher.registerTree(createRootWithChildren([usersNode]));
-
-  return matcher;
-}
-
-/**
- * Matcher with a single constrained param route under an arbitrary constraint.
- *
- * Tree: root > r(/:n<constraint>)
- * Used to exercise constraints other than the default `\d+` — e.g. a length
- * constraint `<.{3}>` — against over-encoded inputs (#857/#859).
- */
-export function createConstraintMatcher(
-  constraint: string,
-  options?: Partial<SegmentMatcherOptions>,
-): SegmentMatcher {
-  const matcher = createTestMatcher(options);
-
-  const node = createInputNode({
-    name: "r",
-    path: `/:n${constraint}`,
-    fullName: "r",
-  });
-
-  matcher.registerTree(createRootWithChildren([node]));
-
-  return matcher;
-}
-
-/**
- * Matcher with an optional param route.
- *
- * Tree: root > search(/search/:query?)
- * Routes: "search"
- * Matches both /search and /search/:query
- */
-export function createOptionalParamMatcher(
-  options?: Partial<SegmentMatcherOptions>,
-): SegmentMatcher {
-  const matcher = createTestMatcher(options);
-
-  const searchNode = createInputNode({
-    name: "search",
-    path: "/search/:query?",
-    fullName: "search",
-  });
-
-  matcher.registerTree(createRootWithChildren([searchNode]));
-
-  return matcher;
-}
-
-/**
  * Matcher with a splat param route.
  *
  * Tree: root > files(/files/*path)
@@ -319,18 +241,6 @@ export const arbSplatValue: fc.Arbitrary<string> = fc
   .map((segments) => segments.join("/"));
 
 /**
- * Numeric string satisfying \d+ constraint.
- */
-export const arbNumericParam: fc.Arbitrary<string> =
-  fc.stringMatching(/^\d{1,10}$/);
-
-/**
- * Non-numeric (letters-only) string — violates \d+ constraint.
- */
-export const arbNonNumericParam: fc.Arbitrary<string> =
-  fc.stringMatching(/^[a-zA-Z]{1,10}$/);
-
-/**
  * A single path-segment value (no "/") that EVERY non-identity strategy must
  * transform — it always contains a space or a multibyte char, which `default`,
  * `uri`, and `uriComponent` all percent-encode. Unlike `arbSafeParamValue` (a
@@ -371,24 +281,6 @@ export const arbMatchSafeEncodableValue: fc.Arbitrary<string> = fc
 export const arbMatchSafeEncodableSplatValue: fc.Arbitrary<string> = fc
   .array(arbMatchSafeEncodableValue, { minLength: 1, maxLength: 3 })
   .map((segments) => segments.join("/"));
-
-/**
- * Percent-encodes every character of an ASCII string to its `%XX` form
- * ("A" → "%41", "5" → "%35"). Builds over-encoded constraint inputs whose raw
- * form differs from the decoded value — the discriminating shape for the
- * decode-then-validate contract (#857/#859).
- */
-export function percentEncodeAscii(value: string): string {
-  let out = "";
-
-  for (const ch of value) {
-    const code = ch.codePointAt(0) ?? 0;
-
-    out += `%${code.toString(16).toUpperCase().padStart(2, "0")}`;
-  }
-
-  return out;
-}
 
 /**
  * Arbitrary string covering the full Unicode range for pure encoding-function

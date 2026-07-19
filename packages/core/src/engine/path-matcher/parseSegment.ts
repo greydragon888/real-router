@@ -9,46 +9,40 @@
  * class — #858 / #1050 / #1150 / #1311 / #1149 / #1324).
  *
  * A single left-to-right `charCodeAt` scan produces either a token tuple or a
- * typed error. Grammar (RFC §4):
+ * typed error. Grammar — **3 tokens only** (`static | :param | *splat`); the
+ * grammar has no optional `:x?` or `<re>` constraint forms. Any `<`/`>` or a
+ * post-name `?` in the path is a *registration error* carrying a replacement
+ * recipe (`optional-removed` / `constraint-removed`), not a token:
  * 1. Leading `:`/`*` → param/splat; otherwise `static` (a marker glued *after* a
- *    static prefix ⇒ `fused-marker`; a `<...>` in a marker-less segment ⇒
- *    `constraint-in-static`; a trailing `?` on a marker-less segment ⇒ `name-less`
- *    — the optional modifier has no param name, #1241 / `/faq?`).
+ *    static prefix ⇒ `fused-marker`; any `<`/`>` (a former constraint) ⇒
+ *    `constraint-removed`; a trailing `?` on a marker-less segment ⇒ `name-less`
+ *    — the modifier has no param name, #1241 / `/faq?`).
  * 2. name = any char except `<`/`?` (no `/` remains inside a segment); a name
  *    ending in a bare `:`/`*` ⇒ `trailing-marker` (#1324). A *mid* marker stays
  *    a name char — `:a:b` → name `a:b`, preserved.
  * 3. empty name ⇒ `name-less` (#858).
- * 4. constraint = `<...>` after the name; unbalanced/`<>` ⇒ `unbalanced`/`empty`
- *    (#804); text after `>` other than a trailing `?` ⇒ `fused-constraint-suffix`
- *    (#1150).
- * 5. a trailing `?` ⇒ optional; on a splat ⇒ `optional-splat` (#1149).
+ * 4. a `<` after the name (a former `<re>` constraint) ⇒ `constraint-removed`.
+ * 5. a post-name `?` (a former optional modifier, on `:param` or `*splat`) ⇒
+ *    `optional-removed`.
  *
  * @module parseSegment
  */
 
-/* eslint-disable unicorn/prefer-code-point, sonarjs/cognitive-complexity -- charCodeAt code-unit scan + a single inlined branchy pass are this RFC's char-scan perf basis (§9); the same deliberate choices as registration/trie.ts hasNonAsciiSegment (#1285) and SegmentMatcher's inlined #traverseFrom (:550). Markers compared are ASCII (`:` `*` `<` `?`, < 0x80). */
+/* eslint-disable unicorn/prefer-code-point, unicorn/prefer-includes-over-repeated-comparisons, sonarjs/cognitive-complexity -- charCodeAt code-unit scan + a single inlined branchy pass are this RFC's char-scan perf basis (§9); the same deliberate choices as registration/trie.ts hasNonAsciiSegment (#1285) and SegmentMatcher's inlined #traverseFrom. A `[LT,GT,QUESTION].includes(code)` boundary check would allocate an array literal per scanned char. Markers compared are ASCII (`:` `*` `<` `>` `?`, < 0x80). */
 
-/** A successfully tokenized segment. */
+/** A successfully tokenized segment (3-token grammar: `static | :param | *splat`). */
 export type SegmentTokens =
   | { readonly kind: "static"; readonly text: string }
-  | {
-      readonly kind: "param";
-      readonly name: string;
-      readonly constraint?: string;
-      readonly optional: boolean;
-    }
+  | { readonly kind: "param"; readonly name: string }
   | { readonly kind: "splat"; readonly name: string };
 
-/** Grammar-shape rejections, each mirroring an existing registration guard. */
+/** Grammar-shape rejections, each mirroring a registration guard. */
 export type SegmentErrorCode =
   | "name-less" // #858 — a marker with no name
   | "trailing-marker" // #1324 — a param name ending in a bare `:`/`*`
   | "fused-marker" // #1050 — a marker glued after a static prefix
-  | "fused-constraint-suffix" // #1150 — static text after a constraint's `>`
-  | "constraint-in-static" // #1311 — a `<...>` in a marker-less segment
-  | "optional-splat" // #1149 — `*name?`
-  | "unbalanced-constraint" // #804 — `<` with no matching `>`
-  | "empty-constraint"; // #804 — `<>` (compiles to a never-matching `^()$`)
+  | "optional-removed" // M1 — a `:x?`/`*x?` optional modifier (removed; two sibling routes)
+  | "constraint-removed"; // M1 — a `<re>` constraint or stray `<`/`>` (removed; validate in a guard)
 
 export interface SegmentError {
   readonly error: SegmentErrorCode;
@@ -64,14 +58,12 @@ const SLASH = 47; // /
 const isMarker = (code: number): boolean => code === COLON || code === STAR;
 
 /**
- * Splits a path into its `/`-delimited segments — but NOT on a `/` inside a
- * `<...>` constraint, whose body may legally contain `/` (e.g. `:id<a/b>`, which
- * the current whole-path `buildParamMeta` scan tolerates). First-`>` semantics,
- * matching the constraint grammar (`<[^>]*>`). This is the **segmentation** half
- * of the path-grammar unification: `parseSegment` owns the per-segment grammar,
- * `splitPathSegments` owns where a segment begins and ends. Reused by every layer
- * that must go from a path string to per-segment tokens (L1 now; L3 in a later
- * phase), so segmentation itself can never drift.
+ * Splits a path into its `/`-delimited segments. A plain `/`-split (M1): the
+ * 3-token grammar has no `<...>` constraint whose body could legally contain a
+ * `/`, so no constraint-awareness is needed — a stray `<`/`>` is a
+ * `constraint-removed` error, caught per segment by `parseSegment`. This is the
+ * **segmentation** half of the path-grammar unification: `parseSegment` owns the
+ * per-segment grammar, `splitPathSegments` owns where a segment begins and ends.
  *
  * @param path - a route path (query already stripped by the caller)
  * @returns the segments in order, including empty leading/trailing/`//` segments
@@ -80,19 +72,14 @@ const isMarker = (code: number): boolean => code === COLON || code === STAR;
 export function splitPathSegments(path: string): string[] {
   const segments: string[] = [];
   let start = 0;
-  let inConstraint = false;
 
   for (let i = 0; i < path.length; i += 1) {
-    const code = path.charCodeAt(i);
-
-    if (code === LT) {
-      inConstraint = true;
-    } else if (code === GT) {
-      inConstraint = false;
-    } else if (code === SLASH && !inConstraint) {
-      segments.push(path.slice(start, i));
-      start = i + 1;
+    if (path.charCodeAt(i) !== SLASH) {
+      continue;
     }
+
+    segments.push(path.slice(start, i));
+    start = i + 1;
   }
 
   segments.push(path.slice(start));
@@ -118,35 +105,33 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
     for (let i = 0; i < length; i += 1) {
       const code = segment.charCodeAt(i);
 
-      // A `<...>` in a marker-less segment reshapes the route (#1311).
-      if (code === LT) {
-        return { error: "constraint-in-static" };
+      // A `<`/`>` (a former `<re>` constraint or a stray delimiter) is no longer
+      // grammar — M1 removed constraints. Reject with the constraint recipe.
+      if (code === LT || code === GT) {
+        return { error: "constraint-removed" };
       }
 
       // A marker glued after a static prefix is extracted as a param by build/meta
       // but compiled as a static literal by the trie (#1050) — reject it as fused.
-      // Two placements are NOT fused: a marker ENDING the segment (a static ending in
-      // `:`/`*` — `/a:`, `/a*`, F2 — caught by `i + 1 < length` being false), and a
-      // marker followed by `<` (the constraint-in-static case `a<b>`, caught by the
-      // `<` branch above). Every OTHER following char is fused — including a `?`
-      // (`a:?`): that shape never reaches the tokenizer through a real path (a `?`
-      // after a bare marker is not a valid `:name?` optional, so the query mask strips
-      // it before `/`-segmentation), so a direct call correctly reports fused-marker.
-      if (
-        isMarker(code) &&
-        i + 1 < length &&
-        segment.charCodeAt(i + 1) !== LT
-      ) {
+      // A marker ENDING the segment (a static ending in `:`/`*` — `/a:`, `/a*`, F2)
+      // is NOT fused: caught by `i + 1 < length` being false. Every other following
+      // char is fused — including a `?` (`a:?`): that shape never reaches the
+      // tokenizer through a real path (a `?` after a bare marker is not a valid
+      // `:name?` form, so the query mask strips it before `/`-segmentation), so a
+      // direct call correctly reports fused-marker. (`a<`/`a>` already returned
+      // `constraint-removed` above, so no `<`-follows exception is needed here.)
+      if (isMarker(code) && i + 1 < length) {
         return { error: "fused-marker" };
       }
     }
 
-    // A trailing `?` is the optional modifier; on a marker-less segment (no param
-    // name) it is an optional-with-no-name — name-less (#858/#1241, `/faq?`). The
-    // backstop rejects it by the SAME rule: its `endsWith("?")` optional fork routes
-    // the segment to `extractParamName` → this tokenizer. Owning the `?` modifier
-    // here (not just in the marker branches) is what lets the gate and backstop
-    // agree on it — otherwise the gate reads `faq?` as a valid static (#1324 §4).
+    // A trailing `?` is a former optional modifier; on a marker-less segment (no
+    // param name) it is a modifier-with-no-name — name-less (#858/#1241, `/faq?`),
+    // NOT `optional-removed` (there is no param to route to two siblings). The
+    // backstop rejects it by the SAME rule: its `endsWith("?")` fork routes the
+    // segment to `extractParamName` → this tokenizer. Owning the `?` here (not
+    // only in the marker branch) is what lets the gate and backstop agree on it —
+    // otherwise the gate reads `faq?` as a valid static (#1324 §4).
     if (segment.charCodeAt(length - 1) === QUESTION) {
       return { error: "name-less" };
     }
@@ -156,13 +141,14 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
 
   const splat = segment.charCodeAt(0) === STAR;
 
-  // ---- name: up to the first `<` or `?` (a segment holds no `/`) ---------
+  // ---- name: up to the first `<`/`>` (former constraint delimiter, reserved —
+  // В1.3) or `?` (former optional). A segment holds no `/`. -----------------
   let cursor = 1;
 
   while (cursor < length) {
     const code = segment.charCodeAt(cursor);
 
-    if (code === LT || code === QUESTION) {
+    if (code === LT || code === GT || code === QUESTION) {
       break;
     }
 
@@ -179,52 +165,18 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
     return { error: "trailing-marker" }; // #1324
   }
 
-  // ---- constraint + optional --------------------------------------------
-  let constraint: string | undefined;
-  let optional = false;
-
+  // ---- former constraint / optional modifiers (removed in M1) ------------
+  // The name scan stops at the first `<`/`>` or `?`. Either is a form removed
+  // in M1: a `<re>` constraint (also a stray `<`/`>` — В1.3), or a `:x?`/`*x?`
+  // optional. Only `?` is the optional; `<`/`>` are the constraint recipe.
+  // Reject with the matching replacement recipe rather than tokenize it.
   if (cursor < length) {
-    if (segment.charCodeAt(cursor) === LT) {
-      const close = segment.indexOf(">", cursor + 1);
-
-      if (close === -1) {
-        return { error: "unbalanced-constraint" }; // #804
-      }
-
-      if (close === cursor + 1) {
-        return { error: "empty-constraint" }; // #804 — `<>`
-      }
-
-      constraint = segment.slice(cursor, close + 1);
-
-      const after = close + 1;
-
-      if (after < length) {
-        // Only a trailing `?` may follow a constraint (matches the current
-        // `(\?)?` capture); any other text is fused (#1150).
-        if (segment.charCodeAt(after) === QUESTION) {
-          optional = true;
-        } else {
-          return { error: "fused-constraint-suffix" };
-        }
-      }
-    } else {
-      // segment.charCodeAt(cursor) === QUESTION
-      optional = true;
-    }
+    return segment.charCodeAt(cursor) === QUESTION
+      ? { error: "optional-removed" }
+      : { error: "constraint-removed" }; // LT or GT
   }
 
-  if (splat) {
-    if (optional) {
-      return { error: "optional-splat" }; // #1149
-    }
-
-    return { kind: "splat", name };
-  }
-
-  return constraint === undefined
-    ? { kind: "param", name, optional }
-    : { kind: "param", name, constraint, optional };
+  return splat ? { kind: "splat", name } : { kind: "param", name };
 }
 
 /**
@@ -256,34 +208,67 @@ export function findSegmentGrammarError(
   return undefined;
 }
 
+/** A removed-form (M1) match, describing the offending segment and — for an
+ * optional — the two sibling paths that replace it (path without the optional
+ * segment + path with the param made required). The route-tree gate uses this to
+ * build a route-contextual replacement recipe; the matcher backstop uses only the
+ * error code (a shorter, path-free recipe). */
+export type RemovedForm =
+  | {
+      readonly code: "optional-removed";
+      readonly segment: string;
+      readonly withoutSegment: string;
+      readonly requiredForm: string;
+    }
+  | { readonly code: "constraint-removed"; readonly segment: string };
+
 /**
- * Whether a path places ≥2 optional params DIRECTLY before a splat
- * (`/:a?/:b?/*rest`, `/:a<c>?/:b<c>?/*rest`, #1287). A single trie slot carries
- * only one optional→splat fork, so the outer optional's mark overwrites the
- * inner's — the omit-outer/take-inner form silently reshapes into the splat.
+ * The rich (route-tree gate) view over the tokenizer for a removed form: finds
+ * the first `optional-removed` / `constraint-removed` segment and, for an
+ * optional, computes its two replacement sibling paths from the ACTUAL path
+ * (dropping the segment → without-form; dropping the trailing `?` → required
+ * form). Returns `undefined` if no removed form is present (the gate then uses
+ * `findSegmentGrammarError` for a surviving grammar rejection).
  *
- * A whole-path (cross-segment) property that `parseSegment` cannot decide per
- * segment — so, like `isConstraintBalanced`, it is shared verbatim between the
- * matcher's `registerTree` backstop and `route-tree`'s validation gate, and the
- * two cannot drift. Runs on the RAW path: `splitPathSegments` is constraint-aware,
- * so a `<[^/]+>` body does not break the segment split.
+ * @param path - a route path (query already stripped by the caller)
  */
-export function hasMultipleOptionalsBeforeSplat(path: string): boolean {
+export function describeRemovedForm(path: string): RemovedForm | undefined {
   const segments = splitPathSegments(path);
 
-  for (let i = 2; i < segments.length; i += 1) {
-    if (
-      segments[i].startsWith("*") &&
-      isOptionalParamSegment(segments[i - 1]) &&
-      isOptionalParamSegment(segments[i - 2])
-    ) {
-      return true;
+  for (let i = 0; i < segments.length; i += 1) {
+    const token = parseSegment(segments[i]);
+
+    if (!("error" in token)) {
+      continue;
     }
+
+    // First error wins (mirrors `findSegmentGrammarError`): describe it ONLY if
+    // it is a removed form, else return undefined so the caller falls to the
+    // surviving-code message — this keeps the gate's reason in lockstep with the
+    // matcher backstop's first-error verdict.
+    if (token.error === "optional-removed") {
+      const segment = segments[i];
+      const required = [...segments];
+
+      // Drop the `?` optional modifier AND everything after it (the tokenizer
+      // stopped the name at the first `?`, so it is the modifier). Using the `?`
+      // index — not a blind `slice(0, -1)` — keeps the required sibling VALID for
+      // a reverse/compound form whose `?` is not the last char: `:b?<x>` → `:b`
+      // (not `:b?<x`), `:id??` → `:id` (not `:id?`). #1516
+      required[i] = segment.slice(0, segment.indexOf("?"));
+
+      return {
+        code: "optional-removed",
+        segment,
+        withoutSegment: segments.filter((_, j) => j !== i).join("/"),
+        requiredForm: required.join("/"),
+      };
+    }
+
+    return token.error === "constraint-removed"
+      ? { code: "constraint-removed", segment: segments[i] }
+      : undefined;
   }
 
-  return false;
-}
-
-function isOptionalParamSegment(segment: string): boolean {
-  return segment.startsWith(":") && segment.endsWith("?");
+  return undefined;
 }

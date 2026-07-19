@@ -220,30 +220,6 @@ describe("core/routes/routePath/buildPath", () => {
       });
     });
 
-    describe("constraint violation", () => {
-      it("should throw when param violates constraint", () => {
-        routesApi.add({
-          name: "user",
-          path: String.raw`/user/:id<\d+>`,
-        });
-
-        expect(() => router.buildPath("user", { id: "abc" })).toThrow(
-          /does not match constraint/,
-        );
-      });
-
-      it("should pass when param matches constraint", () => {
-        routesApi.add({
-          name: "user",
-          path: String.raw`/user/:id<\d+>`,
-        });
-
-        const path = router.buildPath("user", { id: "123" });
-
-        expect(path).toBe("/user/123");
-      });
-    });
-
     describe("encoder errors", () => {
       it("should propagate custom errors from encoder", () => {
         routesApi.add({
@@ -314,8 +290,8 @@ describe("core/routes/routePath/buildPath", () => {
     });
 
     describe("array parameter values", () => {
-      it("should accept array with custom constraint", () => {
-        routesApi.add({ name: "user", path: "/user/:ids<.*>" });
+      it("should accept an array param value", () => {
+        routesApi.add({ name: "user", path: "/user/:ids" });
 
         const path = router.buildPath("user", { ids: ["1", "2", "3"] });
 
@@ -376,10 +352,10 @@ describe("core/routes/routePath/buildPath", () => {
         expect(path).toBe("/user/encoded-42");
       });
 
-      it("should work with encoder + defaultParams + constraint", () => {
+      it("should work with encoder + defaultParams", () => {
         routesApi.add({
           name: "user",
-          path: String.raw`/user/:id<\d+>`,
+          path: "/user/:id",
           defaultParams: { id: "0" },
           encodeParams: (params) => {
             // Increment the id
@@ -389,22 +365,10 @@ describe("core/routes/routePath/buildPath", () => {
           },
         });
 
-        // Default "0" → encoder makes "1" → constraint \d+ passes
+        // Default "0" → encoder makes "1"
         const path = router.buildPath("user");
 
         expect(path).toBe("/user/1");
-      });
-
-      it("should fail constraint check after encoder transforms value", () => {
-        routesApi.add({
-          name: "user",
-          path: String.raw`/user/:id<\d+>`,
-          encodeParams: () => ({ id: "not-a-number" }),
-        });
-
-        expect(() => router.buildPath("user", { id: "42" })).toThrow(
-          /does not match constraint/,
-        );
       });
     });
 
@@ -497,7 +461,7 @@ describe("core/routes/routePath/buildPath", () => {
 
       describe("URL path params encoding", () => {
         it("should URL-encode spaces in path params", () => {
-          routesApi.add({ name: "user", path: "/user/:name<.*>" });
+          routesApi.add({ name: "user", path: "/user/:name" });
 
           const path = router.buildPath("user", { name: "John Doe" });
 
@@ -505,7 +469,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode Cyrillic in path params", () => {
-          routesApi.add({ name: "user", path: "/user/:name<.*>" });
+          routesApi.add({ name: "user", path: "/user/:name" });
 
           const path = router.buildPath("user", { name: "Иван" });
 
@@ -513,7 +477,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode special URL characters in path params", () => {
-          routesApi.add({ name: "file", path: "/file/:path<.*>" });
+          routesApi.add({ name: "file", path: "/file/:path" });
 
           const path = router.buildPath("file", { path: "dir/file.txt" });
 
@@ -533,7 +497,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should preserve colon in path params", () => {
-          routesApi.add({ name: "time", path: "/time/:value<.*>" });
+          routesApi.add({ name: "time", path: "/time/:value" });
 
           const path = router.buildPath("time", { value: "12:30:00" });
 
@@ -541,7 +505,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode at-sign in path params (gen-delim per RFC 3986)", () => {
-          routesApi.add({ name: "user", path: "/user/:email<.*>" });
+          routesApi.add({ name: "user", path: "/user/:email" });
 
           const path = router.buildPath("user", { email: "user@example.com" });
 
