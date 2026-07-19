@@ -2,7 +2,7 @@
 "@real-router/route-utils": minor
 ---
 
-Depend on `@real-router/core` as a peer and source types from it
+Depend on `@real-router/core` as a peer and source types from it (#1520)
 
 `route-utils` previously took a direct dependency on the standalone `@real-router/types`
 package. With types folded into `@real-router/core` (wave-2), it now declares

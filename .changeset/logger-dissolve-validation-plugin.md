@@ -2,7 +2,7 @@
 "@real-router/validation-plugin": patch
 ---
 
-Drop the `@real-router/logger` dependency
+Drop the `@real-router/logger` dependency (#1520)
 
 The standalone `@real-router/logger` package was dissolved into `@real-router/core`. The
 plugin's threshold/overwrite validators now emit through the router's per-instance logger

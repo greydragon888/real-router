@@ -2,7 +2,7 @@
 "@real-router/core": minor
 ---
 
-Fold `@real-router/types` into `@real-router/core`
+Fold `@real-router/types` into `@real-router/core` (#1520)
 
 The standalone `@real-router/types` package is dissolved: its types now ship **with**
 `@real-router/core`. Import them from the package root (`import type { State, Params } from

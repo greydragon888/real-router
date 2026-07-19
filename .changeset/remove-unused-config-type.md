@@ -2,7 +2,7 @@
 "@real-router/core": minor
 ---
 
-Remove the unused public `Config` type
+Remove the unused public `Config` type (#1520)
 
 The `Config` interface (exported from `@real-router/core/types`) is removed. It was a
 vestigial public export consumed by nothing — not `@real-router/core` internally, and not

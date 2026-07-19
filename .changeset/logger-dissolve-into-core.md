@@ -2,7 +2,7 @@
 "@real-router/core": patch
 ---
 
-Dissolve `@real-router/logger` into core as a per-router `RouterLogger`
+Dissolve `@real-router/logger` into core as a per-router `RouterLogger` (#1520)
 
 The standalone `@real-router/logger` package has been folded into `@real-router/core`
 (`core/src/foundation/logger/`). The former process-global **singleton** logger is
