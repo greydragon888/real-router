@@ -19,25 +19,20 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { familyOf } from "./rme-policy.mjs";
+
 const CR = join(dirname(fileURLToPath(import.meta.url)), "..");
-const RESULTS = join(CR, "results");
+// RME_RESULTS_DIR override — lets CI probes / mutational self-tests point the gate at a
+// scratch copy of results/ without touching the real tree (audit 07-18 K4 validation).
+const RESULTS = process.env.RME_RESULTS_DIR ?? join(CR, "results");
 const FW = ["react", "vue", "solid", "svelte", "angular"];
 
-// Inherently-noisy metric families — CDP Blink trace (history.pushState), wall-clock
-// latency, and FCP have a fat RME tail by nature → the looser `noisy` bound (still gated).
-const isNoisy = (k) => /blink|latency|fcp/i.test(k);
-
-// SWEEP single-nav-per-size points (`<metric>@N`: navMsWall@N / navMsTask@N / scriptMs@N,
-// blinkMs@N, …) are REPORT-ONLY — never a gate failure. A sweep measures ONE nav per size
-// (not the N-summed windows the per-nav scenarios use), so a point's absolute RME is
-// single-nav quantization noise, NOT instability (navMsWall@N is `perf.now` ~100 µs
-// clamp-quantized; the 07-18 CI run saw svelte search-param-scaling `blinkMs@32` at 53 % on
-// CONSISTENT hardware). The matcher-scaling CURVE is what matters, not the per-point
-// absolute — so a hot @N point must never fail a healthy matrix (completeness + the stable
-// per-nav / heap / throughput signals catch real breakage). Scanned and printed for
-// visibility, excluded from the exit code. The per-nav `navMsWall`/`navMsTask` (NO `@` —
-// they sum N navs, so they are clean) stay stable-gated (≤ stable).
-const isSweep = (k) => /@\d+$/.test(k);
+// Family classification (sweep-point = report-only · noisy ≤ NOISY · stable ≤ STABLE)
+// lives in rme-policy.mjs — SHARED with ci-summary's noise watch so gate and watch can't
+// drift (audit 07-18 K16). Scenario-scoped sweep-point rule: ONLY the single-nav-per-size
+// sweeps (wide/deep/search) are report-only; cold-start @10 keys, table-heap jsHeapMB@100,
+// link-build mountMs@N and the N-summed active/nested windows STAY GATED — the blanket
+// /@\d+$/ rule (c5fe977e) had silently ungated 5/13 deck GRID rows (audit 07-18 K4).
 
 function* resultFiles(cohort) {
   const root = join(RESULTS, cohort);
@@ -84,11 +79,11 @@ for (const cohort of cohorts) {
     for (const [k, s] of Object.entries(data.metrics ?? {})) {
       if (s == null || typeof s.rme !== "number") continue;
       scanned++;
-      if (isSweep(k)) {
+      const family = familyOf(scen, k);
+      if (family === "sweep-point") {
         if (s.rme > noisy) sweepNoise.push({ cohort, scen, engine, k, rme: s.rme, n: s.n });
         continue; // report-only — a single-nav sweep point never fails the gate
       }
-      const family = isNoisy(k) ? "noisy" : "stable";
       const limit = family === "noisy" ? noisy : stable;
       if (s.rme > limit) violations.push({ cohort, scen, engine, k, rme: s.rme, family, limit, n: s.n });
     }
@@ -102,7 +97,7 @@ if (!existsSync(RESULTS) || scanned === 0) {
 
 violations.sort((a, b) => b.rme - a.rme);
 console.log(
-  `RME-gate — stable ≤ ${stable}% · noisy(blink/latency/fcp) ≤ ${noisy}% · sweep @N report-only · min-n ≥ ${minN} · scanned ${scanned} metrics across ${cohorts.join("/")}\n`,
+  `RME-gate — stable ≤ ${stable}% · noisy(blink/latency/fcp/windowed-@N) ≤ ${noisy}% · single-nav sweep @N (wide/deep/search) report-only · min-n ≥ ${minN} · scanned ${scanned} metrics across ${cohorts.join("/")}\n`,
 );
 if (sweepNoise.length > 0) {
   sweepNoise.sort((a, b) => b.rme - a.rme);

@@ -10,6 +10,10 @@
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
 const TARGETS = [1, 2, 4, 8, 16, 32]; // shared-layout depth above the a/b switch
+// K10 live-control knob: reverse the sweep order — the residual first-point bump (if
+// any survives the sacrificial episode) must FOLLOW the position, not the size.
+// Measure-only: write-cell refuses to persist under this knob.
+if (process.env.BENCH_REVERSE_TARGETS === "1") TARGETS.reverse();
 const WARMUP_NAVS = 6;
 const MEASURE_NAVS = 20;
 const BLINK_NAVS = 16;
@@ -32,22 +36,16 @@ export const nestedSwitch = {
         return performance.now() - t0;
       }, navs);
 
-    // Pre-sweep warmup (#1453 class): the first goto in a fresh context is colder than
-    // the rest (one-time app parse/compile), so the first swept depth reads slightly
-    // high vs its warm neighbours. Warm the realm once (goto a mid depth + toggles)
-    // so every measured point is steady-state.
-    try {
-      let wparent = "sec";
-      for (let k = 2; k <= 8; k++) wparent += `/l${k}`;
-      await page.goto(new URL(`${wparent}/a?n=8`, baseURL).href, { waitUntil: "load" });
-      await page.waitForSelector('[data-testid="page-item"]');
-      await page.waitForSelector('[data-testid="link-sec-b"]');
-      await drive(WARMUP_NAVS);
-    } catch (warmErr) {
-      console.error(`nested-switch warmup: ${warmErr.message}`);
-    }
-
-    for (const depth of TARGETS) {
+    // Sacrificial first episode (audit 07-18 K10 — replaces the lighter mid-size
+    // pre-warm): even WITH a pre-warm, the first measured point read systematically
+    // high, and the residual bump is NOT cross-engine-uniform (rr 1.08–1.24×,
+    // solid-router 1.30 — direction varies by engine), tinting first-point classes.
+    // Run the FULL point pipeline once at TARGETS[0] and discard the numbers — every
+    // retained point then has an identical warm predecessor. (Live control —
+    // TARGETS.reverse(), the bump must follow the position — is the owner's re-run.)
+    const POINTS = [TARGETS[0], ...TARGETS]; // POINTS[0] = sacrificial, discarded
+    for (const [idx, depth] of POINTS.entries()) {
+      const record = idx > 0;
       try {
       // parent path of the a/b leaves at this depth: /sec/l2/.../l{depth}
       let parent = "sec";
@@ -64,6 +62,7 @@ export const nestedSwitch = {
       const before = await getMetrics(client);
       const wallTotalMs = await drive(MEASURE_NAVS);
       const after = await getMetrics(client);
+      if (!record) continue; // sacrificial episode — numbers discarded (K10)
       out[`navMsTask@${depth}`] =
         ((after.TaskDuration - before.TaskDuration) * 1000) / MEASURE_NAVS;
       out[`scriptMs@${depth}`] =

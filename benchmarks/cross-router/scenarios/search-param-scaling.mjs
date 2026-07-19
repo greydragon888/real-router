@@ -21,8 +21,10 @@
 // transitions are symmetric ~0.19 ms in a warmed realm. Absolutes now reflect the true
 // steady-state per-nav cost; the flat-then-O(count) SHAPE is unchanged. (The
 // depth/link-count sweeps can't do this — their N is a load-time param, so per-point
-// reload stays forced and their small first-point bump is an accepted, cross-engine-
-// uniform artifact.)
+// reload stays forced. Their residual first-point bump proved NOT cross-engine-uniform
+// — audit 07-18 K10: rr 1.08–1.69×, sv-router up to 2.2×, direction varies by engine —
+// so nested/active/wide now run a sacrificial first episode at TARGETS[0], discarded,
+// before the measured sweep; search itself is one-realm and immune.)
 import {
   getMetrics,
   sampleAllocationBytes,
@@ -31,7 +33,14 @@ import {
 
 const COUNTS = [1, 2, 4, 8, 16, 32, 64, 128, 256];
 const WARM_PASSES = 5; // full sweeps of the count range to tier-up the realm before measuring
-const ALLOC_NAVS = 60;
+// 60→20 (2026-07-19): the toggle navs are rAF-poll-paced (≥1 frame each — ~17 ms on a
+// 60 Hz headless runner), so this pass dominated the scenario's runtime (~65% local).
+// Same-session A/B ×3 vue engines certified the cut: Δ(20 vs 60) = −0.78%/+0.09%/+0.32%
+// (rr/vue-router/tanstack), each inside its arm's 95% CI; fixed per-window overhead
+// F≈3 KB ⇒ +0.1 KB/nav (<0.1%); per-sample RME grows ×√3 to ≤0.3% (gate 15). The
+// window still starts at `lo` (post-setup) so every sampled nav is real and the 50/50
+// hi↔lo mix (K8) is unchanged.
+const ALLOC_NAVS = 20;
 
 export const searchParamScaling = {
   name: "search-param-scaling",

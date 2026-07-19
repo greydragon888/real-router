@@ -50,9 +50,11 @@ export const linkBuild = {
     // (once any mount has run, the path is compiled). Without it the first swept point
     // reads ~4x its true cost — a universal cold-start floor, NOT per-link work: the
     // bare-framework `_baseline` shows the identical @4-vs-@8 hook. One throwaway
-    // mount warms the path so every measured point is steady-state.
+    // mount at TARGETS[0] — the first MEASURED page, so its predecessor is identical
+    // (audit 07-18 K10 alignment; the class's TARGETS.reverse() live check is the
+    // owner's re-run) — warms the path so every measured point is steady-state.
     try {
-      await page.goto(new URL(`?n=32`, baseURL).href, { waitUntil: "load" });
+      await page.goto(new URL(`?n=${TARGETS[0]}`, baseURL).href, { waitUntil: "load" });
       await page.waitForSelector('[data-testid="mount-links"]');
       await mountMeasure();
     } catch (warmErr) {

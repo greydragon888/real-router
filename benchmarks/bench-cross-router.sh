@@ -4,7 +4,8 @@
 # Sibling of bench-compare.sh.bak, but for the cross-router (Playwright + CDP) suite.
 #
 # Rebuilds every package's dist, gates on machine readiness for a ~3 h unattended
-# run, and — on success — runs the full n=15 matrix across all cohorts, writing
+# run, and — on success — runs the full matrix across all cohorts (default n=15;
+# the REFERENCE results/ — the deck source — is n=50: use --runs 50), writing
 # results/ (the source for the infographic deck; text REPORT-*.md are retired).
 #
 # ROOT vs USER split (why this is not a straight bench-compare.sh.bak clone):
@@ -73,7 +74,7 @@ show_help() {
     echo "  -h, --help  Show this help"
     echo ""
     echo "Environment variables:"
-    echo "  RUNS               Samples per cell                     (default: 15)"
+    echo "  RUNS               Samples per cell   (default: 15; reference results/ = 50)"
     echo "  COOLDOWN           Fallback cooldown, thermal unreadable (default: 60)"
     echo "  MAX_COOLDOWN_WAIT  Max thermal cooldown between cohorts  (default: 300)"
     echo "  RME_STABLE         RME % gate, stable families          (default: 15)"
@@ -83,6 +84,7 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  sudo ./bench-cross-router.sh                  # rebuild + all 5 cohorts, n=15"
+    echo "  sudo ./bench-cross-router.sh --runs 50        # reference-grade refresh (results/ deck source is n=50)"
     echo "  sudo ./bench-cross-router.sh --smoke          # dry-run first, then the full run"
     echo "  sudo ./bench-cross-router.sh angular          # just the angular cohort"
     echo "  sudo ./bench-cross-router.sh --runs 30 solid  # solid cohort at n=30"
@@ -420,17 +422,31 @@ else
     fi
 fi
 
+# Instrument №2 — isolated matcher microbench (pure Node, minutes). Refreshed HERE so it
+# shares the exact dist epoch of the browser matrix that follows: a deck rebuilt later
+# from results/ + matcher-bench/results.json then can't pair fresh browser cells with
+# stale matcher curves under one stamp (audit 07-18 G1o/K12 — this step mirrors the CI
+# workflow's bundle → matcher-bench → run-all order).
+echo ""
+echo -e "${YELLOW}[Step 4b] Isolated matcher-bench (wide + deep sweeps, pure Node)...${NC}"
+if as_user "cd '$SCRIPT_DIR' && node --expose-gc cross-router/matcher-bench/run.mjs all"; then
+    echo -e "${GREEN}  ✓ matcher-bench refreshed (cross-router/matcher-bench/results.json)${NC}"
+else
+    echo -e "${RED}  ✗ matcher-bench failed — the deck's wide/deep cards would go stale; aborting before the matrix.${NC}"
+    exit 1
+fi
+
 # -----------------------------------------------------------------------------
 # Step 5: Optional smoke (n=1 dry matrix) — fail fast before the long run
 # -----------------------------------------------------------------------------
 if [[ "$SMOKE" == true ]]; then
     echo ""
     echo -e "${YELLOW}[Step 5] Smoke (n=1) — every app builds + drives before the ~3 h run...${NC}"
-    echo "  (writes throwaway n=1 results; the real n=$RUNS run overwrites them.)"
+    echo "  (measure-only: n=1 is below the N_MIN=10 smoke-grade floor, so nothing is written to results/ (#1455).)"
     SMOKE_FAILED=""
     for cohort in "${COHORTS[@]}"; do
         echo -e "${BLUE}  smoke: $cohort...${NC}"
-        if as_user "cd '$SCRIPT_DIR' && node cross-router/run-all.mjs 1 $cohort"; then
+        if as_user "cd '$SCRIPT_DIR' && BENCH_SMOKE=1 node cross-router/run-all.mjs 1 $cohort"; then
             echo -e "${GREEN}  ✓ $cohort smoke ok${NC}"
         else
             echo -e "${RED}  ✗ $cohort smoke FAILED${NC}"
@@ -542,6 +558,6 @@ if [[ -n "$LOAD_FLAGGED" ]]; then
 fi
 if [[ -z "$FAILED_COHORTS" && -z "$RME_FLAGGED" && -z "$SANITY_FLAGGED" && -z "$LOAD_FLAGGED" ]]; then
     echo -e "${GREEN}  ✓ clean run — all cohorts complete, RME + sub-ms sanity clean.${NC}"
-    echo -e "${GREEN}    Rebuild the infographic deck from results/.${NC}"
+    echo -e "${GREEN}    Rebuild the infographic deck: results/ + matcher-bench/results.json (same epoch) → deck-extract → build-deck.${NC}"
 fi
 echo ""

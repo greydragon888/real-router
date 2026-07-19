@@ -48,7 +48,7 @@ input (the `O(1)` constant of input marshalling does not change a curve's slope)
 | engine | pure match entry | resolution |
 | --- | --- | --- |
 | real-router | `getPluginApi(router).matchPath(url)` | `@real-router/core` + `/api` |
-| react-router | `matchRoutes(routes, url)` | `react-router` |
+| react-router | prebuilt branches → `matchRoutesImpl(routes, url, "/", false, branches)` — Data-mode parity: the bench app's `createBrowserRouter` prebuilds branches once; the public `matchRoutes` re-flattens per call (audit 07-18 K6) | `react-router` + deep-import `lib/router/utils.js` |
 | tanstack | `router.matchRoutes(loc)` | `@tanstack/react-router` (matcher = shared `@tanstack/router-core`) |
 | vue-router | `router.resolve(url)` | `vue-router` |
 | solid-router | `getRouteMatches(createBranches(routes), url)` | direct file `@solidjs/router/dist/routing.js` |
@@ -79,7 +79,13 @@ Isolated µs per match at N = 1024 (representative run):
 
 (Absolutes are Node V8 and vary with the machine; the **O-class and shape** are what the
 card reports. react-router's absolute includes re-flattening branches every call — its
-public `matchRoutes` does this; `createBrowserRouter` may amortize it across navigations.)
+public `matchRoutes` does this; a Data-mode router (`createBrowserRouter`) builds branches
+**once** in its constructor and matches with them precomputed, amortizing that construct
+across navigations — audit probes (2026-07-18) put the per-call flatten at 75–81% of the
+wide figure, so the amortized wide cost is ~4–5× lower while the O(N) slope stands.
+The extraction now prebuilds branches itself — Data-mode parity, audit 07-18 K6 — so the
+react-router rows in BOTH tables are the pre-fix per-call figures until the next
+matcher-bench run refreshes `results.json`.)
 
 ## Deep tree match — depth sweep
 
@@ -95,14 +101,17 @@ match at depth 90 (representative run):
 | tanstack | O(depth) | ~70 | walks the parent chain per level too; rr wins **~25×** |
 | sv-router | O(depth) | ~202 | heavy constant (rr wins ~72×) |
 | solid-router | O(depth) | ~273 | heavy constant (rr wins ~99×) |
-| react-router | **catastrophic** (#15249) | **~5900** | parabola peaking @60 (**9.6 ms**); re-flatten + re-rank every call |
+| react-router | **catastrophic** (#15249) | **~5900** | parabola peaking @60 (**9.6 ms**); re-flatten + re-rank every call — 92–98% construct @90; amortized (Data mode) ≈ 0.11 ms, still O(depth) + rescan |
 
 > ⚠️ **Fixed 2026-07-16 (independent audit, C9):** an earlier version reported TanStack deep as **O(1) ~1 µs** ("champion") — a matcher-bench bug: `tanstack buildDeep` closed over a mutated `let parent` (late-binding), so the 90-level tree never built and `matchRoutes` fuzzy-matched to `/deep` (2 matches) at any depth; the `length > 0` gate passed it. Fixed with per-iteration `const` capture + a depth-assert gate (the match must reach depth d). TanStack deep is **O(depth)**; **real-router wins the deep matcher in every cohort.**
 
 **react-router #15249 is confirmed a MATCHER cost, not render:** the isolated matcher
 reproduces the browser card's exact **parabola (peak @60)** — a matcher-algorithm signature,
-not the monotonic curve render would produce. The browser "react-router wins deep @90" was
-render (its matcher @90 is ~5953 µs, ~2000× real-router's). Deep matches are µs–ms (not
+not the monotonic curve render would produce. The ~5953 µs @90 (~2000× real-router) is the
+**per-call** public `matchRoutes` cost — 92–98% of it the per-call flatten+rank that the
+browser's Data-mode router amortizes (matching with precomputed branches @90 ≈ 0.11 ms,
+~40× real-router; the rescan alone ~105×) — which is why the browser deep card sits far
+closer than this table: amortization, not render compensation. Deep matches are µs–ms (not
 sub-µs like wide), so the deep sweep uses a low per-loop iteration floor.
 
 ## Holdouts

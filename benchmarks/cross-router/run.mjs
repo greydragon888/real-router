@@ -4,14 +4,14 @@
 //   node cross-router/run.mjs <scenario> <engine> [framework=react] [runs]
 // Path-convention: app at apps/<framework>/<engine>/, scenario in scenarios/.
 import { existsSync } from "node:fs";
-import { cpus } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { build, preview } from "vite";
 
+import { isKnownNA } from "./harness/known-na.mjs";
 import { measure } from "./harness/measure.mjs";
-import { freshnessGateAndProvenance } from "./harness/provenance.mjs";
+import { envStamp, freshnessGateAndProvenance } from "./harness/provenance.mjs";
 import { appRoot, SCENARIOS } from "./harness/scenarios-registry.mjs";
 import { writeCell } from "./harness/write-cell.mjs";
 
@@ -33,6 +33,16 @@ const runs = Number(runsArg) || 30;
 const scenario = SCENARIOS[scenarioName];
 if (!scenario) fail(`unknown scenario: ${scenarioName ?? "(none)"}`);
 if (!engine) fail("missing <engine>");
+// KNOWN_NA refusal (audit 07-18 K14): a documented-incomparable cell written here would
+// flow straight into the deck's SWEEP on the next build-deck — only run-all enforced the
+// registry before. Override deliberately if you need the raw (incomparable) measurement.
+if (isKnownNA(framework, scenarioName, engine) && process.env.BENCH_ALLOW_KNOWN_NA !== "1") {
+  fail(
+    `${framework}·${scenarioName}×${engine} is a documented competitor N/A (harness/known-na.mjs) — ` +
+      `the cell cannot produce a COMPARABLE result. Set BENCH_ALLOW_KNOWN_NA=1 to measure anyway ` +
+      `(the cell WILL be persisted and WILL pollute the deck).`,
+  );
+}
 
 const root = appRoot(here, framework, engine, scenarioName);
 const configFile = `${root}/vite.config.ts`;
@@ -62,7 +72,7 @@ const out = {
   engine,
   framework,
   ...result,
-  env: { date: new Date().toISOString(), cpu: cpus()[0]?.model ?? "unknown", runner: process.env.BENCH_RUNNER ?? "local", ...provenance },
+  env: envStamp(provenance),
 };
 
 console.log(JSON.stringify(out.metrics, null, 2));

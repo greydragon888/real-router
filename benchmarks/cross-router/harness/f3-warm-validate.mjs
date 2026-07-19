@@ -5,7 +5,7 @@
 // heavier-bundle engines, i.e. warming NARROWS the unfair cross-engine gap #1453
 // describes. Per sample, from ONE reload: measure the cold first-nav, then warm and
 // measure again. No results/ write.
-//   node cross-router/harness/f3-warm-validate.mjs <engine> [framework=react] [variant=wide] [target=1000]
+//   node cross-router/harness/f3-warm-validate.mjs <engine> [framework=react] [variant=wide] [target=<sweep endpoint>]
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,7 +14,7 @@ import { build, preview } from "vite";
 
 import { attachCDP, getMetrics, installNavMetric } from "./cdp.mjs";
 
-const [engine, framework = "react", variant = "wide", targetArg = "1000"] =
+const [engine, framework = "react", variant = "wide", targetArg] =
   process.argv.slice(2);
 if (!engine) {
   console.error(
@@ -22,13 +22,19 @@ if (!engine) {
   );
   process.exit(1);
 }
-const TARGET = targetArg;
+// Defaults track the LIVE sweep sets (audit 07-18 K20: the old target=1000 and pivots
+// 10/100 pointed at points that stopped existing after the 07-14 powers-of-2 reshape —
+// the probe timed out unusable exactly when a warm regression needed checking). Keep in
+// sync with scenarios/*.mjs TARGETS; a stale point fails loudly (waitForSelector
+// timeout on the missing link).
+const DEFAULT_TARGET = { wide: "1024", searchparams: "256", deep: "90" };
+const TARGET = targetArg ?? DEFAULT_TARGET[variant] ?? "1024";
 const WARM_NAVS = 12;
 const SAMPLES = 24;
 // link/marker prefixes per variant (wide/searchparams use a persistent nav → toggle
 // target↔pivot; deep is home-only → home↔D via history.back + settleGone).
 const KIND = {
-  wide: { link: "link-item", marker: "page-item", attr: "data-n", pivot: "10" },
+  wide: { link: "link-item", marker: "page-item", attr: "data-n", pivot: "4" },
   searchparams: {
     link: "link-search",
     marker: "page-search",
@@ -38,7 +44,7 @@ const KIND = {
   deep: { link: "link-deep", marker: "page-item", attr: "data-n", pivot: null },
 };
 const k = KIND[variant];
-const pivot = k.pivot === TARGET ? (variant === "wide" ? "100" : "10") : k.pivot;
+const pivot = k.pivot === TARGET ? (variant === "wide" ? "8" : "2") : k.pivot;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = `${here}/../apps/${framework}/${engine}/${variant}`;
@@ -63,26 +69,27 @@ for (let s = 0; s < SAMPLES; s++) {
   await page.goto(baseURL, { waitUntil: "load" });
   await page.waitForSelector(`[data-testid="${k.link}-${TARGET}"]`);
 
-  // A precise nav helper mirroring the scenarios' navTo (rAF-poll on the marker).
+  // A precise nav helper mirroring the scenarios' navTo — closes on the shared
+  // MutationObserver settle (frame-quantization-free), the same signal the live
+  // sweeps use (the rAF-poll here predated the R2 settle unification — K20).
   const go = (t) =>
     page.evaluate(
       async ([target, link, marker, attr]) => {
         document.querySelector(`[data-testid="${link}-${target}"]`).click();
-        for (let i = 0; i < 240; i++) {
-          const el = document.querySelector(`[data-testid="${marker}"]`);
-          if (el && el.getAttribute(attr) === String(target)) return;
-          await new Promise((r) => requestAnimationFrame(r));
-        }
-        throw new Error(`not rendered: ${target}`);
+        await window.__navMetric.settle(
+          `[data-testid="${marker}"][${attr}="${target}"]`,
+        );
       },
       [t, k.link, k.marker, k.attr],
     );
 
-  // COLD — first nav after the reload (the OLD metric).
+  // COLD — first nav after the reload (the OLD metric). Axis = ΔTaskDuration, the
+  // live sweep headline (ScriptDuration here predated #1451/R2 and is blind to the
+  // async engines' microtask work — K20).
   let b = await getMetrics(client);
   await go(TARGET);
   let a = await getMetrics(client);
-  cold.push((a.ScriptDuration - b.ScriptDuration) * 1000);
+  cold.push((a.TaskDuration - b.TaskDuration) * 1000);
 
   // WARM — warm the realm (toggle target↔pivot, or home↔D for deep), then one nav.
   if (variant === "deep") {
@@ -123,7 +130,7 @@ for (let s = 0; s < SAMPLES; s++) {
   b = await getMetrics(client);
   await go(TARGET);
   a = await getMetrics(client);
-  warm.push((a.ScriptDuration - b.ScriptDuration) * 1000);
+  warm.push((a.TaskDuration - b.TaskDuration) * 1000);
 
   await context.close();
 }
