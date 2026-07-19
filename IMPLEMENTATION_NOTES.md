@@ -2,6 +2,47 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## CI runtime: base-bundle no longer gates base-test/shards; sonarcloud off the CI Result path
+
+**Problem.** Job-timing data from real runs (e.g. the engine-merge PR run) showed the
+sharded path's critical chain as: Check ~31s → **base-bundle 44s, with base-test AND
+all 10 shards waiting on it** → shards 31–53s → **SonarCloud 94s** → CI Result ≈ 4min.
+Both `needs: base-bundle` edges existed "purely for the upstream ^bundle Remote-Cache
+HIT" (the old in-file comment) — a premise that died when turbo `test` dropped
+`^bundle` (see the test/lint entry below): tests need no dists at all, so the heaviest
+test jobs idled ~47s behind a bundle they never consume. And `sonarcloud` sat in CI
+Result's `needs`, making a third-party scanner the longest serial tail of the
+merge-gating check.
+
+**Solution.**
+- `base-test` and `pipeline-sharded` now `needs: [check]` — they start immediately,
+  parallel to base-bundle.
+- The shard step is split into two turbo invocations: `test test:properties` first
+  (starts with no dist prerequisites), then `bundle`. By the time a shard's tests
+  finish, the parallel base-bundle has published core#bundle to the Remote Cache, so
+  the shard's `bundle` (its `^bundle` chain reaches core) resolves as a HIT; a lost
+  race merely re-executes the upstream bundle in that shard — benign duplicate, never
+  a failure. base-bundle's remaining jobs: dist-base artifact (bundle-size/smoke),
+  core publint/attw, the cache warm, and the angular dom-utils sync check.
+- `sonarcloud` removed from CI Result's `needs` (and its `ok "$SONAR"` arm from the
+  verdict): the scan still runs and reports its own PR status, but the required check
+  no longer waits ~90s for it. Expected wall-clock: ~4min → ~2.5min on core PRs.
+
+**⚠ Gating consequence (owner action required).** The master ruleset's
+`required_status_checks` lists only `CI Result` (+ `Require Changeset`,
+`Validate Changesets`, `Dependency Review`) — SonarCloud was gating merges ONLY via
+CI Result's needs. With this change a red quality gate is **advisory, not blocking**,
+until the "SonarCloud" context is added to the ruleset's required checks (Settings →
+Rules → ruleset for master → Require status checks → add). The one-line revert is
+documented next to the `needs` list in ci.yml.
+
+**Why (measured, not assumed).** PR runs: ~4min sharded / 1.5–8min leaf; post-merge
+1min hot (remote cache working) vs 14min cold. Shards are balanced (31–53s spread).
+The two dropped edges and the Sonar tail were the only structural latency left; setup
+composite (pnpm store cache) and Check Changes (minimal install) were already lean.
+The old matrix's empty "internal" shard — 31s of pure setup per sharded run — had
+already been removed with the bucket itself.
+
 ## `build` gained `^bundle` — the examples dist-closure hole; `bundle`'s own `^bundle` re-probed and KEPT
 
 **Problem.** `examples.yml`'s build job ran `turbo run build --filter='./examples/**'`

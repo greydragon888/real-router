@@ -298,16 +298,16 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # BASE — split in two so core's TESTS no longer gate the shards. Shards (and
-  # base-test) need only core's BUNDLE, not its test results (turbo `test`
-  # dependsOn `^bundle`, not `^test`). So:
-  #   base-bundle: bundle + publication lints (publint/attw) → uploads dist-base.
-  #     ONLY this gates pipeline-sharded (`needs: base-bundle`) — the fast Amdahl
-  #     prefix. Also runs the angular dom-utils sync check once.
-  #   base-test:   test + test:properties → uploads coverage-reports-base. Runs in
-  #     PARALLEL to the shards; `needs: base-bundle` only so the core-layer
-  #     ^bundle arrives as a Remote-Cache HIT (no redundant rebuild). Core's
-  #     property-test cost is now OFF the shard critical path (R2.6).
+  # BASE — since turbo `test` dropped its `^bundle` dependency, TESTS need no
+  # dists at all, so base-bundle gates NOTHING via `needs` anymore: base-test
+  # and the shards start straight after `check`, and base-bundle runs in
+  # PARALLEL with them. base-bundle still exists for four jobs:
+  #   1. dist-base artifact (consumed by bundle-size / smoke),
+  #   2. core's publication lints (publint/attw),
+  #   3. Remote-Cache warm of core#bundle — the shards' SECOND turbo invocation
+  #      (`turbo run bundle`, after their tests) hits it instead of each shard
+  #      rebuilding core (a lost race is a benign duplicate build, not a failure),
+  #   4. the angular dom-utils sync check, run once.
   # Repo-global lints live in the separate parallel repo-lints job.
   # ============================================
 
@@ -352,15 +352,17 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # BASE-TEST: core-layer test + test:properties, PARALLEL to the shards. The
-  # heavy property-test cost no longer blocks shard fan-out — only base-bundle
-  # does. `needs: base-bundle` purely for the upstream ^bundle Remote-Cache HIT.
-  # Emits coverage-reports-base for the coverage / sonar merge.
+  # BASE-TEST: core-layer test + test:properties, PARALLEL to the shards AND to
+  # base-bundle. It starts straight after `check`: turbo `test` no longer
+  # depends on `^bundle`, so the former `needs: base-bundle` edge ("purely for
+  # the upstream ^bundle Remote-Cache HIT") lost its premise and was removed —
+  # it was delaying the heaviest test job by base-bundle's full duration for
+  # nothing. Emits coverage-reports-base for the coverage / sonar merge.
   # ============================================
   base-test:
     name: Base test (core layer)
     runs-on: ubuntu-latest
-    needs: [check, base-bundle]
+    needs: [check]
     if: needs.check.outputs.mode == 'sharded'
     steps:
       - name: Checkout
@@ -479,7 +481,7 @@ jobs:
   pipeline-sharded:
     name: Pipeline (shard ${{ matrix.name }})
     runs-on: ubuntu-latest
-    needs: [check, base-bundle]
+    needs: [check]
     if: needs.check.outputs.mode == 'sharded'
     strategy:
       fail-fast: false
@@ -509,10 +511,23 @@ jobs:
       # matrix.filter is one or more `--filter=<pkg>` tokens. Route it through an
       # env var (no ${{ }} inside run: — keeps actionlint clean) and leave it
       # UNQUOTED so the shell word-splits multiple filters.
-      - name: Test + bundle shard
+      #
+      # Tests and bundling are SEPARATE invocations on purpose: tests need no
+      # dists (turbo `test` has no `^bundle`), so they start immediately — the
+      # shard no longer waits for base-bundle (`needs: [check]`). By the time
+      # the tests finish, the parallel base-bundle job has published core#bundle
+      # to the Remote Cache, so this shard's `bundle` (whose `^bundle` chain
+      # reaches core) resolves it as a HIT. A lost race just re-executes the
+      # upstream bundle here — a benign duplicate, never a failure.
+      - name: Test shard
         env:
           SHARD_FILTER: ${{ matrix.filter }}
-        run: pnpm turbo run test test:properties bundle $SHARD_FILTER --filter='!./examples/**' --summarize
+        run: pnpm turbo run test test:properties $SHARD_FILTER --filter='!./examples/**' --summarize
+
+      - name: Bundle shard
+        env:
+          SHARD_FILTER: ${{ matrix.filter }}
+        run: pnpm turbo run bundle $SHARD_FILTER --filter='!./examples/**' --summarize
 
       # Per-task execution timings (.turbo/runs/*.json) — perf diagnostics to
       # localize which shard task dominates (e.g. solid#test vs react#test under
@@ -1033,7 +1048,14 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, coverage, sonarcloud, actionlint]
+    # sonarcloud is deliberately NOT in needs (latency): its ~90s scan was
+    # the longest serial tail of this required check. The SonarCloud job still
+    # runs and reports its own status on the PR. ⚠ The master ruleset's
+    # required_status_checks lists only CI Result (+changesets/dep-review) — so
+    # until the owner adds the "SonarCloud" context there, a red quality gate no
+    # longer BLOCKS a merge (it is visible but advisory). Revert = re-add
+    # `sonarcloud` here + the SONAR line + `ok "$SONAR"` below.
+    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, coverage, actionlint]
     if: always()
     steps:
       - name: Determine result
@@ -1073,9 +1095,8 @@ jobs:
           SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
           COVERAGE="${{ needs.coverage.result }}"
-          SONAR="${{ needs.sonarcloud.result }}"
           LINTS="${{ needs.repo-lints.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE sonar=$SONAR lints=$LINTS"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS"
 
           # Defensive belt-and-suspenders on the shard-plan output (R2.19): the
           # check-result guard at the top of this step already exits on any check
@@ -1085,12 +1106,12 @@ jobs:
             exit 1
           fi
 
-          # ok(): success OR skipped. Used ONLY for smoke/coverage/sonar (coverage
-          # & sonar legitimately skip on a built==false leaf; sonar also skips on
-          # dependabot — codecov runs tokenless there and stays gated) and an
-          # empty-include pipeline-sharded — NEVER for the job that DEFINES the
-          # active path (pipeline-leaf / base-bundle + base-test), so a real
-          # failure there cannot be masked as a skip.
+          # ok(): success OR skipped. Used ONLY for smoke/coverage (they
+          # legitimately skip on a built==false leaf) and an empty-include
+          # pipeline-sharded — NEVER for the job that DEFINES the active path
+          # (pipeline-leaf / base-bundle + base-test), so a real failure there
+          # cannot be masked as a skip. (sonarcloud left this gate entirely —
+          # see the needs comment above.)
           ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
 
           case "$MODE" in
@@ -1106,7 +1127,7 @@ jobs:
           # repo-lints runs on every should_run PR in BOTH modes — past the
           # should_run short-circuit above it must have run AND passed (hard
           # requirement, not ok()-skippable like smoke/sonar).
-          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$SONAR"; then
+          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE"; then
             echo "✅ All checks passed"
             exit 0
           fi
