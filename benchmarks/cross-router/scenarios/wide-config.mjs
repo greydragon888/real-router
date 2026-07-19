@@ -19,6 +19,10 @@
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
 const TARGETS = [4, 8, 16, 32, 64, 128, 256, 512, 1024];
+// K10 live-control knob: reverse the sweep order — the residual first-point bump (if
+// any survives the sacrificial episode) must FOLLOW the position, not the size.
+// Measure-only: write-cell refuses to persist under this knob.
+if (process.env.BENCH_REVERSE_TARGETS === "1") TARGETS.reverse();
 const WARM_NAVS = 12; // in-realm navs to reach optimized steady state before measuring
 
 export const wideConfig = {
@@ -61,7 +65,14 @@ export const wideConfig = {
         [target, pivot, WARM_NAVS / 2],
       );
 
-    for (const n of TARGETS) {
+    // Sacrificial first episode (audit 07-18 K10): unlike nested/active, wide had NO
+    // pre-sweep episode at all — the fresh context's one-time parse/compile leaked
+    // into the first size (rr 1.21–1.69×, sv-router up to 2.20× — NOT uniform, so
+    // first-point classes were artifact-tinted). Run the full point pipeline once at
+    // TARGETS[0], numbers discarded. (Live TARGETS.reverse() control — owner's re-run.)
+    const POINTS = [TARGETS[0], ...TARGETS]; // POINTS[0] = sacrificial, discarded
+    for (const [idx, n] of POINTS.entries()) {
+      const record = idx > 0;
       try {
       const pivot = n === TARGETS[0] ? TARGETS[1] : TARGETS[0];
       await land(n);
@@ -75,6 +86,7 @@ export const wideConfig = {
       const navMsTask =
         (after.TaskDuration - before.TaskDuration) * 1000;
       const scriptMs = (after.ScriptDuration - before.ScriptDuration) * 1000;
+      if (!record) continue; // sacrificial episode — numbers discarded (K10)
 
       // blink diagnostic — same nav from the same pivot, traced (pushState work).
       await navTo(pivot); // reset N→pivot

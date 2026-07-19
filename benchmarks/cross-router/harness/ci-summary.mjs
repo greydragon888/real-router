@@ -12,6 +12,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { RME_NOISY_DEFAULT, RME_STABLE_DEFAULT, familyOf } from "./rme-policy.mjs";
+
 const CR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const RESULTS = join(CR, "results");
 const FW = ["react", "vue", "solid", "svelte", "angular"];
@@ -47,7 +49,16 @@ const out = ["# Cross-router benchmark — CI snapshot\n"];
 const ci = !!(META && META.runner && META.runner !== "local" && META.runner !== "unknown");
 if (META) {
   const d = String(META.date || "").slice(0, 10);
-  out.push(`\`${META.cpu}\` · ${META.runner} · commit \`${META.commit}\` · ${d} · **n=${META.runs}**\n`);
+  const cells = META.cells ? ` · matrix ${META.cells.written}/${META.cells.expected}` : "";
+  out.push(`\`${META.cpu}\` · ${META.runner} · commit \`${META.commit}\` · ${d} · **n=${META.runs}**${cells}\n`);
+  if (META.cells && META.cells.written < META.cells.expected)
+    out.push(
+      `> ⚠️ **Partial snapshot** — ${META.cells.expected - META.cells.written} of ${META.cells.expected} matrix cells are missing from results/ (audit 07-18 K13): the grid below under-represents the matrix; missing cells render as —.\n`,
+    );
+  if (META.matcher && META.matcher.commit && META.commit !== "unknown" && META.matcher.commit !== META.commit)
+    out.push(
+      `> ⚠️ **Mixed epochs** — matcher-bench results (\`${META.matcher.commit}\`) vs browser cells (\`${META.commit}\`): wide/deep cards are from a different dist epoch (audit 07-18 K12); re-run matcher-bench.\n`,
+    );
   if (ci)
     out.push(
       "> ⚠️ The cards below are **this run's fresh snapshot** (CI runner — see stamp). The curated **Why** analysis in the committed deck is anchored to the committed reference snapshot, not necessarily this run.\n",
@@ -76,9 +87,11 @@ out.push(
   `\n_Tally: ${g} 🟢 lead · ${y} 🟡 tie · ${r} 🔴 trail — real-router vs the nearest competitor at each scenario's headline metric; lower is better. Advisory competitive signal (drift-invariant ratio), never a gate._\n`,
 );
 
-// ── RME noise watch (light scan of results/, same families as rme-gate) ──
-const isNoisy = (k) => /blink|latency|fcp/i.test(k) || /^(navMsWall|navMsTask|scriptMs)@/.test(k);
-const STABLE = 15, NOISY = 40;
+// ── RME noise watch (light scan of results/) — families from the SHARED rme-policy, so
+// this watch is a true mirror of rme-gate and can't silently diverge again (K16).
+// Single-nav sweep points are report-only in the gate → excluded from the watch too
+// (they'd otherwise flood the top-25 with healthy quantization noise).
+const STABLE = RME_STABLE_DEFAULT, NOISY = RME_NOISY_DEFAULT;
 const flagged = [];
 for (const co of FW) {
   const root = join(RESULTS, co);
@@ -96,7 +109,9 @@ for (const co of FW) {
       }
       for (const [k, s] of Object.entries(data.metrics ?? {})) {
         if (!s || typeof s.rme !== "number") continue;
-        const lim = isNoisy(k) ? NOISY : STABLE;
+        const family = familyOf(sc, k);
+        if (family === "sweep-point") continue;
+        const lim = family === "noisy" ? NOISY : STABLE;
         if (s.rme > lim) flagged.push({ co, sc, eng: f.replace(/\.json$/, ""), k, rme: s.rme, lim });
       }
     }

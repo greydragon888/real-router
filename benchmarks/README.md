@@ -20,7 +20,7 @@ benchmarks/
 
 ## Findings & isolated repros
 
-- **react-router #15249 — deep-route match blowup.** The cross-router `deep-config` sweep surfaced a non-monotonic (parabolic) match-cost curve for react-router; [`react-router-bug/`](react-router-bug/) isolates it to a pure-Node `matchRoutes()` repro — the identical URL match is **~10× slower in a 210-deep route tree than a 90-deep one** (routes *below* the match are re-scanned). Live chart (browser-measured, match + render, swept to depth 210): <https://claude.ai/code/artifact/58736d29-e694-4c20-9f0c-3469bbcb6c44>.
+- **react-router #15249 — deep-route match blowup.** The cross-router `deep-config` sweep surfaced a non-monotonic (parabolic) match-cost curve for react-router; [`react-router-bug/`](react-router-bug/) isolates it to a pure-Node `matchRoutes()` repro — the identical URL match is **~10× slower in a 210-deep route tree than a 90-deep one** (routes *below* the match are re-scanned). Live chart (browser-measured, match + render, swept to depth 210): <https://claude.ai/code/artifact/58736d29-e694-4c20-9f0c-3469bbcb6c44>. ⚠ The ms-scale absolutes and "~10×" time the *public per-call* `matchRoutes()` — 54–97% of those figures is its per-call flatten+rank, which a Data-mode router (`createBrowserRouter`) amortizes across navigations; amortized, the per-nav rescan alone still runs ~105× a µs-class matcher and the parabola survives (audit 2026-07-18).
 
 ## Cross-Router — real browser, all competitors
 

@@ -17,6 +17,10 @@ artifact; this directory holds the committed **source + rendered output**.
 ## Rebuild
 
 ```bash
+node --expose-gc ../matcher-bench/run.mjs   # FIRST if packages/ changed since its last run —
+                                            # the wide/deep cards read it, and deck-extract
+                                            # warns on an epoch mismatch (audit 07-18 K12/G1o;
+                                            # bench-cross-router.sh runs it automatically)
 node deck-extract.mjs   # after a fresh bench run: ../results + ../matcher-bench → deck-data.json
 node build-deck.mjs     # deck-config.js + deck-data.json → deck.html
 ```

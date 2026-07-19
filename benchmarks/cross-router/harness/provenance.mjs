@@ -6,6 +6,7 @@
 // cell) and run-all.mjs (interleaved matrix) so the guard can't be bypassed by either.
 import { execSync } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
+import { cpus } from "node:os";
 import { join } from "node:path";
 
 const newestMtime = (root, exts) => {
@@ -22,7 +23,9 @@ const newestMtime = (root, exts) => {
     for (const e of entries) {
       const p = join(dir, e.name);
       if (e.isDirectory()) {
-        if (e.name !== "node_modules") stack.push(p); // symlinks (shared/) are not dirs → skipped
+        // symlinks are not dirs → the walk never descends them; the shared/ TREE those
+        // symlinks point at is scanned directly by the gate below (audit 07-18 K3).
+        if (e.name !== "node_modules") stack.push(p);
       } else if (!exts || exts.some((x) => e.name.endsWith(x))) {
         try {
           max = Math.max(max, statSync(p).mtimeMs);
@@ -54,6 +57,15 @@ export function freshnessGateAndProvenance(here) {
         newestMtime(join(pkgs, pkg.name, "dist"), [".mjs", ".cjs", ".js"]),
       );
     }
+    // shared/ sources (browser-env / dom-utils / ssr) reach dist only through consumer
+    // symlinks (src/browser-env etc.), and the per-package walk above never descends a
+    // symlink — so an edit to shared/*.ts sailed past the gate un-bundled and silently
+    // measured stale dist across five cohorts' Link/history hot path (audit 07-18 K3).
+    // Scan the real shared/ tree directly.
+    srcMtime = Math.max(
+      srcMtime,
+      newestMtime(join(here, "..", "..", "shared"), [".ts", ".tsx"]),
+    );
   } catch {
     /* not a monorepo checkout — no gate, no dist provenance */
   }
@@ -93,5 +105,18 @@ export function freshnessGateAndProvenance(here) {
     dirtyFiles,
     dirtyCode,
     distNewestMtime: distMtime ? new Date(distMtime).toISOString() : null,
+  };
+}
+
+// Uniform per-cell env stamp — ONE composition for every results/ writer (run.mjs,
+// run-all.mjs, run-subset.mjs) and for matcher-bench, so a writer can't silently drop
+// the O-10 machine fields again (run-subset shipped a date-only env until audit
+// 07-18 K15, making its cells' machine provenance unrecoverable).
+export function envStamp(provenance) {
+  return {
+    date: new Date().toISOString(),
+    cpu: cpus()[0]?.model ?? "unknown",
+    runner: process.env.BENCH_RUNNER ?? "local",
+    ...provenance,
   };
 }

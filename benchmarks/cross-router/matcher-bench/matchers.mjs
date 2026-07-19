@@ -60,7 +60,7 @@ export const URL_OF = (n) => `/catalog/item-${n}`; // worst-case target = the la
 // #15249 parabola is a real matcher artifact or was render-dominated. Same build(d) =>
 // zero-arg match-closure contract as the wide loaders, so run.mjs sweeps both identically.
 export const DEPTH_SWEEP = [3, 30, 60, 90]; // = deep-spec DEEP_TARGETS (the deck's deep points)
-const DEEP_DEPTH = 90; // = deep-spec DEEP_DEPTH (the nested-chain depth every engine builds)
+const DEEP_DEPTH = Math.max(...DEPTH_SWEEP); // = deep-spec DEEP_DEPTH, DERIVED from the sweep (audit 07-18 K19)
 const deepPath = (d) => {
   let p = "/deep";
   for (let i = 1; i <= d; i++) p += `/l${i}`;
@@ -103,8 +103,23 @@ const LOADERS = {
       check: (r) => r != null,
     };
   },
+  // Data-mode parity (audit 07-18 K6): the bench app is a `createBrowserRouter` DATA
+  // router — it builds its ranked branches ONCE in the constructor and matches every
+  // navigation with them precomputed. The public `matchRoutes(routes, url)` instead
+  // re-runs flatten+rank on EVERY call — timing it charged react-router a per-call
+  // construct phase no browser navigation actually pays (75–98 % of the old figures;
+  // the deep "~2000×" read ~40× amortized). So the timed closure matches the way the
+  // bench app's router does: branches prebuilt via the same internal the router uses
+  // (`flattenAndRankRoutes` + `matchRoutesImpl` live in `lib/router/utils.js` next to
+  // the package index — no public prebuild API exists; recipe validated by the audit's
+  // A/B probe). The construct stays in build() — excluded from timing like every other
+  // engine's router construction.
   "react-router": async () => {
-    const { matchRoutes } = await impPkg("react-router");
+    const idx = rootReq.resolve("react-router");
+    const { matchRoutes } = await impAbs(idx);
+    const { flattenAndRankRoutes, matchRoutesImpl } = await impAbs(
+      path.join(path.dirname(idx), "lib/router/utils.js"),
+    );
     return {
       build(n) {
         const routes = [
@@ -116,8 +131,9 @@ const LOADERS = {
             ],
           },
         ];
+        const branches = flattenAndRankRoutes(routes);
         const url = URL_OF(n);
-        return () => matchRoutes(routes, url);
+        return () => matchRoutesImpl(routes, url, "/", false, branches);
       },
       buildDeep(d) {
         const mk = (k) => {
@@ -128,8 +144,12 @@ const LOADERS = {
         const routes = [
           { path: "/", children: [{ index: true }, { path: "deep", children: [mk(1)] }] },
         ];
-        return () => matchRoutes(routes, deepPath(d));
+        const branches = flattenAndRankRoutes(routes);
+        return () => matchRoutesImpl(routes, deepPath(d), "/", false, branches);
       },
+      // Kept importable for parity probes: the public per-call entry this extraction
+      // deliberately does NOT time (it re-flattens per call).
+      matchRoutesPublic: matchRoutes,
       check: (r) => Array.isArray(r) && r.length > 0,
     };
   },

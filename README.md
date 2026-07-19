@@ -223,23 +223,17 @@ The only standalone router that ships the **same SSR contract** across React 19,
 Navigation stays fast as your route tree grows — from 10 routes to 1000, the cost per navigation barely moves.
 The Segment Trie matcher traverses in O(segments), not O(routes).
 
-**2.3–14× faster and 2–9× fewer allocations** than TanStack Router in full client-side navigation benchmarks (identical 10-step loop, JSDOM, Vite production build):
+Measured in the [cross-router benchmark](benchmarks/README.md) — real Chromium (Playwright + CDP), production Vite builds, every serious competitor in each framework cohort, per-cohort verdicts only.
 
-**Speed** (relative to TanStack Router, higher is better):
+**vs TanStack Router** (same snapshot, per cohort):
 
-| Framework | vs TanStack Router |
-| --------- | ------------------ |
-| React     | **~14× faster**    |
-| Solid     | **~11.5× faster**  |
-| Vue       | **~2.3× faster**   |
+| Cohort | Navigation latency | Transient GC per navigation |
+| ------ | ------------------ | --------------------------- |
+| React  | **~2.6× faster**   | **~12× fewer allocations**  |
+| Solid  | **~6× faster**     | **~17× fewer allocations**  |
+| Vue    | **~3.5× faster**   | **~24× fewer allocations**  |
 
-**Allocations per navigation** (relative to TanStack Router, lower is better):
-
-| Framework | vs TanStack Router        |
-| --------- |---------------------------|
-| React     | **~9× fewer allocations** |
-| Solid     | **~7× fewer allocations** |
-| Vue       | **~2× fewer allocations** |
+In the isolated matcher microbench ([`matcher-bench`](benchmarks/cross-router/matcher-bench/README.md)), only real-router and TanStack hold a flat **O(1)** curve as the route table widens — every other measured router scans O(N) — and real-router **wins the deep-tree match in every cohort**.
 
 ### Key Features
 

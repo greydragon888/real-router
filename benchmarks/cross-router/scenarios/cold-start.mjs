@@ -60,6 +60,10 @@ export const coldStart = {
     return {
       [`fcpMs@${n}`]: fcpMs,
       [`scriptDurationMs@${n}`]: m.ScriptDuration * 1000,
+      // ΔTaskDuration twin (audit 07-18 K2-option): script-only inherits the F2 class
+      // (blind to promise-microtask boot work of async engines), so the boot-CPU story
+      // carries both axes; fcpMs above stays the felt axis.
+      [`taskDurationMs@${n}`]: m.TaskDuration * 1000,
       [`jsHeapMB@${n}`]: retainedBytes / (1024 * 1024),
       [`jsHeapPreGcMB@${n}`]: m.JSHeapUsedSize / (1024 * 1024),
     };

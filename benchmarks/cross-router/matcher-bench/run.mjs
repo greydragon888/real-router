@@ -11,6 +11,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
+import { envStamp, freshnessGateAndProvenance } from "../harness/provenance.mjs";
 import {
   COHORTS,
   DEEP_COHORTS,
@@ -23,6 +25,13 @@ import {
 } from "./matchers.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+// Provenance contour (audit 07-18 K12): matchers resolve real-router to packages/*/dist
+// exactly like the browser drivers do, so this instrument needs the SAME stale-dist
+// refusal (exit 3) — without it, an un-bundled src edit silently re-times the old dist.
+// The env stamp makes results.json datable: deck-extract warns when its epoch diverges
+// from the browser cells' (mixed-epoch deck). Gate runs BEFORE any engine loads.
+const provenance = freshnessGateAndProvenance(path.join(HERE, ".."));
 const BUDGET_MS = 80;
 const WARM_MS = 25;
 const REPS = 9;
@@ -142,6 +151,7 @@ const deepCohorts =
 const out = {
   N_SWEEP,
   DEPTH_SWEEP,
+  env: envStamp(provenance),
   meta: {
     unit: "us-per-match",
     budgetMs: BUDGET_MS,

@@ -1,8 +1,10 @@
 import { Component } from "@angular/core";
 import { RouterLink, RouterOutlet } from "@angular/router";
 
-// DEEP_TARGETS — the sweep depths (3 / 30 / 60 / 90) the driver navigates to.
-const DEEP_TARGETS = [3, 30, 60, 90] as const;
+// DEEP_TARGETS — the sweep depths the driver navigates to; imported from routes.ts
+// (single source, audit 07-18 K19 — a local twin copy here is exactly the drift
+// class that twice broke the search sweep).
+import { DEEP_TARGETS } from "./routes";
 
 // URL path to depth d: /deep/l1/l2/.../ld
 function deepPath(d: number): string {

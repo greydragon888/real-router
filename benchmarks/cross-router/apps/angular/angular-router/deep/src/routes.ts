@@ -6,7 +6,11 @@ import { LevelComponent } from "./pages/level.component";
 // deep-config: a nested chain /deep/l1/l2/.../l90. Each level is a LevelComponent
 // rendering <router-outlet> for the next level; the deepest matched level renders
 // page-item (data-n = depth). Leaf detection is via ActivatedRoute.firstChild.
-const DEEP_DEPTH = 90;
+// DEEP_TARGETS is exported as this app's SINGLE SOURCE (audit 07-18 K19):
+// app.component imports it instead of keeping a free twin copy — the unlinked
+// depth-here/targets-there pair was the drift class that twice broke search.
+export const DEEP_TARGETS = [3, 30, 60, 90] as const;
+const DEEP_DEPTH = Math.max(...DEEP_TARGETS);
 
 function buildLevel(k: number): Route {
   return {

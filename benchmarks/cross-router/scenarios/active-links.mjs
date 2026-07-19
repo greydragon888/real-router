@@ -11,6 +11,10 @@
 import { getMetrics, traceBlinkUs } from "../harness/cdp.mjs";
 
 const TARGETS = [4, 8, 16, 32, 64, 128, 256]; // links mounted per page — the active-recompute axis (capped at 256 = the deck's endpoint; each point costs ∝ N × navs, and 512/1024 were ~75% of runtime for points the deck no longer charts)
+// K10 live-control knob: reverse the sweep order — the residual first-point bump (if
+// any survives the sacrificial episode) must FOLLOW the position, not the size.
+// Measure-only: write-cell refuses to persist under this knob.
+if (process.env.BENCH_REVERSE_TARGETS === "1") TARGETS.reverse();
 const WARMUP_NAVS = 6;
 const MEASURE_NAVS = 20;
 const BLINK_NAVS = 16;
@@ -33,20 +37,15 @@ export const activeLinks = {
         return performance.now() - t0;
       }, navs);
 
-    // Pre-sweep warmup (#1453 class): the first goto in a fresh context is colder than
-    // the rest (one-time app parse/compile), so the first swept point reads slightly
-    // high vs its warm neighbours. Warm the realm once (goto + WARMUP_NAVS toggles)
-    // so every measured point is steady-state.
-    try {
-      await page.goto(new URL(`tab/1?n=32`, baseURL).href, { waitUntil: "load" });
-      await page.waitForSelector('[data-testid="page-tab"]');
-      await page.waitForSelector('[data-testid="link-tab-32"]');
-      await drive(WARMUP_NAVS);
-    } catch (warmErr) {
-      console.error(`active-links warmup: ${warmErr.message}`);
-    }
-
-    for (const count of TARGETS) {
+    // Sacrificial first episode (audit 07-18 K10 — replaces the lighter mid-size
+    // pre-warm): even WITH a pre-warm, the first measured point read systematically
+    // high, and the residual bump is NOT cross-engine-uniform (direction varies by
+    // engine), tinting first-point classes. Run the FULL point pipeline once at
+    // TARGETS[0] and discard the numbers — every retained point then has an identical
+    // warm predecessor. (Live control — TARGETS.reverse() — is the owner's re-run.)
+    const POINTS = [TARGETS[0], ...TARGETS]; // POINTS[0] = sacrificial, discarded
+    for (const [idx, count] of POINTS.entries()) {
+      const record = idx > 0;
       try {
       // ?n=<count> → the app's links-spec renders exactly `count` active-aware links.
       await page.goto(new URL(`tab/1?n=${count}`, baseURL).href, {
@@ -60,6 +59,7 @@ export const activeLinks = {
       const before = await getMetrics(client);
       const wallTotalMs = await drive(MEASURE_NAVS);
       const after = await getMetrics(client);
+      if (!record) continue; // sacrificial episode — numbers discarded (K10)
       out[`navMsTask@${count}`] =
         ((after.TaskDuration - before.TaskDuration) * 1000) / MEASURE_NAVS;
       out[`scriptMs@${count}`] =

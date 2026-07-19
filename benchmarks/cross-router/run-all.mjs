@@ -12,48 +12,48 @@
 // left open. Cells are written via the shared writeCell (smoke-grade guard, #1455) with
 // the shared provenance stamp (#1459).
 import { existsSync } from "node:fs";
-import { cpus } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { build, preview } from "vite";
 
+import { isKnownNA } from "./harness/known-na.mjs";
 import { measureInterleaved } from "./harness/measure.mjs";
-import { freshnessGateAndProvenance } from "./harness/provenance.mjs";
-import { appRoot, SCENARIOS } from "./harness/scenarios-registry.mjs";
-import { writeCell } from "./harness/write-cell.mjs";
+import { envStamp, freshnessGateAndProvenance } from "./harness/provenance.mjs";
+import { appRoot, COHORT_ENGINES, runsFor, SCENARIOS } from "./harness/scenarios-registry.mjs";
+import { N_MIN, writeCell } from "./harness/write-cell.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-// Per-cohort engine rosters — each cohort compares real-router against that framework's
-// real competitors (see apps/<fw>/ and the REPORT Scope sections). The engines differ
-// per cohort — that is why a single hardcoded list was wrong.
-const COHORT_ENGINES = {
-  react: ["real-router", "tanstack", "react-router"],
-  vue: ["real-router", "vue-router", "tanstack"],
-  solid: ["real-router", "solid-router", "tanstack"],
-  svelte: ["real-router", "sv-router", "mateo-router"],
-  angular: ["real-router", "angular-router"],
-};
 const SCENARIO_NAMES = Object.keys(SCENARIOS);
 // _baseline (bare framework, no router) — reference floor for scenarios with a
 // no-router analog. Run after the main matrix of each cohort.
 const BASELINE_SCENARIOS = ["cold-start", "nav-latency", "link-build"];
 
-// Documented competitor limitations — (cohort → scenario → [engines]) cells that CANNOT
-// produce a COMPARABLE result: either the competing router errors, or it structurally
-// cannot express the scenario's semantics. SKIPPED (not run, not a failure); the REPORT
-// documents the N/A. Remove an entry if the competitor changes.
-const KNOWN_NA = {
-  solid: { "deep-config": ["tanstack"] },
-  svelte: { "nested-switch": ["mateo-router"] },
-};
-const isKnownNA = (framework, scenario, engine) =>
-  KNOWN_NA[framework]?.[scenario]?.includes(engine) ?? false;
-
 const runs = process.argv[2] ?? "15";
 const fwArg = process.argv[3];
 const frameworks = fwArg ? [fwArg] : Object.keys(COHORT_ENGINES);
+
+// BENCH_SMOKE=1 — measure-only dry matrix (the orchestrator's Step-5 smoke and CI-style
+// fail-fast checks): every app must BUILD + DRIVE, nothing is persisted, and a
+// non-persisted cell is NOT a failure — the exit code answers "does the matrix drive?",
+// not "is the matrix written?". Without this mode the K13 refusal below would abort the
+// very smoke path (`run-all.mjs 1`) it was never aimed at.
+const SMOKE_MODE = process.env.BENCH_SMOKE === "1";
+if (SMOKE_MODE) console.error(`run-all: BENCH_SMOKE=1 — measure-only dry matrix, results/ untouched`);
+
+// Sub-N_MIN matrix runs are a trap (audit 07-18 K13): every writeCell refuses, yet the
+// run exits green — an empty/partial matrix that a later deck rebuild would publish as
+// if complete. The matrix runner therefore REFUSES below N_MIN; per-cell A/B smokes at
+// low n stay possible via run.mjs, and dry matrices via BENCH_SMOKE=1.
+if (!SMOKE_MODE && (!Number.isFinite(Number(runs)) || Number(runs) < N_MIN)) {
+  console.error(
+    `run-all: runs=${runs} is below N_MIN=${N_MIN} — nothing would be persisted (smoke-grade guard #1455), ` +
+      `while the run exits green (audit 07-18 K13). Use run.mjs for sub-N_MIN A/B smokes, ` +
+      `or BENCH_SMOKE=1 for a measure-only dry matrix.`,
+  );
+  process.exit(1);
+}
 
 // Gate a stale dist + capture provenance ONCE, before any build (#1459).
 const provenance = freshnessGateAndProvenance(here);
@@ -67,6 +67,8 @@ let skipped = 0;
 // skipped; an engine whose scenario throws mid-run is dropped by measureInterleaved.
 const runScenario = async (framework, scenarioName, engineList) => {
   const scenario = SCENARIOS[scenarioName];
+  // Sweep scenarios run at max(50, base/2) — see runsFor in scenarios-registry.mjs.
+  const effRuns = runsFor(scenarioName, Number(runs));
   const started = Date.now();
   const apps = [];
   const servers = [];
@@ -98,14 +100,14 @@ const runScenario = async (framework, scenarioName, engineList) => {
   if (apps.length === 0) return;
 
   console.error(
-    `\n=== ${framework} · ${scenarioName} × [${apps.map((a) => a.engine).join(", ")}] interleaved ===`,
+    `\n=== ${framework} · ${scenarioName} × [${apps.map((a) => a.engine).join(", ")}] interleaved (n=${effRuns}) ===`,
   );
   let results;
   try {
     results = await measureInterleaved({
       apps,
       scenario,
-      runs: Number(runs),
+      runs: effRuns,
     });
   } catch (error) {
     failed += apps.length;
@@ -120,14 +122,26 @@ const runScenario = async (framework, scenarioName, engineList) => {
       failed += 1; // dropped mid-interleave (threw)
       continue;
     }
+    if (SMOKE_MODE) {
+      ok += 1; // measured + drove — the smoke's only question; nothing persisted
+      continue;
+    }
     const out = {
       scenario: scenarioName,
       engine,
       framework,
       ...results[engine],
-      env: { date: new Date().toISOString(), cpu: cpus()[0]?.model ?? "unknown", runner: process.env.BENCH_RUNNER ?? "local", ...provenance },
+      env: envStamp(provenance),
     };
-    if (writeCell(`${here}/results`, out, Number(runs))) ok += 1;
+    if (writeCell(`${here}/results`, out, effRuns)) {
+      ok += 1;
+    } else {
+      // Measured but NOT persisted (smoke-grade or n-downgrade refusal) — for matrix
+      // purposes that cell is missing, so it must redden the run, not vanish silently
+      // into a green exit (audit 07-18 K13).
+      failed += 1;
+      console.error(`!! cell not persisted: ${framework}·${scenarioName}×${engine} (writeCell refused)`);
+    }
   }
   console.error(
     `  · ${scenarioName}: ${((Date.now() - started) / 1000).toFixed(1)}s`,
