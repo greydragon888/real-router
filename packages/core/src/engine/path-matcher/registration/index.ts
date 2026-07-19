@@ -3,21 +3,11 @@
 // insertion, plus the route-meta / query-and-constraint collection helpers.
 // Concerns split into ./context ./errors ./trieNodes ./trie ./buildParts.
 
-import { EMPTY_PARAM_META } from "../buildParamMeta";
-import {
-  INVALID_QUERY_NAME_RGX,
-  isConstraintBalanced,
-} from "../constraint-grammar";
-import {
-  hasMultipleOptionalsBeforeSplat,
-  parseSegment,
-  splitPathSegments,
-} from "../parseSegment";
+import { EMPTY_PARAM_META, INVALID_QUERY_NAME_RGX } from "../buildParamMeta";
+import { parseSegment, splitPathSegments } from "../parseSegment";
 import { buildFullPath, normalizeTrailingSlash } from "../pathUtils";
 import { compileBuildParts } from "./buildParts";
 import {
-  CONSTRAINT_PATTERN_RGX,
-  EMPTY_CONSTRAINTS,
   EMPTY_PARAMS,
   EMPTY_ROUTE_META,
   EMPTY_STRINGS,
@@ -27,18 +17,12 @@ import {
 import {
   throwDuplicateParamName,
   throwInvalidQueryParamName,
-  throwMultipleOptionalsBeforeSplat,
   throwPathQueryNameCollision,
   throwSegmentGrammarError,
-  throwUnbalancedConstraint,
 } from "./errors";
 import { insertIntoTrie, insertSlashChildIntoTrie } from "./trie";
 
-import type {
-  CompiledRoute,
-  ConstraintPattern,
-  MatcherInputNode,
-} from "../types";
+import type { CompiledRoute, MatcherInputNode } from "../types";
 
 export type { RegistrationState } from "./context";
 
@@ -69,47 +53,23 @@ export function registerNode(
       : pathPattern;
   const rawNodePath = isAbsolute ? strippedPattern : pathPattern;
 
-  // Bare-core backstop for constraint-delimiter grammar (#804): reject a stray
-  // unbalanced `<`/`>` before trie insertion. This is the ONE grammar check that
-  // `parseSegment` cannot make per-segment — its name class `[^/?<]+` includes `>`,
-  // so a `>` with no matching `<` is visible only by the balance COUNT over the
-  // whole path. Runs first, so the per-segment pass below never sees an unbalanced
-  // `<` (it would otherwise surface there as a spurious `unbalanced-constraint`).
-  if (!isConstraintBalanced(rawNodePath)) {
-    throwUnbalancedConstraint(rawNodePath);
-  }
-
-  // Per-segment grammar backstop (Реш.2): the trie's own grammar verdict now reads
-  // the SAME `parseSegment` tokenizer the route-tree gate reads (`findSegmentGrammarError`),
+  // Per-segment grammar backstop: the trie's own grammar verdict reads the SAME
+  // `parseSegment` tokenizer the route-tree gate reads (`findSegmentGrammarError`),
   // so backstop and gate cannot drift on a per-segment form. One pass over the RAW
-  // path (`splitPathSegments` is constraint-aware — a body can hold `/`) rejects
-  // every such form: name-less (#858), fused marker (#1050), trailing marker
-  // (#1324), optional splat (#1149), and the constraint forms empty / fused-suffix /
-  // in-static (#804/#1150/#1311). Each code maps to the existing matcher-level
-  // message (reject reason preserved per code; only the first-error ORDER on a
-  // multi-error path follows the left-to-right scan). So `processSegment` /
-  // `extractParamName` / `insertIntoTrieFrom` downstream see only grammatically
-  // valid segments — their former per-segment throws are removed.
+  // path rejects every rejection form: name-less (#858), fused marker (#1050),
+  // trailing marker (#1324), and the removed forms `optional-removed` /
+  // `constraint-removed` (M1). So `processSegment` / `extractParamName` downstream
+  // see only grammatically valid `static | :param | *splat` segments.
   for (const segment of splitPathSegments(rawNodePath)) {
     const token = parseSegment(segment);
 
     if ("error" in token) {
-      throwSegmentGrammarError(token.error, segment, rawNodePath);
+      throwSegmentGrammarError(token.error, segment);
     }
   }
 
-  // Strip constraint patterns (e.g., <\d+>, <[^/]+>) from path before trie insertion.
-  // Constraints like <[^/]+> contain "/" which breaks segment splitting in indexOf("/", start).
-  const nodePath = rawNodePath.replaceAll(CONSTRAINT_PATTERN_RGX, "");
-
-  // #1287: two optional params directly before a splat can't be represented by a
-  // single trie-slot fork — the outer optional's mark overwrites the inner's, silently
-  // reshaping the omit-outer/take-inner form into the splat (`/:a<c1>?/:b<c2>?/*rest`).
-  // Reject. The predicate is shared verbatim with route-tree's validation gate (it runs
-  // on the RAW path — `splitPathSegments` is constraint-aware), so the two can't drift.
-  if (hasMultipleOptionalsBeforeSplat(rawNodePath)) {
-    throwMultipleOptionalsBeforeSplat(rawNodePath);
-  }
+  // 3-token grammar (M1): no `<...>` constraint to strip before trie insertion.
+  const nodePath = rawNodePath;
 
   const matchPath = isAbsolute ? nodePath : buildFullPath(parentPath, nodePath);
 
@@ -154,7 +114,6 @@ function compileAndRegisterRoute(
     state.rootQueryParams,
     segments,
   );
-  const constraintPatterns = collectConstraintPatterns(segments);
 
   // Slash-child: use parent path for buildParts (not slash-child's path)
   const buildPath = slashChild
@@ -205,8 +164,6 @@ function compileAndRegisterRoute(
         ? EMPTY_STRING_SET
         : new Set(declaredQueryParams),
     hasTrailingSlash: matchPath.length > 1 && matchPath.endsWith("/"),
-    constraintPatterns,
-    hasConstraints: constraintPatterns.size > 0,
     buildStaticParts,
     buildParamSlots,
     buildParamNamesSet,
@@ -329,20 +286,6 @@ function collectDeclaredQueryParams(
   }
 
   return queryParams.length === 0 ? EMPTY_STRINGS : queryParams;
-}
-
-function collectConstraintPatterns(
-  segments: readonly MatcherInputNode[],
-): ReadonlyMap<string, ConstraintPattern> {
-  const patterns = new Map<string, ConstraintPattern>();
-
-  for (const segment of segments) {
-    for (const [paramName, pattern] of segment.paramMeta.constraintPatterns) {
-      patterns.set(paramName, pattern);
-    }
-  }
-
-  return patterns.size === 0 ? EMPTY_CONSTRAINTS : patterns;
 }
 
 function validateQueryParamDeclarations(

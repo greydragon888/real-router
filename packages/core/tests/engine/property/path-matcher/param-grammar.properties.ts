@@ -67,36 +67,41 @@ describe("Param-grammar properties (#738)", () => {
     },
   );
 
-  describe("constraint-internal `?` never leaks as a query param", () => {
-    const arbConstraintBodyWithQ = fc.constantFrom(
+  describe("removed forms are rejected at registration (M1)", () => {
+    const arbConstraintBody = fc.constantFrom(
+      String.raw`\d+`,
+      "[a-z]+",
       String.raw`\d?`,
-      String.raw`\d{1,3}?`,
-      String.raw`\w+?`,
       "(ab)?c",
       ".+?",
       "a?b?",
     );
 
-    test.prop([arbConstraintBodyWithQ], { numRuns: NUM_RUNS.fast })(
-      "constraint body containing `?` keeps urlParams intact, queryParams empty",
-      (body) => {
-        const meta = buildParamMeta(`/a/:id<${body}>`);
-
-        expect(meta.urlParams).toStrictEqual(["id"]);
-        expect(meta.queryParams).toStrictEqual([]);
-        expect(meta.constraintPatterns.has("id")).toBe(true);
-        expect(meta.pathPattern).toBe(`/a/:id<${body}>`);
+    test.prop([arbParamName, arbConstraintBody], { numRuns: NUM_RUNS.fast })(
+      "a `<re>` constraint on a param is rejected (constraint-removed)",
+      (name, body) => {
+        expect(() => singleRouteMatcher(`/a/:${name}<${body}>`)).toThrow(
+          /Regex constraints are not supported/u,
+        );
       },
     );
 
-    test.prop([arbConstraintBodyWithQ], { numRuns: NUM_RUNS.fast })(
-      "a real query is still detected after a `?`-bearing constraint",
-      (body) => {
-        const meta = buildParamMeta(`/a/:id<${body}>?tab&page`);
+    test.prop([arbParamName], { numRuns: NUM_RUNS.fast })(
+      "a `:x?` optional param is rejected (optional-removed)",
+      (name) => {
+        expect(() => singleRouteMatcher(`/a/:${name}?`)).toThrow(
+          /Optional params are not supported/u,
+        );
+      },
+    );
 
-        expect(meta.urlParams).toStrictEqual(["id"]);
-        expect(meta.queryParams).toStrictEqual(["tab", "page"]);
-        expect(meta.constraintPatterns.has("id")).toBe(true);
+    test.prop([arbParamName], { numRuns: NUM_RUNS.fast })(
+      "a `/:id?format` keeps the param and reads the tail as a query",
+      (name) => {
+        const meta = buildParamMeta(`/a/:${name}?tab`);
+
+        expect(meta.urlParams).toStrictEqual([name]);
+        expect(meta.queryParams).toStrictEqual(["tab"]);
       },
     );
   });

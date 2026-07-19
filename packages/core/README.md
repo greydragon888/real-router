@@ -235,7 +235,7 @@ const routes: Route[] = [
 
 | Value                      | URL path param (`:id`) | URL query param (`?q`)                             | `state.params` after navigation |
 | -------------------------- | ---------------------- | -------------------------------------------------- | ------------------------------- |
-| `undefined`                | Error (required) / skip (optional `:id?`) | **stripped** — parameter absent from URL         | Key absent (`"q" in params` is `false`) |
+| `undefined`                | Error — path param is required | **stripped** — parameter absent from URL         | Key absent (`"q" in params` is `false`) |
 | `null`                     | Same as `undefined`    | `?q` (key-only, via `nullFormat: "default"`)       | `null`                          |
 | `""` (empty string)        | Empty segment (caller's responsibility) | `?q=` (explicit empty value, distinct from `null`) | `""`                            |
 | `string`                   | Encoded per `urlParamsEncoding` | `?q=value` (URI-encoded)                           | Unchanged                       |

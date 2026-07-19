@@ -104,42 +104,10 @@ describe("validateRoutePath (via public validateRoute)", () => {
         });
       });
 
-      it("should accept optional parameters", () => {
-        const paths = ["/path/:id?", "/users/:userId?/posts", "/:optional?"];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).not.toThrow();
-        });
-      });
-
-      it("should accept regex constraints", () => {
-        const paths = [
-          String.raw`/:id<\d+>`,
-          "/:uuid<[a-f0-9]{8}>",
-          String.raw`/posts/:id<\d{1,10}>`,
-          "/:param<[A-Z]+>",
-        ];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).not.toThrow();
-        });
-      });
-
-      // Regression guard (#749): these were the original "#738 breakers" but
-      // #738 made them valid configs (lazy quantifier inside a constraint, and
-      // hyphen in a param name). The #749 delimiter-balance check must NOT
-      // reject them — they have balanced `<...>` / no constraint at all.
-      it("should accept hyphenated names and balanced lazy-quantifier constraints", () => {
-        const paths = [
-          "/h/:my-param",
-          String.raw`/a/:id<\d?>`,
-          String.raw`/a/:id<\d?>?tab`,
-          "/:id<[a<b]>", // `<` legitimately inside a constraint body
-        ];
+      // #738: a param name may carry non-word chars (hyphen), and a `?` tail is
+      // the query separator (param stays required) — all valid 3-token forms.
+      it("should accept hyphenated names and a query tail after a param", () => {
+        const paths = ["/h/:my-param", "/a/:id?tab", "/users/:id/posts/:pid"];
 
         paths.forEach((path) => {
           expect(() => {
@@ -209,9 +177,9 @@ describe("validateRoutePath (via public validateRoute)", () => {
       it("should accept complex valid paths", () => {
         const paths = [
           "/api/v2/users/:id/posts/*rest",
-          String.raw`/:category/:id<\d+>?page=1`,
+          "/:category/:id?page=1",
           "/files/*path?download=true",
-          "~/admin/:section/:id?",
+          "~/admin/:section/:id",
         ];
 
         paths.forEach((path) => {
@@ -314,64 +282,44 @@ describe("validateRoutePath (via public validateRoute)", () => {
       });
     });
 
-    describe("Constraint syntax errors (#749)", () => {
-      // An unbalanced `<` desyncs match vs build grammars: the param name is
-      // truncated at `<`, but the unclosed constraint survives as a literal in
-      // the trie node path, so `buildPath` later throws `Missing required
-      // param`. `validateRoute` is the gatekeeper that must reject it early.
-      it("should throw for unbalanced constraint delimiters", () => {
+    // Every `<`/`>` in a path (a `<re>` constraint, an `<>`, an invalid-regex
+    // body, a `<...>` in a static segment, or a stray `>`) is rejected with the
+    // route-contextual "regex constraints are not supported" recipe. path-matcher
+    // backstops the same forms at `registerTree` with a shorter recipe.
+    describe("removed forms — regex constraints (M1)", () => {
+      it("throws the constraint recipe for any `<...>` / stray `<`,`>`", () => {
         const paths = [
-          String.raw`/u/:id<\d+`, // no closing '>'
-          "/u/:id<", // dangling '<'
-          "/u/:id>", // stray '>' with no '<'
-          String.raw`/u/:id<\d+>>`, // extra '>'
-          String.raw`/a/:id<\d?>?tab<`, // trailing dangling '<' after a valid constraint
+          String.raw`/:id<\d+>`, // a former constraint
+          "/:uuid<[a-f0-9]{8}>",
+          "/u/:id<", // dangling '<' (was #804 unbalanced)
+          "/u/:id>", // stray '>' (В1.3)
+          "/u/:id<>", // empty '<>' (was #804)
+          "/u/:id<*x>", // former invalid-regex body — no longer compiled
+          "/foo<bar>", // constraint filling a static segment (was #1311)
+          "/a>b", // a stray '>' in a static segment (В1.3)
+          String.raw`/:year<\d+>-archive`, // was fused-constraint-suffix (#1150)
         ];
 
         paths.forEach((path) => {
           expect(() => {
             validatePath(path, routeName, methodName);
-          }).toThrow(/constraint/);
+          }).toThrow(/regex constraints are not supported/u);
         });
       });
 
-      // An empty `<>` is balanced but compiles to a never-matching `^()$`
-      // pattern — a dead required param. The gate rejects it route-contextually
-      // (#804); path-matcher backstops it at registerTree.
-      it("should throw for an empty constraint '<>' (#804)", () => {
-        const paths = [
-          "/u/:id<>", // empty constraint
-          "/x/:id<>?/y", // empty constraint before an optional marker
-        ];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).toThrow(/empty constraint/);
-        });
+      it("names the offending segment and reserves '<'/'>' in the recipe", () => {
+        expect(() => {
+          validatePath(String.raw`/users/:id<\d+>`, "u", "add");
+        }).toThrow(/'<' and '>' are reserved in path segments/u);
       });
 
-      // A constraint body that is BALANCED and non-empty (so it clears the two
-      // checks above) but is NOT a valid regular expression — `<*x>`, `<(>`, `<[>`.
-      // `buildParamMeta` throws a plain `Error` compiling the body to a `RegExp`
-      // (path-matcher #1324); `validateRoutePath` wraps that call so it surfaces as
-      // the gate's route-contextual `TypeError`, not a bare `[buildParamMeta]` Error
-      // — the one malformed class that used to escape the gate contract (F1-residual).
-      it("should re-throw an invalid-regex constraint body as a route-contextual TypeError (#1324)", () => {
-        const paths = [
-          "/u/:id<*x>", // leading quantifier — "Nothing to repeat"
-          "/u/:id<(>", // unterminated group
-          "/u/:id<[>", // unterminated character class
-        ];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).toThrow(TypeError);
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).toThrow(/^\[router\./);
-        });
+      it("the recipe is a route-contextual TypeError", () => {
+        expect(() => {
+          validatePath(String.raw`/:id<\d+>`, routeName, methodName);
+        }).toThrow(TypeError);
+        expect(() => {
+          validatePath(String.raw`/:id<\d+>`, routeName, methodName);
+        }).toThrow(/^\[router\./);
       });
     });
 
@@ -430,52 +378,6 @@ describe("validateRoutePath (via public validateRoute)", () => {
         });
       });
 
-      it("should throw for static text fused to a constraint '>' (#1150)", () => {
-        const paths = [
-          String.raw`/:year<\d+>-archive`, // static suffix after a constraint
-          String.raw`/post/:id<\d+>.html`, // ".html" suffix
-          String.raw`/x/:id<\d+>x`, // letter suffix
-          String.raw`/x/:a<\d+>:b`, // a second marker fused after the constraint
-        ];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).toThrow(/fused to a constraint/u);
-        });
-      });
-
-      it("should NOT flag a constraint that ends its segment (controls, #1150)", () => {
-        const paths = [
-          String.raw`/:id<\d+>`, // constraint at end of path
-          String.raw`/:id<\d+>/edit`, // followed by a segment boundary
-          String.raw`/:id<\d+>?`, // followed by an optional marker
-          "/:id<[a<b]>", // '<' inside the constraint body
-          "/:id<[a/b]>", // '/' inside the constraint body
-        ];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).not.toThrow();
-        });
-      });
-
-      it("should throw for a `<...>` constraint in a clean static segment (#1311)", () => {
-        const paths = [
-          "/foo<bar>", // constraint filling a static segment
-          "/a<b>", // minimal
-          String.raw`/x<\d+>`, // constraint body on a static segment
-          "/users/x<[a/b]>", // '/' inside the constraint body, static segment
-        ];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).toThrow(/constraint '<\.\.\.>' in a static segment/u);
-        });
-      });
-
       it("should throw for a duplicate param name within one route (#1151)", () => {
         const paths = [
           "/:id/:id", // same name, two segments
@@ -491,7 +393,7 @@ describe("validateRoutePath (via public validateRoute)", () => {
       });
 
       it("should NOT flag distinct param names (control, #1151)", () => {
-        const paths = ["/:a/:b", "/a/:b?/:c?/d", "/:x/*rest"];
+        const paths = ["/:a/:b", "/a/:b/:c/d", "/:x/*rest"];
 
         paths.forEach((path) => {
           expect(() => {
@@ -510,11 +412,10 @@ describe("validateRoutePath (via public validateRoute)", () => {
         });
       });
 
-      it("should NOT flag percent-encoded statics, non-ASCII param names, or constraints (control, #1154)", () => {
+      it("should NOT flag percent-encoded statics or non-ASCII param names (control, #1154)", () => {
         const paths = [
           "/caf%C3%A9", // percent-encoded — already works today
           "/:café", // a non-ASCII PARAM name (only static text is compared raw)
-          "/:id<[а-я]+>", // a Cyrillic constraint body (matched against decoded value)
           "/users",
         ];
 
@@ -525,9 +426,11 @@ describe("validateRoutePath (via public validateRoute)", () => {
         });
       });
 
-      it("should throw for a constraint leaked into a query name (#1242 §5.1)", () => {
+      it("should throw for a `<`/`>` in a query name (#1242 §5.1)", () => {
+        // A real query declaration whose NAME carries `<`/`>` (e.g. a reverse-order
+        // typo `?a<b`) is still rejected as an invalid query-param name.
         expect(() => {
-          validatePath(String.raw`/a/:b?<\d+>`, routeName, methodName);
+          validatePath("/path?a<b", routeName, methodName);
         }).toThrow(/invalid query-param name/u);
       });
 
@@ -553,90 +456,66 @@ describe("validateRoutePath (via public validateRoute)", () => {
         });
       });
 
-      it("should throw for an optional splat '*name?' (#1149)", () => {
+      // M1: optional `:x?` (and optional splat `*x?`) were removed. Every optional
+      // form — bare, before a splat, before a param, or two in a row — is rejected
+      // with the route-contextual "optional params are not supported" recipe.
+      it("throws the optional recipe for any `:x?` / `*x?`", () => {
         const paths = [
-          "/files/*path?", // optional splat
-          "/:lang?/files/*rest?", // optional splat after an optional param
+          "/:id?", // bare optional
+          "/files/*path?", // optional splat (was #1149)
+          "/:v?/*rest", // optional before a splat (was #1264)
+          "/:a?/:b", // optional before a param
+          "/:lang?/home", // optional before a static
+          "/:a?/:b?/*rest", // two optionals before a splat (was #1287)
         ];
 
         paths.forEach((path) => {
           expect(() => {
             validatePath(path, routeName, methodName);
-          }).toThrow(/optional splat/u);
+          }).toThrow(/optional params are not supported/u);
         });
       });
 
-      it("should NOT flag a required splat followed by a query (control, #1149)", () => {
-        // `?download` is the query separator, `*path` a required splat — the
-        // query-stripped pathPattern has no optional marker on the splat.
+      it("should NOT flag a required splat followed by a query (control)", () => {
+        // `?download` is the query separator, `*path` a required splat.
         expect(() => {
           validatePath("/files/*path?download", routeName, methodName);
         }).not.toThrow();
       });
 
-      it("should throw for an unconstrained optional param before a splat (#1264)", () => {
-        const paths = ["/:v?/*rest", "/:lang?/*path", "/api/:version?/*rest"];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).toThrow(/unconstrained optional param before a splat/u);
-        });
-      });
-
-      it("should NOT flag a CONSTRAINED optional before a splat, nor opt→param/static (#1264)", () => {
-        const paths = [
-          String.raw`/:v<v\d+>?/*rest`, // constrained → try-take-if-valid (A1)
-          "/:id<[^/]+>?/*rest", // constraint containing '/'
-          "/:a?/:b", // optional before a param, not a splat (A2)
-          "/:lang?/home", // optional before a static
-        ];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).not.toThrow();
-        });
-      });
-
-      it("should throw for two optional params directly before a splat (#1287)", () => {
-        const paths = [
-          "/:a<[a-z]+>?/:b<[a-z]+>?/*rest", // two constrained optionals before a splat
-          "/:a<[^/]+>?/:b<[^/]+>?/*rest", // constraint containing '/'
-        ];
-
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).toThrow(/two optional params directly before a splat/u);
-        });
-      });
-
-      it("reports the #1287 reason (not #1264) for TWO UNCONSTRAINED optionals before a splat — aligned with the registerTree backstop", () => {
-        // `/:a?/:b?/*rest` triggers BOTH #1264 (an unconstrained optional before the
-        // splat) and #1287 (two optionals before the splat). The path-matcher backstop
-        // reports #1287 first (registerNode runs before markOptionalFork's #1264 throw);
-        // the gate must too, so the two layers give the SAME reject reason. The
-        // gate↔backstop parity property only checks the reject BOOLEAN, so this reason
-        // divergence was invisible to it. #1287's "split / drop the '?'" is the correct
-        // fix — the #1264 "add a constraint" hint is a dead end (`/:a<c>?/:b<c>?/*rest`
-        // is still rejected by #1287).
+      // В1.1 rich tier: the gate recipe names the offending segment and computes
+      // the two replacement sibling paths from the ACTUAL path.
+      it("computes the two sibling routes for the optional recipe", () => {
         expect(() => {
-          validatePath("/:a?/:b?/*rest", routeName, methodName);
-        }).toThrow(/two optional params directly before a splat/u);
+          validatePath("/profile/:tab?", "p", "add");
+        }).toThrow(
+          /optional params are not supported — ":tab\?"\. Declare two sibling routes instead: "\/profile" and "\/profile\/:tab"/u,
+        );
       });
 
-      it("should NOT flag a single constrained optional before a splat (#1287)", () => {
-        const paths = [
-          "/:v<[a-z]+>?/*rest", // one constrained optional → supported (#1264 A1)
-          "/:a<[a-z]+>?/:b<[a-z]+>?/end", // two optionals, but before a static
-        ];
+      it("computes siblings for a MID-PATH optional (// collapses)", () => {
+        expect(() => {
+          validatePath("/a/:b?/c", "p", "add");
+        }).toThrow(
+          /Declare two sibling routes instead: "\/a\/c" and "\/a\/:b\/c"/u,
+        );
+      });
 
-        paths.forEach((path) => {
-          expect(() => {
-            validatePath(path, routeName, methodName);
-          }).not.toThrow();
-        });
+      // #1516 review: a reverse/compound optional (`?` NOT the segment's last char
+      // — `:b?<x>` is a §3.3 boundary pin that stays a path segment). The required
+      // sibling must drop the WHOLE `?…` modifier tail, not a blind last char — so
+      // it is a VALID route `/a/:b`, not the malformed `/a/:b?<x` a `slice(0,-1)`
+      // would emit. A user copying the recipe's sibling must get a registerable path.
+      it("yields a VALID required sibling for a reverse/compound optional", () => {
+        expect(() => {
+          validatePath("/a/:b?<x>", "p", "add");
+        }).toThrow(
+          /optional params are not supported .*Declare two sibling routes instead: "\/a" and "\/a\/:b"/u,
+        );
+        // the degenerate double-`?` collapses to the plain required param too
+        expect(() => {
+          validatePath("/:id??", "p", "add");
+        }).toThrow(/Declare two sibling routes instead: "" and "\/:id"/u);
       });
 
       it("should NOT flag a boundary marker or a marker-led greedy name (controls)", () => {

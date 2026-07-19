@@ -16,15 +16,12 @@ import type { SegmentErrorCode } from "../parseSegment";
  * becomes a hard `start()` crash on a legitimate config — so we reject the
  * ambiguity loudly at registration instead of corrupting matches.
  *
- * The conflict is strictly **cross-route**. A single route may legitimately land
- * two differently-named params on the same trie position via the optional-omit
- * branch — e.g. `/a/:b?/:c?/d` or `/a/:b?/:c/d`, where omitting `:b?` lets the
- * next param occupy `:b?`'s slot. That intra-route aliasing is the established,
- * tested semantics (first optional wins the slot), not a bug. We tell the two
- * apart with `ownNodes`: the set of nodes whose param/splat child was *created
- * during the current route's insertion*. A differing name on a node in that set
- * is the same route revisiting its own slot (keep-first); on any other node it
- * is a prior route's slot (throw).
+ * The conflict is strictly **cross-route**. Under the 3-token grammar (M1, #1516)
+ * insertion is a strict linear walk — a route never revisits a slot it created
+ * (the former optional-omit fork, which could land two differently-named params
+ * on one position within a single route, is gone). So any name mismatch at a
+ * position is unconditionally a prior route's slot: `ensureParamChild` throws on
+ * `name !== paramName` with no `ownNodes` exception.
  */
 export function throwParamNameConflict(
   existingName: string,
@@ -49,14 +46,14 @@ export function throwParamNameConflict(
  */
 export function throwEmptyParamName(): never {
   // Marker-agnostic: this fires for a bare ':'/'*' (`/x/:`, `/x/*`), a marker
-  // carrying only a modifier/constraint (`/x/:?`, `/x/:<\d+>`), AND a static
-  // segment with a trailing '?' (`/faq?`) — which the optional fork routes here
-  // via `extractParamName`. So the message must NOT claim a specific ':' marker
+  // carrying only a modifier char with no name (`/x/:?`, `/x/:<...>`), AND a
+  // static segment with a trailing '?' (`/faq?`) — all routed here via
+  // `extractParamName`. So the message must NOT claim a specific ':' marker
   // (there isn't one for `/faq?`, #1241).
   throw new Error(
     `[SegmentMatcher.registerTree] Empty parameter name: a parameter marker ` +
-      `(':' or '*') or an optional '?' must be followed by a name (e.g. ':id', ` +
-      `'*rest', ':id?'). A name-less marker or modifier would capture under an ` +
+      `(':' or '*') must be followed by a name (e.g. ':id', '*rest'). A name-less ` +
+      `marker, or a trailing '?' with no parameter name, would capture under an ` +
       `empty key at match but emit a literal at build — the two disagree, so it ` +
       `is rejected.`,
   );
@@ -99,13 +96,30 @@ function throwTrailingMarker(segment: string): never {
   );
 }
 
-export function throwMultipleOptionalsBeforeSplat(path: string): never {
+/**
+ * `optional-removed` (M1): a `:x?`/`*x?` optional modifier. The backstop tier —
+ * a short, path-free recipe (the route-tree gate's rich tier computes the two
+ * concrete sibling paths). Optional params were dropped for zero corpus use +
+ * the axis's largest bug cluster; the hierarchy already expresses optionality.
+ */
+function throwOptionalRemoved(segment: string): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Two optional params directly before a splat in ` +
-      `"${path}": a single trie slot carries only one optional→splat fork, so the ` +
-      `outer optional would overwrite the inner and the omit-outer/take-inner form ` +
-      `would silently reshape into the splat. Split into separate routes, or drop the ` +
-      `'?' on one.`,
+    `[SegmentMatcher.registerTree] Optional params are not supported: "${segment}" — ` +
+      `declare two sibling routes instead (one with the segment, one without). ` +
+      `The route hierarchy already expresses optionality.`,
+  );
+}
+
+/**
+ * `constraint-removed` (M1): a `<re>` constraint or a stray `<`/`>`. The backstop
+ * tier — a short recipe (the gate's rich tier names the offending segment). Regex
+ * constraints were dropped; validate the value in a guard instead.
+ */
+function throwConstraintRemoved(segment: string): never {
+  throw new Error(
+    `[SegmentMatcher.registerTree] Regex constraints are not supported: "<"/">" are ` +
+      `reserved in path segments ("${segment}"). Match the segment as a plain ` +
+      `string and validate the value in a guard (canActivate) or app code.`,
   );
 }
 
@@ -118,98 +132,15 @@ export function throwNonAsciiStatic(segment: string): never {
 }
 
 /**
- * Rejects an optional splat (`*name?`): `buildParamMeta`/`compileBuildParts`
- * classify it as a splat (multi-segment, splat encoder preserves "/"), but the
- * optional fork would compile a plain param node that eats a single segment — a
- * three-way match/build/meta desync (`buildPath` emits multi-segment URLs `match`
- * rejects). The shape only "worked" for 0–1 segments, so rejecting loses nothing
- * real. The sibling of {@link throwEmptyParamName} (#858) / {@link throwFusedMarker}
- * (#1050). route-tree's validation gate catches this first with a route-contextual
- * error; this is the standalone registration backstop. (#1149)
- */
-function throwOptionalSplat(segment: string): never {
-  throw new Error(
-    `[SegmentMatcher.registerTree] Optional splat "${segment}" is not supported: ` +
-      `a splat cannot be optional — build emits multi-segment URLs the matcher ` +
-      `rejects. Use a required splat "*name".`,
-  );
-}
-
-/**
- * Rejects an UNCONSTRAINED optional param directly before a splat (`/:v?/*rest`,
- * #1264, product decision). Without a constraint there is no validity signal to
- * disambiguate "take the optional" from "let the splat capture", so every
- * multi-segment value has two readings and `match` would silently reshape half the
- * input space — a wrong-name in new clothing, worse than the loud UNMATCH it had.
- * A CONSTRAINED optional→splat (`:v<c>?/*rest`) IS supported (A1). Sibling of the
- * optional-splat (#1149) / fused (#1050) rejections; route-tree's gate catches it
- * first with a route-contextual error.
- */
-export function throwUnconstrainedOptionalSplat(paramName: string): never {
-  throw new Error(
-    `[SegmentMatcher.registerTree] Optional param ":${paramName}?" before a splat ` +
-      `must be constrained: an unconstrained optional before a splat is ambiguous ` +
-      `(every multi-segment value has two readings). Add a constraint, e.g. ` +
-      `":${paramName}<[a-z]+>?", or model it as two routes.`,
-  );
-}
-
-/**
- * An unbalanced `<`/`>` desyncs match vs build: the name is truncated at the
- * stray `<`, the unclosed constraint survives as a literal in the trie path, and
- * `buildPath` emits a URL its own `match` rejects (#804 — the residual gap #749
- * only closed on the plugin path; this is the bare-core backstop). Sibling of
- * {@link throwEmptyParamName} (#858) / {@link throwFusedMarker} (#1050).
- */
-export function throwUnbalancedConstraint(path: string): never {
-  throw new Error(
-    `[SegmentMatcher.registerTree] Unbalanced constraint delimiter ('<' or '>') ` +
-      `in path "${path}": every '<' must be closed by a '>'. A stray delimiter ` +
-      `desyncs match vs build (buildPath would emit a URL match rejects).`,
-  );
-}
-
-/**
- * An empty constraint `<>` compiles to `^()$`, which matches only the empty
- * string — a never-matching required param. Rejected loudly instead of silently
- * producing a dead route (#804 §3.3). Sibling of the name-less rejection (#858).
- */
-function throwEmptyConstraint(path: string): never {
-  throw new Error(
-    `[SegmentMatcher.registerTree] Empty constraint '<>' in path "${path}": ` +
-      `a constraint body must be non-empty (e.g. '<[0-9]+>'). An empty '<>' ` +
-      `compiles to a never-matching pattern.`,
-  );
-}
-
-function throwFusedConstraintSuffix(path: string): never {
-  throw new Error(
-    `[SegmentMatcher.registerTree] Text fused to a constraint '>' in path "${path}": ` +
-      `a '<...>' constraint must end its segment or be followed by '/' or an ` +
-      `optional '?' — use "/:id<...>/rest", not "/:id<...>rest".`,
-  );
-}
-
-function throwConstraintInStaticSegment(path: string): never {
-  throw new Error(
-    `[SegmentMatcher.registerTree] Constraint '<...>' in a static segment in path "${path}": ` +
-      `a '<...>' constraint must follow a parameter marker (':' or '*') — a static ` +
-      `segment carrying '<...>' is silently stripped. Attach it to a param ` +
-      `(e.g. "/:id<...>") or drop it.`,
-  );
-}
-
-/**
- * Dispatches a `parseSegment` grammar-error code (the per-segment backstop, Реш.2)
- * to the matching matcher-level throw — the single place mapping the tokenizer's
- * verdict onto the existing messages, so the reject reason stays byte-identical per
- * code. `unbalanced-constraint` is unreachable (`isConstraintBalanced` rejects a
- * stray delimiter first); kept for `SegmentErrorCode` exhaustiveness.
+ * Dispatches a `parseSegment` grammar-error code (the per-segment backstop) to the
+ * matching matcher-level throw — the single place mapping the tokenizer's verdict
+ * onto the message, so the reject reason stays byte-identical per code. The two
+ * removed-form codes (M1) route to their short recipe throws; the route-tree gate
+ * catches the same forms first with its richer route-contextual recipe.
  */
 export function throwSegmentGrammarError(
   code: SegmentErrorCode,
   segment: string,
-  path: string,
 ): never {
   switch (code) {
     case "name-less": {
@@ -221,23 +152,12 @@ export function throwSegmentGrammarError(
     case "fused-marker": {
       return throwFusedMarker(segment);
     }
-    case "optional-splat": {
-      return throwOptionalSplat(segment);
+    case "optional-removed": {
+      return throwOptionalRemoved(segment);
     }
-    case "empty-constraint": {
-      return throwEmptyConstraint(path);
+    case "constraint-removed": {
+      return throwConstraintRemoved(segment);
     }
-    case "fused-constraint-suffix": {
-      return throwFusedConstraintSuffix(path);
-    }
-    case "constraint-in-static": {
-      return throwConstraintInStaticSegment(path);
-    }
-    /* v8 ignore start -- unreachable: isConstraintBalanced rejects a stray '<'/'>' before this runs */
-    case "unbalanced-constraint": {
-      return throwUnbalancedConstraint(path);
-    }
-    /* v8 ignore stop */
   }
 }
 
@@ -272,10 +192,8 @@ export function throwInvalidQueryParamName(
 ): never {
   throw new Error(
     `[SegmentMatcher.registerTree] Invalid query-param declaration "${name}" in ` +
-      `route "${routeName}": a query-param name cannot contain '<' or '>'. This is a ` +
-      `reverse-order modifier typo that leaked a constraint into the query — put the ` +
-      `optional '?' AFTER the constraint (':id<...>?', not ':id?<...>'). It would ` +
-      `never round-trip.`,
+      `route "${routeName}": a query-param name cannot contain '<' or '>' — it would ` +
+      `never round-trip. Rename the query param.`,
   );
 }
 
@@ -309,9 +227,8 @@ export function throwSlashChildUnderDynamicParent(
 ): never {
   throw new Error(
     `[SegmentMatcher.registerTree] Index route "${routeName}" (path "/") under the ` +
-      `dynamic parent "${parentPath}" is not supported: the index cannot reliably ` +
-      `replace the parent on every form of its path — under an optional param it ` +
-      `binds only the present form, under a splat it is unreachable. Give the index ` +
-      `a distinct path, or make the parent static.`,
+      `splat parent "${parentPath}" is not supported: the index sits on the splat ` +
+      `node, which the wildcard match never reaches, so it is unreachable. Give the ` +
+      `index a distinct path, or make the parent static.`,
   );
 }

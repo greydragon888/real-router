@@ -6,29 +6,6 @@
  * @module path-matcher/types
  */
 
-// =============================================================================
-// Constraint Types
-// =============================================================================
-
-/**
- * Constraint pattern for a URL parameter.
- */
-export interface ConstraintPattern {
-  /**
-   * Compiled RegExp for validating the parameter value.
-   *
-   * @example /^(\d+)$/ for constraint "<\\d+>"
-   */
-  readonly pattern: RegExp;
-
-  /**
-   * Raw constraint string from the route pattern.
-   *
-   * @example "<\\d+>"
-   */
-  readonly constraint: string;
-}
-
 /**
  * Parameter metadata extracted from a route path pattern.
  */
@@ -60,23 +37,6 @@ export interface ParamMeta {
    * @example { id: "url", q: "query" }
    */
   readonly paramTypeMap: Readonly<Record<string, "url" | "query">>;
-
-  /**
-   * Map of parameter names to their constraint patterns.
-   *
-   * Only includes parameters with explicit constraints (e.g., `:id<\\d+>`).
-   * Parameters without constraints are not included in this map.
-   *
-   * @example
-   * ```typescript
-   * buildParamMeta("/users/:id<\\d+>").constraintPatterns.get("id")
-   * // → { pattern: /^(\d+)$/, constraint: "<\\d+>" }
-   *
-   * buildParamMeta("/users/:id").constraintPatterns.size
-   * // → 0 (no constraints)
-   * ```
-   */
-  readonly constraintPatterns: ReadonlyMap<string, ConstraintPattern>;
 
   /**
    * Path pattern without query string, pre-computed for buildPath.
@@ -129,8 +89,6 @@ export interface CompiledRoute {
   readonly declaredQueryParams: readonly string[];
   readonly declaredQueryParamsSet: ReadonlySet<string>;
   readonly hasTrailingSlash: boolean;
-  readonly constraintPatterns: ReadonlyMap<string, ConstraintPattern>;
-  readonly hasConstraints: boolean;
 
   readonly buildStaticParts: readonly string[];
   readonly buildParamSlots: readonly BuildParamSlot[];
@@ -146,7 +104,6 @@ export interface CompiledRoute {
 export interface BuildParamSlot {
   readonly paramName: string;
   readonly encoder: (value: string) => string;
-  readonly isOptional: boolean;
 }
 
 /**
@@ -161,26 +118,6 @@ export interface BuildPathOptions {
 // Segment Trie Types
 // =============================================================================
 
-/**
- * Marks a `paramChild` as an OPTIONAL-successor fork (#1263/#1264): the param came
- * from an optional `:opt<constraint>?` directly followed by a dynamic segment, so
- * `match` must disambiguate the omit form. Exactly one field is set:
- *
- * - `constraint` — the optional is followed by a **splat** (`/:v<c>?/*rest`). Take
- *   the segment as the optional only if its DECODED value (#857) satisfies the
- *   constraint (`try-take-if-valid`), else skip and let the splat capture. An
- *   UNCONSTRAINED optional→splat is rejected at registration (reject-with-hint).
- * - `skipName` — the optional is followed by a **required param** (`/:a?/:b`).
- *   On the LAST segment the optional is omitted, so the segment is the successor:
- *   bind it under `skipName` (the successor's name), not the optional's. When the
- *   optional is present (≥2 segments) it binds normally and its constraint (if
- *   any) is validated post-traverse.
- */
-export interface ForkMeta {
-  readonly constraint?: RegExp | undefined;
-  readonly skipName?: string | undefined;
-}
-
 export interface SegmentNode {
   /**
    * Starts as the shared frozen `EMPTY_STATIC_CHILDREN` sentinel (pathUtils);
@@ -190,19 +127,9 @@ export interface SegmentNode {
    */
   staticChildren: Record<string, SegmentNode>;
   hasChildren: boolean;
-  paramChild?:
-    | { node: SegmentNode; name: string; fork?: ForkMeta | undefined }
-    | undefined;
+  paramChild?: { node: SegmentNode; name: string } | undefined;
   splatChild?: { node: SegmentNode; name: string } | undefined;
   route?: CompiledRoute | undefined;
-  /**
-   * #1153: `true` when `route` was set by a STRONG (full-insertion) terminal write,
-   * `false` for a WEAK (optional-omit `??=`) write or when unset. Registration-only
-   * — the match hot path never reads it. A second strong write by a DIFFERENT route
-   * means two routes share an effective path (a silent-shadow dup); a weak owner is
-   * legitimately displaced by a strong write.
-   */
-  routeIsStrong?: boolean | undefined;
   slashChildRoute?: CompiledRoute | undefined;
 }
 

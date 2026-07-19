@@ -55,14 +55,14 @@ graph LR
 
 `route-tree` wraps `path-matcher` and `search-params` into a single facade:
 
-| Dependency        | What route-tree uses   | Purpose                                                                                                |
-| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------------------ |
-| **path-matcher**  | `SegmentMatcher` class | Segment Trie for URL matching and path building                                                        |
-| **path-matcher**  | `buildParamMeta()`     | Extract param metadata from path patterns                                                              |
-| **path-matcher**  | `ParamMeta` type       | Parameter metadata (urlParams, queryParams, spatParams, constraintPatterns, paramTypeMap, pathPattern) |
-| **search-params** | `parseQuery()`         | Query string parsing (DI into SegmentMatcher)                                                          |
-| **search-params** | `build()`              | Query string building (DI into SegmentMatcher)                                                         |
-| **search-params** | Type re-exports        | `ArrayFormat`, `BooleanFormat`, `NullFormat`, etc.                                                     |
+| Dependency        | What route-tree uses   | Purpose                                                                            |
+| ----------------- | ---------------------- | ---------------------------------------------------------------------------------- |
+| **path-matcher**  | `SegmentMatcher` class | Segment Trie for URL matching and path building                                    |
+| **path-matcher**  | `buildParamMeta()`     | Extract param metadata from path patterns                                          |
+| **path-matcher**  | `ParamMeta` type       | Parameter metadata (urlParams, queryParams, spatParams, paramTypeMap, pathPattern) |
+| **search-params** | `parseQuery()`         | Query string parsing (DI into SegmentMatcher)                                      |
+| **search-params** | `build()`              | Query string building (DI into SegmentMatcher)                                     |
+| **search-params** | Type re-exports        | `ArrayFormat`, `BooleanFormat`, `NullFormat`, etc.                                 |
 
 **Key design:** `path-matcher` has no query string handling — `route-tree` injects `search-params` functions via dependency injection at matcher creation time.
 
@@ -91,12 +91,12 @@ interface RouteTree {
 
 **Cache purpose:**
 
-| Cache                 | Avoids                                       | Used by                          |
-| --------------------- | -------------------------------------------- | -------------------------------- |
-| `fullName`            | Runtime `parent.join(".")` on every lookup   | All name-based operations        |
-| `paramTypeMap`        | Recomputing url vs query classification      | `buildState()`, meta computation |
-| `nonAbsoluteChildren` | Filtering on every match iteration           | Segment Trie matching            |
-| `children` Map        | O(n) array scan for child lookup             | `getSegmentsByName()`            |
+| Cache                 | Avoids                                     | Used by                          |
+| --------------------- | ------------------------------------------ | -------------------------------- |
+| `fullName`            | Runtime `parent.join(".")` on every lookup | All name-based operations        |
+| `paramTypeMap`        | Recomputing url vs query classification    | `buildState()`, meta computation |
+| `nonAbsoluteChildren` | Filtering on every match iteration         | Segment Trie matching            |
+| `children` Map        | O(n) array scan for child lookup           | `getSegmentsByName()`            |
 
 ### RouteDefinition
 
@@ -179,7 +179,7 @@ interface MutableRouteNode {
 
 Recursively processes each `MutableRouteNode` into `RouteTree`:
 
-1. **`buildParamMeta(path)`** — extracts `urlParams`, `queryParams`, `spatParams`, `constraintPatterns` from path pattern (via `path-matcher`)
+1. **`buildParamMeta(path)`** — extracts `urlParams`, `queryParams`, `spatParams` from path pattern (via `path-matcher`)
 2. **`buildParamTypeMap(paramMeta)`** — maps param names to `"url"` | `"query"`
 3. **`computeFullName(node)`** — builds dot-notation name from parent chain (`"users.profile"`)
 4. **`processChildren()`** — recursively processes children, builds `ReadonlyMap`, filters `nonAbsoluteChildren`
@@ -268,9 +268,8 @@ validateRoutePath(path, routeName, methodName, parentNode?)
 | Absolute with tilde | `"~/dashboard"`           | Override parent path    |
 | Query-only          | `"?page"`, `"?q&limit"`   | Query parameter routes  |
 | Relative segment    | `"profile"`, `"settings"` | Appended to parent path |
-| Parameterized       | `"/:id"`, `"/:id<\\d+>"`  | Dynamic URL params      |
+| Parameterized       | `"/:id"`                  | Dynamic URL params      |
 | Splat               | `"/*path"`                | Catch-all params        |
-| Optional            | `"/:id?"`                 | Optional URL params     |
 
 **Rejected:**
 
@@ -410,12 +409,12 @@ Tree is read synchronously — no concurrency concerns in single-threaded JS.
 
 ### Runtime
 
-| Operation                 | Complexity  | Notes                     |
-| ------------------------- | ----------- | ------------------------- |
-| `match(path)`             | O(segments) | Segment Trie traversal    |
-| `buildPath(name, params)` | O(segments) | Path injection            |
-| `getSegmentsByName(name)` | O(depth)    | Map.get() per level       |
-| `hasRoute(name)`          | O(depth)    | Map.get() per level       |
+| Operation                 | Complexity  | Notes                  |
+| ------------------------- | ----------- | ---------------------- |
+| `match(path)`             | O(segments) | Segment Trie traversal |
+| `buildPath(name, params)` | O(segments) | Path injection         |
+| `getSegmentsByName(name)` | O(depth)    | Map.get() per level    |
+| `hasRoute(name)`          | O(depth)    | Map.get() per level    |
 
 ### Memory Optimizations
 
@@ -462,14 +461,12 @@ Tree diff algorithm — identify exactly which routes changed between two trees.
 - **Prerequisite:** `SegmentMatcher.patchTree(delta)` — incremental trie updates (see "Incremental Tree Updates" above). Without it, diffing has no consumer — full rebuild is needed regardless
 - **Note:** HMR does NOT require diffing. `routesApi.replace()` solves HMR via full tree rebuild + state revalidation
 
-#### Constraint Composition
+#### Param value validation & typed params
 
-Reusable, composable constraints instead of inline regex patterns.
-
-- **Impact:** DX/ergonomics only. No performance effect — regex execution time is identical
-- **Approach:** Named constraint factories composed via helpers
-- **Challenge:** API design, backward compatibility with string patterns
-- **Trigger:** User demand for constraint reuse across routes
+The path grammar has no inline regex constraints (`:id<\d+>`) — `<` and `>` are
+reserved in path segments. To restrict a param's values today, validate in a guard
+(`canActivate`) or app code. The planned direction for typed/validated params is
+**typed params** ("type as data"), not composable regex constraints.
 
 ### Likely Not Worth Investigating
 

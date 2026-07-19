@@ -1,4 +1,4 @@
-// Trie insertion + walking: the recursive `insertIntoTrieFrom` fork engine, slash-child
+// Trie insertion + walking: the recursive `insertIntoTrieFrom` linear walk, slash-child
 // insertion, per-segment `processSegment`, and the `walkTrie` lookups. Builds the
 // segment trie from the node builders in `./trieNodes`.
 
@@ -16,32 +16,25 @@ import {
   ensureParamChild,
   ensureSplatChild,
   extractParamName,
-  markConstrainedParamFork,
-  markOptionalFork,
 } from "./trieNodes";
 
 import type { CompiledRoute, SegmentNode } from "../types";
 import type { RegistrationState } from "./context";
 
 /**
- * #1153: writes a STRONG (full-insertion) terminal route, rejecting a second strong
- * write by a DIFFERENT route — two routes compiling to the same effective path
- * (flat vs nested `/a/b`, or `/x` vs `/x/`), where the later would silently shadow
- * the earlier (its deep link would resolve to the other route). A revisit by the
- * SAME route (the optional-omit fan-out) is idempotent, and a WEAK (omit `??=`)
- * owner is legitimately displaced by a strong write — neither throws.
+ * #1153: writes a terminal route, rejecting a second write by a DIFFERENT route —
+ * two routes compiling to the same effective path (flat vs nested `/a/b`, or `/x`
+ * vs `/x/`), where the later would silently shadow the earlier (its deep link
+ * would resolve to the other route). A revisit by the SAME route is idempotent.
+ * (With the 3-token grammar every terminal write is a full insertion — the former
+ * WEAK optional-omit `??=` writes are gone with optional params.)
  */
-function writeStrongRoute(node: SegmentNode, compiled: CompiledRoute): void {
-  if (
-    node.route !== undefined &&
-    node.route !== compiled &&
-    node.routeIsStrong === true
-  ) {
+function writeTerminalRoute(node: SegmentNode, compiled: CompiledRoute): void {
+  if (node.route !== undefined && node.route !== compiled) {
     throwDuplicateRoutePath(node.route.name, compiled.name);
   }
 
   node.route = compiled;
-  node.routeIsStrong = true;
 }
 
 /**
@@ -73,29 +66,12 @@ export function insertIntoTrie(
   const normalized = normalizeTrailingSlash(fullPath);
 
   if (normalized === "/") {
-    writeStrongRoute(state.root, compiled);
+    writeTerminalRoute(state.root, compiled);
 
     return;
   }
 
-  // Nodes whose param/splat child is created during THIS route's insertion.
-  // Lets the conflict guard distinguish a route revisiting its own slot (the
-  // optional-omit branch) from a genuine cross-route collision (#736).
-  const ownNodes = new Set<SegmentNode>();
-
-  // Visited (node, start) pairs for THIS insertion — collapses the take/skip
-  // fan-out of consecutive optional params from O(2^N) to polynomial (#849).
-  const visited = new Map<SegmentNode, Set<number>>();
-
-  insertIntoTrieFrom(
-    state,
-    state.root,
-    normalized,
-    1,
-    compiled,
-    ownNodes,
-    visited,
-  );
+  insertIntoTrieFrom(state, state.root, normalized, 1, compiled);
 }
 
 function insertIntoTrieFrom(
@@ -104,88 +80,22 @@ function insertIntoTrieFrom(
   path: string,
   start: number,
   compiled: CompiledRoute,
-  ownNodes: Set<SegmentNode>,
-  visited: Map<SegmentNode, Set<number>>,
 ): void {
-  // #849: each optional param forks this function into a "take" and a "skip"
-  // branch, and those branches converge on the same (node, start) pairs across
-  // consecutive optionals — without memoization that is O(2^N) work for N
-  // optionals (the trie stays small; only the work explodes). Inserting from a
-  // given (node, start) is deterministic for a fixed (path, compiled), and the
-  // only side effects (ensureParamChild returning an existing child,
-  // `node.route ??=`/`=` with the same compiled) are idempotent, so a revisit is
-  // pure redundancy — record the entry and skip repeats. This collapses the
-  // fan-out to O(distinct (node, start) pairs).
-  let seenStarts = visited.get(node);
-
-  if (seenStarts === undefined) {
-    seenStarts = new Set<number>();
-    visited.set(node, seenStarts);
-  } else if (seenStarts.has(start)) {
-    return;
-  }
-
-  seenStarts.add(start);
-
   const length = path.length;
 
+  // 3-token grammar (M1): every segment is `static | :param | *splat` — a single
+  // linear walk down the trie (no optional take/skip fork, so no `visited` memo,
+  // and — since a route never revisits a slot it created — no #736 `ownNodes` set).
   while (start <= length) {
     const end = path.indexOf("/", start);
     const segmentEnd = end === -1 ? length : end;
     const segment = path.slice(start, segmentEnd);
 
-    if (segment.endsWith("?")) {
-      // Optional param fork. An optional SPLAT (`*name?`, #1149) was already
-      // rejected by registerNode's per-segment grammar pass, so a `?`-suffixed
-      // segment reaching here is always an optional param.
-      const paramName = extractParamName(segment);
-      const paramChildNode = ensureParamChild(node, paramName, ownNodes);
-
-      // Path with param: continue recursively from paramChild
-      insertIntoTrieFrom(
-        state,
-        paramChildNode,
-        path,
-        segmentEnd + 1,
-        compiled,
-        ownNodes,
-        visited,
-      );
-
-      // Path without param: skip this segment and continue from node
-      if (segmentEnd >= length) {
-        node.route ??= compiled;
-      } else {
-        insertIntoTrieFrom(
-          state,
-          node,
-          path,
-          segmentEnd + 1,
-          compiled,
-          ownNodes,
-          visited,
-        );
-      }
-
-      // #1263/#1264: mark this optional's paramChild as a fork so `match` can
-      // disambiguate the omit form (opt→splat via constraint, opt→param via the
-      // successor's name).
-      markOptionalFork(node, compiled, paramName, path, segmentEnd, length);
-
-      return;
-    }
-
-    const parent = node;
-
-    node = processSegment(state, node, segment, ownNodes);
-    // #1266: mark a CONSTRAINED required param as a try-take-if-valid fork so `match`
-    // can fall to a splat sibling when the constraint fails, instead of greedily
-    // committing and dying post-traverse.
-    markConstrainedParamFork(parent, compiled, segment);
+    node = processSegment(state, node, segment);
     start = segmentEnd + 1;
   }
 
-  writeStrongRoute(node, compiled);
+  writeTerminalRoute(node, compiled);
 }
 
 export function insertSlashChildIntoTrie(
@@ -193,23 +103,15 @@ export function insertSlashChildIntoTrie(
   compiled: CompiledRoute,
   parentPath: string,
 ): void {
-  // #1242 §5.4 + #1294: an index route (path "/") under a parent whose path carries an
-  // OPTIONAL param in ANY position, or ends in a SPLAT, is unreachable/inconsistent.
-  // Under an optional the index binds only the take form (`/a/:b?/c` + idx: `/a/x/c/` →
-  // index, `/a/c/` → parent) — `walkTrie` lands `slashChildRoute` on the full-take
-  // terminal only and does not fan out omit forms; under a splat `slashChildRoute` sits
-  // on the splat node, which `#matchSplat`'s fast path never reads, so the index is
-  // unreachable entirely. #1242 checked only the LAST segment, missing mid-path
-  // optionals (#1294). A REQUIRED-param parent (`/users/:id`, `/a/:b/c`) has a single
-  // form and its slash-child is coherent (existing behaviour) — allowed. parentPath is
-  // constraint-stripped (walkTrie requires it), so "/" is a clean segment separator.
+  // #1242 §5.4: an index route (path "/") under a parent whose path ends in a
+  // SPLAT is unreachable — `slashChildRoute` sits on the splat node, which
+  // `#matchSplat`'s fast path never reads. A REQUIRED-param parent (`/users/:id`,
+  // `/a/:b/c`) has a single form and its slash-child is coherent (existing
+  // behaviour) — allowed. (The former OPTIONAL-param arm, #1294, is gone with
+  // optional params — M1.)
   const lastSegment = parentPath.slice(parentPath.lastIndexOf("/") + 1);
-  const optionalParamParent = parentPath
-    .split("/")
-    .some((segment) => segment.startsWith(":") && segment.endsWith("?"));
-  const splatParent = lastSegment.startsWith("*");
 
-  if (optionalParamParent || splatParent) {
+  if (lastSegment.startsWith("*")) {
     throwSlashChildUnderDynamicParent(compiled.name, parentPath);
   }
 
@@ -240,9 +142,7 @@ function walkTrieFrom(
   const length = normalized.length;
 
   // Slash-child re-walks an already-inserted path of the same route family —
-  // names always match, so the conflict guard never fires; a throwaway set
-  // keeps the shared `processSegment` signature satisfied.
-  const ownNodes = new Set<SegmentNode>();
+  // names always match, so the conflict guard never fires.
 
   while (start <= length) {
     const end = normalized.indexOf("/", start);
@@ -256,7 +156,7 @@ function walkTrieFrom(
 
     const segment = normalized.slice(start, segmentEnd);
 
-    node = processSegment(state, node, segment, ownNodes);
+    node = processSegment(state, node, segment);
     start = segmentEnd + 1;
   }
 
@@ -267,14 +167,13 @@ function processSegment(
   state: RegistrationState,
   node: SegmentNode,
   segment: string,
-  ownNodes: Set<SegmentNode>,
 ): SegmentNode {
   if (segment.startsWith("*")) {
     // extractParamName (via parseSegment) rejects a name-less `*` (#858) AND a
     // trailing marker (`*y:`, #1324) — the splat name shares one boundary with
-    // the param branch, the optional fork, and the route-tree gate.
+    // the param branch and the route-tree gate.
     const splatName = extractParamName(segment);
-    const child = ensureSplatChild(node, splatName, ownNodes);
+    const child = ensureSplatChild(node, splatName);
 
     // Stryker disable next-line BooleanLiteral: equivalent — sets hasChildren on the node ACQUIRING a splat child; only a splat NODE's own hasChildren is read (in #matchSplat), and splat-of-splat is unreachable (splat is terminal-greedy). Proven by injection.
     node.hasChildren = true;
@@ -284,7 +183,7 @@ function processSegment(
 
   if (segment.startsWith(":")) {
     const paramName = extractParamName(segment);
-    const child = ensureParamChild(node, paramName, ownNodes);
+    const child = ensureParamChild(node, paramName);
 
     node.hasChildren = true;
 

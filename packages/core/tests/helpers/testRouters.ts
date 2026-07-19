@@ -66,7 +66,12 @@ const routes: Route[] = [
   },
   {
     name: "section",
-    path: String.raw`/:section<section[\d]+>`,
+    // Was `/:section<section[\d]+>` (M1 removed the `section\d+` constraint). A bare
+    // top-level `/:section` would be a single-segment catch-all — matching every
+    // "not found" probe (`/nonexistent`, `/invalid`) and breaking the ROUTE_NOT_FOUND
+    // suites. A static `sections/` prefix keeps `section` a param (positive tests pass
+    // `{ section: "section1" }`) while a single-segment path no longer matches it.
+    path: "/sections/:section",
     children: [
       { name: "view", path: "/view/:id" },
       { name: "query", path: "/query?param1&param2&param3" },

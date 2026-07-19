@@ -59,8 +59,6 @@ describe("type compilation", () => {
       declaredQueryParams: [],
       declaredQueryParamsSet: new Set(),
       hasTrailingSlash: false,
-      constraintPatterns: new Map(),
-      hasConstraints: false,
       buildStaticParts: ["/"],
       buildParamSlots: [],
       buildParamNamesSet: new Set(),
@@ -74,12 +72,10 @@ describe("type compilation", () => {
   it("should compile BuildParamSlot interface", () => {
     const slot: BuildParamSlot = {
       paramName: "id",
-      isOptional: false,
       encoder: encodeURIComponent,
     };
 
     expect(slot.paramName).toBe("id");
-    expect(slot.isOptional).toBe(false);
     expect(slot.encoder).toBe(encodeURIComponent);
   });
 
@@ -341,17 +337,17 @@ describe("SegmentMatcher", () => {
       }).toThrow(/'\*path' and '\*rest'/);
     });
 
-    it("throws when two routes share an optional-param position under different names", () => {
+    it("throws when two routes share a param position under different names", () => {
       const matcher = createTestMatcher();
 
       const search = createInputNode({
         name: "search",
-        path: "/search/:q?",
+        path: "/search/:q",
         fullName: "search",
       });
       const searchT = createInputNode({
         name: "searchT",
-        path: "/search/:term?",
+        path: "/search/:term",
         fullName: "searchT",
       });
 
@@ -429,54 +425,6 @@ describe("SegmentMatcher", () => {
       expect(() => {
         matcher.registerTree(twoRouteRoot(file, fileMeta));
       }).toThrow(/Duplicate route path/);
-    });
-
-    it("does NOT treat a single route's consecutive optionals as a conflict", () => {
-      // Within ONE route, omitting `:b?` lets the next param occupy `:b?`'s
-      // slot — established positional-optional semantics, not a cross-route
-      // collision. The guard must stay silent here even though two differently
-      // named params (`b`, `c`) land on the same trie position.
-      const matcher = createTestMatcher();
-
-      const route = createInputNode({
-        name: "route",
-        path: "/a/:b?/:c?/d",
-        fullName: "route",
-      });
-
-      expect(() => {
-        matcher.registerTree(
-          createInputNode({
-            name: "",
-            path: "",
-            fullName: "",
-            children: new Map([["route", route]]),
-            nonAbsoluteChildren: [route],
-          }),
-        );
-      }).not.toThrow();
-    });
-
-    it("does NOT treat a single route's optional-then-required param as a conflict", () => {
-      const matcher = createTestMatcher();
-
-      const route = createInputNode({
-        name: "route",
-        path: "/a/:b?/:c/d",
-        fullName: "route",
-      });
-
-      expect(() => {
-        matcher.registerTree(
-          createInputNode({
-            name: "",
-            path: "",
-            fullName: "",
-            children: new Map([["route", route]]),
-            nonAbsoluteChildren: [route],
-          }),
-        );
-      }).not.toThrow();
     });
 
     it("does NOT throw for different names at DIFFERENT positions", () => {
@@ -662,38 +610,24 @@ describe("SegmentMatcher", () => {
   // re-extracts greedily (name `year-archive`) — build name ≠ meta name, so the
   // route compiles to a silent dead route. The mirror of #1050 on the other side
   // of the param; route-tree's gate backstops with a route-contextual message.
-  describe("registerTree — fused constraint suffix rejection (#1150)", () => {
-    it("throws on static text fused after a constraint (/:year<...>-archive)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: String.raw`/:year<\d+>-archive` }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
-    });
-
-    it("throws on a '.html' suffix fused after a constraint", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: String.raw`/post/:id<\d+>.html` }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
-    });
-
-    it("still accepts a constraint that ends its segment (controls)", () => {
+  // M1 removed regex constraints — any `<`/`>` in a path segment (a former
+  // `<re>` constraint, whatever its position: after a param, fused with a suffix,
+  // filling a static segment, or a stray delimiter) is rejected at registration
+  // with the constraint-removed recipe (the former #1150 fused-suffix / #1311
+  // clean-static / #804 balance cases all collapse into one reject).
+  describe("registerTree — regex constraints removed (M1)", () => {
+    it("throws for any `<...>` regardless of position", () => {
       for (const path of [
-        String.raw`/:id<\d+>`, // constraint at end
-        String.raw`/:id<\d+>/edit`, // followed by '/'
-        String.raw`/:id<\d+>?`, // followed by an optional '?'
-        "/:id<[a/b]>", // '/' inside the constraint body
+        String.raw`/:year<\d+>-archive`, // was #1150 fused suffix
+        String.raw`/post/:id<\d+>.html`, // was #1150 '.html' suffix
+        String.raw`/:id<\d+>`, // constraint at end (was a control)
+        String.raw`/:id<\d+>/edit`, // followed by '/' (was a control)
+        "/foo<bar>", // constraint filling a static segment (was #1311)
+        "/a<b>",
+        String.raw`/x<\d+>`,
       ]) {
-        expect(() => createMatcher([{ name: "r", path }])).not.toThrow();
-      }
-    });
-
-    it("throws on a `<...>` constraint in a CLEAN static segment (/foo<bar>, #1311)", () => {
-      // A constraint filling a static segment (no ':'/'*' marker) is silently
-      // stripped to '/foo' by CONSTRAINT_PATTERN_RGX — #1150 catches only a
-      // constraint fused with TRAILING text (`/:id<\d+>x`); a constraint that
-      // cleanly ends a static segment slips through. Reject it, sibling of #1050.
-      for (const path of ["/foo<bar>", "/a<b>", String.raw`/x<\d+>`]) {
         expect(() => createMatcher([{ name: "r", path }])).toThrow(
-          /\[SegmentMatcher\.registerTree\]/,
+          /Regex constraints are not supported/u,
         );
       }
     });
@@ -724,12 +658,12 @@ describe("SegmentMatcher", () => {
       }).toThrow(/Duplicate parameter name/);
     });
 
-    it("still accepts distinct names, incl. #736 consecutive optionals (controls)", () => {
+    it("still accepts distinct names (controls)", () => {
       expect(() =>
         createMatcher([{ name: "r", path: "/:a/:b" }]),
       ).not.toThrow();
       expect(() =>
-        createMatcher([{ name: "r", path: "/a/:b?/:c?/d" }]),
+        createMatcher([{ name: "r", path: "/a/:b/:c/d" }]),
       ).not.toThrow();
       // the SAME name in DIFFERENT routes is fine — only intra-route dups reject
       expect(() =>
@@ -774,22 +708,25 @@ describe("SegmentMatcher", () => {
       }).toThrow(/Duplicate route path/);
     });
 
-    it("still accepts distinct routes, optional-omit fan-out, and weak→strong (controls)", () => {
+    it("still accepts distinct routes (controls)", () => {
       expect(() =>
         createMatcher([
           { name: "a", path: "/a" },
           { name: "b", path: "/b" },
         ]),
       ).not.toThrow();
-      // a single route's optional-omit revisits its own terminal — idempotent
-      expect(() =>
-        createMatcher([{ name: "r", path: "/a/:b?/:c?/d" }]),
-      ).not.toThrow();
-      // an optional's omit weakly claims the root; a full "/" route displaces it
+      // a param sibling and a static sibling at the same depth coexist
       expect(() =>
         createMatcher([
-          { name: "opt", path: "/:a?" },
+          { name: "static", path: "/users/new" },
+          { name: "param", path: "/users/:id" },
+        ]),
+      ).not.toThrow();
+      // a static root and a param route at distinct terminals
+      expect(() =>
+        createMatcher([
           { name: "root", path: "/" },
+          { name: "item", path: "/:a" },
         ]),
       ).not.toThrow();
     });
@@ -828,14 +765,16 @@ describe("SegmentMatcher", () => {
     });
   });
 
-  // Malformed query-param declarations (#1242 §5.1/§5.2/§5.3): a query name carrying
-  // constraint/query metacharacters (a modifier-order typo or a '=' in the decl), or
-  // one colliding with a path-param name — all degraded silently before.
+  // Malformed query-param declarations (#1242 §5.3): a query name colliding with a
+  // path-param name, and a reverse-order modifier typo. Under M1 the reverse-order
+  // typo `:b?<\d+>` is caught as an optional (the `?`, removed) rather than a
+  // leaked query constraint — the `<\d+>` tail keeps the `?` from being read as the
+  // query separator (§3.3), so the whole segment stays a path param.
   describe("registerTree — malformed query-param declaration rejection (#1242)", () => {
-    it("throws on a reverse-order modifier leaking a constraint into the query name (§5.1)", () => {
+    it("throws optional-removed for a reverse-order modifier typo (§5.1, now M1)", () => {
       expect(() =>
         createMatcher([{ name: "r", path: String.raw`/a/:b?<\d+>` }]),
-      ).toThrow(/Invalid query-param declaration/);
+      ).toThrow(/Optional params are not supported/u);
     });
 
     it("throws on a path-param / query-param name collision (§5.3)", () => {
@@ -844,12 +783,26 @@ describe("SegmentMatcher", () => {
       );
     });
 
+    it("throws on a query-param name carrying '<'/'>' (backstop survivor, §5.1)", () => {
+      // A `<`/`>` in a PLAIN query tail (NOT the reverse-order `:b?<...>` form,
+      // which §3.3 keeps in the path as optional-removed) is the input that still
+      // reaches the backstop's `throwInvalidQueryParamName` after M1 re-routed the
+      // former reverse-form fixture (#776 above) to optional-removed. Without this,
+      // the survivor guard (INVALID_QUERY_NAME_RGX at registerTree, §3.4 B1) is
+      // never exercised — a 100% coverage hole (#1516 review).
+      expect(() => createMatcher([{ name: "r", path: "/a?fil<ter" }])).toThrow(
+        /cannot contain '<' or '>'/u,
+      );
+      expect(() => createMatcher([{ name: "r", path: "/a?x>y" }])).toThrow(
+        /cannot contain '<' or '>'/u,
+      );
+    });
+
     it("still accepts clean query declarations, incl. tolerated ?name=value (controls)", () => {
       for (const path of [
         "/a?valid",
         "/a/:id?q",
         "/a?a&b", // '&' separates two query names — neither is malformed
-        String.raw`/a/:id<\d+>?q`, // correct modifier order: constraint, then query
         "/a?tab=1", // a '=' in the declaration is tolerated today (§5.2 not folded in)
         "/search?first&second",
       ]) {
@@ -858,18 +811,111 @@ describe("SegmentMatcher", () => {
     });
   });
 
-  // An index route (path "/") under an OPTIONAL-param or SPLAT parent is
-  // unreachable/inconsistent (#1242 §5.4). A REQUIRED-param parent has no omit form,
-  // so its slash-child is coherent (existing behaviour) — allowed.
-  describe("registerTree — index under an optional/splat parent rejection (#1242 §5.4)", () => {
-    it("throws for an index (path '/') under an optional-param parent", () => {
-      expect(() =>
-        createMatcher([
-          { name: "p", path: "/a/:b?", children: [{ name: "idx", path: "/" }] },
-        ]),
-      ).toThrow(/Index route .* is not supported/);
+  // The #1288 param+splat junction FALLBACK (a node holding BOTH a param child
+  // and a splat sibling; a multi-segment path dead-ends the param branch → the
+  // splat captures). The forward direction (single segment → param wins) is pinned
+  // in matching.properties.ts; the fallback lost its only discriminating pin when
+  // validated-subtraverse.test.ts was deleted (§4.2 "#1288 structural pins
+  // сохраняются"). Mutating `#traverseFrom`'s fallback (`return this.#matchSplat`
+  // → `return undefined`) survived the whole 878-test suite before this describe
+  // (#1516 review — mutationally proven).
+  describe("match — param+splat junction fallback (#1288, structural)", () => {
+    const junction = () =>
+      createMatcher([
+        {
+          name: "items",
+          path: "/items",
+          children: [
+            { name: "specific", path: "/:id" },
+            { name: "all", path: "/*rest" },
+          ],
+        },
+      ]);
+
+    it("a single-segment path takes the param branch (it completes)", () => {
+      const r = junction().match("/items/hello");
+
+      expect(r?.segments.at(-1)?.fullName).toBe("items.specific");
+      expect(r?.params).toStrictEqual({ id: "hello" });
     });
 
+    it("a multi-segment path dead-ends the param branch → the splat captures", () => {
+      const r = junction().match("/items/a/b/c");
+
+      expect(r?.segments.at(-1)?.fullName).toBe("items.all");
+      expect(r?.params).toStrictEqual({ rest: "a/b/c" });
+    });
+
+    it("a deeper param route dead-ends BELOW the junction → the catch-all", () => {
+      const m = createMatcher([
+        {
+          name: "user",
+          path: "/user",
+          children: [
+            { name: "prof", path: "/:id/profile" },
+            { name: "all", path: "/*rest" },
+          ],
+        },
+      ]);
+
+      // completing param route wins
+      expect(m.match("/user/x/profile")?.segments.at(-1)?.fullName).toBe(
+        "user.prof",
+      );
+
+      // param branch dead-ends below the junction → catch-all (was UNMATCH)
+      const r = m.match("/user/x/settings");
+
+      expect(r?.segments.at(-1)?.fullName).toBe("user.all");
+      expect(r?.params).toStrictEqual({ rest: "x/settings" });
+    });
+  });
+
+  // Roundtrip Extensions #2 (relocated from the deleted caveat-locks.test.ts,
+  // #1516 review): the LIVE, non-optional value-corruption caveats on a PLAIN
+  // param route under `uri`/`none` encoding. caveat-locks.test.ts was deleted
+  // wholesale for its optional-specific blocks; this survivor pin came with it.
+  describe("match — silent value corruption under uri/none (Roundtrip Ext #2)", () => {
+    const versioned = (encoding: "uri" | "none") =>
+      createMatcher([{ name: "r", path: "/users/:id" }], {
+        urlParamsEncoding: encoding,
+      });
+
+    it.each(["uri", "none"] as const)(
+      "[%s] a '?' in a value silently SPLITS into a query param",
+      (encoding) => {
+        const m = versioned(encoding);
+        const url = m.buildPath("r", { id: "x?tab=1" });
+
+        expect(url).toBe("/users/x?tab=1");
+        expect(m.match(url)?.params).toStrictEqual({ id: "x", tab: "1" });
+      },
+    );
+
+    it.each(["uri", "none"] as const)(
+      "[%s] a '#' in a value silently TRUNCATES at the fragment",
+      (encoding) => {
+        const m = versioned(encoding);
+        const url = m.buildPath("r", { id: "x#sec" });
+
+        expect(url).toBe("/users/x#sec");
+        expect(m.match(url)?.params).toStrictEqual({ id: "x" });
+      },
+    );
+
+    it("[none] a non-ASCII value builds an unmatchable URL", () => {
+      const m = versioned("none");
+      const url = m.buildPath("r", { id: "café" });
+
+      expect(url).toBe("/users/café");
+      expect(m.match(url)).toBeUndefined();
+    });
+  });
+
+  // An index route (path "/") under a SPLAT parent is unreachable (#1242 §5.4). A
+  // REQUIRED-param or static parent has one coherent form, so its slash-child is
+  // allowed. (Optional-param parents no longer exist — M1 rejects them at parse.)
+  describe("registerTree — index under a splat parent rejection (#1242 §5.4)", () => {
     it("throws for an index under a splat parent", () => {
       expect(() =>
         createMatcher([
@@ -882,7 +928,7 @@ describe("SegmentMatcher", () => {
       ).toThrow(/Index route .* is not supported/);
     });
 
-    it("still accepts an index under a required-param or static parent (controls)", () => {
+    it("still accepts an index under a required-param, mid-path-param, or static parent (controls)", () => {
       expect(() =>
         createMatcher([
           {
@@ -894,45 +940,6 @@ describe("SegmentMatcher", () => {
       ).not.toThrow();
       expect(() =>
         createMatcher([
-          { name: "p", path: "/a/b", children: [{ name: "idx", path: "/" }] },
-        ]),
-      ).not.toThrow();
-    });
-  });
-
-  // #1294: the §5.4 gate checked only the LAST parent segment, so an index under a
-  // parent with an optional param in a MID-path position registered silently while
-  // the index bound only the take form (present on the full path, absent on every
-  // omit form — `/a/:b?/c` + idx: `/a/x/c/` → idx, `/a/c/` → parent). Extended to
-  // reject an optional param ANYWHERE in the parent path (follow-up of #1242 §5.4).
-  describe("registerTree — index under a mid-path optional parent rejection (#1294)", () => {
-    it("throws for an index whose parent's optional is NOT the last segment", () => {
-      expect(() =>
-        createMatcher([
-          {
-            name: "p",
-            path: "/a/:b?/c",
-            children: [{ name: "idx", path: "/" }],
-          },
-        ]),
-      ).toThrow(/Index route .* is not supported/);
-    });
-
-    it("throws for an index under two mid-path optionals", () => {
-      expect(() =>
-        createMatcher([
-          {
-            name: "p",
-            path: "/a/:b?/:c?/d",
-            children: [{ name: "idx", path: "/" }],
-          },
-        ]),
-      ).toThrow(/Index route .* is not supported/);
-    });
-
-    it("still accepts an index under a REQUIRED mid-path param (one form, coherent)", () => {
-      expect(() =>
-        createMatcher([
           {
             name: "p",
             path: "/a/:b/c",
@@ -940,361 +947,11 @@ describe("SegmentMatcher", () => {
           },
         ]),
       ).not.toThrow();
-    });
-  });
-
-  // #1266: a `/*rest` catch-all next to a constrained `/:v<c>/*rest` sibling. The `:v`
-  // paramChild greedily commits (INVARIANTS #8), the constraint is validated only
-  // after the full traverse (#857, no backtrack), so a first segment failing `v\d+`
-  // dies in the param branch instead of falling to the `/*rest` splat sibling — the
-  // catch-all is unreachable and its `buildPath` yields dead deep-links. Generalizes
-  // the optional-successor try-take-if-valid (#1264 A1) to a REQUIRED param — no
-  // `optional` anywhere.
-  describe("match — catch-all reachable next to a constrained param+splat sibling (#1266)", () => {
-    const routes = [
-      { name: "all", path: "/*rest" },
-      { name: "ver", path: String.raw`/:v<v\d+>/*rest` },
-    ];
-
-    it("falls back to the /*rest catch-all when the first segment fails the constraint", () => {
-      const m = createMatcher(routes);
-      const one = m.match("/users");
-
-      expect(one?.segments.at(-1)?.name).toBe("all");
-      expect(one?.params).toStrictEqual({ rest: "users" });
-      // multi-segment too
-      expect(m.match("/a/b")?.params).toStrictEqual({ rest: "a/b" });
-    });
-
-    it("still resolves the constrained versioned form (constraint passes → param)", () => {
-      const m = createMatcher(routes);
-      const r = m.match("/v1/users");
-
-      expect(r?.segments.at(-1)?.name).toBe("ver");
-      expect(r?.params).toStrictEqual({ v: "v1", rest: "users" });
-    });
-
-    it("buildPath on the catch-all round-trips (no dead deep-link)", () => {
-      const m = createMatcher(routes);
-      const url = m.buildPath("all", { rest: "users" });
-
-      expect(m.match(url)?.segments.at(-1)?.name).toBe("all");
-    });
-
-    it("is registration-order independent (splat sibling registered second)", () => {
-      const m = createMatcher([routes[1], routes[0]]);
-
-      expect(m.match("/users")?.params).toStrictEqual({ rest: "users" });
-      expect(m.match("/v1/users")?.params).toStrictEqual({
-        v: "v1",
-        rest: "users",
-      });
-    });
-  });
-
-  // #1283: the try-take-if-valid fork (A1 #1264 / required #1266) skips to the splat
-  // only when the constraint FAILS. When a constraint-SATISFYING segment is also the
-  // LAST one and the take-node is a dead terminal (no route, only a would-be-empty
-  // splat child), the take dead-ends → UNMATCH while buildPath emits that URL — a
-  // `range(buildPath) ⊄ dom(match)` dead deep-link, the exact class try-take-if-valid
-  // was built to close.
-  describe("match — try-take-if-valid fork last-segment dead-end falls to splat (#1283)", () => {
-    it("opt→splat: a single constraint-satisfying last segment resolves the omit form", () => {
-      const m = createMatcher([
-        { name: "r", path: String.raw`/:v<v\d+>?/*rest` },
-      ]);
-
-      // build of the omit form is "/v1"; match must resolve it, not UNMATCH
-      expect(m.match("/v1")?.params).toStrictEqual({ rest: "v1" });
-      // the take form (multi-segment) still resolves under the optional's name
-      expect(m.match("/v1/users")?.params).toStrictEqual({
-        v: "v1",
-        rest: "users",
-      });
-    });
-
-    it("#1266 required→splat: a single constraint-satisfying segment falls to the catch-all sibling", () => {
-      const m = createMatcher([
-        { name: "all", path: "/*rest" },
-        { name: "ver", path: String.raw`/:v<v\d+>/*rest` },
-      ]);
-
-      const r = m.match("/v1");
-
-      expect(r?.segments.at(-1)?.name).toBe("all");
-      expect(r?.params).toStrictEqual({ rest: "v1" });
-      // the multi-segment versioned form still resolves to ver
-      expect(m.match("/v1/users")?.params).toStrictEqual({
-        v: "v1",
-        rest: "users",
-      });
-    });
-
-    it("preserves present-first: a take-node WITH a terminal route still takes (not skip)", () => {
-      const m = createMatcher([
-        { name: "rest", path: String.raw`/:v<v\d+>?/*rest` },
-        { name: "bare", path: String.raw`/:v<v\d+>` },
-      ]);
-
-      // /v1 → the bare :v terminal (a valid take), NOT the splat omit form
-      const r = m.match("/v1");
-
-      expect(r?.segments.at(-1)?.name).toBe("bare");
-      expect(r?.params).toStrictEqual({ v: "v1" });
-    });
-  });
-
-  // #1284: one trie slot legally serves several routes with DIFFERENT constraints
-  // under the same param name. #1266 marked `fork.constraint ??= <first>`, so with a
-  // splat sibling present, `match` used only the FIRST-registered route's constraint
-  // as the slot-wide validity signal — a value matching a LATER route's constraint
-  // failed the fork and fell to the catch-all, killing that route (order-dependent).
-  describe("registerTree — same-name constrained siblings coexist under a splat sibling (#1284)", () => {
-    const routes = [
-      { name: "num", path: String.raw`/user/:id<\d+>/a` },
-      { name: "hex", path: "/user/:id<[a-f]+>/b" },
-      { name: "all", path: "/user/*rest" },
-    ];
-
-    it("routes to the hex sibling when the numeric constraint fails (not the catch-all)", () => {
-      const m = createMatcher(routes);
-      const r = m.match("/user/abc/b");
-
-      expect(r?.segments.at(-1)?.name).toBe("hex");
-      expect(r?.params).toStrictEqual({ id: "abc" });
-    });
-
-    it("still routes a numeric id to the numeric sibling", () => {
-      const m = createMatcher(routes);
-
-      expect(m.match("/user/123/a")?.segments.at(-1)?.name).toBe("num");
-    });
-
-    it("is registration-order independent (hex registered first)", () => {
-      const m = createMatcher([routes[1], routes[0], routes[2]]);
-
-      expect(m.match("/user/123/a")?.params).toStrictEqual({ id: "123" });
-      expect(m.match("/user/abc/b")?.params).toStrictEqual({ id: "abc" });
-    });
-
-    it("a value matching NEITHER constraint still falls to the catch-all", () => {
-      const m = createMatcher(routes);
-      const r = m.match("/user/xyz/b"); // xyz ∉ \d+ and ∉ [a-f]+
-
-      expect(r?.segments.at(-1)?.name).toBe("all");
-      expect(r?.params).toStrictEqual({ rest: "xyz/b" });
-    });
-
-    it("two SAME-constraint siblings need no disjunction (identical source is a no-op)", () => {
-      const m = createMatcher([
-        { name: "a", path: String.raw`/user/:id<\d+>/a` },
-        { name: "c", path: String.raw`/user/:id<\d+>/c` }, // identical \d+ constraint
-        { name: "all", path: "/user/*rest" },
-      ]);
-
-      expect(m.match("/user/1/a")?.segments.at(-1)?.name).toBe("a");
-      expect(m.match("/user/2/c")?.segments.at(-1)?.name).toBe("c");
-      expect(m.match("/user/xyz/a")?.segments.at(-1)?.name).toBe("all");
-    });
-  });
-
-  // #1287: two (or more) optional params directly before a splat can't be represented
-  // by a single trie-slot fork — the outer optional's mark overwrites the inner's,
-  // silently reshaping the omit-outer/take-inner form into the splat
-  // (`/:a<c1>?/:b<c2>?/*rest`: `/ab/x` → {rest:"ab/x"} instead of {b:"ab",rest:"x"}).
-  // Rejected at registration (both must be constrained, else #1264 B caught the inner).
-  describe("registerTree — two optionals before a splat rejected (#1287)", () => {
-    it("throws for two constrained optionals directly before a splat", () => {
       expect(() =>
         createMatcher([
-          { name: "r", path: String.raw`/:a<\d+>?/:b<[a-f]+>?/*rest` },
+          { name: "p", path: "/a/b", children: [{ name: "idx", path: "/" }] },
         ]),
-      ).toThrow(/optional/i);
-    });
-
-    it("still accepts a single constrained optional before a splat (#1264 A1)", () => {
-      expect(() =>
-        createMatcher([{ name: "r", path: String.raw`/:v<v\d+>?/*rest` }]),
       ).not.toThrow();
-    });
-
-    it("still accepts two optionals NOT before a splat (opt→opt, static tail)", () => {
-      expect(() =>
-        createMatcher([{ name: "r", path: "/:a?/:b?/tail" }]),
-      ).not.toThrow();
-    });
-  });
-
-  // #1286: the A2 optional-successor rename (#1263) disambiguates by segment count on
-  // the LAST segment only, so it covers a TERMINAL successor (`/:a?/:b`) but NOT a
-  // non-terminal one (`/:a?/:b/c`) — the omit form then binds under the OPTIONAL's
-  // name, not the successor's. Pinned as a documented limitation (the general fix,
-  // variable-depth remaining-segment counting, is disproportionate); see CLAUDE.md.
-  describe("match — A2 rename covers only a terminal successor (#1286, caveat-lock)", () => {
-    it("binds the omit form under the optional's name for a NON-terminal successor (known limitation)", () => {
-      const m = createMatcher([{ name: "r", path: "/:a?/:b/c" }]);
-
-      // wanted { b: "x" }; the A2 rename does not reach a non-terminal successor
-      expect(m.match("/x/c")?.params).toStrictEqual({ a: "x" });
-      // the present form is unaffected
-      expect(m.match("/1/x/c")?.params).toStrictEqual({ a: "1", b: "x" });
-    });
-
-    it("still renames correctly for a TERMINAL successor (#1263 A2)", () => {
-      const m = createMatcher([{ name: "r", path: "/:a?/:b" }]);
-
-      expect(m.match("/x")?.params).toStrictEqual({ b: "x" });
-    });
-  });
-
-  // An unbalanced constraint delimiter (`/:id<\d+`, stray `>`) or a semantically
-  // empty `<>` desyncs match vs build the same way name-less (#858) / fused
-  // (#1050) markers do: bare core built these silently and buildPath then emitted
-  // a garbage URL (`/x/1<\d+`). registerTree is the bare-core backstop that
-  // rejects them for every consumer, not only under validation-plugin (#804).
-  describe("registerTree — unbalanced/empty constraint rejection (#804)", () => {
-    it("throws on an unclosed constraint '<' (/x/:id<[0-9]+)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: String.raw`/x/:id<\d+` }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\].*[Uu]nbalanced/);
-    });
-
-    it("throws on a lone opening '<' (/x/:id<)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: "/x/:id<" }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
-    });
-
-    it("throws on a stray closing '>' (/x/a>b)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: "/x/a>b" }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
-    });
-
-    it("throws on the empty constraint '<>' (/x/:id<>)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: "/x/:id<>" }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\].*[Ee]mpty/);
-    });
-
-    it("throws on the empty constraint before an optional marker (/x/:id<>?/y)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: "/x/:id<>?/y" }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\].*[Ee]mpty/);
-    });
-
-    it("still accepts a well-formed constraint (control, /x/:id<[0-9]+>)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: String.raw`/x/:id<\d+>` }]);
-      }).not.toThrow();
-    });
-
-    it("still accepts a well-formed constrained-optional (control, /x/:id<[0-9]+>?)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: String.raw`/x/:id<\d+>?` }]);
-      }).not.toThrow();
-    });
-
-    it("still accepts a '<' inside the constraint body (control, /:id<[a<b]>)", () => {
-      expect(() => {
-        createMatcher([{ name: "r", path: "/:id<[a<b]>" }]);
-      }).not.toThrow();
-    });
-  });
-
-  // ===========================================================================
-  // build↔match grammar agreement (#738)
-  // ===========================================================================
-  //
-  // The build-path grammar was narrower than the match-path grammar: match()
-  // recognized names/constraints that buildPath() then rejected with "Missing
-  // required param", crashing start() via rewritePathOnMatch. These lock the
-  // two grammars together.
-
-  describe("build↔match grammar agreement (#738)", () => {
-    function singleRouteMatcher(name: string, path: string): SegmentMatcher {
-      const matcher = createTestMatcher();
-      const route = createInputNode({ name, path, fullName: name });
-      const root = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([[name, route]]),
-        nonAbsoluteChildren: [route],
-      });
-
-      matcher.registerTree(root);
-
-      return matcher;
-    }
-
-    it.each([
-      ["/h/:my-param", "my-param"],
-      ["/h/:a.b", "a.b"],
-      ["/h/:user~id", "user~id"],
-    ])(
-      "round-trips a non-word-char param name in '%s' (match key === build key)",
-      (path, key) => {
-        const matcher = singleRouteMatcher("h", path);
-
-        expect(matcher.match("/h/v")?.params).toStrictEqual({ [key]: "v" });
-        expect(() => matcher.buildPath("h", { [key]: "v" })).not.toThrow();
-        expect(matcher.buildPath("h", { [key]: "v" })).toBe("/h/v");
-      },
-    );
-
-    it("does not crash building a route whose constraint contains a `?`", () => {
-      const matcher = singleRouteMatcher("a", String.raw`/a/:id<\d?>`);
-
-      // The lazy-quantifier `?` no longer destroys the slot/metadata.
-      expect(matcher.match("/a/5")?.params).toStrictEqual({ id: "5" });
-      expect(matcher.buildPath("a", { id: "5" })).toBe("/a/5");
-    });
-
-    it("enforces the constraint that survived query detection (#738)", () => {
-      const matcher = singleRouteMatcher("a", String.raw`/a/:id<\d?>`);
-
-      // \d? matches a single digit or empty — two digits must be rejected.
-      expect(matcher.match("/a/55")).toBeUndefined();
-    });
-  });
-
-  // ===========================================================================
-  // Constraint validation uses the DECODED value (#857)
-  // ===========================================================================
-
-  describe("constraint validation uses the decoded value (#857)", () => {
-    function constrainedMatcher(path: string): SegmentMatcher {
-      const matcher = createTestMatcher();
-      const route = createInputNode({ name: "r", path, fullName: "r" });
-      const root = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["r", route]]),
-        nonAbsoluteChildren: [route],
-      });
-
-      matcher.registerTree(root);
-
-      return matcher;
-    }
-
-    it("matches an over-encoded value whose decoded form satisfies the constraint", () => {
-      // `%35` decodes to "5", which satisfies <\d+>. The constraint must be
-      // checked on the decoded value, not the raw segment (#857).
-      const matcher = constrainedMatcher(String.raw`/:n<\d+>`);
-
-      expect(matcher.match("/%35")?.params).toStrictEqual({ n: "5" });
-    });
-
-    it("extracted param always satisfies the constraint (Matching #9)", () => {
-      // `%41` is 3 chars (raw satisfies <.{3}>) but decodes to "A" (1 char), which
-      // does NOT. match() must reject it, not return a value violating its own
-      // constraint (the old order returned { n: "A" }).
-      const matcher = constrainedMatcher("/:n<.{3}>");
-
-      expect(matcher.match("/%41")).toBeUndefined();
     });
   });
 
@@ -1670,26 +1327,6 @@ describe("SegmentMatcher", () => {
 
       expect(matcher.hasRoute("users")).toBe(true);
       expect(matcher.hasRoute("users.list")).toBe(true);
-    });
-
-    it("should register route with param constraint", () => {
-      const matcher = createTestMatcher();
-      const userNode = createInputNode({
-        name: "user",
-        path: String.raw`/users/:id<\d+>`,
-        fullName: "user",
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["user", userNode]]),
-        nonAbsoluteChildren: [userNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      expect(matcher.hasRoute("user")).toBe(true);
     });
 
     it("should return nested meta with all segments", () => {
@@ -2563,27 +2200,6 @@ describe("SegmentMatcher", () => {
       );
     });
 
-    it("does NOT reject an empty-string value for an optional param (#740)", () => {
-      const matcher = createTestMatcher();
-      const search = createInputNode({
-        name: "search",
-        path: "/search/:q?",
-        fullName: "search",
-      });
-
-      matcher.registerTree(
-        createInputNode({
-          name: "",
-          path: "",
-          fullName: "",
-          children: new Map([["search", search]]),
-          nonAbsoluteChildren: [search],
-        }),
-      );
-
-      expect(() => matcher.buildPath("search", { q: "" })).not.toThrow();
-    });
-
     it("should build path with multiple params", () => {
       const matcher = createTestMatcher();
 
@@ -2757,102 +2373,6 @@ describe("SegmentMatcher", () => {
       expect(matcher.buildPath("users.profile", { id: "hello world" })).toBe(
         "/users/hello world",
       );
-    });
-
-    it("should skip optional param when value is undefined", () => {
-      const matcher = createTestMatcher();
-
-      const searchNode = createInputNode({
-        name: "search",
-        path: "/search/:query?",
-        fullName: "search",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["search", searchNode]]),
-        nonAbsoluteChildren: [searchNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      expect(matcher.buildPath("search", {})).toBe("/search");
-    });
-
-    it("should validate constraints in buildPath", () => {
-      const matcher = createTestMatcher();
-
-      const profileNode = createInputNode({
-        name: "profile",
-        path: String.raw`/:id<\d+>`,
-        fullName: "users.profile",
-      });
-
-      const usersNode = createInputNode({
-        name: "users",
-        path: "/users",
-        fullName: "users",
-        children: new Map([["profile", profileNode]]),
-        nonAbsoluteChildren: [profileNode],
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["users", usersNode]]),
-        nonAbsoluteChildren: [usersNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      // Valid
-      expect(matcher.buildPath("users.profile", { id: "123" })).toBe(
-        "/users/123",
-      );
-
-      // Invalid
-      expect(() => matcher.buildPath("users.profile", { id: "abc" })).toThrow(
-        /does not match constraint/,
-      );
-
-      // Object value — serialized via JSON.stringify before constraint check
-      expect(() =>
-        matcher.buildPath("users.profile", { id: { foo: 1 } }),
-      ).toThrow(/does not match constraint/);
-    });
-
-    it("should skip constraint validation for undefined optional param", () => {
-      const matcher = createTestMatcher();
-
-      const profileNode = createInputNode({
-        name: "profile",
-        path: String.raw`/:id<\d+>?`,
-        fullName: "users.profile",
-      });
-
-      const usersNode = createInputNode({
-        name: "users",
-        path: "/users",
-        fullName: "users",
-        children: new Map([["profile", profileNode]]),
-        nonAbsoluteChildren: [profileNode],
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["users", usersNode]]),
-        nonAbsoluteChildren: [usersNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      // Optional param with constraint - should not throw when omitted
-      expect(matcher.buildPath("users.profile", {})).toBe("/users");
     });
 
     it("should serialize object params to JSON", () => {
@@ -3305,253 +2825,6 @@ describe("SegmentMatcher", () => {
       expect(matcher.buildPath("users.profile.list", { type: "admin" })).toBe(
         "/users/admin",
       );
-    });
-  });
-
-  // ===========================================================================
-  // Optional Params — match
-  // ===========================================================================
-
-  describe("match — optional params", () => {
-    function createOptionalParamMatcher(): SegmentMatcher {
-      const matcher = createTestMatcher();
-
-      const searchNode = createInputNode({
-        name: "search",
-        path: "/search/:query?",
-        fullName: "search",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["search", searchNode]]),
-        nonAbsoluteChildren: [searchNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      return matcher;
-    }
-
-    it("should match without optional param", () => {
-      const matcher = createOptionalParamMatcher();
-
-      const result = matcher.match("/search");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("search");
-      expect(result!.params).toStrictEqual({});
-    });
-
-    it("should match with optional param provided", () => {
-      const matcher = createOptionalParamMatcher();
-
-      const result = matcher.match("/search/hello");
-
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("search");
-      expect(result!.params).toStrictEqual({ query: "hello" });
-    });
-
-    it("should handle optional param in middle of path", () => {
-      const matcher = createTestMatcher();
-
-      const searchNode = createInputNode({
-        name: "search",
-        path: "/search/:query?/results",
-        fullName: "search",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["search", searchNode]]),
-        nonAbsoluteChildren: [searchNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      const withParam = matcher.match("/search/test/results");
-
-      expect(withParam).toBeDefined();
-      expect(withParam!.params).toStrictEqual({ query: "test" });
-
-      const withoutParam = matcher.match("/search/results");
-
-      expect(withoutParam).toBeDefined();
-      expect(withoutParam!.params).toStrictEqual({});
-    });
-
-    it("should handle consecutive optional params", () => {
-      const matcher = createTestMatcher();
-
-      const routeNode = createInputNode({
-        name: "route",
-        path: "/a/:b?/:c?/d",
-        fullName: "route",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["route", routeNode]]),
-        nonAbsoluteChildren: [routeNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      const bothProvided = matcher.match("/a/x/y/d");
-
-      expect(bothProvided).toBeDefined();
-      expect(bothProvided!.params).toStrictEqual({ b: "x", c: "y" });
-
-      const noneProvided = matcher.match("/a/d");
-
-      expect(noneProvided).toBeDefined();
-      expect(noneProvided!.params).toStrictEqual({});
-    });
-
-    it("should decode percent-encoded optional param", () => {
-      const matcher = createOptionalParamMatcher();
-
-      const result = matcher.match("/search/hello%20world");
-
-      expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ query: "hello world" });
-    });
-  });
-
-  // ===========================================================================
-  // Optional Params — buildPath
-  // ===========================================================================
-
-  describe("buildPath — optional params", () => {
-    // eslint-disable-next-line sonarjs/no-identical-functions -- Test fixture intentionally similar to match suite - tests buildPath behavior vs match behavior
-    function createOptionalBuildMatcher(): SegmentMatcher {
-      const matcher = createTestMatcher();
-
-      const searchNode = createInputNode({
-        name: "search",
-        path: "/search/:query?",
-        fullName: "search",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["search", searchNode]]),
-        nonAbsoluteChildren: [searchNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      return matcher;
-    }
-
-    it("should build path without optional param", () => {
-      const matcher = createOptionalBuildMatcher();
-
-      expect(matcher.buildPath("search")).toBe("/search");
-    });
-
-    it("should build path with optional param provided", () => {
-      const matcher = createOptionalBuildMatcher();
-
-      expect(matcher.buildPath("search", { query: "hello" })).toBe(
-        "/search/hello",
-      );
-    });
-
-    it("should build path with null optional param", () => {
-      const matcher = createOptionalBuildMatcher();
-
-      expect(matcher.buildPath("search", { query: null })).toBe("/search");
-    });
-
-    it("should not produce double slash for optional-in-middle", () => {
-      const matcher = createTestMatcher();
-
-      const searchNode = createInputNode({
-        name: "search",
-        path: "/search/:query?/results",
-        fullName: "search",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["search", searchNode]]),
-        nonAbsoluteChildren: [searchNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      expect(matcher.buildPath("search", { query: "test" })).toBe(
-        "/search/test/results",
-      );
-      expect(matcher.buildPath("search", {})).toBe("/search/results");
-    });
-
-    it("should handle consecutive optionals in buildPath", () => {
-      const matcher = createTestMatcher();
-
-      const routeNode = createInputNode({
-        name: "route",
-        path: "/a/:b?/:c?/d",
-        fullName: "route",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["route", routeNode]]),
-        nonAbsoluteChildren: [routeNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      expect(matcher.buildPath("route", { b: "x", c: "y" })).toBe("/a/x/y/d");
-      expect(matcher.buildPath("route", { b: "x" })).toBe("/a/x/d");
-      expect(matcher.buildPath("route", { c: "y" })).toBe("/a/y/d");
-      expect(matcher.buildPath("route", {})).toBe("/a/d");
-    });
-
-    it("should encode optional param values", () => {
-      const matcher = createOptionalBuildMatcher();
-
-      expect(matcher.buildPath("search", { query: "hello world" })).toBe(
-        "/search/hello%20world",
-      );
-    });
-
-    it("should handle optional param at root level", () => {
-      const matcher = createTestMatcher();
-
-      const routeNode = createInputNode({
-        name: "item",
-        path: "/:slug?",
-        fullName: "item",
-      });
-
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["item", routeNode]]),
-        nonAbsoluteChildren: [routeNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      expect(matcher.buildPath("item")).toBe("/");
-      expect(matcher.buildPath("item", { slug: "hello" })).toBe("/hello");
     });
   });
 
@@ -5070,161 +4343,6 @@ describe("SegmentMatcher", () => {
       expect(matcher.match("/USERS")).toBeUndefined();
     });
   });
-
-  // ===========================================================================
-  // Constraint Validation
-  // ===========================================================================
-
-  describe("constraint validation", () => {
-    it("should match when param satisfies numeric constraint", () => {
-      const matcher = createTestMatcher();
-      const userNode = createInputNode({
-        name: "user",
-        path: String.raw`/users/:id<\d+>`,
-        fullName: "user",
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["user", userNode]]),
-        nonAbsoluteChildren: [userNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      const result = matcher.match("/users/123");
-
-      expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123" });
-    });
-
-    it("should reject when param fails numeric constraint", () => {
-      const matcher = createTestMatcher();
-      const userNode = createInputNode({
-        name: "user",
-        path: String.raw`/users/:id<\d+>`,
-        fullName: "user",
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["user", userNode]]),
-        nonAbsoluteChildren: [userNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      const result = matcher.match("/users/abc");
-
-      expect(result).toBeUndefined();
-    });
-
-    it("should match without constraints (fast path, hasConstraints is false)", () => {
-      const matcher = createTestMatcher();
-      const userNode = createInputNode({
-        name: "user",
-        path: "/users/:id",
-        fullName: "user",
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["user", userNode]]),
-        nonAbsoluteChildren: [userNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      const result = matcher.match("/users/abc");
-
-      expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "abc" });
-    });
-
-    it("should validate constraint against the DECODED param value (#857)", () => {
-      const matcher = createTestMatcher();
-      const userNode = createInputNode({
-        name: "user",
-        path: String.raw`/users/:id<\d+>`,
-        fullName: "user",
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["user", userNode]]),
-        nonAbsoluteChildren: [userNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      // `%33` decodes to "3", which satisfies <\d+>. The constraint describes the
-      // logical (decoded) value, so the over-encoded form must match (#857).
-      const result = matcher.match("/users/%33");
-
-      expect(result?.params).toStrictEqual({ id: "3" });
-    });
-
-    it("should validate multiple constraints on different params", () => {
-      const matcher = createTestMatcher();
-      const postNode = createInputNode({
-        name: "post",
-        path: String.raw`/:postId<\d+>`,
-        fullName: "user.post",
-      });
-      const userNode = createInputNode({
-        name: "user",
-        path: String.raw`/users/:id<\d+>`,
-        fullName: "user",
-        children: new Map([["post", postNode]]),
-        nonAbsoluteChildren: [postNode],
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["user", userNode]]),
-        nonAbsoluteChildren: [userNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      expect(matcher.match("/users/123/456")).toBeDefined();
-      expect(matcher.match("/users/123/456")!.params).toStrictEqual({
-        id: "123",
-        postId: "456",
-      });
-      expect(matcher.match("/users/abc/456")).toBeUndefined();
-      expect(matcher.match("/users/123/abc")).toBeUndefined();
-    });
-
-    it("should match with alpha constraint", () => {
-      const matcher = createTestMatcher();
-      const slugNode = createInputNode({
-        name: "slug",
-        path: "/posts/:slug<[a-z-]+>",
-        fullName: "slug",
-      });
-      const rootNode = createInputNode({
-        name: "",
-        path: "",
-        fullName: "",
-        children: new Map([["slug", slugNode]]),
-        nonAbsoluteChildren: [slugNode],
-      });
-
-      matcher.registerTree(rootNode);
-
-      expect(matcher.match("/posts/hello-world")).toBeDefined();
-      expect(matcher.match("/posts/hello-world")!.params).toStrictEqual({
-        slug: "hello-world",
-      });
-      expect(matcher.match("/posts/Hello123")).toBeUndefined();
-    });
-  });
 });
 
 // =============================================================================
@@ -5262,23 +4380,12 @@ describe("mutation guards (observable-behavior kills)", () => {
     expect(matcher.match("/%zz")?.params).toStrictEqual({ id: "%zz" });
   });
 
-  it("buildPath reports a missing required param (not a constraint failure) for null", () => {
-    // A null value is "absent", so the constraint check must SKIP it and the
-    // missing-required-param error must fire — not a constraint-mismatch error.
-    const matcher = matcherWithRoute(String.raw`/:id<\d+>`);
+  it("buildPath reports a missing required param for a null value", () => {
+    // A null value is "absent", so the missing-required-param error must fire.
+    const matcher = matcherWithRoute("/:id");
 
     expect(() => matcher.buildPath("r", { id: null })).toThrow(
       "Missing required param 'id'",
-    );
-  });
-
-  it("buildPath validates an object/array constraint value via JSON.stringify", () => {
-    // JSON.stringify([5]) === "[5]" violates <\d+>; String([5]) === "5" would
-    // wrongly pass — pins the `typeof === "object" ? JSON.stringify : String`.
-    const matcher = matcherWithRoute(String.raw`/:id<\d+>`);
-
-    expect(() => matcher.buildPath("r", { id: [5] })).toThrow(
-      "does not match constraint",
     );
   });
 

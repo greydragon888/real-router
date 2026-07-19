@@ -32,22 +32,7 @@ describe("Coverage improvement tests", () => {
     });
   });
 
-  describe("constrained param matching", () => {
-    it("should match constrained routes correctly", () => {
-      // Tests constraint matching with angle bracket syntax
-      // Note: SegmentMatcher uses a single param child per trie node,
-      // so sibling param routes at the same level share a param slot.
-      // The last registered route's constraint applies.
-      const tree = createRouteTree("", "", [
-        { name: "numeric", path: String.raw`/items/:id<\d+>` },
-      ]);
-
-      // Numeric constraint matches digits
-      expect(matchPath(tree, "/items/123")?.name).toBe("numeric");
-      // Constraint fails — no match
-      expect(matchPath(tree, "/items/abc")).toBeNull();
-    });
-
+  describe("param matching", () => {
     it("should match paths with different segment lengths", () => {
       // Tests matching with different path lengths
       const tree = createRouteTree("", "", [

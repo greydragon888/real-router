@@ -68,7 +68,6 @@ describe("createSegmentNode (internal node/memory invariants)", () => {
       "paramChild",
       "splatChild",
       "route",
-      "routeIsStrong",
       "slashChildRoute",
     ]);
   });

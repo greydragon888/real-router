@@ -15,7 +15,7 @@ import { buildParamMeta } from "../../../../src/engine/path-matcher/buildParamMe
  *
  * Invariants asserted:
  * - **Exact classification:** `urlParams` / `queryParams` / `spatParams` /
- *   `paramTypeMap` / `constraintPatterns` / `pathPattern` all equal the model.
+ *   `paramTypeMap` / `pathPattern` all equal the model.
  * - **Splat ⊆ url:** every splat name is also a url param.
  * - **Disjoint type map:** no name is both url and query.
  * - **`pathPattern` is the query-free residue:** re-parsing it yields the same
@@ -23,8 +23,7 @@ import { buildParamMeta } from "../../../../src/engine/path-matcher/buildParamMe
  * - **Purity / determinism:** two calls on the same input agree.
  */
 
-type SegKind =
-  "static" | "param" | "constrained" | "constrainedLazy" | "optional";
+type SegKind = "static" | "param";
 
 interface Spec {
   kinds: SegKind[];
@@ -34,21 +33,14 @@ interface Spec {
 }
 
 // Includes a hyphen so the model exercises the #738 name class (`:my-param`)
-// that PARAM_NAME_PATTERN (`[^/?<]+`) admits — not just `\w`. The leading char
-// stays `[a-z]` so a name never starts with `-`.
+// that the param-name grammar (`[^/?<]+`) admits — not just `\w`. The leading
+// char stays `[a-z]` so a name never starts with `-`.
 const arbName = fc.stringMatching(/^[a-z][a-z0-9-]{0,5}$/);
 
 const arbSpec = fc.record({
-  kinds: fc.array(
-    fc.constantFrom<SegKind>(
-      "static",
-      "param",
-      "constrained",
-      "constrainedLazy",
-      "optional",
-    ),
-    { maxLength: 5 },
-  ),
+  kinds: fc.array(fc.constantFrom<SegKind>("static", "param"), {
+    maxLength: 5,
+  }),
   splat: fc.boolean(),
   queryCount: fc.nat({ max: 3 }),
   // Unique pool so every segment / splat / query name is distinct — the
@@ -63,28 +55,10 @@ interface Model {
   queryParams: string[];
   spatParams: string[];
   paramTypeMap: Record<string, "url" | "query">;
-  constrainedNames: string[];
 }
 
 function renderSegment(kind: SegKind, name: string): string {
-  switch (kind) {
-    case "static": {
-      return name;
-    }
-    case "param": {
-      return `:${name}`;
-    }
-    case "constrained": {
-      return String.raw`:${name}<\d+>`;
-    }
-    case "constrainedLazy": {
-      // `?` inside the constraint — must NOT be read as a query separator (#738).
-      return String.raw`:${name}<\d?>`;
-    }
-    case "optional": {
-      return `:${name}?`;
-    }
-  }
+  return kind === "static" ? name : `:${name}`;
 }
 
 function buildModel(spec: Spec): Model {
@@ -94,7 +68,6 @@ function buildModel(spec: Spec): Model {
   const pieces: string[] = [];
   const urlParams: string[] = [];
   const spatParams: string[] = [];
-  const constrainedNames: string[] = [];
   const paramTypeMap: Record<string, "url" | "query"> = {};
 
   for (const kind of kinds) {
@@ -105,10 +78,6 @@ function buildModel(spec: Spec): Model {
     if (kind !== "static") {
       urlParams.push(name);
       paramTypeMap[name] = "url";
-    }
-
-    if (kind === "constrained" || kind === "constrainedLazy") {
-      constrainedNames.push(name);
     }
   }
 
@@ -141,7 +110,6 @@ function buildModel(spec: Spec): Model {
     queryParams: queryKeys,
     spatParams,
     paramTypeMap,
-    constrainedNames,
   };
 }
 
@@ -158,13 +126,6 @@ describe("buildParamMeta structural invariants", () => {
       expect(meta.spatParams).toStrictEqual(model.spatParams);
       expect(meta.paramTypeMap).toStrictEqual(model.paramTypeMap);
       expect(meta.pathPattern).toBe(model.pathPattern);
-
-      // Constraint entries: exactly the constrained names.
-      const byLocale = (a: string, b: string): number => a.localeCompare(b);
-
-      expect(
-        [...meta.constraintPatterns.keys()].toSorted(byLocale),
-      ).toStrictEqual(model.constrainedNames.toSorted(byLocale));
     },
   );
 

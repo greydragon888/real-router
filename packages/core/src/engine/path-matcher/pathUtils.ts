@@ -22,8 +22,6 @@ export function createSegmentNode(): SegmentNode {
     paramChild: undefined,
     splatChild: undefined,
     route: undefined,
-    // #1153: initialized so static and param nodes share one hidden class (#1009).
-    routeIsStrong: false,
     slashChildRoute: undefined,
   };
 }
