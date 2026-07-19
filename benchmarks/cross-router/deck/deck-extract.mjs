@@ -191,8 +191,9 @@ META.cells = { written: cellsWritten, expected: cellsExpected };
 if (minRuns != null) META.runs = minRuns === maxRuns ? minRuns : `${minRuns}–${maxRuns}`;
 
 // Same-session discipline (audit 07-18 K7 регламент): the deck must be rebuilt from
-// ONE session's final results — the committed deck once shipped cells finalized AFTER
-// its own build, and borderline plates flipped on the next honest extract. Mechanical
+// ONE session's final results — the K7 defect (the then-committed deck shipped cells
+// finalized AFTER its own build → borderline plates flipped on the next honest extract).
+// Still guards CI/artifact rebuilds even though the deck is now gitignored. Mechanical
 // check: one commit epoch, one time window. Warn by default; DECK_REQUIRE_SAME_EPOCH=1
 // hardens it to a refusal (for CI / release rebuilds).
 // Span bound 12h, NOT 6h: one honest same-session n=100 matrix runs ~6–6.5h on the CI

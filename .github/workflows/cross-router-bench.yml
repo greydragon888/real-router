@@ -78,7 +78,8 @@ jobs:
       #    but NOT when it was skipped (preflight/bundle failed → no results/ to publish) ──
 
       # rebuild the deck from THIS run in the workspace (META stamp header + disclaimer).
-      # Goes to the artifact/Pages only — the committed deck/ is NEVER overwritten.
+      # Writes the gitignored deck.html/deck-data.json artifacts; the tracked source
+      # (deck-shell.html + deck-config.js) is read-only — build-deck never mutates it.
       - name: Rebuild deck snapshot
         id: deck
         if: ${{ !cancelled() && steps.matrix.outcome != 'skipped' }}
@@ -105,17 +106,18 @@ jobs:
 
       # stamp + win/loss/parity grid (advisory competitive-ratio) + RME watch, from the fresh deck-data.json.
       - name: Step summary
-        # Gate on the deck REBUILD, not the matrix: if deck-extract/build-deck threw, deck-data.json is the
-        # git-clean-restored committed reference (META=null) and ci-summary would render the CURATED deck as
-        # this run's snapshot with no stamp/disclaimer. Only summarize a fresh deck.
+        # Gate on the deck REBUILD, not the matrix: deck-data.json/deck.html are gitignored generated
+        # artifacts (not committed), so a failed deck-extract/build-deck leaves NO deck to summarize —
+        # absent on a fresh checkout, or a stale partial from this attempt. The success gate keeps
+        # ci-summary from rendering a broken/empty snapshot.
         if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
         run: node cross-router/harness/ci-summary.mjs >> "$GITHUB_STEP_SUMMARY"
         working-directory: benchmarks
 
       # ONE artifact — raw numbers + matcher input + the rebuilt CI deck.
       - name: Upload results + CI deck
-        # Same gate as the summary: a failed rebuild leaves the committed reference deck in the workspace;
-        # shipping it as the CI artifact/Pages would misrepresent it as this run's snapshot.
+        # Same gate as the summary: deck.html/deck-data.json are gitignored generated artifacts, so a
+        # failed rebuild leaves no fresh deck (or a stale partial) — don't ship it as this run's snapshot.
         if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
@@ -147,7 +149,7 @@ jobs:
       - name: Assemble dashboard
         id: assemble
         # deck.html is self-contained → it IS the dashboard. Keep the raw data alongside for download.
-        # NEVER touches the committed deck/ — the CI deck lives only in this artifact/Pages.
+        # Operates only on the downloaded artifact — the repo's deck/ holds tracked SOURCE only; the rendered deck lives only in this artifact/Pages.
         # If the bench produced no artifact (early failure / failed rebuild), skip cleanly — a truly-failed
         # run keeps Pages' last-good deploy instead of a second opaque red job (cp on an empty $deck).
         run: |

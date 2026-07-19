@@ -11,7 +11,9 @@ let cfg = tpl
 if (["__META__", "__SWEEP__", "__GRID__", "__DATA__"].some((p) => cfg.includes(p)))
   throw new Error("unreplaced placeholder remains");
 
-let html = readFileSync(`${DIR}/deck.html`, "utf8");
+// Template is the TRACKED deck-shell.html (HTML + render JS, no data); the built
+// deck.html is a generated, gitignored artifact (CI uploads it / local report).
+let html = readFileSync(`${DIR}/deck-shell.html`, "utf8");
 const start = html.indexOf("  const GROUPS=[");
 if (start < 0) throw new Error("GROUPS anchor not found");
 const dataIdx = html.indexOf("  const DATA=", start);

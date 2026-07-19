@@ -35,7 +35,7 @@ const SCEN = [
   ["link-build", "Link mounting"],
 ];
 
-// ── fresh deck-data.json (this run's snapshot; workspace, not the committed reference) ──
+// ── fresh deck-data.json (this run's snapshot, written by deck-extract; gitignored, not committed) ──
 const ddPath = join(CR, "deck", "deck-data.json");
 if (!existsSync(ddPath)) {
   console.error("ci-summary: deck/deck-data.json not found — run deck-extract first (workflow order).");
@@ -61,7 +61,7 @@ if (META) {
     );
   if (ci)
     out.push(
-      "> ⚠️ The cards below are **this run's fresh snapshot** (CI runner — see stamp). The curated **Why** analysis in the committed deck is anchored to the committed reference snapshot, not necessarily this run.\n",
+      "> ⚠️ The cards below are **this run's fresh snapshot** (CI runner — see stamp). The curated **Why** analysis (from the tracked `deck-config.js`) is anchored to the reference epoch its blurbs were verified against, not necessarily this run.\n",
     );
 }
 

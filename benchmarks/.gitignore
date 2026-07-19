@@ -1,2 +1,9 @@
 **/.bench/
 **/.bench-results/
+
+# Generated deck artifacts — rebuilt from deck-config.js + deck-shell.html (tracked
+# source) via deck-extract → build-deck. CI uploads them as the Pages/artifact snapshot;
+# locally they're an untracked report. Only the SOURCE is tracked (results/ is gitignored
+# too, so there is no committed data to build a fresh-clone deck from — by design).
+cross-router/deck/deck.html
+cross-router/deck/deck-data.json

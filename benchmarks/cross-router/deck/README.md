@@ -2,17 +2,20 @@
 
 Rendered performance infographic comparing `@real-router/*` against the per-framework
 competitor routers, built from the benchmark `results/`. Published as a claude.ai
-artifact; this directory holds the committed **source + rendered output**.
+artifact; this directory tracks only the **source** — the rendered `deck.html` and its
+`deck-data.json` are gitignored, generated on demand (locally an untracked report; CI
+uploads them to the Pages/artifact snapshot, never committing anything).
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `deck-config.js` | Template — `GROUPS` / `SCEN` / `WHY` / `CO` / `FIELD` + `__DATA__` / `__GRID__` / `__SWEEP__` placeholders. **The source you edit**: chart layout, scenario descriptions, per-cohort WHY blurbs. |
+| `deck-config.js` | **Tracked source you edit** — `GROUPS` / `SCEN` / `WHY` / `CO` / `FIELD` + `__DATA__` / `__GRID__` / `__SWEEP__` / `__META__` placeholders: chart layout, scenario descriptions, per-cohort WHY blurbs. |
+| `deck-shell.html` | **Tracked source** — HTML shell + render JS that `build-deck` splices the config block into (its config span is a `const GROUPS=[]; const DATA=[];` stub the splice overwrites). Read-only template; `build-deck` never mutates it. |
 | `deck-extract.mjs` | Reads `../results/` (browser bench) + `../matcher-bench/results.json` (isolated matcher) → writes `deck-data.json`. |
-| `deck-data.json` | Extracted numbers (`DATA` / `GRID` / `SWEEP`). Committed **snapshot** — `results/` is gitignored, so this is the only record of the figures the rendered deck was built from. |
-| `build-deck.mjs` | Splices `deck-config.js` + `deck-data.json` into `deck.html` (fills the placeholders and replaces the `const GROUPS … const DATA` block). |
-| `deck.html` | Rendered infographic (self-contained, ~54 KB). **Generated** — don't hand-edit the data block; edit `deck-config.js` and rebuild. |
+| `build-deck.mjs` | Splices `deck-config.js` + `deck-data.json` into `deck-shell.html` → writes `deck.html` (fills the placeholders and replaces the `const GROUPS … const DATA` block). |
+| `deck-data.json` | **Gitignored, generated** — extracted numbers (`META` / `DATA` / `GRID` / `SWEEP`). `results/` is gitignored too, so there is no committed snapshot; regenerate from a run. |
+| `deck.html` | **Gitignored, generated** — rendered infographic (self-contained, ~58 KB). Don't hand-edit; edit `deck-config.js` / `deck-shell.html` and rebuild. |
 
 ## Rebuild
 
@@ -25,9 +28,10 @@ node deck-extract.mjs   # after a fresh bench run: ../results + ../matcher-bench
 node build-deck.mjs     # deck-config.js + deck-data.json → deck.html
 ```
 
-Copy (blurbs, layout) lives in `deck-config.js`; numbers come from `deck-data.json`.
-`deck-extract.mjs` re-derives the numbers from the current (gitignored) `results/`, so a
-rebuild after a new run shifts the committed snapshot — expected, `results/` isn't tracked.
+Copy (blurbs, layout) lives in `deck-config.js` + `deck-shell.html`; numbers come from
+`deck-data.json`. `deck-extract.mjs` re-derives the numbers from the current (gitignored)
+`results/`, so a rebuild after a new run regenerates the (gitignored) `deck-data.json` +
+`deck.html` — there is no committed snapshot to keep in sync.
 
 The `WHY` blurbs read the winner/loser mechanism per scenario × cohort; each ratio in them
 is anchored to `deck-data.json` (or `../matcher-bench/results.json` for the wide/deep
