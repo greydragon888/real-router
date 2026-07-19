@@ -8,6 +8,9 @@
   "types": "./dist/esm/index.d.mts",
   "typesVersions": {
     "*": {
+      "types": [
+        "./dist/cjs/types.d.ts"
+      ],
       "api": [
         "./dist/cjs/api.d.ts"
       ],
