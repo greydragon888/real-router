@@ -37,7 +37,10 @@ So a **reachability ratchet** (`scripts/reachability-check.mjs` +
 and fails on any *new* facade-unreachable file/line. Its baseline confirms the pre-merge
 dead-code sweep (#1505): 16 files / 571 lines facade-unreachable, ALL in the two layers,
 0 in the route-tree facade, none dead (each covered by its own layer tier). Not wired
-into pre-push until the registry is triaged to "empty + KEEP" (Faza 2).
+into pre-push until the registry is triaged to "empty + KEEP" (Faza 2). **(The ratchet
+was later removed when the engine folded into core — iteration 2 below: a non-gated
+meta-guard on a now-internal subsystem, inconsistent with how the rest of core is
+tested. The 3-tier tests + eslint whitebox rules + the 100% coverage gate remain.)**
 
 ## Engine Merge iteration 2 — `engine` → `core/src/engine` (#1510)
 
@@ -61,13 +64,17 @@ discipline ported into core intact:
   whitebox tiers — facade, path-matcher-unit, search-params-unit). Globs re-scoped
   `src/`→`src/engine/`, `tests/`→`tests/engine/`; §5 facade now allows the `src/engine`
   barrel (functional tests can no longer import a standalone `engine` package).
-- **Reachability ratchet** ported: `ENGINE_REACHABILITY.json` (16 keys re-prefixed
-  `src/`→`src/engine/`) + `reachability-check.mjs` (`ENGINE_ROOT`→`packages/core`) +
-  **new** `core/vitest.config.facade.mts` (extends `commonConfig`, NOT `unit` — a
-  `mergeConfig` would CONCATENATE the inherited include and drag core's own + the layer
-  tiers back into the facade-only run; coverage re-scoped to `src/engine/**`, thresholds
-  dropped). `test:reachability` passes: 16 files / 571 facade-unreachable lines, baseline
-  unchanged from iteration 1.
+- **Reachability ratchet — ported, then removed.** The fold first carried the engine's
+  RFC §5.5 ratchet into core (`ENGINE_REACHABILITY.json` re-prefixed `src/`→`src/engine/`,
+  `reachability-check.mjs` `ENGINE_ROOT`→`packages/core`, a `core/vitest.config.facade.mts`
+  facade-only run). A **follow-up deleted it entirely** — all three files plus the
+  `test:reachability` scripts. Rationale: it is a non-gated meta-guard (never in
+  pre-push/CI), and once the engine is internal core code the "reachable from the facade"
+  question no longer maps to a package public boundary. Decisively, core's OWN code is
+  covered by functional+unit with no such ratchet — a line covered only by `tests/unit`
+  is fine everywhere else in core, so holding `src/engine` to a stricter facade-reachable
+  bar was inconsistent. The real guards stay: the 3 test tiers (still run, still 100%),
+  the eslint §5 whitebox rules, and the 100% coverage gate.
 
 Configs: CORE_LAYER 2→1 (core alone); codecov engine component removed;
 syncpack two `engine` entries removed; `build-matrix.test.mjs` live sweep 23→22 packages,
@@ -93,10 +100,11 @@ auto-counted every barrel export as used; folded in, the barrel is internal, so 
 demanded a real importer and flagged `MatchResult` as unused. Fix: declare
 `src/engine/index.ts` a knip `entry` in the `packages/core` workspace — restoring the
 "this barrel is the engine's public surface" semantic (the whitebox facade tier is
-*required* to import from it). NOT a code removal: `MatchResult` is genuinely used;
-the line-level reachability ratchet independently guards real dead code in `src/engine`.
-The engine's own bundle contribution is unchanged (core already `alwaysBundle`d it) —
-a pure structural move.
+*required* to import from it). NOT a code removal: `MatchResult` is genuinely used (the
+operations test helper imports it from the barrel), and the 100% line-coverage gate
+independently catches any genuinely dead line in `src/engine` — declaring the barrel a
+knip entry only relaxes knip's export-level check, not coverage. The engine's own bundle
+contribution is unchanged (core already `alwaysBundle`d it) — a pure structural move.
 
 ## `fsm` + `event-emitter` → `core/src/foundation`
 
