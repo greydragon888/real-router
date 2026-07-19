@@ -2,6 +2,43 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## `build` gained `^bundle` — the examples dist-closure hole; `bundle`'s own `^bundle` re-probed and KEPT
+
+**Problem.** `examples.yml`'s build job ran `turbo run build --filter='./examples/**'`
+with **no graph edge to any library bundle**. Examples resolve `@real-router/*` as
+external consumers — their tsconfigs don't extend the root (no `customConditions`),
+so `tsc -b` / vite go through package `exports` → `dist/`. From a clean state the job
+cannot succeed (repro: zero dists → `TS2307: Cannot find module '@real-router/core'`);
+it stayed green only via self-hosted runner residue (gitignored `dist/` survives
+`actions/checkout` between runs) + turbo remote cache. Same failure class as #499
+("dist/ not restored across jobs") and the #833 episode.
+
+**Solution.** `build.dependsOn` gains `"^bundle"`. For an example:
+`example#build → ^bundle (its direct @real-router deps) → each lib's bundle →
+its ^bundle → core/sources/route-utils` — full transitive dist closure (verified:
+the dry-run graph of `react-combined-example#build` contains all 11 lib bundle
+tasks, and the real run from zero dists is green). For `packages/*` the edge is
+redundant-but-harmless: their own `bundle` (which already chains `^bundle`) is in
+`build`'s graph, and pre-push builds the full set anyway. Pre-commit is untouched —
+it runs `test`, which no longer depends on bundling at all (entry below).
+
+**Why `bundle` KEEPS its `^bundle` (re-probed).** The previous entry's premise-check
+was extended to bundling itself: at zero dists, tsdown (react; browser-plugin incl.
+the symlinked browser-env), rollup (solid), and svelte-package (svelte) all emit
+fine — inline publint passes and attw reports "No problems found" — so the old
+assumption "attw needs upstream `.d.ts`" is **false**. The edge stays for two real
+reasons: (1) **ng-packagr (angular) genuinely fails** without upstream dists
+(`TS2307` — it resolves via standard conditions and knows nothing of
+`internal-source`); (2) a chained `^bundle` is turbo's only way to express the
+**transitive dist closure** that `build` (examples) and `test:e2e` rely on — with
+the post-fold graph only 2 deep, removing it would buy ~2 sync points of bundle
+parallelism and break closure. Rejected; recorded so a future audit doesn't remove
+the edge on the strength of the same emission probe.
+
+Also removed the dead root `test:mutation` script (`stryker run` at the repo root,
+where no stryker config exists — mutation testing runs from package dirs;
+`mutation:analyze` stays).
+
 ## test/lint tiers dropped `^bundle` — hooks and shards no longer build upstream dists
 
 **Problem.** `test` / `test:properties` / `test:stress` / `lint` / `lint:fix` carried

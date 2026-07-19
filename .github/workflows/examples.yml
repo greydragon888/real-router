@@ -46,9 +46,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # turbo dependency chain: build → test → lint, type-check
-      # Single command runs the full validation pipeline
-      - name: Build (includes lint, type-check, test via turbo deps)
+      # turbo dependency chain: build → ^bundle (the @real-router libs each
+      # example depends on, transitively down to core) + the example's own
+      # test/lint/type-check. The ^bundle edge makes this job self-sufficient
+      # from a clean runner — examples resolve @real-router/* via package
+      # exports → dist/ (consumer-style tsconfigs, no internal-source), so
+      # without it the job only worked off self-hosted runner residue /
+      # remote-cache leftovers (#499 was this exact class).
+      - name: Build (includes lib bundles + lint, type-check, test via turbo deps)
         run: pnpm turbo run build --filter='./examples/**'
 
   e2e:

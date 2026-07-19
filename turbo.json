@@ -35,7 +35,7 @@
       "cache": true
     },
     "build": {
-      "dependsOn": ["bundle", "test", "test:properties"],
+      "dependsOn": ["^bundle", "bundle", "test", "test:properties"],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte,html,css}",
         "index.html",
