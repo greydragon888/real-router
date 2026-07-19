@@ -14,6 +14,8 @@
     "packages/react/src/legacy.ts",
     "packages/react/src/legacy.ssr.ts",
     "packages/react/src/ink.ts",
+    "packages/validation-plugin/src/type-guards/**",
+    "shared/browser-env/state-guard.ts",
     "**/*.d.ts"
   ],
   "format": ["typescript", "tsx", "svelte"],
