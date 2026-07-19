@@ -148,9 +148,8 @@ describe("createRouter", () => {
 
   describe("logger config validation surface (assertLoggerConfig via ctor, #789)", () => {
     // The ctor gates `assertLoggerConfig` behind `if (loggerConfig)`, so every
-    // case below drives the real validator through the public createRouter path.
-    // (The lone unreachable branch — `config === null`, a TS-narrowing guard —
-    // is covered directly in typeGuards.test.ts.)
+    // case below drives the real validator (now in src/guards.ts, merged from the
+    // former src/typeGuards.ts) through the public createRouter path.
 
     it("accepts an empty logger object", () => {
       expect(() => createRouter([], { logger: {} })).not.toThrow();

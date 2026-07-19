@@ -9,7 +9,11 @@
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import { EventEmitter } from "./foundation/event-emitter";
 import { RouterLogger } from "./foundation/logger";
-import { guardDependencies, guardRouteStructure } from "./guards";
+import {
+  assertLoggerConfig,
+  guardDependencies,
+  guardRouteStructure,
+} from "./guards";
 import { createLimits, normalizeParams } from "./helpers";
 import {
   createBinaryInterceptable,
@@ -32,7 +36,6 @@ import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamesp
 import { RouterError } from "./RouterError";
 import { createRouterFSM } from "./routerFSM";
 import { getTransitionPath } from "./transitionPath";
-import { assertLoggerConfig } from "./typeGuards";
 import { wireNamespaces } from "./wiring";
 
 import type { CreateMatcherOptions } from "./engine";
