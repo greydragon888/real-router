@@ -78,7 +78,7 @@ find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
 
 # 4: run the scanner directly via dotenv — NOT `pnpm run sonar -- …`.
 # `pnpm run <script> -- <args>` forwards <args> behind a literal `--`, and
-# @sonar/scan v4's commander CLI (`-D, --define <property=value...>`, zero
+# @sonar/scan v5's commander CLI (`-D, --define <property=value...>`, zero
 # positional args) treats every token after `--` as a positional operand:
 # `error: too many arguments. Expected 0 arguments but got 4.`. Passing the
 # flags as plain options (no intervening `--`) parses them as -D defines.
@@ -88,7 +88,7 @@ find packages -path '*/coverage/lcov.info' -print0 2>/dev/null |
 # expansion in the `sonar` script ran in a shell without .env → always empty).
 # Mirrors CI "SonarCloud Scan".
 echo "☁️  running SonarCloud scan..."
-exec pnpm exec dotenv -- sonar \
+exec pnpm exec dotenv -- sonar-scanner-npm \
   -Dsonar.projectVersion="$VERSION" \
   -Dsonar.sources="$SOURCES" \
   -Dsonar.tests="$TESTS" \
