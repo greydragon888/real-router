@@ -6,13 +6,10 @@
  * within this single file to resolve circular dependencies.
  */
 
-import type {
-  State,
-  Params,
-  NavigationOptions,
-  RouterError,
-  Unsubscribe,
-} from "./base";
+import type { State, Params, RouterError, Unsubscribe } from "./base";
+// Augment-target interfaces are declared lexically in the entry (#1540); the
+// type-only cycle with the barrel is deliberate — see the note in ./index.
+import type { NavigationOptions } from "./index";
 import type { LimitsConfig } from "./limits";
 import type { QueryParamsMode, QueryParamsOptions } from "./route-node-types";
 
