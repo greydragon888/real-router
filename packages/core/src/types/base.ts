@@ -76,6 +76,19 @@ export interface StateMetaInput<P extends Params = Params> {
 }
 
 /**
+ * Parsed shape produced by `serializeRouterState()` (`@real-router/ssr-utils`,
+ * after `JSON.parse`). Identical to {@link State} minus `transition`
+ * (per-navigation `TransitionMeta` is meaningless after hydration; the client
+ * builds its own on commit). Defined here (not in `ssr-utils`) because core's
+ * own hydration scratchpad (`RouterInternals.hydrationState`) is typed against
+ * it — see `internals.ts`.
+ */
+export type SerializedRouterState<P extends Params = Params> = Omit<
+  State<P>,
+  "transition"
+>;
+
+/**
  * RouterError interface describing the public API of the RouterError class.
  * The actual class implementation is in the real-router package.
  * This interface enables structural typing compatibility between

@@ -15,6 +15,7 @@
     "@real-router/core": "workspace:^",
     "@real-router/react": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
+    "@real-router/ssr-utils": "workspace:^",
     "express": "5.1.0",
     "react": "~19.2.7",
     "react-dom": "~19.2.7"

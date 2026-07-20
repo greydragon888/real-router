@@ -40,7 +40,8 @@ real-router/
 │   ├── navigation-plugin/         # Navigation API browser synchronization + route-level history
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
-│   └── route-utils/               # Route tree queries and segment testing
+│   ├── route-utils/               # Route tree queries and segment testing
+│   └── ssr-utils/                 # Router-level SSR/SSG/hydration helpers (extracted from core/utils, #1543)
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
 │   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/{core,sources} for transitive symlink resolution
 │   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, scroll spy (#575), view transitions, direction tracker, link helpers
@@ -62,7 +63,7 @@ real-router/
 │       └── tauri/      (2 apps)           # Tauri v2: browser-plugin, navigation-plugin
 ```
 
-**Public packages** (published to npm): `core`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `ssr-utils`, `logger`
 
 **Internal subsystems of `core`** (bundled into core, not standalone packages, not on npm): the merged **routing engine** (route-tree facade + path-matcher + search-params layers, #1510) now lives **inside** `core` at `src/engine` — folded in by engine-merge iteration 2 (it is the router's core, so it sits in `src/`, not `src/foundation/`); the former bare `packages/engine` is deleted. **Note:** the generic FSM engine, typed event emitter, and per-router logger likewise live inside `core` at `src/foundation/{fsm,event-emitter,logger}`; `type-guards` was dissolved into its plugin consumers (wave-2 — each plugin inlines the guards it uses); `@real-router/types` folded into `core` (wave-2, exposed at `@real-router/core/types`). The `fsm` package — published to npm by mistake — had its source **deleted** in wave-3 (its live engine had already been copied into `core/src/foundation/fsm`); the orphaned `@real-router/fsm@0.6.1` stays on npm, deprecated. **No standalone internal packages remain.**
 
@@ -86,6 +87,7 @@ graph TD
         PPP["persistent-params-plugin"]
         NP["navigation-plugin"]
         ROUTEUTILS["route-utils"]
+        SSRUTILS["ssr-utils"]
     end
 
     BROWSERENV["shared/browser-env<br/>(shared sources)"]
@@ -140,6 +142,7 @@ graph TD
     ANGULAR -->|dep| CORE
     ANGULAR -->|dep| SOURCES
     ANGULAR -->|dep| ROUTEUTILS
+    ANGULAR -->|dep| SSRUTILS
     ANGULAR -.->|copy| DOMUTILS
 
     RX -->|dep| CORE
@@ -170,6 +173,8 @@ graph TD
     SSP -->|dep| CORE
 
     ROUTEUTILS -.->|peer| CORE
+
+    SSRUTILS -.->|peer| CORE
 ```
 
 Solid arrows = runtime `dependencies`. Dashed arrows = bundled at build time (consumer's bundle includes the internal package). The `angular` adapter uses a git-tracked **copy** of `shared/dom-utils/` (not a symlink) because ng-packagr does not follow symlinks the same way tsdown does — `prebundle` re-materializes the copy before every build.

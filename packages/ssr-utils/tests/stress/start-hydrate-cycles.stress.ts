@@ -1,8 +1,8 @@
+import { getPluginApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 import { describe, it, expect } from "vitest";
 
-import { getPluginApi } from "@real-router/core/api";
-import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
-import { getInternals } from "@real-router/core/validation";
+import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
 
 import { createTestRouter } from "../helpers";
 

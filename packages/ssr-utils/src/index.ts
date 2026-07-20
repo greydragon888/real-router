@@ -15,10 +15,9 @@ export type { Deserialize, HydrateRouterOptions } from "./hydrateRouter";
 
 export { serializeRouterState } from "./serializeRouterState";
 
-export type {
-  SerializedRouterState,
-  SerializeRouterStateOptions,
-} from "./serializeRouterState";
+export type { SerializeRouterStateOptions } from "./serializeRouterState";
+
+export type { SerializedRouterState } from "@real-router/core/types";
 
 export { serializeState } from "./serializeState";
 

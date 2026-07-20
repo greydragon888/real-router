@@ -74,5 +74,8 @@
   "sideEffects": false,
   "peerDependencies": {
     "@real-router/core": "workspace:>=0.1.0"
+  },
+  "devDependencies": {
+    "@real-router/ssr-utils": "workspace:^"
   }
 }

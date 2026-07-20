@@ -26,16 +26,11 @@ api/ (standalone functions — tree-shakeable)
     ├── getLifecycleApi(router)   — guard management
     ├── getPluginApi(router)      — plugin management
     └── cloneRouter(router, deps) — SSR cloning
-
-utils/ (SSR/SSG/hydration helpers — separate subpath export)
-    ├── serializeState(data)              — XSS-safe JSON for embedding in HTML <script> tags
-    ├── serializeRouterState(state, opts) — XSS-safe State serializer (strips `transition`, keeps `context`); `excludeContext` filters non-JSON namespaces (#572); `serialize` plugs custom serializer (devalue/superjson) for non-JSON types like Date/Map/Set/RegExp/BigInt (#606)
-    ├── hydrateRouter(router, source, opts?) — drives `router.start(parsed.path)` with a one-shot hydration scratchpad on `RouterInternals` so SSR loader plugins skip the post-hydration re-run (#596); `deserialize` matches the custom `serialize` choice (#606)
-    ├── getStaticPaths(router, entries?)  — enumerate leaf routes and build URLs for SSG pre-rendering
-    └── createRequestScope(req, base, deps?) — per-request SSR isolation: clones `base`, binds an `AbortSignal` to the request lifetime (Node `"close"` event / Web `request.signal`), injects it into the clone's deps under `abortSignal`, exposes `dispose()` (+ `Symbol.asyncDispose` for `await using`) (#603)
 ```
 
-**Hydration scratchpad (#596)**: `RouterInternals.hydrationState` is `null` outside `hydrateRouter`. Inside, the parsed `SerializedRouterState` is briefly assigned, then cleared in `finally`. SSR loader plugins (`ssr-data-plugin`, `rsc-server-plugin`) read `getInternals(router).hydrationState` from inside their `start` interceptor — when the namespace value is already present in the parsed context for the same route name, they reuse it instead of invoking the loader. Single-shot semantics: only the first `start()` consumes the scratchpad. Plugin-internal mechanism — no public API surface beyond `hydrateRouter` itself.
+**SSR/SSG/hydration helpers live outside core, in `@real-router/ssr-utils`** (`serializeState`, `serializeRouterState`, `hydrateRouter`, `getStaticPaths`, `createRequestScope` — #1543). They are router-level (not plugin-level like `shared/ssr`), consume core exclusively through its public subpaths (`@real-router/core/api`, `@real-router/core/validation`, `@real-router/core/types`), and were extracted from the former `@real-router/core/utils` subpath to keep core a pure router with zero SSR-specific surface.
+
+**Hydration scratchpad (#596)**: `RouterInternals.hydrationState` is `null` outside `hydrateRouter` (`@real-router/ssr-utils`). Inside, the parsed `SerializedRouterState` is briefly assigned, then cleared in `finally`. SSR loader plugins (`ssr-data-plugin`, `rsc-server-plugin`) read `getInternals(router).hydrationState` from inside their `start` interceptor — when the namespace value is already present in the parsed context for the same route name, they reuse it instead of invoking the loader. Single-shot semantics: only the first `start()` consumes the scratchpad. The `SerializedRouterState` type itself is defined in `src/types/base.ts` (core owns the shape of its own hydration scratchpad) and re-exported by `@real-router/ssr-utils`.
 
 **RouterFSM states**: `IDLE → STARTING → READY ⇄ TRANSITION_STARTED → LEAVE_APPROVED → READY | DISPOSED`
 

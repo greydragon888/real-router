@@ -1,4 +1,4 @@
-import { hydrateRouter } from "@real-router/core/utils";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/solid";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { hydrate } from "solid-js/web";

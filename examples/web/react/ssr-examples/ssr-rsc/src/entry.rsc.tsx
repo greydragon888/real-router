@@ -2,7 +2,7 @@ import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
   createRequestScope,
   serializeRouterState,
-} from "@real-router/core/utils";
+} from "@real-router/ssr-utils";
 import {
   rscActionPluginFactory,
   rscServerPluginFactory,

@@ -1,9 +1,9 @@
 import { test } from "@fast-check/vitest";
+import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
 import { describe, expect, it } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
-import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
 import {

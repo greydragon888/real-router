@@ -64,4 +64,5 @@ export default [
 
   // ── Utilities ─────────────────────────────────────────────────────
   esm("route-utils", "1 kB"),
+  esm("ssr-utils", "2 kB", ignoreCore),
 ];

@@ -1,20 +1,7 @@
 import { serializeState } from "./serializeState";
 
 import type { Serialize } from "./serializeState";
-import type { Params, State } from "../types";
-
-/**
- * Parsed shape produced by {@link serializeRouterState} (after `JSON.parse`).
- *
- * Identical to {@link State} minus `transition` (per-navigation `TransitionMeta`
- * is meaningless after hydration; the client builds its own on commit). Used as
- * the input shape for {@link hydrateRouter} and as the type of the one-shot
- * hydration scratchpad consumed by SSR loader plugins.
- */
-export type SerializedRouterState<P extends Params = Params> = Omit<
-  State<P>,
-  "transition"
->;
+import type { State } from "@real-router/core/types";
 
 export interface SerializeRouterStateOptions {
   /**

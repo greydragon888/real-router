@@ -9,7 +9,7 @@
  */
 
 import { createRouter } from "@real-router/core";
-import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
+import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { ssrDataPluginFactory } from "../../src";

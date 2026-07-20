@@ -12,11 +12,11 @@
 //     isolates async listener rejections centrally; pinned in
 //     error-handling.test.ts (next to the sync-throw onStart isolation).
 
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { describe, afterEach, it, expect } from "vitest";
 
 import { createRouter, errorCodes } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
-import { hydrateRouter } from "@real-router/core/utils";
 
 import { captureSyncThrow, createTestRouter } from "../../../helpers";
 

@@ -8,12 +8,14 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets — now 1/6/3/2/2/8 = 22 after the
+//     reproduce the companion §C buckets — now 1/6/3/2/2/9 = 23 after the
 //     foundation dissolutions (event-emitter + logger in wave-1; type-guards +
 //     the @real-router/types fold into core in wave-2; @real-router/fsm's frozen
 //     shell deleted in wave-3; engine folded into core/src/engine, engine-merge
 //     iteration 2 — and the then-empty `internal` bucket dropped from
-//     GROUP_NAMES, so 6 buckets now, not 7); §C's original master figure was
+//     GROUP_NAMES, so 6 buckets now, not 7) and the @real-router/ssr-utils
+//     extraction (#1543, a new leaf — depends only on core's public subpaths,
+//     no shared/ssr symlink); §C's original master figure was
 //     6/6/3/2/2/8/1 = 28 — plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
@@ -182,20 +184,20 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
 
-test("L2: classify() buckets all real packages/* exactly 1/6/3/2/2/8 = 22", () => {
+test("L2: classify() buckets all real packages/* exactly 1/6/3/2/2/9 = 23", () => {
   const counts = {};
   for (const pkg of allPackages) {
     const bucket = classify(pkg, realDirOf);
     counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  assert.equal(allPackages.length, 22, "expected 22 packages/* workspaces");
+  assert.equal(allPackages.length, 23, "expected 23 packages/* workspaces");
   assert.deepEqual(counts, {
     base: 1,
     adapter: 6,
     "url-plugin": 3,
     "ssr-plugin": 2,
     "adapter-shared": 2,
-    leaf: 8,
+    leaf: 9,
   });
 });
 
@@ -479,7 +481,7 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   );
 });
 
-test("routing: full rebuild (all 22) → base excluded, 10 shards", () => {
+test("routing: full rebuild (all 23) → base excluded, 10 shards", () => {
   const { mode, matrix } = buildPlan(allPackages, realDirOf);
   assert.equal(mode, "sharded");
   const names = matrix.include.map((i) => i.name);

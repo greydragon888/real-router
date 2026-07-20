@@ -1,4 +1,4 @@
-import { hydrateRouter } from "@real-router/core/utils";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { createFromReadableStream } from "@vitejs/plugin-rsc/ssr";
 import { renderToReadableStream } from "react-dom/server.edge";
 import { injectRSCPayload } from "rsc-html-stream/server";

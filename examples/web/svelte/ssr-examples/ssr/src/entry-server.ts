@@ -2,7 +2,7 @@ import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
-} from "@real-router/core/utils";
+} from "@real-router/ssr-utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { createHttpStatusSink } from "@real-router/svelte/ssr";
 import { render } from "svelte/server";
@@ -66,7 +66,7 @@ export async function renderPage(
   // read getDep("abortSignal"). Explicit try/finally + await scope.dispose()
   // is used (instead of `await using`) for compatibility with Node 22 LTS,
   // where Symbol.asyncDispose is not yet a well-known symbol — see
-  // @real-router/core/utils/createRequestScope JSDoc for the runtime matrix.
+  // @real-router/ssr-utils/createRequestScope JSDoc for the runtime matrix.
   const scope = createRequestScope(context.req, baseRouter, {
     currentUser: context.currentUser,
   });

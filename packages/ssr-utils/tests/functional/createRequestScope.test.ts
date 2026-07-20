@@ -1,13 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
-
 import { RouterError, errorCodes } from "@real-router/core";
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
-import { createRequestScope } from "@real-router/core/utils";
+import { describe, it, expect, vi } from "vitest";
 
-import { createTestRouter } from "../../helpers";
+import { createRequestScope } from "@real-router/ssr-utils";
+
+import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
-import type { IncomingMessageLike } from "@real-router/core/utils";
+import type { IncomingMessageLike } from "@real-router/ssr-utils";
 
 interface FakeIncomingMessage extends IncomingMessageLike {
   emitClose: () => void;

@@ -3,7 +3,7 @@ import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
-} from "@real-router/core/utils";
+} from "@real-router/ssr-utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { RouterProvider } from "@real-router/vue";
 import { createSSRApp, h } from "vue";

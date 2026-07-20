@@ -13,6 +13,7 @@
   "dependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
+    "@real-router/ssr-utils": "workspace:^",
     "@real-router/svelte": "workspace:^",
     "express": "5.1.0",
     "svelte": "~5.56.4"

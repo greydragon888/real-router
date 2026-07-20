@@ -1328,6 +1328,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -1468,6 +1471,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -2158,6 +2164,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       preact:
         specifier: ~10.29.7
         version: 10.29.7(preact-render-to-string@6.7.0)
@@ -2198,6 +2207,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -2244,6 +2256,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -2287,6 +2302,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -3323,6 +3341,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       react:
         specifier: ~19.2.7
         version: 19.2.7
@@ -3369,6 +3390,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -3421,6 +3445,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -3473,6 +3500,9 @@ importers:
       '@real-router/rsc-server-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/rsc-server-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -3528,6 +3558,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -4182,6 +4215,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       solid-js:
         specifier: ~1.9.14
         version: 1.9.14
@@ -4219,6 +4255,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@solidjs/meta':
         specifier: ~0.29.4
         version: 0.29.4(solid-js@1.9.14)
@@ -4265,6 +4304,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -4305,6 +4347,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -5069,6 +5114,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../../../../../packages/svelte
@@ -5109,6 +5157,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../../../../../packages/svelte
@@ -5155,6 +5206,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../../../../../packages/svelte
@@ -5198,6 +5252,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@real-router/svelte':
         specifier: workspace:^
         version: link:../../../../../packages/svelte
@@ -5922,6 +5979,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@real-router/vue':
         specifier: workspace:^
         version: link:../../../../../packages/vue
@@ -5962,6 +6022,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@real-router/vue':
         specifier: workspace:^
         version: link:../../../../../packages/vue
@@ -6008,6 +6071,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@real-router/vue':
         specifier: workspace:^
         version: link:../../../../../packages/vue
@@ -6051,6 +6117,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../../../../../packages/ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../../../../../packages/ssr-utils
       '@real-router/vue':
         specifier: workspace:^
         version: link:../../../../../packages/vue
@@ -6125,6 +6194,9 @@ importers:
       '@real-router/sources':
         specifier: workspace:^
         version: link:../sources
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../ssr-utils
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.6.2
@@ -6170,7 +6242,11 @@ importers:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.2.0)
 
-  packages/core: {}
+  packages/core:
+    devDependencies:
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../ssr-utils
 
   packages/hash-plugin:
     dependencies:
@@ -6327,6 +6403,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../ssr-data-plugin
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../ssr-utils
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -6417,6 +6496,16 @@ importers:
         version: link:../route-utils
 
   packages/ssr-data-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:>=0.1.0
+        version: link:../core
+    devDependencies:
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../ssr-utils
+
+  packages/ssr-utils:
     dependencies:
       '@real-router/core':
         specifier: workspace:>=0.1.0

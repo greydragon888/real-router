@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { serializeState } from "@real-router/core/utils";
+import { serializeState } from "@real-router/ssr-utils";
 
 describe("serializeState", () => {
   it("should serialize a plain object to JSON", () => {

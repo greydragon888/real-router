@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { serializeState } from "@real-router/core/utils";
+import { serializeState } from "@real-router/ssr-utils";
 
 import { measureTime } from "./helpers";
 

@@ -1,4 +1,4 @@
-import { hydrateRouter } from "@real-router/core/utils";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/react";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { hydrateRoot } from "react-dom/client";
