@@ -1,5 +1,21 @@
 # @real-router/angular
 
+## 0.16.4
+
+### Patch Changes
+
+- [#1544](https://github.com/greydragon888/real-router/pull/1544) [`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427) Thanks [@greydragon888](https://github.com/greydragon888)! - Update SSR helper import to `@real-router/ssr-utils` ([#1543](https://github.com/greydragon888/real-router/issues/1543))
+
+  Internal refactor — `provideRealRouterFactory`'s use of `hydrateRouter` /
+  `serializeRouterState` now comes from the new `@real-router/ssr-utils`
+  package instead of the removed `@real-router/core/utils` subpath. No public
+  API change; `@real-router/ssr-utils` is added as a runtime dependency.
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427), [`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+  - @real-router/ssr-utils@0.1.0
+  - @real-router/sources@0.12.3
+
 ## 0.16.3
 
 ### Patch Changes
