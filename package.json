@@ -74,7 +74,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@changesets/changelog-github": "0.7.0",
-    "@changesets/cli": "2.31.0",
+    "@changesets/cli": "2.31.1",
     "@codspeed/tinybench-plugin": "5.7.1",
     "@commitlint/cli": "21.2.0",
     "@commitlint/config-conventional": "21.2.0",
