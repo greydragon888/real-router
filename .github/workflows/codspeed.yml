@@ -79,9 +79,22 @@ jobs:
     # the release. (github.head_ref is empty on push / workflow_dispatch, so the
     # changeset-release/* clause is a no-op for them; the head_commit clause is
     # push-only, so it never affects pull_request or workflow_dispatch.)
+    #
+    # DEPENDABOT PRs: skipped on the pull_request side (author dependabot[bot],
+    # second clause of the pull_request guard). Dependabot only bumps infra
+    # devDeps / peer ranges / GitHub Actions; the CodSpeed verdict is NOT a
+    # required check and adds little on a dep bump, while each run costs 2 slow
+    # jobs (core + adapters) on the single one-job-at-a-time runner — a queue
+    # the valuable feature-PR / baseline runs would wait behind. The push-to-
+    # master side is deliberately NOT skipped: after a Dependabot PR merges, the
+    # master push re-seeds the baseline with the real dep change, so a bundler/
+    # compiler bump that DOES shift instruction counts (tsdown / rolldown /
+    # vitest / typescript / tinybench) still surfaces on the next ordinary
+    # comparison — the verdict is deferred one run, not lost.
     if: >-
       (github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository) &&
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]')) &&
       !startsWith(github.head_ref, 'changeset-release/') &&
       !(github.event_name == 'push' &&
       startsWith(github.event.head_commit.message, 'release: version packages'))
