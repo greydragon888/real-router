@@ -24,7 +24,7 @@
     "@angular/cli": "~22.0.6",
     "@angular/compiler": "~22.0.6",
     "@angular/compiler-cli": "~22.0.6",
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.61.1",
     "sirv-cli": "3.0.1",
     "typescript": "6.0.3"
   }

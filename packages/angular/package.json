@@ -55,8 +55,8 @@
     "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "2.6.2",
-    "@analogjs/vitest-angular": "2.6.2",
+    "@analogjs/vite-plugin-angular": "2.6.3",
+    "@analogjs/vitest-angular": "2.6.3",
     "@angular/build": "~22.0.6",
     "@angular/common": "~22.0.6",
     "@angular/compiler": "~22.0.6",

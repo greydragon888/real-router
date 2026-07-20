@@ -82,8 +82,8 @@
     "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
-    "@babel/core": "7.29.7",
-    "@babel/preset-typescript": "7.29.7",
+    "@babel/core": "8.0.1",
+    "@babel/preset-typescript": "8.0.1",
     "@real-router/browser-plugin": "workspace:^",
     "@rollup/plugin-babel": "7.1.0",
     "@rollup/plugin-node-resolve": "16.0.3",
@@ -93,10 +93,10 @@
     "@testing-library/user-event": "~14.6.1",
     "babel-preset-solid": "1.9.12",
     "rimraf": "6.1.3",
-    "rollup": "4.62.0",
+    "rollup": "4.62.2",
     "rollup-plugin-dts": "6.4.1",
     "solid-js": "~1.9.14",
-    "vite-plugin-solid": "2.11.12",
+    "vite-plugin-solid": "2.11.13",
     "vitest": "4.1.10"
   },
   "peerDependencies": {

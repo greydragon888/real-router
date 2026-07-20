@@ -48,21 +48,21 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "2.6.2",
+    "@analogjs/vite-plugin-angular": "2.6.3",
     "@angular/build": "~22.0.6",
     "@angular/compiler": "~22.0.6",
     "@angular/compiler-cli": "~22.0.6",
     "@real-router/persistent-params-plugin": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
-    "@sveltejs/vite-plugin-svelte": "6.2.4",
+    "@sveltejs/vite-plugin-svelte": "7.2.0",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "5.2.0",
-    "@vitejs/plugin-vue": "6.0.7",
-    "@vitejs/plugin-vue-jsx": "5.1.5",
+    "@vitejs/plugin-react": "6.0.3",
+    "@vitejs/plugin-vue": "6.0.8",
+    "@vitejs/plugin-vue-jsx": "5.1.6",
     "jsdom": "29.1.1",
     "playwright": "1.61.1",
     "vite": "7.3.6",
-    "vite-plugin-solid": "2.11.12"
+    "vite-plugin-solid": "2.11.13"
   }
 }

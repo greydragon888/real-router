@@ -18,11 +18,11 @@
     "solid-js": "~1.9.14"
   },
   "devDependencies": {
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.61.1",
     "@types/node": "24.13.2",
-    "tsx": "4.22.4",
+    "tsx": "4.23.1",
     "typescript": "6.0.3",
     "vite": "7.3.6",
-    "vite-plugin-solid": "2.11.12"
+    "vite-plugin-solid": "2.11.13"
   }
 }

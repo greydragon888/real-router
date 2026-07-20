@@ -18,15 +18,15 @@
     "vue": "~3.5.39"
   },
   "devDependencies": {
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.61.1",
     "@testing-library/jest-dom": "~6.9.1",
     "@testing-library/user-event": "~14.6.1",
     "@testing-library/vue": "~8.1.0",
-    "@vitejs/plugin-vue": "6.0.7",
+    "@vitejs/plugin-vue": "6.0.8",
     "jsdom": "29.1.1",
     "typescript": "6.0.3",
     "vite": "7.3.6",
     "vitest": "4.1.10",
-    "vue-tsc": "3.3.5"
+    "vue-tsc": "3.3.7"
   }
 }
