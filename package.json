@@ -83,7 +83,7 @@
     "@fast-check/vitest": "0.4.1",
     "@size-limit/esbuild": "12.1.0",
     "@size-limit/preset-small-lib": "12.1.0",
-    "@sonar/scan": "4.3.8",
+    "@sonar/scan": "4.4.0",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/typescript-checker": "9.6.1",
     "@stryker-mutator/vitest-runner": "9.6.1",
