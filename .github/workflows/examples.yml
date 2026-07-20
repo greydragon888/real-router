@@ -2,7 +2,7 @@ name: Examples
 
 on:
   schedule:
-    - cron: '0 22 * * 0,3' # Mon & Thu at 05:00 ICT (UTC+7)
+    - cron: '0 22 * * 2' # Wed at 05:00 ICT (UTC+7)
   workflow_dispatch: {}
 
 concurrency:

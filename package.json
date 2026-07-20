@@ -107,7 +107,7 @@
     "eslint-plugin-sonarjs": "4.1.0",
     "eslint-plugin-testing-library": "7.16.2",
     "eslint-plugin-unicorn": "69.0.0",
-    "fast-check": "4.8.0",
+    "fast-check": "4.9.0",
     "husky": "9.1.7",
     "jscpd": "5.0.9",
     "jsdom": "29.1.1",
