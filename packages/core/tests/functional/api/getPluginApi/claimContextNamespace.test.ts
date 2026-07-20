@@ -1,8 +1,8 @@
+import { serializeRouterState } from "@real-router/ssr-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
 import { cloneRouter, getPluginApi } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
 
 import { createTestRouter } from "../../../helpers";
 

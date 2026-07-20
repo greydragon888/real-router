@@ -3,7 +3,7 @@ import { cloneRouter } from "@real-router/core/api";
 import {
   getStaticPaths as getStaticPathsFromRouter,
   serializeRouterState,
-} from "@real-router/core/utils";
+} from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/preact";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { renderToString } from "preact-render-to-string";

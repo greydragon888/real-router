@@ -3,7 +3,7 @@ import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
-} from "@real-router/core/utils";
+} from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/preact";
 import {
   getSsrDataMode,

@@ -14,6 +14,7 @@
     "@real-router/core": "workspace:^",
     "@real-router/solid": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
+    "@real-router/ssr-utils": "workspace:^",
     "express": "5.1.0",
     "solid-js": "~1.9.14"
   },

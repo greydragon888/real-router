@@ -52,7 +52,8 @@
   "dependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/route-utils": "workspace:^",
-    "@real-router/sources": "workspace:^"
+    "@real-router/sources": "workspace:^",
+    "@real-router/ssr-utils": "workspace:^"
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "2.6.2",

@@ -13,6 +13,7 @@ import type {
   Router as RouterInterface,
   RouterLogger,
   RouteTreeState,
+  SerializedRouterState,
   SimpleState,
   State,
   TreeChangedEvent,
@@ -21,7 +22,6 @@ import type {
   PluginFactory,
 } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
-import type { SerializedRouterState } from "./utils";
 
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,

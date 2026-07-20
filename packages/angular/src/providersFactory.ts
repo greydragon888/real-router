@@ -16,8 +16,8 @@ import {
   type Router,
 } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
-import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
 import { createRouteSource, primeErrorSource } from "@real-router/sources";
+import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
 
 import {
   installScrollRestoration,

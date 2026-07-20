@@ -1,7 +1,7 @@
+import { createRouter } from "@real-router/core";
 import { describe, expect, it } from "vitest";
 
-import { createRouter } from "@real-router/core";
-import { getStaticPaths } from "@real-router/core/utils";
+import { getStaticPaths } from "@real-router/ssr-utils";
 
 import { measureTimeAsync } from "./helpers";
 

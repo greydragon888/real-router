@@ -14,9 +14,6 @@
       "api": [
         "./dist/cjs/api.d.ts"
       ],
-      "utils": [
-        "./dist/cjs/utils.d.ts"
-      ],
       "validation": [
         "./dist/cjs/validation.d.ts"
       ]
@@ -49,15 +46,6 @@
       },
       "import": "./dist/esm/api.mjs",
       "require": "./dist/cjs/api.js"
-    },
-    "./utils": {
-      "@real-router/internal-source": "./src/utils/index.ts",
-      "types": {
-        "import": "./dist/esm/utils.d.mts",
-        "require": "./dist/cjs/utils.d.ts"
-      },
-      "import": "./dist/esm/utils.mjs",
-      "require": "./dist/cjs/utils.js"
     },
     "./validation": {
       "@real-router/internal-source": "./src/validation.ts",
@@ -109,5 +97,8 @@
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "bundle": "rm -rf dist && tsdown --config-loader unrun && node scripts/check-dts-augment-targets.mjs"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "@real-router/ssr-utils": "workspace:^"
+  }
 }

@@ -15,6 +15,7 @@
     "@real-router/core": "workspace:^",
     "@real-router/preact": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
+    "@real-router/ssr-utils": "workspace:^",
     "preact": "~10.29.7",
     "preact-render-to-string": "~6.7.0"
   },

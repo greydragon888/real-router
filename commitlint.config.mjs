@@ -38,6 +38,7 @@ export const SCOPES = [
   "angular",
   "rx",
   "route-utils",
+  "ssr-utils",
   "sources",
   "dom-utils",
   "benchmarks",

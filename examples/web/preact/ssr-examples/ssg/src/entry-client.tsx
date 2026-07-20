@@ -1,5 +1,5 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
-import { hydrateRouter } from "@real-router/core/utils";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/preact";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { hydrate, render } from "preact";

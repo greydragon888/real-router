@@ -17,6 +17,7 @@ export type {
   TransitionPhase,
   TransitionReason,
   TransitionMeta,
+  SerializedRouterState,
 } from "./base";
 
 // ---------------------------------------------------------------------------

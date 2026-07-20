@@ -3,7 +3,7 @@ import { cloneRouter } from "@real-router/core/api";
 import {
   getStaticPaths as getStaticPathsFromRouter,
   serializeRouterState,
-} from "@real-router/core/utils";
+} from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/solid";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { generateHydrationScript, renderToString } from "solid-js/web";

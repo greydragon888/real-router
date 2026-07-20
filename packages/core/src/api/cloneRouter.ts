@@ -90,7 +90,7 @@ export interface CloneOptions {
  * // clone.deps.currentUser          ✓ unique per request
  * ```
  *
- * @see createRequestScope — `@real-router/core/utils` SSR helper that
+ * @see createRequestScope — `@real-router/ssr-utils` SSR helper that
  *   wraps this function and injects `abortSignal` automatically.
  */
 export function cloneRouter<

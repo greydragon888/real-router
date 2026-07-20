@@ -1,7 +1,7 @@
+import { createRouter } from "@real-router/core";
 import { describe, it, expect } from "vitest";
 
-import { createRouter } from "@real-router/core";
-import { getStaticPaths } from "@real-router/core/utils";
+import { getStaticPaths } from "@real-router/ssr-utils";
 
 function makeRouter(routes: Parameters<typeof createRouter>[0]) {
   return createRouter(routes, { allowNotFound: true });

@@ -1,5 +1,5 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
-import { hydrateRouter } from "@real-router/core/utils";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { RouterProvider } from "@real-router/vue";
 import { createSSRApp, h } from "vue";

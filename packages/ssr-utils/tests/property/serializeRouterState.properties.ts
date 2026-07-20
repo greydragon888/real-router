@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
-import { serializeRouterState } from "@real-router/core/utils";
+import { serializeRouterState } from "@real-router/ssr-utils";
 
 import { arbState, NUM_RUNS } from "./helpers";
 
