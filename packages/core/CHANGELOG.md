@@ -1,5 +1,27 @@
 # @real-router/core
 
+## 0.80.0
+
+### Minor Changes
+
+- [#1544](https://github.com/greydragon888/real-router/pull/1544) [`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the `@real-router/core/utils` subpath — moved to `@real-router/ssr-utils` ([#1543](https://github.com/greydragon888/real-router/issues/1543))
+
+  **Breaking Change:** SSR/SSG/hydration helpers (`serializeState`,
+  `serializeRouterState`, `hydrateRouter`, `getStaticPaths`,
+  `createRequestScope`) are no longer available under `@real-router/core/utils`.
+
+  **Migration:**
+
+  ```diff
+  - import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
+  + import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
+  ```
+
+  `SerializedRouterState` is now defined directly in `@real-router/core/types`
+  (and re-exported from `@real-router/ssr-utils`) — no import change needed for
+  consumers already importing it from `@real-router/core` or
+  `@real-router/core/types`.
+
 ## 0.79.1
 
 ### Patch Changes

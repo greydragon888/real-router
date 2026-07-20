@@ -7,6 +7,192 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-20]
 
+### @real-router/core@0.80.0
+
+### Minor Changes
+
+- [#1544](https://github.com/greydragon888/real-router/pull/1544) [`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the `@real-router/core/utils` subpath — moved to `@real-router/ssr-utils` ([#1543](https://github.com/greydragon888/real-router/issues/1543))
+
+  **Breaking Change:** SSR/SSG/hydration helpers (`serializeState`,
+  `serializeRouterState`, `hydrateRouter`, `getStaticPaths`,
+  `createRequestScope`) are no longer available under `@real-router/core/utils`.
+
+  **Migration:**
+
+  ```diff
+  - import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
+  + import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
+  ```
+
+  `SerializedRouterState` is now defined directly in `@real-router/core/types`
+  (and re-exported from `@real-router/ssr-utils`) — no import change needed for
+  consumers already importing it from `@real-router/core` or
+  `@real-router/core/types`.
+
+### @real-router/ssr-utils@0.1.0
+
+### Minor Changes
+
+- [#1544](https://github.com/greydragon888/real-router/pull/1544) [`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/ssr-utils` package — SSR/SSG/hydration helpers extracted from core ([#1543](https://github.com/greydragon888/real-router/issues/1543))
+
+  New standalone package hosting the router-level SSR primitives previously
+  exposed via the `@real-router/core/utils` subpath: `serializeState`,
+  `serializeRouterState`, `hydrateRouter`, `getStaticPaths`, and
+  `createRequestScope`. Isomorphic (server + client), depends on
+  `@real-router/core` as a peer.
+
+  **Migration:**
+
+  ```diff
+  - import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
+  + import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
+  ```
+
+  `SerializedRouterState` is now defined in `@real-router/core/types` (core owns
+  the shape of its own hydration scratchpad) and re-exported from
+  `@real-router/ssr-utils` for backward-compatible imports.
+
+### @real-router/angular@0.16.4
+
+### Patch Changes
+
+- [#1544](https://github.com/greydragon888/real-router/pull/1544) [`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427) Thanks [@greydragon888](https://github.com/greydragon888)! - Update SSR helper import to `@real-router/ssr-utils` ([#1543](https://github.com/greydragon888/real-router/issues/1543))
+
+  Internal refactor — `provideRealRouterFactory`'s use of `hydrateRouter` /
+  `serializeRouterState` now comes from the new `@real-router/ssr-utils`
+  package instead of the removed `@real-router/core/utils` subpath. No public
+  API change; `@real-router/ssr-utils` is added as a runtime dependency.
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427), [`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+  - @real-router/ssr-utils@0.1.0
+  - @real-router/sources@0.12.3
+
+### @real-router/browser-plugin@0.18.24
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/hash-plugin@0.8.23
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/lifecycle-plugin@0.7.4
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/logger-plugin@0.5.34
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/memory-plugin@0.4.31
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/navigation-plugin@0.7.33
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/persistent-params-plugin@0.2.34
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/preact@0.17.3
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+  - @real-router/sources@0.12.3
+
+### @real-router/preload-plugin@0.6.24
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/react@0.29.7
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+  - @real-router/sources@0.12.3
+
+### @real-router/rx@0.3.35
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/search-schema-plugin@0.4.22
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/solid@0.18.3
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+  - @real-router/sources@0.12.3
+
+### @real-router/sources@0.12.3
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/svelte@0.16.7
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+  - @real-router/sources@0.12.3
+
+### @real-router/validation-plugin@0.12.5
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+
+### @real-router/vue@0.18.3
+
+### Patch Changes
+
+- Updated dependencies [[`22e7d44`](https://github.com/greydragon888/real-router/commit/22e7d4441fbf5f70c55f50a8ab08615991a4d427)]:
+  - @real-router/core@0.80.0
+  - @real-router/sources@0.12.3
+
+
 ### @real-router/core@0.79.1
 
 ### Patch Changes
