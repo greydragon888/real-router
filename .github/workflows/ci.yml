@@ -630,7 +630,7 @@ jobs:
         uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -683,7 +683,7 @@ jobs:
       # Pin Node for the --emit script (fs-only, no pnpm install) instead of
       # relying on the runner image's system node.
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -763,7 +763,7 @@ jobs:
       # Pin Node for the `node -p` version read and the --emit scope script
       # (fs-only, no pnpm install) instead of relying on the runner's system node.
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -804,7 +804,7 @@ jobs:
         run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         with:
           args: >
             -Dsonar.projectVersion=${{ steps.version.outputs.version }}
