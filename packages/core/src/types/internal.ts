@@ -8,13 +8,14 @@
  *
  * Imports pull from the sibling declaration files (not `./index`) to keep
  * `internal.ts` off the barrel's re-export cycle (`import-x/no-cycle`).
+ * Exception: the augmentation-target interfaces (`NavigationOptions`,
+ * `StateContext`) are declared lexically IN `./index` (#1540) and can only be
+ * imported from there — acyclic here, since the barrel never re-exports
+ * `internal.ts`.
  */
 
-import type {
-  NavigationOptions,
-  RouterError as RouterErrorType,
-  State,
-} from "./base";
+import type { RouterError as RouterErrorType, State } from "./base";
+import type { NavigationOptions } from "./index";
 import type { LimitsConfig } from "./limits";
 import type { TreeChangedEvent } from "./tree-changed";
 

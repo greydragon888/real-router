@@ -41,10 +41,14 @@ jobs:
     # packages…" merge commit (push) both carry byte-identical runtime code, so
     # the baseline is already recorded by the feature-merge push. This keeps the
     # per-release cost at 2 runs, not 3 (see codspeed.yml for the full
-    # rationale).
+    # rationale). DEPENDABOT PRs are likewise skipped on the pull_request side
+    # (author dependabot[bot]) — dep bumps don't warrant 2 slow jobs on the
+    # one-at-a-time runner; the post-merge master push re-seeds the baseline
+    # (full rationale in codspeed.yml).
     if: >-
       (github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository) &&
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]')) &&
       !startsWith(github.head_ref, 'changeset-release/') &&
       !(github.event_name == 'push' &&
       startsWith(github.event.head_commit.message, 'release: version packages'))
