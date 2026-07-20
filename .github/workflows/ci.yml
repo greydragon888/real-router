@@ -630,7 +630,7 @@ jobs:
         uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -683,7 +683,7 @@ jobs:
       # Pin Node for the --emit script (fs-only, no pnpm install) instead of
       # relying on the runner image's system node.
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -763,7 +763,7 @@ jobs:
       # Pin Node for the `node -p` version read and the --emit scope script
       # (fs-only, no pnpm install) instead of relying on the runner's system node.
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
