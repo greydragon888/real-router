@@ -24,7 +24,11 @@ fi
 # allow-ghsas + adds RUSTSEC unmaintained advisories that GitHub Dependency
 # Review doesn't flag (no CVSS) but osv-scanner does.
 set +e
-osv-scanner scan source --config=scripts/osv-scanner.toml --recursive .
+# --verbosity warn silences osv-scanner's per-ignore "<id> has been filtered out because:
+# <reason>" info logging — one line per IgnoredVulns entry × each matching lockfile (~40 lines,
+# doubled by the two identical Tauri desktop-example Cargo.lock files). The results table and
+# exit code are result output, not logging, so real findings still surface at warn level.
+osv-scanner scan source --config=scripts/osv-scanner.toml --recursive . --verbosity warn
 exit_code=$?
 set -e
 
