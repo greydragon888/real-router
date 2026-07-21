@@ -13,6 +13,9 @@
   section.cohort{scroll-margin-top:16px}
   body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1140px;margin:0 auto;padding:0 32px}
+  /* router-name emphasis in prose (applied by NT in deck-render.js): rivals bold, real-router brand-blue */
+  .nr{font-weight:600}
+  .rr{color:var(--accent)}
   .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);font-weight:600;display:flex;align-items:center;gap:10px}
   .eyebrow::before{content:"";width:26px;height:2px;background:var(--accent)}
   h1{font-size:clamp(2.3rem,5.4vw,3.8rem);line-height:1.03;letter-spacing:-.028em;font-weight:780;margin:20px 0 0;text-wrap:balance;max-width:17ch}
@@ -36,6 +39,14 @@
   .fw .vs{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.55}
   .fw .vs .ver{color:var(--ink);font-weight:600}
   .fw .vs .me{color:var(--accent-ink);font-weight:600}
+  .badges{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .badge{display:inline-flex;align-items:stretch;font-family:var(--mono);font-size:11px;font-weight:600;line-height:1;text-decoration:none;border:1px solid var(--hair2);border-radius:5px;overflow:hidden;transition:transform .1s,box-shadow .12s}
+  .badge span{display:flex;align-items:center;padding:5px 9px}
+  .badge .bl{background:var(--ink);color:#fff;letter-spacing:.02em}
+  .badge .bv{background:var(--surface);color:var(--accent-ink)}
+  .badge.gh .bv{color:var(--ink)}
+  .badge:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(20,23,29,.12)}
+  .badge:hover .bv{background:var(--accent-soft)}
   .pdf-btn{position:absolute;top:60px;right:0;display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent-ink);text-decoration:none;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 25%,var(--hair));padding:9px 16px;border-radius:7px;transition:background .13s}
   .pdf-btn:hover{background:#dde0fb}
   @media print{.pdf-btn{display:none}}
@@ -139,14 +150,15 @@
 <div class="wrap">
   <section class="hero">
     <div class="eyebrow">Cross-framework router benchmark &middot; real Chromium</div>
-    <h1>real-router, against each popular router in <span class="hl">every framework</span>.</h1>
+    <h1><span translate="no" class="rr">real-router</span>, against each popular router in <span class="hl">every framework</span>.</h1>
     <p class="lede">One core across five ecosystems, timed in a real browser from click to settled DOM — the same scenarios for every router.</p>
     <a class="pdf-btn" href="cross-router-report.pdf" target="_blank" rel="noopener">Open the full report &mdash; PDF &#8599;</a>
     <div class="readout">
-      <div class="stat"><div class="k">up to 11&times;</div><div class="l"><b>faster per navigation</b> — ahead or level on every click in all 5 ecosystems, far ahead on link-heavy pages</div></div>
+      <div class="stat"><div class="k" id="k-pernav">up to 11&times;</div><div class="l"><b>faster per navigation</b> — ahead or level on every click in all 5 ecosystems, far ahead on link-heavy pages</div></div>
       <div class="stat"><div class="k">flat</div><div class="l"><b>constant-time route matching</b> — just as fast however wide the route table grows, while most rivals slow down</div></div>
       <div class="stat"><div class="k">5</div><div class="l"><b>ecosystems with a serious rival</b> — one framework-agnostic router, benchmarked head-to-head in each</div></div>
     </div>
+    <div class="badges" id="badges"></div>
     <div class="field-lab">routers under test, by ecosystem</div>
     <div class="field" id="field"></div>
     <div class="stamp" id="stamp" translate="no"></div>
@@ -154,11 +166,11 @@
 
   <section>
     <div class="sec-head"><h2>The whole board</h2></div>
-    <p class="sec-sub">Each cell is real-router versus the <em>fastest</em> competing router in that ecosystem, grouped by what the scenario stresses.</p>
+    <p class="sec-sub">Each cell is <span translate="no" class="nr rr">real-router</span> versus the <em>fastest</em> competing router in that ecosystem, grouped by what the scenario stresses.</p>
     <div class="board"><table class="grid" id="grid"></table></div>
     <div class="key">
-      real-router vs the fastest rival: <b>real-router faster → green, right</b> · <b>rival faster → red, left</b> · tie sits on the centre line. Bars are scaled <b>within each scenario</b> (the widest in a row = that scenario's biggest gap), so lengths compare <b>down a row</b>, not across rows.<br>
-      At-scale rows stack <b>one bar per size</b> (small → large) — bars reaching further right down the stack = real-router's lead <b>widens with scale</b>. Full curves in <b>How it scales</b> below — where a <b>bold, white-ringed dot</b> marks the fastest router at each point (the leader can change as the app grows).
+      <span translate="no" class="nr rr">real-router</span> vs the fastest rival: <b><span translate="no" class="nr rr">real-router</span> faster → green, right</b> · <b>rival faster → red, left</b> · tie sits on the centre line. Bars are scaled <b>within each scenario</b> (the widest in a row = that scenario's biggest gap), so lengths compare <b>down a row</b>, not across rows.<br>
+      At-scale rows stack <b>one bar per size</b> (small → large) — bars reaching further right down the stack = <span translate="no" class="nr rr">real-router</span>'s lead <b>widens with scale</b>. Full curves in <b>How it scales</b> below — where a <b>bold, white-ringed dot</b> marks the fastest router at each point (the leader can change as the app grows).
     </div>
   </section>
 
@@ -181,6 +193,8 @@
   document.getElementById("grid").innerHTML=boardHTML();
   document.getElementById("field").innerHTML=fieldHTML(true);
   document.getElementById("stamp").innerHTML=stampHTML();
+  document.getElementById("badges").innerHTML=badgesHTML();
+  document.getElementById("k-pernav").innerHTML="up to "+heroMaxX();  // de-hardcoded: max active-links lead vs fastest rival
   const CHARTS=[];
   function swCard(s){
     const id=CHARTS.length;CHARTS.push({p:s.p,ser:s.s,u:s.u,log:s.log,sw:s.sw});
@@ -193,7 +207,7 @@
     const mem=MEM_S.map(card).join("");
     const scale=SCALE_S.map(card).join("");
     return "<section class='cohort' id='cohort-"+co+"'><div class='cohort-head'><h2>"+NT(M.name)+"</h2><span class='badge'>"+tally(co)+"</span></div>"
-      +"<p class='matchup'>"+NT(M.matchup)+"</p><p class='sec-sub'>"+NT(M.sub)+"</p>"
+      +"<p class='matchup'>"+NT(resolveR(M.matchup,co))+"</p><p class='sec-sub'>"+NT(resolveR(M.sub,co))+"</p>"
       +"<div class='grp-lab'>Per navigation — the cost of a click</div><div class='cards'>"+pn+"</div>"
       +"<div class='grp-lab'>Memory &amp; startup</div><div class='cards'>"+mem+"</div>"
       +"<div class='grp-lab'>How it scales — cost vs. the size of the app</div><div class='cards'>"+scale+"</div></section>";

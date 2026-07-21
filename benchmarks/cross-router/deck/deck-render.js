@@ -9,13 +9,21 @@
 // translate="no": shield router/brand/framework names + code identifiers from machine
 // translation (Google Translate etc.) — else "real-router"→"настоящий роутер". Wraps
 // matches ONLY inside text nodes, never inside tags/attributes.
-const NO_TR = ["@mateothegreat/svelte5-router", "@tanstack/react-router", "@tanstack/vue-router", "@tanstack/solid-router", "@solidjs/router", "@angular/router", "real-router", "react-router", "vue-router", "solid-router", "sv-router", "mateo-router", "TanStack", "mateo", "use:link", "React", "Vue", "Solid", "Svelte", "Angular"].sort((a, b) => b.length - a.length);
+// Each match also earns emphasis in prose: a router name gets .nr (bold); real-router
+// additionally gets .rr (brand blue) so it stands out among the bolded rivals. Framework
+// names (React/Vue/…), scenario ids (nav-latency, wide-config, …) and code identifiers
+// (use:link) are shielded but NOT emphasised — they're context, not the subject. CSS for
+// .nr/.rr lives in both shells. (Board framework headers + card scenario keys carry their
+// own translate='no' attr — see boardHTML/head — since they aren't run through NT.)
+const NO_TR = ["@mateothegreat/svelte5-router", "@tanstack/react-router", "@tanstack/vue-router", "@tanstack/solid-router", "@solidjs/router", "@angular/router", "real-router", "react-router", "vue-router", "solid-router", "sv-router", "mateo-router", "TanStack", "mateo", "use:link", "React", "Vue", "Solid", "Svelte", "Angular", "search-param-scaling", "nested-switch", "back-forward", "active-links", "nav-latency", "wide-config", "deep-config", "gc-per-nav", "table-heap", "link-build", "cold-start", "nav-churn", "param-nav"].sort((a, b) => b.length - a.length);
+const ROUTERS = new Set(["@mateothegreat/svelte5-router", "@tanstack/react-router", "@tanstack/vue-router", "@tanstack/solid-router", "@solidjs/router", "@angular/router", "real-router", "react-router", "vue-router", "solid-router", "sv-router", "mateo-router", "TanStack", "mateo"]);
 const NT_RE = new RegExp("(" + NO_TR.join("|") + ")", "g");
-function NT(h) { return String(h).replace(/(<[^>]*>)|([^<]+)/g, (m, tag, txt) => txt == null ? m : txt.replace(NT_RE, "<span translate='no'>$1</span>")); }
+function ntClass(name) { return name === "real-router" ? " class='nr rr'" : ROUTERS.has(name) ? " class='nr'" : ""; }
+function NT(h) { return String(h).replace(/(<[^>]*>)|([^<]+)/g, (m, tag, txt) => txt == null ? m : txt.replace(NT_RE, (mm, name) => "<span translate='no'" + ntClass(name) + ">" + name + "</span>")); }
 
 function fmt(v, u) { if (v == null) return "—"; let s; if (u === "KB") s = Math.round(v).toString(); else if (u === "MB") s = v.toFixed(2); else s = (v < 1 ? v.toFixed(3) : v < 10 ? v.toFixed(2) : v.toFixed(1)); if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, ""); return s; }
 
-function head(s) { return "<div class='card-head'><span class='card-title'>" + s.t + "</span><span class='card-key'>" + s.k + "</span><span class='chip'>" + s.c + "</span></div><div class='what'>" + s.what + "</div>"; }
+function head(s) { return "<div class='card-head'><span class='card-title'>" + s.t + "</span><span class='card-key' translate='no'>" + s.k + "</span><span class='chip'>" + s.c + "</span></div><div class='what'>" + s.what + "</div>"; }
 
 function barCard(s) {
   const E = s.e.filter(x => x[1] != null);
@@ -24,7 +32,7 @@ function barCard(s) {
   const rank = v => Math.min(2, sorted.indexOf(v));
   const bars = E.map(([n, v]) => {
     const rr = n === "real-router", w = Math.max(3, (v / max) * 100), col = RANK[rank(v)];
-    return "<div class='bar" + (rr ? " rr" : "") + "'><span class='en'>" + n + "</span><span class='track'><span class='fill' style='width:" + w.toFixed(1) + "%;background:" + col + "'></span></span><span class='val'>" + fmt(v, s.u) + " " + s.u + "</span></div>";
+    return "<div class='bar" + (rr ? " rr" : "") + "'><span class='en' translate='no'>" + n + "</span><span class='track'><span class='fill' style='width:" + w.toFixed(1) + "%;background:" + col + "'></span></span><span class='val'>" + fmt(v, s.u) + " " + s.u + "</span></div>";
   }).join("");
   const pod = ["1st", "2nd", "3rd"].slice(0, Math.min(3, E.length)).map((lbl, i) => "<span><i style='background:" + RANK[i] + "'></i>" + lbl + "</span>").join("");
   return "<div class='card'>" + head(s) + "<div class='bars'>" + bars + "</div>"
@@ -107,7 +115,7 @@ function dcell(cls, ratio, rmax) {
 function boardHTML(groups = GROUPS) {
   let g = "<tbody>";
   for (const [gn, scns] of groups) {
-    g += "<tr class='grp'><td class='rowlab'>" + gn + "</td>" + COHORTS.map(([, n]) => "<th>" + n + "</th>").join("") + "</tr>";
+    g += "<tr class='grp'><td class='rowlab'>" + gn + "</td>" + COHORTS.map(([, n]) => "<th translate='no'>" + n + "</th>").join("") + "</tr>";
     for (const [k, title, sub, swept] of scns) {
       const rmax = rowMax(k, swept);
       const pts = swept && SCEN[k] ? SCEN[k].p : null;
@@ -142,6 +150,19 @@ function fieldHTML(withAnchors) {
   }).join("");
 }
 
+// Install / source badges — self-contained pills (the deck ships to GitHub Pages only, so no
+// external badge service / CSP concern). Repo + @real-router/core + every framework adapter
+// under test (derived from FIELD), each a link to npm. Versions live in the FIELD panel above,
+// so the pills stay link-only. translate='no' on each (package/brand names).
+function badgesHTML() {
+  const REPO = "https://github.com/greydragon888/real-router";
+  const adapters = FIELD.map(([, rs]) => (rs.find(([nm]) => nm.startsWith("@real-router/")) || [])[0]).filter(Boolean);
+  const pkgs = ["@real-router/core", ...adapters];
+  const pill = (cls, href, label, value) =>
+    "<a class='badge " + cls + "' translate='no' href='" + href + "' target='_blank' rel='noopener'><span class='bl'>" + label + "</span><span class='bv'>" + value + "</span></a>";
+  return pill("gh", REPO, "GitHub", "real-router") + pkgs.map((nm) => pill("npm", "https://www.npmjs.com/package/" + nm, "npm", nm)).join("");
+}
+
 // The provenance stamp (machine · runner · commit · date · n · completeness), or "" when
 // META is absent (the committed/seed deck). ci=true adds the CI-runner disclaimer.
 function stampHTML() {
@@ -154,14 +175,61 @@ function stampHTML() {
   return "<b>" + META.cpu + "</b> &middot; " + META.runner + " &middot; commit " + META.commit + " &middot; " + d + " &middot; n=" + META.runs + (cells ? " &middot; matrix " + cells.written + "/" + cells.expected : "")
     + (partial ? "<span class='ci-note'>⚠ Partial snapshot — only " + cells.written + " of " + cells.expected + " matrix cells are present (failed/salvaged run); missing cells render as —.</span>" : "")
     + (mEpoch ? "<span class='ci-note'>⚠ Mixed epochs — the isolated wide/deep matcher curves were measured at commit " + META.matcher.commit + ", the browser cells at " + META.commit + ".</span>" : "")
-    + (ci ? "<span class='ci-note'>Cards = this run's fresh snapshot (CI runner — see stamp above). The <b>Why</b> blurbs are curated analysis; their figures are anchored to the reference snapshot, not necessarily this run.</span>" : "");
+    + (ci ? "<span class='ci-note'>Cards = this run's fresh snapshot (CI runner — see stamp above). The <b>Why</b> blurbs are curated analysis; their ×N multipliers are derived live from this snapshot's own data.</span>" : "");
+}
+
+// ---- Data-derived ratio tokens ⟨[sc:]rival[@N|@max|@min]⟩ ----------------------------------
+// A prose multiplier is exactly the magnitude a reader can read off the chart: the larger of
+// {rr, rival} over the smaller — at a sweep point (@N), across the whole sweep (@max/@min), or
+// overall (bar, no @). Deriving it from the SAME DATA the chart plots means the number can never
+// drift from the picture again: the hardcoded "~45×" literals were the recurring re-pin tax, and
+// at least one had already gone stale (react wide read ~45× in prose while the chart showed ~200×).
+// Direction ("heavier"/"leaner"/"lighter") stays in the prose; only the magnitude is derived.
+// sc/co default to the card's context; a cohort-panel token carries an explicit "sc:" prefix.
+const SC_PTS = {};
+for (const k in SCEN) if (SCEN[k] && SCEN[k].p) SC_PTS[k] = SCEN[k].p;
+function ratioMag(co, sc, rival, at) {
+  const series = DATA[co] && DATA[co][sc];
+  if (!series) return null;
+  const row = (n) => { const e = series.find((s) => s[0] === n); return e ? e[1] : null; };
+  const rr = row("real-router"), rv = row(rival);
+  if (rr == null || rv == null) return null;
+  const mag = (a, b) => (a == null || b == null ? null : Math.max(a, b) / Math.min(a, b));
+  if (!Array.isArray(rr)) return mag(rr, rv); // bar
+  const pts = SC_PTS[sc] || rr.map((_, i) => i);
+  if (at === "max" || at === "min") {
+    const all = rr.map((_, i) => mag(rr[i], rv[i])).filter((v) => v != null);
+    if (!all.length) return null;
+    return at === "max" ? Math.max(...all) : Math.min(...all);
+  }
+  const i = pts.indexOf(Number(at));
+  return i < 0 ? null : mag(rr[i], rv[i]);
+}
+function fmtX(v) { if (v == null) return "?×"; const s = v >= 10 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toString().replace(/\.0$/, ""); return s + "×"; }
+function resolveR(text, co, sc) {
+  return String(text).replace(/⟨([^⟩]+)⟩/g, (m, body) => {
+    let s = sc, spec = body;
+    const ci = body.indexOf(":");
+    if (ci > 0) { s = body.slice(0, ci); spec = body.slice(ci + 1); }
+    const ai = spec.indexOf("@");
+    const rival = ai >= 0 ? spec.slice(0, ai) : spec;
+    const at = ai >= 0 ? spec.slice(ai + 1) : null;
+    return fmtX(ratioMag(co, s, rival, at));
+  });
+}
+// Hero stat: the biggest per-navigation lead vs the fastest rival — the active-links endpoint
+// (the "far ahead on link-heavy pages" headline), derived so it re-pins with each snapshot.
+function heroMaxX() {
+  let best = 0;
+  for (const [co] of COHORTS) { const g = GRID[co] && GRID[co]["active-links"]; if (g && g[1] === "g" && g[0] > best) best = g[0]; }
+  return fmtX(best);
 }
 
 // Build a card spec from config+data for scenario sc in cohort co (used by both shells'
 // card renderers). wide-config and non-angular deep-config read the isolated matcher in µs
-// on a log axis.
+// on a log axis. Why blurbs run through resolveR (⟨…⟩ → live multiplier) before NT.
 function mk(sc, co) {
-  const m = SCEN[sc], o = { t: m.t, k: sc, c: m.c, u: m.u, what: m.what, why: NT(why(sc, co)) };
+  const m = SCEN[sc], o = { t: m.t, k: sc, c: m.c, u: m.u, what: NT(m.what), why: NT(resolveR(why(sc, co), co, sc)) };
   if (m.kind === "sweep") { o.p = m.p; o.s = DATA[co][sc]; o.sw = (SWEEP[co] && SWEEP[co][sc]) || null; }
   else { o.e = DATA[co][sc]; }
   if (sc === "wide-config" || (sc === "deep-config" && co !== "angular")) { o.u = "µs"; o.log = 1; }

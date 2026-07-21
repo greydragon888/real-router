@@ -15,6 +15,9 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:#fff;color:var(--ink);font-family:var(--sans);font-size:9.2pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* router-name emphasis in prose (applied by NT in deck-render.js): rivals bold, real-router brand-blue */
+  .nr{font-weight:600}
+  .rr{color:var(--accent)}
 
   section{break-inside:auto}
   .overview{break-before:page}
@@ -37,6 +40,12 @@
   .fw .vs{font-family:var(--mono);font-size:8pt;color:var(--muted);margin-top:4px;line-height:1.5}
   .fw .vs .ver{color:var(--ink);font-weight:600}
   .fw .vs .me{color:var(--accent-ink);font-weight:600}
+  .badges{margin-top:5mm;display:flex;flex-wrap:wrap;gap:6px}
+  .badge{display:inline-flex;align-items:stretch;font-family:var(--mono);font-size:8pt;font-weight:600;line-height:1;text-decoration:none;border:1px solid var(--hair2);border-radius:5px;overflow:hidden}
+  .badge span{display:flex;align-items:center;padding:4px 8px}
+  .badge .bl{background:var(--ink);color:#fff}
+  .badge .bv{background:var(--surface);color:var(--accent-ink)}
+  .badge.gh .bv{color:var(--ink)}
 
   h2{font-size:16pt;letter-spacing:-.014em;font-weight:700;margin:0 0 5mm}
 
@@ -122,16 +131,17 @@
     const M=CO[co];
     const card=(sc)=>{const o=mk(sc,co);return SCEN[sc].kind==="sweep"?printSwCard(o):barCard(o);};
     return "<section class='cohort'><div class='cohort-head'><h2>"+NT(M.name)+"</h2><span class='badge'>"+tally(co)+"</span></div>"
-      +"<p class='matchup'>"+NT(M.matchup)+"</p><p class='sec-sub'>"+NT(M.sub)+"</p>"
+      +"<p class='matchup'>"+NT(resolveR(M.matchup,co))+"</p><p class='sec-sub'>"+NT(resolveR(M.sub,co))+"</p>"
       +"<div class='grp-lab'>Per navigation — the cost of a click</div><div class='cards'>"+PN_S.map(card).join("")+"</div>"
       +"<div class='grp-lab'>Memory &amp; startup</div><div class='cards'>"+MEM_S.map(card).join("")+"</div>"
       +"<div class='grp-lab'>How it scales — cost vs. the size of the app</div><div class='cards'>"+SCALE_S.map(card).join("")+"</div></section>";
   }
   const cover="<section class='cover'>"
     +"<div class='eyebrow'>Cross-framework router benchmark &middot; real Chromium</div>"
-    +"<h1>real-router, against each popular router in <span class='hl'>every framework</span></h1>"
+    +"<h1><span translate='no' class='rr'>real-router</span>, against each popular router in <span class='hl'>every framework</span></h1>"
     +"<p class='lede'>One core across five ecosystems, timed in a real browser from click to settled DOM — the same scenarios for every router. Cards are static snapshots of the interactive deck.</p>"
     +"<div class='field'>"+fieldHTML(false)+"</div>"
+    +"<div class='badges'>"+badgesHTML()+"</div>"
     +"<div class='stamp'>"+stampHTML()+"</div></section>";
   // Summary board split by row-group — one group per page (Per navigation / At scale /
   // Memory & startup), so a landscape page isn't overloaded with all 13 rows at once.

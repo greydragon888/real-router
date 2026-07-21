@@ -32,8 +32,9 @@ function buildOne(shellFile, outFile) {
   const eol = html.indexOf("\n", dataIdx);
   if (eol < 0) throw new Error(`DATA line end not found in ${shellFile}`);
   html = html.slice(0, start) + cfg + html.slice(eol);
-  // function replacer: the render text contains "$1" (NT's replacement) — a string replacer
-  // would treat $1/$& as backreferences; a function's return value is inserted verbatim.
+  // function replacer: a plain-string 2nd arg to replace() would treat any $1/$&/$` in the
+  // render text as backreferences; a function's return value is inserted verbatim, so the
+  // inlined JS is copied through untouched whatever $-sequences it may contain.
   html = html.replace("//__RENDER__", () => render);
   writeFileSync(`${OUT}/${outFile}`, html);
   console.log(`out/${outFile}: ${html.length} chars`);

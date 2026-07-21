@@ -44,7 +44,7 @@ const SCEN = {
   "wide-config": ["navMsTask", "sweep", [4, 16, 64, 256]],
   "deep-config": ["navMsTask", "sweep", [3, 30, 60, 90]],
   "search-param-scaling": ["navMsTask", "sweep", [1, 2, 4, 8, 16, 32, 64, 128, 256]],
-  "table-heap": ["jsHeapMB@100", "bar", null],
+  "table-heap": ["routeTableKB", "bar", null], // DERIVED (self-floor): (jsHeapMB@256 − jsHeapMB@1) × 1024, isolated route-table heap in KB
 };
 function cell(co, sc) {
   const p = `${ROOT}/${co}/${sc}`;
@@ -57,6 +57,18 @@ function cell(co, sc) {
 }
 const r3 = (v) => (v == null ? null : Math.round(v * 1000) / 1000);
 const val = (x) => (x == null ? null : r3(x.v));
+// table-heap self-floor: isolated route-table heap (KB) = (@256 − @1) × 1024. The bare
+// framework AND the engine floor cancel in the subtraction, leaving the matcher's own data
+// structure (trie vs ranked list). rme propagates in quadrature so a noisier engine can't
+// fake a tight verdict; a non-positive delta (floor ≥ loaded — a measurement glitch) → null.
+function routeTableKB(get, eng) {
+  const hi = get(eng, "jsHeapMB@256"), lo = get(eng, "jsHeapMB@1");
+  if (!hi || !lo) return null;
+  const v = (hi.v - lo.v) * 1024;
+  if (!(v > 0)) return null;
+  const eHi = (hi.v * (hi.rme ?? 0)) / 100, eLo = (lo.v * (lo.rme ?? 0)) / 100;
+  return { v, rme: ((Math.hypot(eHi, eLo) * 1024) / v) * 100 };
+}
 // class + ratio vs FASTEST rival (lower=better for all metrics).
 // Margin rule (audit 07-18 K7): a g/r class must also hold at each side's ~95% CI
 // edges (median ± rme%) — the bare point thresholds sat inside session drift, so a
@@ -87,9 +99,10 @@ for (const [co, engines] of Object.entries(ENG)) {
   for (const [sc, [metric, kind, pts, dir]] of Object.entries(SCEN)) {
     const get = cell(co, dir ?? sc);
     if (kind === "bar") {
-      const e = engines.map((eng) => [eng, val(get(eng, metric))]);
+      const read = sc === "table-heap" ? (eng) => routeTableKB(get, eng) : (eng) => get(eng, metric);
+      const e = engines.map((eng) => [eng, val(read(eng))]);
       DATA[co][sc] = e;
-      const v = verdict(get("real-router", metric), rivals.map((eng) => get(eng, metric)));
+      const v = verdict(read("real-router"), rivals.map((eng) => read(eng)));
       if (v) GRID[co][sc] = [v[1], v[0]]; // board GRID = [ratio, class]
     } else {
       // wide-config reads the isolated matcher (µs) for every cohort — angular included
