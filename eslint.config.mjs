@@ -1379,7 +1379,7 @@ export default tsEslint.config(
   // ============================================
   // 16. TURBO CONFIGURATION (must be last)
   // ============================================
-  // eslint-config-turbo v2.9.1
+  // eslint-config-turbo v2.10.5 (co-versioned with the turbo CLI)
   ...turboConfig,
   {
     // eslint-config-turbo does not read global.env from turbo.json
