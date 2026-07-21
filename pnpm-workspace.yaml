@@ -54,9 +54,19 @@ overrides:
   piscina: '>=5.2.0 <6.0.0'
   flatted: '>=3.4.2'
   path-to-regexp: '>=8.4.0'
-  brace-expansion@1: 1.1.13
-  brace-expansion@2: 2.0.3
-  brace-expansion@5: 5.0.6
+  # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). All three major lines are in the tree
+  # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
+  # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
+  # the @1-selected dep could resolve up to 5.x). Bump each line when its next patch lands.
+  brace-expansion@1: 1.1.16
+  brace-expansion@2: 2.1.2
+  brace-expansion@5: 5.0.7
+  # shell-quote < 1.9.0 (GHSA-395f-4hp3-45gv, High) — dev-only (concurrently → shell-quote), never
+  # in a published @real-router/* package. Drop when concurrently pulls >=1.9.0 transitively.
+  shell-quote: '>=1.9.0'
+  # body-parser < 2.3.0 (GHSA-v422-hmwv-36x6, Low) — example-only (express@5), not shipped. Drop
+  # when express pulls >=2.3.0.
+  body-parser: '>=2.3.0'
   node-forge: '>=1.4.0'
   picomatch@2: 2.3.2
   picomatch@4: 4.0.4
