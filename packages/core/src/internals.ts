@@ -134,7 +134,7 @@ export interface RouterInternals<
   // receive it via their deps at wiring; plugins reach it through
   // `getPluginApi(router).logger`. Replaces the former process-global singleton
   // from the standalone `@real-router/logger` package (now folded into
-  // `foundation/logger`), whose `configure()` leaked across routers (#724).
+  // `utils/logger`), whose `configure()` leaked across routers (#724).
   readonly logger: RouterLogger;
 
   // Dependencies (issue #172)

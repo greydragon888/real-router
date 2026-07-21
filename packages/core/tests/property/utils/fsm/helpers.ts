@@ -1,8 +1,8 @@
 import { fc } from "@fast-check/vitest";
 
-import { FSM } from "../../../../src/foundation/fsm/index.js";
+import { FSM } from "../../../../src/utils/fsm/index.js";
 
-import type { FSMConfig } from "../../../../src/foundation/fsm/index.js";
+import type { FSMConfig } from "../../../../src/utils/fsm/index.js";
 
 export const NUM_RUNS = { standard: 100, lifecycle: 50, async: 30 } as const;
 

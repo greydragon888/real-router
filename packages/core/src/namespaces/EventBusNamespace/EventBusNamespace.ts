@@ -5,8 +5,6 @@ import { RouterError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
 import type { EventBusOptions } from "./types";
-import type { EventEmitter } from "../../foundation/event-emitter";
-import type { FSM } from "../../foundation/fsm";
 import type { RouterEvent, RouterPayloads, RouterState } from "../../routerFSM";
 import type {
   EventName,
@@ -22,6 +20,8 @@ import type {
 } from "../../types";
 import type { RouterEventMap } from "../../types/internal";
 import type { RouterValidator } from "../../types/RouterValidator";
+import type { EventEmitter } from "../../utils/event-emitter";
+import type { FSM } from "../../utils/fsm";
 
 /**
  * Internal-only event key for route-tree mutations. Lives on the same

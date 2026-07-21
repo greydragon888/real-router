@@ -1,6 +1,6 @@
 import { fc } from "@fast-check/vitest";
 
-import { EventEmitter } from "../../../../src/foundation/event-emitter/EventEmitter.js";
+import { EventEmitter } from "../../../../src/utils/event-emitter/EventEmitter.js";
 
 export const NUM_RUNS = {
   standard: 100,

@@ -3,8 +3,8 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import {
   LEVEL_CONFIGS,
   LOG_LEVELS,
-} from "../../../../src/foundation/logger/constants";
-import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
+} from "../../../../src/utils/logger/constants";
+import { RouterLogger } from "../../../../src/utils/logger/RouterLogger";
 
 import type {
   LogCallback,
@@ -13,7 +13,7 @@ import type {
 } from "@real-router/core";
 
 // Per-router logger instance under test — the standalone `@real-router/logger`
-// singleton was dissolved into core (`foundation/logger`). A fresh instance is
+// singleton was dissolved into core (`utils/logger`). A fresh instance is
 // created in the "Logger" describe's beforeEach (replaces the singleton reset).
 let logger: RouterLogger;
 

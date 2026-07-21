@@ -8,7 +8,7 @@ import {
   LOG_LEVEL_CONFIGS,
   protoCallbackConfigArbitrary,
 } from "./helpers";
-import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
+import { RouterLogger } from "../../../../src/utils/logger/RouterLogger";
 
 import type { LogLevelConfig } from "@real-router/core";
 

@@ -1,9 +1,9 @@
 // packages/core/src/routerFSM.ts
 
-import { FSM } from "./foundation/fsm";
+import { FSM } from "./utils/fsm";
 
-import type { FSMConfig } from "./foundation/fsm";
 import type { NavigationOptions, State } from "./types";
+import type { FSMConfig } from "./utils/fsm";
 
 /**
  * Router FSM states.

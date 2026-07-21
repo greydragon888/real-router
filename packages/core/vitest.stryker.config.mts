@@ -18,7 +18,7 @@ export default defineConfig({
       "@real-router/core": path.resolve(import.meta.dirname, "./src"),
       // (Former `engine` / `logger` workspace aliases removed — both folded into
       // core: engine → src/engine (engine-merge iteration 2), logger →
-      // src/foundation/logger (wave-1b). Nothing imports them bare anymore.)
+      // src/utils/logger (wave-1b). Nothing imports them bare anymore.)
     },
   },
 

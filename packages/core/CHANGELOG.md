@@ -28,7 +28,7 @@
 
 - [#1541](https://github.com/greydragon888/real-router/pull/1541) [`ad30aff`](https://github.com/greydragon888/real-router/commit/ad30aff08e6dbe5b72cf20c01170b13fb6049214) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix plugin `StateContext` / `NavigationOptions` module augmentation being silently dropped for external consumers resolving `dist` ([#1540](https://github.com/greydragon888/real-router/issues/1540))
 
-  `declare module "@real-router/core/types"` merges only when the resolved module is the interface's lexical declaration-site — a re-export barrel of any form is a silent no-op ([#1519](https://github.com/greydragon888/real-router/issues/1519)). The bundled dts hoisted `StateContext` / `NavigationOptions` into a shared chunk (regressed by the foundation fold, [#1520](https://github.com/greydragon888/real-router/issues/1520)), so every plugin's typed `state.context.<namespace>` and `NavigationOptions` extension degraded to `{}` for dist-resolving consumers, while `src`-resolving monorepo CI stayed green.
+  `declare module "@real-router/core/types"` merges only when the resolved module is the interface's lexical declaration-site — a re-export barrel of any form is a silent no-op ([#1519](https://github.com/greydragon888/real-router/issues/1519)). The bundled dts hoisted `StateContext` / `NavigationOptions` into a shared chunk (regressed by the utils fold, [#1520](https://github.com/greydragon888/real-router/issues/1520)), so every plugin's typed `state.context.<namespace>` and `NavigationOptions` extension degraded to `{}` for dist-resolving consumers, while `src`-resolving monorepo CI stayed green.
 
   The fix is two-fold and does not change the JS output at all:
 
@@ -89,14 +89,14 @@
 
 ### Patch Changes
 
-- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal: fold the FSM engine and the `event-emitter` primitive into `@real-router/core` at `src/foundation/` — no public API or behavior change. ([#1520](https://github.com/greydragon888/real-router/issues/1520))
+- [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal: fold the FSM engine and the `event-emitter` primitive into `@real-router/core` at `src/utils/` — no public API or behavior change. ([#1520](https://github.com/greydragon888/real-router/issues/1520))
 
   `event-emitter` (private) is dissolved and its package removed. `@real-router/fsm` (published to npm by mistake, unpublish blocked) is frozen and no longer a dependency of core — core now builds its router state machine on an in-tree copy, so consumers no longer receive `@real-router/fsm` as a transitive dependency.
 
 - [#1521](https://github.com/greydragon888/real-router/pull/1521) [`d72cff0`](https://github.com/greydragon888/real-router/commit/d72cff062862967806de3265ff903bfc7e2d3122) Thanks [@greydragon888](https://github.com/greydragon888)! - Dissolve `@real-router/logger` into core as a per-router `RouterLogger` ([#1520](https://github.com/greydragon888/real-router/issues/1520))
 
   The standalone `@real-router/logger` package has been folded into `@real-router/core`
-  (`core/src/foundation/logger/`). The former process-global **singleton** logger is
+  (`core/src/utils/logger/`). The former process-global **singleton** logger is
   replaced by a **per-router `RouterLogger` instance**, built from `options.logger` in the
   `Router` constructor and stored on the router's internal context. So
   `createRouter(routes, { logger })` now configures **only that router's** logger and its
@@ -116,7 +116,7 @@
 
 - [#1513](https://github.com/greydragon888/real-router/pull/1513) [`e50042a`](https://github.com/greydragon888/real-router/commit/e50042ac53276b637f49f709d8f5b9e483bc28e5) Thanks [@greydragon888](https://github.com/greydragon888)! - Internal: merge the routing-engine trio (search-params + path-matcher + route-tree) into a single private `engine` package ([#1510](https://github.com/greydragon888/real-router/issues/1510))
 
-  Iteration 1 of the engine-merge RFC. The three internal foundation packages fold into one zero-dependency `engine` package (former `route-tree` facade at the src root; `path-matcher` and `search-params` as internal layers), which core bundles exactly as it bundled `route-tree` before. No public API or behaviour change — core's exports and dist shape are unchanged (tree-shaking already kept the layers internal to the bundle).
+  Iteration 1 of the engine-merge RFC. The three internal utils packages fold into one zero-dependency `engine` package (former `route-tree` facade at the src root; `path-matcher` and `search-params` as internal layers), which core bundles exactly as it bundled `route-tree` before. No public API or behaviour change — core's exports and dist shape are unchanged (tree-shaking already kept the layers internal to the bundle).
 
 ## 0.77.3
 
@@ -571,7 +571,7 @@
 
 - [#1304](https://github.com/greydragon888/real-router/pull/1304) [`2b63604`](https://github.com/greydragon888/real-router/commit/2b636041aa136f4e4e36bda88cb1c7ad8bc33cee) Thanks [@greydragon888](https://github.com/greydragon888)! - Re-export `validateRoute` (+ `Matcher` / `RouteTree` types) from the `@real-router/core/validation` subpath ([#1301](https://github.com/greydragon888/real-router/issues/1301))
 
-  So `@real-router/validation-plugin` reaches the batch route validator through core instead of importing the foundation `route-tree` package directly — keeping core the sole consumer of the routing engine. Plumbing on the plugin-facing subpath (off the main public index); no runtime behaviour change.
+  So `@real-router/validation-plugin` reaches the batch route validator through core instead of importing the utils `route-tree` package directly — keeping core the sole consumer of the routing engine. Plumbing on the plugin-facing subpath (off the main public index); no runtime behaviour change.
 
 ## 0.68.0
 
@@ -1503,7 +1503,7 @@
 
   **Breaking (pre-1.0 → minor):** code that relied on the previous silent
   collapse must pass a non-empty value (or use a splat/optional param). Optional
-  params are unaffected. Part of the foundation-audit path-matcher hardening
+  params are unaffected. Part of the utils-audit path-matcher hardening
   cluster ([#740](https://github.com/greydragon888/real-router/issues/740)).
 
 - [#832](https://github.com/greydragon888/real-router/pull/832) [`e6b8340`](https://github.com/greydragon888/real-router/commit/e6b83400a0ced7245ad33adf7be9e9b29b818f16) Thanks [@greydragon888](https://github.com/greydragon888)! - Reject param-name aliasing at registration instead of corrupting matches ([#736](https://github.com/greydragon888/real-router/issues/736))
@@ -1647,7 +1647,7 @@
   `/` — for roots declared with or without a trailing slash. Prefix-only paths
   (`/apple` under `/app`) now correctly return `undefined`.
 
-  Closes the rootPath mis-routing item of the foundation-audit path-matcher cluster ([#740](https://github.com/greydragon888/real-router/issues/740)).
+  Closes the rootPath mis-routing item of the utils-audit path-matcher cluster ([#740](https://github.com/greydragon888/real-router/issues/740)).
 
 ## 0.56.0
 

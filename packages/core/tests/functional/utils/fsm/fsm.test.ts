@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { FSM } from "../../../../src/foundation/fsm/fsm.js";
+import { FSM } from "../../../../src/utils/fsm/fsm.js";
 
-import type { FSMConfig } from "../../../../src/foundation/fsm/types.js";
+import type { FSMConfig } from "../../../../src/utils/fsm/types.js";
 
 type LightState = "green" | "yellow" | "red";
 type LightEvent = "TIMER" | "RESET";

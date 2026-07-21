@@ -12,7 +12,7 @@ export { getInternals } from "./internals";
 export type { RouterInternals } from "./internals";
 
 // Route-tree surface the validation plugin needs, re-exported so the plugin
-// depends only on @real-router/core (not the foundation `route-tree` package) —
+// depends only on @real-router/core (not the utils `route-tree` package) —
 // core stays the sole consumer of the routing engine (#1301). `validateRoute` is
 // a pure batch validator with no equivalent on the runtime matcher; `Matcher` /
 // `RouteTree` are the node/matcher types the plugin's validators operate on

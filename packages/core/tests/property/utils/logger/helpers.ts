@@ -3,7 +3,7 @@ import { fc } from "@fast-check/vitest";
 import {
   LEVEL_CONFIGS,
   LOG_LEVELS as LOG_LEVELS_MAP,
-} from "../../../../src/foundation/logger/constants";
+} from "../../../../src/utils/logger/constants";
 
 import type {
   LogCallback,

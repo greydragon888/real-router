@@ -1,7 +1,7 @@
 # Invariants
 
 > [!NOTE]
-> These are the invariants of the `RouterLogger` class in `core/src/foundation/logger/`
+> These are the invariants of the `RouterLogger` class in `core/src/utils/logger/`
 > (the dissolved-in `@real-router/logger`, #724). They are verified per **instance** —
 > each router owns its own `RouterLogger`, so there is no shared/global state; the
 > invariants below hold for every instance independently.

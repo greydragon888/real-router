@@ -12,7 +12,7 @@ import {
   createFSM,
   createFSMWithPayloads,
 } from "./helpers";
-import { FSM } from "../../../../src/foundation/fsm/index.js";
+import { FSM } from "../../../../src/utils/fsm/index.js";
 
 describe("FSM State Transition Properties", () => {
   test.prop(

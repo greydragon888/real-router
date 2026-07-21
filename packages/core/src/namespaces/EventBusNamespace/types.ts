@@ -1,9 +1,9 @@
 // packages/core/src/namespaces/EventBusNamespace/types.ts
 
-import type { EventEmitter } from "../../foundation/event-emitter";
-import type { FSM } from "../../foundation/fsm";
 import type { RouterEvent, RouterPayloads, RouterState } from "../../routerFSM";
 import type { RouterEventMap } from "../../types/internal";
+import type { EventEmitter } from "../../utils/event-emitter";
+import type { FSM } from "../../utils/fsm";
 
 export interface EventBusOptions {
   routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;

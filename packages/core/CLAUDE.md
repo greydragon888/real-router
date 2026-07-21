@@ -71,7 +71,7 @@ The `validator` object is namespaced by concern (`routes`, `navigation`, `state`
 
 Structural guards remain in namespace folders (`OptionsNamespace/validators.ts`, `PluginsNamespace/validators.ts`). DX validators live in `@real-router/validation-plugin`, accessed via `RouterValidator` interface in `src/types/RouterValidator.ts`.
 
-**The `@real-router/core/validation` subpath (`src/validation.ts`) is the plugin's ONLY door to the engine (#1301).** Besides `getInternals` / `RouterInternals`, it re-exports `validateRoute` (route-tree's batch validator — no matcher equivalent) plus the `Matcher` / `RouteTree` types, so the validation plugin never imports the foundation `route-tree` package directly (segment lookup + existence go through the matcher's own `getSegmentsByName` / `hasRoute`). Kept on this plugin-facing subpath, off the main public index; a guard test in the plugin blocks re-coupling.
+**The `@real-router/core/validation` subpath (`src/validation.ts`) is the plugin's ONLY door to the engine (#1301).** Besides `getInternals` / `RouterInternals`, it re-exports `validateRoute` (route-tree's batch validator — no matcher equivalent) plus the `Matcher` / `RouteTree` types, so the validation plugin never imports the utils `route-tree` package directly (segment lookup + existence go through the matcher's own `getSegmentsByName` / `hasRoute`). Kept on this plugin-facing subpath, off the main public index; a guard test in the plugin blocks re-coupling.
 
 ### Invariant Guards (always active, no plugin required)
 

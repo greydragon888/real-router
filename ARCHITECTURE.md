@@ -19,7 +19,7 @@ Key technical choices:
 ```
 real-router/
 ├── packages/
-│   ├── core/                      # Router implementation (facade + namespaces); routing engine folded in at src/engine (#1510 iteration 2); public types live in src/types, exposed at @real-router/core/types (folded from @real-router/types, wave-2)
+│   ├── core/                      # Router implementation (facade + namespaces); routing engine at src/engine; public types in src/types, exposed at @real-router/core/types
 │   ├── react/                     # React integration (triple entry: main for 19.2+, /legacy for 18+, /ink for Ink 7+ terminal UIs)
 │   ├── preact/                     # Preact integration (hooks, components, Suspense)
 │   ├── solid/                     # Solid.js integration (hooks, components, directives)
@@ -41,10 +41,10 @@ real-router/
 │   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── search-schema-plugin/     # Runtime search param validation via Standard Schema (Zod, Valibot, ArkType)
 │   ├── route-utils/               # Route tree queries and segment testing
-│   └── ssr-utils/                 # Router-level SSR/SSG/hydration helpers (extracted from core/utils, #1543)
+│   └── ssr-utils/                 # Router-level SSR/SSG/hydration helpers
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
 │   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/{core,sources} for transitive symlink resolution
-│   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, scroll spy (#575), view transitions, direction tracker, link helpers
+│   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, scroll spy, view transitions, direction tracker, link helpers
 │   ├── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
 │   └── ssr/                       # Shared SSR plugin scaffolding: createSsrLoaderPlugin generic factory + createLoadersValidator
 ├── examples/
@@ -63,9 +63,9 @@ real-router/
 │       └── tauri/      (2 apps)           # Tauri v2: browser-plugin, navigation-plugin
 ```
 
-**Public packages** (published to npm): `core`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `ssr-utils`, `logger`
+**Public packages** (published to npm): `core`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `ssr-utils`
 
-**Internal subsystems of `core`** (bundled into core, not standalone packages, not on npm): the merged **routing engine** (route-tree facade + path-matcher + search-params layers, #1510) now lives **inside** `core` at `src/engine` — folded in by engine-merge iteration 2 (it is the router's core, so it sits in `src/`, not `src/foundation/`); the former bare `packages/engine` is deleted. **Note:** the generic FSM engine, typed event emitter, and per-router logger likewise live inside `core` at `src/foundation/{fsm,event-emitter,logger}`; `type-guards` was dissolved into its plugin consumers (wave-2 — each plugin inlines the guards it uses); `@real-router/types` folded into `core` (wave-2, exposed at `@real-router/core/types`). The `fsm` package — published to npm by mistake — had its source **deleted** in wave-3 (its live engine had already been copied into `core/src/foundation/fsm`); the orphaned `@real-router/fsm@0.6.1` stays on npm, deprecated. **No standalone internal packages remain.**
+**Internal subsystems of `core`** (bundled into core, not standalone packages, not on npm): the **routing engine** (route-tree facade + path-matcher + search-params layers) lives at `core/src/engine`; the generic **FSM engine**, **typed event emitter**, and per-router **logger** live at `core/src/utils/{fsm, event-emitter, logger}`; **public types** live at `core/src/types`, exposed at `@real-router/core/types`. No standalone internal packages exist.
 
 **Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`, `shared/ssr`
 
@@ -266,13 +266,13 @@ FSM events trigger observable emissions through two paths:
 - `CANCEL` (from `TRANSITION_STARTED` or `LEAVE_APPROVED`) → `emitTransitionCancel()`
 - `FAIL` (from any state) → `emitTransitionError()`
 
-**Via the FSM table `send()` + emit action (#1169)** — the three hot navigation transitions dispatch through the FSM table via `send()`, which fires a registered action that emits; `forceState()` is **not** used in core (a bundle-invariant). An invalid transition (e.g. `COMPLETE` from IDLE/DISPOSED after a listener's `stop()`/`dispose()`) is a table no-op that emits nothing, so the table is the sole authority over state — the FSM cannot be resurrected out of a terminal state:
+**Via the FSM table `send()` + emit action** — the three hot navigation transitions dispatch through the FSM table via `send()`, which fires a registered action that emits; `forceState()` is **not** used in core (a bundle-invariant). An invalid transition (e.g. `COMPLETE` from IDLE/DISPOSED after a listener's `stop()`/`dispose()`) is a table no-op that emits nothing, so the table is the sole authority over state — the FSM cannot be resurrected out of a terminal state:
 
 - `NAVIGATE` (`sendNavigate`) → `send(NAVIGATE, {toState, fromState})` → action `emitTransitionStart()`
 - `LEAVE_APPROVE` (`sendLeaveApprove`) → `send(LEAVE_APPROVE, {…})` → action `emitTransitionLeaveApprove()`
 - `COMPLETE` (`sendComplete`) → `send(COMPLETE, {…})` → action `emitTransitionSuccess()`
 
-Cost: routing these through the table is ~+15–20% on `navigate/*` + one transition-payload allocation per navigation — a deliberate determinism-over-micro-optimization trade (owner decision). Correctness is now enforced by the state machine, not by scattered re-checks.
+Cost: one transition-payload allocation per navigation — a deliberate trade of micro-optimization for structural determinism. Correctness is enforced by the state machine, not by scattered re-checks.
 
 ### Route-tree mutation channel — `TREE_CHANGED` (orthogonal to the FSM)
 
@@ -280,7 +280,7 @@ The seven events above are all about **transitions** (FSM state changes). A sepa
 
 - **Post-commit, fire-and-forget** — emitted from the five `getRoutesApi` wrappers after the atomic commit, never from the shared internals that `dispose()`/`cloneRouter()`/`setRootPath()` reuse, so teardown and cloning stay silent.
 - **Discriminated payload** (`TreeChangedEvent`, keyed by `op`); `update` emits only on structural fields (guard-only patches are silent).
-- Depth tracking (`maxEventDepth`) and per-listener error isolation come for free from the shared emitter; `RecursionDepthError` is the one error that propagates to the CRUD caller.
+- Per-listener error isolation comes for free from the shared emitter; a nested same-event emit (a listener that re-triggers the same event) is coalesced to a no-op, so the listener runs once and the mutation still commits.
 
 Tree mutations are an **infrastructural** concern (DevTools, microfrontend coordinators, file-routes watch, caches keyed by route name), not an app-level event — there is deliberately no `router.subscribeTree()` facade and no `addEventListener` path. See [packages/core/CLAUDE.md](packages/core/CLAUDE.md) for the consumer pattern.
 
@@ -328,7 +328,7 @@ On error at any step: `emitTransitionError()`, Promise rejects with `RouterError
 
 **`navigateToNotFound()`** bypasses this pipeline entirely — sets state directly and emits only `TRANSITION_SUCCESS` (no guards, no AbortController, no `TRANSITION_START`). Always uses `replace: true`.
 
-**Cancellation sources:** external AbortController (`opts.signal`), concurrent navigation (aborts previous), `stop()`, `dispose()`. The internal AbortController is created **synchronously** whenever the navigation has guards or `subscribeLeave` listeners (they receive `signal` before it is known whether they run async); only the pure hot path — no guards, no leave listeners — allocates none. It is aborted solely on cancellation/error, never on success (#722).
+**Cancellation sources:** external AbortController (`opts.signal`), concurrent navigation (aborts previous), `stop()`, `dispose()`. The internal AbortController is created **synchronously** whenever the navigation has guards or `subscribeLeave` listeners (they receive `signal` before it is known whether they run async); only the pure hot path — no guards, no leave listeners — allocates none. It is aborted solely on cancellation/error, never on success.
 
 ## Extension Points
 
@@ -387,8 +387,8 @@ These are deliberately designed constraints. Violating them will break the syste
 
 ### FSM & Events
 
-- **All transition events are consequences of FSM transitions** — never manual calls. Literal since #1169: the NAVIGATE/LEAVE_APPROVE/COMPLETE emits are FSM **actions** fired by `send()`, and `forceState()` is gone from core — so an event can only fire when the table actually took the transition. No boolean flags (`#started`, `#active`, `#navigating` — all removed). (The `TREE_CHANGED` channel is the one deliberate exception — it is orthogonal to the FSM, emitted by `getRoutesApi` mutations, not by state changes.)
-- **`dispose()` is terminal — structurally, not by convention (#1169)** — DISPOSED has no outbound table transitions, and core reaches every transition through `send()` (never `forceState()`), so a post-dispose `send(COMPLETE)`/`send(LEAVE_APPROVE)` is a table no-op: the FSM cannot be resurrected. All mutating methods throw `RouterError(ROUTER_DISPOSED)` after disposal.
+- **All transition events are consequences of FSM transitions** — never manual calls. The NAVIGATE/LEAVE_APPROVE/COMPLETE emits are FSM **actions** fired by `send()`, and `forceState()` is not used in core — so an event can only fire when the table actually took the transition. No boolean flags. (The `TREE_CHANGED` channel is the one deliberate exception — it is orthogonal to the FSM, emitted by `getRoutesApi` mutations, not by state changes.)
+- **`dispose()` is terminal — structurally, not by convention** — DISPOSED has no outbound table transitions, and core reaches every transition through `send()` (never `forceState()`), so a post-dispose `send(COMPLETE)`/`send(LEAVE_APPROVE)` is a table no-op: the FSM cannot be resurrected. All mutating methods throw `RouterError(ROUTER_DISPOSED)` after disposal.
 - **`TREE_CHANGED` is internal-only and wrapper-emitted** — never in the public `EventName` union, and emitted strictly from the five `getRoutesApi` CRUD wrappers, never from shared internals (`adoptRouteArtifacts`/`commitTreeChanges`/`resetStore`). This keeps `dispose()`, `cloneRouter()`, and `setRootPath()` from emitting it.
 
 ### Guards & Plugins
@@ -425,21 +425,21 @@ These are deliberately designed constraints. Violating them will break the syste
 ├──────────────────────────────────────────────────────────────────┤
 │                core internals (bundled into core)                │
 ├──────────────────────────────────────────────────────────────────┤
-│    src/engine  ·  src/foundation/{fsm, event-emitter, logger}    │
+│    src/engine  ·  src/utils/{fsm, event-emitter, logger}         │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 **ALLOWED:**
 
 - Consumer packages depend on `core`
-- Consumer plugins inline the guards they need (formerly bundled from `type-guards`, dissolved into each plugin — wave-2)
+- Consumer plugins inline the guards they need
 - Consumer packages import shared sources via git-tracked symlinks (`src/dom-utils` → `shared/dom-utils`, `src/browser-env` → `shared/browser-env`, `src/shared-ssr` → `shared/ssr`)
-- The `engine` subsystem (`core/src/engine`) is self-contained (the former `route-tree` → `path-matcher` / `search-params` dependency is now an internal layer boundary within `src/engine`, enforced by core's lint — #1510)
+- The `engine` subsystem (`core/src/engine`) is self-contained — the `route-tree` → `path-matcher` / `search-params` layering is an internal boundary within `src/engine`, enforced by core's lint
 - `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)
 
 **FORBIDDEN:**
 
-- Foundation packages must not depend on `core`
+- Shared sources must not depend on `core`
   - Exception: `shared/browser-env` files import `Router`, `PluginApi`, `RouterError` types from `@real-router/core` — resolved via the consumer's `node_modules` when accessed through the symlink
 - Consumer packages must not depend on each other's internals
 - No package may bypass the plugin system to mutate router state directly
@@ -476,7 +476,7 @@ pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsd
 The navigate path is heavily optimized:
 
 - **Optimistic sync execution** — no `await`/microtask on the sync path; AbortController allocated only when guards or `subscribeLeave` listeners exist (none on the pure hot path)
-- **FSM `send()` (table-driven, #1169)** — NAVIGATE/LEAVE_APPROVE/COMPLETE dispatch through the table (emit is the action); `forceState()` removed from core. ~+15–20% vs the old `forceState` bypass, traded for structural determinism
+- **FSM `send()` (table-driven)** — NAVIGATE/LEAVE_APPROVE/COMPLETE dispatch through the table (emit is the action); `forceState()` is not used. A deliberate trade of micro-optimization for structural determinism
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` avoids V8 rest-param array allocation
 - **Cached error rejections** — pre-allocated for common error codes
 - **Single-pass freeze** — `freezeStateInPlace` in one recursive traversal

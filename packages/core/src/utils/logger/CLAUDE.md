@@ -1,8 +1,8 @@
-# RouterLogger (`core/src/foundation/logger`)
+# RouterLogger (`core/src/utils/logger`)
 
 > [!NOTE]
 > **Dissolved into `@real-router/core` (#724).** The standalone `@real-router/logger`
-> package is gone — its code now lives here at `core/src/foundation/logger/`. The former
+> package is gone — its code now lives here at `core/src/utils/logger/`. The former
 > process-global **singleton** is replaced by a **per-router `RouterLogger` instance**,
 > built from `options.logger` in the `Router` constructor and stored on
 > `RouterInternals.logger` (the `ctx`); each router owns its own logger, so `configure()`
@@ -36,7 +36,7 @@ instance.
 ## Module Structure
 
 ```
-core/src/foundation/logger/
+core/src/utils/logger/
 ├── RouterLogger.ts  -- RouterLogger class (per-router instance; NO singleton)
 ├── constants.ts     -- LOG_LEVELS, LEVEL_CONFIGS numeric mappings
 └── index.ts         -- exports { RouterLogger }

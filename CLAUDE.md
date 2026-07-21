@@ -236,7 +236,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/memory-plugin/CLAUDE.md](packages/memory-plugin/CLAUDE.md) — Memory plugin architecture
 - [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
 - [packages/core/src/engine/CLAUDE.md](packages/core/src/engine/CLAUDE.md) — Routing engine (merged): route-tree facade + path-matcher + search-params layers (#1510); folded into core as `src/engine` (engine-merge iteration 2)
-- [packages/core/src/foundation/fsm/CLAUDE.md](packages/core/src/foundation/fsm/CLAUDE.md) — FSM engine internals (the live, sole copy in core; the standalone `@real-router/fsm` package was deleted from source in wave-3, its published `0.6.1` deprecated on npm)
+- [packages/core/src/utils/fsm/CLAUDE.md](packages/core/src/utils/fsm/CLAUDE.md) — FSM engine internals (the live, sole copy in core; the standalone `@real-router/fsm` package was deleted from source in wave-3, its published `0.6.1` deprecated on npm)
 - [benchmarks/CLAUDE.md](benchmarks/CLAUDE.md) — Benchmark suite
 - [MCP Servers Guide](.claude/mcp-guide.md)
 - [Roadmap to 1.0](https://github.com/greydragon888/real-router/issues/296) — issue #296, milestone tracking

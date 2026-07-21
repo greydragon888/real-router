@@ -7,8 +7,6 @@
  */
 
 import { EMPTY_PARAMS, errorCodes } from "./constants";
-import { EventEmitter } from "./foundation/event-emitter";
-import { RouterLogger } from "./foundation/logger";
 import {
   assertLoggerConfig,
   guardDependencies,
@@ -36,6 +34,8 @@ import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamesp
 import { RouterError } from "./RouterError";
 import { createRouterFSM } from "./routerFSM";
 import { getTransitionPath } from "./transitionPath";
+import { EventEmitter } from "./utils/event-emitter";
+import { RouterLogger } from "./utils/logger";
 import { wireNamespaces } from "./wiring";
 
 import type { CreateMatcherOptions } from "./engine";

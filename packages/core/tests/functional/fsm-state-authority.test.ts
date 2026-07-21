@@ -27,7 +27,7 @@ import path from "node:path";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-import { FSM } from "../../src/foundation/fsm";
+import { FSM } from "../../src/utils/fsm";
 
 const SRC_DIR = path.resolve(__dirname, "../../src");
 

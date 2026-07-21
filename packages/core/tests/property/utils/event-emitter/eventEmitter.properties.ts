@@ -17,7 +17,7 @@ import {
   type TestEventMap,
   type EventName,
 } from "./helpers";
-import { EventEmitter } from "../../../../src/foundation/event-emitter/EventEmitter.js";
+import { EventEmitter } from "../../../../src/utils/event-emitter/EventEmitter.js";
 
 describe("EventEmitter Property-Based Tests", () => {
   describe("delivery — all listeners receive emitted data", () => {

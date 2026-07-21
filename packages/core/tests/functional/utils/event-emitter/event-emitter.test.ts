@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { EventEmitter } from "../../../../src/foundation/event-emitter/EventEmitter.js";
+import { EventEmitter } from "../../../../src/utils/event-emitter/EventEmitter.js";
 
-import type { EventEmitterOptions } from "../../../../src/foundation/event-emitter/types.js";
+import type { EventEmitterOptions } from "../../../../src/utils/event-emitter/types.js";
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type` not `interface` for Record constraint
 type TestEventMap = {

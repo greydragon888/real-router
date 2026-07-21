@@ -12,7 +12,7 @@ import {
   shouldInvokeCallback,
   throwingCallbackArbitrary,
 } from "./helpers";
-import { RouterLogger } from "../../../../src/foundation/logger/RouterLogger";
+import { RouterLogger } from "../../../../src/utils/logger/RouterLogger";
 
 import type { LogCallback } from "@real-router/core";
 
