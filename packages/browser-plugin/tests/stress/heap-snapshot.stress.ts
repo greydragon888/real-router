@@ -59,12 +59,15 @@ describe("B7.3 — heap stability across 40 000 navigations", () => {
     (console.error as unknown as { mockRestore?: () => void }).mockRestore?.();
   });
 
-  it("heapUsed delta stays within a generous threshold", async () => {
+  it("heapUsed delta stays within a generous threshold", async ({ skip }) => {
     // `globalThis.gc` is exposed by `--expose-gc` (see vitest.config.stress
-    // execArgv). Outside the stress runner the function is absent — skip
-    // the body but keep the test recorded so the runner reports it.
-    // eslint-disable-next-line vitest/no-conditional-in-test -- env-gated skip; runtime check is intentional, not a flaky branch
+    // execArgv). Outside the stress runner it is absent — `skip()` reports this
+    // as skipped instead of a silent pass; the following `return` both stops
+    // execution and narrows `globalThis.gc` to a function below.
+    // eslint-disable-next-line vitest/no-conditional-in-test -- env-gated skip
     if (typeof globalThis.gc !== "function") {
+      skip("requires --expose-gc (stress runner only)");
+
       return;
     }
 

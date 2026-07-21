@@ -1050,6 +1050,16 @@ export default tsEslint.config(
       // (prefer-specific-assertions adopted in tests — #915)
       "sonarjs/no-floating-point-equality": "off",
       "sonarjs/no-trivial-assertions": "off",
+
+      // v4.2.0: 11 new recommended rules (all test-oriented). 9 fire zero
+      // violations and are kept on as forward-guards. Disabled below:
+      //  - parameterized-tests: opinionated style rule ("replace these N tests
+      //    with a single Parameterized one") — 28 hits across 17 test files on
+      //    deliberately-explicit `it()` blocks. Converting to `it.each` is a
+      //    large refactor that obscures individual test names / failure sites;
+      //    a taste opinion, not a bug-catcher. Same class as the other declined
+      //    opinionated sonarjs test rules above (no-commented-code, no-duplicate-string).
+      "sonarjs/parameterized-tests": "off",
     },
   },
 
