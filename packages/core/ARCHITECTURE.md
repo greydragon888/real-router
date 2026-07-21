@@ -13,6 +13,7 @@
 ```
 core/
 ├── src/
+│   ├── index.ts                     — Public API barrel
 │   ├── Router.ts                    — Facade class
 │   ├── createRouter.ts              — Factory function
 │   ├── getNavigator.ts              — Navigator factory (WeakMap-cached)
@@ -20,10 +21,14 @@ core/
 │   ├── constants.ts                 — Error codes, events, limits
 │   ├── internals.ts                 — WeakMap registry for API functions
 │   ├── transitionPath.ts            — Transition path calculation
+│   ├── stateMetaStore.ts            — Per-route param-name meta cache
 │   ├── helpers.ts                   — Utility functions
 │   ├── guards.ts                    — Input guards (deps, routes) + logger-config assertion
 │   ├── routerFSM.ts                 — Router FSM config (states, events, payloads)
-│   ├── types.ts                     — Router-dependent types
+│   ├── validation.ts                — @real-router/core/validation subpath (plugin's door to the engine, #1301)
+│   ├── types/                       — Public + internal types (the /types subpath + augmentation site)
+│   │
+│   ├── engine/                      — Merged routing engine: route-tree + path-matcher + search-params layers (#1510)
 │   │
 │   ├── namespaces/
 │   │   ├── RoutesNamespace/         — Route tree, path operations, forwarding
@@ -47,28 +52,36 @@ core/
 │   │   ├── getPluginApi.ts          — Plugin management
 │   │   └── cloneRouter.ts           — SSR cloning
 │   │
-│   └── utils/
-│       └── serializeState.ts        — XSS-safe JSON serialization for SSR
+│   └── utils/                       — Internal folded-in modules (NOT external deps)
+│       ├── event-emitter/          — EventEmitter (folded from @real-router/event-emitter)
+│       ├── fsm/                    — FSM engine (folded from @real-router/fsm)
+│       └── logger/                 — logger singleton
 ```
 
-## Dependencies
+(SSR/SSG/hydration helpers are no longer under `src/utils` — they were extracted to the separate `@real-router/ssr-utils` package, #1543.)
+
+## Internal Modules
+
+Core has **zero runtime `dependencies`** — the former sibling packages were folded in and now live under `src/` (engine-merge #1510 + foundation-dissolution). They are internal modules, not workspace deps:
 
 ```mermaid
 graph TD
-    CORE["core"] -->|dep| FSM["fsm"]
-    CORE -->|dep| ENGINE["engine (route-tree + path-matcher + search-params layers)"]
-    CORE -->|dep| EE["event-emitter"]
-    CORE -->|dep| LOG["logger"]
-    CORE -->|dep| TYPES["core-types"]
+    CORE["@real-router/core"] --> ENGINE["src/engine — route-tree + path-matcher + search-params layers"]
+    CORE --> FSM["src/utils/fsm — FSM engine"]
+    CORE --> EE["src/utils/event-emitter — EventEmitter"]
+    CORE --> LOG["src/utils/logger — logger singleton"]
+    CORE --> TYPES["src/types — shared type definitions"]
 ```
 
-| Dependency        | What it provides            | Used by                                  |
-| ----------------- | --------------------------- | ---------------------------------------- |
-| **fsm**           | `FSM` class                 | `EventBusNamespace` (router lifecycle)   |
-| **engine**        | `createMatcher()`, tree ops, query parse | `RoutesNamespace` (path matching, build) |
-| **event-emitter** | `EventEmitter` class        | `EventBusNamespace` (event dispatch)     |
-| **logger**        | `logger` singleton          | Warning/error logging across namespaces  |
-| **core-types**    | Shared type definitions     | All modules                              |
+| Internal module             | What it provides                               | Used by                                  |
+| --------------------------- | ---------------------------------------------- | ---------------------------------------- |
+| **src/engine**              | `createMatcher()`, tree ops, query parse       | `RoutesNamespace` (path matching, build) |
+| **src/utils/fsm**           | `FSM` class                                    | `EventBusNamespace` (router lifecycle)   |
+| **src/utils/event-emitter** | `EventEmitter` class                           | `EventBusNamespace` (event dispatch)     |
+| **src/utils/logger**        | `logger` singleton                             | Warning/error logging across namespaces  |
+| **src/types**               | Shared type definitions (the `/types` subpath) | All modules                              |
+
+(The only workspace reference in `package.json` is a **dev**Dependency on `@real-router/ssr-utils` for SSR-helper tests — there are no runtime `dependencies`.)
 
 ## Facade + Namespaces Pattern
 
@@ -170,7 +183,7 @@ fsm.on("LEAVE_APPROVED", "COMPLETE", (p) =>
 fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
   emitter.emit("$$cancel", p.toState, p.fromState),
 );
-// FAIL actions on STARTING, READY, TRANSITION_STARTED → emitter.emit("$$error", ...)
+// FAIL actions on STARTING, READY, TRANSITION_STARTED, LEAVE_APPROVED → emitter.emit("$$error", ...)
 ```
 
 **`send*` vs `emit*` naming convention** in `EventBusNamespace`:
@@ -199,7 +212,7 @@ fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
            │
            ▼
 ┌──────────────────────┐
-│  Build target state  │  buildStateWithSegments() (internally calls forwardState())
+│  Build target state  │  buildNavigateState() (single-pass: forwardState + buildPath + makeState)
 │  + force replace     │  forceReplaceFromUnknown(opts, fromState)
 │  + SAME_STATES check │  fromState.path === toState.path — canonical path comparison
 └──────────┬───────────┘
@@ -338,11 +351,11 @@ Plugin hooks are bound to router events via `addEventListener()`:
 
 Plugins intercept router methods via `addInterceptor()` on `PluginApi`:
 
-| Interceptable method | Used by                  |
-| -------------------- | ------------------------ |
-| `start`              | browser-plugin           |
-| `buildPath`          | persistent-params-plugin |
-| `forwardState`       | persistent-params-plugin |
+| Interceptable method | Used by                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `start`              | browser-plugin, hash-plugin, navigation-plugin (path-optional); ssr-data-plugin, rsc-server-plugin (SSR loaders) |
+| `buildPath`          | persistent-params-plugin                                                                                         |
+| `forwardState`       | persistent-params-plugin                                                                                         |
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` plus the method's arguments. Chains stored in `RouterInternals.interceptors` (`Map<string, InterceptorFn[]>`).
 
@@ -354,12 +367,12 @@ Multiple interceptors per method execute in **LIFO** order (last-registered wrap
 
 ### Guard Origin Tracking
 
-`RouteLifecycleNamespace` tracks guard origins via two `Set<string>` collections:
+`RouteLifecycleNamespace` tracks guard origins via **four `Map` collections** split by origin × phase — `#definitionActivateFactories`, `#externalActivateFactories`, `#definitionDeactivateFactories`, `#externalDeactivateFactories`:
 
-- **Definition guards** — from route config (`canActivate`/`canDeactivate` in route definition), tracked in `#definitionActivateGuardNames`
-- **External guards** — registered via `getLifecycleApi().addActivateGuard()`
+- **Definition guards** — from route config (`canActivate`/`canDeactivate` in a route definition), stored in the `#definition*Factories` Maps
+- **External guards** — registered via `getLifecycleApi().addActivateGuard()` / `addDeactivateGuard()`, stored in the `#external*Factories` Maps
 
-`replace()` clears only definition guards; external guards survive route replacement.
+Resolution is **external-wins regardless of registration order**: when a route holds both, the compiled slot is the external guard. `clearDefinitionGuards()` (run by `replace()`) clears only the two definition Maps and recompiles the compiled slot from the surviving external factory, so external guards survive route replacement (#1174/#1192).
 
 ### Segment Cleanup After Deactivation
 
@@ -439,23 +452,23 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Stress Test Coverage
 
-103 stress tests across 25 files in `tests/stress/` validate behavior under extreme conditions:
+115 stress tests across 34 `*.stress.ts` files in `tests/stress/` validate behavior under extreme conditions. The suite spans these categories (see `tests/stress/` for the current file set — per-category counts drift, so they are not enumerated here):
 
-| Category              | Tests (file count) | Test count | What they verify                                                            |
-| --------------------- | ------------------ | ---------- | --------------------------------------------------------------------------- |
-| Memory & leaks        | 4 files            | 19 tests   | Heap stable across thousands of navigations; dispose releases all resources |
-| Concurrent navigation | 3 files            | 14 tests   | Fire-and-forget storm, AbortController churn, mixed concurrent operations   |
-| Guards under load     | 3 files            | 12 tests   | Guard execution under load, removal mid-execution, 1000+ error cycles       |
-| Route CRUD            | 3 files            | 12 tests   | Add/remove/replace under load, atomic replace, 1000+ route trees            |
-| Lifecycle             | 2 files            | 10 tests   | Rapid start/stop cycles, FSM transition correctness under churn             |
-| Edge cases            | 4 files            | 14 tests   | Deep forwarding chains, unknown route handling, utility function stress     |
-| FSM & Events          | 3 files            | 13 tests   | Event depth limits, listener cleanup, FSM state correctness                 |
-| Utilities & Helpers   | 4 files            | 9 tests    | Hot path utilities, navigator caching, state equality, active route checks  |
+| Category              | What they verify                                                            |
+| --------------------- | --------------------------------------------------------------------------- |
+| Memory & leaks        | Heap stable across thousands of navigations; dispose releases all resources |
+| Concurrent navigation | Fire-and-forget storm, AbortController churn, mixed concurrent operations   |
+| Guards under load     | Guard execution under load, removal mid-execution, 1000+ error cycles       |
+| Route CRUD            | Add/remove/replace under load, atomic replace, 1000+ route trees            |
+| Lifecycle             | Rapid start/stop cycles, FSM transition correctness under churn             |
+| Edge cases            | Deep forwarding chains, unknown route handling, utility function stress     |
+| FSM & Events          | Event depth limits, listener cleanup, FSM state correctness                 |
+| Utilities & Helpers   | Hot path utilities, navigator caching, state equality, active route checks  |
 
 ## See Also
 
 - [root ARCHITECTURE.md](../../ARCHITECTURE.md) — system-level overview, FSM state diagram, package dependencies
-- [INVARIANTS.md](INVARIANTS.md) — property-based test invariants (120+ invariants verified via fast-check)
-- [../fsm/ARCHITECTURE.md](../fsm/ARCHITECTURE.md) — FSM engine
-- [../event-emitter/ARCHITECTURE.md](../event-emitter/ARCHITECTURE.md) — event emitter
-- [../engine/ARCHITECTURE.md](../engine/ARCHITECTURE.md) — merged routing engine (route tree + Segment Trie matching + query string handling)
+- [INVARIANTS.md](INVARIANTS.md) — property-based test invariants (240+ invariants verified via fast-check)
+- [src/utils/fsm/ARCHITECTURE.md](src/utils/fsm/ARCHITECTURE.md) — FSM engine
+- [src/utils/event-emitter/ARCHITECTURE.md](src/utils/event-emitter/ARCHITECTURE.md) — event emitter
+- [src/engine/ARCHITECTURE.md](src/engine/ARCHITECTURE.md) — merged routing engine (route tree + Segment Trie matching + query string handling)
