@@ -42,7 +42,7 @@ shared/
 | Vitest          | 4.1     | root `devDependencies`                                                      |
 | tsdown          | 0.22    | root `devDependencies`                                                      |
 | Turbo           | 2.10    | root `devDependencies`                                                      |
-| ESLint          | 10.5    | root `devDependencies` (flat config)                                        |
+| ESLint          | 10.7    | root `devDependencies` (flat config)                                        |
 | @changesets/cli | 2.31    | root `devDependencies`                                                      |
 | Prettier        | 3.9     | root `devDependencies`                                                      |
 | husky           | 9.1     | root `devDependencies` (v9 config format — `.husky/*` are plain scripts)    |
