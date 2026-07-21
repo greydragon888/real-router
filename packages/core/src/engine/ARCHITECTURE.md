@@ -172,6 +172,7 @@ interface MutableRouteNode {
 ```
 
 - Absolute paths: detected by `path.startsWith("~")`, tilde stripped from stored `path`
+- Leading-slash normalization (#1407): after the `~`-strip, a non-empty path that starts with neither `/` nor `?` (query-only) gets a `/` prepended — `foo`/`~foo` → `/foo`, `:id` → `/:id`. So the trie only ever sees leading-`/` paths (no cross-node fusion, no slash-less dead route); a leading-`/`, `~/`, `?query`, or empty root path is untouched
 - Children: recursively created via `createNode()`
 - Parent references: set during construction
 
@@ -267,7 +268,7 @@ validateRoutePath(path, routeName, methodName, parentNode?)
 | Absolute            | `"/users"`, `"/api/v2"`   | Standard paths          |
 | Absolute with tilde | `"~/dashboard"`           | Override parent path    |
 | Query-only          | `"?page"`, `"?q&limit"`   | Query parameter routes  |
-| Relative segment    | `"profile"`, `"settings"` | Appended to parent path |
+| Relative segment    | `"profile"`, `"settings"` | Normalized to a `/`-child (`/profile`), appended to parent (#1407) |
 | Parameterized       | `"/:id"`                  | Dynamic URL params      |
 | Splat               | `"/*path"`                | Catch-all params        |
 
