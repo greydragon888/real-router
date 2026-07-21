@@ -23,13 +23,13 @@ route-tree/
 │   ├── builder/
 │   │   ├── buildTree.ts           — Single-pass mutable tree construction
 │   │   ├── computeCaches.ts       — Cache computation + freeze
-│   │   ├── createRouteTree.ts     — Public API (function + builder)
-│   │   ├── types.ts               — RouteTree, RouteDefinition, RouteTreeBuilder
+│   │   ├── createRouteTree.ts     — Public API (function)
+│   │   ├── types.ts               — RouteTree, RouteDefinition
 │   │   └── index.ts
 │   ├── operations/
 │   │   ├── query.ts               — getSegmentsByName() — O(1) route lookup
 │   │   ├── routeTreeToDefinitions.ts — Tree → RouteDefinition[] (for cloneRouter)
-│   │   └── types.ts               — MatchResult, RouteTreeState, mode types
+│   │   └── types.ts               — MatchResult, RouteTreeState, RouteTreeStateMeta, ParamSource
 │   ├── validation/
 │   │   ├── route-batch.ts         — Full route validation with duplicate detection
 │   │   └── routes.ts              — Path format validation
@@ -47,7 +47,7 @@ graph LR
 
     PM -.->|provides| SM[SegmentMatcher]
     PM -.->|provides| BPM[buildParamMeta]
-    SP -.->|provides| PARSE[parse]
+    SP -.->|provides| PARSE[parseQuery]
     SP -.->|provides| BUILD[build]
 
     RT -.->|combines into| MATCHER[createMatcher]
@@ -150,7 +150,7 @@ graph TD
     end
 
     subgraph "Phase 2: computeCaches()"
-        C1[buildParamMeta per node] --> C2[Build paramTypeMap]
+        C1[buildParamMeta per node] --> C2[read paramTypeMap from paramMeta]
         C2 --> C3[Compute fullName]
         C3 --> C4[processChildren — recursive Map + nonAbsoluteChildren]
         C4 --> C6["Object.freeze()"]
@@ -180,8 +180,8 @@ interface MutableRouteNode {
 
 Recursively processes each `MutableRouteNode` into `RouteTree`:
 
-1. **`buildParamMeta(path)`** — extracts `urlParams`, `queryParams`, `spatParams` from path pattern (via `path-matcher`)
-2. **`buildParamTypeMap(paramMeta)`** — maps param names to `"url"` | `"query"`
+1. **`buildParamMeta(path)`** — extracts `urlParams`, `queryParams`, `spatParams` **and** the `paramTypeMap` (`"url"` | `"query"` per name) from the path pattern (via `path-matcher`)
+2. **`paramTypeMap`** — read directly off the `paramMeta` produced in step 1 (`computeCaches` does not build it separately)
 3. **`computeFullName(node)`** — builds dot-notation name from parent chain (`"users.profile"`)
 4. **`processChildren()`** — recursively processes children, builds `ReadonlyMap`, filters `nonAbsoluteChildren`
 5. **`Object.freeze()`** — freezes node, children map, arrays, paramTypeMap
@@ -190,7 +190,7 @@ Recursively processes each `MutableRouteNode` into `RouteTree`:
 
 ## Matcher Factory
 
-`createMatcher()` combines `SegmentMatcher` (from `path-matcher`) with `parse`/`build` (from `search-params`) via dependency injection:
+`createMatcher()` combines `SegmentMatcher` (from `path-matcher`) with `parseQuery`/`build` (from `search-params`) via dependency injection:
 
 ```typescript
 function createMatcher(options?: CreateMatcherOptions): Matcher {
@@ -201,7 +201,7 @@ function createMatcher(options?: CreateMatcherOptions): Matcher {
     strictTrailingSlash, // from options
     strictQueryParams, // from options
     urlParamsEncoding, // from options
-    parseQueryString: (qs) => parse(qs, qp), // DI: search-params
+    parseQueryString: (qs) => parseQuery(qs, qp), // DI: search-params
     buildQueryString: (p) => build(p, qp), // DI: search-params
   });
 }
@@ -262,25 +262,31 @@ validateRoutePath(path, routeName, methodName, parentNode?)
 
 **Valid formats:**
 
-| Format              | Example                   | Purpose                 |
-| ------------------- | ------------------------- | ----------------------- |
-| Empty string        | `""`                      | Grouping/root routes    |
-| Absolute            | `"/users"`, `"/api/v2"`   | Standard paths          |
-| Absolute with tilde | `"~/dashboard"`           | Override parent path    |
-| Query-only          | `"?page"`, `"?q&limit"`   | Query parameter routes  |
+| Format              | Example                   | Purpose                                                            |
+| ------------------- | ------------------------- | ------------------------------------------------------------------ |
+| Empty string        | `""`                      | Grouping/root routes                                               |
+| Absolute            | `"/users"`, `"/api/v2"`   | Standard paths                                                     |
+| Absolute with tilde | `"~/dashboard"`           | Override parent path                                               |
+| Query-only          | `"?page"`, `"?q&limit"`   | Query parameter routes                                             |
 | Relative segment    | `"profile"`, `"settings"` | Normalized to a `/`-child (`/profile`), appended to parent (#1407) |
-| Parameterized       | `"/:id"`                  | Dynamic URL params      |
-| Splat               | `"/*path"`                | Catch-all params        |
+| Parameterized       | `"/:id"`                  | Dynamic URL params                                                 |
+| Splat               | `"/*path"`                | Catch-all params                                                   |
 
 **Rejected:**
 
-| Rule                             | Example                    | Reason                          |
-| -------------------------------- | -------------------------- | ------------------------------- |
-| Non-string                       | `null`, `123`              | Type safety                     |
-| Whitespace (`\s`)                | `"/users /list"`           | Any whitespace rejected         |
-| Invalid path format              | `"#fragment"`              | Must match `/^([/?~]\|[^/]+$)/` |
-| Double slashes                   | `"//users"`                | Malformed URLs                  |
-| Tilde under parameterized parent | `"~/admin"` under `"/:id"` | Ambiguous matching              |
+| Rule                                | Example                         | Reason                                                                 |
+| ----------------------------------- | ------------------------------- | ---------------------------------------------------------------------- |
+| Non-string                          | `null`, `123`                   | Type safety                                                            |
+| Whitespace (`\s`)                   | `"/users /list"`                | Any whitespace rejected                                                |
+| Invalid path format                 | `"#fragment"`                   | Must match `/^([/?~]\|[^/]+$)/`                                        |
+| Double slashes                      | `"//users"`                     | Malformed URLs                                                         |
+| Tilde under parameterized parent    | `"~/admin"` under `"/:id"`      | Ambiguous matching                                                     |
+| Optional modifier (removed, M1)     | `"/:id?"`, `"/*rest?"`          | Optionality is expressed with sibling routes (`optional-removed`)      |
+| Regex constraint (removed, M1)      | `"/:id<\d+>"`, `"/a>b"`         | `<`/`>` reserved; validate the value in a guard (`constraint-removed`) |
+| Fused mid-segment marker (#1050)    | `"/a:b"`, `"/x:id"`             | build extracts a param, the trie compiles a literal — they disagree    |
+| Duplicate param name (#1151)        | `"/:id/:id"`, `"/:x/*x"`        | the second binding silently overwrites the first at match              |
+| Non-ASCII static segment (#1154)    | `"/café"`, `"/меню"`            | match compares statics raw and rejects non-ASCII input — never matches |
+| Malformed query declaration (#1242) | `"/a?fil<ter"`, `"/a/:tab?tab"` | a query name carrying `<`/`>`, or colliding with a path-param name     |
 
 ### Validation Errors
 
@@ -322,31 +328,31 @@ Converts `RouteTree` back to `RouteDefinition[]`. Used by `cloneRouter()` for SS
 ```mermaid
 graph TD
     subgraph core ["@real-router/core"]
-        R[Router.ts facade]
         RN[RoutesNamespace]
         RS[routesStore]
-        V[validators.ts]
-        FV[forwardToValidation.ts]
+        VAL["validation.ts (plugin door, #1301)"]
+        GR[getRoutesApi]
         CR[cloneRouter]
     end
 
-    subgraph rt [route-tree]
+    subgraph rt [engine]
         CRT[createRouteTree]
         CM[createMatcher]
         VR[validateRoute]
-        GSN[getSegmentsByName]
         RTD[routeTreeToDefinitions]
         NTD[nodeToDefinition]
     end
 
     RS -->|creates| CRT
     RS -->|creates| CM
-    V -->|calls| VR
-    FV -->|calls| GSN
+    RS -->|converts| RTD
+    VAL -->|re-exports| VR
     RN -->|delegates to| CM
     CR -->|converts| RTD
-    RS -->|converts| NTD
+    GR -->|converts| NTD
 ```
+
+(Segment lookup / existence used elsewhere in core go through the **matcher methods** `matcher.getSegmentsByName` / `matcher.hasRoute`, not the standalone `operations/query.ts` export.)
 
 ### routesStore — Tree Lifecycle
 
@@ -386,17 +392,16 @@ Tree is read synchronously — no concurrency concerns in single-threaded JS.
 
 ### Core Imports Summary
 
-| Core module              | Imports from route-tree                                                           |
-| ------------------------ | --------------------------------------------------------------------------------- |
-| `routesStore.ts`         | `createMatcher`, `createRouteTree`, `nodeToDefinition`, types                     |
-| `RoutesNamespace.ts`     | Types only (`CreateMatcherOptions`, `RouteParams`, `RouteTree`, `RouteTreeState`) |
-| `validators.ts`          | `validateRoute`, `Matcher`, `RouteTree` types                                     |
-| `forwardToValidation.ts` | `getSegmentsByName`, `RouteTree` type                                             |
-| `cloneRouter.ts`         | `routeTreeToDefinitions`                                                          |
-| `Router.ts`              | `CreateMatcherOptions` type                                                       |
-| `internals.ts`           | `RouteTree` type                                                                  |
-| `StateNamespace`         | `RouteTreeStateMeta` type                                                         |
-| `getRoutesApi.ts`        | `RouteDefinition`, `RouteTree` types                                              |
+| Core module          | Imports from engine                                                               |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `routesStore.ts`     | `createMatcher`, `createRouteTree`, `routeTreeToDefinitions`, types               |
+| `RoutesNamespace.ts` | Types only (`CreateMatcherOptions`, `RouteParams`, `RouteTree`, `RouteTreeState`) |
+| `validation.ts`      | `validateRoute`, `Matcher`, `RouteTree` types (re-exported for the plugin, #1301) |
+| `cloneRouter.ts`     | `routeTreeToDefinitions`                                                          |
+| `getRoutesApi.ts`    | `nodeToDefinition`, `RouteDefinition`, `RouteTree` types                          |
+| `Router.ts`          | `CreateMatcherOptions` type                                                       |
+| `internals.ts`       | `RouteTree` type                                                                  |
+| `StateNamespace`     | `RouteTreeStateMeta` type                                                         |
 
 ## Performance Characteristics
 
@@ -480,8 +485,7 @@ Compute `paramTypeMap` lazily (on first access) instead of eagerly for all nodes
 
 ## See Also
 
+- [CLAUDE.md](CLAUDE.md) — Engine facade layer (route-tree) architecture, gotchas, and the folded-in `path-matcher` / `search-params` layers
 - [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
-- [path-matcher ARCHITECTURE.md](../path-matcher/ARCHITECTURE.md) — Segment Trie URL matching (zero deps)
-- [search-params ARCHITECTURE.md](../search-params/ARCHITECTURE.md) — Query string parsing/building (zero deps)
-- [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture
+- [../../CLAUDE.md](../../CLAUDE.md) — Core package architecture
+- [../../../../ARCHITECTURE.md](../../../../ARCHITECTURE.md) — System-level architecture (repo root)
