@@ -48,7 +48,21 @@ function createNode(
 ): MutableRouteNode {
   const path = definition.path;
   const absolute = path.startsWith("~");
-  const normalizedPath = absolute ? path.slice(1) : path;
+  const stripped = absolute ? path.slice(1) : path;
+  // #1407: normalize a missing leading "/". The trie, buildFullPath, and every
+  // downstream layer assume a leading-"/" path; a non-absolute path without one
+  // (`foo`, `:id`) fuses onto its parent across the segment boundary, and an
+  // absolute `~foo` (slash-less) compiles a dead route (the trie scans from
+  // index 1, dropping the first char). After the `~`-strip, prepend "/" to any
+  // non-empty path that lacks it — `foo`/`~foo` → `/foo`, `:id` → `/:id`,
+  // `foo?q` → `/foo?q` — leaving `/foo`/`~/foo` and the empty root untouched.
+  // A query-only path (`?q`) has no leading path segment to slash (the `?` starts
+  // the query), so it is skipped too. The path-matcher's "I only see leading-'/'
+  // paths" invariant becomes correct-by-construction.
+  const normalizedPath =
+    stripped !== "" && !stripped.startsWith("/") && !stripped.startsWith("?")
+      ? `/${stripped}`
+      : stripped;
 
   const node: MutableRouteNode = {
     name: definition.name,

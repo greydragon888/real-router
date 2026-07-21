@@ -25,6 +25,9 @@ export function extractParamName(segment: string): string {
   // — name-less (#858), trailing-marker (#1324), fused-marker (#1050), constraint
   // forms — before trie insertion, so a param|splat name is guaranteed here. The
   // error/`static` branches are unreachable, kept as a typed defensive backstop.
+  // This ALSO relies on createNode's leading-`/` normalization (#1407): a
+  // slash-less path (`a:`) let the trie's index-1 scan drop the leading char and
+  // reach `:` here (a name-less marker) — normalization keeps that branch dead.
   /* v8 ignore start -- unreachable: registerNode's grammar pass rejects non-name segments first */
   if ("error" in token || token.kind === "static") {
     throwEmptyParamName();

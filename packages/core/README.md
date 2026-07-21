@@ -51,12 +51,12 @@ await router.navigate("users.profile", { id: "123" });
 
 ### Navigation
 
-| Method                              | Returns          | Description                               |
-| ----------------------------------- | ---------------- | ----------------------------------------- |
-| `navigate(name, params?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe |
+| Method                              | Returns          | Description                                         |
+| ----------------------------------- | ---------------- | --------------------------------------------------- |
+| `navigate(name, params?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe           |
 | `navigateToDefault(options?)`       | `Promise<State>` | Navigate to the default route. Fire-and-forget safe |
-| `navigateToNotFound(path?)`         | `State`          | Synchronously set UNKNOWN_ROUTE state     |
-| `canNavigateTo(name, params?)`      | `boolean`        | Check if guards allow navigation          |
+| `navigateToNotFound(path?)`         | `State`          | Synchronously set UNKNOWN_ROUTE state               |
+| `canNavigateTo(name, params?)`      | `boolean`        | Check if guards allow navigation                    |
 
 ```typescript
 await router.navigate("users.profile", { id: "123" });
@@ -81,11 +81,11 @@ controller.abort();
 
 ### Events & Plugins
 
-| Method                     | Returns       | Description                                                                                                                                                   |
-| -------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `subscribe(listener)`      | `Unsubscribe` | Listen to successful transitions                                                                                                                              |
+| Method                     | Returns       | Description                                                                                                                                                                                                                                                                                 |
+| -------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `subscribe(listener)`      | `Unsubscribe` | Listen to successful transitions                                                                                                                                                                                                                                                            |
 | `subscribeLeave(listener)` | `Unsubscribe` | Subscribe to **approved** route departures — tentative, not committed: an activation guard can still reject. Listener may return `Promise<void>` to block the pipeline (exit animations). Receives an `AbortSignal` that aborts (with the failure reason) if the navigation does not commit |
-| `usePlugin(...plugins)`    | `Unsubscribe` | Register plugin factories                                                                                                                                     |
+| `usePlugin(...plugins)`    | `Unsubscribe` | Register plugin factories                                                                                                                                                                                                                                                                   |
 
 ```typescript
 const unsub = router.subscribe(({ route, previousRoute }) => {
@@ -120,17 +120,17 @@ import {
 } from "@real-router/core/api";
 ```
 
-| Function                     | Purpose               | Key methods                                                                  |
-| ---------------------------- | --------------------- | ---------------------------------------------------------------------------- |
-| `getRoutesApi(router)`       | Dynamic route CRUD    | `add`, `remove`, `update`, `replace`, `has`, `get`                           |
-| `getDependenciesApi(router)` | Dependency injection  | `get`, `set`, `setAll`, `remove`, `has`                                      |
-| `getLifecycleApi(router)`    | Guard registration    | `addActivateGuard`, `addDeactivateGuard`, `remove*`                          |
+| Function                     | Purpose               | Key methods                                                                                         |
+| ---------------------------- | --------------------- | --------------------------------------------------------------------------------------------------- |
+| `getRoutesApi(router)`       | Dynamic route CRUD    | `add`, `remove`, `update`, `replace`, `has`, `get`                                                  |
+| `getDependenciesApi(router)` | Dependency injection  | `get`, `set`, `setAll`, `remove`, `has`                                                             |
+| `getLifecycleApi(router)`    | Guard registration    | `addActivateGuard`, `addDeactivateGuard`, `remove*`                                                 |
 | `getPluginApi(router)`       | Plugin infrastructure | `makeState`, `matchPath`, `addInterceptor`, `extendRouter`, `emitTransitionError`, `getRouteConfig` |
-| `cloneRouter(router, deps?)` | SSR cloning           | Shares route definitions, independent state                                  |
+| `cloneRouter(router, deps?)` | SSR cloning           | Shares route definitions, independent state                                                         |
 
 ## Utilities
 
-SSR/SSG/hydration helpers imported from `@real-router/core/utils`.
+SSR/SSG/hydration helpers are published separately as [@real-router/ssr-utils](https://www.npmjs.com/package/@real-router/ssr-utils) (extracted from the former `@real-router/core/utils` subpath).
 
 ```typescript
 import {
@@ -138,7 +138,7 @@ import {
   hydrateRouter,
   getStaticPaths,
   serializeState,
-} from "@real-router/core/utils";
+} from "@real-router/ssr-utils";
 
 // SSR: serialize the full resolved State (incl. plugin context namespaces)
 const state = await router.start(req.url);
@@ -155,14 +155,14 @@ const paths = await getStaticPaths(router, {
 // → ["/", "/users", "/users/1", "/users/2"]
 ```
 
-| Function                                            | Purpose                                                                                                                                          |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `serializeRouterState(state, { excludeContext? })`  | XSS-safe JSON serialization of a router `State` for SSR → client transport. Strips `transition`; keeps `name`, `params`, `path`, `context`. Pass `excludeContext` to drop non-JSON-safe namespaces (e.g. `rsc`) |
-| `hydrateRouter(router, source)`                     | Hydrate a fresh router from the server-serialized payload. Deposits the parsed state onto a one-shot scratchpad consumed by SSR loader plugins (#596) so the first `start()` reuses server-resolved namespace values instead of re-running loaders |
-| `serializeState(data)`                              | XSS-safe JSON serialization for embedding arbitrary data in HTML `<script>` tags (lower-level than `serializeRouterState`)                       |
-| `getStaticPaths(router, entries?)`                  | Enumerate leaf routes and build URLs for SSG pre-rendering                                                                                       |
-| `SerializedRouterState` (type)                      | Parsed shape produced by `serializeRouterState` after `JSON.parse` — `Omit<State, "transition">`                                                |
-| `StaticPathEntries` (type)                          | Type for the `entries` parameter: `Record<string, () => Promise<Record<string, string>[]>>`                                                      |
+| Function                                           | Purpose                                                                                                                                                                                                                                            |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `serializeRouterState(state, { excludeContext? })` | XSS-safe JSON serialization of a router `State` for SSR → client transport. Strips `transition`; keeps `name`, `params`, `path`, `context`. Pass `excludeContext` to drop non-JSON-safe namespaces (e.g. `rsc`)                                    |
+| `hydrateRouter(router, source)`                    | Hydrate a fresh router from the server-serialized payload. Deposits the parsed state onto a one-shot scratchpad consumed by SSR loader plugins (#596) so the first `start()` reuses server-resolved namespace values instead of re-running loaders |
+| `serializeState(data)`                             | XSS-safe JSON serialization for embedding arbitrary data in HTML `<script>` tags (lower-level than `serializeRouterState`)                                                                                                                         |
+| `getStaticPaths(router, entries?)`                 | Enumerate leaf routes and build URLs for SSG pre-rendering                                                                                                                                                                                         |
+| `SerializedRouterState` (type)                     | Parsed shape produced by `serializeRouterState` after `JSON.parse` — `Omit<State, "transition">`                                                                                                                                                   |
+| `StaticPathEntries` (type)                         | Type for the `entries` parameter: `Record<string, () => Promise<Record<string, string>[]>>`                                                                                                                                                        |
 
 ### `getNavigator(router)` (main entry)
 
@@ -233,15 +233,15 @@ const routes: Route[] = [
 
 ### Input — `params` object values
 
-| Value                      | URL path param (`:id`) | URL query param (`?q`)                             | `state.params` after navigation |
-| -------------------------- | ---------------------- | -------------------------------------------------- | ------------------------------- |
-| `undefined`                | Error — path param is required | **stripped** — parameter absent from URL         | Key absent (`"q" in params` is `false`) |
-| `null`                     | Same as `undefined`    | `?q` (key-only, via `nullFormat: "default"`)       | `null`                          |
-| `""` (empty string)        | Empty segment (caller's responsibility) | `?q=` (explicit empty value, distinct from `null`) | `""`                            |
-| `string`                   | Encoded per `urlParamsEncoding` | `?q=value` (URI-encoded)                           | Unchanged                       |
-| `number`                   | `/users/42`            | `?q=42`                                            | `42` (number, via `numberFormat: "auto"`) |
-| `boolean`                  | `/users/true`          | `?q=true` / `?q=false` (via `booleanFormat: "auto"`) | `true` / `false`              |
-| `0`, `false` (falsy-defined) | Coerced to string   | Preserved (not stripped)                           | Preserved                       |
+| Value                        | URL path param (`:id`)                  | URL query param (`?q`)                               | `state.params` after navigation           |
+| ---------------------------- | --------------------------------------- | ---------------------------------------------------- | ----------------------------------------- |
+| `undefined`                  | Error — path param is required          | **stripped** — parameter absent from URL             | Key absent (`"q" in params` is `false`)   |
+| `null`                       | Same as `undefined`                     | `?q` (key-only, via `nullFormat: "default"`)         | `null`                                    |
+| `""` (empty string)          | Empty segment (caller's responsibility) | `?q=` (explicit empty value, distinct from `null`)   | `""`                                      |
+| `string`                     | Encoded per `urlParamsEncoding`         | `?q=value` (URI-encoded)                             | Unchanged                                 |
+| `number`                     | `/users/42`                             | `?q=42`                                              | `42` (number, via `numberFormat: "auto"`) |
+| `boolean`                    | `/users/true`                           | `?q=true` / `?q=false` (via `booleanFormat: "auto"`) | `true` / `false`                          |
+| `0`, `false` (falsy-defined) | Coerced to string                       | Preserved (not stripped)                             | Preserved                                 |
 
 **`undefined` is stripped at the core boundary.** This is an explicit public contract, not an implementation detail. Plugins that add `undefined` values via `addInterceptor("forwardState")` also have them scrubbed before URL and state.
 
@@ -303,7 +303,7 @@ try {
 } catch (err) {
   if (err instanceof RouterError) {
     // err.code: ROUTE_NOT_FOUND | CANNOT_ACTIVATE | CANNOT_DEACTIVATE
-    //           | TRANSITION_CANCELLED | SAME_STATES | DISPOSED | ...
+    //           | CANCELLED | SAME_STATES | DISPOSED | ...
   }
 }
 ```
@@ -332,19 +332,19 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 - [Navigation Lifecycle](https://github.com/greydragon888/real-router/wiki/navigation-lifecycle) — transitions, guards, hooks
 - [RouterOptions](https://github.com/greydragon888/real-router/wiki/RouterOptions) — `defaultRoute`, `trailingSlash`, `allowNotFound`, and more
 - [Plugin Architecture](https://github.com/greydragon888/real-router/wiki/plugin-architecture) — interception, extension, events
-- [Migration from router5](https://github.com/greydragon888/real-router/wiki/migration-guide)
 
 ## Related Packages
 
-| Package                                                                                                      | Description                                                      |
-| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| [@real-router/react](https://www.npmjs.com/package/@real-router/react)                                       | React integration (`RouterProvider`, hooks, `Link`, `RouteView`) |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin)                     | Browser History API and URL synchronization                      |
-| [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin)                           | Hash-based routing                                               |
-| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx)                                             | Observable API (`state$`, `events$`, TC39 Observable)            |
-| [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging                                              |
-| [@real-router/persistent-params-plugin](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence                                            |
-| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)                           | Route tree queries and segment testing                           |
+| Package                                                                                                      | Description                                                               |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react)                                       | React integration (`RouterProvider`, hooks, `Link`, `RouteView`)          |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin)                     | Browser History API and URL synchronization                               |
+| [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin)                           | Hash-based routing                                                        |
+| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx)                                             | Observable API (`state$`, `events$`, TC39 Observable)                     |
+| [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging                                                       |
+| [@real-router/persistent-params-plugin](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence                                                     |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)                           | Route tree queries and segment testing                                    |
+| [@real-router/ssr-utils](https://www.npmjs.com/package/@real-router/ssr-utils)                               | Router-level SSR/SSG/hydration helpers (serialize, hydrate, static paths) |
 
 ## Contributing
 

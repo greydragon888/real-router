@@ -4,6 +4,7 @@ import { fc, test } from "@fast-check/vitest";
 
 import { arbRouteForest, NUM_RUNS } from "./helpers";
 import { createRouteTree } from "../../../src/engine/builder/createRouteTree";
+import { createMatcher } from "../../../src/engine/createMatcher";
 import {
   nodeToDefinition,
   routeTreeToDefinitions,
@@ -140,6 +141,39 @@ describe("createRouteTree Properties", () => {
           expect(match!.absolute).toBe(node.absolute);
           expect(match!.path).toBe(node.path);
         }
+      },
+    );
+  });
+
+  // #1407: `createNode` prepends a missing leading "/" (after the `~`-strip), so
+  // the trie never sees a bare relative segment. All four spellings of an absolute
+  // single segment — relative `s`, `/s`, `~s`, `~/s` — collapse to the stored path
+  // `/s` and round-trip through the matcher. (arbRouteForest only generates
+  // leading-`/`/`~/` forms, so this slash-less space is otherwise untested.)
+  describe("5: leading-slash normalization — a slash-less path is prepended with / (#1407)", () => {
+    const arbSeg = fc.stringMatching(/^[a-z][a-z0-9]{0,7}$/);
+    // The four spellings of an absolute single segment, by their path prefix:
+    // relative `s`, absolute `/s`, tilde-no-slash `~s`, tilde-slash `~/s`.
+    const arbPrefix = fc.constantFrom("", "/", "~", "~/");
+
+    test.prop([arbSeg, arbPrefix], { numRuns: NUM_RUNS.standard })(
+      "every spelling of an absolute single segment stores path `/s` and round-trips",
+      (seg: string, prefix: string) => {
+        const tree = createRouteTree("", "", [
+          { name: "r", path: `${prefix}${seg}` },
+        ]);
+        const node = collectAllNodes(tree)[0];
+
+        // The stored path is always leading-"/" — the trie only ever sees a
+        // leading-"/" path (the "correct-by-construction" invariant #1407).
+        expect(node.path).toBe(`/${seg}`);
+
+        const matcher = createMatcher();
+
+        matcher.registerTree(tree);
+
+        expect(matcher.buildPath("r", {})).toBe(`/${seg}`);
+        expect(matcher.match(`/${seg}`)?.segments.at(-1)?.name).toBe("r");
       },
     );
   });
