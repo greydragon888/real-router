@@ -1,3 +1,9 @@
+// @ts-nocheck — template source: the double-underscore META/SWEEP/GRID/DATA/VERSIONS tokens
+// below are build-time placeholders that build-deck.mjs string-replaces before this becomes
+// valid JS. The raw file is not standalone-valid and is in no tsconfig; IDE-only checking
+// would flag those placeholders as undefined names (TS 2570).
+// (Do NOT write the literal __token__ forms in this comment — build-deck's single-occurrence
+//  string .replace() would consume them here and leave the real assignments unreplaced.)
   const GROUPS=[
     ["Per navigation",[
       ["nav-latency","Navigation latency","click → DOM committed"],

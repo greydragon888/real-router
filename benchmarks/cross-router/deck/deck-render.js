@@ -19,7 +19,7 @@ const NO_TR = ["@mateothegreat/svelte5-router", "@tanstack/react-router", "@tans
 const ROUTERS = new Set(["@mateothegreat/svelte5-router", "@tanstack/react-router", "@tanstack/vue-router", "@tanstack/solid-router", "@solidjs/router", "@angular/router", "real-router", "react-router", "vue-router", "solid-router", "sv-router", "mateo-router", "TanStack", "mateo"]);
 const NT_RE = new RegExp("(" + NO_TR.join("|") + ")", "g");
 function ntClass(name) { return name === "real-router" ? " class='nr rr'" : ROUTERS.has(name) ? " class='nr'" : ""; }
-function NT(h) { return String(h).replace(/(<[^>]*>)|([^<]+)/g, (m, tag, txt) => txt == null ? m : txt.replace(NT_RE, (mm, name) => "<span translate='no'" + ntClass(name) + ">" + name + "</span>")); }
+function NT(h) { return String(h).replace(/(<[^>]*>)|([^<]+)/g, (m, _tag, txt) => txt == null ? m : txt.replace(NT_RE, (_mm, name) => "<span translate='no'" + ntClass(name) + ">" + name + "</span>")); }
 
 function fmt(v, u) { if (v == null) return "—"; let s; if (u === "KB") s = Math.round(v).toString(); else if (u === "MB") s = v.toFixed(2); else s = (v < 1 ? v.toFixed(3) : v < 10 ? v.toFixed(2) : v.toFixed(1)); if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, ""); return s; }
 
@@ -207,7 +207,7 @@ function ratioMag(co, sc, rival, at) {
 }
 function fmtX(v) { if (v == null) return "?×"; const s = v >= 10 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toString().replace(/\.0$/, ""); return s + "×"; }
 function resolveR(text, co, sc) {
-  return String(text).replace(/⟨([^⟩]+)⟩/g, (m, body) => {
+  return String(text).replace(/⟨([^⟩]+)⟩/g, (_m, body) => {
     let s = sc, spec = body;
     const ci = body.indexOf(":");
     if (ci > 0) { s = body.slice(0, ci); spec = body.slice(ci + 1); }
