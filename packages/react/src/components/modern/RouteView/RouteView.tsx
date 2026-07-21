@@ -65,11 +65,18 @@ function RouteViewRoot({
   // that never committed — otherwise a later render would show that
   // never-mounted match as a hidden keepAlive subtree. Adding the same name
   // twice is a no-op, so the effect is safe to re-run.
+  // `hasBeenActivated` is a ref-held Set (L15-20), mutated post-commit in this
+  // effect — the concurrent-safe pattern #1251 established. @eslint-react's
+  // experimental `immutability` rule (detection widened in v5.17) flags the ref
+  // mutation and suggests state, which would defeat the ref's whole purpose
+  // (re-render-free activation tracking). Intentional exception, scoped here.
+  /* eslint-disable @eslint-react/immutability -- intentional post-commit ref-Set mutation, see #1251 */
   useEffect(() => {
     if (activatedName !== null) {
       hasBeenActivated.add(activatedName);
     }
   }, [activatedName, hasBeenActivated]);
+  /* eslint-enable @eslint-react/immutability */
 
   if (rendered.length > 0) {
     return <>{rendered}</>;
