@@ -67,12 +67,12 @@ describe("change-detection storm — RealLink / RealLinkActive cache absorbs CD 
     setAttributeCount = { href: 0, other: 0 };
     classOpCount = { toggle: 0, remove: 0, add: 0 };
 
-    /* eslint-disable vitest/unbound-method -- monkey-patching DOM prototypes for instrumentation; methods are re-bound via `.call(this)` / `.apply(this)` below */
+    // Monkey-patching DOM prototypes for instrumentation; methods are re-bound
+    // via `.call(this)` / `.apply(this)` below.
     origSetAttribute = Element.prototype.setAttribute;
     origToggle = DOMTokenList.prototype.toggle;
     origRemove = DOMTokenList.prototype.remove;
     origAdd = DOMTokenList.prototype.add;
-    /* eslint-enable vitest/unbound-method */
 
     Element.prototype.setAttribute = function (
       name: string,

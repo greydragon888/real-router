@@ -1147,6 +1147,13 @@ export default tsEslint.config(
       "@typescript-eslint/no-shadow": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/unbound-method": "off", // Conflicts with expect.any() in Vitest
+      // vitest's port of unbound-method (on via configs.all). typescript-eslint
+      // 8.65 (#12448) expanded the shared logic to flag member access on UNION
+      // types, which the vitest variant inherited — now FPs on idiomatic mock
+      // reads like `vi.mocked(console[messageLevel])` (method handed to an
+      // identity cast, never invoked unbound). Same structural-FP class as the
+      // base rule off above; aligned here rather than fixed per-site.
+      "vitest/unbound-method": "off",
       "sonarjs/no-commented-code": "off",
       "sonarjs/no-duplicate-string": "off",
       "sonarjs/function-return-type": "off",
