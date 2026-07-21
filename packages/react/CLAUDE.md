@@ -2,6 +2,8 @@
 
 > React bindings with optimal re-render strategies
 
+**Perf bench (CodSpeed):** this adapter's hot-path suite lives centrally, not in-package (the cross-cutting multi-framework harness needs one prebuild + one V8-flag-wrapped process — see `benchmarks/CLAUDE.md`): `benchmarks/adapter-bench/benches/react.bench.mts` + `apps/react.tsx` (three benches: navigate-param-swap / navigate-route-swap / back-forward). Run locally: `pnpm -C benchmarks run bench:adapter react`. Design record: IMPLEMENTATION_NOTES "adapter-bench slot".
+
 ## Entry Points (Subpath Exports)
 
 Six entry points via `package.json` `exports` — five named subpaths plus a `react-server` condition on the root and `/ssr` exports:

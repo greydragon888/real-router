@@ -2,6 +2,8 @@
 
 > Svelte 5 bindings with compiler-driven Runes reactivity
 
+**Perf bench (CodSpeed):** this adapter's hot-path suite lives centrally, not in-package (the cross-cutting multi-framework harness needs one prebuild + one V8-flag-wrapped process — see `benchmarks/CLAUDE.md`): `benchmarks/adapter-bench/benches/svelte.bench.mts` + `apps/svelte/` (`.svelte` components — three benches: navigate-param-swap / navigate-route-swap / back-forward, commits drained via `flushSync()` from `svelte`). Run locally: `pnpm -C benchmarks run bench:adapter svelte`. Design record: IMPLEMENTATION_NOTES "adapter-bench slot".
+
 ## Single Entry Point
 
 ```typescript

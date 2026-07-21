@@ -2,6 +2,8 @@
 
 > Angular 22 bindings with signal-based reactive state
 
+**Perf bench (CodSpeed):** this adapter's hot-path suite lives centrally, not in-package (the cross-cutting multi-framework harness needs one prebuild + one V8-flag-wrapped process — see `benchmarks/CLAUDE.md`): `benchmarks/adapter-bench/benches/angular.bench.mts` + `apps/angular/` (AOT via `@analogjs/vite-plugin-angular`, zoneless — three benches: navigate-param-swap / navigate-route-swap / back-forward, commits via `appRef.tick()`). Unlike the other five it resolves `@real-router/*` to built dist, so its prebuild bundles the angular graph first. Run locally: `pnpm -C benchmarks run bench:adapter angular`. Design record: IMPLEMENTATION_NOTES "adapter-bench slot".
+
 ## Two Entry Points
 
 ```typescript

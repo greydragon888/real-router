@@ -2,6 +2,8 @@
 
 > Vue 3 bindings with proxy-based reactive refs
 
+**Perf bench (CodSpeed):** this adapter's hot-path suite lives centrally, not in-package (the cross-cutting multi-framework harness needs one prebuild + one V8-flag-wrapped process — see `benchmarks/CLAUDE.md`): `benchmarks/adapter-bench/benches/vue.bench.mts` + `apps/vue.ts` (three benches: navigate-param-swap / navigate-route-swap / back-forward — Vue is the one ASYNC suite, commits settle via `await nextTick()`). Run locally: `pnpm -C benchmarks run bench:adapter vue`. Design record: IMPLEMENTATION_NOTES "adapter-bench slot".
+
 ## Single Entry Point
 
 ```typescript

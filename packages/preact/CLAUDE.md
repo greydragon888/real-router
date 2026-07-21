@@ -2,6 +2,8 @@
 
 > Preact bindings with optimal re-render strategies
 
+**Perf bench (CodSpeed):** this adapter's hot-path suite lives centrally, not in-package (the cross-cutting multi-framework harness needs one prebuild + one V8-flag-wrapped process — see `benchmarks/CLAUDE.md`): `benchmarks/adapter-bench/benches/preact.bench.mts` + `apps/preact.tsx` (three benches: navigate-param-swap / navigate-route-swap / back-forward). Run locally: `pnpm -C benchmarks run bench:adapter preact`. Design record: IMPLEMENTATION_NOTES "adapter-bench slot".
+
 ## Entry Points (Subpath Exports)
 
 Two entry points via `package.json` `exports` — main + SSR subpath:
