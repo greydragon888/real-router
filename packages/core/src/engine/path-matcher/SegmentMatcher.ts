@@ -301,11 +301,11 @@ export class SegmentMatcher {
 
     if (queryParamsMode === "loose") {
       for (const paramKey in params) {
-        if (!(
-          Object.hasOwn(params, paramKey) &&
-          !route.declaredQueryParamsSet.has(paramKey) &&
-          !route.buildParamNamesSet.has(paramKey)
-        )) {
+        if (
+          !Object.hasOwn(params, paramKey) ||
+          route.declaredQueryParamsSet.has(paramKey) ||
+          route.buildParamNamesSet.has(paramKey)
+        ) {
           continue;
         }
 

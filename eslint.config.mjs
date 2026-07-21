@@ -711,8 +711,14 @@ export default tsEslint.config(
       "unicorn/consistent-template-literal-escape": "error",
       // v64: Disallow unnecessary Iterator#toArray() calls
       "unicorn/no-useless-iterator-to-array": "error",
-      // v64: Put simpler condition first in logical expressions
-      "unicorn/prefer-simple-condition-first": "warn",
+      // v64: Put simpler condition first in logical expressions. Adopted at warn
+      // in v64 (then clean), but v72 "Fix logic" (#3530) expanded detection to 27
+      // previously-green sites (16 src). In every hit the "complex" operand is a
+      // cheap pure field access or tiny guard, so the short-circuit gain is nil,
+      // while reordering hurts readability (e.g. `!isString(x) || x === ""` would
+      // check emptiness before knowing x is a string). A style micro-opt, not a
+      // bug-catcher — declined under the same doctrine as the style opinions below.
+      "unicorn/prefer-simple-condition-first": "off",
       // v64: Enforce consistent break position in switch cases
       "unicorn/switch-case-break-position": "warn",
 
@@ -936,6 +942,27 @@ export default tsEslint.config(
       // sites. Modernizing test scaffolding is pure churn with no shipped value,
       // so it is declined repo-wide rather than carved out per-file.
       "unicorn/prefer-dom-node-replace-children": "off",
+
+      // ============================================
+      // v70–v72 — 19 new rules, all in `recommended`. 14 have zero hits and are
+      // adopted for free as forward-guards. 3 declined below; 2 modernizations
+      // (prefer-simplified-conditions, prefer-split-limit) are adopted and
+      // autofixed in place. See .claude/unicorn-v72-rules-audit.md.
+      // ============================================
+      // v72: `.getHTML()` (Element serialization API) is undefined in jsdom@29 —
+      // the entire test env. All 37 hits are test assertions reading `.innerHTML`
+      // (`expect(el.innerHTML.trim())…`); autofixing to `.getHTML()` would throw
+      // TypeError at runtime. Reading innerHTML in a test is correct and universal.
+      // Same jsdom-missing-API precedent as require-css-escape.
+      "unicorn/prefer-dom-node-html-methods": "off",
+      // v72: `.then(f, g)` → `.then(f).catch(g)` changes semantics — the 2-arg
+      // form's reject handler does NOT catch errors thrown by the fulfill handler.
+      // Both shipped sites (preact `Await` promise-tracking, ssr-data settle map)
+      // deliberately rely on that separation; no safe autofix, all uses intentional.
+      "unicorn/prefer-then-catch": "off",
+      // v70: `Iterator#find/map/…` helpers are ES2025 (Node 22+) — same broad-
+      // runtime-target risk as prefer-iterator-to-array above. 2 test hits only.
+      "unicorn/prefer-iterator-helpers": "off",
     },
   },
 

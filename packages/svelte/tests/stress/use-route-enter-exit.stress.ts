@@ -62,7 +62,7 @@ describe("Stress: useRouteExit", () => {
 
     // Every call has a distinct `from → to` pair where from !== to.
     handlerCalls.forEach((entry) => {
-      const [from, to] = entry.split("→");
+      const [from, to] = entry.split("→", 2);
 
       expect(from).not.toBe(to);
     });
