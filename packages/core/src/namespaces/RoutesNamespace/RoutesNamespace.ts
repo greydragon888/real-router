@@ -350,13 +350,13 @@ export class RoutesNamespace<
           : { params: routeParams, search };
 
       // Reunite the (encoded) query with the path bag so the rebuilt URL keeps its
-      // query string — the matchPath rebuild is still v1/single-bag (an explicit
-      // two-channel rebuild here needs the defaultParams field-split, a В2.5 /
-      // milestone-3 follow-up). PATH params win over a same-named query param
-      // (`/items/:id?id`): the path bag is spread LAST so query never overwrites
-      // the path value in the rebuild — the killed #843 precedence. (A colliding
-      // name's query value in the rebuilt URL stays imperfect until then; the path
-      // identity and the split state.params/state.search are correct.)
+      // query string — the matchPath rebuild is still v1/single-bag (a search-aware
+      // two-channel rebuild here is an M2 §4 follow-up, #1549 — NOT the milestone-3
+      // defaultParams field-split, which is a separate config-shape change). PATH
+      // params win over a same-named query param (`/items/:id?id`): the path bag is
+      // spread LAST so query never overwrites the path value in the rebuild — the
+      // killed #843 precedence. (A colliding name's query value in the rebuilt URL
+      // stays imperfect until then; the path identity is correct.)
       const buildParams = { ...encoded.search, ...encoded.params } as Params;
 
       const ts = opts.trailingSlash;
@@ -364,8 +364,8 @@ export class RoutesNamespace<
       try {
         // `search` omitted (v1 single-bag rebuild): the matched query is folded
         // into `buildParams` above, so the matcher extracts the query half from
-        // it — a colliding rebuild stays imperfect here (В2.5 follow-up), but
-        // query-typed defaultParams still reach the URL. The write path
+        // it — a colliding rebuild stays imperfect here (M2 §4 follow-up, #1549),
+        // but query-typed defaultParams still reach the URL. The write path
         // (navigate / buildPath) passes an explicit `search` and resolves the
         // collision (RFC-4 M2 / #1548).
         builtPath = this.#store.matcher.buildPath(
@@ -394,10 +394,11 @@ export class RoutesNamespace<
 
     // `state.search` carries the matched query as returned by forwardState (a
     // search-schema interceptor may have validated/stripped it); `state.params`
-    // keeps the resolved path bag. Query-typed defaults and decoder-injected
-    // keys stay in `params` on the matchPath path — the clean two-channel split
-    // there is a В2.5 follow-up; the navigate path already splits fully
-    // (RFC-4 M2 / #1548).
+    // keeps the resolved path bag. NOTE: a query-declared `defaultParam` (and a
+    // decoder-injected query key) currently stays in `state.params` instead of
+    // `state.search` — `defaultParams` is not yet routed by channel on EITHER the
+    // match or the navigate path (`makeState` re-merges the full bag). That
+    // channel routing is an M2 §4 follow-up, #1549 (RFC-4 M2 / #1548).
     return this.#deps.makeState<P>(
       routeName,
       routeParams,
