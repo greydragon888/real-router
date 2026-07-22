@@ -103,9 +103,9 @@ describe("core/routes/clearRoutes", () => {
 
   describe("config cleanup", () => {
     it("should clear decoders", async () => {
-      const decodeParams = vi.fn((params) => ({
-        ...params,
-        id: Number(params.id),
+      const decodeParams = vi.fn(({ params, search }) => ({
+        params: { ...params, id: Number(params.id) },
+        search,
       }));
 
       routesApi.add({
@@ -132,9 +132,9 @@ describe("core/routes/clearRoutes", () => {
     });
 
     it("should clear encoders", async () => {
-      const encodeParams = vi.fn((params) => ({
-        ...params,
-        id: `${params.id as number}`,
+      const encodeParams = vi.fn(({ params, search }) => ({
+        params: { ...params, id: `${params.id as number}` },
+        search,
       }));
 
       routesApi.add({

@@ -107,6 +107,28 @@ export interface NavigationTarget<
 }
 
 /**
+ * The two navigation channels a per-route codec operates on (RFC-4 M2 / #1548):
+ * `params` is the path channel, `search` the query channel. Used as **both** the
+ * input and the output of {@link Route.encodeParams} / {@link Route.decodeParams}
+ * — a codec transforms whichever channel(s) it owns and returns the other channel
+ * unchanged (it must be passed through explicitly).
+ *
+ * @remarks
+ * v1 ran the whole (path + query) bag through both callbacks, so a query value
+ * reached `decodeParams`. This two-channel shape preserves that reach: the query
+ * arrives in `search` rather than merged into `params`. Value semantics are
+ * unchanged — only the storage location differs (M2 keeps query parsing/printing
+ * exactly as v1).
+ */
+export interface ParamsSearch<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+> {
+  params: P;
+  search: S;
+}
+
+/**
  * Parsed shape produced by `serializeRouterState()` (`@real-router/ssr-utils`,
  * after `JSON.parse`). Identical to {@link State} minus `transition`
  * (per-navigation `TransitionMeta` is meaningless after hydration; the client

@@ -258,20 +258,32 @@ export class RoutesNamespace<
       : /* v8 ignore next -- @preserve: V8 can't track ?? branch in ternary; covered by buildPath tests without params */ (params ??
         {});
 
-    const encodedParams =
-      typeof this.#store.config.encoders[route] === "function"
-        ? this.#store.config.encoders[route]({ ...paramsWithDefault })
-        : paramsWithDefault;
+    // `search` (RFC-4 M2 / #1548) is the explicit query channel. The route codec
+    // (if any) now sees BOTH channels — `encodeParams({ params, search })` returns
+    // `{ params, search }` (§4) — so an encoder can shape the query as well as the
+    // path. The matcher then builds the path slots from the returned `params` and
+    // the query string from the returned `search`. With no encoder the channels
+    // pass straight through, allocating no wrapper object on the hot path.
+    if (typeof this.#store.config.encoders[route] === "function") {
+      const encoded = this.#store.config.encoders[route]({
+        // Spread so a mutating encoder can't reach the caller's original params
+        // object (the `params ?? {}` branch above aliases it) — a copy, as the
+        // v1 single-bag call (`encoders[route]({ ...paramsWithDefault })`) did.
+        params: { ...paramsWithDefault },
+        search: search ?? {},
+      });
 
-    // `search` (RFC-4 M2 / #1548) is the explicit query channel — passed through
-    // to the matcher, which builds the query string from it when present and
-    // falls back to extracting the query half from `encodedParams` when absent
-    // (the v1 single-bag path). Not run through the route encoder: encoders
-    // target the path bag; a search-aware caller supplies already-shaped query
-    // values (a per-route query encoder is a follow-up).
+      return this.#store.matcher.buildPath(
+        route,
+        encoded.params,
+        encoded.search,
+        this.#getBuildPathOptions(options),
+      );
+    }
+
     return this.#store.matcher.buildPath(
       route,
-      encodedParams,
+      paramsWithDefault,
       search,
       this.#getBuildPathOptions(options),
     );
@@ -295,44 +307,57 @@ export class RoutesNamespace<
     }
 
     const routeState = createRouteState(matchResult);
-    const { name, params, search } = routeState;
+    const { name, params } = routeState;
+    // The matcher always carries a search bag (a frozen `{}` when empty) but types
+    // its values as `unknown`; narrow it to the query channel once here so the
+    // codec / forwardState / rebuild uses it without per-site casts.
+    const search = routeState.search as SearchParams;
 
-    const decodedParams =
+    // Two-channel decode (RFC-4 M2 / #1548, §4): the route codec sees BOTH the
+    // path params AND the parsed query — `decodeParams({ params, search })` →
+    // `{ params, search }` — restoring v1's reach (v1 ran the whole path+query bag
+    // through the decoder). Runs here, inside match, BEFORE any search-schema
+    // plugin validation (the v1 order: engine codec → plugin). With no decoder the
+    // channels pass through untouched.
+    const decoded =
       typeof this.#store.config.decoders[name] === "function"
-        ? this.#store.config.decoders[name](params)
-        : params;
+        ? this.#store.config.decoders[name]({ params, search })
+        : { params, search };
 
-    // Thread the matched query through forwardState (RFC-4 M2 / #1548): a
-    // search-schema interceptor validates it on the URL→State path here (the
-    // `routeSearch` argument is defined, marking this as a re-parse, not a
+    // Thread the decoded channels through forwardState (RFC-4 M2 / #1548): a
+    // search-schema interceptor validates the query on the URL→State path here
+    // (the `routeSearch` argument is defined, marking this as a re-parse, not a
     // navigate). `forwardedSearch` is what the (possibly validating) interceptor
     // chain returns — use it for the committed `state.search`.
     const {
       name: routeName,
       params: routeParams,
       search: forwardedSearch,
-    } = this.#deps.forwardState<P>(
-      name,
-      decodedParams as P,
-      search as SearchParams,
-    );
+    } = this.#deps.forwardState<P>(name, decoded.params as P, decoded.search);
 
     let builtPath = path;
 
     if (opts.rewritePathOnMatch) {
-      // Reunite the matched query with the resolved bag so the rebuilt URL keeps
-      // its query string — buildPath is still v1/single-bag (the search-aware
-      // slot-shift is a separate step, RFC-4 M2 / #1548). PATH params win over a
-      // same-named query param (`/items/:id?id`): query must NOT overwrite the
-      // path value in the rebuild — that is the killed #843 precedence. (The
-      // query value of a colliding name in the rebuilt URL is imperfect until
-      // buildPath is search-aware — a В2.5 follow-up; the path identity, and the
-      // split state.params/state.search, are correct.)
-      const buildBag = { ...search, ...(routeParams as Params) } as Params;
-      const buildParams =
+      // Two-channel encode for the URL rebuild (RFC-4 M2 / #1548, §4): the codec
+      // sees `{ params: routeParams, search }` and returns `{ params, search }`,
+      // so it can shape either channel of the rebuilt URL.
+      const encoded =
         typeof this.#store.config.encoders[routeName] === "function"
-          ? this.#store.config.encoders[routeName]({ ...buildBag })
-          : (buildBag as Record<string, unknown>);
+          ? this.#store.config.encoders[routeName]({
+              params: routeParams,
+              search,
+            })
+          : { params: routeParams, search };
+
+      // Reunite the (encoded) query with the path bag so the rebuilt URL keeps its
+      // query string — the matchPath rebuild is still v1/single-bag (an explicit
+      // two-channel rebuild here needs the defaultParams field-split, a В2.5 /
+      // milestone-3 follow-up). PATH params win over a same-named query param
+      // (`/items/:id?id`): the path bag is spread LAST so query never overwrites
+      // the path value in the rebuild — the killed #843 precedence. (A colliding
+      // name's query value in the rebuilt URL stays imperfect until then; the path
+      // identity and the split state.params/state.search are correct.)
+      const buildParams = { ...encoded.search, ...encoded.params } as Params;
 
       const ts = opts.trailingSlash;
 

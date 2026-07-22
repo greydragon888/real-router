@@ -92,9 +92,9 @@ describe("core/routes/routePath/buildPath", () => {
       routesApi.add({
         name: "user",
         path: "/user/:id",
-        encodeParams: (params) => ({
-          ...params,
-          id: `encoded-${params.id as string}`,
+        encodeParams: ({ params, search }) => ({
+          params: { ...params, id: `encoded-${params.id as string}` },
+          search,
         }),
       });
 
@@ -110,13 +110,13 @@ describe("core/routes/routePath/buildPath", () => {
       routesApi.add({
         name: "user",
         path: "/user/:id",
-        encodeParams: (params) => {
+        encodeParams: ({ params, search }) => {
           receivedParams = params;
 
           // Encoder can mutate its copy without affecting original
           params.id = `encoded-${params.id as string}`;
 
-          return params;
+          return { params, search };
         },
       });
 
@@ -134,9 +134,9 @@ describe("core/routes/routePath/buildPath", () => {
       routesApi.add({
         name: "user",
         path: "/user/:id",
-        encodeParams: (params) => ({
-          ...params,
-          id: `encoded-${params.id as string}`,
+        encodeParams: ({ params, search }) => ({
+          params: { ...params, id: `encoded-${params.id as string}` },
+          search,
         }),
       });
 
@@ -324,9 +324,9 @@ describe("core/routes/routePath/buildPath", () => {
           name: "user",
           path: "/user/:id",
           defaultParams: { id: "0" },
-          encodeParams: (params) => ({
-            ...params,
-            id: `encoded-${params.id as string}`,
+          encodeParams: ({ params, search }) => ({
+            params: { ...params, id: `encoded-${params.id as string}` },
+            search,
           }),
         });
 
@@ -341,9 +341,9 @@ describe("core/routes/routePath/buildPath", () => {
           name: "user",
           path: "/user/:id",
           defaultParams: { id: "default" },
-          encodeParams: (params) => ({
-            ...params,
-            id: `encoded-${params.id as string}`,
+          encodeParams: ({ params, search }) => ({
+            params: { ...params, id: `encoded-${params.id as string}` },
+            search,
           }),
         });
 
@@ -357,11 +357,11 @@ describe("core/routes/routePath/buildPath", () => {
           name: "user",
           path: "/user/:id",
           defaultParams: { id: "0" },
-          encodeParams: (params) => {
+          encodeParams: ({ params, search }) => {
             // Increment the id
             const numId = Number(params.id);
 
-            return { ...params, id: String(numId + 1) };
+            return { params: { ...params, id: String(numId + 1) }, search };
           },
         });
 

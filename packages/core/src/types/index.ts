@@ -10,6 +10,7 @@ export type {
 export type {
   Params,
   NavigationTarget,
+  ParamsSearch,
   SearchParams,
   SearchParamValue,
   SearchParamPrimitive,

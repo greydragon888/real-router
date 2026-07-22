@@ -10,6 +10,7 @@ import type {
   State,
   Params,
   NavigationTarget,
+  ParamsSearch,
   SearchParams,
   RouterError,
   Unsubscribe,
@@ -423,10 +424,21 @@ export interface Route<
   forwardTo?: string | ForwardToCallback<Dependencies>;
   /** Nested child routes. */
   children?: Route<Dependencies>[];
-  /** Encodes state params to URL params. */
-  encodeParams?: (stateParams: Params) => Params;
-  /** Decodes URL params to state params. */
-  decodeParams?: (pathParams: Params) => Params;
+  /**
+   * Encodes the state channels to URL channels before path building (RFC-4 M2 /
+   * #1548). Receives `{ params, search }` and returns `{ params, search }` —
+   * transform whichever channel you own and pass the other through. The path
+   * slots are built from the returned `params`, the query string from the
+   * returned `search`.
+   */
+  encodeParams?: (channels: ParamsSearch) => ParamsSearch;
+  /**
+   * Decodes the matched URL channels to state channels (RFC-4 M2 / #1548).
+   * Receives `{ params, search }` (path params + parsed query) and returns
+   * `{ params, search }`. Runs inside `matchPath`, **before** any search-schema
+   * plugin validation — the v1 transformation order (engine codec → plugin).
+   */
+  decodeParams?: (channels: ParamsSearch) => ParamsSearch;
   /**
    * Default parameters for this route.
    *
@@ -469,9 +481,9 @@ export interface RouteConfigUpdate<
   /** Set to null to remove defaultParams */
   defaultParams?: Params | null;
   /** Set to null to remove decoder */
-  decodeParams?: ((params: Params) => Params) | null;
+  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null;
   /** Set to null to remove encoder */
-  encodeParams?: ((params: Params) => Params) | null;
+  encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null;
   /** Set to null to remove canActivate */
   canActivate?: GuardFnFactory<Dependencies> | null;
   /** Set to null to remove canDeactivate */

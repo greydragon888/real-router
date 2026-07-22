@@ -25,6 +25,7 @@ import type {
   ForwardToCallback,
   GuardFn,
   Params,
+  ParamsSearch,
   RouteConfigUpdate,
   RouterLogger,
   GuardFnFactory,
@@ -276,13 +277,19 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   }
 
   if (route.decodeParams) {
-    config.decoders[fullName] = (params: Params): Params =>
-      route.decodeParams?.(params) ?? params;
+    const decode = route.decodeParams;
+
+    config.decoders[fullName] = (channels: ParamsSearch): ParamsSearch =>
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if a user-provided decoder violates its `{ params, search }` return type
+      decode(channels) ?? channels;
   }
 
   if (route.encodeParams) {
-    config.encoders[fullName] = (params: Params): Params =>
-      route.encodeParams?.(params) ?? params;
+    const encode = route.encodeParams;
+
+    config.encoders[fullName] = (channels: ParamsSearch): ParamsSearch =>
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if a user-provided encoder violates its `{ params, search }` return type
+      encode(channels) ?? channels;
   }
 
   if (route.defaultParams) {
@@ -809,8 +816,8 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
 ): {
   forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
   defaultParams?: Params | null | undefined;
-  decodeParams?: ((params: Params) => Params) | null | undefined;
-  encodeParams?: ((params: Params) => Params) | null | undefined;
+  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+  encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 } {
   const {
     forwardTo,
@@ -1016,8 +1023,10 @@ function commitScalarConfig<
   name: string,
   updates: {
     defaultParams?: Params | null | undefined;
-    decodeParams?: ((params: Params) => Params) | null | undefined;
-    encodeParams?: ((params: Params) => Params) | null | undefined;
+    decodeParams?:
+      ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+    encodeParams?:
+      ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
   },
 ): void {
   if (updates.defaultParams !== undefined) {
@@ -1034,9 +1043,9 @@ function commitScalarConfig<
     } else {
       const decoder = updates.decodeParams;
 
-      store.config.decoders[name] = (params: Params): Params =>
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided decoder violates its return type
-        decoder(params) ?? params;
+      store.config.decoders[name] = (channels: ParamsSearch): ParamsSearch =>
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided decoder violates its `{ params, search }` return type
+        decoder(channels) ?? channels;
     }
   }
 
@@ -1046,9 +1055,9 @@ function commitScalarConfig<
     } else {
       const encoder = updates.encodeParams;
 
-      store.config.encoders[name] = (params: Params): Params =>
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided encoder violates its return type
-        encoder(params) ?? params;
+      store.config.encoders[name] = (channels: ParamsSearch): ParamsSearch =>
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided encoder violates its `{ params, search }` return type
+        encoder(channels) ?? channels;
     }
   }
 }

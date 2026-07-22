@@ -113,7 +113,10 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should register decodeParams and call it during matchPath", async () => {
-    const decodeParams = vi.fn((params) => ({ ...params, decoded: true }));
+    const decodeParams = vi.fn(({ params, search }) => ({
+      params: { ...params, decoded: true },
+      search,
+    }));
 
     routesApi.add([
       {
@@ -125,13 +128,20 @@ describe("core/routes/addRoute", () => {
 
     const state = getPluginApi(router).matchPath("/item/123");
 
-    // Test behavior: decodeParams was called and transformed the params
-    expect(decodeParams).toHaveBeenCalledWith({ id: "123" });
+    // Test behavior: decodeParams was called with both channels and transformed
+    // the path channel.
+    expect(decodeParams).toHaveBeenCalledWith({
+      params: { id: "123" },
+      search: {},
+    });
     expect(state?.params).toStrictEqual({ id: "123", decoded: true });
   });
 
   it("should register encodeParams and call it during buildPath", async () => {
-    const encodeParams = vi.fn((params) => ({ ...params, encoded: true }));
+    const encodeParams = vi.fn(({ params, search }) => ({
+      params: { ...params, encoded: true },
+      search,
+    }));
 
     routesApi.add([
       {
@@ -143,8 +153,11 @@ describe("core/routes/addRoute", () => {
 
     router.buildPath("item", { id: "123" });
 
-    // Test behavior: encodeParams was called
-    expect(encodeParams).toHaveBeenCalledWith({ id: "123" });
+    // Test behavior: encodeParams was called with both channels
+    expect(encodeParams).toHaveBeenCalledWith({
+      params: { id: "123" },
+      search: {},
+    });
   });
 
   it("should use fallback params when decodeParams returns undefined (line 100)", async () => {
@@ -160,8 +173,11 @@ describe("core/routes/addRoute", () => {
 
     const state = getPluginApi(router).matchPath("/decode-fallback/123");
 
-    expect(decodeParams).toHaveBeenCalledWith({ id: "123" });
-    // Falls back to original params when decodeParams returns undefined
+    expect(decodeParams).toHaveBeenCalledWith({
+      params: { id: "123" },
+      search: {},
+    });
+    // Falls back to input channels when decodeParams returns undefined
     expect(state?.params).toStrictEqual({ id: "123" });
   });
 
@@ -178,8 +194,11 @@ describe("core/routes/addRoute", () => {
 
     const path = router.buildPath("encode-fallback", { id: "456" });
 
-    expect(encodeParams).toHaveBeenCalledWith({ id: "456" });
-    // Falls back to original params when encodeParams returns undefined
+    expect(encodeParams).toHaveBeenCalledWith({
+      params: { id: "456" },
+      search: {},
+    });
+    // Falls back to input channels when encodeParams returns undefined
     expect(path).toBe("/encode-fallback/456");
   });
 
@@ -283,9 +302,9 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should register decodeParams for children routes", async () => {
-      const childDecoder = vi.fn((params) => ({
-        ...params,
-        childDecoded: true,
+      const childDecoder = vi.fn(({ params, search }) => ({
+        params: { ...params, childDecoded: true },
+        search,
       }));
 
       routesApi.add({
@@ -302,14 +321,17 @@ describe("core/routes/addRoute", () => {
 
       const state = getPluginApi(router).matchPath("/api/resource/123");
 
-      expect(childDecoder).toHaveBeenCalledWith({ id: "123" });
+      expect(childDecoder).toHaveBeenCalledWith({
+        params: { id: "123" },
+        search: {},
+      });
       expect(state?.params).toStrictEqual({ id: "123", childDecoded: true });
     });
 
     it("should register encodeParams for children routes", async () => {
-      const childEncoder = vi.fn((params) => ({
-        ...params,
-        childEncoded: true,
+      const childEncoder = vi.fn(({ params, search }) => ({
+        params: { ...params, childEncoded: true },
+        search,
       }));
 
       routesApi.add({
@@ -326,7 +348,10 @@ describe("core/routes/addRoute", () => {
 
       router.buildPath("api.item", { id: "456" });
 
-      expect(childEncoder).toHaveBeenCalledWith({ id: "456" });
+      expect(childEncoder).toHaveBeenCalledWith({
+        params: { id: "456" },
+        search: {},
+      });
     });
 
     it("should register defaultParams for children routes", async () => {
@@ -476,7 +501,10 @@ describe("core/routes/addRoute", () => {
         routesApi.add({
           name: "valid-decoder",
           path: "/valid-decoder/:id",
-          decodeParams: (params) => ({ ...params, decoded: true }),
+          decodeParams: ({ params, search }) => ({
+            params: { ...params, decoded: true },
+            search,
+          }),
         });
       }).not.toThrow();
     });
@@ -486,7 +514,10 @@ describe("core/routes/addRoute", () => {
         routesApi.add({
           name: "valid-encoder",
           path: "/valid-encoder/:id",
-          encodeParams: (params) => ({ ...params, encoded: true }),
+          encodeParams: ({ params, search }) => ({
+            params: { ...params, encoded: true },
+            search,
+          }),
         });
       }).not.toThrow();
     });
@@ -926,8 +957,14 @@ describe("core/routes/addRoute", () => {
     it("should handle route with all options combined", async () => {
       const canActivate = vi.fn(() => () => true);
       const nestedCanActivate = vi.fn(() => () => true);
-      const decodeParams = vi.fn((p) => ({ ...p, decoded: true }));
-      const encodeParams = vi.fn((p) => ({ ...p, encoded: true }));
+      const decodeParams = vi.fn(({ params, search }) => ({
+        params: { ...params, decoded: true },
+        search,
+      }));
+      const encodeParams = vi.fn(({ params, search }) => ({
+        params: { ...params, encoded: true },
+        search,
+      }));
 
       routesApi.add({ name: "target", path: "/target/:id" });
 
@@ -956,13 +993,19 @@ describe("core/routes/addRoute", () => {
       // Verify decodeParams works
       const matchedState = getPluginApi(router).matchPath("/complete/123");
 
-      expect(decodeParams).toHaveBeenCalledWith({ id: "123" });
+      expect(decodeParams).toHaveBeenCalledWith({
+        params: { id: "123" },
+        search: {},
+      });
       expect(matchedState?.params).toStrictEqual({ id: "123", decoded: true });
 
       // Verify encodeParams works
       router.buildPath("complete", { id: "456" });
 
-      expect(encodeParams).toHaveBeenCalledWith({ id: "456" });
+      expect(encodeParams).toHaveBeenCalledWith({
+        params: { id: "456" },
+        search: {},
+      });
 
       // Verify defaultParams works
       const defaultState = getPluginApi(router).makeState("complete");

@@ -221,8 +221,16 @@ const routes: Route[] = [
   {
     name: "product",
     path: "/product/:id",
-    encodeParams: ({ id }) => ({ id: String(id) }),
-    decodeParams: ({ id }) => ({ id: Number(id) }),
+    // Codecs are two-channel: receive `{ params, search }`, return `{ params,
+    // search }` — transform the channel you own, pass the other through.
+    encodeParams: ({ params: { id }, search }) => ({
+      params: { id: String(id) },
+      search,
+    }),
+    decodeParams: ({ params: { id }, search }) => ({
+      params: { id: Number(id) },
+      search,
+    }),
   },
 ];
 ```

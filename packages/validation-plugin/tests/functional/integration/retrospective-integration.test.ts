@@ -82,8 +82,14 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
       {
         name: "product",
         path: "/product/:id",
-        decodeParams: (params) => ({ id: Number(params.id) }),
-        encodeParams: (params) => ({ ...params }),
+        decodeParams: ({ params, search }) => ({
+          params: { id: Number(params.id) },
+          search,
+        }),
+        encodeParams: ({ params, search }) => ({
+          params: { ...params },
+          search,
+        }),
       },
     ]);
 

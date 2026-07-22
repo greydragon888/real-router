@@ -5,6 +5,7 @@ import type {
   ForwardToCallback,
   GuardFn,
   Params,
+  ParamsSearch,
   RouterLogger,
   SearchParams,
   SimpleState,
@@ -91,10 +92,10 @@ export interface RoutesDependencies<
  */
 export interface RouteConfig {
   /** Custom param decoders per route */
-  decoders: Record<string, (params: Params) => Params>;
+  decoders: Record<string, (channels: ParamsSearch) => ParamsSearch>;
 
   /** Custom param encoders per route */
-  encoders: Record<string, (params: Params) => Params>;
+  encoders: Record<string, (channels: ParamsSearch) => ParamsSearch>;
 
   /** Default params per route */
   defaultParams: Record<string, Params>;

@@ -292,9 +292,9 @@ describe("core/routes/removeRoute", () => {
 
   describe("config cleanup", () => {
     it("should clear decoders on removeRoute", async () => {
-      const decodeParams = vi.fn((params) => ({
-        ...params,
-        id: Number(params.id),
+      const decodeParams = vi.fn(({ params, search }) => ({
+        params: { ...params, id: Number(params.id) },
+        search,
       }));
 
       routesApi.add({
@@ -318,9 +318,9 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should clear encoders on removeRoute", async () => {
-      const encodeParams = vi.fn((params) => ({
-        ...params,
-        id: `${params.id as number}`,
+      const encodeParams = vi.fn(({ params, search }) => ({
+        params: { ...params, id: `${params.id as number}` },
+        search,
       }));
 
       routesApi.add({
@@ -569,8 +569,14 @@ describe("core/routes/removeRoute", () => {
         name: "existing",
         path: "/existing/:id",
         defaultParams: { id: "1" },
-        decodeParams: (p) => ({ ...p, id: Number(p.id) }),
-        encodeParams: (p) => ({ ...p, id: `${p.id as number}` }),
+        decodeParams: ({ params, search }) => ({
+          params: { ...params, id: Number(params.id) },
+          search,
+        }),
+        encodeParams: ({ params, search }) => ({
+          params: { ...params, id: `${params.id as number}` },
+          search,
+        }),
         canActivate: () => activateGuard,
       });
       lifecycle.addDeactivateGuard("existing", () => deactivateGuard);

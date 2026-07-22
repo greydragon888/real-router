@@ -36,6 +36,7 @@ import type {
   ForwardToCallback,
   NavigationOptions,
   Params,
+  ParamsSearch,
   Router,
   RouterLogger,
   State,
@@ -362,8 +363,8 @@ function buildStructuralPatch<
 >(fields: {
   forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
   defaultParams?: Params | null | undefined;
-  decodeParams?: ((params: Params) => Params) | null | undefined;
-  encodeParams?: ((params: Params) => Params) | null | undefined;
+  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+  encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 }): Readonly<TreeStructuralPatch<Dependencies>> {
   const patch: TreeStructuralPatch<Dependencies> = {};
 

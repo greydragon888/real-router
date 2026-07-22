@@ -630,9 +630,12 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "user",
         path: "/user/:id",
-        decodeParams: (params) => ({
-          id: Number.parseInt(params.id as string, 10),
-          originalId: params.id,
+        decodeParams: ({ params, search }) => ({
+          params: {
+            id: Number.parseInt(params.id as string, 10),
+            originalId: params.id,
+          },
+          search,
         }),
       });
 
@@ -725,10 +728,10 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "enc",
         path: "/enc/:id",
-        encodeParams: (params) => {
+        encodeParams: ({ params, search }) => {
           encoderCalled = true;
 
-          return params;
+          return { params, search };
         },
       });
 
@@ -748,10 +751,10 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "enc",
         path: "/enc/:id",
-        encodeParams: (params) => {
+        encodeParams: ({ params, search }) => {
           encoderCalled = true;
 
-          return params;
+          return { params, search };
         },
       });
 
@@ -799,9 +802,9 @@ describe("core/routes/routePath/matchPath", () => {
         path: "/enc?q",
         // deliberately out-of-domain: hands buildPath an unserialisable query
         // value so the codec throws during the rewrite
-        encodeParams: (params) => ({
-          ...params,
-          q: [undefined] as unknown as string[],
+        encodeParams: ({ params, search }) => ({
+          params: { ...params, q: [undefined] as unknown as string[] },
+          search,
         }),
       });
 
@@ -905,8 +908,9 @@ describe("core/routes/routePath/matchPath", () => {
         {
           name: "old-item",
           path: "/old-item/:id",
-          decodeParams: (p) => ({
-            id: Number(p.id),
+          decodeParams: ({ params, search }) => ({
+            params: { id: Number(params.id) },
+            search,
           }),
           forwardTo: "new-item",
         },

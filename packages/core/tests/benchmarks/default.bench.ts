@@ -392,7 +392,10 @@ export async function run(): Promise<void> {
     {
       name: "encoded",
       path: "/enc/:id",
-      encodeParams: (params) => ({ ...params, id: `e-${params.id as string}` }),
+      encodeParams: ({ params, search }) => ({
+        params: { ...params, id: `e-${params.id as string}` },
+        search,
+      }),
     },
     { name: "files", path: "/files/*path" },
   ]);

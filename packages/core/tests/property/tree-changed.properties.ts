@@ -7,7 +7,7 @@ import { getRoutesApi } from "@real-router/core/api";
 import { arbSegmentName, NUM_RUNS } from "./helpers";
 
 import type {
-  Params,
+  ParamsSearch,
   Route,
   RouteConfigUpdate,
   Router,
@@ -92,10 +92,16 @@ function buildPatch(
     patch.defaultParams = { x: "1" };
   }
   if (structural.includes("encodeParams")) {
-    patch.encodeParams = (p: Params) => p;
+    patch.encodeParams = ({ params, search }: ParamsSearch) => ({
+      params,
+      search,
+    });
   }
   if (structural.includes("decodeParams")) {
-    patch.decodeParams = (p: Params) => p;
+    patch.decodeParams = ({ params, search }: ParamsSearch) => ({
+      params,
+      search,
+    });
   }
   if (guard.includes("canActivate")) {
     patch.canActivate = () => () => true;

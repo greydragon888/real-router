@@ -4,7 +4,7 @@ import { createRouter } from "@real-router/core";
 import { cloneRouter, getRoutesApi } from "@real-router/core/api";
 
 import type {
-  Params,
+  ParamsSearch,
   Route,
   RouteConfigUpdate,
   Router,
@@ -346,8 +346,14 @@ describe("core/events/tree-changed", () => {
   // encode/decode structural fields.
   it("carries config on payload routes, parent on add, encode/decode on update", () => {
     const fwd = (): string => "home";
-    const enc = (params: Params): Params => params;
-    const dec = (params: Params): Params => params;
+    const enc = ({ params, search }: ParamsSearch): ParamsSearch => ({
+      params,
+      search,
+    });
+    const dec = ({ params, search }: ParamsSearch): ParamsSearch => ({
+      params,
+      search,
+    });
     const guard = () => () => true;
 
     const router = makeRouter([

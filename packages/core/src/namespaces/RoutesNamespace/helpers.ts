@@ -6,6 +6,7 @@ import type {
   DefaultDependencies,
   ForwardToCallback,
   Params,
+  ParamsSearch,
   Route,
 } from "../../types";
 
@@ -14,8 +15,14 @@ import type {
  */
 export function createEmptyConfig(): RouteConfig {
   return {
-    decoders: Object.create(null) as Record<string, (params: Params) => Params>,
-    encoders: Object.create(null) as Record<string, (params: Params) => Params>,
+    decoders: Object.create(null) as Record<
+      string,
+      (channels: ParamsSearch) => ParamsSearch
+    >,
+    encoders: Object.create(null) as Record<
+      string,
+      (channels: ParamsSearch) => ParamsSearch
+    >,
     defaultParams: Object.create(null) as Record<string, Params>,
     forwardMap: Object.create(null) as Record<string, string>,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
