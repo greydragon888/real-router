@@ -2,6 +2,42 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## Cross-router bench: per-cohort processes instead of one whole-matrix process (OOM fix)
+
+**Problem.** `cross-router-bench.yml`'s matrix step ran the entire 5-cohort matrix in
+**one** node process (`node cross-router/run-all.mjs "$RUNS"`). Over ~2.9 h that process
+accreted the residue of hundreds of `vite build()` calls (Rollup/esbuild caches, module
+graphs, heap fragmentation node never returns to the OS) up to **~10.6 GB anon-rss**. The
+runner is NOT a dedicated VPS as the comments claimed — it is a shared 11 GiB host packed
+with ~24 co-tenant production services (ispmanager: mysql/postgres/redis, apache/nginx/
+php-fpm, several Next.js apps, telegram bots, mail/DNS). On 07-21 a co-tenant
+(`test555-telegram-bot`, python) spiked, the box hit **global OOM**, and the kernel picked
+the fattest process — our bench — as the victim: `actions.runner…: Failed with result
+'oom-kill'` → runner lost its worker → "runner has received a shutdown signal" → job red at
+the **angular** finish (last cohort), 2 min short of the ~2h53m a healthy run takes (run
+29852814520). Journal since 07-10 shows exactly one OOM kill — rare, but structurally
+inevitable while the bench lives on the RAM edge of a co-tenant box.
+
+**Solution.** Drive the five cohorts as **separate processes** in a bash loop
+(`for cohort in react vue solid svelte angular; do node …run-all.mjs "$RUNS" "$cohort"; done`),
+accumulating `rc` so any cohort failure still reddens the job (completeness gate intact) while
+the rest run for a full snapshot. `run-all.mjs` already supports the single-cohort form (arg 3
+= framework); the local `bench-cross-router.sh` wrapper has always driven cohorts
+one-per-invocation, so this is a first-class path, not new code. A fresh heap per cohort caps
+peak RSS at one cohort (~2–3 GB).
+
+**Why it costs nothing methodologically.** Cohorts are **independent** comparisons — react
+pits real-router vs tanstack/react-router, svelte vs sv-router/mateo-router, etc.; their
+numbers are never cross-compared, so the cohort boundary carries no methodological weight. The
+engine INTERLEAVE that DOES matter — round-robin of a cohort's engines in one browser session
+so machine drift hits all engines equally (#1460) — lives entirely inside a single `run-all`
+invocation and is untouched. Provenance is identical across processes on the same machine
+(`commit`/`cpu`/`runner`/`dirty`/`distNewestMtime`), and `env.date` was already stamped
+per-cell (react cells at run start, angular cells ~2.5 h later) — so `deck-data` is unaffected.
+Bonus: the last cohort (angular) no longer measures under the fat process's memory-pressure
+(GC pauses / swap). Caveat: this makes OOM far less likely, not impossible — a hard co-tenant
+spike can still kill a 2–3 GB process; only more RAM / a truly dedicated runner closes it fully.
+
 ## import-x graph rules were silently inert — revived via the typescript settings trio (#1525)
 
 **Problem.** `import-x/no-cycle` sat at error level (universal `**/*.ts` block) while

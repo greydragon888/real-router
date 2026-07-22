@@ -28,7 +28,8 @@ env:
 
 jobs:
   bench:
-    # Unsharded: ONE job runs all 5 cohorts — coherent snapshot, one honest machine stamp.
+    # Unsharded: ONE job runs all 5 cohorts (as per-cohort node processes — see the matrix
+    # step) — coherent snapshot, one honest machine stamp (same VPS → identical env stamp).
     runs-on: self-hosted # the dedicated consistent VPS (same runner as codspeed/examples) — low-variance hardware, so the rme-gate can arm (CONSISTENT_RUNNER=1 below). schedule/workflow_dispatch only (no fork-PR) → no self-hosted RCE surface.
     steps:
       - uses: actions/checkout@v7
@@ -67,9 +68,31 @@ jobs:
       # any real failure (broken adapter / contaminated run) → exit 1 → red job = "0 failed cells" failed.
       - name: Run the full matrix
         id: matrix
-        run: node cross-router/run-all.mjs "$RUNS"
+        # Per-cohort PROCESSES (one node per cohort) instead of one process for all five.
+        # Cohorts are INDEPENDENT comparisons (react = real-router vs tanstack/react-router;
+        # svelte = real-router vs sv-router/mateo-router; …) — their numbers are never
+        # cross-compared, so splitting on the cohort boundary loses nothing methodological.
+        # The engine INTERLEAVE that DOES matter (round-robin in one browser session, #1460)
+        # lives entirely inside a single run-all invocation and is untouched. The split caps
+        # peak RSS at ONE cohort (~2–3 GB) instead of the ~10.6 GB the all-in-one process
+        # accreted over ~2.9 h of vite builds — the fattest victim the global OOM-killer picked
+        # on 07-21 (OOM triggered by a co-tenant on this shared 11 GB VPS → runner unit killed →
+        # red at the angular finish, run 29852814520). It also removes the memory-pressure
+        # (GC pauses / swap) the LAST cohort measured under in the fat single process.
+        # Provenance is identical across processes on the same machine (commit/cpu/runner/
+        # dirty/distMtime) and env.date was already per-cell → deck-data unaffected. Any cohort
+        # failing → rc=1 → red job (run-all's own completeness exit code) while the remaining
+        # cohorts still run, for a full-as-possible snapshot in the log.
+        run: |
+          rc=0
+          for cohort in react vue solid svelte angular; do
+            echo "::group::cohort ${cohort}"
+            node cross-router/run-all.mjs "$RUNS" "${cohort}" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
         working-directory: benchmarks
-        timeout-minutes: 600 # first run (07-18) hit the 240min cap mid-svelte, angular never ran → the full n=100 matrix needs ~5–6h on the VPS; 600min headroom (self-hosted has NO platform cap → this timeout is the SOLE hang/OOM backstop)
+        timeout-minutes: 600 # covers all five cohorts in the loop; self-hosted has NO platform cap → this timeout is the SOLE hang backstop (per-cohort heaps make OOM far less likely now)
         env:
           BENCH_RUNNER: "self-hosted" # machine stamp (env.cpu carries the real CPU model)
           RUNS: ${{ inputs.runs || '100' }} # via env, not inline in `run:` — a workflow_dispatch input spliced into a run-script is a shell-injection sink (matches the rme-gate step below)
