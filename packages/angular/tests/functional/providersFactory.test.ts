@@ -154,7 +154,8 @@ describe("provideRealRouterFactory", () => {
       const state = router.getState();
 
       expect(state?.name).toBe("users.profile");
-      expect(state?.params).toStrictEqual({ id: "42", sort: "desc" });
+      expect(state?.params).toStrictEqual({ id: "42" });
+      expect(state?.search).toStrictEqual({ sort: "desc" });
     });
 
     it("REQUEST is optional — falls back to window.location on client", async () => {
@@ -382,10 +383,8 @@ describe("provideRealRouterFactory", () => {
       const router = TestBed.inject(ROUTER);
 
       expect(router.getState()?.name).toBe("users.profile");
-      expect(router.getState()?.params).toStrictEqual({
-        id: "99",
-        lang: "en",
-      });
+      expect(router.getState()?.params).toStrictEqual({ id: "99" });
+      expect(router.getState()?.search).toStrictEqual({ lang: "en" });
     });
   });
 

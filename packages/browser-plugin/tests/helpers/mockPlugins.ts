@@ -100,7 +100,7 @@ export const createStateModifierPlugin = (
 
         modifyState({ params: modifiedParams } as unknown as State);
 
-        return { name: result.name, params: modifiedParams };
+        return { name: result.name, params: modifiedParams, search: {} };
       },
     );
 
@@ -203,15 +203,15 @@ export const createPersistentParamsPlugin = (
           ...result.params,
         };
 
-        return { name: result.name, params: mergedParams };
+        return { name: result.name, params: mergedParams, search: {} };
       },
     );
 
     return {
       onTransitionSuccess: (toState: State) => {
         persistentParams.forEach((param) => {
-          if (toState.params[param] !== undefined) {
-            persistentParamsValues[param] = toState.params[param];
+          if (toState.search[param] !== undefined) {
+            persistentParamsValues[param] = toState.search[param];
           }
         });
       },

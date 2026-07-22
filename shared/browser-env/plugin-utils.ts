@@ -105,6 +105,9 @@ export function createReplaceHistoryState(
     const builtState = api.makeState(
       state.name,
       state.params,
+      // `buildState` yields no separate query channel yet (the search-aware
+      // write path is a slot-shift follow-up, RFC-4 M2 / #1548) — pass none.
+      undefined,
       router.buildPath(state.name, state.params),
       {
         params: state.meta,

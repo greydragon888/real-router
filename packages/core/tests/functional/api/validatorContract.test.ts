@@ -355,7 +355,7 @@ describe("core/validator call-site contract", () => {
     });
 
     it("navigateToState: validates options ('navigateToState') ONLY when options provided", () => {
-      const state = plugin.makeState("home", {}, "/home");
+      const state = plugin.makeState("home", {}, undefined, "/home");
 
       plugin.navigateToState(state).catch(() => {});
 

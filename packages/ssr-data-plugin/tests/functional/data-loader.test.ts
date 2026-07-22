@@ -37,6 +37,7 @@ const buildServerState = (
 ): State => ({
   name: "users.profile",
   params: { id: "42" },
+  search: {},
   path: "/users/42",
   transition: {
     phase: "activating",
@@ -993,6 +994,7 @@ describe("@real-router/ssr-data-plugin", () => {
     const stateWith = (ssrDataMode: unknown): State => ({
       name: "users.profile",
       params: { id: "42" },
+      search: {},
       path: "/users/42",
       transition: {
         phase: "activating",

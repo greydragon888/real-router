@@ -37,6 +37,7 @@ describe("S21: makeState / buildState memory", () => {
       const state = pluginApi.makeState(
         `route${i % 100}`,
         { id: String(i) },
+        undefined,
         `/route${i % 100}`,
       );
 

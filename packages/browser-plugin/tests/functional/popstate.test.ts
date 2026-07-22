@@ -296,6 +296,7 @@ describe("Browser Plugin — Popstate", () => {
       const state1: State = {
         name: "users.view",
         params: { id: "1" },
+        search: {},
         path: "/users/view/1",
         transition: STUB_TRANSITION,
         context: {},
@@ -304,6 +305,7 @@ describe("Browser Plugin — Popstate", () => {
       const state2: State = {
         name: "users.view",
         params: { id: "2" },
+        search: {},
         path: "/users/view/2",
         transition: STUB_TRANSITION,
         context: {},
@@ -312,6 +314,7 @@ describe("Browser Plugin — Popstate", () => {
       const state3: State = {
         name: "users.list",
         params: {},
+        search: {},
         path: "/users/list",
         transition: STUB_TRANSITION,
         context: {},
@@ -447,6 +450,7 @@ describe("Browser Plugin — Popstate", () => {
       const validState: State = {
         name: "home",
         params: {},
+        search: {},
         path: "/home",
         transition: STUB_TRANSITION,
         context: {},
@@ -484,6 +488,7 @@ describe("Browser Plugin — Popstate", () => {
       const validState: State = {
         name: "home",
         params: {},
+        search: {},
         path: "/home",
         transition: STUB_TRANSITION,
         context: {},

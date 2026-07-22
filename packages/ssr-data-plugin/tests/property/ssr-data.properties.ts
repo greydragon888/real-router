@@ -871,6 +871,7 @@ describe("getSsrDataMode: pure read-side guard", () => {
   const stateWith = (ssrDataMode: unknown): State => ({
     name: "any",
     params: {},
+    search: {},
     path: "/",
     transition: {
       phase: "activating",

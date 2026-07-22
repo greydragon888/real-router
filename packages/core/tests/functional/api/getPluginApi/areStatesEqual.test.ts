@@ -19,38 +19,38 @@ describe("areStatesEqual", () => {
   });
 
   it("returns true for same name and params", () => {
-    const s1 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
-    const s2 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
+    const s1 = getPluginApi(router).makeState("home", { id: 1 }, undefined, "/home");
+    const s2 = getPluginApi(router).makeState("home", { id: 1 }, undefined, "/home");
 
     expect(router.areStatesEqual(s1, s2)).toBe(true);
   });
 
   it("returns false for different names", () => {
-    const s1 = getPluginApi(router).makeState("home", {}, "/home");
-    const s2 = getPluginApi(router).makeState("admin", {}, "/admin");
+    const s1 = getPluginApi(router).makeState("home", {}, undefined, "/home");
+    const s2 = getPluginApi(router).makeState("admin", {}, undefined, "/admin");
 
     expect(router.areStatesEqual(s1, s2)).toBe(false);
   });
 
   it("returns false for different params", () => {
-    const s1 = getPluginApi(router).makeState("items", { id: 1 }, "/home");
-    const s2 = getPluginApi(router).makeState("items", { id: 2 }, "/home");
+    const s1 = getPluginApi(router).makeState("items", { id: 1 }, undefined, "/home");
+    const s2 = getPluginApi(router).makeState("items", { id: 2 }, undefined, "/home");
 
     // `id` is not query param
     expect(router.areStatesEqual(s1, s2, true)).toBe(false);
   });
 
   it("returns true for different params with ignore query params", () => {
-    const s1 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
-    const s2 = getPluginApi(router).makeState("home", { id: 2 }, "/home");
+    const s1 = getPluginApi(router).makeState("home", { id: 1 }, undefined, "/home");
+    const s2 = getPluginApi(router).makeState("home", { id: 2 }, undefined, "/home");
 
     // `id` is query param
     expect(router.areStatesEqual(s1, s2)).toBe(true);
   });
 
   it("returns true for different params without ignore query params", () => {
-    const s1 = getPluginApi(router).makeState("items", { id: 1 }, "/home");
-    const s2 = getPluginApi(router).makeState("items", { id: 2 }, "/home");
+    const s1 = getPluginApi(router).makeState("items", { id: 1 }, undefined, "/home");
+    const s2 = getPluginApi(router).makeState("items", { id: 2 }, undefined, "/home");
 
     expect(router.areStatesEqual(s1, s2, false)).toBe(false);
   });
@@ -59,11 +59,13 @@ describe("areStatesEqual", () => {
     const s1 = getPluginApi(router).makeState(
       "home",
       { foo: "bar", q: "1" },
+      undefined,
       "/home",
     );
     const s2 = getPluginApi(router).makeState(
       "home",
       { foo: "bar", q: "1" },
+      undefined,
       "/home",
     );
 
@@ -76,20 +78,20 @@ describe("areStatesEqual", () => {
 
   it("should use cached urlParams on second call (line 118 cache hit)", () => {
     // First call computes and caches urlParams for "home"
-    const s1 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
-    const s2 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
+    const s1 = getPluginApi(router).makeState("home", { id: 1 }, undefined, "/home");
+    const s2 = getPluginApi(router).makeState("home", { id: 1 }, undefined, "/home");
 
     expect(router.areStatesEqual(s1, s2, true)).toBe(true);
 
     // Second call uses cached urlParams (line 118 returns early)
-    const s3 = getPluginApi(router).makeState("home", { id: 2 }, "/home");
-    const s4 = getPluginApi(router).makeState("home", { id: 2 }, "/home");
+    const s3 = getPluginApi(router).makeState("home", { id: 2 }, undefined, "/home");
+    const s4 = getPluginApi(router).makeState("home", { id: 2 }, undefined, "/home");
 
     expect(router.areStatesEqual(s3, s4, true)).toBe(true);
   });
 
   it("should return false when one state is undefined", () => {
-    const state = getPluginApi(router).makeState("home", {}, "/home");
+    const state = getPluginApi(router).makeState("home", {}, undefined, "/home");
 
     expect(router.areStatesEqual(state, undefined)).toBe(false);
     expect(router.areStatesEqual(undefined, state)).toBe(false);
@@ -101,11 +103,13 @@ describe("areStatesEqual", () => {
     const s1 = getPluginApi(router).makeState(
       "nonexistent.route",
       { id: 1 },
+      undefined,
       "/nonexistent",
     );
     const s2 = getPluginApi(router).makeState(
       "nonexistent.route",
       { id: 1 },
+      undefined,
       "/nonexistent",
     );
 
@@ -118,11 +122,13 @@ describe("areStatesEqual", () => {
     const s1 = getPluginApi(router).makeState(
       "unknown.route",
       { x: 1 },
+      undefined,
       "/unknown",
     );
     const s2 = getPluginApi(router).makeState(
       "unknown.route",
       { x: 2 },
+      undefined,
       "/unknown",
     );
 
@@ -136,7 +142,7 @@ describe("areStatesEqual", () => {
 
   describe("argument validation", () => {
     it("does not throw for null/undefined states", () => {
-      const validState = getPluginApi(router).makeState("home", {}, "/home");
+      const validState = getPluginApi(router).makeState("home", {}, undefined, "/home");
 
       // null/undefined are valid inputs (represent "no state")
       // Using 'as never' to test runtime behavior with null values
@@ -160,11 +166,13 @@ describe("areStatesEqual", () => {
       const s1 = getPluginApi(router).makeState(
         "home",
         { a: 1, b: undefined } as never,
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
         "home",
         { a: 1, c: 2 } as never,
+        undefined,
         "/home",
       );
 
@@ -175,11 +183,13 @@ describe("areStatesEqual", () => {
       const s1 = getPluginApi(router).makeState(
         "home",
         { x: 1, y: 2 },
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
         "home",
         { x: 1, z: 2 },
+        undefined,
         "/home",
       );
 
@@ -190,11 +200,13 @@ describe("areStatesEqual", () => {
       const s1 = getPluginApi(router).makeState(
         "home",
         { a: 1, b: undefined } as never,
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
         "home",
         { a: 1, b: undefined } as never,
+        undefined,
         "/home",
       );
 
@@ -207,11 +219,13 @@ describe("areStatesEqual", () => {
       const s1 = getPluginApi(router).makeState(
         "home",
         { tags: ["a", "b", "c"] },
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
         "home",
         { tags: ["a", "b", "c"] },
+        undefined,
         "/home",
       );
 
@@ -224,11 +238,13 @@ describe("areStatesEqual", () => {
       const s1 = getPluginApi(router).makeState(
         "home",
         { ids: [1, 2, 3] },
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
         "home",
         { ids: [1, 2] },
+        undefined,
         "/home",
       );
 
@@ -239,11 +255,13 @@ describe("areStatesEqual", () => {
       const s1 = getPluginApi(router).makeState(
         "home",
         { ids: [1, 2, 3] },
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
         "home",
         { ids: [1, 2, 4] },
+        undefined,
         "/home",
       );
 
@@ -259,6 +277,7 @@ describe("areStatesEqual", () => {
             [3, 4],
           ],
         } as never,
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
@@ -269,6 +288,7 @@ describe("areStatesEqual", () => {
             [3, 4],
           ],
         } as never,
+        undefined,
         "/home",
       );
 
@@ -284,6 +304,7 @@ describe("areStatesEqual", () => {
             [3, 4],
           ],
         } as never,
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
@@ -294,6 +315,7 @@ describe("areStatesEqual", () => {
             [3, 5],
           ],
         } as never,
+        undefined,
         "/home",
       );
 
@@ -304,11 +326,13 @@ describe("areStatesEqual", () => {
       const s1 = getPluginApi(router).makeState(
         "home",
         { data: [1, 2, 3] },
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
         "home",
         { data: "1,2,3" },
+        undefined,
         "/home",
       );
 
@@ -316,8 +340,8 @@ describe("areStatesEqual", () => {
     });
 
     it("handles empty arrays correctly", () => {
-      const s1 = getPluginApi(router).makeState("home", { items: [] }, "/home");
-      const s2 = getPluginApi(router).makeState("home", { items: [] }, "/home");
+      const s1 = getPluginApi(router).makeState("home", { items: [] }, undefined, "/home");
+      const s2 = getPluginApi(router).makeState("home", { items: [] }, undefined, "/home");
 
       expect(router.areStatesEqual(s1, s2, false)).toBe(true);
     });
@@ -327,11 +351,13 @@ describe("areStatesEqual", () => {
       const s1 = getPluginApi(router).makeState(
         "home",
         { tags: sharedArray },
+        undefined,
         "/home",
       );
       const s2 = getPluginApi(router).makeState(
         "home",
         { tags: sharedArray },
+        undefined,
         "/home",
       );
 

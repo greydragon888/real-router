@@ -206,7 +206,7 @@ describe("Browser Plugin Integration", () => {
       // At minimum two forwardState calls: initial start → "home"
       // (defaultRoute) and navigate → "users.view". Core may call it
       // additionally for internal resolutions — asserting lower-bound 2.
-      expect(currentHistoryState?.params.modified).toBe(true);
+      expect(currentHistoryState?.search.modified).toBe(true);
       expect(modifiedStates.length).toBeGreaterThanOrEqual(2);
       // Last recorded state must reflect the navigation target.
       expect(modifiedStates.at(-1)?.params.modified).toBe(true);
@@ -223,18 +223,18 @@ describe("Browser Plugin Integration", () => {
       // Set persistent params
       await router.navigate("home", { lang: "en", theme: "dark" });
 
-      expect(router.getState()?.params.lang).toBe("en");
-      expect(router.getState()?.params.theme).toBe("dark");
+      expect(router.getState()?.search.lang).toBe("en");
+      expect(router.getState()?.search.theme).toBe("dark");
 
       // Navigate to different route - params should persist
       await router.navigate("users.list");
 
-      expect(router.getState()?.params.lang).toBe("en");
-      expect(router.getState()?.params.theme).toBe("dark");
+      expect(router.getState()?.search.lang).toBe("en");
+      expect(router.getState()?.search.theme).toBe("dark");
 
       // Browser history should include persistent params
-      expect(currentHistoryState?.params.lang).toBe("en");
-      expect(currentHistoryState?.params.theme).toBe("dark");
+      expect(currentHistoryState?.search.lang).toBe("en");
+      expect(currentHistoryState?.search.theme).toBe("dark");
     });
   });
 
@@ -357,7 +357,7 @@ describe("Browser Plugin Integration", () => {
       // Persistent params worked
       await router.navigate("home");
 
-      expect(router.getState()?.params.sessionId).toBe("abc");
+      expect(router.getState()?.search.sessionId).toBe("abc");
 
       // Browser plugin updated history
       expect(currentHistoryState?.name).toBe("home");
@@ -447,10 +447,10 @@ describe("Browser Plugin Integration", () => {
       await router.navigate("users.list");
 
       // Browser plugin should handle complex params
-      expect(currentHistoryState?.params.nested).toStrictEqual({
+      expect(currentHistoryState?.search.nested).toStrictEqual({
         deep: { value: 42 },
       });
-      expect(currentHistoryState?.params.array).toStrictEqual([1, 2, 3]);
+      expect(currentHistoryState?.search.array).toStrictEqual([1, 2, 3]);
     });
   });
 
@@ -473,7 +473,7 @@ describe("Browser Plugin Integration", () => {
       // Final state should be correct (49 % 2 === 1, so last route is "users.list")
       expect(router.getState()?.name).toBe("users.list");
       expect(currentHistoryState?.name).toBe("users.list");
-      expect(router.getState()?.params.lang).toBe("en");
+      expect(router.getState()?.search.lang).toBe("en");
     });
   });
 });

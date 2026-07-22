@@ -65,6 +65,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        search: {},
         transition: STUB_TRANSITION,
         context: {},
       };
@@ -253,6 +254,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        search: {},
         transition: STUB_TRANSITION,
         context: {},
       };
@@ -261,6 +263,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.list",
         params: {},
         path: "/users/list",
+        search: {},
         transition: STUB_TRANSITION,
         context: {},
       };
@@ -302,6 +305,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
+        search: {},
         transition: STUB_TRANSITION,
         context: {},
       };
@@ -310,6 +314,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.view",
         params: { id: "2" },
         path: "/users/view/2",
+        search: {},
         transition: STUB_TRANSITION,
         context: {},
       };
@@ -318,6 +323,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "users.list",
         params: {},
         path: "/users/list",
+        search: {},
         transition: STUB_TRANSITION,
         context: {},
       };
@@ -455,6 +461,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "home",
         params: {},
         path: "/home",
+        search: {},
         transition: STUB_TRANSITION,
         context: {},
       };
@@ -496,6 +503,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         name: "home",
         params: {},
         path: "/home",
+        search: {},
         transition: STUB_TRANSITION,
         context: {},
       };

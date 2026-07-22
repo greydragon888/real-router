@@ -26,6 +26,7 @@ export function makeMinimalState(name: string, path: string): State {
   return {
     name,
     params: {},
+    search: {},
     path,
     transition: STUB_TRANSITION,
     context: {},
@@ -183,6 +184,7 @@ export function createMockPluginApi(
         ? {
             name: matchResult.name,
             params: matchResult.params,
+            search: {},
             path: "/matched",
             transition: STUB_TRANSITION,
             context: {},
@@ -191,6 +193,7 @@ export function createMockPluginApi(
     makeState: (name: string, params: Params, path: string) => ({
       name,
       params,
+      search: {},
       path,
       transition: STUB_TRANSITION,
       context: {},
@@ -217,6 +220,7 @@ export const arbFullState: fc.Arbitrary<State> = fc
   .map(([name, path, params]) => ({
     name,
     params,
+    search: {},
     path,
     transition: STUB_TRANSITION,
     context: {},

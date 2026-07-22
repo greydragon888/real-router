@@ -22,6 +22,7 @@ function makeState(
   return {
     name,
     params: params as State["params"],
+    search: {},
     path: "/",
     context: context,
     transition: transition as State["transition"],

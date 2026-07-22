@@ -57,7 +57,7 @@ describe("getPluginApi()", () => {
   });
 
   it("makeState should delegate to router.makeState", () => {
-    const state = api.makeState("home", {}, "/home");
+    const state = api.makeState("home", {}, undefined, "/home");
 
     expect(state.name).toBe("home");
     expect(state.path).toBe("/home");

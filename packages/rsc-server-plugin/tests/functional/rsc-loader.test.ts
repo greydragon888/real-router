@@ -590,6 +590,7 @@ describe("@real-router/rsc-server-plugin", () => {
     ): State => ({
       name: "users.profile",
       params: { id: "42" },
+      search: {},
       path: "/users/42",
       transition: {
         phase: "activating",
@@ -1053,6 +1054,7 @@ describe("@real-router/rsc-server-plugin", () => {
     const stateWith = (ssrRscMode: unknown): State => ({
       name: "users.profile",
       params: { id: "42" },
+      search: {},
       path: "/users/42",
       transition: {
         phase: "activating",
@@ -1119,6 +1121,7 @@ describe("@real-router/rsc-server-plugin", () => {
       const state: State = {
         name: "users.profile",
         params: { id: "42" },
+        search: {},
         path: "/users/42",
         transition: {
           phase: "activating",

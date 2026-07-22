@@ -360,9 +360,10 @@ describe("search-params: query params preserved through hash URL matchUrl", () =
 
       expect(state).toBeDefined();
       expect(state!.name).toBe("users.list");
+      // Query params now live in the dedicated search channel (RFC-4 M2).
       // queryParamsMode: "default" auto-converts numeric strings to numbers
-      expect(String(state!.params.page as number)).toBe(page);
-      expect(state!.params.sort).toBe(sort);
+      expect(String(state!.search.page as number)).toBe(page);
+      expect(state!.search.sort).toBe(sort);
 
       router.stop();
     },
@@ -494,8 +495,9 @@ describe("multi-key query params survive matchUrl parsing", () => {
       expect(state!.name).toBe("users.list");
 
       for (const [key, value] of Object.entries(params)) {
+        // Query params now live in the dedicated search channel (RFC-4 M2).
         // queryParamsMode: "default" may coerce numeric strings to numbers.
-        const actual = state!.params[key];
+        const actual = state!.search[key];
 
         expect(
           actual === undefined ? "" : String(actual as string | number),
@@ -547,9 +549,10 @@ describe("query collision: inner hash query is source of truth", () => {
       expect(state).toBeDefined();
       expect(state!.name).toBe("users.list");
       expect(state!.path).toBe("/users/list");
-      expect(String(state!.params.page as number)).toBe(page);
-      expect(state!.params.sort).toBe(sort);
-      expect(state!.params.outer).toBeUndefined();
+      // Query params now live in the dedicated search channel (RFC-4 M2).
+      expect(String(state!.search.page as number)).toBe(page);
+      expect(state!.search.sort).toBe(sort);
+      expect(state!.search.outer).toBeUndefined();
 
       router.stop();
     },

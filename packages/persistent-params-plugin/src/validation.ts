@@ -84,7 +84,10 @@ export function isValidParamsConfig(
  * @param value - Value to validate
  * @throws {TypeError} If value is null, array, object, or other non-primitive type
  */
-export function validateParamValue(key: string, value: unknown): void {
+export function validateParamValue(
+  key: string,
+  value: unknown,
+): asserts value is string | number | boolean | undefined {
   if (value === null) {
     throw new TypeError(
       `${ERROR_PREFIX} Parameter "${key}" cannot be null. ` +

@@ -110,7 +110,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       await testRouter.start();
 
       expect(testRouter.getState()?.name).toBe("users.list");
-      expect(testRouter.getState()?.params).toStrictEqual({ page: 2 });
+      expect(testRouter.getState()?.search).toStrictEqual({ page: 2 });
 
       testRouter.stop();
     });

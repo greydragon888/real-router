@@ -96,9 +96,10 @@ describe("Browser Plugin — URL", () => {
 
         expect(withoutMeta(state!)).toStrictEqual({
           name: "users.list",
-          params: { page: 1, sort: "asc" },
+          params: {},
           path: "/users/list",
         });
+        expect(state!.search).toStrictEqual({ page: 1, sort: "asc" });
       });
 
       it("handles IPv6 addresses", async () => {

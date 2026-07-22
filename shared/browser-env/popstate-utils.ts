@@ -1,7 +1,7 @@
 import { isStateStrict as isState } from "./state-guard";
 
 import type { Browser } from "./types.js";
-import type { State, Params } from "@real-router/core";
+import type { State, Params, SearchParams } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
@@ -46,7 +46,9 @@ export function getRouteFromEvent(
   const state: unknown = "state" in evt ? evt.state : undefined;
 
   if (isState(state)) {
-    return api.makeState(state.name, state.params, state.path);
+    // Restore the query channel too (RFC-4 M2 / #1548). Entries written before
+    // M2 have no `search` — `makeState` reuses the frozen empty bag for them.
+    return api.makeState(state.name, state.params, state.search, state.path);
   }
 
   return api.matchPath(location);
@@ -69,6 +71,8 @@ export function updateBrowserState(
   const historyState = {
     name: state.name,
     params: state.params,
+    // Persist the query channel so a popstate/refresh restores it (RFC-4 M2).
+    search: state.search,
     path: state.path,
   };
 
@@ -100,12 +104,14 @@ export function createUpdateBrowserState(): (
   const buffer = {
     name: "",
     params: {} as Params,
+    search: {} as SearchParams,
     path: "",
   };
 
   return (state, url, replace, browser) => {
     buffer.name = state.name;
     buffer.params = state.params;
+    buffer.search = state.search;
     buffer.path = state.path;
 
     if (replace) {
@@ -157,6 +163,6 @@ export function canSkipPopstateHistoryWrite(
   return (
     isState(live) &&
     live.path === toState.path &&
-    areStatesEqual(toState, live as unknown as State, false)
+    areStatesEqual(toState, live, false)
   );
 }

@@ -29,7 +29,7 @@ describe("persistence: persistent param survives navigation to a different route
       await router.navigate("routeA", { id: idA, [paramName]: paramValue });
       await router.navigate("routeB", { id: idB });
 
-      expect(router.getState()?.params[paramName]).toBe(paramValue);
+      expect(router.getState()?.search[paramName]).toBe(paramValue);
 
       router.stop();
     },
@@ -48,7 +48,7 @@ describe("persistence: persistent param survives navigation to a different route
       await router.navigate("routeB", { id: idB });
       await router.navigate("routeC", { id: idC });
 
-      expect(router.getState()?.params[paramName]).toBe(paramValue);
+      expect(router.getState()?.search[paramName]).toBe(paramValue);
 
       router.stop();
     },
@@ -71,7 +71,7 @@ describe("override: explicitly passed param overrides the stored persistent valu
       await router.navigate("routeA", { id: idA, [paramName]: initialValue });
       await router.navigate("routeB", { id: idB, [paramName]: overrideValue });
 
-      expect(router.getState()?.params[paramName]).toBe(overrideValue);
+      expect(router.getState()?.search[paramName]).toBe(overrideValue);
 
       router.stop();
     },
@@ -90,7 +90,7 @@ describe("override: explicitly passed param overrides the stored persistent valu
       await router.navigate("routeB", { id: idB, [paramName]: overrideValue });
       await router.navigate("routeC", { id: idC });
 
-      expect(router.getState()?.params[paramName]).toBe(overrideValue);
+      expect(router.getState()?.search[paramName]).toBe(overrideValue);
 
       router.stop();
     },
@@ -189,8 +189,8 @@ describe("scope: persistent params apply ONLY to params listed in plugin config"
 
       const state = router.getState();
 
-      expect(state?.params[configuredName]).toBe(configuredValue);
-      expect(state?.params).not.toHaveProperty(unconfiguredName);
+      expect(state?.search[configuredName]).toBe(configuredValue);
+      expect(state?.search).not.toHaveProperty(unconfiguredName);
 
       router.stop();
     },
@@ -237,8 +237,8 @@ describe("idempotency: double merge does not duplicate persistent params", () =>
       await router.navigate("routeB", { id: idB });
       await router.navigate("routeC", { id: idC });
 
-      const params = router.getState()?.params ?? {};
-      const occurrences = Object.keys(params).filter((k) => k === paramName);
+      const search = router.getState()?.search ?? {};
+      const occurrences = Object.keys(search).filter((k) => k === paramName);
 
       expect(occurrences).toStrictEqual([paramName]);
 
@@ -313,7 +313,7 @@ describe("removal: passing undefined permanently removes a param from persistenc
       // the rejected removal never committed — the param must still persist
       await router.navigate("routeC", { id: idC });
 
-      expect(router.getState()?.params[paramName]).toBe(paramValue);
+      expect(router.getState()?.search[paramName]).toBe(paramValue);
 
       router.stop();
     },
@@ -336,7 +336,7 @@ describe("default values: object config injects defaults before any explicit set
 
       await router.navigate("routeA", { id: idA });
 
-      expect(router.getState()?.params[paramName]).toBe(defaultValue);
+      expect(router.getState()?.search[paramName]).toBe(defaultValue);
 
       router.stop();
     },
@@ -358,7 +358,7 @@ describe("default values: object config injects defaults before any explicit set
       });
       await router.navigate("routeB", { id: idB });
 
-      expect(router.getState()?.params[paramName]).toBe(explicitValue);
+      expect(router.getState()?.search[paramName]).toBe(explicitValue);
 
       router.stop();
     },
@@ -387,10 +387,10 @@ describe("multi-param: multiple persistent params coexist correctly", () => {
       });
       await router.navigate("routeB", { id: idB });
 
-      const params = router.getState()?.params ?? {};
+      const search = router.getState()?.search ?? {};
 
-      expect(params[param1]).toBe(value1);
-      expect(params[param2]).toBe(value2);
+      expect(search[param1]).toBe(value1);
+      expect(search[param2]).toBe(value2);
 
       router.stop();
     },
@@ -418,10 +418,10 @@ describe("multi-param: multiple persistent params coexist correctly", () => {
       });
       await router.navigate("routeC", { id: idC });
 
-      const params = router.getState()?.params ?? {};
+      const search = router.getState()?.search ?? {};
 
-      expect(params[param1]).toBe(val1Override);
-      expect(params[param2]).toBe(val2);
+      expect(search[param1]).toBe(val1Override);
+      expect(search[param2]).toBe(val2);
 
       router.stop();
     },

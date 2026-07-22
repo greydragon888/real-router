@@ -65,7 +65,8 @@ describe("Persistent params plugin", () => {
 
       const state = router.getState();
 
-      expect(state?.params).toStrictEqual({ id: "1", mode: "dev" });
+      expect(state?.params).toStrictEqual({ id: "1" });
+      expect(state?.search).toStrictEqual({ mode: "dev" });
     });
 
     it("should inject persistent param from initial URL on subsequent navigation", async () => {
@@ -84,7 +85,7 @@ describe("Persistent params plugin", () => {
 
       const state = router.getState();
 
-      expect(state?.params.mode).toBe("dev");
+      expect(state?.search.mode).toBe("dev");
     });
 
     it("should accept number values", async () => {
@@ -97,7 +98,7 @@ describe("Persistent params plugin", () => {
 
       const state = router.getState();
 
-      expect(state?.params.mode).toBe(42);
+      expect(state?.search.mode).toBe(42);
     });
 
     it("should accept boolean values", async () => {
@@ -110,7 +111,7 @@ describe("Persistent params plugin", () => {
 
       const state = router.getState();
 
-      expect(state?.params.mode).toBe(true);
+      expect(state?.search.mode).toBe(true);
     });
 
     it("should accept undefined to remove parameter", async () => {
@@ -169,9 +170,9 @@ describe("Persistent params plugin", () => {
 
       const state = router.getState();
 
-      expect(state?.params.mode).toBe("dev");
-      expect(state?.params.lang).toBe("en");
-      expect(state?.params.theme).toBe("light");
+      expect(state?.search.mode).toBe("dev");
+      expect(state?.search.lang).toBe("en");
+      expect(state?.search.theme).toBe("light");
     });
 
     it("should only update changed parameters", async () => {
@@ -189,9 +190,9 @@ describe("Persistent params plugin", () => {
 
       const state = router.getState();
 
-      expect(state?.params.mode).toBe("prod");
-      expect(state?.params.lang).toBe("en");
-      expect(state?.params.theme).toBe("light");
+      expect(state?.search.mode).toBe("prod");
+      expect(state?.search.lang).toBe("en");
+      expect(state?.search.theme).toBe("light");
     });
   });
 
@@ -406,7 +407,7 @@ describe("Persistent params plugin", () => {
         // the transition never committed — the removal must be rolled back
         const state = await router.navigate("route1", { id: "1" });
 
-        expect(state.params.lang).toBe("en");
+        expect(state.search.lang).toBe("en");
         expect(state.path).toBe("/route1/1?lang=en");
       });
 
@@ -436,7 +437,7 @@ describe("Persistent params plugin", () => {
         const winner = await router.navigate("route3", { id: "3" });
 
         // the superseding navigation still carries the (not-yet-removed) param
-        expect(winner.params.lang).toBe("en");
+        expect(winner.search.lang).toBe("en");
 
         // release the now-cancelled guard; the removal rejects as cancelled
         releaseGuard(true);
@@ -445,7 +446,7 @@ describe("Persistent params plugin", () => {
         // the cancelled removal must not have dropped `lang` permanently
         const state = await router.navigate("route1", { id: "9" });
 
-        expect(state.params.lang).toBe("en");
+        expect(state.search.lang).toBe("en");
       });
 
       it("should still remove the param permanently once a removal navigation actually commits", async () => {
@@ -494,7 +495,9 @@ describe("Persistent params plugin", () => {
         const state = router.getState();
 
         expect(state?.params).not.toHaveProperty("extra");
-        expect(state?.params).toStrictEqual({ id: "2", mode: "dev" });
+        expect(state?.search).not.toHaveProperty("extra");
+        expect(state?.params).toStrictEqual({ id: "2" });
+        expect(state?.search).toStrictEqual({ mode: "dev" });
       });
 
       it("should not include undefined values in query string", async () => {
@@ -562,14 +565,14 @@ describe("Persistent params plugin", () => {
 
         const state1 = router.getState();
 
-        expect(state1?.params.mode).toBe("");
+        expect(state1?.search.mode).toBe("");
 
         await router.navigate("route2", { id: "2" });
 
         const state2 = router.getState();
 
         // Empty string should persist across navigations
-        expect(state2?.params.mode).toBe("");
+        expect(state2?.search.mode).toBe("");
       });
     });
 
@@ -654,7 +657,7 @@ describe("Persistent params plugin", () => {
         await router.navigate("route3", { id: "3" });
 
         expect(spy).toHaveBeenCalledTimes(2);
-        expect(router.getState()?.params).toMatchObject({ mode: "test" });
+        expect(router.getState()?.search).toMatchObject({ mode: "test" });
       });
     });
   });
@@ -847,7 +850,7 @@ describe("Persistent params plugin", () => {
         const state = await router.navigate("route1", params);
 
         expect(state).toBeDefined();
-        expect(state.params.mode).toBe("dev");
+        expect(state.search.mode).toBe("dev");
       });
     });
   });
@@ -976,14 +979,16 @@ describe("Persistent params plugin", () => {
         await router.navigate("route1", { id: "1", mode: "dev" });
         const state1 = router.getState();
         const params1 = state1?.params;
+        const search1 = state1?.search;
 
         await router.navigate("route2", { id: "2", mode: "prod" });
         const state2 = router.getState();
         const params2 = state2?.params;
+        const search2 = state2?.search;
 
         expect(params1).not.toBe(params2);
-        expect(params1?.mode).toBe("dev");
-        expect(params2?.mode).toBe("prod");
+        expect(search1?.mode).toBe("dev");
+        expect(search2?.mode).toBe("prod");
       });
 
       it("should not mutate persistent params directly", async () => {
@@ -1107,9 +1112,9 @@ describe("Persistent params plugin", () => {
 
       let state = router.getState();
 
-      expect(state?.params.a).toBe("1");
-      expect(state?.params.b).toBe("2");
-      expect(state?.params.c).toBe("3");
+      expect(state?.search.a).toBe("1");
+      expect(state?.search.b).toBe("2");
+      expect(state?.search.c).toBe("3");
 
       await router.navigate("route", {
         id: "2",
@@ -1120,7 +1125,8 @@ describe("Persistent params plugin", () => {
 
       state = router.getState();
 
-      expect(state?.params).toStrictEqual({ id: "2", b: "2", d: "4" });
+      expect(state?.params).toStrictEqual({ id: "2" });
+      expect(state?.search).toStrictEqual({ b: "2", d: "4" });
       expect(router.buildPath("route", { id: "3" })).toBe("/route/3?b=2&d=4");
     });
   });
@@ -1172,6 +1178,7 @@ describe("Persistent params plugin", () => {
       const noLangState = getPluginApi(router).makeState(
         "route",
         { id: "2" },
+        undefined,
         "/route/2",
       );
 

@@ -105,9 +105,11 @@ describe("Hash Plugin — URL Operations", () => {
 
         expect(withoutMeta(state!)).toStrictEqual({
           name: "users.list",
-          params: { page: 1, sort: "asc" },
+          params: {},
           path: "/users/list",
         });
+        // Query params now live in the dedicated search channel (RFC-4 M2).
+        expect(state!.search).toStrictEqual({ page: 1, sort: "asc" });
       });
 
       it("parses file:// URLs — returns undefined when hash does not match route", () => {
@@ -223,8 +225,8 @@ describe("Hash Plugin — URL Operations", () => {
 
         expect(state).toBeDefined();
         expect(state!.name).toBe("users.list");
-        expect(state!.params).toStrictEqual({ page: 2 });
-        expect(state!.params.a).toBeUndefined();
+        expect(state!.search).toStrictEqual({ page: 2 });
+        expect(state!.search.a).toBeUndefined();
       });
 
       it("falls back to outer search when hash has no query", () => {
@@ -233,7 +235,7 @@ describe("Hash Plugin — URL Operations", () => {
         );
 
         expect(state).toBeDefined();
-        expect(state!.params).toStrictEqual({ page: 3 });
+        expect(state!.search).toStrictEqual({ page: 3 });
       });
 
       it("produces a well-formed path (no double '?') when collision happens", () => {

@@ -21,6 +21,7 @@ describe("buildState / makeState Properties", () => {
       const state = pluginApi.makeState(
         buildStateResult.name,
         buildStateResult.params,
+        undefined,
         path,
         {
           params: buildStateResult.meta,
@@ -46,7 +47,7 @@ describe("buildState / makeState Properties", () => {
     "makeState returns a frozen state",
     (params) => {
       const path = router.buildPath("users.view", params);
-      const state = pluginApi.makeState("users.view", params, path);
+      const state = pluginApi.makeState("users.view", params, undefined, path);
 
       expect(Object.isFrozen(state)).toBe(true);
     },
@@ -56,8 +57,8 @@ describe("buildState / makeState Properties", () => {
     "makeState determinism: same args produce structurally equal states (except id)",
     (params) => {
       const path = router.buildPath("users.view", params);
-      const s1 = pluginApi.makeState("users.view", params, path);
-      const s2 = pluginApi.makeState("users.view", params, path);
+      const s1 = pluginApi.makeState("users.view", params, undefined, path);
+      const s2 = pluginApi.makeState("users.view", params, undefined, path);
 
       expect(s1.name).toBe(s2.name);
       expect(s1.path).toBe(s2.path);

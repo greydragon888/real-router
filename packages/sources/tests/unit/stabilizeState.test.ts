@@ -47,7 +47,7 @@ describe("stabilizeState", () => {
   describe("basic scenarios", () => {
     it("same reference (prev === next) → returns prev", () => {
       const api = getPluginApi(router);
-      const state = api.makeState("home", {}, "/");
+      const state = api.makeState("home", {}, undefined, "/");
 
       expect(stabilizeState(state, state)).toBe(state);
     });
@@ -60,7 +60,7 @@ describe("stabilizeState", () => {
 
     it("prev = undefined, next = State → returns next", () => {
       const api = getPluginApi(router);
-      const next = api.makeState("home", {}, "/");
+      const next = api.makeState("home", {}, undefined, "/");
 
       const result = stabilizeState(undefined, next);
 
@@ -69,7 +69,7 @@ describe("stabilizeState", () => {
 
     it("prev = State, next = undefined → returns next (undefined)", () => {
       const api = getPluginApi(router);
-      const prev = api.makeState("home", {}, "/");
+      const prev = api.makeState("home", {}, undefined, "/");
 
       const result = stabilizeState(prev, undefined);
 
@@ -94,8 +94,8 @@ describe("stabilizeState", () => {
 
     it("same path, different transition → result === prev", () => {
       const api = getPluginApi(router);
-      const prev = api.makeState("home", {}, "/");
-      const next = api.makeState("home", {}, "/");
+      const prev = api.makeState("home", {}, undefined, "/");
+      const next = api.makeState("home", {}, undefined, "/");
 
       expect(prev).not.toBe(next);
       expect(stabilizeState(prev, next)).toBe(prev);
@@ -103,8 +103,8 @@ describe("stabilizeState", () => {
 
     it("same path, different meta + transition → result === prev", () => {
       const api = getPluginApi(router);
-      const prev = api.makeState("users.view", { id: "1" }, "/users/1");
-      const next = api.makeState("users.view", { id: "1" }, "/users/1");
+      const prev = api.makeState("users.view", { id: "1" }, undefined, "/users/1");
+      const next = api.makeState("users.view", { id: "1" }, undefined, "/users/1");
 
       expect(prev).not.toBe(next);
       expect(prev.path).toBe(next.path);
@@ -113,7 +113,7 @@ describe("stabilizeState", () => {
 
     it("same path, without meta vs with meta → result === prev", () => {
       const api = getPluginApi(router);
-      const prev = api.makeState("home", {}, "/");
+      const prev = api.makeState("home", {}, undefined, "/");
       const next = api.makeState("home", {});
 
       expect(prev.path).toBe(next.path);
@@ -122,16 +122,16 @@ describe("stabilizeState", () => {
 
     it("different paths → result === next", () => {
       const api = getPluginApi(router);
-      const prev = api.makeState("home", {}, "/");
-      const next = api.makeState("users.view", { id: "1" }, "/users/1");
+      const prev = api.makeState("home", {}, undefined, "/");
+      const next = api.makeState("users.view", { id: "1" }, undefined, "/users/1");
 
       expect(stabilizeState(prev, next)).toBe(next);
     });
 
     it("different paths, same name → result === next", () => {
       const api = getPluginApi(router);
-      const prev = api.makeState("users.view", { id: "1" }, "/users/1");
-      const next = api.makeState("users.view", { id: "2" }, "/users/2");
+      const prev = api.makeState("users.view", { id: "1" }, undefined, "/users/1");
+      const next = api.makeState("users.view", { id: "2" }, undefined, "/users/2");
 
       expect(stabilizeState(prev, next)).toBe(next);
     });
@@ -216,7 +216,7 @@ describe("stabilizeState", () => {
 
     it("same path, different context.url.hash → returns next", () => {
       const api = getPluginApi(router);
-      const base = api.makeState("home", {}, "/");
+      const base = api.makeState("home", {}, undefined, "/");
       const prev = makeStateWithHash(base, "profile");
       const next = makeStateWithHash(base, "billing");
 
@@ -226,7 +226,7 @@ describe("stabilizeState", () => {
 
     it("same path, same context.url.hash → returns prev", () => {
       const api = getPluginApi(router);
-      const base = api.makeState("home", {}, "/");
+      const base = api.makeState("home", {}, undefined, "/");
       const prev = makeStateWithHash(base, "profile");
       const next = makeStateWithHash(base, "profile");
 
@@ -235,7 +235,7 @@ describe("stabilizeState", () => {
 
     it("same path, prev has hash, next has no hash → returns next", () => {
       const api = getPluginApi(router);
-      const base = api.makeState("home", {}, "/");
+      const base = api.makeState("home", {}, undefined, "/");
       const prev = makeStateWithHash(base, "anchor");
       const next = makeStateWithHash(base, undefined);
 
@@ -244,7 +244,7 @@ describe("stabilizeState", () => {
 
     it("same path, both no hash → returns prev (legacy behavior preserved)", () => {
       const api = getPluginApi(router);
-      const base = api.makeState("home", {}, "/");
+      const base = api.makeState("home", {}, undefined, "/");
       const prev = makeStateWithHash(base, undefined);
       const next = makeStateWithHash(base, undefined);
 
@@ -271,7 +271,7 @@ describe("stabilizeState", () => {
 
     it("same path, next.transition.reload === true → returns next (bypass dedupe)", () => {
       const api = getPluginApi(router);
-      const base = api.makeState("home", {}, "/");
+      const base = api.makeState("home", {}, undefined, "/");
       const prev = withReload(base, false);
       const next = withReload(base, true);
 
@@ -281,7 +281,7 @@ describe("stabilizeState", () => {
 
     it("same path, neither has reload → returns prev (legacy behavior)", () => {
       const api = getPluginApi(router);
-      const base = api.makeState("home", {}, "/");
+      const base = api.makeState("home", {}, undefined, "/");
       const prev = withReload(base, false);
       const next = withReload(base, false);
 
@@ -293,7 +293,7 @@ describe("stabilizeState", () => {
       // reload flag is irrelevant; what matters is whether the current
       // navigation was an explicit reload request.
       const api = getPluginApi(router);
-      const base = api.makeState("home", {}, "/");
+      const base = api.makeState("home", {}, undefined, "/");
       const prev = withReload(base, true);
       const next = withReload(base, false);
 

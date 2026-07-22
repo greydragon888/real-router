@@ -149,9 +149,21 @@ export class PersistentParamsPlugin {
     let newParams: Params | undefined;
 
     for (const key of this.#paramNamesSet) {
-      const value = toState.params[key];
+      // Persistent params are QUERY params (declared on the root path as
+      // `?a&b`). After the RFC-4 M2 params/search split (#1548) a committed
+      // query value normally lands in `toState.search` (the navigate /
+      // matchPath re-parse path). But a state built via `makeState` — `start()`
+      // with an injected default, or a `navigateToState` commit — is not yet
+      // slot-shifted, so an injected query value still rides in `toState.params`
+      // there (with `search` left `{}`). Read the value from whichever channel
+      // carries the key: `search` is canonical, `params` is the makeState
+      // fallback. Path params are never tracked by this plugin (they are not in
+      // the `?a&b` root-path declaration), so this cannot pick one up.
+      const inSearch = Object.hasOwn(toState.search, key);
+      const present = inSearch || Object.hasOwn(toState.params, key);
+      const value = inSearch ? toState.search[key] : toState.params[key];
 
-      if (!Object.hasOwn(toState.params, key) || value === undefined) {
+      if (!present || value === undefined) {
         // A tracked param is absent from the committed state — either an explicit
         // removal (`navigate({ key: undefined })`, applied as a delete by
         // mergeParams for this transition) or a state committed via navigateToState

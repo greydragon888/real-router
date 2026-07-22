@@ -34,6 +34,7 @@ const arbState: fc.Arbitrary<State> = fc
   })
   .map((r) => ({
     ...r,
+    search: {},
     transition: STUB_TRANSITION,
     context: {},
   }));

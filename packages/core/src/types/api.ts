@@ -5,6 +5,7 @@
 
 import type {
   Params,
+  SearchParams,
   State,
   SimpleState,
   StateMetaInput,
@@ -95,12 +96,13 @@ export interface ContextNamespaceClaim<T = unknown> {
  * Hides plugin-internal methods from public autocomplete.
  */
 export interface PluginApi {
-  makeState: <P extends Params = Params>(
+  makeState: <P extends Params = Params, S extends SearchParams = SearchParams>(
     name: string,
     params?: P,
+    search?: S,
     path?: string,
     meta?: StateMetaInput,
-  ) => State<P>;
+  ) => State<P, S>;
 
   buildState: (
     routeName: string,

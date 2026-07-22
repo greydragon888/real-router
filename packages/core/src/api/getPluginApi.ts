@@ -31,17 +31,16 @@ export function getPluginApi<
 
   const ctx = getInternals(router);
   const api: PluginApi = {
-    makeState: (name, params, path, meta) => {
+    makeState: (name, params, search, path, meta) => {
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
 
-      // The public PluginApi.makeState keeps its v1 (name, params, path, meta)
-      // shape during the M2 rollout; no search is threaded here (RFC-4 M2 /
-      // #1548 — the public search-aware form lands with the facade slot-shift),
-      // so makeState reuses the frozen EMPTY_SEARCH.
+      // Public PluginApi.makeState carries the query channel (RFC-4 M2 / #1548)
+      // so plugins (e.g. browser-plugin popstate restore) can reconstruct a
+      // split state from a serialized history entry.
       return ctx.makeState(
         name,
         params,
-        undefined,
+        search,
         path,
         meta?.params as
           Record<string, Record<string, "url" | "query">> | undefined,

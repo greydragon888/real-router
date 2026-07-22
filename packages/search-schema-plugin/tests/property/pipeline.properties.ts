@@ -157,11 +157,11 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             const state = router.getState();
 
             for (const [key, value] of Object.entries(validParams)) {
-              expect(state?.params[key]).toBe(value);
+              expect(state?.search[key]).toBe(value);
             }
 
             for (const [key, value] of Object.entries(extraParams)) {
-              expect(state?.params[key]).toBe(value);
+              expect(state?.search[key]).toBe(value);
             }
 
             router.stop();
@@ -212,11 +212,11 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             const state = router.getState();
 
             for (const key of invalidKeys) {
-              expect(state?.params).not.toHaveProperty(key);
+              expect(state?.search).not.toHaveProperty(key);
             }
 
             for (const [key, value] of Object.entries(validParams)) {
-              expect(state?.params[key]).toBe(value);
+              expect(state?.search[key]).toBe(value);
             }
 
             router.stop();
@@ -272,11 +272,11 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             const state = router.getState();
 
             for (const key of invalidKeys) {
-              expect(state?.params[key]).toBe(defaults[key]);
+              expect(state?.search[key]).toBe(defaults[key]);
             }
 
             for (const [key, value] of Object.entries(validParams)) {
-              expect(state?.params[key]).toBe(value);
+              expect(state?.search[key]).toBe(value);
             }
 
             router.stop();
@@ -321,11 +321,11 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             const state = router.getState();
 
             for (const [key, value] of Object.entries(schemaOutput)) {
-              expect(state?.params[key]).toBe(value);
+              expect(state?.search[key]).toBe(value);
             }
 
             for (const key of Object.keys(extraParams)) {
-              expect(state?.params).not.toHaveProperty(key);
+              expect(state?.search).not.toHaveProperty(key);
             }
 
             router.stop();
@@ -374,11 +374,11 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
               const expected =
                 typeof value === "string" ? value.toUpperCase() : value;
 
-              expect(state?.params[key]).toBe(expected);
+              expect(state?.search[key]).toBe(expected);
             }
 
             for (const [key, value] of Object.entries(extraParams)) {
-              expect(state?.params[key]).toBe(value);
+              expect(state?.search[key]).toBe(value);
             }
 
             router.stop();

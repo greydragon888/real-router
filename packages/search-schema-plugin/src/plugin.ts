@@ -6,7 +6,12 @@ import type {
   StandardSchemaV1,
   StandardSchemaV1Issue,
 } from "./types";
-import type { Params, Plugin, TreeChangedEvent } from "@real-router/core";
+import type {
+  Params,
+  Plugin,
+  SimpleState,
+  TreeChangedEvent,
+} from "@real-router/core";
 import type { PluginApi, RoutesApi } from "@real-router/core/api";
 
 export class SearchSchemaPlugin {
@@ -95,10 +100,7 @@ export class SearchSchemaPlugin {
       StandardSchemaV1 | undefined;
   }
 
-  #validateState(result: { name: string; params: Params }): {
-    name: string;
-    params: Params;
-  } {
+  #validateState(result: SimpleState): SimpleState {
     const schema = this.#getSchema(result.name);
 
     if (!schema) {

@@ -103,8 +103,18 @@ describe("updateBrowserState", () => {
 });
 
 describe("createUpdateBrowserState", () => {
-  const stateA = { name: "a", params: {}, path: "/a" } as unknown as State;
-  const stateB = { name: "b", params: {}, path: "/b" } as unknown as State;
+  const stateA = {
+    name: "a",
+    params: {},
+    search: {},
+    path: "/a",
+  } as unknown as State;
+  const stateB = {
+    name: "b",
+    params: {},
+    search: {},
+    path: "/b",
+  } as unknown as State;
 
   it("pushes and replaces through the same closure", () => {
     const update = createUpdateBrowserState();
@@ -134,12 +144,12 @@ describe("createUpdateBrowserState", () => {
     expect(calls).toStrictEqual([
       {
         method: "push",
-        state: { name: "a", params: {}, path: "/a" },
+        state: { name: "a", params: {}, search: {}, path: "/a" },
         url: "/a",
       },
       {
         method: "replace",
-        state: { name: "b", params: {}, path: "/b" },
+        state: { name: "b", params: {}, search: {}, path: "/b" },
         url: "/b",
       },
     ]);
