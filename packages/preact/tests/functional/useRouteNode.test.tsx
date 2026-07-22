@@ -247,7 +247,7 @@ describe("useRouteNode", () => {
       const initialRoute = result.current.route;
 
       await act(async () => {
-        await router.navigate("users.list", {}, { reload: true });
+        await router.navigate("users.list", {}, undefined, { reload: true });
       });
 
       // Reload is the user's explicit non-idempotent signal — observers

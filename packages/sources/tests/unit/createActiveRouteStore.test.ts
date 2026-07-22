@@ -127,7 +127,14 @@ describe("createActiveRouteSources", () => {
 
     await router.navigate("users");
 
-    expect(spy).toHaveBeenCalledWith("users", undefined, false, true);
+    // Slot-shift (RFC-4 M2 / #1548): search channel at position 3 (undefined here).
+    expect(spy).toHaveBeenCalledWith(
+      "users",
+      undefined,
+      undefined,
+      false,
+      true,
+    );
   });
 
   it("ignoreQueryParams=false: isActiveRoute called with ignoreQueryParams=false", async () => {
@@ -144,7 +151,14 @@ describe("createActiveRouteSources", () => {
 
     await router.navigate("users");
 
-    expect(spy).toHaveBeenCalledWith("users", undefined, false, false);
+    // Slot-shift (RFC-4 M2 / #1548): search channel at position 3 (undefined here).
+    expect(spy).toHaveBeenCalledWith(
+      "users",
+      undefined,
+      undefined,
+      false,
+      false,
+    );
   });
 
   it("boolean dedup: listener NOT called if value unchanged (both active)", async () => {
@@ -409,6 +423,7 @@ describe("createActiveRouteSources", () => {
           "settings",
           {},
           // Cast keeps this test independent of URL-plugin augmentations.
+          undefined,
           { hash: "billing", force: true, hashChange: true } as Parameters<
             typeof r.navigate
           >[2],

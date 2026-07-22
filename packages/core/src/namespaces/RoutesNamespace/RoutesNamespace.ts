@@ -12,7 +12,7 @@ import {
   rebuildTreeInPlace,
   resetStore,
 } from "./routesStore";
-import { constants, DEFAULT_TRANSITION, EMPTY_SEARCH } from "../../constants";
+import { constants, DEFAULT_TRANSITION } from "../../constants";
 import { splitParamsBySearch } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -234,9 +234,15 @@ export class RoutesNamespace<
    *
    * @param route - Route name
    * @param params - Route parameters
+   * @param search - Query-channel params (RFC-4 M2 / #1548)
    * @param options - Router options
    */
-  buildPath(route: string, params?: Params, options?: Options): string {
+  buildPath(
+    route: string,
+    params?: Params,
+    search?: SearchParams,
+    options?: Options,
+  ): string {
     if (route === constants.UNKNOWN_ROUTE) {
       return typeof params?.path === "string" ? params.path : "";
     }
@@ -254,9 +260,16 @@ export class RoutesNamespace<
         ? this.#store.config.encoders[route]({ ...paramsWithDefault })
         : paramsWithDefault;
 
+    // `search` (RFC-4 M2 / #1548) is the explicit query channel — passed through
+    // to the matcher, which builds the query string from it when present and
+    // falls back to extracting the query half from `encodedParams` when absent
+    // (the v1 single-bag path). Not run through the route encoder: encoders
+    // target the path bag; a search-aware caller supplies already-shaped query
+    // values (a per-route query encoder is a follow-up).
     return this.#store.matcher.buildPath(
       route,
       encodedParams,
+      search,
       this.#getBuildPathOptions(options),
     );
   }
@@ -311,10 +324,21 @@ export class RoutesNamespace<
       const ts = opts.trailingSlash;
 
       try {
-        builtPath = this.#store.matcher.buildPath(routeName, buildParams, {
-          trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
-          queryParamsMode: opts.queryParamsMode,
-        });
+        // `search` omitted (v1 single-bag rebuild): the matched query is folded
+        // into `buildParams` above, so the matcher extracts the query half from
+        // it — a colliding rebuild stays imperfect here (В2.5 follow-up), but
+        // query-typed defaultParams still reach the URL. The write path
+        // (navigate / buildPath) passes an explicit `search` and resolves the
+        // collision (RFC-4 M2 / #1548).
+        builtPath = this.#store.matcher.buildPath(
+          routeName,
+          buildParams,
+          undefined,
+          {
+            trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+            queryParamsMode: opts.queryParamsMode,
+          },
+        );
 
         if (ts === "preserve") {
           builtPath = matchSourceTrailingSlash(path, builtPath);
@@ -442,6 +466,7 @@ export class RoutesNamespace<
   isActiveRoute(
     name: string,
     params: Params = {},
+    searchArg: SearchParams = {},
     strictEquality = false,
     ignoreQueryParams = true,
   ): boolean {
@@ -475,8 +500,10 @@ export class RoutesNamespace<
       // Split the target bag into path and query channels so `areStatesEqual`
       // compares each against the active state's own channels (RFC-4 M2 /
       // #1548) — `activeState.params` is now path-only, query is in
-      // `activeState.search`.
-      const { params: pathParams, search } = splitParamsBySearch(
+      // `activeState.search`. `params` may still carry query keys (a v1
+      // single-bag call that omits `searchArg`); the explicit `searchArg` (the
+      // slot-shifted query channel) then wins over any split/default query value.
+      const { params: pathParams, search: splitSearch } = splitParamsBySearch(
         effectiveParams,
         this.getUrlParams(name),
       );
@@ -484,7 +511,7 @@ export class RoutesNamespace<
       const targetState: State = {
         name,
         params: pathParams,
-        search: search ?? EMPTY_SEARCH,
+        search: { ...splitSearch, ...searchArg },
         path: "",
         transition: DEFAULT_TRANSITION,
         context: {},
@@ -516,7 +543,12 @@ export class RoutesNamespace<
       ...activeState.search,
     } as Params;
 
-    if (!paramsMatch(params, activeParams)) {
+    // Recombine the target's two channels for the single-bag comparison logic
+    // below: the explicit query `searchArg` wins over any query key still riding
+    // in `params` (a v1 single-bag call) — RFC-4 M2 / #1548.
+    const combinedTarget = { ...params, ...searchArg } as Params;
+
+    if (!paramsMatch(combinedTarget, activeParams)) {
       return false;
     }
 
@@ -545,7 +577,7 @@ export class RoutesNamespace<
         )
       : defaultParams;
 
-    return paramsMatchExcluding(defaultsToCheck, activeParams, params);
+    return paramsMatchExcluding(defaultsToCheck, activeParams, combinedTarget);
   }
 
   getMetaForState(

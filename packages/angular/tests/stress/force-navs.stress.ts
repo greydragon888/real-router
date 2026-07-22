@@ -59,13 +59,13 @@ describe("concurrent force-navs stress", () => {
     const navOptsSeen: { force?: boolean; hashChange?: boolean }[] = [];
     const originalNavigate = router.navigate.bind(router);
 
-    router.navigate = (name, params, opts) => {
+    router.navigate = ((name, params, search, opts) => {
       navOptsSeen.push(
         (opts ?? {}) as { force?: boolean; hashChange?: boolean },
       );
 
-      return originalNavigate(name, params, opts);
-    };
+      return originalNavigate(name, params, search, opts);
+    }) as typeof router.navigate;
 
     let completedCount = 0;
     let rejectedCount = 0;
@@ -124,7 +124,7 @@ describe("concurrent force-navs stress", () => {
 
     for (let i = 0; i < 100; i++) {
       // Same route, same params, force:true → bypass SAME_STATES.
-      await router.navigate("route0", {}, { force: true });
+      await router.navigate("route0", {}, undefined, { force: true });
       completedCount += 1;
     }
 
@@ -217,7 +217,7 @@ describe("concurrent force-navs stress", () => {
       // Force: same route, same params, force:true → commits even though
       // it's identical to current state.
       try {
-        await router.navigate("route0", {}, { force: true });
+        await router.navigate("route0", {}, undefined, { force: true });
         forceCommitted += 1;
       } catch {
         // Force should never reject in this setup.

@@ -34,7 +34,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     it("should respect strictEquality", async () => {
       await router.navigate("sign-in");
 
-      expect(router.isActiveRoute("home", {}, true)).toBe(false);
+      expect(router.isActiveRoute("home", {}, undefined, true)).toBe(false);
     });
 
     it("should return false if router was not started", async () => {
@@ -62,7 +62,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       it("should return false for parent with strictEquality=true when child is active", async () => {
         await router.navigate("users.view", { id: "123" });
 
-        expect(router.isActiveRoute("users", {}, true)).toBe(false);
+        expect(router.isActiveRoute("users", {}, undefined, true)).toBe(false);
       });
 
       it("should return false for sibling route when another sibling is active", async () => {
@@ -134,6 +134,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
           router.isActiveRoute(
             "section.query",
             { section: "section1" },
+            undefined,
             false,
             false,
           ),
@@ -149,6 +150,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
               param2: "value2",
               param3: "value3",
             },
+            undefined,
             false,
             false,
           ),
@@ -173,6 +175,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
               param2: "value2",
               param3: "value3",
             },
+            undefined,
             false,
             false,
           ),
@@ -195,7 +198,9 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         expect(router.isActiveRoute("withDefaultParam", {})).toBe(true);
 
         // With strictEquality, should still work
-        expect(router.isActiveRoute("withDefaultParam", {}, true)).toBe(true);
+        expect(
+          router.isActiveRoute("withDefaultParam", {}, undefined, true),
+        ).toBe(true);
       });
     });
 
@@ -268,13 +273,17 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         // Parent has defaultParams.sort = "asc"; with ignoreQueryParams=true
         // the query-typed default must be stripped before comparison so the
         // ancestor link still highlights as active.
-        expect(router.isActiveRoute("products", {}, false, true)).toBe(true);
+        expect(
+          router.isActiveRoute("products", {}, undefined, false, true),
+        ).toBe(true);
       });
 
       it("still enforces query default when ignoreQueryParams=false", async () => {
         await router.navigate("products.detail", { id: "6" });
 
-        expect(router.isActiveRoute("products", {}, false, false)).toBe(false);
+        expect(
+          router.isActiveRoute("products", {}, undefined, false, false),
+        ).toBe(false);
       });
 
       it("treats descendant link as inactive when current state is the parent", async () => {
@@ -302,11 +311,15 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
         await router.navigate("mixedA.leaf", { slot: "b" });
 
-        expect(router.isActiveRoute("mixedA", {}, false, true)).toBe(false);
+        expect(router.isActiveRoute("mixedA", {}, undefined, false, true)).toBe(
+          false,
+        );
 
         await router.navigate("mixedA.leaf", { slot: "a" });
 
-        expect(router.isActiveRoute("mixedA", {}, false, true)).toBe(true);
+        expect(router.isActiveRoute("mixedA", {}, undefined, false, true)).toBe(
+          true,
+        );
       });
 
       it("strips multiple consecutive query defaults", async () => {
@@ -322,7 +335,9 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         await router.navigate("twoQ.leaf", { slot: "x" });
 
         // Both `a` and `b` are query defaults → stripped; URL slot enforced.
-        expect(router.isActiveRoute("twoQ", {}, false, true)).toBe(true);
+        expect(router.isActiveRoute("twoQ", {}, undefined, false, true)).toBe(
+          true,
+        );
       });
 
       it("keeps defaults untouched when none are query-typed (url-only meta)", async () => {
@@ -338,7 +353,9 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
         await router.navigate("urlOnly.leaf", { slot: "a" });
 
-        expect(router.isActiveRoute("urlOnly", {}, false, true)).toBe(true);
+        expect(
+          router.isActiveRoute("urlOnly", {}, undefined, false, true),
+        ).toBe(true);
       });
 
       it("preserves URL-typed defaults during the strip (query key first)", async () => {
@@ -354,11 +371,15 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
         await router.navigate("mixedB.leaf", { slot: "a" });
 
-        expect(router.isActiveRoute("mixedB", {}, false, true)).toBe(true);
+        expect(router.isActiveRoute("mixedB", {}, undefined, false, true)).toBe(
+          true,
+        );
 
         await router.navigate("mixedB.leaf", { slot: "b" });
 
-        expect(router.isActiveRoute("mixedB", {}, false, true)).toBe(false);
+        expect(router.isActiveRoute("mixedB", {}, undefined, false, true)).toBe(
+          false,
+        );
       });
     });
 
@@ -437,14 +458,26 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         await router.navigate("users.view", { id: "123" });
 
         // Explicit boolean values work correctly
-        expect(router.isActiveRoute("users", {}, false)).toBe(true); // hierarchical
-        expect(router.isActiveRoute("users", {}, true)).toBe(false); // strict
+        expect(router.isActiveRoute("users", {}, undefined, false)).toBe(true); // hierarchical
+        expect(router.isActiveRoute("users", {}, undefined, true)).toBe(false); // strict
 
         expect(
-          router.isActiveRoute("users.view", { id: "123" }, false, true),
+          router.isActiveRoute(
+            "users.view",
+            { id: "123" },
+            undefined,
+            false,
+            true,
+          ),
         ).toBe(true);
         expect(
-          router.isActiveRoute("users.view", { id: "123" }, false, false),
+          router.isActiveRoute(
+            "users.view",
+            { id: "123" },
+            undefined,
+            false,
+            false,
+          ),
         ).toBe(true);
       });
     });

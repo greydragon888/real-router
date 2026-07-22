@@ -9,6 +9,7 @@ export type {
 // Base types
 export type {
   Params,
+  NavigationTarget,
   SearchParams,
   SearchParamValue,
   SearchParamPrimitive,

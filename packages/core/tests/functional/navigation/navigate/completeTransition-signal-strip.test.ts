@@ -43,7 +43,9 @@ describe("completeTransition — opts.signal stripping (#722)", () => {
 
     router.usePlugin(plugin);
 
-    await router.navigate("users", {}, { signal: controller.signal });
+    await router.navigate("users", {}, undefined, {
+      signal: controller.signal,
+    });
 
     expect(received).toBeDefined();
     // signal must be stripped from the public success payload
@@ -60,11 +62,10 @@ describe("completeTransition — opts.signal stripping (#722)", () => {
       },
     }));
 
-    await router.navigate(
-      "users",
-      {},
-      { signal: controller.signal, reload: true },
-    );
+    await router.navigate("users", {}, undefined, {
+      signal: controller.signal,
+      reload: true,
+    });
 
     expect(received?.reload).toBe(true);
     expect(received && "signal" in received).toBe(false);

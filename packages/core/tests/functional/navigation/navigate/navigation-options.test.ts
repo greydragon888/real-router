@@ -27,7 +27,7 @@ describe("router.navigate() - navigation meta and options", () => {
   });
 
   it("should be able to call navigate with 3 args without callback", async () => {
-    await router.navigate("orders.pending", {}, { force: true });
+    await router.navigate("orders.pending", {}, undefined, { force: true });
 
     expect(router.getState()?.name).toBe("orders.pending");
   });
@@ -35,7 +35,7 @@ describe("router.navigate() - navigation meta and options", () => {
   it("should set transition.reload when navigating with reload option", async () => {
     const options = { reload: true, replace: true, force: true };
 
-    await router.navigate("profile", {}, options);
+    await router.navigate("profile", {}, undefined, options);
 
     expect(router.getState()?.transition?.reload).toBe(true);
   });
@@ -43,17 +43,17 @@ describe("router.navigate() - navigation meta and options", () => {
   it("should allow navigation when canActivate guard returns true", async () => {
     lifecycle.addActivateGuard("profile", () => () => true);
 
-    const state = await router.navigate("profile", {}, {});
+    const state = await router.navigate("profile", {}, undefined, {});
 
     expect(state.name).toBe("profile");
   });
 
   it("should allow navigation when guard returns true after previous navigation", async () => {
-    await router.navigate("users", {}, { replace: true });
+    await router.navigate("users", {}, undefined, { replace: true });
 
     lifecycle.addActivateGuard("settings", () => () => true);
 
-    const state = await router.navigate("settings", {}, {});
+    const state = await router.navigate("settings", {}, undefined, {});
 
     expect(state.name).toBe("settings");
   });
@@ -61,7 +61,7 @@ describe("router.navigate() - navigation meta and options", () => {
   it("should allow navigation when canDeactivate guard returns true", async () => {
     lifecycle.addDeactivateGuard("home", () => () => true);
 
-    const state = await router.navigate("settings", {}, {});
+    const state = await router.navigate("settings", {}, undefined, {});
 
     expect(state.name).toBe("settings");
   });
@@ -71,7 +71,7 @@ describe("router.navigate() - navigation meta and options", () => {
 
     const navOptions = { reload: true, replace: true };
 
-    const state = await router.navigate("profile", {}, navOptions);
+    const state = await router.navigate("profile", {}, undefined, navOptions);
 
     expect(state.transition?.reload).toBe(true);
   });
@@ -92,7 +92,7 @@ describe("router.navigate() - navigation meta and options", () => {
       return true;
     });
 
-    const state = await router.navigate("profile", {}, {});
+    const state = await router.navigate("profile", {}, undefined, {});
 
     expect(state.name).toBe("profile");
     expect(deactivateCallCount).toBe(1);
@@ -105,7 +105,12 @@ describe("router.navigate() - navigation meta and options", () => {
 
       await freshRouter.start("/home");
 
-      const resultState = await freshRouter.navigate("users", {}, {});
+      const resultState = await freshRouter.navigate(
+        "users",
+        {},
+        undefined,
+        {},
+      );
 
       expect(resultState).toBeDefined();
       expect(resultState.transition?.redirected).toBeUndefined();
@@ -118,11 +123,9 @@ describe("router.navigate() - navigation meta and options", () => {
 
       await freshRouter.start("/home");
 
-      const resultState = await freshRouter.navigate(
-        "users",
-        {},
-        { redirected: true },
-      );
+      const resultState = await freshRouter.navigate("users", {}, undefined, {
+        redirected: true,
+      });
 
       expect(resultState).toBeDefined();
       expect(resultState.transition?.redirected).toBe(true);
@@ -145,13 +148,11 @@ describe("router.navigate() - navigation meta and options", () => {
         },
       );
 
-      await freshRouter.navigate("users", {}, {});
+      await freshRouter.navigate("users", {}, undefined, {});
 
-      await freshRouter.navigate(
-        "users.view",
-        { id: "1" },
-        { redirected: true },
-      );
+      await freshRouter.navigate("users.view", { id: "1" }, undefined, {
+        redirected: true,
+      });
 
       expect(stateLog).toStrictEqual([
         { redirected: undefined },
@@ -164,25 +165,29 @@ describe("router.navigate() - navigation meta and options", () => {
 
   describe("transition meta flags (reload, replace, redirected)", () => {
     it("sets transition.reload to true when navigating with reload option", async () => {
-      const state = await router.navigate("profile", {}, { reload: true });
+      const state = await router.navigate("profile", {}, undefined, {
+        reload: true,
+      });
 
       expect(state.transition?.reload).toBe(true);
     });
 
     it("does not set transition.reload for normal navigation", async () => {
-      const state = await router.navigate("profile", {}, {});
+      const state = await router.navigate("profile", {}, undefined, {});
 
       expect(state.transition?.reload).toBeUndefined();
     });
 
     it("sets transition.redirected to true when navigating with redirected option", async () => {
-      const state = await router.navigate("users", {}, { redirected: true });
+      const state = await router.navigate("users", {}, undefined, {
+        redirected: true,
+      });
 
       expect(state.transition?.redirected).toBe(true);
     });
 
     it("does not set transition.redirected for normal navigation", async () => {
-      const state = await router.navigate("users", {}, {});
+      const state = await router.navigate("users", {}, undefined, {});
 
       expect(state.transition?.redirected).toBeUndefined();
     });
@@ -203,7 +208,7 @@ describe("router.navigate() - navigation meta and options", () => {
         },
       );
 
-      await freshRouter.navigate("profile", {}, { reload: true });
+      await freshRouter.navigate("profile", {}, undefined, { reload: true });
 
       // During guard, transition is not yet built
       expect(reloadInGuard).toBeUndefined();
@@ -214,19 +219,23 @@ describe("router.navigate() - navigation meta and options", () => {
     });
 
     it("sets transition.replace to true when navigating with replace option", async () => {
-      const state = await router.navigate("profile", {}, { replace: true });
+      const state = await router.navigate("profile", {}, undefined, {
+        replace: true,
+      });
 
       expect(state.transition?.replace).toBe(true);
     });
 
     it("does not set transition.replace for normal navigation (undefined)", async () => {
-      const state = await router.navigate("profile", {}, {});
+      const state = await router.navigate("profile", {}, undefined, {});
 
       expect(state.transition?.replace).toBeUndefined();
     });
 
     it("sets transition.replace to false when explicitly passed replace: false", async () => {
-      const state = await router.navigate("profile", {}, { replace: false });
+      const state = await router.navigate("profile", {}, undefined, {
+        replace: false,
+      });
 
       expect(state.transition?.replace).toBe(false);
     });
@@ -243,7 +252,7 @@ describe("router.navigate() - navigation meta and options", () => {
       await freshRouter.start("/home");
       freshRouter.navigateToNotFound("/unknown");
 
-      const state = await freshRouter.navigate("users", {}, {});
+      const state = await freshRouter.navigate("users", {}, undefined, {});
 
       expect(state.transition?.replace).toBe(true);
 
@@ -259,7 +268,9 @@ describe("router.navigate() - navigation meta and options", () => {
       await freshRouter.start("/home");
       freshRouter.navigateToNotFound("/unknown");
 
-      const state = await freshRouter.navigate("users", {}, { replace: false });
+      const state = await freshRouter.navigate("users", {}, undefined, {
+        replace: false,
+      });
 
       expect(state.transition?.replace).toBe(true);
 
@@ -281,7 +292,7 @@ describe("router.navigate() - navigation meta and options", () => {
         },
       );
 
-      await freshRouter.navigate("profile", {}, { replace: true });
+      await freshRouter.navigate("profile", {}, undefined, { replace: true });
 
       expect(replaceInGuard).toBeUndefined();
       expect(freshRouter.getState()?.transition?.replace).toBe(true);
@@ -298,7 +309,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const callLog: string[] = [];
 
       await freshRouter.start("/home");
-      await freshRouter.navigate("users", {}, {});
+      await freshRouter.navigate("users", {}, undefined, {});
 
       // Register first guard (factory pattern: () => guardFn)
       getLifecycleApi(freshRouter).addDeactivateGuard("users", () => () => {
@@ -315,7 +326,7 @@ describe("router.navigate() - navigation meta and options", () => {
       });
 
       // Navigate away
-      await freshRouter.navigate("home", {}, {});
+      await freshRouter.navigate("home", {}, undefined, {});
 
       // Only guard2 should be called (guard1 was replaced)
       expect(callLog).toStrictEqual(["guard2"]);
@@ -344,7 +355,7 @@ describe("router.navigate() - navigation meta and options", () => {
       });
 
       // Navigate to users
-      await freshRouter.navigate("users", {}, {});
+      await freshRouter.navigate("users", {}, undefined, {});
 
       // Only guard2 should be called (guard1 was replaced)
       expect(callLog).toStrictEqual(["guard2"]);
@@ -357,7 +368,7 @@ describe("router.navigate() - navigation meta and options", () => {
       let callCount = 0;
 
       await freshRouter.start("/home");
-      await freshRouter.navigate("users", {}, {});
+      await freshRouter.navigate("users", {}, undefined, {});
 
       // Register handler 10 times for the same route (factory pattern)
       for (let i = 0; i < 10; i++) {
@@ -369,7 +380,7 @@ describe("router.navigate() - navigation meta and options", () => {
       }
 
       // Navigate away
-      await freshRouter.navigate("home", {}, {});
+      await freshRouter.navigate("home", {}, undefined, {});
 
       // Should only call once (last handler), not 10 times
       expect(callCount).toBe(1);
@@ -382,7 +393,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const callLog: string[] = [];
 
       await freshRouter.start("/home");
-      await freshRouter.navigate("users", {}, {});
+      await freshRouter.navigate("users", {}, undefined, {});
 
       // Register guard for users (factory pattern)
       getLifecycleApi(freshRouter).addDeactivateGuard("users", () => () => {
@@ -392,20 +403,20 @@ describe("router.navigate() - navigation meta and options", () => {
       });
 
       // Navigate to users.view (same branch)
-      await freshRouter.navigate("users.view", { id: "1" }, {});
+      await freshRouter.navigate("users.view", { id: "1" }, undefined, {});
 
       // Navigate away to different branch
-      await freshRouter.navigate("home", {}, {});
+      await freshRouter.navigate("home", {}, undefined, {});
 
       // Guard was called when leaving users branch
       expect(callLog).toStrictEqual(["users-guard"]);
 
       // Navigate back to users
       callLog.length = 0;
-      await freshRouter.navigate("users", {}, {});
+      await freshRouter.navigate("users", {}, undefined, {});
 
       // Navigate away again - guard should NOT be called (was auto-cleared)
-      await freshRouter.navigate("home", {}, {});
+      await freshRouter.navigate("home", {}, undefined, {});
 
       // Guard was auto-cleared, so not called
       expect(callLog).toStrictEqual([]);
@@ -448,9 +459,9 @@ describe("router.navigate() - navigation meta and options", () => {
       );
 
       // Rapid sequential navigations (synchronous - no guards/middleware)
-      await freshRouter.navigate("users", {}, {});
-      await freshRouter.navigate("orders", {}, {});
-      await freshRouter.navigate("home", {}, {});
+      await freshRouter.navigate("users", {}, undefined, {});
+      await freshRouter.navigate("orders", {}, undefined, {});
+      await freshRouter.navigate("home", {}, undefined, {});
 
       // All 3 navigations complete synchronously (no async guards/middleware)
       // Each navigation completes BEFORE the next one starts
@@ -494,9 +505,9 @@ describe("router.navigate() - navigation meta and options", () => {
       );
 
       // Start async navigation to users (don't await - let it run in background)
-      freshRouter.navigate("users", {}, {}).catch(() => {});
+      freshRouter.navigate("users", {}, undefined, {}).catch(() => {});
       // Immediately navigate to orders (should cancel users)
-      await freshRouter.navigate("orders", {}, {});
+      await freshRouter.navigate("orders", {}, undefined, {});
 
       // Wait a bit for cancellation event to fire
       await new Promise((resolve) => setTimeout(resolve, 100));

@@ -24,13 +24,16 @@ describe("router.navigate() - edge cases input validation", () => {
   describe("Issue #60: navigate() options validation", () => {
     it("should accept valid NavigationOptions", () => {
       expect(() => {
-        void router.navigate("users", {}, { replace: true, reload: false });
+        void router.navigate("users", {}, undefined, {
+          replace: true,
+          reload: false,
+        });
       }).not.toThrow();
     });
 
     it("should accept empty options object", () => {
       expect(() => {
-        void router.navigate("users", {}, {});
+        void router.navigate("users", {}, undefined, {});
       }).not.toThrow();
     });
 
@@ -225,7 +228,7 @@ describe("router.navigate() - edge cases input validation", () => {
         value: true,
       });
 
-      const state = await r.navigate("users", {}, opts);
+      const state = await r.navigate("users", {}, undefined, opts);
 
       expect(state.transition?.replace).toBe(true);
       expect(onTransitionSuccess).toHaveBeenCalledWith(

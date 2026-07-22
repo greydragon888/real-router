@@ -263,6 +263,7 @@ describe("Search schema plugin", () => {
     // slot-shift. The navigate→State path already validates the query (see
     // above). Assertions below are already M2-correct (state.search) for when
     // the contract lands. Un-skip then.
+    // eslint-disable-next-line vitest/no-disabled-tests -- intentionally skipped pending the forwardState(+search) contract (RFC-4 M2 §2.3, #1548); body kept so the un-skip is a one-line change, not a .todo() rewrite
     it.skip("should validate params from URL on router.start()", async () => {
       const consoleSpy = vi
         .spyOn(console, "error")

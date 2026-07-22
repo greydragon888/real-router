@@ -6,6 +6,7 @@ import type {
   Options,
   Params,
   RouterLogger,
+  SearchParams,
   State,
 } from "../../types";
 
@@ -45,6 +46,7 @@ export interface NavigationDependencies {
   buildNavigateState: (
     routeName: string,
     routeParams: Params,
+    routeSearch?: SearchParams,
   ) => State | undefined;
 
   /** Resolve defaultRoute and defaultParams options (static value or callback) */

@@ -80,7 +80,9 @@ describe("router.navigate() - same states", () => {
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation with reload - should succeed
-        await router.navigate("orders.pending", {}, { reload: true });
+        await router.navigate("orders.pending", {}, undefined, {
+          reload: true,
+        });
 
         const state2 = router.getState();
 
@@ -108,11 +110,9 @@ describe("router.navigate() - same states", () => {
 
         // Second navigation with reload - should succeed (no SAME_STATES error)
         // Guards are not re-run because same-state reload has empty transition path
-        const state = await router.navigate(
-          "orders.pending",
-          {},
-          { reload: true },
-        );
+        const state = await router.navigate("orders.pending", {}, undefined, {
+          reload: true,
+        });
 
         expect(state?.name).toBe("orders.pending");
         expect(canDeactivateGuard).toHaveBeenCalledTimes(0);
@@ -130,7 +130,7 @@ describe("router.navigate() - same states", () => {
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation with force - should succeed
-        await router.navigate("orders.pending", {}, { force: true });
+        await router.navigate("orders.pending", {}, undefined, { force: true });
 
         const state2 = router.getState();
 
@@ -147,7 +147,7 @@ describe("router.navigate() - same states", () => {
         canDeactivateSpy.mockClear();
 
         // Second navigation with force - should bypass guard
-        await router.navigate("orders.pending", {}, { force: true });
+        await router.navigate("orders.pending", {}, undefined, { force: true });
 
         // Guard should not be called with force
         expect(canDeactivateSpy).not.toHaveBeenCalled();
@@ -161,11 +161,10 @@ describe("router.navigate() - same states", () => {
         expect(state1?.name).toBe("orders.pending");
 
         // Both force and reload
-        await router.navigate(
-          "orders.pending",
-          {},
-          { force: true, reload: true },
-        );
+        await router.navigate("orders.pending", {}, undefined, {
+          force: true,
+          reload: true,
+        });
 
         const state2 = router.getState();
 
@@ -185,6 +184,7 @@ describe("router.navigate() - same states", () => {
         const state = await router.navigate(
           "section.query",
           { section: "section1", param1: 42, param2: "b", param3: "c" },
+          undefined,
           { force: true },
         );
 
@@ -213,6 +213,7 @@ describe("router.navigate() - same states", () => {
             param2: "b",
             param3: "c",
           },
+          undefined,
           { force: true },
         );
 
@@ -238,12 +239,12 @@ describe("router.navigate() - same states", () => {
 
       it("should compare states including meta information", async () => {
         // First navigate with options
-        await router.navigate("profile", {}, { replace: true });
+        await router.navigate("profile", {}, undefined, { replace: true });
 
         // Second navigate with different options but same route.
         // Should still be considered same state (options don't affect state comparison)
         await expect(
-          router.navigate("profile", {}, { replace: false }),
+          router.navigate("profile", {}, undefined, { replace: false }),
         ).rejects.toMatchObject({
           code: errorCodes.SAME_STATES,
         });

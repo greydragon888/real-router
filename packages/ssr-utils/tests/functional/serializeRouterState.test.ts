@@ -15,6 +15,7 @@ describe("serializeRouterState", () => {
     const state: State = {
       name: "users.view",
       params: { id: "1" },
+      search: {},
       path: "/users/1",
       context: {},
       transition: baseTransition,
@@ -36,6 +37,7 @@ describe("serializeRouterState", () => {
     const state: State = {
       name: "home",
       params: { foo: "bar" },
+      search: {},
       path: "/home?foo=bar",
       context: { data: { hello: "world" } },
       transition: baseTransition,
@@ -54,6 +56,7 @@ describe("serializeRouterState", () => {
     const state: State = {
       name: "page",
       params: { html: "</script>" },
+      search: {},
       path: "/<>&",
       context: {},
       transition: baseTransition,
@@ -73,6 +76,7 @@ describe("serializeRouterState", () => {
     const state: State = {
       name: "users.list",
       params: {},
+      search: {},
       path: "/users/list",
       context: { data: { count: 42 } },
       transition: baseTransition,
@@ -93,6 +97,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {
           data: { a: 1 },
@@ -112,6 +117,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {
           data: { x: 1 },
@@ -145,6 +151,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context,
         transition: baseTransition,
@@ -164,6 +171,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: { data: { x: 1 } },
         transition: baseTransition,
@@ -179,6 +187,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: { data: { x: 1 } },
         transition: baseTransition,
@@ -194,6 +203,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {
           data: { a: 1 },
@@ -223,6 +233,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: { data: { when: date } },
         transition: baseTransition,
@@ -263,6 +274,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {
           data: { a: 1 },
@@ -293,6 +305,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {},
         transition: baseTransition,
@@ -313,6 +326,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: { data: { a: 1 } },
         transition: baseTransition,

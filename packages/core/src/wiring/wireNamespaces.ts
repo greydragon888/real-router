@@ -181,7 +181,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     setState: (state) => {
       ns.state.set(state);
     },
-    buildNavigateState: (routeName, routeParams) => {
+    buildNavigateState: (routeName, routeParams, routeSearch) => {
       const ctx = getInternals(ns.router);
 
       ctx.validator?.routes.validateStateBuilderArgs(
@@ -199,11 +199,29 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         return;
       }
 
-      // Split the incoming v1 bag into path and query channels by declaration
-      // (keys that are not path params — RFC-4 M2 / #1548). `buildPath` still
-      // takes the FULL bag (the facade slot-shift is a separate step), so the
-      // URL keeps its query string; `state.params` gets the path-only bag and
-      // `state.search` the query.
+      // Explicit query channel (RFC-4 M2 / #1548): the descriptor
+      // `navigate(target)` and positional `navigate(name, params, search)` forms
+      // supply `search` directly. Path comes from the path bag, query from
+      // `routeSearch` — buildPath is search-aware, so a colliding name
+      // (`/items/:id?id`) keeps the path value in its slot and the query value
+      // in its own (the killed #843 precedence).
+      if (routeSearch !== undefined) {
+        const explicitPath = ctx.buildPath(name, fullParams, routeSearch);
+
+        return ns.state.makeState(
+          name,
+          fullParams,
+          routeSearch,
+          explicitPath,
+          meta,
+          true,
+        );
+      }
+
+      // v1 single-bag path: split the forwarded bag into path and query channels
+      // by declaration (keys that are not path params). `buildPath` still takes
+      // the FULL bag, so the URL keeps its query string; `state.params` gets the
+      // path-only bag and `state.search` the query.
       const { params, search } = splitParamsBySearch(
         fullParams,
         ns.routes.getUrlParams(name),

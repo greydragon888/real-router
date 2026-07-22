@@ -68,6 +68,9 @@ function getDelegation(router: Router): DelegationState {
       .navigate(
         target.name,
         target.params ?? EMPTY_PARAMS,
+        // Slot-shift (RFC-4 M2 / #1548): query channel at position 3 (unused —
+        // Link query rides in params), options at position 4.
+        undefined,
         target.options ?? EMPTY_OPTIONS,
       )
       .catch(NOOP);

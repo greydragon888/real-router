@@ -1182,7 +1182,7 @@ describe("@real-router/rsc-server-plugin", () => {
       listLoader.mockResolvedValueOnce(refreshed);
 
       invalidate(router, "rsc");
-      await router.navigate("users.list", {}, { reload: true });
+      await router.navigate("users.list", {}, undefined, { reload: true });
 
       expect(listLoader).toHaveBeenCalledTimes(1);
       expect(router.getState()!.context.rsc).toBe(refreshed);
@@ -1207,7 +1207,9 @@ describe("@real-router/rsc-server-plugin", () => {
       ).toBe(1);
 
       invalidate(router, "rsc");
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(2);
       expect(
@@ -1228,7 +1230,9 @@ describe("@real-router/rsc-server-plugin", () => {
       invalidate(router, "rsc");
       invalidate(router, "rsc");
 
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(1);
 
@@ -1236,7 +1240,9 @@ describe("@real-router/rsc-server-plugin", () => {
       // invalidate() MUST NOT re-trigger the loader. Catches a regression
       // where stacked invalidates would each survive one extra navigation
       // instead of collapsing into a single one.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(1);
     });
@@ -1310,7 +1316,9 @@ describe("@real-router/rsc-server-plugin", () => {
       invalidate(router, "rsc");
 
       await expect(
-        router.navigate("users.profile", { id: "42" }, { reload: true }),
+        router.navigate("users.profile", { id: "42" }, undefined, {
+          reload: true,
+        }),
       ).rejects.toThrow("boom");
     });
 
@@ -1391,14 +1399,18 @@ describe("@real-router/rsc-server-plugin", () => {
 
       // Following navigation: the flag is consumed in LEAVE_APPROVE phase,
       // loader runs a second time, fresh payload lands on nextRoute.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(2);
       expect(router.getState()!.context.rsc).toBe(secondNode);
 
       // Sanity: the flag is single-shot — a third navigation without a
       // fresh invalidate must NOT touch the loader.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(2);
     });
@@ -1438,7 +1450,9 @@ describe("@real-router/rsc-server-plugin", () => {
         rscServerPluginFactory({ "users.profile": () => loader }),
       );
 
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       // The pre-existing flag was consumed by the new listener — second
       // loader call, fresh payload.
@@ -1489,11 +1503,9 @@ describe("@real-router/rsc-server-plugin", () => {
       invalidate(router, "rsc");
 
       const ac = new AbortController();
-      const navA = router.navigate(
-        "users.profile",
-        { id: "42" },
-        { signal: ac.signal },
-      );
+      const navA = router.navigate("users.profile", { id: "42" }, undefined, {
+        signal: ac.signal,
+      });
 
       // Yield enough microtasks for the leave handler to reach
       // `await loader(…)`. The empirically-required count is 3 yields:
@@ -1518,7 +1530,9 @@ describe("@real-router/rsc-server-plugin", () => {
       expect(loader).toHaveBeenCalledTimes(1);
 
       // Flag preserved — next navigation refreshes.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(2);
       expect(router.getState()!.context.rsc).toBe(freshNode);
@@ -1550,12 +1564,12 @@ describe("@real-router/rsc-server-plugin", () => {
 
       // childB navigation reloads — but its own stale flag is clean,
       // so the leave handler must no-op.
-      await childB.navigate("home", {}, { reload: true });
+      await childB.navigate("home", {}, undefined, { reload: true });
 
       expect(loaderB).not.toHaveBeenCalled();
 
       // childA navigation reloads — its flag is set, leave handler runs.
-      await childA.navigate("home", {}, { reload: true });
+      await childA.navigate("home", {}, undefined, { reload: true });
 
       expect(loaderA).toHaveBeenCalledTimes(1);
 
@@ -1575,13 +1589,17 @@ describe("@real-router/rsc-server-plugin", () => {
       // What ssr-data-plugin's invalidate would do:
       markStale(router, "data");
 
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).not.toHaveBeenCalled();
 
       // Own namespace still works.
       invalidate(router, "rsc");
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(1);
     });
@@ -1667,12 +1685,16 @@ describe("@real-router/rsc-server-plugin", () => {
       invalidate(router, "rsc");
 
       await expect(
-        router.navigate("users.profile", { id: "42" }, { reload: true }),
+        router.navigate("users.profile", { id: "42" }, undefined, {
+          reload: true,
+        }),
       ).rejects.toThrow("transient");
 
       expect(loader).toHaveBeenCalledTimes(2);
 
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(3);
       expect(router.getState()!.context.rsc).toBe(recoveredNode);
@@ -1719,7 +1741,9 @@ describe("@real-router/rsc-server-plugin", () => {
       expect(loader.mock.calls[0]).toStrictEqual([{ id: "42" }]);
 
       invalidate(router, "rsc");
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       // Leave handler passes { signal } from the navigation's controller.
       expect(observedSignal).toBeInstanceOf(AbortSignal);
@@ -1755,11 +1779,9 @@ describe("@real-router/rsc-server-plugin", () => {
       invalidate(router, "rsc");
 
       const ac = new AbortController();
-      const navA = router.navigate(
-        "users.profile",
-        { id: "42" },
-        { signal: ac.signal },
-      );
+      const navA = router.navigate("users.profile", { id: "42" }, undefined, {
+        signal: ac.signal,
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -1776,7 +1798,9 @@ describe("@real-router/rsc-server-plugin", () => {
 
       await expect(navA).rejects.toThrow();
 
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(router.getState()!.context.rsc).toBe(freshNode);
     });
@@ -1819,11 +1843,10 @@ describe("@real-router/rsc-server-plugin", () => {
       invalidate(router, "rsc");
 
       const ac = new AbortController();
-      const navA = router.navigate(
-        "users.profile",
-        { id: "42" },
-        { reload: true, signal: ac.signal },
-      );
+      const navA = router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+        signal: ac.signal,
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -1833,7 +1856,9 @@ describe("@real-router/rsc-server-plugin", () => {
 
       await expect(navA).rejects.toThrow();
 
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(router.getState()!.context.rsc).toBe(recoveredNode);
     });

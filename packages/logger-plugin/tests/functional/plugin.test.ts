@@ -99,7 +99,7 @@ describe("@real-router/logger-plugin", () => {
       errorSpy.mockClear();
 
       await expect(
-        router.navigate("nonexistent", {}, {}),
+        router.navigate("nonexistent", {}, undefined, {}),
       ).rejects.toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
 
       expect(errorSpy).toHaveBeenCalledWith(
@@ -308,7 +308,7 @@ describe("@real-router/logger-plugin", () => {
       router.usePlugin(loggerPluginFactory());
       await router.start("/");
 
-      await router.navigate("users", {}, {});
+      await router.navigate("users", {}, undefined, {});
 
       expect(loggerSpy).toHaveBeenCalled();
 
@@ -331,8 +331,8 @@ describe("@real-router/logger-plugin", () => {
       router.usePlugin(loggerPluginFactory());
       await router.start("/");
 
-      await router.navigate("users", {}, {});
-      await router.navigate("admin", {}, {});
+      await router.navigate("users", {}, undefined, {});
+      await router.navigate("admin", {}, undefined, {});
 
       expect(consoleGroupEndSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
@@ -478,7 +478,9 @@ describe("@real-router/logger-plugin", () => {
       await router.navigate("users.view", { id: "123" });
       loggerSpy.mockClear();
 
-      await router.navigate("users.view", { id: "123" }, { reload: true });
+      await router.navigate("users.view", { id: "123" }, undefined, {
+        reload: true,
+      });
 
       const calls = loggerSpy.mock.calls.map(
         (call: unknown[]) => call[0] as string,
@@ -1042,7 +1044,7 @@ describe("@real-router/logger-plugin", () => {
         errorSpy.mockClear();
 
         await expect(
-          router.navigate("nonexistent", {}, {}),
+          router.navigate("nonexistent", {}, undefined, {}),
         ).rejects.toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
 
         const errorCall = errorSpy.mock.calls.find((call: unknown[]) =>

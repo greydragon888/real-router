@@ -3192,9 +3192,9 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("home", {}, { trailingSlash: "always" })).toBe(
-        "/home/",
-      );
+      expect(
+        matcher.buildPath("home", {}, undefined, { trailingSlash: "always" }),
+      ).toBe("/home/");
     });
 
     it("should not double trailing slash when already present", () => {
@@ -3216,9 +3216,9 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("home", {}, { trailingSlash: "always" })).toBe(
-        "/home/",
-      );
+      expect(
+        matcher.buildPath("home", {}, undefined, { trailingSlash: "always" }),
+      ).toBe("/home/");
     });
 
     it("should remove trailing slash when mode is 'never'", () => {
@@ -3240,9 +3240,9 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("home", {}, { trailingSlash: "never" })).toBe(
-        "/home",
-      );
+      expect(
+        matcher.buildPath("home", {}, undefined, { trailingSlash: "never" }),
+      ).toBe("/home");
     });
 
     it("should not remove slash from root path '/'", () => {
@@ -3264,9 +3264,9 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("index", {}, { trailingSlash: "never" })).toBe(
-        "/",
-      );
+      expect(
+        matcher.buildPath("index", {}, undefined, { trailingSlash: "never" }),
+      ).toBe("/");
     });
 
     it("should not modify path without trailingSlash option", () => {
@@ -3414,6 +3414,7 @@ describe("SegmentMatcher", () => {
         matcher.buildPath(
           "users",
           { id: "42", extra: "value", another: "one" },
+          undefined,
           { queryParamsMode: "loose" },
         ),
       ).toBe("/users/42?extra=value&another=one");
@@ -3463,11 +3464,9 @@ describe("SegmentMatcher", () => {
       matcher.registerTree(rootNode);
 
       expect(
-        matcher.buildPath(
-          "search",
-          { q: "test", extra: "val" },
-          { queryParamsMode: "loose" },
-        ),
+        matcher.buildPath("search", { q: "test", extra: "val" }, undefined, {
+          queryParamsMode: "loose",
+        }),
       ).toBe("/search?q=test&extra=val");
     });
 
@@ -3491,7 +3490,9 @@ describe("SegmentMatcher", () => {
       matcher.registerTree(rootNode);
 
       expect(
-        matcher.buildPath("search", { q: "test" }, { trailingSlash: "always" }),
+        matcher.buildPath("search", { q: "test" }, undefined, {
+          trailingSlash: "always",
+        }),
       ).toBe("/search/?q=test");
     });
 
@@ -4411,11 +4412,9 @@ describe("mutation guards (observable-behavior kills)", () => {
 
     expect(matcher.buildPath("r", { id: "5", extra: "x" })).toBe("/5");
     expect(
-      matcher.buildPath(
-        "r",
-        { id: "5", extra: "x" },
-        { queryParamsMode: "loose" },
-      ),
+      matcher.buildPath("r", { id: "5", extra: "x" }, undefined, {
+        queryParamsMode: "loose",
+      }),
     ).toBe("/5?extra=x");
   });
 

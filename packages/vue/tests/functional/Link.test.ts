@@ -358,9 +358,9 @@ describe("Link component", () => {
 
       expect(router.navigate).toHaveBeenCalledTimes(1);
 
-      const [name, params, options] = (
+      const [name, params, , options] = (
         router.navigate as ReturnType<typeof vi.fn>
-      ).mock.calls[0] as [string, object, object];
+      ).mock.calls[0] as [string, object, undefined, object];
 
       expect(name).toBe("one-more-test");
       // params identity is preserved through navigateWithHash → singleton.
@@ -690,9 +690,9 @@ describe("Link component", () => {
 
       expect(router.navigate).toHaveBeenCalledTimes(1);
 
-      const [name, params, options] = (
+      const [name, params, , options] = (
         router.navigate as ReturnType<typeof vi.fn>
-      ).mock.calls[0] as [string, object, object];
+      ).mock.calls[0] as [string, object, undefined, object];
 
       expect(name).toBe("one-more-test");
       expect(params).toBe(EMPTY_PARAMS);

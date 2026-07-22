@@ -571,11 +571,11 @@ describe("navigateWithHash", () => {
 
     await navigateWithHash(router, "r", { id: "1" }, "new");
 
-    expect(router.navigate).toHaveBeenCalledWith(
-      "r",
-      { id: "1" },
-      { hash: "new", force: true, hashChange: true },
-    );
+    expect(router.navigate).toHaveBeenCalledWith("r", { id: "1" }, undefined, {
+      hash: "new",
+      force: true,
+      hashChange: true,
+    });
   });
 
   it("does not force when the hash is unchanged on the same route+params", async () => {
@@ -587,11 +587,9 @@ describe("navigateWithHash", () => {
 
     await navigateWithHash(router, "r", { id: "1" }, "same");
 
-    expect(router.navigate).toHaveBeenCalledWith(
-      "r",
-      { id: "1" },
-      { hash: "same" },
-    );
+    expect(router.navigate).toHaveBeenCalledWith("r", { id: "1" }, undefined, {
+      hash: "same",
+    });
   });
 
   it("does a plain navigate for a different route (no same-route branch)", async () => {
@@ -603,7 +601,9 @@ describe("navigateWithHash", () => {
 
     await navigateWithHash(router, "r", {}, "h");
 
-    expect(router.navigate).toHaveBeenCalledWith("r", {}, { hash: "h" });
+    expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {
+      hash: "h",
+    });
   });
 
   it("omits the hash option entirely when hash is undefined", async () => {
@@ -611,7 +611,7 @@ describe("navigateWithHash", () => {
 
     await navigateWithHash(router, "r", {}, undefined);
 
-    expect(router.navigate).toHaveBeenCalledWith("r", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {});
   });
 
   it("treats a missing context.url.hash as empty (same route, new hash forces)", async () => {
@@ -624,15 +624,11 @@ describe("navigateWithHash", () => {
 
     await navigateWithHash(router, "r", {}, "frag");
 
-    expect(router.navigate).toHaveBeenCalledWith(
-      "r",
-      {},
-      {
-        hash: "frag",
-        force: true,
-        hashChange: true,
-      },
-    );
+    expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {
+      hash: "frag",
+      force: true,
+      hashChange: true,
+    });
   });
 
   it("keeps the current hash when called with hash=undefined on the same route", async () => {
@@ -645,7 +641,7 @@ describe("navigateWithHash", () => {
 
     await navigateWithHash(router, "r", {}, undefined);
 
-    expect(router.navigate).toHaveBeenCalledWith("r", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {});
   });
 });
 

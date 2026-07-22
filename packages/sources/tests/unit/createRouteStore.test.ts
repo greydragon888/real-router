@@ -114,11 +114,11 @@ describe("createRouteSources", () => {
     // Reload is the user's explicit non-idempotent signal — every reload
     // emits a fresh snapshot so observers see refreshed `state.context`
     // (e.g. data refreshed by `invalidate(router, "data")` + reload).
-    await router.navigate("home", {}, { reload: true });
+    await router.navigate("home", {}, undefined, { reload: true });
 
     expect(listener).toHaveBeenCalledTimes(1);
 
-    await router.navigate("home", {}, { reload: true });
+    await router.navigate("home", {}, undefined, { reload: true });
 
     expect(listener).toHaveBeenCalledTimes(2);
   });
@@ -133,13 +133,13 @@ describe("createRouteSources", () => {
     // "/users": the first force-nav flips previousRoute from "/" to "/users"
     // (path change → update fires), after which both fields sit on "/users".
     await router.navigate("users");
-    await router.navigate("users", {}, { force: true });
+    await router.navigate("users", {}, undefined, { force: true });
 
     const callsAfterSetup = listener.mock.calls.length;
 
     // A fully idempotent force-nav now: route "/users" and previousRoute
     // "/users" both stabilize to prev (matched paths, no reload) → no update.
-    await router.navigate("users", {}, { force: true });
+    await router.navigate("users", {}, undefined, { force: true });
 
     expect(listener).toHaveBeenCalledTimes(callsAfterSetup);
   });

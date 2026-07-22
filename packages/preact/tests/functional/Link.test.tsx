@@ -532,6 +532,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         expect.any(Object),
+        undefined,
         expect.objectContaining({ replace: true }),
       );
 
@@ -552,6 +553,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         expect.any(Object),
+        undefined,
         expect.objectContaining({ reload: true }),
       );
     });
@@ -1102,7 +1104,7 @@ describe("Link component", () => {
 
       expect(call).toBeDefined();
 
-      const opts = call?.[2] as Record<string, unknown> | undefined;
+      const opts = call?.[3] as Record<string, unknown> | undefined;
 
       expect(opts?.hash).toBeUndefined();
     });
@@ -1125,7 +1127,7 @@ describe("Link component", () => {
 
       expect(call).toBeDefined();
 
-      const opts = call?.[2] as Record<string, unknown> | undefined;
+      const opts = call?.[3] as Record<string, unknown> | undefined;
 
       expect(opts?.hash).toBe("");
     });
@@ -1135,7 +1137,7 @@ describe("Link component", () => {
       // next click is a same-route+params navigation that only differs in
       // hash — exactly the SAME_STATES bypass case navigateWithHash handles.
       await act(async () => {
-        await router.navigate("one-more-test", {}, { hash: "a" });
+        await router.navigate("one-more-test", {}, undefined, { hash: "a" });
       });
 
       const navigateSpy = vi.spyOn(router, "navigate");
@@ -1155,7 +1157,7 @@ describe("Link component", () => {
 
       expect(call).toBeDefined();
 
-      const opts = call?.[2] as Record<string, unknown> | undefined;
+      const opts = call?.[3] as Record<string, unknown> | undefined;
 
       expect(opts?.hash).toBe("b");
       expect(opts?.force).toBe(true);
@@ -1192,7 +1194,9 @@ describe("Link component", () => {
       expect(screen.getByTestId("link-account")).not.toHaveClass("active");
 
       await act(async () => {
-        await router.navigate("one-more-test", {}, { hash: "profile" });
+        await router.navigate("one-more-test", {}, undefined, {
+          hash: "profile",
+        });
       });
 
       expect(screen.getByTestId("link-profile")).toHaveClass("active");

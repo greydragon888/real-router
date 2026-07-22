@@ -290,6 +290,7 @@ describe("navigate() → transition.segments Properties", () => {
     const state = await router.navigate(
       "users.view",
       { id: "abc" },
+      undefined,
       { reload: true },
     );
 
@@ -319,9 +320,14 @@ describe("navigate() → transition.segments Properties", () => {
       controller.abort();
 
       try {
-        await router.navigate(targetRoute, getParamsForRoute(targetRoute), {
-          signal: controller.signal,
-        });
+        await router.navigate(
+          targetRoute,
+          getParamsForRoute(targetRoute),
+          undefined,
+          {
+            signal: controller.signal,
+          },
+        );
 
         expect.unreachable("should have thrown");
       } catch (error) {
@@ -392,6 +398,7 @@ describe("navigate() → transition.segments Properties", () => {
       const state = await router.navigate(
         target,
         getParamsForRoute(target),
+        undefined,
         opts,
       );
 
@@ -432,12 +439,12 @@ describe("navigate() → transition.segments Properties", () => {
       expect(router.getState()?.name).toBe(target);
 
       if ("reload" in opts || "force" in opts) {
-        const state = await router.navigate(target, params, opts);
+        const state = await router.navigate(target, params, undefined, opts);
 
         expect(state.name).toBe(target);
       } else {
         await expect(
-          router.navigate(target, params, opts),
+          router.navigate(target, params, undefined, opts),
         ).rejects.toMatchObject({ code: errorCodes.SAME_STATES });
       }
 
@@ -511,7 +518,7 @@ describe("navigate() → transition.segments Properties", () => {
       controller.abort(reason);
 
       const error = await router
-        .navigate(target, getParamsForRoute(target), {
+        .navigate(target, getParamsForRoute(target), undefined, {
           signal: controller.signal,
         })
         .catch((error_: unknown) => error_);

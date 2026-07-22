@@ -122,13 +122,20 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     await router.start("/");
 
-    const calls: [string, object | undefined, object | undefined][] = [];
+    const calls: [
+      string,
+      object | undefined,
+      object | undefined,
+      object | undefined,
+    ][] = [];
     const navigateSpy = (
       name: string,
       params?: object,
+      search?: object,
       opts?: object,
     ): Promise<unknown> => {
-      calls.push([name, params, opts]);
+      // Slot-shift (RFC-4 M2 / #1548): query channel at position 3, opts at 4.
+      calls.push([name, params, search, opts]);
 
       return Promise.resolve(router.getState()!);
     };
@@ -146,7 +153,7 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[0]).toBe("home");
-    expect(calls[0]?.[2]).toMatchObject({
+    expect(calls[0]?.[3]).toMatchObject({
       hash: "new",
       force: true,
       hashChange: true,
@@ -160,14 +167,26 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     await router.start("/");
 
-    const calls: [string, object | undefined, object | undefined][] = [];
+    const calls: [
+      string,
+      object | undefined,
+      object | undefined,
+      object | undefined,
+    ][] = [];
 
     (
       router as unknown as {
         navigate: (...args: unknown[]) => Promise<unknown>;
       }
     ).navigate = (...args) => {
-      calls.push(args as [string, object | undefined, object | undefined]);
+      calls.push(
+        args as [
+          string,
+          object | undefined,
+          object | undefined,
+          object | undefined,
+        ],
+      );
 
       return Promise.resolve(router.getState()!);
     };
@@ -180,7 +199,7 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     await navigateWithHash(router, "home", {}, "x");
 
-    expect(calls[0]?.[2]).not.toMatchObject({ force: true });
+    expect(calls[0]?.[3]).not.toMatchObject({ force: true });
 
     router.stop();
   });
@@ -193,22 +212,34 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     await router.start("/");
 
-    const calls: [string, object | undefined, object | undefined][] = [];
+    const calls: [
+      string,
+      object | undefined,
+      object | undefined,
+      object | undefined,
+    ][] = [];
 
     (
       router as unknown as {
         navigate: (...args: unknown[]) => Promise<unknown>;
       }
     ).navigate = (...args) => {
-      calls.push(args as [string, object | undefined, object | undefined]);
+      calls.push(
+        args as [
+          string,
+          object | undefined,
+          object | undefined,
+          object | undefined,
+        ],
+      );
 
       return Promise.resolve(router.getState()!);
     };
 
     await navigateWithHash(router, "users", {}, "anchor");
 
-    expect(calls[0]?.[2]).toMatchObject({ hash: "anchor" });
-    expect(calls[0]?.[2]).not.toMatchObject({ force: true });
+    expect(calls[0]?.[3]).toMatchObject({ hash: "anchor" });
+    expect(calls[0]?.[3]).not.toMatchObject({ force: true });
 
     router.stop();
   });
@@ -218,14 +249,26 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     await router.start("/");
 
-    const calls: [string, object | undefined, object | undefined][] = [];
+    const calls: [
+      string,
+      object | undefined,
+      object | undefined,
+      object | undefined,
+    ][] = [];
 
     (
       router as unknown as {
         navigate: (...args: unknown[]) => Promise<unknown>;
       }
     ).navigate = (...args) => {
-      calls.push(args as [string, object | undefined, object | undefined]);
+      calls.push(
+        args as [
+          string,
+          object | undefined,
+          object | undefined,
+          object | undefined,
+        ],
+      );
 
       return Promise.resolve(router.getState()!);
     };
@@ -233,7 +276,7 @@ describe("dom-utils integration (copy from shared/)", () => {
     await navigateWithHash(router, "home", {}, undefined);
 
     // hash undefined → opts.hash not set
-    expect(calls[0]?.[2]).not.toHaveProperty("hash");
+    expect(calls[0]?.[3]).not.toHaveProperty("hash");
 
     router.stop();
   });

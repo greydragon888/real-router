@@ -6,7 +6,14 @@
  * within this single file to resolve circular dependencies.
  */
 
-import type { State, Params, RouterError, Unsubscribe } from "./base";
+import type {
+  State,
+  Params,
+  NavigationTarget,
+  SearchParams,
+  RouterError,
+  Unsubscribe,
+} from "./base";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
 // type-only cycle with the barrel is deliberate — see the note in ./index.
 import type { NavigationOptions } from "./index";
@@ -253,19 +260,30 @@ export interface Subscription {
  * For full router access, use the Router interface directly or the useRouter() hook.
  */
 export interface Navigator {
-  navigate: (
-    routeName: string,
-    routeParams?: Params,
-    options?: NavigationOptions,
-  ) => Promise<State>;
+  // Two forms (RFC-4 M2 / #1548): descriptor `navigate(target, opts)` and
+  // positional `navigate(name, params, search, opts)`.
+  navigate: {
+    (target: NavigationTarget, options?: NavigationOptions): Promise<State>;
+    (
+      routeName: string,
+      routeParams?: Params,
+      routeSearch?: SearchParams,
+      options?: NavigationOptions,
+    ): Promise<State>;
+  };
   getState: () => State | undefined;
   isActiveRoute: (
     name: string,
     params?: Params,
+    search?: SearchParams,
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ) => boolean;
-  canNavigateTo: (name: string, params?: Params) => boolean;
+  canNavigateTo: (
+    name: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => boolean;
   subscribe: (listener: SubscribeFn) => Unsubscribe;
   subscribeLeave: (listener: LeaveFn) => Unsubscribe;
   isLeaveApproved: () => boolean;
@@ -286,11 +304,12 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
   isActiveRoute: (
     name: string,
     params?: Params,
+    search?: SearchParams,
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ) => boolean;
 
-  buildPath: (route: string, params?: Params) => string;
+  buildPath: (route: string, params?: Params, search?: SearchParams) => string;
 
   getState: <P extends Params = Params>() => State<P> | undefined;
 
@@ -314,7 +333,11 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
 
   dispose: () => void;
 
-  canNavigateTo: (name: string, params?: Params) => boolean;
+  canNavigateTo: (
+    name: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => boolean;
 
   usePlugin: (
     ...plugins: (PluginFactory<D> | false | null | undefined)[]
@@ -326,11 +349,17 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
 
   isLeaveApproved: () => boolean;
 
-  navigate: (
-    routeName: string,
-    routeParams?: Params,
-    options?: NavigationOptions,
-  ) => Promise<State>;
+  // Two forms (RFC-4 M2 / #1548): descriptor `navigate(target, opts)` and
+  // positional `navigate(name, params, search, opts)`.
+  navigate: {
+    (target: NavigationTarget, options?: NavigationOptions): Promise<State>;
+    (
+      routeName: string,
+      routeParams?: Params,
+      routeSearch?: SearchParams,
+      options?: NavigationOptions,
+    ): Promise<State>;
+  };
 
   navigateToDefault: (options?: NavigationOptions) => Promise<State>;
 

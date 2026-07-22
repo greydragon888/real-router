@@ -24,6 +24,7 @@ import type {
   GuardFn,
   NavigationOptions,
   Params,
+  SearchParams,
   State,
   TransitionMeta,
 } from "../../types";
@@ -87,6 +88,7 @@ export class NavigationNamespace {
   navigate(
     name: string,
     params: Params,
+    search: SearchParams | undefined,
     opts: NavigationOptions,
   ): Promise<State> {
     this.lastSyncResolved = false;
@@ -104,7 +106,7 @@ export class NavigationNamespace {
     let toState: State | undefined;
 
     try {
-      toState = deps.buildNavigateState(name, params);
+      toState = deps.buildNavigateState(name, params, search);
     } catch (error) {
       /* v8 ignore next 3 -- @preserve: reachable only via validator-driven
          throws from buildNavigateState (validateStateBuilderArgs) — covered
@@ -245,7 +247,7 @@ export class NavigationNamespace {
       );
     }
 
-    return this.navigate(route, params, opts);
+    return this.navigate(route, params, undefined, opts);
   }
 
   navigateToNotFound(path: string): State {

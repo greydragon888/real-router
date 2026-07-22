@@ -120,9 +120,11 @@ describe("N8: Navigation meta storm", () => {
       if (navigationType === 0) {
         return await router.navigate(name, params);
       } else if (navigationType === 1) {
-        return await router.navigate(name, params, { replace: true });
+        return await router.navigate(name, params, undefined, {
+          replace: true,
+        });
       } else {
-        return await router.navigate(name, params, { reload: true });
+        return await router.navigate(name, params, undefined, { reload: true });
       }
     } catch {
       return undefined;

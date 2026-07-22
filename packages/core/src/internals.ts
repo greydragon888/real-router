@@ -80,7 +80,11 @@ export interface RouterInternals<
     readonly isEmitting: () => boolean;
   };
 
-  readonly buildPath: (route: string, params?: Params) => string;
+  readonly buildPath: (
+    route: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => string;
 
   readonly emitTransitionError: (error: Error) => void;
 
@@ -271,6 +275,34 @@ export function createBinaryInterceptable<A, B, R>(
     }
 
     return executeInterceptorChain(chain, original, [arg1, arg2]);
+  };
+}
+
+/**
+ * Three-argument interceptor wrapper — preserves the exact
+ * `(a: A, b: B, c: C) => R` signature that the variadic
+ * {@link createInterceptable} widens to `any[]`. Used for the search-aware
+ * `buildPath(route, params, search)` interceptable (RFC-4 M2 / #1548): a legacy
+ * two-arg interceptor stays valid (TS allows fewer params, and `next(a, b)`
+ * leaves `c` `undefined` — the v1 single-bag path), while a search-aware
+ * interceptor can read and forward the third argument.
+ */
+export function createTernaryInterceptable<A, B, C, R>(
+  name: string,
+  original: (a: A, b: B, c: C) => R,
+  interceptors: Map<
+    string,
+    ((next: (...args: any[]) => any, ...args: any[]) => any)[]
+  >,
+): (a: A, b: B, c: C) => R {
+  return (arg1: A, arg2: B, arg3: C) => {
+    const chain = interceptors.get(name);
+
+    if (!chain || chain.length === 0) {
+      return original(arg1, arg2, arg3);
+    }
+
+    return executeInterceptorChain(chain, original, [arg1, arg2, arg3]);
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */

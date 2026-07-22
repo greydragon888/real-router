@@ -720,7 +720,8 @@ export function createScrollSpy(
     // changes microtask schedule and breaks "spy continues after rejection".
     selfEmitting = true;
     router
-      .navigate(state.name, state.params, opts)
+      // Slot-shift (RFC-4 M2 / #1548): opts at position 4, query channel unused.
+      .navigate(state.name, state.params, undefined, opts)
       .catch(() => {
         // Fire-and-forget — suppress expected rejections (concurrent
         // navigate, router stopped, etc.) consistent with `<Link>` adapter

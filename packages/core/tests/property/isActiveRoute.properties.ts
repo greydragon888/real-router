@@ -25,7 +25,9 @@ describe("isActiveRoute Properties", () => {
   it("current route with exact params is active (strictEquality)", () => {
     const state = router.getState()!;
 
-    expect(router.isActiveRoute(state.name, state.params, true)).toBe(true);
+    expect(
+      router.isActiveRoute(state.name, state.params, undefined, true),
+    ).toBe(true);
   });
 
   it("ancestor of current route is active", () => {
@@ -36,15 +38,27 @@ describe("isActiveRoute Properties", () => {
   });
 
   it("strictEquality blocks ancestor match", () => {
-    expect(router.isActiveRoute("users", {}, true)).toBe(false);
+    expect(router.isActiveRoute("users", {}, undefined, true)).toBe(false);
   });
 
   test.prop([arbFixtureRoute, fc.boolean()], { numRuns: NUM_RUNS.fast })(
     "monotonicity of strict: strict=true → strict=false",
     (name, ignoreQP) => {
       const params = router.getState()!.params;
-      const strictResult = router.isActiveRoute(name, params, true, ignoreQP);
-      const looseResult = router.isActiveRoute(name, params, false, ignoreQP);
+      const strictResult = router.isActiveRoute(
+        name,
+        params,
+        undefined,
+        true,
+        ignoreQP,
+      );
+      const looseResult = router.isActiveRoute(
+        name,
+        params,
+        undefined,
+        false,
+        ignoreQP,
+      );
 
       if (strictResult) {
         expect(looseResult).toBe(true);
@@ -56,8 +70,20 @@ describe("isActiveRoute Properties", () => {
     "monotonicity of ignoreQueryParams: ignoreQP=false → ignoreQP=true",
     (name, strict) => {
       const params = router.getState()!.params;
-      const withQP = router.isActiveRoute(name, params, strict, false);
-      const withoutQP = router.isActiveRoute(name, params, strict, true);
+      const withQP = router.isActiveRoute(
+        name,
+        params,
+        undefined,
+        strict,
+        false,
+      );
+      const withoutQP = router.isActiveRoute(
+        name,
+        params,
+        undefined,
+        strict,
+        true,
+      );
 
       if (withQP) {
         expect(withoutQP).toBe(true);

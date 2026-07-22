@@ -154,6 +154,7 @@ describe("createMatcher", () => {
         q: "hello",
         active: true,
       },
+      undefined,
       { queryParamsMode: "loose" },
     );
 

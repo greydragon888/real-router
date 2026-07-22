@@ -69,7 +69,14 @@ function makeFakeRouter(current: FakeCurrent | undefined): {
         context,
       } as unknown as State;
     },
-    navigate: (name: string, params: Params, opts?: HashAwareOpts) => {
+    navigate: (
+      name: string,
+      params: Params,
+      _search: unknown,
+      opts?: HashAwareOpts,
+    ) => {
+      // Slot-shift (RFC-4 M2 / #1548): navigateWithHash passes the query channel
+      // at position 3 (unused here) and opts at position 4.
       calls.push({ name, params, opts: opts ?? {} });
 
       return Promise.resolve({ name, params } as unknown as State);

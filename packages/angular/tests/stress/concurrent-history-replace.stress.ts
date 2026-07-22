@@ -62,9 +62,11 @@ describe("replaceHistoryState mid-transition (Angular)", () => {
 
     fixture.detectChanges();
 
-    const slowPromise = router.navigate("slow", {}, {}).catch(() => null);
+    const slowPromise = router
+      .navigate("slow", {}, undefined, {})
+      .catch(() => null);
     const replacePromise = router
-      .navigate("replaced", {}, { replace: true })
+      .navigate("replaced", {}, undefined, { replace: true })
       .catch(() => null);
 
     await Promise.all([slowPromise, replacePromise]);
@@ -100,7 +102,9 @@ describe("replaceHistoryState mid-transition (Angular)", () => {
       const target = targets[i % 3];
       const opts = i % 2 === 0 ? { replace: true } : {};
 
-      promises.push(router.navigate(target, {}, opts).catch(() => null));
+      promises.push(
+        router.navigate(target, {}, undefined, opts).catch(() => null),
+      );
     }
 
     await Promise.all(promises);

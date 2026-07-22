@@ -39,11 +39,9 @@ describe("S10: AbortController / Signal stress", () => {
         controller.abort();
         const target = (i % 9) + 1;
 
-        return router.navigate(
-          `route${target}`,
-          {},
-          { signal: controller.signal },
-        );
+        return router.navigate(`route${target}`, {}, undefined, {
+          signal: controller.signal,
+        });
       }),
     );
 
@@ -195,7 +193,9 @@ describe("S10: AbortController / Signal stress", () => {
       const target = (i % 9) + 1;
 
       await router
-        .navigate(`route${target}`, {}, { signal: controller.signal })
+        .navigate(`route${target}`, {}, undefined, {
+          signal: controller.signal,
+        })
         .catch(() => {});
       lastTarget = target;
     }
@@ -242,7 +242,7 @@ describe("S10: AbortController / Signal stress", () => {
 
     const targets = ["route1", "route2", "route3"] as const;
 
-    let prev = router.navigate(targets[0], {}, { signal });
+    let prev = router.navigate(targets[0], {}, undefined, { signal });
 
     prev.catch(() => {});
 
@@ -251,7 +251,9 @@ describe("S10: AbortController / Signal stress", () => {
       // the next navigation supersedes it.
       await Promise.resolve();
 
-      const next = router.navigate(targets[i % targets.length], {}, { signal });
+      const next = router.navigate(targets[i % targets.length], {}, undefined, {
+        signal,
+      });
 
       next.catch(() => {});
       await prev.catch(() => {});
@@ -260,7 +262,7 @@ describe("S10: AbortController / Signal stress", () => {
 
     // A guard-free route supersedes the last in-flight navigation so it settles
     // (releasing its listener) and then commits.
-    const final = router.navigate("route9", {}, { signal });
+    const final = router.navigate("route9", {}, undefined, { signal });
 
     await prev.catch(() => {});
     await final.catch(() => {});

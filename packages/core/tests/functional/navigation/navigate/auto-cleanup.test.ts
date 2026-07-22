@@ -178,7 +178,7 @@ describe("router.navigate() - auto cleanup", () => {
       lifecycle.addDeactivateGuard("users", () => usersGuard);
 
       // Same-route force-nav: users never becomes inactive ⇒ guard retained.
-      await router.navigate("users", {}, { force: true });
+      await router.navigate("users", {}, undefined, { force: true });
 
       await router.navigate("orders");
 

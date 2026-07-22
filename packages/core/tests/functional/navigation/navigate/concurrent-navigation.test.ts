@@ -368,7 +368,12 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const navigationOptions = { replace: true, reload: true };
 
-      const promise = router.navigate("profile", {}, navigationOptions);
+      const promise = router.navigate(
+        "profile",
+        {},
+        undefined,
+        navigationOptions,
+      );
 
       setTimeout(() => {
         router.stop();
@@ -639,7 +644,7 @@ describe("router.navigate() - concurrent navigation", () => {
       );
 
       await expect(
-        router.navigate("users", {}, { signal: controller.signal }),
+        router.navigate("users", {}, undefined, { signal: controller.signal }),
       ).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });

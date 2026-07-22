@@ -56,7 +56,7 @@ describe("S22: isActiveRoute performance", () => {
     for (let i = 0; i < 5000; i++) {
       const strict = i % 2 === 0;
 
-      const isActive = router.isActiveRoute("level0_0", {}, strict);
+      const isActive = router.isActiveRoute("level0_0", {}, undefined, strict);
 
       if (isActive) {
         trueCount++;
@@ -71,8 +71,8 @@ describe("S22: isActiveRoute performance", () => {
     // (i % 2) → exactly 2500 each. Pin the exact input→result mapping + counts;
     // the old `> 0` / `> 0` passed even if strict/loose semantics were inverted
     // (both branches still occur under alternation).
-    expect(router.isActiveRoute("level0_0", {}, false)).toBe(true);
-    expect(router.isActiveRoute("level0_0", {}, true)).toBe(false);
+    expect(router.isActiveRoute("level0_0", {}, undefined, false)).toBe(true);
+    expect(router.isActiveRoute("level0_0", {}, undefined, true)).toBe(false);
     expect(trueCount).toBe(2500);
     expect(falseCount).toBe(2500);
   }, 30_000);
@@ -94,6 +94,7 @@ describe("S22: isActiveRoute performance", () => {
       const isActive = router.isActiveRoute(
         "route50",
         { query: "other" },
+        undefined,
         false,
         ignoreQuery,
       );

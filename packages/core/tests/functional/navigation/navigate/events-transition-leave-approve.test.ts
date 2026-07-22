@@ -92,7 +92,7 @@ describe("router.navigate() - events transition leave approve (RFC §9.2)", () =
         onLeaveApprove,
       );
 
-      await router.navigate("users", {}, { forceDeactivate: true });
+      await router.navigate("users", {}, undefined, { forceDeactivate: true });
 
       expect(deactivateGuard).not.toHaveBeenCalled();
       expect(onLeaveApprove).toHaveBeenCalledTimes(1);

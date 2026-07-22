@@ -123,7 +123,9 @@ describe("invalidate() race conditions", () => {
 
     const results = await Promise.allSettled(
       Array.from({ length: 200 }, () =>
-        router.navigate("users.profile", { id: "42" }, { reload: true }),
+        router.navigate("users.profile", { id: "42" }, undefined, {
+          reload: true,
+        }),
       ),
     );
 
@@ -180,7 +182,9 @@ describe("invalidate() race conditions", () => {
       invalidate(router, "data");
     }
 
-    await router.navigate("users.profile", { id: "42" }, { reload: true });
+    await router.navigate("users.profile", { id: "42" }, undefined, {
+      reload: true,
+    });
 
     expect(loaderCalls).toBe(1);
 

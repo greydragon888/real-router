@@ -34,7 +34,9 @@ describe("core/utils", () => {
       );
       expect(router.isActiveRoute("users.view")).toStrictEqual(false);
       expect(router.isActiveRoute("users")).toStrictEqual(true);
-      expect(router.isActiveRoute("users", {}, true)).toStrictEqual(false);
+      expect(router.isActiveRoute("users", {}, undefined, true)).toStrictEqual(
+        false,
+      );
 
       await router.navigate("section.query", { section: "section1" });
 
@@ -54,6 +56,7 @@ describe("core/utils", () => {
         router.isActiveRoute(
           "section.query",
           { section: "section1", param2: "123" },
+          undefined,
           false,
           false,
         ),

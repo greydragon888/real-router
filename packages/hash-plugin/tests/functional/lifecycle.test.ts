@@ -180,7 +180,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       await router.start("/home");
       vi.spyOn(mockedBrowser, "replaceState");
 
-      await router.navigate("users.list", {}, { replace: true });
+      await router.navigate("users.list", {}, undefined, { replace: true });
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users.list" }),
@@ -206,7 +206,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       await router.start("/home");
       vi.spyOn(mockedBrowser, "pushState");
 
-      await router.navigate("users.list", {}, { replace: false });
+      await router.navigate("users.list", {}, undefined, { replace: false });
 
       expect(mockedBrowser.pushState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users.list" }),
@@ -219,7 +219,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       await router.start("/");
       vi.spyOn(mockedBrowser, "replaceState");
 
-      await router.navigate("index", {}, { reload: true });
+      await router.navigate("index", {}, undefined, { reload: true });
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "index" }),
@@ -233,7 +233,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       await router.navigate("users.list");
       vi.spyOn(mockedBrowser, "pushState");
 
-      await router.navigate("home", {}, { reload: true });
+      await router.navigate("home", {}, undefined, { reload: true });
 
       expect(mockedBrowser.pushState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "home" }),
@@ -444,11 +444,11 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
 
       getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
 
-      await expect(router.navigate("users.list", {}, {})).rejects.toMatchObject(
-        {
-          code: errorCodes.CANNOT_DEACTIVATE,
-        },
-      );
+      await expect(
+        router.navigate("users.list", {}, undefined, {}),
+      ).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
+      });
 
       expect(router.getState()?.name).toBe("index");
     });
@@ -479,8 +479,8 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
     it("warns once on router.navigate(name, params, { hash })", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
-      await router.navigate("users.list", {}, { hash: "section" });
-      await router.navigate("home", {}, { hash: "other" });
+      await router.navigate("users.list", {}, undefined, { hash: "section" });
+      await router.navigate("home", {}, undefined, { hash: "other" });
 
       expect(warnSpy).toHaveBeenCalledTimes(1);
 

@@ -124,7 +124,14 @@ export function link<P extends Params = Params>(
     }
 
     router
-      .navigate(options.routeName, resolvedRouteParams, resolvedRouteOptions)
+      // Slot-shift (RFC-4 M2 / #1548): query channel at position 3 (unused),
+      // options at position 4.
+      .navigate(
+        options.routeName,
+        resolvedRouteParams,
+        undefined,
+        resolvedRouteOptions,
+      )
       .catch(() => {});
   }
 

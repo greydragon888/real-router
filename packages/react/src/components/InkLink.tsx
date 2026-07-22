@@ -113,7 +113,11 @@ const InkLinkImpl: FC<InkLinkProps> = ({
             error,
           );
         }
-        router.navigate(routeName, paramsForNav, routeOptions).catch(() => {});
+        // Slot-shift (RFC-4 M2 / #1548): query channel at position 3 (unused),
+        // options at position 4.
+        router
+          .navigate(routeName, paramsForNav, undefined, routeOptions)
+          .catch(() => {});
       }
     },
     { isActive: isFocused },

@@ -93,9 +93,10 @@ describe("buildPath ↔ matchPath Roundtrip Properties", () => {
       expect(matched!.name).toBe("search");
 
       // numberFormat: "auto" converts canonical numeric strings to numbers.
-      // Roundtrip preserves VALUE but may change TYPE (string→number).
-      const q = matched!.params.q as string | number;
-      const page = matched!.params.page as string | number;
+      // Roundtrip preserves VALUE but may change TYPE (string→number). Query
+      // values now live in `state.search`, not `state.params` (RFC-4 M2 / #1548).
+      const q = matched!.search.q as string | number;
+      const page = matched!.search.page as string | number;
 
       expect(`${q}`).toBe(params.q);
       expect(`${page}`).toBe(params.page);

@@ -97,7 +97,12 @@ describe("router.navigate() - events transition success", () => {
 
       const navigationOptions = { replace: true, reload: true };
 
-      const newState = await router.navigate("profile", {}, navigationOptions);
+      const newState = await router.navigate(
+        "profile",
+        {},
+        undefined,
+        navigationOptions,
+      );
 
       expect(onSuccess).toHaveBeenCalledTimes(1);
 
@@ -136,7 +141,9 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Navigate to same route with force
-      const newState = await router.navigate("profile", {}, { force: true });
+      const newState = await router.navigate("profile", {}, undefined, {
+        force: true,
+      });
 
       expect(onSuccess).toHaveBeenCalledTimes(1);
       expect(onSuccess).toHaveBeenCalledWith(
@@ -284,7 +291,7 @@ describe("router.navigate() - events transition success", () => {
       const onSuccess = vi.fn();
 
       // Navigate to route first
-      await router.navigate("orders", {}, {});
+      await router.navigate("orders", {}, undefined, {});
 
       const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
@@ -292,7 +299,9 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Try to navigate to same route without force
-      await expect(router.navigate("orders", {}, {})).rejects.toMatchObject({
+      await expect(
+        router.navigate("orders", {}, undefined, {}),
+      ).rejects.toMatchObject({
         code: errorCodes.SAME_STATES,
       });
 

@@ -247,7 +247,9 @@ describe("useRouteNode", () => {
       const initialRoute = result.current.route;
 
       // Navigate to same route with reload: true.
-      await act(() => router.navigate("users.list", {}, { reload: true }));
+      await act(() =>
+        router.navigate("users.list", {}, undefined, { reload: true }),
+      );
 
       // Reload is the user's explicit non-idempotent signal — observers
       // see fresh refs so they react to context changes (e.g. data

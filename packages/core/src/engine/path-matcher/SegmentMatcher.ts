@@ -158,6 +158,7 @@ export class SegmentMatcher {
   buildPath(
     name: string,
     params?: Record<string, unknown>,
+    search?: Record<string, unknown>,
     options?: BuildPathOptions,
   ): string {
     const route = this.#routesByName.get(name);
@@ -168,9 +169,15 @@ export class SegmentMatcher {
 
     const path = this.#buildUrlPath(route, params);
     const finalPath = this.#applyTrailingSlash(path, options?.trailingSlash);
+    // Search-aware (RFC-4 M2 / #1548): when an explicit `search` bag is passed,
+    // the query string is built from it; the path comes from `params`. So a
+    // colliding name (`/items/:id?id` with `buildPath("items", {id:5}, {id:7})`)
+    // emits `/items/5?id=7` — path wins its slot, query wins its own (the killed
+    // #843 precedence). A v1 caller passes no `search`, so `search ?? params`
+    // falls back to extracting the query half from the single bag, unchanged.
     const queryString = this.#buildQueryStringForBuild(
       route,
-      params,
+      search ?? params,
       options?.queryParamsMode,
     );
 

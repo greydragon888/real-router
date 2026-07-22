@@ -16,6 +16,7 @@ import { createLimits, normalizeParams } from "./helpers";
 import {
   createBinaryInterceptable,
   createInterceptable,
+  createTernaryInterceptable,
   getInternals,
   registerInternals,
 } from "./internals";
@@ -45,9 +46,11 @@ import type {
   DefaultDependencies,
   LeaveFn,
   NavigationOptions,
+  NavigationTarget,
   Options,
   Params,
   Router as RouterInterface,
+  SearchParams,
   State,
   SubscribeFn,
   Unsubscribe,
@@ -280,12 +283,13 @@ export class Router<
         listenerCount: () => this.#eventBus.treeChangedListenerCount(),
         isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
       },
-      buildPath: createBinaryInterceptable(
+      buildPath: createTernaryInterceptable(
         "buildPath",
-        (route: string, params?: Params) =>
+        (route: string, params?: Params, search?: SearchParams) =>
           this.#routes.buildPath(
             route,
             params ?? EMPTY_PARAMS,
+            search,
             this.#options.get(),
           ),
         interceptorsMap,
@@ -455,6 +459,7 @@ export class Router<
   isActiveRoute(
     name: string,
     params?: Params,
+    search?: SearchParams,
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ): boolean {
@@ -480,21 +485,27 @@ export class Router<
       return false;
     }
 
+    // Slot-shift (RFC-4 M2 / #1548): `search` is the explicit query channel at
+    // position 3; `strictEquality` / `ignoreQueryParams` shift to 4 / 5.
     return this.#routes.isActiveRoute(
       name,
       params,
+      search,
       strictEquality,
       ignoreQueryParams,
     );
   }
 
-  buildPath(route: string, params?: Params): string {
+  buildPath(route: string, params?: Params, search?: SearchParams): string {
     const ctx = getInternals(this);
 
     ctx.validator?.routes.validateBuildPathArgs(route);
     ctx.validator?.navigation.validateParams(params, "buildPath");
 
-    return ctx.buildPath(route, normalizeParams(params));
+    // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
+    // builds the query string from it and the path from `params`, resolving a
+    // colliding name (`/items/:id?id`). Omitted → the v1 single-bag path.
+    return ctx.buildPath(route, normalizeParams(params), search);
   }
 
   // ============================================================================
@@ -678,7 +689,7 @@ export class Router<
   // Route Lifecycle (Guards)
   // ============================================================================
 
-  canNavigateTo(name: string, params?: Params): boolean {
+  canNavigateTo(name: string, params?: Params, search?: SearchParams): boolean {
     const ctx = getInternals(this);
 
     ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
@@ -714,14 +725,15 @@ export class Router<
     try {
       const normalizedParams = normalizeParams(resolvedParams);
       const meta = this.#routes.getMetaForState(resolvedName);
-      const path = ctx.buildPath(resolvedName, normalizedParams);
+      const path = ctx.buildPath(resolvedName, normalizedParams, search);
 
       toState = this.#state.makeState(
         resolvedName,
         normalizedParams,
-        // A3.1: canNavigateTo builds toState from resolved params only; the
-        // meta-split search population lands with the write path in A3.2.
-        undefined,
+        // The explicit query channel (RFC-4 M2 / #1548): `toState.search` mirrors
+        // what a real navigate would commit, so guards that read `toState.search`
+        // and `areStatesEqual`'s query comparison see the same shape as navigate.
+        search,
         path,
         meta,
         true,
@@ -810,24 +822,59 @@ export class Router<
   // ============================================================================
 
   navigate(
+    target: NavigationTarget,
+    options?: NavigationOptions,
+  ): Promise<State>;
+  navigate(
     routeName: string,
     routeParams?: Params,
+    routeSearch?: SearchParams,
+    options?: NavigationOptions,
+  ): Promise<State>;
+  navigate(
+    nameOrTarget: string | NavigationTarget,
+    paramsOrOptions?: Params | NavigationOptions,
+    routeSearch?: SearchParams,
     options?: NavigationOptions,
   ): Promise<State> {
     this.#assertNotReentrant();
 
     const ctx = getInternals(this);
 
+    // Two equal-standing forms (RFC-4 M2 / #1548): the descriptor
+    // `navigate(target, opts)` (opts at position 2) and the positional
+    // `navigate(name, params, search, opts)` (opts at position 4). The v1
+    // `navigate(name, params, opts)` form is gone — its position-3 opts is now
+    // the `search` slot; unpack whichever form the caller used into one path.
+    let routeName: string;
+    let routeParams: Params | undefined;
+    let search: SearchParams | undefined;
+    let opts: NavigationOptions;
+
+    // The static type excludes null, but `navigate(null)` is a real runtime
+    // misuse that must stay graceful (ROUTE_NOT_FOUND, not a crash on
+    // `null.name`) — the null check routes it to the positional branch.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime null guard for navigate(null)
+    if (typeof nameOrTarget === "object" && nameOrTarget !== null) {
+      routeName = nameOrTarget.name;
+      routeParams = nameOrTarget.params;
+      search = nameOrTarget.search;
+      opts = (paramsOrOptions as NavigationOptions | undefined) ?? EMPTY_OPTS;
+    } else {
+      routeName = nameOrTarget;
+      routeParams = paramsOrOptions as Params | undefined;
+      search = routeSearch;
+      opts = options ?? EMPTY_OPTS;
+    }
+
     ctx.validator?.navigation.validateNavigateArgs(routeName);
     ctx.validator?.navigation.validateParams(routeParams, "navigate");
-
-    const opts = options ?? EMPTY_OPTS;
-
     ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
 
     const promiseState = this.#navigation.navigate(
       routeName,
       routeParams ?? EMPTY_PARAMS,
+      search,
       opts,
     );
 

@@ -171,7 +171,10 @@ export function navigateWithHash(
     }
   }
 
-  return router.navigate(routeName, routeParams, opts);
+  // Slot-shift (RFC-4 M2 / #1548): opts moved to position 4; the query channel
+  // (position 3) stays undefined — a link's query lives in `routeParams` until
+  // the descriptor-aware Link `to` prop lands (a follow-up).
+  return router.navigate(routeName, routeParams, undefined, opts);
 }
 
 // Match-any-whitespace regex shared across calls. RegExp literals at

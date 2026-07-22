@@ -58,6 +58,7 @@ function makeRouter(
     navigate: (
       name: string,
       params: Params,
+      _search: unknown,
       opts?: NavigationOptions & { hash?: string; hashChange?: boolean },
     ) => {
       calls.push({ name, params, opts: opts ?? {} });

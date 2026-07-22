@@ -55,8 +55,10 @@ describe("S3: a large query string merges in linear time (10k loose, 50k strict)
     const result = matcher.match(`/s?${query}`);
     const elapsedMs = performance.now() - start;
 
-    expect(Object.keys(result!.params)).toHaveLength(10_000);
-    expect(result!.params.k9999).toBe("v9999");
+    // Query params land in `MatchResult.search` (RFC-4 M2 / #1548); `/s` has no
+    // path params, so `.params` is empty and all 10k keys are in `.search`.
+    expect(Object.keys(result!.search)).toHaveLength(10_000);
+    expect(result!.search.k9999).toBe("v9999");
     expect(elapsedMs).toBeLessThan(500); // healthy ~6 ms
   });
 
@@ -83,7 +85,8 @@ describe("S3: a large query string merges in linear time (10k loose, 50k strict)
     const elapsedMs = performance.now() - start;
 
     expect(result).toBeDefined();
-    expect(Object.keys(result!.params)).toHaveLength(50_000);
+    // Declared query params land in `MatchResult.search` (RFC-4 M2 / #1548).
+    expect(Object.keys(result!.search)).toHaveLength(50_000);
     expect(elapsedMs).toBeLessThan(300);
   });
 });

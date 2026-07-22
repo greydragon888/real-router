@@ -202,7 +202,12 @@ describe("Link component", () => {
 
       link.dispatchEvent(event);
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it("still navigates (isolated) when the onclick handler throws (#1436)", () => {
@@ -233,7 +238,12 @@ describe("Link component", () => {
         /* pre-fix: unisolated throw */
       }
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining("[real-router]"),
         expect.any(Error),

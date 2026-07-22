@@ -474,7 +474,9 @@ describe("RSC Loader Stress", () => {
 
       const fleet = Array.from({ length: 4 }, (_, k) =>
         router
-          .navigate("users.profile", { id: `i${i}-${k}` }, { reload: true })
+          .navigate("users.profile", { id: `i${i}-${k}` }, undefined, {
+            reload: true,
+          })
           // Concurrent navigations cancel each other; rejection is
           // expected, crash is not.
           .catch(() => undefined),
@@ -765,6 +767,7 @@ describe("RSC Loader Stress", () => {
       const navPromise = router.navigate(
         "users.profile",
         { id: `a${i}` },
+        undefined,
         { signal: ac.signal },
       );
 

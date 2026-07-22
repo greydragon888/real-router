@@ -210,7 +210,7 @@ describe("Memory plugin", () => {
     await router.start("/");
 
     await router.navigate("users");
-    await router.navigate("settings", {}, { replace: true });
+    await router.navigate("settings", {}, undefined, { replace: true });
 
     expect(router.getState()?.name).toBe("settings");
 
@@ -400,7 +400,7 @@ describe("Memory plugin", () => {
     await router.start("/");
 
     await router.navigate("users");
-    await router.navigate("home", {}, { replace: true });
+    await router.navigate("home", {}, undefined, { replace: true });
 
     // History: [home, home], index=1. Both entries have path "/".
     const stateBefore = router.getState()!;
@@ -436,7 +436,7 @@ describe("Memory plugin", () => {
     await router.start("/");
 
     await router.navigate("users");
-    await router.navigate("home", {}, { replace: true });
+    await router.navigate("home", {}, undefined, { replace: true });
 
     // History: [home, home], index=1. Both entries have path "/".
     const stateBefore = router.getState()!;
@@ -626,7 +626,7 @@ describe("Memory plugin", () => {
       router.usePlugin(memoryPluginFactory());
       await router.start("/");
 
-      await router.navigate("users", {}, { replace: true });
+      await router.navigate("users", {}, undefined, { replace: true });
 
       // "home" replaced with "users": [users], index=0
       expect(router.getState()?.name).toBe("users");
@@ -922,9 +922,11 @@ describe("Memory plugin", () => {
       // Record visit with current defaults (sort=asc, page=1).
       await router2.navigate("users", { page: "2" });
 
-      const recordedParams = { ...router2.getState()?.params };
+      // sort/page are QUERY params (`/users?sort&page`) → they live in
+      // `state.search` after the RFC-4 M2 split (#1548), not `state.params`.
+      const recordedSearch = { ...router2.getState()?.search };
 
-      expect(recordedParams).toMatchObject({ sort: "asc", page: "2" });
+      expect(recordedSearch).toMatchObject({ sort: "asc", page: "2" });
 
       // Mutate defaultParams between record and replay. A re-resolve flow
       // would observe the new defaults; a snapshot flow does not.

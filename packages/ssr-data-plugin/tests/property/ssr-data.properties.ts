@@ -1001,12 +1001,12 @@ describe("invalidate: per-router isolation across cloneRouter() boundaries", () 
 
       // childB navigation reloads — its own stale flag is clean,
       // so the leave handler must no-op.
-      await childB.navigate("home", {}, { reload: true });
+      await childB.navigate("home", {}, undefined, { reload: true });
 
       expect(bCalls).toBe(1);
 
       // childA navigation reloads — flag is set, leave handler runs.
-      await childA.navigate("home", {}, { reload: true });
+      await childA.navigate("home", {}, undefined, { reload: true });
 
       expect(aCalls).toBe(2);
 

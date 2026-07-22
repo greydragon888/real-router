@@ -198,7 +198,7 @@ describe("usePlugin Properties", () => {
     router.usePlugin(plugin);
 
     await router.start("/");
-    await router.navigate("admin.settings", {}, { replace: true });
+    await router.navigate("admin.settings", {}, undefined, { replace: true });
 
     expect(receivedOpts).toHaveBeenCalledWith(
       expect.objectContaining({ replace: true }),

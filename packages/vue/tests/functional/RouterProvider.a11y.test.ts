@@ -508,7 +508,7 @@ describe("RouterProvider — announceNavigation edge cases", () => {
     announcer!.textContent = "";
 
     // Force the router into a fresh subscribe event for the same route.
-    await baseRouter.navigate("home", undefined, { force: true });
+    await baseRouter.navigate("home", undefined, undefined, { force: true });
 
     // dedupe gate fires → no re-announce.
     expect(announcer!.textContent).toBe("");

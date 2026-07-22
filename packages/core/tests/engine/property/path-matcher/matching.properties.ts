@@ -172,11 +172,9 @@ describe("Matching Properties", () => {
     test.prop([arbSafeParamValue], { numRuns: NUM_RUNS.standard })(
       "buildPath with trailingSlash=always ends with /",
       (id: string) => {
-        const path = matcher.buildPath(
-          "users.profile",
-          { id },
-          { trailingSlash: "always" },
-        );
+        const path = matcher.buildPath("users.profile", { id }, undefined, {
+          trailingSlash: "always",
+        });
 
         expect(path.endsWith("/")).toBe(true);
       },

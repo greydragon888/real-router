@@ -285,7 +285,7 @@ describe("subscribeLeave() properties", () => {
 
         const controller = new AbortController();
         const opts = action === "external" ? { signal: controller.signal } : {};
-        const parked = router.navigate("b", {}, opts);
+        const parked = router.navigate("b", {}, undefined, opts);
 
         parked.catch(() => {});
         await Promise.resolve();

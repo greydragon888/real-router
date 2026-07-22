@@ -229,7 +229,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     renderScroll(router, { mode: "restore" });
 
-    await router.navigate("about", {}, { replace: true });
+    await router.navigate("about", {}, undefined, { replace: true });
 
     // Capture still runs, but the restore arm is skipped for a genuine replace.
     expect(scrollTo).not.toHaveBeenCalled();
@@ -247,7 +247,7 @@ describe("RouterProvider — scrollRestoration", () => {
     scrollTo.mockClear();
     setScrollY(180); // user scrolled within "about"
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     // reload → capture about@180, then restore about@180.
     expect(scrollTo).toHaveBeenCalledWith({
@@ -268,7 +268,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     renderScroll(router, { mode: "restore" });
 
-    await router.navigate("about", {}, { hash: "section-2" });
+    await router.navigate("about", {}, undefined, { hash: "section-2" });
 
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "auto" });
 
@@ -319,7 +319,7 @@ describe("RouterProvider — scrollRestoration", () => {
     containerScrollTo.mockClear();
     top = 220;
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     // reload → capture about@220, then restorePos through the container; the
     // reflected write makes the instant early-stop fire on the first frame.
@@ -347,7 +347,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     scrollTo.mockClear();
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     // Container getter returns null → restorePos falls back to window across the
     // retry budget (harmless clamp) — window scrollTo is invoked.
@@ -370,7 +370,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     renderScroll(router, { mode: "restore", anchorScrolling: false });
 
-    await router.navigate("about", {}, { hash: "section-3" });
+    await router.navigate("about", {}, undefined, { hash: "section-3" });
 
     expect(scrollIntoView).not.toHaveBeenCalled();
     expect(scrollTo).toHaveBeenCalledWith({
@@ -683,7 +683,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     // reload → restorePos; smooth never early-stops, so it re-applies every
     // frame across the retry budget.
-    await router.navigate("test", {}, { reload: true });
+    await router.navigate("test", {}, undefined, { reload: true });
 
     expect(containerScrollTo.mock.calls.length).toBeGreaterThan(1);
 
@@ -724,11 +724,9 @@ describe("RouterProvider — scrollRestoration", () => {
     scrollTo.mockClear();
 
     // reload → restore arm → safeKeyOf(route) is null → restorePos(0).
-    await plain.navigate(
-      "about",
-      { big: 1n as unknown as string },
-      { reload: true },
-    );
+    await plain.navigate("about", { big: 1n as unknown as string }, undefined, {
+      reload: true,
+    });
 
     expect(scrollTo).toHaveBeenCalledWith({
       top: 0,
@@ -752,7 +750,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     // reload-navigate to a never-visited route → loadStore()[key] is undefined
     // → the `?? 0` fallback restores to top.
-    await router.navigate("home", {}, { reload: true });
+    await router.navigate("home", {}, undefined, { reload: true });
 
     expect(scrollTo).toHaveBeenCalledWith({
       top: 0,

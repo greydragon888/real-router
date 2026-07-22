@@ -118,7 +118,9 @@ describe("router.navigate() - guards can deactivate", () => {
         pendingDeactivateGuard.mockClear();
 
         // Navigate with forceDeactivate - should NOT call canDeactivate
-        await router.navigate("profile", {}, { forceDeactivate: true });
+        await router.navigate("profile", {}, undefined, {
+          forceDeactivate: true,
+        });
 
         expect(pendingDeactivateGuard).not.toHaveBeenCalled();
         expect(ordersDeactivateGuard).not.toHaveBeenCalled();
@@ -137,7 +139,9 @@ describe("router.navigate() - guards can deactivate", () => {
         blockingDeactivateGuard.mockClear();
 
         // Navigate with forceDeactivate - should succeed without calling guard
-        await router.navigate("profile", {}, { forceDeactivate: true });
+        await router.navigate("profile", {}, undefined, {
+          forceDeactivate: true,
+        });
 
         expect(blockingDeactivateGuard).not.toHaveBeenCalled(); // Guard bypassed
       });
@@ -158,7 +162,7 @@ describe("router.navigate() - guards can deactivate", () => {
         privacyDeactivateGuard.mockClear();
 
         // Navigate with forceDeactivate - should bypass all guards
-        await router.navigate("home", {}, { forceDeactivate: true });
+        await router.navigate("home", {}, undefined, { forceDeactivate: true });
 
         expect(privacyDeactivateGuard).not.toHaveBeenCalled();
         expect(settingsDeactivateGuard).not.toHaveBeenCalled();
@@ -243,7 +247,9 @@ describe("router.navigate() - guards can deactivate", () => {
         deactivateGuard.mockClear();
 
         // Explicitly set forceDeactivate: false - should call guards normally
-        await router.navigate("profile", {}, { forceDeactivate: false });
+        await router.navigate("profile", {}, undefined, {
+          forceDeactivate: false,
+        });
 
         expect(deactivateGuard).toHaveBeenCalledTimes(1);
       });
@@ -278,7 +284,9 @@ describe("router.navigate() - guards can deactivate", () => {
         deactivateGuard.mockClear();
 
         // Both fromState and forceDeactivate - should NOT call guard at all
-        await router.navigate("profile", {}, { forceDeactivate: true });
+        await router.navigate("profile", {}, undefined, {
+          forceDeactivate: true,
+        });
 
         expect(deactivateGuard).not.toHaveBeenCalled(); // ✅ Guard bypassed
       });

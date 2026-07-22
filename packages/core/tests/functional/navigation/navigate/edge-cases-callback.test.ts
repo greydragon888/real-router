@@ -131,32 +131,40 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
 
     describe("opts in every form resolves", () => {
       it("resolves when opts is undefined: navigate(name, params, undefined)", async () => {
-        const state = await router.navigate("users", { id: 1 }, undefined);
+        const state = await router.navigate(
+          "users",
+          { id: 1 },
+          undefined,
+          undefined,
+        );
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
       });
 
       it("resolves when opts is null: navigate(name, params, null)", async () => {
-        const state = await router.navigate("users", { id: 1 }, null as any);
+        const state = await router.navigate(
+          "users",
+          { id: 1 },
+          undefined,
+          null as any,
+        );
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
       });
 
       it("resolves when opts is empty object: navigate(name, params, {})", async () => {
-        const state = await router.navigate("users", { id: 1 }, {});
+        const state = await router.navigate("users", { id: 1 }, undefined, {});
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
       });
 
       it("honors opts when populated: navigate(name, params, { replace: true })", async () => {
-        const state = await router.navigate(
-          "users",
-          { id: 1 },
-          { replace: true },
-        );
+        const state = await router.navigate("users", { id: 1 }, undefined, {
+          replace: true,
+        });
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
@@ -168,7 +176,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
     describe("resolution / rejection carries the right value", () => {
       it("rejects with ROUTE_NOT_FOUND when route missing and opts undefined", async () => {
         await expect(
-          router.navigate("nonexistent", {}, undefined),
+          router.navigate("nonexistent", {}, undefined, undefined),
         ).rejects.toMatchObject({
           code: errorCodes.ROUTE_NOT_FOUND,
         });
@@ -178,6 +186,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
         const state = await router.navigate(
           "users.view",
           { id: "123" },
+          undefined,
           undefined,
         );
 
@@ -196,7 +205,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
           successListener,
         );
 
-        await router.navigate("users", {}, { replace: true });
+        await router.navigate("users", {}, undefined, { replace: true });
 
         // Verify options were passed through to the transition
         expect(successListener).toHaveBeenCalled();
@@ -216,7 +225,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
           successListener,
         );
 
-        await router.navigate("users", {}, undefined);
+        await router.navigate("users", {}, undefined, undefined);
 
         expect(successListener).toHaveBeenCalled();
 
@@ -270,7 +279,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
           successListener,
         );
 
-        await router.navigate("users", {}, { replace: true });
+        await router.navigate("users", {}, undefined, { replace: true });
 
         expect(successListener).toHaveBeenCalled();
 
@@ -296,7 +305,12 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
       await freshRouter.start("/home");
 
       // This form: navigate(name, params, undefined)
-      const state = await freshRouter.navigate("users", { id: "1" }, undefined);
+      const state = await freshRouter.navigate(
+        "users",
+        { id: "1" },
+        undefined,
+        undefined,
+      );
 
       expect(state).toBeDefined();
       expect(state.name).toBe("users");
@@ -310,7 +324,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
       await freshRouter.start("/home");
 
       // @ts-expect-error - testing null opts
-      const state = await freshRouter.navigate("users", {}, null);
+      const state = await freshRouter.navigate("users", {}, undefined, null);
 
       expect(state).toBeDefined();
 
@@ -324,7 +338,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
 
       // Navigate to non-existent route
       await expect(
-        freshRouter.navigate("nonexistent", {}, undefined),
+        freshRouter.navigate("nonexistent", {}, undefined, undefined),
       ).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,
       });
@@ -350,13 +364,18 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
       await freshRouter.navigate("users.view", { id: "2" });
 
       // Form 5: navigate(name, params, opts)
-      await freshRouter.navigate("users", {}, { reload: true });
+      await freshRouter.navigate("users", {}, undefined, { reload: true });
 
       // Form 6: navigate(name, params, opts)
-      await freshRouter.navigate("users", {}, { reload: true });
+      await freshRouter.navigate("users", {}, undefined, { reload: true });
 
       // Form 7: navigate(name, params, undefined) - the historical bug case
-      await freshRouter.navigate("users.view", { id: "3" }, undefined);
+      await freshRouter.navigate(
+        "users.view",
+        { id: "3" },
+        undefined,
+        undefined,
+      );
 
       expect(freshRouter.getState()?.name).toBe("users.view");
 

@@ -25,7 +25,7 @@ describe("router.navigate() - edge cases params", () => {
     describe("dot-notation edge cases", () => {
       it("should return ROUTE_NOT_FOUND for consecutive dots (users..view)", async () => {
         try {
-          await router.navigate("users..view", {}, {});
+          await router.navigate("users..view", {}, undefined, {});
 
           expect.fail("Should have thrown error");
         } catch (error) {
@@ -35,7 +35,7 @@ describe("router.navigate() - edge cases params", () => {
 
       it("should return ROUTE_NOT_FOUND for leading dot (.users)", async () => {
         try {
-          await router.navigate(".users", {}, {});
+          await router.navigate(".users", {}, undefined, {});
 
           expect.fail("Should have thrown error");
         } catch (error) {
@@ -45,7 +45,7 @@ describe("router.navigate() - edge cases params", () => {
 
       it("should return ROUTE_NOT_FOUND for trailing dot (users.)", async () => {
         try {
-          await router.navigate("users.", {}, {});
+          await router.navigate("users.", {}, undefined, {});
 
           expect.fail("Should have thrown error");
         } catch (error) {
@@ -55,7 +55,7 @@ describe("router.navigate() - edge cases params", () => {
 
       it("should return ROUTE_NOT_FOUND for only dots (..)", async () => {
         try {
-          await router.navigate("..", {}, {});
+          await router.navigate("..", {}, undefined, {});
 
           expect.fail("Should have thrown error");
         } catch (error) {
@@ -72,7 +72,12 @@ describe("router.navigate() - edge cases params", () => {
       it("should accept array-like object as params", async () => {
         const arrayLikeParams = { length: 2, 0: "a", 1: "b", id: 123 };
 
-        const state = await router.navigate("users.view", arrayLikeParams, {});
+        const state = await router.navigate(
+          "users.view",
+          arrayLikeParams,
+          undefined,
+          {},
+        );
 
         expect(state.name).toBe("users.view");
         // `id` fills the `:id` path slot (stays in .params); the undeclared
@@ -90,7 +95,12 @@ describe("router.navigate() - edge cases params", () => {
       it("should handle object with numeric keys", async () => {
         const numericKeyParams = { 0: "first", 1: "second", id: 456 };
 
-        const state = await router.navigate("users.view", numericKeyParams, {});
+        const state = await router.navigate(
+          "users.view",
+          numericKeyParams,
+          undefined,
+          {},
+        );
 
         expect(state.name).toBe("users.view");
         // `id` fills the `:id` path slot (stays in .params); the undeclared
@@ -140,7 +150,9 @@ describe("router.navigate() - edge cases params", () => {
 
       it("honors opts when params is null: navigate(name, null, { replace: true })", async () => {
         // @ts-expect-error - testing runtime behavior with null
-        const state = await router.navigate("users", null, { replace: true });
+        const state = await router.navigate("users", null, undefined, {
+          replace: true,
+        });
 
         expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
         // null params must not swallow the opts — `replace` must still apply.
@@ -175,6 +187,7 @@ describe("router.navigate() - edge cases params", () => {
         const state = await router.navigate(
           "users.view",
           { id: negativeZero as unknown as number },
+          undefined,
           {},
         );
 
@@ -187,7 +200,12 @@ describe("router.navigate() - edge cases params", () => {
       });
 
       it("should accept regular finite numbers in params", async () => {
-        const state = await router.navigate("users.view", { id: 123 }, {});
+        const state = await router.navigate(
+          "users.view",
+          { id: 123 },
+          undefined,
+          {},
+        );
 
         expect(state).toStrictEqual(
           expect.objectContaining({

@@ -24,6 +24,7 @@ describe("hydrateRouter", () => {
     const serverState: State = {
       name: "users.view",
       params: { id: "42" },
+      search: {},
       path: "/users/view/42",
       context: {},
       transition: {
@@ -53,6 +54,7 @@ describe("hydrateRouter", () => {
     const fullState: State = {
       name: "stale.from.server",
       params: { id: "999" },
+      search: {},
       path: "/users/list",
       context: { data: "payload" },
       transition: {
@@ -86,6 +88,7 @@ describe("hydrateRouter", () => {
       const serverState: State = {
         name: "users.view",
         params: { id: "42" },
+        search: {},
         path: "/users/view/42",
         context: { data: { user: { id: "42", name: "Alice" } } },
         transition: {
@@ -205,6 +208,7 @@ describe("hydrateRouter", () => {
       const json = serializeRouterState({
         name: "users.list",
         params: {},
+        search: {},
         path: "/users/list",
         context: {},
         transition: {
@@ -277,6 +281,7 @@ describe("hydrateRouter", () => {
       const serverState: State = {
         name: "users.list",
         params: {},
+        search: {},
         path: "/users/list",
         context: { data: { fetchedAt: date } },
         transition: {

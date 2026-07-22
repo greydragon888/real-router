@@ -214,7 +214,15 @@ export function expectedActive(
   ignoreQueryParams: boolean,
   hash: string | undefined,
 ): boolean {
-  if (!router.isActiveRoute(routeName, params, strict, ignoreQueryParams)) {
+  if (
+    !router.isActiveRoute(
+      routeName,
+      params,
+      undefined,
+      strict,
+      ignoreQueryParams,
+    )
+  ) {
     return false;
   }
   if (hash === undefined) {

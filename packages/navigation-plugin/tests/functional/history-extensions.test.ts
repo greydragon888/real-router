@@ -362,7 +362,7 @@ describe("Navigation Plugin — History Extensions", () => {
       // not "" (stripped) and not undefined (urlClaim skipped).
       mockNav.reset("http://localhost/");
       await router.start();
-      await router.navigate("users.list", {}, { hash: "anchor" });
+      await router.navigate("users.list", {}, undefined, { hash: "anchor" });
       await router.navigate("home");
 
       const state = await router.traverseToLast("users.list");

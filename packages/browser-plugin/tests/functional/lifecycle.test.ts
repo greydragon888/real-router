@@ -88,7 +88,7 @@ describe("Browser Plugin — Lifecycle", () => {
 
       vi.spyOn(mockedBrowser, "replaceState");
 
-      await router.navigate("users.list", {}, { replace: true });
+      await router.navigate("users.list", {}, undefined, { replace: true });
 
       expect(mockedBrowser.replaceState).toHaveBeenCalled();
     });
@@ -255,7 +255,7 @@ describe("Browser Plugin — Lifecycle", () => {
       // Router already started on "home" (default route)
       vi.spyOn(mockedBrowser, "replaceState");
 
-      await router.navigate("index", {}, { reload: true });
+      await router.navigate("index", {}, undefined, { reload: true });
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "index" }),
@@ -299,7 +299,7 @@ describe("Browser Plugin — Lifecycle", () => {
       pushSpy.mockClear();
       replaceSpy.mockClear();
 
-      await router.navigate("users.list", {}, { replace: false });
+      await router.navigate("users.list", {}, undefined, { replace: false });
 
       expect(pushSpy).toHaveBeenCalledTimes(1);
       expect(replaceSpy).not.toHaveBeenCalled();
@@ -332,7 +332,7 @@ describe("Browser Plugin — Lifecycle", () => {
     });
 
     it("supports navigate callback", async () => {
-      const state = await router.navigate("users.list", {}, {});
+      const state = await router.navigate("users.list", {}, undefined, {});
 
       expect(state.name).toBe("users.list");
     });
@@ -388,11 +388,11 @@ describe("Browser Plugin — Lifecycle", () => {
       getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
 
       // Navigate should fail
-      await expect(router.navigate("users.list", {}, {})).rejects.toMatchObject(
-        {
-          code: errorCodes.CANNOT_DEACTIVATE,
-        },
-      );
+      await expect(
+        router.navigate("users.list", {}, undefined, {}),
+      ).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
+      });
 
       expect(router.getState()?.name).toBe("index");
     });

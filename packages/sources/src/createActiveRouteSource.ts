@@ -131,6 +131,10 @@ function computeActive(
   const routeActive = router.isActiveRoute(
     routeName,
     params,
+    // Slot-shift (RFC-4 M2 / #1548): query channel at position 3; strict /
+    // ignoreQueryParams shift to 4 / 5. The active-route source compares the
+    // single param bag, so the explicit query channel is unused here.
+    undefined,
     strict,
     ignoreQueryParams,
   );

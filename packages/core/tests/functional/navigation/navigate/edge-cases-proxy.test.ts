@@ -28,7 +28,12 @@ describe("router.navigate() - edge cases proxy", () => {
           },
         };
 
-        const state = await router.navigate("users", {}, optsWithGetter);
+        const state = await router.navigate(
+          "users",
+          {},
+          undefined,
+          optsWithGetter,
+        );
 
         expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
         // The getter's `replace: true` must actually be honored — without this
@@ -60,7 +65,12 @@ describe("router.navigate() - edge cases proxy", () => {
           },
         );
 
-        const state = await router.navigate("users.view", proxyParams, {});
+        const state = await router.navigate(
+          "users.view",
+          proxyParams,
+          undefined,
+          {},
+        );
 
         // Navigation succeeds, using the proxied value
         expect(state).toStrictEqual(
@@ -84,7 +94,7 @@ describe("router.navigate() - edge cases proxy", () => {
 
         // The navigation passes isNavigationOptions validation (Proxy returns correct values)
         // and Proxy options are now accepted (no structuredClone)
-        const state = await router.navigate("users", {}, proxyOpts);
+        const state = await router.navigate("users", {}, undefined, proxyOpts);
 
         expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
         // The Proxy's `replace: true` must reach the transition — otherwise the
@@ -100,7 +110,12 @@ describe("router.navigate() - edge cases proxy", () => {
           },
         };
 
-        const state = await router.navigate("users", {}, objectWithGetter);
+        const state = await router.navigate(
+          "users",
+          {},
+          undefined,
+          objectWithGetter,
+        );
 
         expect(state).toStrictEqual(
           expect.objectContaining({

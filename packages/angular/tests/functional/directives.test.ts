@@ -94,7 +94,7 @@ describe("RealLink directive", () => {
       anchor.dispatchEvent(event);
 
       expect(preventSpy).toHaveBeenCalled();
-      expect(navigateSpy).toHaveBeenCalledWith("", {}, {});
+      expect(navigateSpy).toHaveBeenCalledWith("", {}, undefined, {});
       expect(spy).toHaveBeenCalled();
 
       spy.mockRestore();

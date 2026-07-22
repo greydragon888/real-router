@@ -66,7 +66,7 @@ describe("commit-gate #1169 — stop/dispose/abort from a transition listener", 
     });
 
     const code = await router
-      .navigate("items", { id: "1" }, { signal: controller.signal })
+      .navigate("items", { id: "1" }, undefined, { signal: controller.signal })
       .then(
         () => undefined,
         (error: unknown) => codeOf(error),
@@ -178,11 +178,9 @@ describe("#1197 — external abort during async subscribeLeave canonicalizes", (
     );
 
     const controller = new AbortController();
-    const nav = router.navigate(
-      "items",
-      { id: "1" },
-      { signal: controller.signal },
-    );
+    const nav = router.navigate("items", { id: "1" }, undefined, {
+      signal: controller.signal,
+    });
 
     await new Promise((r) => setTimeout(r, 5));
     controller.abort(new Error("user-cancelled"));

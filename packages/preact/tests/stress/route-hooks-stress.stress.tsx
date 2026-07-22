@@ -215,7 +215,7 @@ describe("R — useRouteEnter / useRouteExit stress (§7.2 #16)", () => {
     // Force-navigate to the same route 5 times. Same-route → skip.
     for (let i = 0; i < 5; i++) {
       await act(async () => {
-        await router.navigate("route0", {}, { force: true });
+        await router.navigate("route0", {}, undefined, { force: true });
       });
     }
 
@@ -254,7 +254,7 @@ describe("R — useRouteEnter / useRouteExit stress (§7.2 #16)", () => {
 
     for (let i = 0; i < 5; i++) {
       await act(async () => {
-        await router.navigate("route0", {}, { force: true });
+        await router.navigate("route0", {}, undefined, { force: true });
       });
     }
 

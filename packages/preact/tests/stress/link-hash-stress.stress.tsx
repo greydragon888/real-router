@@ -51,15 +51,17 @@ function instrumentNavigate(router: Router): {
   const calls: NavigateCall[] = [];
   const original = router.navigate.bind(router);
 
-  router.navigate = (
+  router.navigate = ((
     name: string,
-    params?: Params,
+    params: Params | undefined,
+    _search: unknown,
     opts?: NavigationOptions & { hash?: string; hashChange?: boolean },
   ) => {
     calls.push({ name, params: params ?? {}, opts: opts ?? {} });
 
-    return original(name, params, opts);
-  };
+    // The stub ignores the query channel (RFC-4 M2 slot); forward opts at pos 4.
+    return original(name, params, undefined, opts);
+  }) as typeof router.navigate;
 
   return {
     calls,

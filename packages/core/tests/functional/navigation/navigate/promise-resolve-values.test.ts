@@ -37,12 +37,12 @@ describe("router.navigate() - promise resolve values", () => {
         );
 
         // Navigate to initial state
-        await router.navigate("orders.pending", {}, {});
+        await router.navigate("orders.pending", {}, undefined, {});
 
         promiseDeactivateGuard.mockClear();
 
         // Navigate away - should succeed
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(promiseDeactivateGuard).toHaveBeenCalledTimes(1);
         // The transition did not just run the guard — it reached the target.
@@ -56,12 +56,12 @@ describe("router.navigate() - promise resolve values", () => {
         lifecycle.addDeactivateGuard("orders", () => promiseGuard1);
         lifecycle.addDeactivateGuard("orders.pending", () => promiseGuard2);
 
-        await router.navigate("orders.pending", {}, {});
+        await router.navigate("orders.pending", {}, undefined, {});
 
         promiseGuard1.mockClear();
         promiseGuard2.mockClear();
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
@@ -75,7 +75,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         lifecycle.addActivateGuard("profile", () => promiseActivateGuard);
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(promiseActivateGuard).toHaveBeenCalledTimes(1);
         expect(router.getState()?.name).toBe("profile");
@@ -88,7 +88,7 @@ describe("router.navigate() - promise resolve values", () => {
         lifecycle.addActivateGuard("settings", () => promiseGuard1);
         lifecycle.addActivateGuard("settings.account", () => promiseGuard2);
 
-        await router.navigate("settings.account", {}, {});
+        await router.navigate("settings.account", {}, undefined, {});
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
@@ -102,7 +102,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
-        await router.navigate("orders.pending", {}, {});
+        await router.navigate("orders.pending", {}, undefined, {});
 
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
         expect(router.getState()?.name).toBe("orders.pending");
@@ -115,7 +115,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware1 }));
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware2 }));
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(promiseMiddleware1).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware2).toHaveBeenCalledTimes(1);
@@ -129,7 +129,7 @@ describe("router.navigate() - promise resolve values", () => {
         lifecycle.addActivateGuard("orders", () => syncGuard);
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
-        await router.navigate("orders", {}, {});
+        await router.navigate("orders", {}, undefined, {});
 
         expect(syncGuard).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
@@ -151,7 +151,7 @@ describe("router.navigate() - promise resolve values", () => {
         deactivateGuard.mockClear();
 
         // Navigate away - should succeed
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(deactivateGuard).toHaveBeenCalledTimes(1);
         expect(router.getState()?.name).toBe("profile");
@@ -169,7 +169,7 @@ describe("router.navigate() - promise resolve values", () => {
         guard1.mockClear();
         guard2.mockClear();
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(guard1).toHaveBeenCalledTimes(1);
         expect(guard2).toHaveBeenCalledTimes(1);
@@ -183,7 +183,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         lifecycle.addActivateGuard("profile", () => activateGuard);
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(activateGuard).toHaveBeenCalledTimes(1);
         expect(router.getState()?.name).toBe("profile");
@@ -196,7 +196,7 @@ describe("router.navigate() - promise resolve values", () => {
         lifecycle.addActivateGuard("settings", () => guard1);
         lifecycle.addActivateGuard("settings.account", () => guard2);
 
-        await router.navigate("settings.account", {}, {});
+        await router.navigate("settings.account", {}, undefined, {});
 
         expect(guard1).toHaveBeenCalledTimes(1);
         expect(guard2).toHaveBeenCalledTimes(1);
@@ -210,7 +210,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
-        await router.navigate("orders.pending", {}, {});
+        await router.navigate("orders.pending", {}, undefined, {});
 
         expect(middleware).toHaveBeenCalledTimes(1);
         expect(router.getState()?.name).toBe("orders.pending");
@@ -223,7 +223,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.usePlugin(() => ({ onTransitionSuccess: middleware1 }));
         router.usePlugin(() => ({ onTransitionSuccess: middleware2 }));
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(middleware1).toHaveBeenCalledTimes(1);
         expect(middleware2).toHaveBeenCalledTimes(1);
@@ -237,7 +237,7 @@ describe("router.navigate() - promise resolve values", () => {
         lifecycle.addActivateGuard("orders", () => guard);
         router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
-        await router.navigate("orders", {}, {});
+        await router.navigate("orders", {}, undefined, {});
 
         expect(guard).toHaveBeenCalledTimes(1);
         expect(middleware).toHaveBeenCalledTimes(1);
@@ -271,7 +271,12 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: redirectingMiddleware,
         }));
 
-        const state = await router.navigate("orders.pending", {}, {});
+        const state = await router.navigate(
+          "orders.pending",
+          {},
+          undefined,
+          {},
+        );
 
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
 
@@ -294,7 +299,7 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: redirectingMiddleware,
         }));
 
-        const state = await router.navigate("orders", {}, {});
+        const state = await router.navigate("orders", {}, undefined, {});
 
         expect(firstMiddleware).toHaveBeenCalledTimes(1);
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
@@ -317,7 +322,7 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: redirectingMiddleware,
         }));
 
-        const state = await router.navigate("profile", {}, {});
+        const state = await router.navigate("profile", {}, undefined, {});
 
         expect(guard).toHaveBeenCalledTimes(1);
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
@@ -344,7 +349,7 @@ describe("router.navigate() - promise resolve values", () => {
         promiseDeactivateGuard.mockClear();
 
         // Navigate away - should succeed
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(promiseDeactivateGuard).toHaveBeenCalledTimes(1);
         expect(router.getState()?.name).toBe("profile");
@@ -362,7 +367,7 @@ describe("router.navigate() - promise resolve values", () => {
         promiseGuard1.mockClear();
         promiseGuard2.mockClear();
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
@@ -376,7 +381,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         lifecycle.addActivateGuard("profile", () => promiseActivateGuard);
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(promiseActivateGuard).toHaveBeenCalledTimes(1);
         expect(router.getState()?.name).toBe("profile");
@@ -389,7 +394,7 @@ describe("router.navigate() - promise resolve values", () => {
         lifecycle.addActivateGuard("settings", () => promiseGuard1);
         lifecycle.addActivateGuard("settings.account", () => promiseGuard2);
 
-        await router.navigate("settings.account", {}, {});
+        await router.navigate("settings.account", {}, undefined, {});
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
@@ -403,7 +408,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
-        await router.navigate("orders.pending", {}, {});
+        await router.navigate("orders.pending", {}, undefined, {});
 
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
         expect(router.getState()?.name).toBe("orders.pending");
@@ -416,7 +421,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware1 }));
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware2 }));
 
-        await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, undefined, {});
 
         expect(promiseMiddleware1).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware2).toHaveBeenCalledTimes(1);
@@ -430,7 +435,7 @@ describe("router.navigate() - promise resolve values", () => {
         lifecycle.addActivateGuard("orders", () => promiseGuard);
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
-        await router.navigate("orders", {}, {});
+        await router.navigate("orders", {}, undefined, {});
 
         expect(promiseGuard).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
@@ -461,7 +466,12 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: promiseRedirectMiddleware,
         }));
 
-        const state = await router.navigate("orders.pending", {}, {});
+        const state = await router.navigate(
+          "orders.pending",
+          {},
+          undefined,
+          {},
+        );
 
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);
 
@@ -487,7 +497,7 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: promiseRedirectMiddleware,
         }));
 
-        const state = await router.navigate("orders", {}, {});
+        const state = await router.navigate("orders", {}, undefined, {});
 
         expect(firstPromiseMiddleware).toHaveBeenCalledTimes(1);
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);
@@ -512,7 +522,7 @@ describe("router.navigate() - promise resolve values", () => {
           onTransitionSuccess: promiseRedirectMiddleware,
         }));
 
-        const state = await router.navigate("profile", {}, {});
+        const state = await router.navigate("profile", {}, undefined, {});
 
         expect(promiseGuard).toHaveBeenCalledTimes(1);
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);

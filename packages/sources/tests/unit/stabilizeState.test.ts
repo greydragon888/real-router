@@ -103,8 +103,18 @@ describe("stabilizeState", () => {
 
     it("same path, different meta + transition → result === prev", () => {
       const api = getPluginApi(router);
-      const prev = api.makeState("users.view", { id: "1" }, undefined, "/users/1");
-      const next = api.makeState("users.view", { id: "1" }, undefined, "/users/1");
+      const prev = api.makeState(
+        "users.view",
+        { id: "1" },
+        undefined,
+        "/users/1",
+      );
+      const next = api.makeState(
+        "users.view",
+        { id: "1" },
+        undefined,
+        "/users/1",
+      );
 
       expect(prev).not.toBe(next);
       expect(prev.path).toBe(next.path);
@@ -123,15 +133,30 @@ describe("stabilizeState", () => {
     it("different paths → result === next", () => {
       const api = getPluginApi(router);
       const prev = api.makeState("home", {}, undefined, "/");
-      const next = api.makeState("users.view", { id: "1" }, undefined, "/users/1");
+      const next = api.makeState(
+        "users.view",
+        { id: "1" },
+        undefined,
+        "/users/1",
+      );
 
       expect(stabilizeState(prev, next)).toBe(next);
     });
 
     it("different paths, same name → result === next", () => {
       const api = getPluginApi(router);
-      const prev = api.makeState("users.view", { id: "1" }, undefined, "/users/1");
-      const next = api.makeState("users.view", { id: "2" }, undefined, "/users/2");
+      const prev = api.makeState(
+        "users.view",
+        { id: "1" },
+        undefined,
+        "/users/1",
+      );
+      const next = api.makeState(
+        "users.view",
+        { id: "2" },
+        undefined,
+        "/users/2",
+      );
 
       expect(stabilizeState(prev, next)).toBe(next);
     });
@@ -167,7 +192,9 @@ describe("stabilizeState", () => {
 
       const prevRoute = router.getState()!;
 
-      await router.navigate("users.view", { id: "42" }, { reload: true });
+      await router.navigate("users.view", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       const nextRoute = router.getState()!;
 

@@ -514,7 +514,12 @@ describe("Link component", () => {
     fireEvent.click(link, { bubbles: true, cancelable: true });
 
     // audit-2026-05-17 §1 MEDIUM #4 — pin exact arg shape, not just any-Object
-    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      undefined,
+      {},
+    );
   });
 
   it("should render without href and log error for invalid routeName", () => {
@@ -783,9 +788,9 @@ describe("Link component", () => {
 
         // opts must be defined — Link always forwards a third argument so the
         // routing layer sees an explicit options object (no implicit defaults).
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         // Undefined hash MUST stay undefined — no `hash` key in opts.
         expect("hash" in opts).toBe(false);
@@ -808,9 +813,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         expect(opts.hash).toBe("");
         // Cross-route navigation → no force/hashChange auto-bypass.
@@ -834,9 +839,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         expect(opts.hash).toBe("section");
         // Cross-route — same-route hash logic must NOT fire.
@@ -849,7 +854,7 @@ describe("Link component", () => {
         // is populated. Then click a Link targeting the same route + same
         // params but with hash B — navigateWithHash must auto-bypass core's
         // SAME_STATES rejection by setting `force: true, hashChange: true`.
-        await router.navigate("about", {}, { hash: "first" });
+        await router.navigate("about", {}, undefined, { hash: "first" });
 
         const spy = vi.spyOn(router, "navigate");
 
@@ -866,9 +871,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         expect(opts.hash).toBe("second");
         expect((opts as { force?: boolean }).force).toBe(true);
@@ -880,7 +885,7 @@ describe("Link component", () => {
         // the current hash, navigateWithHash must NOT add force/hashChange.
         // Adding them would force a redundant transition where SAME_STATES
         // correctly rejects.
-        await router.navigate("about", {}, { hash: "same" });
+        await router.navigate("about", {}, undefined, { hash: "same" });
 
         const spy = vi.spyOn(router, "navigate");
 
@@ -900,9 +905,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         expect(opts.hash).toBe("same");
         expect((opts as { force?: boolean }).force).toBeUndefined();

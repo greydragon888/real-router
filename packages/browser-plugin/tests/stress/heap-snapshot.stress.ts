@@ -83,11 +83,9 @@ describe("B7.3 — heap stability across 40 000 navigations", () => {
       // initial allocations. `replace: true` to match the measured loop.
       for (let i = 0; i < 100; i++) {
         await router
-          .navigate(
-            ROUTES[i % ROUTES.length],
-            { id: String(i) },
-            { replace: true },
-          )
+          .navigate(ROUTES[i % ROUTES.length], { id: String(i) }, undefined, {
+            replace: true,
+          })
           .catch(expectedStressError);
       }
 
@@ -101,11 +99,9 @@ describe("B7.3 — heap stability across 40 000 navigations", () => {
       // the healthy baseline does not grow O(N) and mask a real router leak.
       for (let i = 0; i < ITER; i++) {
         await router
-          .navigate(
-            ROUTES[i % ROUTES.length],
-            { id: String(i) },
-            { replace: true },
-          )
+          .navigate(ROUTES[i % ROUTES.length], { id: String(i) }, undefined, {
+            replace: true,
+          })
           .catch(expectedStressError);
       }
 

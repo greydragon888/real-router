@@ -99,7 +99,9 @@ describe("E1 — useRouteEnter/useRouteExit under stress (§7.2 #16)", () => {
     // `useRouteEnter` (the hook's createEffect runs on mount-driven
     // `useRoute()` resolution); subsequent ones are guarded out.
     for (let i = 0; i < 100; i++) {
-      await router.navigate("users.view", { id: "1" }, { force: true });
+      await router.navigate("users.view", { id: "1" }, undefined, {
+        force: true,
+      });
     }
 
     // skipSameRoute default = true → at most ONE fire (the initial

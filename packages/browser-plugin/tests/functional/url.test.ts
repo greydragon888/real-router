@@ -423,7 +423,7 @@ describe("Browser Plugin — URL", () => {
       globalThis.dispatchEvent(new Event("hashchange"));
 
       // Reload same route — path stays the same, hash should be preserved
-      await router.navigate("home", {}, { reload: true });
+      await router.navigate("home", {}, undefined, { reload: true });
 
       // Tri-state preserve (#532): opts.hash === undefined ⇒ keep prevHash from fromState.context.url.hash
       expect(replaceStateSpy).toHaveBeenCalled();
@@ -492,7 +492,7 @@ describe("Browser Plugin — URL", () => {
         "/home#section",
       );
 
-      await router.navigate("users.list", {}, { hash: "" });
+      await router.navigate("users.list", {}, undefined, { hash: "" });
 
       const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
 
@@ -504,7 +504,7 @@ describe("Browser Plugin — URL", () => {
 
       const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
 
-      await router.navigate("users.list", {}, { hash: "footer" });
+      await router.navigate("users.list", {}, undefined, { hash: "footer" });
 
       const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
 

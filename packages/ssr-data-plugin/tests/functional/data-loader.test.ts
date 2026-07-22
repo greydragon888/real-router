@@ -1240,7 +1240,7 @@ describe("@real-router/ssr-data-plugin", () => {
       // *destination* route — even when navigating away to a different route.
       listLoader.mockResolvedValueOnce({ page: "list-v2" });
       invalidate(router, "data");
-      await router.navigate("users.list", {}, { reload: true });
+      await router.navigate("users.list", {}, undefined, { reload: true });
 
       expect(listLoader).toHaveBeenCalledTimes(1);
       expect(router.getState()!.context.data).toStrictEqual({
@@ -1263,7 +1263,9 @@ describe("@real-router/ssr-data-plugin", () => {
       expect(router.getState()!.context.data).toStrictEqual({ value: 1 });
 
       invalidate(router, "data");
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(2);
       expect(router.getState()!.context.data).toStrictEqual({ value: 2 });
@@ -1280,7 +1282,9 @@ describe("@real-router/ssr-data-plugin", () => {
       invalidate(router, "data");
       invalidate(router, "data");
 
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(1);
     });
@@ -1364,6 +1368,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const state2 = await router.navigate(
         "users.profile",
         { id: "2" },
+        undefined,
         { reload: true },
       );
 
@@ -1384,7 +1389,9 @@ describe("@real-router/ssr-data-plugin", () => {
       invalidate(router, "data");
 
       await expect(
-        router.navigate("users.profile", { id: "42" }, { reload: true }),
+        router.navigate("users.profile", { id: "42" }, undefined, {
+          reload: true,
+        }),
       ).rejects.toThrow("boom");
     });
 
@@ -1450,11 +1457,9 @@ describe("@real-router/ssr-data-plugin", () => {
       invalidate(router, "data");
 
       const ac = new AbortController();
-      const navA = router.navigate(
-        "users.profile",
-        { id: "42" },
-        { signal: ac.signal },
-      );
+      const navA = router.navigate("users.profile", { id: "42" }, undefined, {
+        signal: ac.signal,
+      });
 
       // Let the leave handler reach `await loader(…)`.
       await Promise.resolve();
@@ -1474,7 +1479,9 @@ describe("@real-router/ssr-data-plugin", () => {
       expect(loader).toHaveBeenCalledTimes(1);
 
       // Flag preserved — next navigation refreshes from the second mock.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(2);
       expect(router.getState()!.context.data).toStrictEqual({ v: 2 });
@@ -1491,13 +1498,17 @@ describe("@real-router/ssr-data-plugin", () => {
       // would do). The ssr-data-plugin's listener checks "data" — sees no flag.
       markStale(router, "rsc");
 
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).not.toHaveBeenCalled();
 
       // Own namespace still works.
       invalidate(router, "data");
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(1);
     });
@@ -1574,13 +1585,17 @@ describe("@real-router/ssr-data-plugin", () => {
       invalidate(router, "data");
 
       await expect(
-        router.navigate("users.profile", { id: "42" }, { reload: true }),
+        router.navigate("users.profile", { id: "42" }, undefined, {
+          reload: true,
+        }),
       ).rejects.toThrow("transient");
 
       expect(loader).toHaveBeenCalledTimes(2);
 
       // Flag preserved through rejection — retry refreshes successfully.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(3);
       expect(router.getState()!.context.data).toBe("recovered");
@@ -1620,7 +1635,9 @@ describe("@real-router/ssr-data-plugin", () => {
       expect(loader.mock.calls[0]).toStrictEqual([{ id: "42" }]);
 
       invalidate(router, "data");
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       // Leave handler passes { signal } from the navigation's controller.
       // Capture inside the loader because the controller is aborted during
@@ -1656,11 +1673,9 @@ describe("@real-router/ssr-data-plugin", () => {
       invalidate(router, "data");
 
       const ac = new AbortController();
-      const navA = router.navigate(
-        "users.profile",
-        { id: "42" },
-        { signal: ac.signal },
-      );
+      const navA = router.navigate("users.profile", { id: "42" }, undefined, {
+        signal: ac.signal,
+      });
 
       // Reach `await loader(...)` in the leave handler.
       await Promise.resolve();
@@ -1681,7 +1696,9 @@ describe("@real-router/ssr-data-plugin", () => {
 
       // Flag preserved because the cancelled nav skipped the write — next
       // navigation refreshes with a fresh, non-aborted signal.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(router.getState()!.context.data).toStrictEqual({ v: 2 });
     });
@@ -1719,11 +1736,10 @@ describe("@real-router/ssr-data-plugin", () => {
       invalidate(router, "data");
 
       const ac = new AbortController();
-      const navA = router.navigate(
-        "users.profile",
-        { id: "42" },
-        { reload: true, signal: ac.signal },
-      );
+      const navA = router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+        signal: ac.signal,
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -1736,7 +1752,9 @@ describe("@real-router/ssr-data-plugin", () => {
 
       // Flag preserved (loader rejection bypasses clearStale). Retry
       // succeeds with fresh, non-aborted signal.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(router.getState()!.context.data).toBe("recovered");
     });
@@ -1775,11 +1793,10 @@ describe("@real-router/ssr-data-plugin", () => {
       ac.abort(new Error("pre-aborted"));
 
       await expect(
-        router.navigate(
-          "users.profile",
-          { id: "42" },
-          { reload: true, signal: ac.signal },
-        ),
+        router.navigate("users.profile", { id: "42" }, undefined, {
+          reload: true,
+          signal: ac.signal,
+        }),
       ).rejects.toThrow(/cancel|abort|pre-aborted/i);
 
       // Surface (2): leave handler never ran — loader was not invoked a
@@ -1790,7 +1807,9 @@ describe("@real-router/ssr-data-plugin", () => {
 
       // Stale flag preserved across the cancelled navigation — a
       // follow-up nav with a non-aborted signal consumes the flag.
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       expect(loader).toHaveBeenCalledTimes(2);
       expect(router.getState()!.context.data).toBe("recovered");
@@ -2040,7 +2059,9 @@ describe("@real-router/ssr-data-plugin", () => {
       expect(state.context.ssrDataDeferred!.reviews).toBe(reviewsP1);
 
       invalidate(router, "data");
-      await router.navigate("users.profile", { id: "42" }, { reload: true });
+      await router.navigate("users.profile", { id: "42" }, undefined, {
+        reload: true,
+      });
 
       const refreshed = router.getState()!;
 
@@ -2145,7 +2166,7 @@ describe("@real-router/ssr-data-plugin", () => {
       markStale(router, "");
 
       // A regular navigation must NOT re-run the loader.
-      await router.navigate("home", {}, { reload: true });
+      await router.navigate("home", {}, undefined, { reload: true });
 
       expect(loader).toHaveBeenCalledTimes(1);
     });

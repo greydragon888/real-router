@@ -665,6 +665,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         {},
+        undefined,
         { replace: true },
       );
 
@@ -685,6 +686,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         {},
+        undefined,
         { reload: true },
       );
     });
@@ -812,7 +814,12 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it('hash="" calls navigate with hash: "" (clears hash)', async () => {
@@ -830,6 +837,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         {},
+        undefined,
         {
           hash: "",
         },
@@ -849,15 +857,11 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(router.navigate).toHaveBeenCalledWith(
-        "test",
-        {},
-        {
-          hash: "section",
-          force: true,
-          hashChange: true,
-        },
-      );
+      expect(router.navigate).toHaveBeenCalledWith("test", {}, undefined, {
+        hash: "section",
+        force: true,
+        hashChange: true,
+      });
     });
   });
 

@@ -94,6 +94,23 @@ export interface StateMetaInput<P extends Params = Params> {
 }
 
 /**
+ * Descriptor form of a navigation target (RFC-4 M2 / #1548). The two-channel
+ * counterpart to the positional `navigate(name, params, search, opts)` form:
+ * `params` is the path channel, `search` the query channel. Passed as the first
+ * argument to `router.navigate(target, opts?)` / `router.buildPath(target)` /
+ * `router.isActiveRoute(target)` and as the `to` prop of framework `<Link>`s,
+ * so a target can be threaded as one value instead of positional arguments.
+ */
+export interface NavigationTarget<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+> {
+  name: string;
+  params?: P;
+  search?: S;
+}
+
+/**
  * Parsed shape produced by `serializeRouterState()` (`@real-router/ssr-utils`,
  * after `JSON.parse`). Identical to {@link State} minus `transition`
  * (per-navigation `TransitionMeta` is meaningless after hydration; the client

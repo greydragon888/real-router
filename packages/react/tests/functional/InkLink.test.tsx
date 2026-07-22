@@ -63,7 +63,7 @@ describe("InkLink", () => {
     stdin.write(ENTER);
 
     await vi.waitFor(() => {
-      expect(navigateSpy).toHaveBeenCalledWith("users.list", {}, {});
+      expect(navigateSpy).toHaveBeenCalledWith("users.list", {}, undefined, {});
     }, WAIT_OPTS);
   });
 
@@ -89,7 +89,12 @@ describe("InkLink", () => {
     stdin.write(ENTER);
 
     await vi.waitFor(() => {
-      expect(navigateSpy).toHaveBeenCalledWith("users.view", params, options);
+      expect(navigateSpy).toHaveBeenCalledWith(
+        "users.view",
+        params,
+        undefined,
+        options,
+      );
     }, WAIT_OPTS);
   });
 
@@ -139,7 +144,7 @@ describe("InkLink", () => {
     await flushInk();
 
     // Navigate was attempted with the correct route; rejection was caught internally.
-    expect(navigateSpy).toHaveBeenCalledWith("about", {}, {});
+    expect(navigateSpy).toHaveBeenCalledWith("about", {}, undefined, {});
   });
 
   it("isolates a throwing onSelect: navigation still fires and the error is logged, not propagated to ink's stdin handler", async () => {
@@ -164,7 +169,7 @@ describe("InkLink", () => {
     stdin.write(ENTER);
 
     await vi.waitFor(() => {
-      expect(navigateSpy).toHaveBeenCalledWith("about", {}, {});
+      expect(navigateSpy).toHaveBeenCalledWith("about", {}, undefined, {});
     }, WAIT_OPTS);
 
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -209,7 +214,7 @@ describe("InkLink", () => {
     stdin.write(ENTER);
 
     await vi.waitFor(() => {
-      expect(navigateSpy).toHaveBeenCalledWith("about", {}, {});
+      expect(navigateSpy).toHaveBeenCalledWith("about", {}, undefined, {});
     }, WAIT_OPTS);
   });
 

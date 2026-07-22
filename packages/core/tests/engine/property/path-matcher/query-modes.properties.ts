@@ -97,11 +97,9 @@ describe("Query-parameter properties", () => {
         expect(matcher.buildPath("search", { [key]: val })).toBe("/search");
 
         // loose → key appears in the query string.
-        const loose = matcher.buildPath(
-          "search",
-          { [key]: val },
-          { queryParamsMode: "loose" },
-        );
+        const loose = matcher.buildPath("search", { [key]: val }, undefined, {
+          queryParamsMode: "loose",
+        });
 
         expect(loose).toContain(key);
         expect(loose.startsWith("/search?")).toBe(true);

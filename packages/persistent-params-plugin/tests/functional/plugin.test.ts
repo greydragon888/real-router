@@ -275,7 +275,9 @@ describe("Persistent params plugin", () => {
     });
 
     it("should handle navigate(routeName, params, options)", async () => {
-      await router.navigate("route1", { id: "1" }, { replace: true });
+      await router.navigate("route1", { id: "1" }, undefined, {
+        replace: true,
+      });
 
       const state = router.getState();
 
@@ -283,11 +285,9 @@ describe("Persistent params plugin", () => {
     });
 
     it("should handle navigate(routeName, params, options, done)", async () => {
-      const state = await router.navigate(
-        "route1",
-        { id: "1" },
-        { replace: true },
-      );
+      const state = await router.navigate("route1", { id: "1" }, undefined, {
+        replace: true,
+      });
 
       expect(state).toBeDefined();
       expect(state.path).toBe("/route1/1?mode=dev");
@@ -305,15 +305,15 @@ describe("Persistent params plugin", () => {
       expect(state1).toBeDefined();
       expect(router.getState()?.path).toBe("/route1/1?mode=prod");
 
-      await router.navigate("route2", { id: "2" }, { replace: false });
+      await router.navigate("route2", { id: "2" }, undefined, {
+        replace: false,
+      });
 
       expect(router.getState()?.path).toBe("/route2/2?mode=prod");
 
-      const state2 = await router.navigate(
-        "route1",
-        { id: "1" },
-        { replace: false },
-      );
+      const state2 = await router.navigate("route1", { id: "1" }, undefined, {
+        replace: false,
+      });
 
       expect(state2).toBeDefined();
       expect(router.getState()?.path).toBe("/route1/1?mode=prod");

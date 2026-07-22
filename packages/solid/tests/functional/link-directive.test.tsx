@@ -661,11 +661,9 @@ describe("link directive", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "one-more-test",
-        {},
-        { replace: true },
-      );
+      expect(navigateSpy).toHaveBeenCalledWith("one-more-test", {}, undefined, {
+        replace: true,
+      });
     });
   });
 
@@ -693,7 +691,12 @@ describe("link directive", () => {
 
       // The directive still navigates to the INITIAL value ("one-more-test"),
       // not the updated value ("about"), because accessor() is called once
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
       expect(router.navigate).not.toHaveBeenCalledWith("about", {}, {});
     });
 
@@ -745,7 +748,12 @@ describe("link directive", () => {
       // Click still targets the initial route, not the updated signal value.
       await user.click(screen.getByTestId("link"));
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
       expect(router.navigate).not.toHaveBeenCalledWith("about", {}, {});
     });
 
@@ -832,7 +840,12 @@ describe("link directive", () => {
       expect(consumerSpy).toHaveBeenCalledTimes(1);
       expect(consumerSpy).toHaveBeenCalledWith(expect.any(MouseEvent));
       expect(navigateSpy).toHaveBeenCalledTimes(1);
-      expect(navigateSpy).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(navigateSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it("after unmount, JSX onClick remains on element while directive listener is removed", async () => {

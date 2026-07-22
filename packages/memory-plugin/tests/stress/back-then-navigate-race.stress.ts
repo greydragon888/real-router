@@ -85,7 +85,7 @@ describe("S11: back() in flight + immediate navigate() race", () => {
         const target = i % 2 === 0 ? "profile" : "settings";
 
         await router
-          .navigate(target, {}, { replace: true })
+          .navigate(target, {}, undefined, { replace: true })
           .catch((error: unknown) => {
             const code = (error as { code?: string }).code;
 

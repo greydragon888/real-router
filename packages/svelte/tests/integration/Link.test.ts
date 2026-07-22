@@ -161,7 +161,7 @@ describe("Link - Integration Tests", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
-      const opts = navigateSpy.mock.calls[0][2] as
+      const opts = navigateSpy.mock.calls[0][3] as
         { hash?: string } | undefined;
 
       // Critical: the `hash` key must be ABSENT (not `undefined`) so plugins
@@ -184,7 +184,7 @@ describe("Link - Integration Tests", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
-      const opts = navigateSpy.mock.calls[0][2] as { hash?: string };
+      const opts = navigateSpy.mock.calls[0][3] as { hash?: string };
 
       // Explicit empty hash: present in opts with empty-string value.
       expect(Object.prototype.hasOwnProperty.call(opts, "hash")).toBe(true);
@@ -205,7 +205,7 @@ describe("Link - Integration Tests", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
-      const opts = navigateSpy.mock.calls[0][2] as { hash?: string };
+      const opts = navigateSpy.mock.calls[0][3] as { hash?: string };
 
       expect(opts.hash).toBe("section");
     });
@@ -230,7 +230,7 @@ describe("Link - Integration Tests", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
-      const opts = navigateSpy.mock.calls[0][2] as {
+      const opts = navigateSpy.mock.calls[0][3] as {
         force?: boolean;
         hashChange?: boolean;
         hash?: string;

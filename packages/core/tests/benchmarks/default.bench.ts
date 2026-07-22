@@ -454,7 +454,7 @@ export async function run(): Promise<void> {
   bench.add(
     "state/isActiveRoute-strict",
     batched(6144, () => {
-      keep(view.isActiveRoute("users.view", { id: "123" }, true));
+      keep(view.isActiveRoute("users.view", { id: "123" }, undefined, true));
     }),
   );
   {

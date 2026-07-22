@@ -101,10 +101,17 @@ describe("router methods validation — with validationPlugin", () => {
 
     it("should throw on non-boolean strictEquality", () => {
       const raw = router as unknown as {
-        isActiveRoute: (n: string, p: unknown, s: unknown) => boolean;
+        isActiveRoute: (
+          n: string,
+          p: unknown,
+          s: unknown,
+          strict: unknown,
+        ) => boolean;
       };
 
-      expect(() => raw.isActiveRoute("home", {}, "not-boolean")).toThrow();
+      expect(() =>
+        raw.isActiveRoute("home", {}, undefined, "not-boolean"),
+      ).toThrow();
     });
 
     it("should throw on non-boolean ignoreQueryParams", () => {
@@ -113,12 +120,13 @@ describe("router methods validation — with validationPlugin", () => {
           n: string,
           p: unknown,
           s?: unknown,
+          strict?: unknown,
           iqp?: unknown,
         ) => boolean;
       };
 
       expect(() =>
-        raw.isActiveRoute("home", {}, undefined, "not-boolean"),
+        raw.isActiveRoute("home", {}, undefined, undefined, "not-boolean"),
       ).toThrow();
     });
 

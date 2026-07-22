@@ -116,7 +116,7 @@ describe("stabilizeState — reload-aware (#605)", () => {
       // Reload navigation against the same target produces a fresh state with
       // transition.reload=true; stabilizer must surface it.
       try {
-        await router.navigate(routeName, paramsForRoute(routeName), {
+        await router.navigate(routeName, paramsForRoute(routeName), undefined, {
           reload: true,
         });
       } catch {

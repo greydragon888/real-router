@@ -330,7 +330,7 @@ describe("createScrollSpy", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
       expect(navigateSpy.mock.calls[0]?.[0]).toBe("docs");
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-1",
         replace: true,
         force: true,
@@ -359,7 +359,7 @@ describe("createScrollSpy", () => {
 
       flushTimersAndRaf();
 
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-2",
       });
 
@@ -398,7 +398,7 @@ describe("createScrollSpy", () => {
       flushTimersAndRaf();
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-2",
       });
 
@@ -437,7 +437,7 @@ describe("createScrollSpy", () => {
       flushTimersAndRaf();
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-2",
       });
 
@@ -468,7 +468,7 @@ describe("createScrollSpy", () => {
 
       flushTimersAndRaf();
 
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-2",
       });
 
@@ -486,7 +486,7 @@ describe("createScrollSpy", () => {
 
       flushTimersAndRaf();
 
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-2",
       });
 
@@ -513,15 +513,11 @@ describe("createScrollSpy", () => {
       const router = await createTestRouter();
 
       // Initialize URL context with a matching hash via a prior emit.
-      await router.navigate(
-        "docs",
-        {},
-        {
-          hash: "section-1",
-          force: true,
-          hashChange: true,
-        },
-      );
+      await router.navigate("docs", {}, undefined, {
+        hash: "section-1",
+        force: true,
+        hashChange: true,
+      });
 
       const navigateSpy = vi.spyOn(router, "navigate");
       const [s1] = setupAnchors(["section-1"]);
@@ -605,15 +601,11 @@ describe("createScrollSpy", () => {
 
       // Simulate a user-driven Link click that updates the hash via the URL
       // plugin. The spy's subscribe callback should set coolingDown=true.
-      await router.navigate(
-        "docs",
-        {},
-        {
-          hash: "section-2",
-          force: true,
-          hashChange: true,
-        },
-      );
+      await router.navigate("docs", {}, undefined, {
+        hash: "section-2",
+        force: true,
+        hashChange: true,
+      });
 
       const navigateSpy = vi.spyOn(router, "navigate");
 
@@ -632,15 +624,11 @@ describe("createScrollSpy", () => {
 
       track(createScrollSpy(router, { selector: "[id]" }));
 
-      await router.navigate(
-        "docs",
-        {},
-        {
-          hash: "section-2",
-          force: true,
-          hashChange: true,
-        },
-      );
+      await router.navigate("docs", {}, undefined, {
+        hash: "section-2",
+        force: true,
+        hashChange: true,
+      });
 
       const navigateSpy = vi.spyOn(router, "navigate");
 
@@ -651,7 +639,7 @@ describe("createScrollSpy", () => {
       flushTimersAndRaf();
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-1",
       });
 
@@ -678,10 +666,10 @@ describe("createScrollSpy", () => {
       // Both emits should land — if selfEmitting failed, the second emit would
       // be rate-limited by cooldown.
       expect(navigateSpy).toHaveBeenCalledTimes(2);
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-1",
       });
-      expect(navigateSpy.mock.calls[1]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[1]?.[3]).toMatchObject({
         hash: "section-2",
       });
 
@@ -1236,7 +1224,7 @@ describe("createScrollSpy", () => {
 
       flushTimersAndRaf();
 
-      expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
         hash: "section-2",
       });
 

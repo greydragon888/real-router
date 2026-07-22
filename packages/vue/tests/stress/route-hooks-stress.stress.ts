@@ -402,7 +402,7 @@ describe("§7.2 #16 — useRouteEnter / useRouteExit stress (Vue)", () => {
     await flushPromises();
 
     for (let i = 0; i < 20; i++) {
-      await router.navigate("route0", {}, { force: true });
+      await router.navigate("route0", {}, undefined, { force: true });
       await nextTick();
       await flushPromises();
     }
@@ -486,7 +486,7 @@ describe("§7.2 #16 — useRouteEnter / useRouteExit stress (Vue)", () => {
 
     // 10 force-same-route navs.
     for (let i = 0; i < 10; i++) {
-      await router.navigate("route0", {}, { force: true });
+      await router.navigate("route0", {}, undefined, { force: true });
       await nextTick();
       await flushPromises();
     }

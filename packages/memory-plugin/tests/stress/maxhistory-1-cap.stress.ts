@@ -77,7 +77,7 @@ describe("S14: maxHistoryLength=1 — continuous trimming correctness", () => {
       for (let i = 0; i < 500; i++) {
         await (i % 2 === 0
           ? router.navigate("user", { id: String(i) })
-          : router.navigate("settings", {}, { replace: true }));
+          : router.navigate("settings", {}, undefined, { replace: true }));
 
         expect(router.canGoBack()).toBe(false);
         expect(router.canGoForward()).toBe(false);

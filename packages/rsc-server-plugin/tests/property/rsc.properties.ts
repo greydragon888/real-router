@@ -599,11 +599,9 @@ describe("invalidate: per-namespace orthogonality", () => {
         nav += 1;
         // Reload to the same route — guarantees the leave handler fires
         // (a same-state guard would otherwise short-circuit).
-        await router.navigate(
-          "users.profile",
-          { id: `n${nav}` },
-          { reload: true },
-        );
+        await router.navigate("users.profile", { id: `n${nav}` }, undefined, {
+          reload: true,
+        });
       }
 
       expect(rscCalls - rscBaseline).toBe(expectedRscDelta);

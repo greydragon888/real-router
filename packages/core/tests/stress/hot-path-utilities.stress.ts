@@ -66,8 +66,18 @@ describe("S17: Hot path utilities", () => {
       meta: { page: 1, nested: { deep: { value: "b" } } },
     };
 
-    const state1 = pluginApi.makeState("route0", deepParams1, undefined, "/route0");
-    const state2 = pluginApi.makeState("route0", deepParams2, undefined, "/route0");
+    const state1 = pluginApi.makeState(
+      "route0",
+      deepParams1,
+      undefined,
+      "/route0",
+    );
+    const state2 = pluginApi.makeState(
+      "route0",
+      deepParams2,
+      undefined,
+      "/route0",
+    );
 
     const { durationMs } = measureTime(() => {
       for (let i = 0; i < 10_000; i++) {

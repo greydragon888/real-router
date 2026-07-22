@@ -139,7 +139,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         void router.navigate("index");
 
-        const promise = router.navigate("profile", {}, {});
+        const promise = router.navigate("profile", {}, undefined, {});
 
         await vi.runAllTimersAsync();
 
@@ -163,7 +163,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         void router.navigate("index");
 
-        const promise = router.navigate("profile", {}, {});
+        const promise = router.navigate("profile", {}, undefined, {});
 
         await vi.runAllTimersAsync();
 

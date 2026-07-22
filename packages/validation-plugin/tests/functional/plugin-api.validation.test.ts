@@ -58,7 +58,9 @@ describe("plugin API validation — with validationPlugin", () => {
         ) => unknown;
       };
 
-      expect(() => raw.makeState("home", {}, undefined, 123)).toThrow(TypeError);
+      expect(() => raw.makeState("home", {}, undefined, 123)).toThrow(
+        TypeError,
+      );
     });
 
     it("accepts valid arguments", () => {

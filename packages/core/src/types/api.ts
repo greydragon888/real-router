@@ -38,7 +38,7 @@ import type { TreeChangedEvent } from "./tree-changed";
  */
 export interface InterceptableMethodMap {
   start: (path?: string) => Promise<State>;
-  buildPath: (route: string, params?: Params) => string;
+  buildPath: (route: string, params?: Params, search?: SearchParams) => string;
   forwardState: (routeName: string, routeParams: Params) => SimpleState;
 }
 

@@ -265,7 +265,7 @@ describe("navigateToDefault", () => {
       await withDefault("profile");
 
       // Navigate to profile first
-      await router.navigate("profile", {}, {});
+      await router.navigate("profile", {}, undefined, {});
 
       // Navigate to default with force (same route)
       const state = await router.navigateToDefault({ force: true });
@@ -325,7 +325,7 @@ describe("navigateToDefault", () => {
       await withDefault("users");
 
       // Navigate to different route first
-      await router.navigate("profile", {}, {});
+      await router.navigate("profile", {}, undefined, {});
 
       expect(router.getState()?.name).toBe("profile");
 
@@ -671,7 +671,7 @@ describe("navigateToDefault", () => {
 
     it("should pass force option and allow same-state navigation", async () => {
       // First navigate to users
-      await router.navigate("users", { id: 123 }, {});
+      await router.navigate("users", { id: 123 }, undefined, {});
 
       // Then try to navigate to default (same route) without force - should fail
       try {
