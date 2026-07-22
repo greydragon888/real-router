@@ -33,7 +33,7 @@ import {
 import { createRouter } from "../../src";
 import { getLifecycleApi, getPluginApi } from "../../src/api";
 
-import type { Params, Route } from "../../src";
+import type { Params, Route, SearchParams } from "../../src";
 import type { Bench } from "tinybench";
 
 /**
@@ -519,6 +519,107 @@ export async function run(): Promise<void> {
       "state/areStatesEqual-fullCompare",
       batched(8192, () => {
         keep(eq.areStatesEqual(sA, sB, false));
+      }),
+    );
+  }
+
+  // ========================================================================
+  // Search channel (RFC-4 M2 / #1548) — the two-channel WRITE / active paths.
+  // `matchPath/search-params` (Axis B below) covers the READ/parse side; these
+  // cover navigate / buildPath / isActiveRoute with an explicit `search`
+  // argument (the canonical M2 form) AND the v1 single-bag form (query merged
+  // into `params`, split out by `splitParamsBySearch` on the navigate path) —
+  // so the split cost is visible as the delta between the two navigate benches.
+  // Separate routers per scenario: navigate mutates state, so isolation keeps
+  // each measure independent (same discipline as the blocks above).
+  // ========================================================================
+
+  // navigate — explicit `search` channel: caller pre-separates path/query, so
+  // buildNavigateState skips `splitParamsBySearch`. Alternating page keeps every
+  // iteration a real transition (paths differ → no same-state reject).
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page&sort" },
+    ]);
+
+    await router.start("/");
+    const searches: SearchParams[] = [
+      { q: "a", page: "1", sort: "date" },
+      { q: "a", page: "2", sort: "date" },
+    ];
+    let i = 0;
+
+    bench.add(
+      "navigate/search-channel",
+      batched(192, () => {
+        void router.navigate("search", {}, searches[i++ % searches.length]);
+      }),
+    );
+  }
+
+  // navigate — v1 single-bag: query rides in `params` and `splitParamsBySearch`
+  // separates it by declaration. The delta vs `navigate/search-channel` is the
+  // per-navigate split overhead a migrated-from-v1 call site still pays.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page&sort" },
+    ]);
+
+    await router.start("/");
+    const bags: Params[] = [
+      { q: "a", page: "1", sort: "date" },
+      { q: "a", page: "2", sort: "date" },
+    ];
+    let i = 0;
+
+    bench.add(
+      "navigate/search-single-bag",
+      batched(192, () => {
+        void router.navigate("search", bags[i++ % bags.length]);
+      }),
+    );
+  }
+
+  // buildPath — search-aware, explicit query channel (path slots from `params`,
+  // query string from `search`). The canonical M2 build for a query URL.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page&sort" },
+    ]);
+
+    await router.start("/");
+    const search: SearchParams = { q: "test", page: "1", sort: "date" };
+
+    bench.add(
+      "buildPath/warm-search",
+      batched(768, () => {
+        keep(router.buildPath("search", {}, search));
+      }),
+    );
+  }
+
+  // isActiveRoute — active state carries a query; the check compares the search
+  // channel by passing `ignoreQueryParams: false` (position 5, after the
+  // `search` slot at 3 and `strictEquality` at 4). The default arm ignores query
+  // — that path is already covered by `state/isActiveRoute-exact` above.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page&sort" },
+    ]);
+
+    await router.start("/");
+    const search: SearchParams = { q: "a", page: "1", sort: "date" };
+
+    await router.navigate("search", {}, search);
+
+    bench.add(
+      "state/isActiveRoute-search",
+      batched(4096, () => {
+        keep(router.isActiveRoute("search", {}, search, undefined, false));
       }),
     );
   }

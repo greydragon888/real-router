@@ -9,7 +9,7 @@ import { batched, isMain, keep, makeBench, settleHeap } from "./fixtures";
 import { createRouter } from "../../src";
 import { getPluginApi } from "../../src/api";
 
-import type { Params, Route } from "../../src";
+import type { Params, Route, SearchParams } from "../../src";
 
 export async function run(): Promise<void> {
   const bench = makeBench("strict-query");
@@ -48,6 +48,29 @@ export async function run(): Promise<void> {
       "navigate/strict-query",
       batched(192, () => {
         void router.navigate("search", targets[i++ % targets.length]);
+      }),
+    );
+  }
+
+  // Explicit `search` channel under strict mode (RFC-4 M2 / #1548): the caller
+  // pre-separates the query so `buildNavigateState` skips `splitParamsBySearch`,
+  // but the strict-reject Set still allocates per match. The delta vs
+  // `navigate/strict-query` (single-bag) isolates the split cost from the strict
+  // matcher cost.
+  {
+    const router = createRouter(routes, { queryParamsMode: "strict" });
+
+    await router.start("/");
+    const searches: SearchParams[] = [
+      { q: "a", page: "1", sort: "date", filter: "active", limit: "10" },
+      { q: "b", page: "2", sort: "name", filter: "all", limit: "20" },
+    ];
+    let i = 0;
+
+    bench.add(
+      "navigate/strict-query-channel",
+      batched(192, () => {
+        void router.navigate("search", {}, searches[i++ % searches.length]);
       }),
     );
   }
