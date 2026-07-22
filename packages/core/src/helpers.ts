@@ -2,7 +2,7 @@
 
 import { DEFAULT_LIMITS, EMPTY_PARAMS } from "./constants";
 
-import type { Params, State, LimitsConfig } from "./types";
+import type { Params, SearchParams, State, LimitsConfig } from "./types";
 import type { Limits } from "./types/internal";
 
 // =============================================================================
@@ -102,4 +102,36 @@ export function normalizeParams(
   // Reuse the shared singleton when nothing survived so makeState's
   // `params === EMPTY_PARAMS` reuse branch fires (#1027).
   return normalized ?? EMPTY_PARAMS;
+}
+
+/**
+ * Splits the query params out of a params bag by route declaration: any key
+ * that is NOT a path (URL) param name of the route is a query param (RFC-4 M2 /
+ * #1548). Mirrors the matcher's read-side split for the navigate/build path,
+ * where the caller still passes one v1-style bag. Lazy — returns `undefined`
+ * when there are no query keys, so `makeState` reuses the frozen EMPTY_SEARCH
+ * singleton (zero transient alloc, #1027).
+ *
+ * `pathNames` is the route's cached URL-param list (`getUrlParams`), covering
+ * ancestor path params too; undeclared keys (loose mode) fall through to
+ * search, matching the matcher's loose behavior.
+ */
+export function extractSearchFromParams(
+  params: Params,
+  pathNames: readonly string[],
+): SearchParams | undefined {
+  let search: Record<string, unknown> | undefined;
+
+  for (const key in params) {
+    if (!Object.hasOwn(params, key) || pathNames.includes(key)) {
+      continue;
+    }
+
+    search ??= {};
+    search[key] = params[key];
+  }
+
+  // Boundary cast (like `params as P` at the matcher edge): the non-path bag
+  // keys carry query values (SearchParamValue), typed loosely here as `unknown`.
+  return search as SearchParams | undefined;
 }

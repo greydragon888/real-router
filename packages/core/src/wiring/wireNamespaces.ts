@@ -1,6 +1,6 @@
 // packages/core/src/wiring/wireNamespaces.ts
 
-import { normalizeParams } from "../helpers";
+import { extractSearchFromParams, normalizeParams } from "../helpers";
 import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
 
@@ -199,12 +199,17 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         return;
       }
 
+      // A3.2: split the query channel out of the incoming bag by declaration
+      // (keys that are not path params — RFC-4 M2 / #1548). buildPath still
+      // takes the full v1 bag (the facade slot-shift is a separate step); query
+      // is ALSO still folded into `params` during the back-compat window.
+      const search = extractSearchFromParams(
+        params,
+        ns.routes.getUrlParams(name),
+      );
       const path = ctx.buildPath(name, params);
 
-      // A3.1: navigate-path search is populated by the meta-split in A3.2; for
-      // now query is still folded into `params` (back-compat), so pass no search
-      // (makeState reuses the frozen EMPTY_SEARCH).
-      return ns.state.makeState(name, params, undefined, path, meta, true);
+      return ns.state.makeState(name, params, search, path, meta, true);
     },
     resolveDefault: () => {
       const options = ns.options.get();
