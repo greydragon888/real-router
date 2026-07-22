@@ -252,8 +252,8 @@ export class Router<
 
     registerInternals(this, {
       logger,
-      makeState: (name, params, path, meta) =>
-        this.#state.makeState(name, params, path, meta),
+      makeState: (name, params, search, path, meta) =>
+        this.#state.makeState(name, params, search, path, meta),
       // `as unknown as` is required: createBinaryInterceptable returns a
       // non-generic `(a: A, b: B) => R`, but RouterInternals["forwardState"]
       // is declared with a generic parameter `<P extends Params = Params>`,
@@ -719,6 +719,9 @@ export class Router<
       toState = this.#state.makeState(
         resolvedName,
         normalizedParams,
+        // A3.1: canNavigateTo builds toState from resolved params only; the
+        // meta-split search population lands with the write path in A3.2.
+        undefined,
         path,
         meta,
         true,

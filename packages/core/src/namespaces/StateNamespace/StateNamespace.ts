@@ -1,13 +1,17 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
 import { areParamValuesEqual } from "./helpers";
-import { DEFAULT_TRANSITION, EMPTY_PARAMS } from "../../constants";
+import {
+  DEFAULT_TRANSITION,
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+} from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
 import { setStateMetaParams } from "../../stateMetaStore";
 
 import type { StateNamespaceDependencies } from "./types";
 import type { RouteTreeStateMeta } from "../../engine";
-import type { Params, State } from "../../types";
+import type { Params, SearchParams, State } from "../../types";
 
 /**
  * Independent namespace for managing router state storage and creation.
@@ -101,13 +105,14 @@ export class StateNamespace {
    * `context` is initialized as a fresh empty object — intentionally NOT frozen
    * so plugins can publish data via `claim.write(state, value)` after creation.
    */
-  makeState<P extends Params = Params>(
+  makeState<P extends Params = Params, S extends SearchParams = SearchParams>(
     name: string,
     params?: P,
+    search?: S,
     path?: string,
     meta?: RouteTreeStateMeta,
     skipFreeze?: boolean,
-  ): State<P> {
+  ): State<P, S> {
     // Optimization: O(1) lookup instead of O(depth) ancestor iteration
     const defaultParamsConfig = this.#deps.getDefaultParams();
     const hasDefaultParams = Object.hasOwn(defaultParamsConfig, name);
@@ -129,10 +134,18 @@ export class StateNamespace {
     const state = {
       name,
       params: mergedParams,
+      // Query channel (RFC-4 M2 / #1548). Callers with no query pass `undefined`
+      // → the shared frozen EMPTY_SEARCH singleton is reused (zero transient
+      // alloc, #1027); a real query bag from the matcher is frozen like
+      // `params`. During the A2/A3.1 back-compat window query is ALSO still
+      // folded into `params` by the matcher — the params-cleanup lands in A3.2.
+      search: (search === undefined
+        ? EMPTY_SEARCH
+        : Object.freeze(search)) as S,
       path: path ?? this.#deps.buildPath(name, params),
       context: {},
       ...(!skipFreeze && { transition: DEFAULT_TRANSITION }),
-    } as State<P>;
+    } as State<P, S>;
 
     if (meta) {
       setStateMetaParams(state, meta);

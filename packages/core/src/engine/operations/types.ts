@@ -85,4 +85,4 @@ export interface RouteTreeState<P extends RouteParams = RouteParams> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cross-package boundary type
 export type RouteParams = Record<string, any>;
 
-export { type URLParamsEncodingType } from "../path-matcher";
+export type { URLParamsEncodingType } from "../path-matcher";

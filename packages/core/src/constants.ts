@@ -89,6 +89,14 @@ export const DEFAULT_LIMITS = {
 
 export const EMPTY_PARAMS: Readonly<Record<string, never>> = Object.freeze({});
 
+/**
+ * Shared frozen empty query bag reused for `State.search` when a navigation
+ * carries no query params — the search-channel twin of {@link EMPTY_PARAMS}
+ * (RFC-4 M2 / #1548). Lets `makeState` reuse one frozen `{}` (zero transient
+ * allocation, #1027) instead of minting an object per query-less state.
+ */
+export const EMPTY_SEARCH: Readonly<Record<string, never>> = Object.freeze({});
+
 const FROZEN_EMPTY_SEGMENTS = Object.freeze({
   deactivated: Object.freeze([]) as unknown as string[],
   activated: Object.freeze([]) as unknown as string[],

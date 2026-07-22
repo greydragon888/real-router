@@ -6,6 +6,7 @@ import type {
   GuardFn,
   Params,
   RouterLogger,
+  SearchParams,
   SimpleState,
   State,
   GuardFnFactory,
@@ -53,12 +54,13 @@ export interface RoutesDependencies<
   ) => GuardFn;
 
   /** Create state object */
-  makeState: <P extends Params = Params>(
+  makeState: <P extends Params = Params, S extends SearchParams = SearchParams>(
     name: string,
     params?: P,
+    search?: S,
     path?: string,
     meta?: Record<string, Record<string, "url" | "query">>,
-  ) => State<P>;
+  ) => State<P, S>;
 
   /** Get current router state */
   getState: () => State | undefined;

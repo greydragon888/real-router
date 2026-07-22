@@ -13,6 +13,7 @@ import type {
   Router as RouterInterface,
   RouterLogger,
   RouteTreeState,
+  SearchParams,
   SerializedRouterState,
   SimpleState,
   State,
@@ -26,12 +27,16 @@ import type { RouterValidator } from "./types/RouterValidator";
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,
 > {
-  readonly makeState: <P extends Params = Params>(
+  readonly makeState: <
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
     name: string,
     params?: P,
+    search?: S,
     path?: string,
     meta?: Record<string, Record<string, "url" | "query">>,
-  ) => State<P>;
+  ) => State<P, S>;
 
   readonly forwardState: <P extends Params = Params>(
     routeName: string,

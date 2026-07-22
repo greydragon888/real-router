@@ -34,9 +34,14 @@ export function getPluginApi<
     makeState: (name, params, path, meta) => {
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
 
+      // The public PluginApi.makeState keeps its v1 (name, params, path, meta)
+      // shape during the M2 rollout; no search is threaded here (RFC-4 M2 /
+      // #1548 — the public search-aware form lands with the facade slot-shift),
+      // so makeState reuses the frozen EMPTY_SEARCH.
       return ctx.makeState(
         name,
         params,
+        undefined,
         path,
         meta?.params as
           Record<string, Record<string, "url" | "query">> | undefined,
@@ -119,6 +124,9 @@ export function getPluginApi<
       return ctx.makeState(
         routeInfo.name,
         routeInfo.params,
+        // buildState builds from resolved params (no URL match); query is still
+        // in `params` during the back-compat window, so no search here.
+        undefined,
         ctx.buildPath(routeInfo.name, routeInfo.params),
         routeInfo.meta,
       );

@@ -29,6 +29,7 @@ import type {
   Options,
   Params,
   RouterLogger,
+  SearchParams,
   State,
   Route,
 } from "../../types";
@@ -277,7 +278,7 @@ export class RoutesNamespace<
     }
 
     const routeState = createRouteState(matchResult);
-    const { name, params, meta } = routeState;
+    const { name, params, search, meta } = routeState;
 
     const decodedParams =
       typeof this.#store.config.decoders[name] === "function"
@@ -321,7 +322,19 @@ export class RoutesNamespace<
       }
     }
 
-    return this.#deps.makeState<P>(routeName, routeParams, builtPath, meta);
+    // A3.1: `search` is the query channel from the matcher (RFC-4 M2 / #1548).
+    // Query is ALSO still folded into `params` during the back-compat window;
+    // the params-cleanup lands in A3.2.
+    // `search as SearchParams`: the matcher yields query values as loose
+    // `unknown` (engine boundary), narrowed here to the core query type — the
+    // same boundary cast `params as P` makes for the path bag.
+    return this.#deps.makeState<P>(
+      routeName,
+      routeParams,
+      search as SearchParams | undefined,
+      builtPath,
+      meta,
+    );
   }
 
   /**
