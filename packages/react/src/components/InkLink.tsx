@@ -52,6 +52,7 @@ function areInkLinkPropsEqual(
     prev.onSelect === next.onSelect &&
     prev.children === next.children &&
     shallowEqual(prev.routeParams, next.routeParams) &&
+    shallowEqual(prev.routeSearch, next.routeSearch) &&
     shallowEqual(prev.routeOptions, next.routeOptions)
   );
 }
@@ -59,6 +60,7 @@ function areInkLinkPropsEqual(
 const InkLinkImpl: FC<InkLinkProps> = ({
   routeName,
   routeParams,
+  routeSearch,
   routeOptions = EMPTY_OPTIONS,
   activeStrict = false,
   ignoreQueryParams = true,
@@ -87,6 +89,7 @@ const InkLinkImpl: FC<InkLinkProps> = ({
   const isRouteActive = useIsActiveRoute(
     routeName,
     routeParams,
+    routeSearch,
     activeStrict,
     ignoreQueryParams,
   );
@@ -113,10 +116,10 @@ const InkLinkImpl: FC<InkLinkProps> = ({
             error,
           );
         }
-        // Slot-shift (RFC-4 M2 / #1548): query channel at position 3 (unused),
+        // Query channel at position 3 (RFC-4 M2 / #1548) — from `routeSearch`;
         // options at position 4.
         router
-          .navigate(routeName, paramsForNav, undefined, routeOptions)
+          .navigate(routeName, paramsForNav, routeSearch, routeOptions)
           .catch(() => {});
       }
     },

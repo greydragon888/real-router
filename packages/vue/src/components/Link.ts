@@ -11,7 +11,11 @@ import {
   shallowEqual,
 } from "../dom-utils";
 
-import type { Params, NavigationOptions } from "@real-router/core";
+import type {
+  Params,
+  NavigationOptions,
+  SearchParams,
+} from "@real-router/core";
 import type { PropType } from "vue";
 
 type OnClickHandler = (evt: MouseEvent) => void;
@@ -95,6 +99,11 @@ export const Link = defineComponent({
       type: Object as PropType<Params>,
       default: undefined,
     },
+    // Query (search) channel (RFC-4 M2, #1548) — parallel to routeParams.
+    routeSearch: {
+      type: Object as PropType<SearchParams>,
+      default: undefined,
+    },
     routeOptions: {
       type: Object as PropType<NavigationOptions>,
       default: () => EMPTY_OPTIONS,
@@ -174,12 +183,20 @@ export const Link = defineComponent({
         [
           props.routeName,
           stableParams.value,
+          props.routeSearch,
           props.activeStrict,
           props.ignoreQueryParams,
           props.hash,
         ] as const,
       (
-        [routeName, routeParams, activeStrict, ignoreQueryParams, hash],
+        [
+          routeName,
+          routeParams,
+          routeSearch,
+          activeStrict,
+          ignoreQueryParams,
+          hash,
+        ],
         _prev,
         onCleanup,
       ) => {
@@ -189,9 +206,7 @@ export const Link = defineComponent({
           router,
           routeName,
           routeParams,
-          // Query channel (RFC-4 M2, #1548) — the `routeSearch` prop wires a
-          // real value through in a follow-up.
-          undefined,
+          routeSearch,
           activeStrict,
           ignoreQueryParams,
           hash,
@@ -213,6 +228,7 @@ export const Link = defineComponent({
         router,
         props.routeName,
         stableParams.value ?? EMPTY_PARAMS,
+        props.routeSearch,
         props.hash,
       ),
     );
@@ -243,6 +259,7 @@ export const Link = defineComponent({
         router,
         props.routeName,
         props.routeParams ?? EMPTY_PARAMS,
+        props.routeSearch,
         props.hash,
         props.routeOptions,
       ).catch(() => {});

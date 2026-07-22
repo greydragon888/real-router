@@ -9,12 +9,17 @@
     navigateWithHash,
   } from "../dom-utils";
 
-  import type { NavigationOptions, Params } from "@real-router/core";
+  import type {
+    NavigationOptions,
+    Params,
+    SearchParams,
+  } from "@real-router/core";
   import type { Snippet } from "svelte";
 
   let {
     routeName,
     routeParams,
+    routeSearch,
     routeOptions = EMPTY_OPTIONS,
     class: className = undefined,
     activeClassName = "active",
@@ -28,6 +33,7 @@
   }: {
     routeName: string;
     routeParams?: Params;
+    routeSearch?: SearchParams;
     routeOptions?: NavigationOptions;
     class?: string;
     activeClassName?: string;
@@ -61,17 +67,20 @@
   const activeState = useIsActiveRoute(
     routeName,
     routeParams,
+    routeSearch,
     activeStrict,
     ignoreQueryParams,
     hash,
   );
 
   // Navigation/href building need a concrete params object — default here only.
+  // `routeSearch` stays raw (`undefined` when unset).
   const href = $derived(
     buildHref(
       router,
       routeName,
       routeParams ?? EMPTY_PARAMS,
+      routeSearch,
       hash,
     ),
   );
@@ -110,6 +119,7 @@
       router,
       routeName,
       routeParams ?? EMPTY_PARAMS,
+      routeSearch,
       hash,
       routeOptions,
     ).catch(NOOP);

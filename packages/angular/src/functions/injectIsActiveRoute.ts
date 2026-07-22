@@ -5,11 +5,12 @@ import { sourceToSignal } from "../sourceToSignal";
 import { injectRouter } from "./injectRouter";
 
 import type { Signal } from "@angular/core";
-import type { Params } from "@real-router/core";
+import type { Params, SearchParams } from "@real-router/core";
 
 export function injectIsActiveRoute(
   routeName: string,
   params?: Params,
+  search?: SearchParams,
   options?: { strict?: boolean; ignoreQueryParams?: boolean; hash?: string },
 ): Signal<boolean> {
   assertInInjectionContext(injectIsActiveRoute);
@@ -24,9 +25,7 @@ export function injectIsActiveRoute(
     router,
     routeName,
     params,
-    // Query channel (RFC-4 M2, #1548) — no `routeSearch` on this function yet;
-    // `[realLink routeSearch]` wires a real value through in a follow-up.
-    undefined,
+    search,
     options?.strict ?? false,
     options?.ignoreQueryParams ?? true,
     options?.hash,

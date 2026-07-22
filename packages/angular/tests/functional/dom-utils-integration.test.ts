@@ -29,7 +29,9 @@ describe("dom-utils integration (copy from shared/)", () => {
       buildPath: () => "/users",
     } as unknown as Parameters<typeof buildHref>[0];
 
-    expect(buildHref(urlRouter, "users", {}, "#sec")).toBe("/users?x=1#sec");
+    expect(buildHref(urlRouter, "users", {}, undefined, "#sec")).toBe(
+      "/users?x=1#sec",
+    );
     expect(buildUrl).toHaveBeenCalledWith("users", {}, undefined, {
       hash: "sec",
     });
@@ -106,10 +108,14 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     await router.start("/");
 
-    expect(buildHref(router, "users", {}, "anchor")).toBe("/users#anchor");
-    expect(buildHref(router, "users", {}, "")).toBe("/users");
-    expect(buildHref(router, "users", {}, "#anchor")).toBe("/users#anchor");
-    expect(buildHref(router, "users", {}, "a b&c#d")).toBe(
+    expect(buildHref(router, "users", {}, undefined, "anchor")).toBe(
+      "/users#anchor",
+    );
+    expect(buildHref(router, "users", {}, undefined, "")).toBe("/users");
+    expect(buildHref(router, "users", {}, undefined, "#anchor")).toBe(
+      "/users#anchor",
+    );
+    expect(buildHref(router, "users", {}, undefined, "a b&c#d")).toBe(
       "/users#a%20b&c%23d",
     );
 
@@ -151,7 +157,7 @@ describe("dom-utils integration (copy from shared/)", () => {
       context: { url: { hash: "old", hashChanged: false } },
     });
 
-    await navigateWithHash(router, "home", {}, "new");
+    await navigateWithHash(router, "home", {}, undefined, "new");
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[0]).toBe("home");
@@ -199,7 +205,7 @@ describe("dom-utils integration (copy from shared/)", () => {
       context: { url: { hash: "x", hashChanged: false } },
     });
 
-    await navigateWithHash(router, "home", {}, "x");
+    await navigateWithHash(router, "home", {}, undefined, "x");
 
     expect(calls[0]?.[3]).not.toMatchObject({ force: true });
 
@@ -238,7 +244,7 @@ describe("dom-utils integration (copy from shared/)", () => {
       return Promise.resolve(router.getState()!);
     };
 
-    await navigateWithHash(router, "users", {}, "anchor");
+    await navigateWithHash(router, "users", {}, undefined, "anchor");
 
     expect(calls[0]?.[3]).toMatchObject({ hash: "anchor" });
     expect(calls[0]?.[3]).not.toMatchObject({ force: true });
@@ -275,7 +281,7 @@ describe("dom-utils integration (copy from shared/)", () => {
       return Promise.resolve(router.getState()!);
     };
 
-    await navigateWithHash(router, "home", {}, undefined);
+    await navigateWithHash(router, "home", {}, undefined, undefined);
 
     // hash undefined → opts.hash not set
     expect(calls[0]?.[3]).not.toHaveProperty("hash");

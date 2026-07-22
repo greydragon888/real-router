@@ -32,6 +32,7 @@ export function Link<P extends Params = Params>(
   const [local, rest] = splitProps(merged, [
     "routeName",
     "routeParams",
+    "routeSearch",
     "routeOptions",
     "activeClassName",
     "activeStrict",
@@ -66,7 +67,10 @@ export function Link<P extends Params = Params>(
     local.hash === undefined &&
     !local.activeStrict &&
     local.ignoreQueryParams &&
-    props.routeParams === undefined;
+    props.routeParams === undefined &&
+    // A `routeSearch` link forces the slow path (RFC-4 M2, #1548) — the
+    // name-only routeSelector is query-blind, exactly like the `hash` gate above.
+    props.routeSearch === undefined;
 
   const buildActiveOptions = () => {
     const base = {
@@ -97,15 +101,21 @@ export function Link<P extends Params = Params>(
           // `props.routeParams` is `undefined` here, so both share one source.
           // `local.routeParams` (concrete EMPTY_PARAMS) stays for nav/href below.
           props.routeParams,
-          // Query channel (RFC-4 M2, #1548) — the `routeSearch` prop wires a
-          // real value through in a follow-up.
-          undefined,
+          // Query channel (RFC-4 M2, #1548) — raw `props.routeSearch`
+          // (`undefined` when unset), same canonical-key reasoning as routeParams.
+          props.routeSearch,
           buildActiveOptions(),
         ),
       );
 
   const href = createMemo(() =>
-    buildHref(router, local.routeName, local.routeParams, local.hash),
+    buildHref(
+      router,
+      local.routeName,
+      local.routeParams,
+      local.routeSearch,
+      local.hash,
+    ),
   );
 
   const handleClick = (evt: MouseEvent) => {
@@ -138,6 +148,7 @@ export function Link<P extends Params = Params>(
       router,
       local.routeName,
       local.routeParams,
+      local.routeSearch,
       local.hash,
       local.routeOptions,
     ).catch(() => {});

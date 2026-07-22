@@ -77,7 +77,7 @@ describe("concurrent force-navs stress", () => {
       const targetHash = tabHashes[i % tabHashes.length];
 
       try {
-        await navigateWithHash(router, "route0", {}, targetHash);
+        await navigateWithHash(router, "route0", {}, undefined, targetHash);
         completedCount += 1;
       } catch {
         rejectedCount += 1;

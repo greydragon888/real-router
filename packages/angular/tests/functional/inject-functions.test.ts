@@ -250,7 +250,7 @@ describe("inject functions", () => {
       const injector = TestBed.inject(Injector);
 
       runInInjectionContext(injector, () => {
-        const isActive = injectIsActiveRoute("home", undefined, {
+        const isActive = injectIsActiveRoute("home", undefined, undefined, {
           strict: true,
         });
 

@@ -119,9 +119,11 @@ describe("buildHref", () => {
     const result = buildHref(router, "users.profile", { id: "123" });
 
     expect(result).toBe("/path/123");
-    expect(router.buildPath).toHaveBeenCalledWith("users.profile", {
-      id: "123",
-    });
+    expect(router.buildPath).toHaveBeenCalledWith(
+      "users.profile",
+      { id: "123" },
+      undefined,
+    );
   });
 
   it("3 — passes empty params to buildUrl", () => {
@@ -147,7 +149,7 @@ describe("buildHref", () => {
 
     buildHref(router, "home", {});
 
-    expect(router.buildPath).toHaveBeenCalledWith("home", {});
+    expect(router.buildPath).toHaveBeenCalledWith("home", {}, undefined);
   });
 
   it("5 — returns undefined and logs error when buildPath throws for unknown route", () => {
@@ -289,7 +291,7 @@ describe("buildHref", () => {
       buildPath: vi.fn().mockReturnValue(""),
     } as unknown as Router;
 
-    const result = buildHref(router, "weird-route", {}, "tab");
+    const result = buildHref(router, "weird-route", {}, undefined, "tab");
 
     expect(result).toBeUndefined();
     expect(consoleError).toHaveBeenCalledWith(
@@ -512,7 +514,7 @@ describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
     // (`%` → `%25`). Before #1211 the probe-roundtrip decoded it to ✓ and
     // re-encoded to "%E2%9C%93" (the copy-from-location.hash tolerance, E.1,
     // now removed so the adapter matches the strict plugin layer).
-    const href = buildHref(routerWith("/p"), "r", {}, "%E2%9C%93");
+    const href = buildHref(routerWith("/p"), "r", {}, undefined, "%E2%9C%93");
 
     expect(href).toBe("/p#%25E2%259C%2593");
   });
@@ -521,7 +523,7 @@ describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
     // "%C3%28" is a literal fragment; the strict encoder has no probe/catch —
     // it always plain-encodes, so each `%` → `%25`. (Coincides with the old
     // decode-throws → catch → plain-encode fallthrough, but is now the ONLY path.)
-    const href = buildHref(routerWith("/p"), "r", {}, "%C3%28");
+    const href = buildHref(routerWith("/p"), "r", {}, undefined, "%C3%28");
 
     expect(href).toBe("/p#%25C3%2528");
   });
@@ -544,20 +546,20 @@ describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
       "x=1&y=2",
       "100%",
     ]) {
-      const href = buildHref(routerWith("/p"), "r", {}, input);
+      const href = buildHref(routerWith("/p"), "r", {}, undefined, input);
 
       expect(href).toBe(`/p#${canonical(input)}`);
     }
   });
 
   it("encodes a plain (non-percent) hash directly", () => {
-    const href = buildHref(routerWith("/p"), "r", {}, "a b");
+    const href = buildHref(routerWith("/p"), "r", {}, undefined, "a b");
 
     expect(href).toBe("/p#a%20b");
   });
 
   it("strips a single leading '#' before encoding", () => {
-    const href = buildHref(routerWith("/p"), "r", {}, "#frag");
+    const href = buildHref(routerWith("/p"), "r", {}, undefined, "#frag");
 
     expect(href).toBe("/p#frag");
   });
@@ -577,7 +579,7 @@ describe("navigateWithHash", () => {
       context: { url: { hash: "old" } },
     } as unknown as State);
 
-    await navigateWithHash(router, "r", { id: "1" }, "new");
+    await navigateWithHash(router, "r", { id: "1" }, undefined, "new");
 
     expect(router.navigate).toHaveBeenCalledWith("r", { id: "1" }, undefined, {
       hash: "new",
@@ -593,7 +595,7 @@ describe("navigateWithHash", () => {
       context: { url: { hash: "same" } },
     } as unknown as State);
 
-    await navigateWithHash(router, "r", { id: "1" }, "same");
+    await navigateWithHash(router, "r", { id: "1" }, undefined, "same");
 
     expect(router.navigate).toHaveBeenCalledWith("r", { id: "1" }, undefined, {
       hash: "same",
@@ -607,7 +609,7 @@ describe("navigateWithHash", () => {
       context: { url: { hash: "x" } },
     } as unknown as State);
 
-    await navigateWithHash(router, "r", {}, "h");
+    await navigateWithHash(router, "r", {}, undefined, "h");
 
     expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {
       hash: "h",
@@ -617,7 +619,7 @@ describe("navigateWithHash", () => {
   it("omits the hash option entirely when hash is undefined", async () => {
     const router = makeRouter(undefined);
 
-    await navigateWithHash(router, "r", {}, undefined);
+    await navigateWithHash(router, "r", {}, undefined, undefined);
 
     expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {});
   });
@@ -630,7 +632,7 @@ describe("navigateWithHash", () => {
       context: {},
     } as unknown as State);
 
-    await navigateWithHash(router, "r", {}, "frag");
+    await navigateWithHash(router, "r", {}, undefined, "frag");
 
     expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {
       hash: "frag",
@@ -647,7 +649,7 @@ describe("navigateWithHash", () => {
       context: { url: { hash: "keep" } },
     } as unknown as State);
 
-    await navigateWithHash(router, "r", {}, undefined);
+    await navigateWithHash(router, "r", {}, undefined, undefined);
 
     expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {});
   });

@@ -476,6 +476,68 @@ describe("Link - Integration Tests", () => {
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#anchor");
     });
 
+    it("should pass routeSearch to buildUrl at the query slot (#1548)", () => {
+      const buildUrlSpy = vi.fn(
+        (
+          _name: string,
+          _params?: object,
+          search?: Record<string, string>,
+          _opts?: { hash?: string },
+        ): string =>
+          search ? `/url?${new URLSearchParams(search).toString()}` : "/url",
+      );
+
+      router.buildUrl = buildUrlSpy;
+
+      render(
+        <Link
+          routeName="one-more-test"
+          routeSearch={{ tab: "posts" }}
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      // The query channel rides at position 3 (RFC-4 M2), hash options at 4.
+      expect(buildUrlSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        { tab: "posts" },
+        undefined,
+      );
+      expect(screen.getByTestId("link")).toHaveAttribute(
+        "href",
+        "/url?tab=posts",
+      );
+    });
+
+    it("should navigate with routeSearch at the query slot on click (#1548)", () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        <Link
+          routeName="one-more-test"
+          routeSearch={{ tab: "posts" }}
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"));
+
+      // navigate(name, params, search, opts) — search at position 3.
+      expect(navigateSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        { tab: "posts" },
+        expect.anything(),
+      );
+    });
+
     it("should re-render href when the hash prop changes (#532)", () => {
       const buildUrlSpy = vi.fn(
         (

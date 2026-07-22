@@ -151,9 +151,13 @@ describe("R — <Link hash> + navigateWithHash stress (§7.2 #13, §7.3)", () =>
     try {
       for (let i = 1; i <= 50; i++) {
         await act(async () => {
-          await navigateWithHash(router, "route0", {}, `section-${i}`).catch(
-            () => {},
-          );
+          await navigateWithHash(
+            router,
+            "route0",
+            {},
+            undefined,
+            `section-${i}`,
+          ).catch(() => {});
         });
         // Advance the mock current hash so the NEXT iteration sees the
         // previous one as `currentHash` for the diff check.
@@ -189,9 +193,13 @@ describe("R — <Link hash> + navigateWithHash stress (§7.2 #13, §7.3)", () =>
     try {
       for (let i = 0; i < 20; i++) {
         await act(async () => {
-          await navigateWithHash(router, "route0", {}, "anchor").catch(
-            () => {},
-          );
+          await navigateWithHash(
+            router,
+            "route0",
+            {},
+            undefined,
+            "anchor",
+          ).catch(() => {});
         });
       }
 

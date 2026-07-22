@@ -234,15 +234,15 @@ dist/
 
 ## Hooks
 
-| Hook                               | Purpose                                                                                                                                                                | Re-renders                     |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `useRouter()`                      | Get router instance                                                                                                                                                    | Never                          |
-| `useNavigator()`                   | Get Navigator (stable ref) — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more                                                                    | Never                          |
-| `useRoute()`                       | Get route state                                                                                                                                                        | Every navigation               |
-| `useRouteNode(name)`               | Subscribe to specific node                                                                                                                                             | Only when node active/inactive |
-| `useRouteUtils()`                  | Get RouteUtils instance                                                                                                                                                | Never                          |
-| `useRouterTransition()`            | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`                                                                                | On transition start/end        |
-| `useRouteExit(handler, options?)`  | Wrap `router.subscribeLeave` with reentrant abort pre-check, same-route skip, latest-handler ref. Handler can return `Promise` — router blocks on it. Returns `void`.  | Never                          |
+| Hook                               | Purpose                                                                                                                                                                                                                                                                                                                                   | Re-renders                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `useRouter()`                      | Get router instance                                                                                                                                                                                                                                                                                                                       | Never                          |
+| `useNavigator()`                   | Get Navigator (stable ref) — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more                                                                                                                                                                                                                                       | Never                          |
+| `useRoute()`                       | Get route state                                                                                                                                                                                                                                                                                                                           | Every navigation               |
+| `useRouteNode(name)`               | Subscribe to specific node                                                                                                                                                                                                                                                                                                                | Only when node active/inactive |
+| `useRouteUtils()`                  | Get RouteUtils instance                                                                                                                                                                                                                                                                                                                   | Never                          |
+| `useRouterTransition()`            | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`                                                                                                                                                                                                                                                   | On transition start/end        |
+| `useRouteExit(handler, options?)`  | Wrap `router.subscribeLeave` with reentrant abort pre-check, same-route skip, latest-handler ref. Handler can return `Promise` — router blocks on it. Returns `void`.                                                                                                                                                                     | Never                          |
 | `useRouteEnter(handler, options?)` | Fire `handler` once on nav-driven mount with `{ route, previousRoute }`. Skip-initial / skip-same-route / StrictMode-immune — guards delegated to the shared `createRouteEnterGate` (`@real-router/sources`, #1435); the gate is held via `useState`'s lazy initializer so its dedupe survives StrictMode effect re-runs. Returns `void`. | Never                          |
 
 > **`/legacy` entry exports 6 hooks** (omits `useRouteExit` and `useRouteEnter`) — those depend on React 19 concurrent-mode scheduling. Use `router.subscribeLeave()` / `useEffect` directly on React 18.
@@ -391,7 +391,7 @@ useRouteEnter(({ route, previousRoute }) => {
 
 `useRouteExit`'s handler can return a `Promise` — the router awaits it before committing the new state. Returning a long-running animation Promise gives router-coordinated exit timing. `useRouteEnter` is fire-and-forget (`void`) and fires after the new component mounts. Both default to `skipSameRoute: true` so query-only navigations (sort/filter) don't trigger.
 
-**No synchronous `navigate()` from a `useRouteExit` handler.** The handler runs inside the transition's leave-dispatch window, so a synchronous `router.navigate(...)` (or `navigateToDefault` / `navigateToState` / `navigateToNotFound`) in the handler body throws `REENTRANT_NAVIGATION` — core bans reentrant navigation from a transition listener (RFC navigation-cancellation-unification §4). To redirect on exit, defer past the sync dispatch: `await` the exit work first, or `queueMicrotask(() => router.navigate(...))`; a navigate issued after the handler's first `await` runs once the transition settles and is allowed. Reach for a `canDeactivate` guard, not `useRouteExit`, when the goal is to *block* or gate the departure.
+**No synchronous `navigate()` from a `useRouteExit` handler.** The handler runs inside the transition's leave-dispatch window, so a synchronous `router.navigate(...)` (or `navigateToDefault` / `navigateToState` / `navigateToNotFound`) in the handler body throws `REENTRANT_NAVIGATION` — core bans reentrant navigation from a transition listener (RFC navigation-cancellation-unification §4). To redirect on exit, defer past the sync dispatch: `await` the exit work first, or `queueMicrotask(() => router.navigate(...))`; a navigate issued after the handler's first `await` runs once the transition settles and is allowed. Reach for a `canDeactivate` guard, not `useRouteExit`, when the goal is to _block_ or gate the departure.
 
 ### useRoute throws when route is undefined
 
@@ -473,7 +473,7 @@ const params = useMemo(() => ({ filters: [1, 2] }), [...]);
 
 The comparator covers all explicit `LinkProps` (`routeName`, `className`, `activeClassName`,
 `activeStrict`, `ignoreQueryParams`, `hash`, `onClick`, `target`, `style`, `children`) plus
-`routeParams`/`routeOptions` via `shallowEqual`. Anchor-spread props (`data-*`, `aria-*`, `id`,
+`routeParams`/`routeSearch`/`routeOptions` via `shallowEqual`. Anchor-spread props (`data-*`, `aria-*`, `id`,
 etc.) are NOT compared — they don't affect Link's hooks.
 
 ### `<Link hash>` Prop (#532)
@@ -505,6 +505,21 @@ Active state is hash-aware: when `hash` is set, the Link is active iff route mat
 // For pagination links:
 <Link routeName="users" ignoreQueryParams={false} />
 ```
+
+### `routeSearch` Prop (#1548)
+
+`routeSearch?: SearchParams` — the query (search) channel of the path/query split
+(RFC-4 M2), parallel to `routeParams`. Feeds the URL query string on click and in
+`href` (passed to `buildUrl` / `buildPath` at position 3), and — paired with
+`ignoreQueryParams={false}` — the active-state check.
+
+```tsx
+// Pagination link with an explicit query channel; active only on ?page=2
+<Link routeName="users" routeSearch={{ page: "2" }} ignoreQueryParams={false} />
+```
+
+A route's query still works when passed inside `routeParams` (the pre-split path);
+`routeSearch` is the explicit, type-clean channel. `InkLink` accepts the same prop.
 
 ### fallback and keepAlive Together
 

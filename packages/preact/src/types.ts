@@ -2,6 +2,7 @@ import type {
   NavigationOptions,
   Params,
   Navigator,
+  SearchParams,
   State,
 } from "@real-router/core";
 import type { HTMLAttributes } from "preact";
@@ -21,6 +22,13 @@ export interface LinkProps<P extends Params = Params> extends Omit<
 > {
   routeName: string;
   routeParams?: P;
+  /**
+   * Query (search) params for the link's target (RFC-4 M2, #1548) — parallel to
+   * `routeParams`, the path/query split's view-layer channel. Feeds the URL's
+   * query on click and `href`, and (with `ignoreQueryParams={false}`) the
+   * active-state check.
+   */
+  routeSearch?: SearchParams;
   routeOptions?: NavigationOptions;
   className?: string;
   activeClassName?: string;

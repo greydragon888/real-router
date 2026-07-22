@@ -86,7 +86,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash,
         });
 
-        void navigateWithHash(router, routeName, {}, hash);
+        void navigateWithHash(router, routeName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
 
@@ -115,7 +115,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, routeName, {}, newHash);
+        void navigateWithHash(router, routeName, {}, undefined, newHash);
 
         expect(calls).toHaveLength(1);
 
@@ -144,7 +144,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, targetName, {}, newHash);
+        void navigateWithHash(router, targetName, {}, undefined, newHash);
 
         expect(calls).toHaveLength(1);
 
@@ -169,7 +169,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: "",
         });
 
-        void navigateWithHash(router, targetName, {}, undefined);
+        void navigateWithHash(router, targetName, {}, undefined, undefined);
 
         expect(calls).toHaveLength(1);
         expect(calls[0].opts.hash).toBeUndefined();
@@ -187,7 +187,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: "",
         });
 
-        void navigateWithHash(router, targetName, {}, hash);
+        void navigateWithHash(router, targetName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
         expect(calls[0].opts.hash).toBe(hash);
@@ -201,7 +201,7 @@ describe("navigateWithHash — Property Tests", () => {
       (routeName, hash) => {
         const { router, calls } = makeRouter(undefined);
 
-        void navigateWithHash(router, routeName, {}, hash);
+        void navigateWithHash(router, routeName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
 
@@ -229,7 +229,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, routeName, {}, undefined);
+        void navigateWithHash(router, routeName, {}, undefined, undefined);
 
         expect(calls).toHaveLength(1);
 
@@ -262,7 +262,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, routeName, {}, newHash);
+        void navigateWithHash(router, routeName, {}, undefined, newHash);
 
         expect(calls).toHaveLength(1);
 
@@ -287,7 +287,9 @@ describe("navigateWithHash — Property Tests", () => {
       (routeName, hash, replace) => {
         const { router, calls } = makeRouter(undefined);
 
-        void navigateWithHash(router, routeName, {}, hash, { replace });
+        void navigateWithHash(router, routeName, {}, undefined, hash, {
+          replace,
+        });
 
         expect(calls).toHaveLength(1);
 
@@ -330,7 +332,13 @@ describe("navigateWithHash — Property Tests", () => {
 
         // Same route name, different params.id — shallowEqual returns false,
         // branch skipped.
-        void navigateWithHash(router, routeName, { id: paramValue }, newHash);
+        void navigateWithHash(
+          router,
+          routeName,
+          { id: paramValue },
+          undefined,
+          newHash,
+        );
 
         fc.pre(paramValue !== "current"); // ensure non-equal
 
@@ -376,7 +384,7 @@ describe("navigateWithHash — Property Tests", () => {
           },
         } as unknown as Router;
 
-        void navigateWithHash(router, routeName, {}, newHash);
+        void navigateWithHash(router, routeName, {}, undefined, newHash);
 
         expect(calls).toHaveLength(1);
 
@@ -411,7 +419,7 @@ describe("navigateWithHash — Property Tests", () => {
         },
       } as unknown as Router;
 
-      void navigateWithHash(router, "home", {}, undefined);
+      void navigateWithHash(router, "home", {}, undefined, undefined);
 
       expect(calls).toHaveLength(1);
 
@@ -445,7 +453,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, routeName, {}, newHash, {
+        void navigateWithHash(router, routeName, {}, undefined, newHash, {
           force: true,
         });
 
@@ -467,7 +475,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash,
         });
 
-        void navigateWithHash(router, routeName, {}, hash, {
+        void navigateWithHash(router, routeName, {}, undefined, hash, {
           force: true,
         });
 
@@ -495,7 +503,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, targetName, {}, newHash, {
+        void navigateWithHash(router, targetName, {}, undefined, newHash, {
           force: true,
         });
 
@@ -523,7 +531,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: "",
         });
 
-        void navigateWithHash(router, routeName, {}, undefined);
+        void navigateWithHash(router, routeName, {}, undefined, undefined);
 
         expect(calls).toHaveLength(1);
 
@@ -545,7 +553,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: "",
         });
 
-        void navigateWithHash(router, routeName, {}, "");
+        void navigateWithHash(router, routeName, {}, undefined, "");
 
         expect(calls).toHaveLength(1);
 

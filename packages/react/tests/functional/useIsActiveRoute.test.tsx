@@ -83,17 +83,23 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should handle non-strict mode", () => {
-    const { result } = renderHook(() => useIsActiveRoute("users", {}, false), {
-      wrapper: (props) => wrapper({ ...props, router }),
-    });
+    const { result } = renderHook(
+      () => useIsActiveRoute("users", {}, undefined, false),
+      {
+        wrapper: (props) => wrapper({ ...props, router }),
+      },
+    );
 
     expect(result.current).toBe(true); // "users.view" is child of "users"
   });
 
   it("should handle strict mode", () => {
-    const { result } = renderHook(() => useIsActiveRoute("users", {}, true), {
-      wrapper: (props) => wrapper({ ...props, router }),
-    });
+    const { result } = renderHook(
+      () => useIsActiveRoute("users", {}, undefined, true),
+      {
+        wrapper: (props) => wrapper({ ...props, router }),
+      },
+    );
 
     expect(result.current).toBe(false); // Exact match required
   });
@@ -124,7 +130,7 @@ describe("useIsActiveRoute", () => {
     it("should update when activeStrict changes and router navigates", async () => {
       const { result, rerender } = renderHook(
         ({ strict }: { strict: boolean }) =>
-          useIsActiveRoute("users", {}, strict),
+          useIsActiveRoute("users", {}, undefined, strict),
         {
           wrapper: (props) => wrapper({ ...props, router }),
           initialProps: { strict: false },
@@ -476,7 +482,7 @@ describe("useIsActiveRoute", () => {
 
       // Non-strict: settings is parent of settings.profile.edit
       const { result: nonStrict } = renderHook(
-        () => useIsActiveRoute("settings", {}, false),
+        () => useIsActiveRoute("settings", {}, undefined, false),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -484,7 +490,7 @@ describe("useIsActiveRoute", () => {
 
       // Strict: exact match required
       const { result: strict } = renderHook(
-        () => useIsActiveRoute("settings", {}, true),
+        () => useIsActiveRoute("settings", {}, undefined, true),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -492,7 +498,7 @@ describe("useIsActiveRoute", () => {
 
       // Check intermediate level
       const { result: intermediate } = renderHook(
-        () => useIsActiveRoute("settings.profile", {}, false),
+        () => useIsActiveRoute("settings.profile", {}, undefined, false),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 

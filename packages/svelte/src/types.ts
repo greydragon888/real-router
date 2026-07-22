@@ -2,6 +2,7 @@ import type {
   NavigationOptions,
   Navigator,
   Params,
+  SearchParams,
   State,
 } from "@real-router/core";
 import type { Snippet } from "svelte";
@@ -26,6 +27,11 @@ export interface LinkProps<P extends Params = Params> {
   readonly [key: string]: unknown;
   readonly routeName: string;
   readonly routeParams?: P;
+  /**
+   * Query (search) params for the link's target (RFC-4 M2, #1548) — parallel to
+   * `routeParams`, the path/query split's view-layer channel.
+   */
+  readonly routeSearch?: SearchParams;
   readonly routeOptions?: NavigationOptions;
   readonly class?: string;
   readonly activeClassName?: string;

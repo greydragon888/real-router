@@ -30,6 +30,7 @@ function areLinkPropsEqual(
     prev.children === next.children &&
     prev.hash === next.hash &&
     shallowEqual(prev.routeParams, next.routeParams) &&
+    shallowEqual(prev.routeSearch, next.routeSearch) &&
     shallowEqual(prev.routeOptions, next.routeOptions)
   );
 }
@@ -37,6 +38,7 @@ function areLinkPropsEqual(
 const LinkImpl: FC<LinkProps> = ({
   routeName,
   routeParams,
+  routeSearch,
   routeOptions = EMPTY_OPTIONS,
   className,
   activeClassName = "active",
@@ -70,15 +72,18 @@ const LinkImpl: FC<LinkProps> = ({
   const isActive = useIsActiveRoute(
     routeName,
     routeParams,
+    routeSearch,
     activeStrict,
     ignoreQueryParams,
     hash,
   );
 
   // Navigation/href building need a concrete params object — default here only.
+  // `routeSearch` stays raw (`undefined` when unset): buildHref / navigateWithHash
+  // pass it straight to the query slot, which tolerates `undefined`.
   const paramsForNav = routeParams ?? EMPTY_PARAMS;
 
-  const href = buildHref(router, routeName, paramsForNav, hash);
+  const href = buildHref(router, routeName, paramsForNav, routeSearch, hash);
 
   // useCallback was wasteful: 7 deps recreated the closure on every meaningful
   // render anyway, and `<a onClick>` does not benefit from a stable function
@@ -110,9 +115,14 @@ const LinkImpl: FC<LinkProps> = ({
     }
 
     evt.preventDefault();
-    navigateWithHash(router, routeName, paramsForNav, hash, routeOptions).catch(
-      () => {},
-    );
+    navigateWithHash(
+      router,
+      routeName,
+      paramsForNav,
+      routeSearch,
+      hash,
+      routeOptions,
+    ).catch(() => {});
   };
 
   // Memoize the joined class string. parseTokens + Set + join on every render

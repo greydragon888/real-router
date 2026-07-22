@@ -14,7 +14,11 @@ import { injectRouter } from "../functions/injectRouter";
 import { createStableParams } from "../internal/createStableParams";
 import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 
-import type { Params, NavigationOptions } from "@real-router/core";
+import type {
+  Params,
+  NavigationOptions,
+  SearchParams,
+} from "@real-router/core";
 
 const NOOP_CATCH = (): void => {};
 
@@ -38,6 +42,11 @@ export class RealLink {
   // manual `injectIsActiveRoute(name)`. Defaulting to {} keys "{}" and splits
   // the same logical question into a second eager subscription (#776).
   readonly routeParams = input<Params | undefined>(undefined);
+  /**
+   * Query (search) params for the link's target (RFC-4 M2, #1548) — parallel to
+   * `routeParams`, the path/query split's view-layer channel.
+   */
+  readonly routeSearch = input<SearchParams | undefined>(undefined);
   readonly routeOptions = input<NavigationOptions>({});
   readonly activeClassName = input<string>("active");
   readonly activeStrict = input(false);
@@ -70,6 +79,7 @@ export class RealLink {
       this.router,
       this.routeName(),
       this.stableParams() ?? EMPTY_PARAMS,
+      this.routeSearch(),
       this.hash(),
     ),
   );
@@ -93,9 +103,7 @@ export class RealLink {
         this.router,
         this.routeName(),
         this.stableParams(),
-        // Query channel (RFC-4 M2, #1548) — the `routeSearch` input wires a
-        // real value through in a follow-up.
-        undefined,
+        this.routeSearch(),
         this.activeStrict(),
         this.ignoreQueryParams(),
         this.hash(),
@@ -132,6 +140,7 @@ export class RealLink {
       this.router,
       this.routeName(),
       this.routeParams() ?? EMPTY_PARAMS,
+      this.routeSearch(),
       this.hash(),
       this.routeOptions(),
     ).catch(NOOP_CATCH);

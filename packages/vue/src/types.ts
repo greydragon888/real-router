@@ -2,6 +2,7 @@ import type {
   NavigationOptions,
   Params,
   Navigator,
+  SearchParams,
   State,
 } from "@real-router/core";
 import type { Ref } from "vue";
@@ -21,6 +22,11 @@ export interface RouteContext<P extends Params = Params> {
 export interface LinkProps<P extends Params = Params> {
   routeName: string;
   routeParams?: P;
+  /**
+   * Query (search) params for the link's target (RFC-4 M2, #1548) — parallel to
+   * `routeParams`, the path/query split's view-layer channel.
+   */
+  routeSearch?: SearchParams;
   routeOptions?: NavigationOptions;
   class?: string;
   activeClassName?: string;

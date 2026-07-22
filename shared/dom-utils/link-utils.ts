@@ -61,6 +61,7 @@ export function buildHref(
   router: Router,
   routeName: string,
   routeParams: Params,
+  routeSearch?: SearchParams,
   hash?: string,
 ): string | undefined {
   try {
@@ -76,9 +77,10 @@ export function buildHref(
       const url = buildUrl(
         routeName,
         routeParams,
-        // Slot-shift (RFC-4 M2 / #1548): query channel at position 3 (a link's
-        // query rides in routeParams for now), hash options at position 4.
-        undefined,
+        // Query channel at position 3 (RFC-4 M2 / #1548) — from the `routeSearch`
+        // prop; hash options at position 4. `undefined` when the link has no
+        // `routeSearch` (its query, if any, still rides in routeParams).
+        routeSearch,
         normHash === undefined ? undefined : { hash: normHash },
       );
 
@@ -94,7 +96,7 @@ export function buildHref(
       }
     }
 
-    const path = router.buildPath(routeName, routeParams);
+    const path = router.buildPath(routeName, routeParams, routeSearch);
 
     // Symmetric to the buildUrl guard above (#S1 audit, Invariant 12).
     // `router.buildPath` is typed `string`, but defends against:
@@ -150,6 +152,7 @@ export function navigateWithHash(
   router: Router,
   routeName: string,
   routeParams: Params,
+  routeSearch: SearchParams | undefined,
   hash: string | undefined,
   extraOptions?: NavigationOptions,
 ): Promise<State> {
@@ -163,7 +166,12 @@ export function navigateWithHash(
 
   if (
     current?.name === routeName &&
-    shallowEqual(current.params, routeParams)
+    shallowEqual(current.params, routeParams) &&
+    // Same-route hash bypass must also match the query channel (RFC-4 M2 /
+    // #1548): a `routeSearch`-less link ignores it (compare current.search to
+    // itself), so hash-only navigation on an unchanged query still bypasses
+    // SAME_STATES.
+    shallowEqual(current.search, routeSearch ?? current.search)
   ) {
     const currentHash =
       (current.context as { url?: { hash?: string } } | undefined)?.url?.hash ??
@@ -176,10 +184,9 @@ export function navigateWithHash(
     }
   }
 
-  // Slot-shift (RFC-4 M2 / #1548): opts moved to position 4; the query channel
-  // (position 3) stays undefined — a link's query lives in `routeParams` until
-  // the descriptor-aware Link `to` prop lands (a follow-up).
-  return router.navigate(routeName, routeParams, undefined, opts);
+  // Query channel at position 3 (RFC-4 M2 / #1548) — from the `routeSearch`
+  // prop; opts at position 4. `undefined` when the link has no `routeSearch`.
+  return router.navigate(routeName, routeParams, routeSearch, opts);
 }
 
 // Match-any-whitespace regex shared across calls. RegExp literals at

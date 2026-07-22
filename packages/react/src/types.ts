@@ -2,6 +2,7 @@ import type {
   NavigationOptions,
   Params,
   Navigator,
+  SearchParams,
   State,
 } from "@real-router/core";
 import type { HTMLAttributes, MouseEventHandler } from "react";
@@ -20,6 +21,14 @@ export interface LinkProps<
 > extends HTMLAttributes<HTMLAnchorElement> {
   routeName: string;
   routeParams?: P;
+  /**
+   * Query (search) params for the link's target (RFC-4 M2, #1548) — the path/
+   * query split's view-layer channel, parallel to `routeParams`. Feeds the URL's
+   * query string on click and `href`, and (with `ignoreQueryParams={false}`)
+   * the active-state check. A route's query still works when passed inside
+   * `routeParams`; `routeSearch` is the explicit, type-clean channel.
+   */
+  routeSearch?: SearchParams;
   routeOptions?: NavigationOptions;
   activeClassName?: string;
   activeStrict?: boolean;

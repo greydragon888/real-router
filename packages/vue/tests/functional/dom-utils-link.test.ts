@@ -451,7 +451,7 @@ describe("buildHref — hash fallback path (no URL plugin)", () => {
   it("appends an encoded hash to buildPath() result when buildUrl is undefined", () => {
     const router = makeFallbackRouter();
 
-    expect(buildHref(router, "settings", {}, "profile")).toBe(
+    expect(buildHref(router, "settings", {}, undefined, "profile")).toBe(
       "/settings#profile",
     );
 
@@ -462,7 +462,7 @@ describe("buildHref — hash fallback path (no URL plugin)", () => {
     const router = makeFallbackRouter();
 
     // Empty hash → `normHash` is falsy, so the conditional `?` drops the `#`.
-    expect(buildHref(router, "settings", {}, "")).toBe("/settings");
+    expect(buildHref(router, "settings", {}, undefined, "")).toBe("/settings");
 
     router.stop();
   });
@@ -477,7 +477,13 @@ describe("buildHref — hash fallback path (no URL plugin)", () => {
     //   - `户` (U+6237) → `%E6%88%B7`
     // encodeURI does NOT escape `#`; the helper does that defensively, but
     // the input has no `#` here — we add another case below for that branch.
-    const href = buildHref(router, "settings", {}, "section%and 用户");
+    const href = buildHref(
+      router,
+      "settings",
+      {},
+      undefined,
+      "section%and 用户",
+    );
 
     expect(href).toBe("/settings#section%25and%20%E7%94%A8%E6%88%B7");
 
@@ -490,7 +496,9 @@ describe("buildHref — hash fallback path (no URL plugin)", () => {
     // After the leading-# strip, what remains may still contain inner `#`
     // characters. encodeURI does not escape `#`, but encodeFragmentInline
     // does — pin the defensive replaceAll.
-    expect(buildHref(router, "settings", {}, "a#b")).toBe("/settings#a%23b");
+    expect(buildHref(router, "settings", {}, undefined, "a#b")).toBe(
+      "/settings#a%23b",
+    );
 
     router.stop();
   });
@@ -498,8 +506,8 @@ describe("buildHref — hash fallback path (no URL plugin)", () => {
   it("strips a leading `#` from the hash option (`'#section'` and `'section'` produce the same href)", () => {
     const router = makeFallbackRouter();
 
-    const withHash = buildHref(router, "settings", {}, "#section");
-    const withoutHash = buildHref(router, "settings", {}, "section");
+    const withHash = buildHref(router, "settings", {}, undefined, "#section");
+    const withoutHash = buildHref(router, "settings", {}, undefined, "section");
 
     expect(withHash).toBe("/settings#section");
     expect(withHash).toBe(withoutHash);

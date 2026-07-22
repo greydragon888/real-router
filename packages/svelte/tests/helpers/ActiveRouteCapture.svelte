@@ -17,7 +17,7 @@
     onCapture: (result: { readonly current: boolean }) => void;
   } = $props();
 
-  const activeState = useIsActiveRoute(routeName, routeParams, strict, ignoreQueryParams);
+  const activeState = useIsActiveRoute(routeName, routeParams, undefined, strict, ignoreQueryParams);
 
   onCapture(activeState);
 </script>

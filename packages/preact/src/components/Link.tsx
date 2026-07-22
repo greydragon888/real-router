@@ -48,6 +48,7 @@ function areLinkPropsEqual(
     prev.children === next.children &&
     prev.hash === next.hash &&
     shallowEqual(prev.routeParams, next.routeParams) &&
+    shallowEqual(prev.routeSearch, next.routeSearch) &&
     shallowEqual(prev.routeOptions, next.routeOptions)
   );
 }
@@ -56,6 +57,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
   ({
     routeName,
     routeParams,
+    routeSearch,
     routeOptions = EMPTY_OPTIONS,
     className,
     activeClassName = "active",
@@ -86,12 +88,14 @@ export const Link: FunctionComponent<LinkProps> = memo(
     const isActive = useIsActiveRoute(
       routeName,
       routeParams,
+      routeSearch,
       activeStrict,
       ignoreQueryParams,
       hash,
     );
 
     // Navigation/href building need a concrete params object — default here only.
+    // `routeSearch` stays raw (`undefined` when unset).
     const paramsForNav = routeParams ?? EMPTY_PARAMS;
 
     // `buildHref` is a cheap synchronous call (route-tree lookup + string
@@ -99,7 +103,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
     // render that does not bail out — and on bail-out the function body
     // doesn't execute, so the cache never pays off. Same logic for
     // `buildActiveClassName` and `handleClick` below.
-    const href = buildHref(router, routeName, paramsForNav, hash);
+    const href = buildHref(router, routeName, paramsForNav, routeSearch, hash);
 
     const handleClick = (evt: TargetedMouseEvent<HTMLAnchorElement>): void => {
       if (onClick) {
@@ -131,6 +135,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
         router,
         routeName,
         paramsForNav,
+        routeSearch,
         hash,
         routeOptions,
       ).catch(() => {});

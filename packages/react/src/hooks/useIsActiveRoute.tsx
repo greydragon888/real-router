@@ -3,11 +3,12 @@ import { useMemo, useSyncExternalStore } from "react";
 
 import { useRouter } from "./useRouter";
 
-import type { Params } from "@real-router/core";
+import type { Params, SearchParams } from "@real-router/core";
 
 export function useIsActiveRoute(
   routeName: string,
   params?: Params,
+  search?: SearchParams,
   strict = false,
   ignoreQueryParams = true,
   hash?: string,
@@ -27,14 +28,12 @@ export function useIsActiveRoute(
         router,
         routeName,
         params,
-        // Query channel (RFC-4 M2, #1548) — no `routeSearch` on this hook yet;
-        // `<Link routeSearch>` wires a real value through in a follow-up.
-        undefined,
+        search,
         strict,
         ignoreQueryParams,
         hash,
       ),
-    [router, routeName, params, strict, ignoreQueryParams, hash],
+    [router, routeName, params, search, strict, ignoreQueryParams, hash],
   );
 
   return useSyncExternalStore(
