@@ -189,6 +189,9 @@ export const Link = defineComponent({
           router,
           routeName,
           routeParams,
+          // Query channel (RFC-4 M2, #1548) — the `routeSearch` prop wires a
+          // real value through in a follow-up.
+          undefined,
           activeStrict,
           ignoreQueryParams,
           hash,

@@ -93,9 +93,15 @@ describe("createActiveRouteSources", () => {
   });
 
   it("strict=false: ancestor match (users active when on users.view)", async () => {
-    const source = createActiveRouteSource(router, "users", undefined, {
-      strict: false,
-    });
+    const source = createActiveRouteSource(
+      router,
+      "users",
+      undefined,
+      undefined,
+      {
+        strict: false,
+      },
+    );
 
     // Lazy source tracks navigations only while subscribed (#766).
     source.subscribe(() => {});
@@ -106,9 +112,15 @@ describe("createActiveRouteSources", () => {
   });
 
   it("strict=true: exact match only (users NOT active when on users.view)", async () => {
-    const source = createActiveRouteSource(router, "users", undefined, {
-      strict: true,
-    });
+    const source = createActiveRouteSource(
+      router,
+      "users",
+      undefined,
+      undefined,
+      {
+        strict: true,
+      },
+    );
 
     await router.navigate("users.view", { id: "1" });
 
@@ -140,9 +152,15 @@ describe("createActiveRouteSources", () => {
   it("ignoreQueryParams=false: isActiveRoute called with ignoreQueryParams=false", async () => {
     const spy = vi.spyOn(router, "isActiveRoute");
 
-    const source = createActiveRouteSource(router, "users", undefined, {
-      ignoreQueryParams: false,
-    });
+    const source = createActiveRouteSource(
+      router,
+      "users",
+      undefined,
+      undefined,
+      {
+        ignoreQueryParams: false,
+      },
+    );
 
     // Lazy: connect so the subscribe handler runs on navigation (#766).
     source.subscribe(() => {});
@@ -366,9 +384,15 @@ describe("createActiveRouteSources", () => {
 
       await r.start("/settings");
 
-      const source = createActiveRouteSource(r, "settings", undefined, {
-        hash: "billing",
-      });
+      const source = createActiveRouteSource(
+        r,
+        "settings",
+        undefined,
+        undefined,
+        {
+          hash: "billing",
+        },
+      );
 
       expect(source.getSnapshot()).toBe(true);
 
@@ -380,9 +404,15 @@ describe("createActiveRouteSources", () => {
 
       await r.start("/settings");
 
-      const source = createActiveRouteSource(r, "settings", undefined, {
-        hash: "billing",
-      });
+      const source = createActiveRouteSource(
+        r,
+        "settings",
+        undefined,
+        undefined,
+        {
+          hash: "billing",
+        },
+      );
 
       expect(source.getSnapshot()).toBe(false);
 
@@ -394,9 +424,15 @@ describe("createActiveRouteSources", () => {
 
       await r.start("/settings");
 
-      const source = createActiveRouteSource(r, "settings", undefined, {
-        hash: "",
-      });
+      const source = createActiveRouteSource(
+        r,
+        "settings",
+        undefined,
+        undefined,
+        {
+          hash: "",
+        },
+      );
 
       expect(source.getSnapshot()).toBe(false);
 
@@ -408,9 +444,15 @@ describe("createActiveRouteSources", () => {
 
       await r.start("/settings");
 
-      const source = createActiveRouteSource(r, "settings", undefined, {
-        hash: "billing",
-      });
+      const source = createActiveRouteSource(
+        r,
+        "settings",
+        undefined,
+        undefined,
+        {
+          hash: "billing",
+        },
+      );
 
       expect(source.getSnapshot()).toBe(false);
 
@@ -465,9 +507,15 @@ describe("createActiveRouteSources", () => {
 
       await r.start("/settings");
 
-      const source = createActiveRouteSource(r, "settings", undefined, {
-        hash: "billing",
-      });
+      const source = createActiveRouteSource(
+        r,
+        "settings",
+        undefined,
+        undefined,
+        {
+          hash: "billing",
+        },
+      );
 
       // Lazy: subscribe so the handler runs on navigation and exercises the
       // hashFlip branch with a missing state.context.url (#766).
@@ -497,13 +545,13 @@ describe("createActiveRouteSources", () => {
 
       await r.start("/settings");
 
-      const a = createActiveRouteSource(r, "settings", undefined, {
+      const a = createActiveRouteSource(r, "settings", undefined, undefined, {
         hash: "profile",
       });
-      const b = createActiveRouteSource(r, "settings", undefined, {
+      const b = createActiveRouteSource(r, "settings", undefined, undefined, {
         hash: "billing",
       });
-      const c = createActiveRouteSource(r, "settings", undefined, {
+      const c = createActiveRouteSource(r, "settings", undefined, undefined, {
         hash: "profile",
       });
 

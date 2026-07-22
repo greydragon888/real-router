@@ -7,7 +7,7 @@ import { readContextHash } from "./internal/readContextHash.js";
 import { normalizeActiveOptions } from "./normalizeActiveOptions.js";
 
 import type { ActiveRouteSourceOptions, RouterSource } from "./types.js";
-import type { Params, Router } from "@real-router/core";
+import type { Params, Router, SearchParams } from "@real-router/core";
 
 const activeSourceCache = new WeakMap<
   Router,
@@ -33,6 +33,7 @@ export function createActiveRouteSource(
   router: Router,
   routeName: string,
   params?: Params,
+  search?: SearchParams,
   options?: ActiveRouteSourceOptions,
 ): RouterSource<boolean> {
   const { strict, ignoreQueryParams, hash } = normalizeActiveOptions(options);
@@ -56,6 +57,13 @@ export function createActiveRouteSource(
     // characters per Link.
     const paramsKey = params === undefined ? "" : canonicalJson(params);
 
+    // Query channel (RFC-4 M2, #1548) — keyed the same way as `params`:
+    // `undefined` (the common no-search Link) collapses to the empty sentinel
+    // to skip `canonicalJson(undefined)` and share one entry with a no-search
+    // call. Distinct from `params` so `{ search: { q } }` and `{ params: { q } }`
+    // never collide on the same cache slot.
+    const searchKey = search === undefined ? "" : canonicalJson(search);
+
     // Delimiter `|` is safe because route names use `.` as the segment
     // separator (`users.list`, not `users|list`) and canonicalJson-encoded
     // params escape `"` (so any literal `|` inside params lives inside a
@@ -63,7 +71,7 @@ export function createActiveRouteSource(
     // names ever grow a `|` character, this composite key would become
     // ambiguous — change the separator to a control char or hash-encode each
     // field.
-    key = `${routeName}|${paramsKey}|${String(strict)}|${String(ignoreQueryParams)}|${hashKey}`;
+    key = `${routeName}|${paramsKey}|${searchKey}|${String(strict)}|${String(ignoreQueryParams)}|${hashKey}`;
   } catch {
     key = undefined;
   }
@@ -76,6 +84,7 @@ export function createActiveRouteSource(
       router,
       routeName,
       params,
+      search,
       strict,
       ignoreQueryParams,
       hash,
@@ -96,6 +105,7 @@ export function createActiveRouteSource(
       router,
       routeName,
       params,
+      search,
       strict,
       ignoreQueryParams,
       hash,
@@ -124,6 +134,7 @@ function computeActive(
   router: Router,
   routeName: string,
   params: Params | undefined,
+  search: SearchParams | undefined,
   strict: boolean,
   ignoreQueryParams: boolean,
   hash: string | undefined,
@@ -131,10 +142,11 @@ function computeActive(
   const routeActive = router.isActiveRoute(
     routeName,
     params,
-    // Slot-shift (RFC-4 M2 / #1548): query channel at position 3; strict /
-    // ignoreQueryParams shift to 4 / 5. The active-route source compares the
-    // single param bag, so the explicit query channel is unused here.
-    undefined,
+    // Query channel at position 3 (RFC-4 M2 / #1548). `isActiveRoute` only
+    // consults it when `ignoreQueryParams` is false — the default active-route
+    // match (ignoreQueryParams: true) still ignores it, so a `routeSearch`-less
+    // Link behaves exactly as before.
+    search,
     strict,
     ignoreQueryParams,
   );
@@ -157,6 +169,7 @@ function buildActiveRouteSource(
   router: Router,
   routeName: string,
   params: Params | undefined,
+  search: SearchParams | undefined,
   strict: boolean,
   ignoreQueryParams: boolean,
   hash: string | undefined,
@@ -165,6 +178,7 @@ function buildActiveRouteSource(
     router,
     routeName,
     params,
+    search,
     strict,
     ignoreQueryParams,
     hash,
@@ -190,6 +204,7 @@ function buildActiveRouteSource(
         router,
         routeName,
         params,
+        search,
         strict,
         ignoreQueryParams,
         hash,
@@ -240,6 +255,7 @@ function buildActiveRouteSource(
               router,
               routeName,
               params,
+              search,
               strict,
               ignoreQueryParams,
               hash,

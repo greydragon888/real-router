@@ -97,6 +97,9 @@ export function Link<P extends Params = Params>(
           // `props.routeParams` is `undefined` here, so both share one source.
           // `local.routeParams` (concrete EMPTY_PARAMS) stays for nav/href below.
           props.routeParams,
+          // Query channel (RFC-4 M2, #1548) — the `routeSearch` prop wires a
+          // real value through in a follow-up.
+          undefined,
           buildActiveOptions(),
         ),
       );

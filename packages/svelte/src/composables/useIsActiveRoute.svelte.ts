@@ -25,6 +25,9 @@ export function useIsActiveRoute(
       router,
       routeName,
       params,
+      // Query channel (RFC-4 M2, #1548) — no `routeSearch` on this hook yet;
+      // `<Link routeSearch>` wires a real value through in a follow-up.
+      undefined,
       strict,
       ignoreQueryParams,
       hash,

@@ -24,6 +24,9 @@ export function injectIsActiveRoute(
     router,
     routeName,
     params,
+    // Query channel (RFC-4 M2, #1548) — no `routeSearch` on this function yet;
+    // `[realLink routeSearch]` wires a real value through in a follow-up.
+    undefined,
     options?.strict ?? false,
     options?.ignoreQueryParams ?? true,
     options?.hash,

@@ -370,7 +370,7 @@ describe("InkLink", () => {
 
     const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "users.list", undefined, {
+    createActiveRouteSource(router, "users.list", undefined, undefined, {
       strict: false,
       ignoreQueryParams: false,
     });

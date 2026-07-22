@@ -56,6 +56,9 @@ export class RealLinkActive {
         this.router,
         this.routeName(),
         this.stableParams(),
+        // Query channel (RFC-4 M2, #1548) — RealLinkActive is styling-only and
+        // has no `routeSearch` input (parity with its no-`hash` policy).
+        undefined,
         this.activeStrict(),
         this.ignoreQueryParams(),
         undefined,

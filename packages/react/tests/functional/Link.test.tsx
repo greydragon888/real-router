@@ -895,7 +895,7 @@ describe("Link component", () => {
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
       // Exactly what `useIsActiveRoute("users", undefined, false, false)` builds.
-      createActiveRouteSource(router, "users", undefined, {
+      createActiveRouteSource(router, "users", undefined, undefined, {
         strict: false,
         ignoreQueryParams: false,
       });

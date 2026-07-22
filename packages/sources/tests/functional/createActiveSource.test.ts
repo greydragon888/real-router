@@ -44,6 +44,7 @@ describe("createActiveSource", () => {
       router,
       "home",
       undefined,
+      undefined,
       false,
       true,
       undefined,
@@ -55,7 +56,7 @@ describe("createActiveSource", () => {
     // The canonical slow-path source was NOT built → cache MISS runs isActiveRoute.
     const spy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "home", undefined, {
+    createActiveRouteSource(router, "home", undefined, undefined, {
       strict: false,
       ignoreQueryParams: true,
     });
@@ -71,6 +72,7 @@ describe("createActiveSource", () => {
       router,
       "users",
       undefined,
+      undefined,
       false,
       true,
       undefined,
@@ -80,15 +82,97 @@ describe("createActiveSource", () => {
   });
 
   it("custom params → slow path (per-link createActiveRouteSource)", () => {
-    createActiveSource(router, "home", { id: "1" }, false, true, undefined);
+    createActiveSource(
+      router,
+      "home",
+      { id: "1" },
+      undefined,
+      false,
+      true,
+      undefined,
+    );
 
     // The slow path built the source → asking for the identical source is a HIT.
+    const spy = vi.spyOn(router, "isActiveRoute");
+
+    createActiveRouteSource(router, "home", { id: "1" }, undefined, {
+      strict: false,
+      ignoreQueryParams: true,
+    });
+
+    expect(spy).not.toHaveBeenCalled();
+
+    spy.mockRestore();
+  });
+
+  it("activeStrict → slow path", () => {
+    createActiveSource(
+      router,
+      "home",
+      undefined,
+      undefined,
+      true,
+      true,
+      undefined,
+    );
+
+    const spy = vi.spyOn(router, "isActiveRoute");
+
+    createActiveRouteSource(router, "home", undefined, undefined, {
+      strict: true,
+      ignoreQueryParams: true,
+    });
+
+    expect(spy).not.toHaveBeenCalled();
+
+    spy.mockRestore();
+  });
+
+  it("ignoreQueryParams=false → slow path", () => {
+    createActiveSource(
+      router,
+      "home",
+      undefined,
+      undefined,
+      false,
+      false,
+      undefined,
+    );
+
+    const spy = vi.spyOn(router, "isActiveRoute");
+
+    createActiveRouteSource(router, "home", undefined, undefined, {
+      strict: false,
+      ignoreQueryParams: false,
+    });
+
+    expect(spy).not.toHaveBeenCalled();
+
+    spy.mockRestore();
+  });
+
+  it("routeSearch → slow path (name-only selector is search-blind, #1548)", () => {
+    // A query channel forces the slow path exactly as a custom hash does — the
+    // per-router name selector can't answer a query-scoped active check.
+    createActiveSource(
+      router,
+      "home",
+      undefined,
+      { q: "1" },
+      false,
+      true,
+      undefined,
+    );
+
+    // The slow path built the source (keyed with the search channel) → asking
+    // for the identical source is a cache HIT, not a fresh isActiveRoute run.
     const spy = vi.spyOn(router, "isActiveRoute");
 
     createActiveRouteSource(
       router,
       "home",
-      { id: "1" },
+      undefined,
+      { q: "1" },
       {
         strict: false,
         ignoreQueryParams: true,
@@ -100,42 +184,20 @@ describe("createActiveSource", () => {
     spy.mockRestore();
   });
 
-  it("activeStrict → slow path", () => {
-    createActiveSource(router, "home", undefined, true, true, undefined);
-
-    const spy = vi.spyOn(router, "isActiveRoute");
-
-    createActiveRouteSource(router, "home", undefined, {
-      strict: true,
-      ignoreQueryParams: true,
-    });
-
-    expect(spy).not.toHaveBeenCalled();
-
-    spy.mockRestore();
-  });
-
-  it("ignoreQueryParams=false → slow path", () => {
-    createActiveSource(router, "home", undefined, false, false, undefined);
-
-    const spy = vi.spyOn(router, "isActiveRoute");
-
-    createActiveRouteSource(router, "home", undefined, {
-      strict: false,
-      ignoreQueryParams: false,
-    });
-
-    expect(spy).not.toHaveBeenCalled();
-
-    spy.mockRestore();
-  });
-
   it("hash-aware (#532) → slow path", () => {
-    createActiveSource(router, "home", undefined, false, true, "frag");
+    createActiveSource(
+      router,
+      "home",
+      undefined,
+      undefined,
+      false,
+      true,
+      "frag",
+    );
 
     const spy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "home", undefined, {
+    createActiveRouteSource(router, "home", undefined, undefined, {
       strict: false,
       ignoreQueryParams: true,
       hash: "frag",
@@ -151,11 +213,19 @@ describe("createActiveSource", () => {
     // fast path — the selector reports root-active `true` for "", whereas the
     // slow path's isActiveRoute("") is false. Keeping "" on the slow path
     // preserves that behaviour.
-    createActiveSource(router, "", undefined, false, true, undefined);
+    createActiveSource(
+      router,
+      "",
+      undefined,
+      undefined,
+      false,
+      true,
+      undefined,
+    );
 
     const spy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "", undefined, {
+    createActiveRouteSource(router, "", undefined, undefined, {
       strict: false,
       ignoreQueryParams: true,
     });
@@ -176,6 +246,7 @@ describe("createActiveSource", () => {
       router,
       "users.view",
       undefined,
+      undefined,
       false,
       true,
       undefined,
@@ -188,6 +259,7 @@ describe("createActiveSource", () => {
     const source = createActiveSource(
       router,
       "users",
+      undefined,
       undefined,
       false,
       true,
@@ -213,6 +285,7 @@ describe("createActiveSource", () => {
     const source = createActiveSource(
       router,
       "home",
+      undefined,
       undefined,
       false,
       true,

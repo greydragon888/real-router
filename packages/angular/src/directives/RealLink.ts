@@ -93,6 +93,9 @@ export class RealLink {
         this.router,
         this.routeName(),
         this.stableParams(),
+        // Query channel (RFC-4 M2, #1548) — the `routeSearch` input wires a
+        // real value through in a follow-up.
+        undefined,
         this.activeStrict(),
         this.ignoreQueryParams(),
         this.hash(),

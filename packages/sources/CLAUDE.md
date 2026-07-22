@@ -10,7 +10,7 @@
 |--------|---------|
 | `createRouteSource(router)` | Route state observable — emits on every navigation |
 | `createRouteNodeSource(router, node)` | Per-node route observable — **per-router + per-nodeName cached** |
-| `createActiveRouteSource(router, name, params?, opts?)` | Active route boolean — **per-router + canonical-args cached**. `opts.hash` (#532) makes the source hash-aware: matches iff route AND `state.context.url.hash` equal expected. |
+| `createActiveRouteSource(router, name, params?, search?, opts?)` | Active route boolean — **per-router + canonical-args cached**. Query channel at position 3 (RFC-4 M2, #1548); `opts` shifts to 4. `search` participates in the cache key and reaches `router.isActiveRoute` — it only changes the verdict when `opts.ignoreQueryParams === false` (the default ignores query). `opts.hash` (#532) makes the source hash-aware: matches iff route AND `state.context.url.hash` equal expected. |
 | `createTransitionSource(router)` | Transition state snapshot — **non-cached** advanced-use factory |
 | `getTransitionSource(router)` | Transition state — **per-router cached**, safe for adapters |
 | `createErrorSource(router)` | Navigation error observable — **non-cached** advanced-use factory |
@@ -66,7 +66,7 @@ interface RouterSource<T> {
 |---------|-------------|------------------------|
 | `createRouteSource` | not cached | Real teardown — unsubscribes from router. |
 | `createRouteNodeSource` | `(router, nodeName)` | **No-op** — shared across consumers. |
-| `createActiveRouteSource` | `(router, name, canonicalJson(params), options)` | **No-op for cached path**; **real teardown for the non-cached fallback** (BigInt / circular params). |
+| `createActiveRouteSource` | `(router, name, canonicalJson(params), canonicalJson(search), options)` | **No-op for cached path**; **real teardown for the non-cached fallback** (BigInt / circular params). |
 | `createTransitionSource` | not cached | Real teardown — unsubscribes from router events. |
 | `getTransitionSource` | `(router,)` | **No-op** — wrapped cached source. |
 | `createErrorSource` | not cached | Real teardown. |

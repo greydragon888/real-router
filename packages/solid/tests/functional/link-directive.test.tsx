@@ -627,10 +627,16 @@ describe("link directive", () => {
       // subscribed cached source — NO new router.subscribe. If the directive feeds
       // the EMPTY_PARAMS ({}) default instead, it keys "{}" ≠ "" → a SECOND cached
       // source + a second router.subscribe (the #1438 regression).
-      const sibling = createActiveRouteSource(router, "home", undefined, {
-        strict: false,
-        ignoreQueryParams: true,
-      });
+      const sibling = createActiveRouteSource(
+        router,
+        "home",
+        undefined,
+        undefined,
+        {
+          strict: false,
+          ignoreQueryParams: true,
+        },
+      );
       const unsubscribe = sibling.subscribe(() => {});
       const delta = subscribeSpy.mock.calls.length - before;
 

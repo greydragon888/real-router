@@ -82,6 +82,7 @@ describe("createStableParams", () => {
             this.router,
             "users",
             this.stableParams(),
+            undefined,
             { strict: false, ignoreQueryParams: true },
           );
 

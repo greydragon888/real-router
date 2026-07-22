@@ -2,7 +2,7 @@ import { createActiveNameSelector } from "./createActiveNameSelector.js";
 import { createActiveRouteSource } from "./createActiveRouteSource.js";
 
 import type { RouterSource } from "./types.js";
-import type { Params, Router } from "@real-router/core";
+import type { Params, Router, SearchParams } from "@real-router/core";
 
 const NOOP = (): void => {};
 
@@ -38,6 +38,7 @@ export function createActiveSource(
   router: Router,
   routeName: string,
   params: Params | undefined,
+  search: SearchParams | undefined,
   strict: boolean,
   ignoreQueryParams: boolean,
   hash: string | undefined,
@@ -45,6 +46,10 @@ export function createActiveSource(
   if (
     routeName !== "" &&
     params === undefined &&
+    // A `routeSearch` link forces the slow path (RFC-4 M2, #1548): the
+    // name-only selector is search-blind, so it can't answer a query-scoped
+    // active check — exactly the reason a custom `hash` also falls through.
+    search === undefined &&
     !strict &&
     ignoreQueryParams &&
     hash === undefined
@@ -65,6 +70,7 @@ export function createActiveSource(
     router,
     routeName,
     params,
+    search,
     hash === undefined
       ? { strict, ignoreQueryParams }
       : { strict, ignoreQueryParams, hash },

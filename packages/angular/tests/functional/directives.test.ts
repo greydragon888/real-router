@@ -417,7 +417,7 @@ describe("RealLink directive", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "", undefined, {
+      createActiveRouteSource(router, "", undefined, undefined, {
         strict: false,
         ignoreQueryParams: true,
       });
@@ -525,7 +525,7 @@ describe("RealLinkActive directive", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "", undefined, {
+      createActiveRouteSource(router, "", undefined, undefined, {
         strict: false,
         ignoreQueryParams: true,
       });

@@ -57,7 +57,7 @@ describe("useIsActiveRoute", () => {
 
     const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "users", undefined, {
+    createActiveRouteSource(router, "users", undefined, undefined, {
       strict: false,
       ignoreQueryParams: true,
     });
