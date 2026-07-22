@@ -9,6 +9,9 @@ export type {
 // Base types
 export type {
   Params,
+  SearchParams,
+  SearchParamValue,
+  SearchParamPrimitive,
   State,
   StateMetaInput,
   SimpleState,
