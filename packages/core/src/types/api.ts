@@ -32,14 +32,18 @@ import type { TreeChangedEvent } from "./tree-changed";
  *
  * To add a new interceptable method:
  * 1. Add its signature here
- * 2. Wrap it with `createInterceptable()` / `createBinaryInterceptable()` in
+ * 2. Wrap it with `createInterceptable()` / `createTernaryInterceptable()` in
  *    the `registerInternals` block of the Router constructor
  *    (`packages/core/src/Router.ts`)
  */
 export interface InterceptableMethodMap {
   start: (path?: string) => Promise<State>;
   buildPath: (route: string, params?: Params, search?: SearchParams) => string;
-  forwardState: (routeName: string, routeParams: Params) => SimpleState;
+  forwardState: (
+    routeName: string,
+    routeParams: Params,
+    routeSearch?: SearchParams,
+  ) => SimpleState;
 }
 
 /**
@@ -109,10 +113,14 @@ export interface PluginApi {
     routeParams: Params,
   ) => RouteTreeState | undefined;
 
-  forwardState: <P extends Params = Params>(
+  forwardState: <
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
     routeName: string,
     routeParams: P,
-  ) => SimpleState<P>;
+    routeSearch?: S,
+  ) => SimpleState<P, S>;
 
   matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;
 

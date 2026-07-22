@@ -14,7 +14,6 @@ import {
 } from "./guards";
 import { createLimits, normalizeParams } from "./helpers";
 import {
-  createBinaryInterceptable,
   createInterceptable,
   createTernaryInterceptable,
   getInternals,
@@ -257,15 +256,16 @@ export class Router<
       logger,
       makeState: (name, params, search, path, meta) =>
         this.#state.makeState(name, params, search, path, meta),
-      // `as unknown as` is required: createBinaryInterceptable returns a
-      // non-generic `(a: A, b: B) => R`, but RouterInternals["forwardState"]
-      // is declared with a generic parameter `<P extends Params = Params>`,
-      // which tsc will not infer from the non-generic source. Sonar S4325
+      // `as unknown as` is required: createTernaryInterceptable returns a
+      // non-generic `(a, b, c) => R`, but RouterInternals["forwardState"]
+      // is declared with generic parameters `<P extends Params, S extends
+      // SearchParams>`, which tsc will not infer from the non-generic source.
+      // Sonar S4325
       // misclassifies this as a redundant cast.
-      forwardState: createBinaryInterceptable(
+      forwardState: createTernaryInterceptable(
         "forwardState",
-        (name: string, params: Params) =>
-          this.#routes.forwardState(name, params),
+        (name: string, params: Params, search?: SearchParams) =>
+          this.#routes.forwardState(name, params, search),
         interceptorsMap,
       ) as unknown as RouterInternals["forwardState"],
       buildStateResolved: (name, params) =>

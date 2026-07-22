@@ -12,7 +12,7 @@ import {
   rebuildTreeInPlace,
   resetStore,
 } from "./routesStore";
-import { constants, DEFAULT_TRANSITION } from "../../constants";
+import { constants, DEFAULT_TRANSITION, EMPTY_SEARCH } from "../../constants";
 import { splitParamsBySearch } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -299,9 +299,19 @@ export class RoutesNamespace<
         ? this.#store.config.decoders[name](params)
         : params;
 
-    const { name: routeName, params: routeParams } = this.#deps.forwardState<P>(
+    // Thread the matched query through forwardState (RFC-4 M2 / #1548): a
+    // search-schema interceptor validates it on the URL→State path here (the
+    // `routeSearch` argument is defined, marking this as a re-parse, not a
+    // navigate). `forwardedSearch` is what the (possibly validating) interceptor
+    // chain returns — use it for the committed `state.search`.
+    const {
+      name: routeName,
+      params: routeParams,
+      search: forwardedSearch,
+    } = this.#deps.forwardState<P>(
       name,
       decodedParams as P,
+      search as SearchParams,
     );
 
     let builtPath = path;
@@ -354,14 +364,16 @@ export class RoutesNamespace<
       }
     }
 
-    // `state.search` carries the matched query; `state.params` keeps the
-    // resolved path bag. Query-typed defaults and decoder-injected keys stay in
-    // `params` on the matchPath path — the clean two-channel split there is a
-    // В2.5 follow-up; the navigate path already splits fully (RFC-4 M2 / #1548).
+    // `state.search` carries the matched query as returned by forwardState (a
+    // search-schema interceptor may have validated/stripped it); `state.params`
+    // keeps the resolved path bag. Query-typed defaults and decoder-injected
+    // keys stay in `params` on the matchPath path — the clean two-channel split
+    // there is a В2.5 follow-up; the navigate path already splits fully
+    // (RFC-4 M2 / #1548).
     return this.#deps.makeState<P>(
       routeName,
       routeParams,
-      search as SearchParams | undefined,
+      forwardedSearch,
       builtPath,
       meta,
     );
@@ -375,10 +387,21 @@ export class RoutesNamespace<
    * 2. Provided params
    * 3. Target route defaultParams (after resolving forwardTo)
    */
-  forwardState<P extends Params = Params>(
+  forwardState<
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
     name: string,
     params: P,
-  ): { name: string; params: P } {
+    search?: S,
+  ): { name: string; params: P; search: S } {
+    // The query channel passes through forwardState untouched (RFC-4 M2 / #1548):
+    // forwardTo resolution and defaultParams merging operate on the path bag,
+    // while `search` carries the already-parsed query (from matchPath's re-parse
+    // or the navigate split) so a search-schema interceptor can validate it on
+    // the URL→State path. Frozen empty singleton when absent.
+    const resolvedSearch = (search ?? EMPTY_SEARCH) as S;
+
     if (Object.hasOwn(this.#store.config.forwardFnMap, name)) {
       const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
       const dynamicForward = this.#store.config.forwardFnMap[name];
@@ -391,6 +414,7 @@ export class RoutesNamespace<
       return {
         name: resolved,
         params: this.#mergeDefaultParams(resolved, paramsWithSourceDefaults),
+        search: resolvedSearch,
       };
     }
 
@@ -412,6 +436,7 @@ export class RoutesNamespace<
       return {
         name: resolved,
         params: this.#mergeDefaultParams(resolved, paramsWithSourceDefaults),
+        search: resolvedSearch,
       };
     }
 
@@ -424,10 +449,15 @@ export class RoutesNamespace<
           staticForward,
           paramsWithSourceDefaults,
         ),
+        search: resolvedSearch,
       };
     }
 
-    return { name, params: this.#mergeDefaultParams(name, params) };
+    return {
+      name,
+      params: this.#mergeDefaultParams(name, params),
+      search: resolvedSearch,
+    };
   }
 
   /**

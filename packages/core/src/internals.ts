@@ -38,10 +38,14 @@ export interface RouterInternals<
     meta?: Record<string, Record<string, "url" | "query">>,
   ) => State<P, S>;
 
-  readonly forwardState: <P extends Params = Params>(
+  readonly forwardState: <
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
     routeName: string,
     routeParams: P,
-  ) => SimpleState<P>;
+    routeSearch?: S,
+  ) => SimpleState<P, S>;
 
   readonly buildStateResolved: (
     resolvedName: string,
@@ -230,9 +234,10 @@ function executeInterceptorChain<T>(
 
 /**
  * Variadic interceptor wrapper — wraps a function of any arity, returning the
- * same callable type `T`. Use {@link createBinaryInterceptable} instead when the
- * wrapped method takes exactly two args and the caller needs the precise
- * `(a, b) => r` signature preserved (the variadic form widens args to `any[]`).
+ * same callable type `T`. Use {@link createTernaryInterceptable} instead when
+ * the wrapped method takes exactly three args and the caller needs the precise
+ * `(a, b, c) => r` signature preserved (the variadic form widens args to
+ * `any[]`).
  */
 export function createInterceptable<T extends (...args: any[]) => any>(
   name: string,
@@ -251,31 +256,6 @@ export function createInterceptable<T extends (...args: any[]) => any>(
 
     return executeInterceptorChain(chain, original, args);
   }) as T;
-}
-
-/**
- * Two-argument interceptor wrapper — preserves the exact `(a: A, b: B) => R`
- * signature, which the variadic {@link createInterceptable} cannot express
- * (it widens args to `any[]`). Used for the binary interceptable methods
- * `forwardState(routeName, routeParams)` and `buildPath(route, params)`.
- */
-export function createBinaryInterceptable<A, B, R>(
-  name: string,
-  original: (a: A, b: B) => R,
-  interceptors: Map<
-    string,
-    ((next: (...args: any[]) => any, ...args: any[]) => any)[]
-  >,
-): (a: A, b: B) => R {
-  return (arg1: A, arg2: B) => {
-    const chain = interceptors.get(name);
-
-    if (!chain || chain.length === 0) {
-      return original(arg1, arg2);
-    }
-
-    return executeInterceptorChain(chain, original, [arg1, arg2]);
-  };
 }
 
 /**

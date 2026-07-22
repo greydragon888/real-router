@@ -76,10 +76,14 @@ export interface RoutesDependencies<
   getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K];
 
   /** Forward state through facade (allows plugin interception) */
-  forwardState: <P extends Params = Params>(
+  forwardState: <
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
     name: string,
     params: P,
-  ) => SimpleState<P>;
+    search?: S,
+  ) => SimpleState<P, S>;
 }
 
 /**

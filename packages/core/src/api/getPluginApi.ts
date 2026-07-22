@@ -9,6 +9,7 @@ import type {
   DefaultDependencies,
   Params,
   Router,
+  SearchParams,
   State,
 } from "../types";
 
@@ -57,9 +58,13 @@ export function getPluginApi<
 
       return ctx.buildStateResolved(name, params);
     },
-    forwardState: <P extends Params = Params>(
+    forwardState: <
+      P extends Params = Params,
+      S extends SearchParams = SearchParams,
+    >(
       routeName: string,
       routeParams: P,
+      routeSearch?: S,
     ) => {
       ctx.validator?.routes.validateStateBuilderArgs(
         routeName,
@@ -67,7 +72,7 @@ export function getPluginApi<
         "forwardState",
       );
 
-      return ctx.forwardState(routeName, routeParams);
+      return ctx.forwardState<P, S>(routeName, routeParams, routeSearch);
     },
     matchPath: (path) => {
       ctx.validator?.routes.validateMatchPathArgs(path);

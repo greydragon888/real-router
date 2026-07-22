@@ -55,8 +55,13 @@ export class PersistentParamsPlugin {
 
       removeForwardState = api.addInterceptor(
         "forwardState",
-        (next, routeName, routeParams) => {
-          const result = next(routeName, routeParams);
+        (next, routeName, routeParams, routeSearch) => {
+          // Forward the query channel through the chain (RFC-4 M2 / #1548) so a
+          // downstream search-schema interceptor still sees the matched query on
+          // the URL→State path. Persistent params are injected into the path bag
+          // (the navigate split re-routes the query-typed ones into
+          // `state.search`); the search channel passes through untouched.
+          const result = next(routeName, routeParams, routeSearch);
 
           return {
             ...result,

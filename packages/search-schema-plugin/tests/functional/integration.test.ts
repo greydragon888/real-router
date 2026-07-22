@@ -255,16 +255,12 @@ describe("Search schema plugin", () => {
   });
 
   describe("URL → State direction", () => {
-    // DEFERRED (RFC-4 M2 / #1548): under the params/search split, the matched
-    // query arrives on `matchResult.search`, which bypasses the `forwardState`
-    // interceptor this plugin validates through (matchPath forwards only the
-    // path params). Validating the query on the URL→State path needs the
-    // `forwardState(+search)` contract (§2.3), which lands with the facade
-    // slot-shift. The navigate→State path already validates the query (see
-    // above). Assertions below are already M2-correct (state.search) for when
-    // the contract lands. Un-skip then.
-    // eslint-disable-next-line vitest/no-disabled-tests -- intentionally skipped pending the forwardState(+search) contract (RFC-4 M2 §2.3, #1548); body kept so the un-skip is a one-line change, not a .todo() rewrite
-    it.skip("should validate params from URL on router.start()", async () => {
+    // RFC-4 M2 (#1548): under the params/search split the matched query arrives
+    // on `state.search`, validated through the forwardState(+search) contract
+    // (§2.3, B1.5) — matchPath threads `matchResult.search` through forwardState,
+    // marking the URL→State path, so this plugin's interceptor validates the
+    // query channel there (not just on the navigate→State path).
+    it("should validate params from URL on router.start()", async () => {
       const consoleSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});

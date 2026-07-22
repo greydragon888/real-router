@@ -11,7 +11,7 @@ import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNam
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
 import type { Router } from "../Router";
-import type { DefaultDependencies, Params } from "../types";
+import type { DefaultDependencies, Params, SearchParams } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
 
 /**
@@ -136,7 +136,14 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
       ns.state.areStatesEqual(state1, state2, ignoreQueryParams),
     getDependency: (name) =>
       ns.dependenciesStore.dependencies[name] as Dependencies[typeof name],
-    forwardState: <P extends Params = Params>(name: string, params: P) => {
+    forwardState: <
+      P extends Params = Params,
+      S extends SearchParams = SearchParams,
+    >(
+      name: string,
+      params: P,
+      search?: S,
+    ) => {
       const ctx = getInternals(ns.router);
 
       ctx.validator?.routes.validateStateBuilderArgs(
@@ -145,7 +152,7 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
         "forwardState",
       );
 
-      return ctx.forwardState(name, params);
+      return ctx.forwardState(name, params, search);
     },
   };
 

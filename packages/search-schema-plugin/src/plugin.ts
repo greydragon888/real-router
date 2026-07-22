@@ -9,6 +9,7 @@ import type {
 import type {
   Params,
   Plugin,
+  SearchParams,
   SimpleState,
   TreeChangedEvent,
 } from "@real-router/core";
@@ -44,10 +45,14 @@ export class SearchSchemaPlugin {
 
     this.#removeForwardStateInterceptor = this.#pluginApi.addInterceptor(
       "forwardState",
-      (next, routeName, routeParams) => {
-        const result = next(routeName, routeParams);
+      (next, routeName, routeParams, routeSearch) => {
+        const result = next(routeName, routeParams, routeSearch);
 
-        return this.#validateState(result);
+        // `routeSearch` defined → URL→State (matchPath): the query rides in
+        // `result.search`. `undefined` → State→URL (navigate): it rides in the
+        // params bag (query not yet slot-shifted). Validate whichever channel
+        // holds the query (RFC-4 M2 / #1548).
+        return this.#validateState(result, routeSearch !== undefined);
       },
     );
 
@@ -100,14 +105,24 @@ export class SearchSchemaPlugin {
       StandardSchemaV1 | undefined;
   }
 
-  #validateState(result: SimpleState): SimpleState {
+  #validateState(result: SimpleState, useSearch: boolean): SimpleState {
     const schema = this.#getSchema(result.name);
 
     if (!schema) {
       return result;
     }
 
-    const validation = schema["~standard"].validate(result.params);
+    // The query channel to validate: `state.search` on the URL→State (matchPath)
+    // path where the query is already slot-shifted, else the params bag on the
+    // State→URL (navigate) path (RFC-4 M2 / #1548). `writeBack` returns the
+    // result with the validated values in whichever channel was read.
+    const channel = (useSearch ? result.search : result.params) as Params;
+    const writeBack = (validated: Params): SimpleState =>
+      useSearch
+        ? { ...result, search: validated as SearchParams }
+        : { ...result, params: validated };
+
+    const validation = schema["~standard"].validate(channel);
 
     if (validation instanceof Promise) {
       throw new TypeError(
@@ -116,18 +131,15 @@ export class SearchSchemaPlugin {
     }
 
     if ("value" in validation) {
-      const params = this.#strict
-        ? (validation.value as Params)
-        : { ...result.params, ...(validation.value as Params) };
-
-      return { ...result, params };
+      return writeBack(
+        this.#strict
+          ? (validation.value as Params)
+          : { ...channel, ...(validation.value as Params) },
+      );
     }
 
     if (this.#onError) {
-      return {
-        ...result,
-        params: this.#onError(result.name, result.params, validation.issues),
-      };
+      return writeBack(this.#onError(result.name, channel, validation.issues));
     }
 
     if (this.#mode === "development") {
@@ -138,12 +150,12 @@ export class SearchSchemaPlugin {
     }
 
     const invalidKeys = getInvalidKeys(validation.issues);
-    const stripped = omitKeys(result.params, invalidKeys);
+    const stripped = omitKeys(channel, invalidKeys);
     const route = this.#routesApi.get(result.name);
     const defaults = route?.defaultParams;
     const restored = defaults ? { ...defaults, ...stripped } : stripped;
 
-    return { ...result, params: restored };
+    return writeBack(restored);
   }
 
   #validateExistingDefaultParams(): void {
