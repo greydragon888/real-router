@@ -254,8 +254,9 @@ export class Router<
 
     registerInternals(this, {
       logger,
-      makeState: (name, params, search, path, meta) =>
-        this.#state.makeState(name, params, search, path, meta),
+      makeState: (name, params, search, path) =>
+        this.#state.makeState(name, params, search, path),
+      getMetaForState: (name) => this.#routes.getMetaForState(name),
       // `as unknown as` is required: createTernaryInterceptable returns a
       // non-generic `(a, b, c) => R`, but RouterInternals["forwardState"]
       // is declared with generic parameters `<P extends Params, S extends
@@ -539,7 +540,9 @@ export class Router<
   ): (toState: State, fromState?: State) => boolean {
     getInternals(this).validator?.routes.validateShouldUpdateNodeArgs(nodeName);
 
-    return RoutesNamespace.shouldUpdateNode(nodeName);
+    return RoutesNamespace.shouldUpdateNode(nodeName, (name) =>
+      this.#routes.getMetaForState(name),
+    );
   }
 
   // ============================================================================
@@ -724,7 +727,6 @@ export class Router<
 
     try {
       const normalizedParams = normalizeParams(resolvedParams);
-      const meta = this.#routes.getMetaForState(resolvedName);
       const path = ctx.buildPath(resolvedName, normalizedParams, search);
 
       toState = this.#state.makeState(
@@ -735,7 +737,6 @@ export class Router<
         // and `areStatesEqual`'s query comparison see the same shape as navigate.
         search,
         path,
-        meta,
         true,
       );
     } catch {
@@ -744,7 +745,11 @@ export class Router<
 
     const fromState = this.#state.get();
 
-    const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
+    const { toDeactivate, toActivate } = getTransitionPath(
+      toState,
+      fromState,
+      (routeName) => this.#routes.getMetaForState(routeName),
+    );
 
     return this.#routeLifecycle.canNavigateTo(
       toDeactivate,

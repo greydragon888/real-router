@@ -7,10 +7,8 @@ import {
   EMPTY_SEARCH,
 } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
-import { setStateMetaParams } from "../../stateMetaStore";
 
 import type { StateNamespaceDependencies } from "./types";
-import type { RouteTreeStateMeta } from "../../engine";
 import type { Params, SearchParams, State } from "../../types";
 
 /**
@@ -110,7 +108,6 @@ export class StateNamespace {
     params?: P,
     search?: S,
     path?: string,
-    meta?: RouteTreeStateMeta,
     skipFreeze?: boolean,
   ): State<P, S> {
     // Optimization: O(1) lookup instead of O(depth) ancestor iteration
@@ -146,10 +143,6 @@ export class StateNamespace {
       context: {},
       ...(!skipFreeze && { transition: DEFAULT_TRANSITION }),
     } as State<P, S>;
-
-    if (meta) {
-      setStateMetaParams(state, meta);
-    }
 
     return skipFreeze ? state : freezeStateInPlace(state);
   }

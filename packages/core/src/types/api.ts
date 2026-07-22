@@ -8,7 +8,6 @@ import type {
   SearchParams,
   State,
   SimpleState,
-  StateMetaInput,
   Unsubscribe,
 } from "./base";
 import type { EventMethodMap, EventName } from "./constants";
@@ -105,7 +104,6 @@ export interface PluginApi {
     params?: P,
     search?: S,
     path?: string,
-    meta?: StateMetaInput,
   ) => State<P, S>;
 
   buildState: (

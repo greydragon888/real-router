@@ -3087,7 +3087,6 @@ src/
 ├── guards.ts                 — guard-related logic
 ├── validation.ts             — structural validation
 ├── typeGuards.ts             — type guard functions
-├── stateMetaStore.ts         — WeakMap<State, Params> (replaces State.meta)
 ├── helpers.ts                — internal utilities
 ├── constants.ts              — error codes, constants
 ├── types.ts                  — core type definitions
@@ -3461,6 +3460,35 @@ Module-level `WeakMap<State, Params>` inside `@real-router/core` (`stateMetaStor
 
 - `deepFreezeState()` uses `structuredClone()` → clone loses WeakMap entry. `err.redirect` intentionally has no meta (only needs name + params for redirect target).
 - `_MP` phantom generic preserved on `State<P, _MP>` for backward compatibility.
+
+### Superseded — WeakMap removed in RFC-4 M2 (#1548)
+
+The `stateMetaStore` WeakMap described above is **gone** as of the params/search
+split (RFC-4 Milestone M2). The sidecar existed only so `getTransitionPath` could
+learn a state's per-segment param-source map (`{ segment: { param: "url" | "query" } }`)
+without a public `State.meta` field. That map is **1:1 with the route name** — it is
+exactly what the live matcher already returns from `getMetaByName(name)` — so carrying
+a per-`State` copy was redundant.
+
+**Now:** `getTransitionPath(toState, fromState, getMeta)` takes a `RouteMetaLookup`
+callback (`transitionPath.ts`), wired to `RoutesNamespace.getMetaForState(name)`. Ownership
+is read from the matcher **by `state.name`** at call time, not stored per-State. Removed
+with the WeakMap: `stateMetaStore.ts` (file deleted), `getStateMetaParams` /
+`setStateMetaParams`, the `StateMetaInput` type, and the `meta` argument on the entire
+`makeState` chain (`PluginApi.makeState`, `StateNamespace.makeState`, `RouterInternals.makeState`,
+the `wiring`/`getPluginApi` wrappers). The `#1170` "carry meta onto the writable state"
+block in `NavigationNamespace` is gone too.
+
+**New failure mode it introduced (and how it's handled):** a state whose name is **no
+longer in the tree** (a `replace()`-removed route, or a survivor state after CRUD) now
+resolves `getMeta(name) === undefined`. `getTransitionPath` treats "both names gone" as
+**FAST PATH 3** (full activate/deactivate lists, no ancestor trim) — order-insensitive,
+correct because `shouldUpdateNode` reads the lists by membership. Any state whose name
+IS still in the tree (every navigate-pipeline state, popstate/start, `canNavigateTo`'s
+built target) takes the STANDARD PATH. White-box tests that used to inject meta via a
+3-arg helper `makeState` now build a **real router whose tree contains the tested route
+names** (`tests/functional/routes/shouldUpdateNode.test.ts`) so `getMetaForState` supplies
+the same ownership map the WeakMap used to.
 
 ## TRANSITION_LEAVE_APPROVE — Observable phase between guard phases
 

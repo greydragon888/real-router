@@ -14,7 +14,6 @@ export type {
   SearchParamValue,
   SearchParamPrimitive,
   State,
-  StateMetaInput,
   SimpleState,
   Unsubscribe,
   RouterError,

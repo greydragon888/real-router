@@ -20,8 +20,7 @@ core/
 │   ├── RouterError.ts               — Typed error class
 │   ├── constants.ts                 — Error codes, events, limits
 │   ├── internals.ts                 — WeakMap registry for API functions
-│   ├── transitionPath.ts            — Transition path calculation
-│   ├── stateMetaStore.ts            — Per-route param-name meta cache
+│   ├── transitionPath.ts            — Transition path calculation (reads route param-source meta via a RouteMetaLookup callback → getMetaForState, #1548)
 │   ├── helpers.ts                   — Utility functions
 │   ├── guards.ts                    — Input guards (deps, routes) + logger-config assertion
 │   ├── routerFSM.ts                 — Router FSM config (states, events, payloads)

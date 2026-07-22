@@ -23,9 +23,6 @@ describe("buildState / makeState Properties", () => {
         buildStateResult.params,
         undefined,
         path,
-        {
-          params: buildStateResult.meta,
-        },
       );
 
       expect(state.path).toBe(path);

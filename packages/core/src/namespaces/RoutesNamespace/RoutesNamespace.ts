@@ -24,6 +24,7 @@ import type {
   RouteTree,
   RouteTreeState,
 } from "../../engine";
+import type { RouteMetaLookup } from "../../transitionPath";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -114,6 +115,7 @@ export class RoutesNamespace<
    */
   static shouldUpdateNode(
     nodeName: string,
+    getMeta: RouteMetaLookup,
   ): (toState: State, fromState?: State) => boolean {
     return (toState: State, fromState?: State): boolean => {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -142,6 +144,7 @@ export class RoutesNamespace<
       const { intersection, toActivate, toDeactivate } = getTransitionPath(
         toState,
         fromState,
+        getMeta,
       );
 
       if (nodeName === intersection) {
@@ -292,7 +295,7 @@ export class RoutesNamespace<
     }
 
     const routeState = createRouteState(matchResult);
-    const { name, params, search, meta } = routeState;
+    const { name, params, search } = routeState;
 
     const decodedParams =
       typeof this.#store.config.decoders[name] === "function"
@@ -375,7 +378,6 @@ export class RoutesNamespace<
       routeParams,
       forwardedSearch,
       builtPath,
-      meta,
     );
   }
 

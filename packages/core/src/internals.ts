@@ -35,8 +35,17 @@ export interface RouterInternals<
     params?: P,
     search?: S,
     path?: string,
-    meta?: Record<string, Record<string, "url" | "query">>,
   ) => State<P, S>;
+
+  /**
+   * Per-segment param-source map for a route name (`{ segment: { param: "url" |
+   * "query" } }`), read from the live matcher — the ownership channel for
+   * `getTransitionPath` (RFC-4 M2 / #1548, replaced the removed per-State
+   * `stateMetaStore` WeakMap). `undefined` when the name is not in the tree.
+   */
+  readonly getMetaForState: (
+    name: string,
+  ) => Record<string, Record<string, "url" | "query">> | undefined;
 
   readonly forwardState: <
     P extends Params = Params,

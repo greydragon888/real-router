@@ -1,5 +1,4 @@
 import { DEFAULT_TRANSITION } from "../../src/constants";
-import { setStateMetaParams } from "../../src/stateMetaStore";
 
 import type { Params, State } from "@real-router/core";
 
@@ -19,12 +18,13 @@ export function pickRouteIdentity(
   };
 }
 
-export const makeState = (
-  name: string,
-  params: Params = {},
-  metaParams: Params = {},
-): State => {
-  const state: State = {
+// Builds a bare frozen-shaped State for unit tests. Since RFC-4 M2 (#1548) the
+// per-State `stateMetaStore` WeakMap is gone — ownership is read from the live
+// matcher by `state.name` — so there is no per-State meta to attach here. Tests
+// that need `getTransitionPath` to see a route's param-source map use a real
+// router (its `getMetaForState`), not a hand-built state.
+export const makeState = (name: string, params: Params = {}): State => {
+  return {
     name,
     path: `/${name.replaceAll(".", "/")}`,
     params,
@@ -32,10 +32,6 @@ export const makeState = (
     transition: DEFAULT_TRANSITION,
     context: {},
   };
-
-  setStateMetaParams(state, metaParams);
-
-  return state;
 };
 
 /**

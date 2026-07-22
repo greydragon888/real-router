@@ -543,6 +543,7 @@ function replaceRoutes<
         const { toDeactivate, toActivate } = getTransitionPath(
           revalidated,
           currentState,
+          ctx.getMetaForState,
         );
 
         const allowed =

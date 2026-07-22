@@ -15,7 +15,6 @@ import {
   constants,
 } from "../../constants";
 import { RouterError } from "../../RouterError";
-import { getStateMetaParams, setStateMetaParams } from "../../stateMetaStore";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
 import type { NavigationContext, NavigationDependencies } from "./types";
@@ -194,18 +193,12 @@ export class NavigationNamespace {
       context: { ...state.context },
     } as State;
 
-    // Carry the route-meta binding (#1170). `matchPath` / `makeState` attach it
-    // to the frozen source `state` via a WeakMap keyed by object reference, so
-    // the fresh writable shell would otherwise be meta-less. Without it, two
-    // consecutive popstate navigations make both `toState` AND `fromState`
-    // meta-less, dropping `getTransitionPath` to FAST PATH 3 (full chains):
-    // ancestor guards re-run and browser-back can block where `navigate()`
-    // succeeds.
-    const meta = getStateMetaParams(state);
-
-    if (meta !== undefined) {
-      setStateMetaParams(writableState, meta);
-    }
+    // No route-meta to carry any more (RFC-4 M2 / #1548): ownership is read from
+    // the live matcher by `state.name` (`getTransitionPath`'s `getMeta`), not
+    // from a per-State WeakMap. The former #1170 carry — which existed only so a
+    // matchPath-derived writable shell stayed non-meta-less across consecutive
+    // popstate navs — is obsolete: any state whose name is in the tree takes the
+    // STANDARD PATH regardless of object identity.
 
     return this.#executeNavigation(writableState, opts);
   }
@@ -378,7 +371,9 @@ export class NavigationNamespace {
         deps.getLifecycleFunctions();
       const isUnknownRoute = toState.name === constants.UNKNOWN_ROUTE;
 
-      const transitionPath = getTransitionPath(toState, fromState);
+      const transitionPath = getTransitionPath(toState, fromState, (name) =>
+        deps.getMetaForState(name),
+      );
       const { toDeactivate, toActivate, intersection } = transitionPath;
 
       const shouldDeactivate =

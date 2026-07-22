@@ -59,7 +59,6 @@ export interface RoutesDependencies<
     params?: P,
     search?: S,
     path?: string,
-    meta?: Record<string, Record<string, "url" | "query">>,
   ) => State<P, S>;
 
   /** Get current router state */

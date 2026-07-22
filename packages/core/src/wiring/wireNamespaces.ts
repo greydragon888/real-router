@@ -129,8 +129,8 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
     },
     compileGuard: (handler, methodName) =>
       ns.routeLifecycle.compileGuardFactory(handler, methodName),
-    makeState: (name, params, search, path, meta) =>
-      ns.state.makeState(name, params, search, path, meta),
+    makeState: (name, params, search, path) =>
+      ns.state.makeState(name, params, search, path),
     getState: () => ns.state.get(),
     areStatesEqual: (state1, state2, ignoreQueryParams) =>
       ns.state.areStatesEqual(state1, state2, ignoreQueryParams),
@@ -184,6 +184,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     logger: getInternals(ns.router).logger,
     getOptions: () => ns.options.get(),
     hasRoute: (name) => ns.routes.hasRoute(name),
+    getMetaForState: (name) => ns.routes.getMetaForState(name),
     getState: () => ns.state.get(),
     setState: (state) => {
       ns.state.set(state);
@@ -220,7 +221,6 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
           fullParams,
           routeSearch,
           explicitPath,
-          meta,
           true,
         );
       }
@@ -235,7 +235,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       );
       const path = ctx.buildPath(name, fullParams);
 
-      return ns.state.makeState(name, params, search, path, meta, true);
+      return ns.state.makeState(name, params, search, path, true);
     },
     resolveDefault: () => {
       const options = ns.options.get();

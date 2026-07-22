@@ -32,20 +32,16 @@ export function getPluginApi<
 
   const ctx = getInternals(router);
   const api: PluginApi = {
-    makeState: (name, params, search, path, meta) => {
+    makeState: (name, params, search, path) => {
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
 
       // Public PluginApi.makeState carries the query channel (RFC-4 M2 / #1548)
       // so plugins (e.g. browser-plugin popstate restore) can reconstruct a
-      // split state from a serialized history entry.
-      return ctx.makeState(
-        name,
-        params,
-        search,
-        path,
-        meta?.params as
-          Record<string, Record<string, "url" | "query">> | undefined,
-      );
+      // split state from a serialized history entry. The former `meta` argument
+      // (per-segment param-source map) was dropped when the `stateMetaStore`
+      // WeakMap was removed — ownership is now read from the live matcher by
+      // `state.name`, so a caller-supplied meta had no effect and is gone.
+      return ctx.makeState(name, params, search, path);
     },
     buildState: (routeName, routeParams) => {
       ctx.validator?.routes.validateStateBuilderArgs(
@@ -132,7 +128,6 @@ export function getPluginApi<
         // in `params` during the back-compat window, so no search here.
         undefined,
         ctx.buildPath(routeInfo.name, routeInfo.params),
-        routeInfo.meta,
       );
     },
     getOptions: ctx.getOptions,

@@ -123,9 +123,9 @@ export function createReplaceHistoryState(
       // caller-supplied `search` on `replaceHistoryState` is a follow-up.
       undefined,
       router.buildPath(state.name, state.params),
-      {
-        params: state.meta,
-      },
+      // No meta arg: since #1548 the per-segment param-source map is read from
+      // the live matcher by `state.name` (getMetaForState), not carried onto the
+      // built State — the removed `stateMetaStore` sidecar.
     );
 
     // Tri-state hash semantics (#532):

@@ -36,6 +36,16 @@ export interface NavigationDependencies {
   /** Check if route exists */
   hasRoute: (name: string) => boolean;
 
+  /**
+   * Per-segment param-source map for a route name (`{ segment: { param: "url" |
+   * "query" } }`), read from the live matcher — the ownership channel for
+   * `getTransitionPath` (RFC-4 M2 / #1548, replaced the removed `stateMetaStore`
+   * WeakMap). `undefined` when the name is not in the tree.
+   */
+  getMetaForState: (
+    name: string,
+  ) => Record<string, Record<string, "url" | "query">> | undefined;
+
   /** Get current state */
   getState: () => State | undefined;
 

@@ -263,9 +263,10 @@ export async function run(): Promise<void> {
   // click-through. Non-empty params hit the branches every navigate bench
   // above skips: normalizeParams' non-empty arm (the static-route benches all
   // reuse the frozen EMPTY_PARAMS singleton, #1027), freezeStateInPlace over a
-  // real params object, setStateMetaParams with content, and the param-encode
-  // inside buildNavigateState's buildPath. Two alternating ids keep every
-  // iteration a real transition (paths differ → no same-state reject).
+  // real params object, the param-source lookup via getMetaForState (RFC-4 M2 /
+  // #1548 — replaced the per-State setStateMetaParams sidecar), and the
+  // param-encode inside buildNavigateState's buildPath. Two alternating ids keep
+  // every iteration a real transition (paths differ → no same-state reject).
   {
     const router = createRouter([
       { name: "home", path: "/" },

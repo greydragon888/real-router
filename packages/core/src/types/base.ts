@@ -89,10 +89,6 @@ export interface State<
   context: StateContext & Record<string, unknown>;
 }
 
-export interface StateMetaInput<P extends Params = Params> {
-  params: P;
-}
-
 /**
  * Descriptor form of a navigation target (RFC-4 M2 / #1548). The two-channel
  * counterpart to the positional `navigate(name, params, search, opts)` form:
