@@ -50,6 +50,7 @@ function createRouteState<P extends RouteParams = RouteParams>(
   matchResult: {
     readonly segments: readonly { fullName: string }[];
     readonly params: Readonly<Record<string, unknown>>;
+    readonly search: Readonly<Record<string, unknown>>;
     readonly meta: Readonly<Record<string, Record<string, "url" | "query">>>;
   },
   name?: string,
@@ -64,6 +65,7 @@ function createRouteState<P extends RouteParams = RouteParams>(
   return {
     name: resolvedName,
     params: matchResult.params as P,
+    search: matchResult.search,
     meta: matchResult.meta,
   };
 }
@@ -404,7 +406,9 @@ export class RoutesNamespace<
     const meta = this.#store.matcher.getMetaByName(resolvedName)!;
 
     return createRouteState(
-      { segments, params: resolvedParams, meta },
+      // Resolved (non-match) path: query is still folded into `params` during
+      // the A2 back-compat window, so `search` is empty here (RFC-4 M2 / #1548).
+      { segments, params: resolvedParams, search: {}, meta },
       resolvedName,
     );
   }

@@ -40,8 +40,18 @@ export interface MatchResult<P extends RouteParams = RouteParams> {
   /** Matched route segments (with slashChild) — for createRouteState() */
   readonly segments: readonly RouteTree[];
 
-  /** Extracted parameters (URL params + query params) */
+  /**
+   * Extracted PATH parameters. During the M2 rollout query params are still
+   * folded in here for back-compat (removed once the split lands, RFC-4 M2 /
+   * #1548); the query channel is {@link MatchResult.search}.
+   */
   readonly params: P;
+
+  /**
+   * Extracted QUERY parameters — the query channel, parsed into its own object
+   * (RFC-4 M2 / #1548). Empty (frozen `{}`) when the URL has no query string.
+   */
+  readonly search: Readonly<Record<string, unknown>>;
 
   /** Pre-computed route meta (segment fullName → paramTypeMap) */
   readonly meta: Readonly<RouteTreeStateMeta>;
@@ -58,8 +68,14 @@ export interface RouteTreeState<P extends RouteParams = RouteParams> {
   /** Full route name (e.g., "users.profile") */
   name: string;
 
-  /** Extracted parameters */
+  /** Extracted PATH parameters (query is {@link RouteTreeState.search}). */
   params: P;
+
+  /**
+   * Extracted QUERY parameters — the query channel (RFC-4 M2 / #1548).
+   * Optional only during the M2 rollout; populated by `createRouteState`.
+   */
+  search?: Readonly<Record<string, unknown>>;
 
   /** Parameter metadata by segment */
   meta: RouteTreeStateMeta;

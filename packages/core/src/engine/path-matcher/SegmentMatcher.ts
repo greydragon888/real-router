@@ -55,6 +55,9 @@ function assignQueryParam(
   }
 }
 
+/** Shared frozen empty query object reused for every query-less match. */
+const EMPTY_SEARCH: Readonly<Record<string, unknown>> = Object.freeze({});
+
 // =============================================================================
 // SegmentMatcher Class
 // =============================================================================
@@ -410,65 +413,70 @@ export class SegmentMatcher {
     params: Record<string, unknown>,
     queryString: string | undefined,
   ): MatchResult | undefined {
-    if (
-      queryString !== undefined &&
-      !this.#mergeQueryParams(route, params, queryString)
-    ) {
-      return undefined;
+    let search: Readonly<Record<string, unknown>> = EMPTY_SEARCH;
+
+    if (queryString !== undefined) {
+      const parsed = this.#parseSearch(route, queryString);
+
+      if (parsed === undefined) {
+        return undefined;
+      }
+
+      search = parsed;
+
+      // Back-compat (removed in the A3 params-cleanup, RFC-4 M2 / #1548): keep
+      // folding the query into `params` too, so readers of
+      // `state.params[queryKey]` keep working until the split completes.
+      // `search` above is the real query channel; this loop — and the
+      // query-overwrites-path precedence it preserves (#843) — dies in A3.
+      for (const key in parsed) {
+        assignQueryParam(params, key, parsed[key]);
+      }
     }
 
     return {
       segments: route.matchSegments,
       params,
+      search,
       meta: route.meta,
     };
   }
 
-  // Parses the query string and folds it into `params`. Returns false (→ match
-  // yields undefined) when the URL is unmatchable: the injected parser threw, or
-  // strict mode saw an undeclared key.
-  //
-  // Precedence (#843, INVARIANTS Matching #25): query params are merged into the
-  // SAME object that already holds the path params, so a query key equal to a
-  // path-param name OVERWRITES the path value (`match("/u/5?id=9")` → `{id:"9"}`).
-  // Intentional and documented: `buildPath` never emits a path param as a query
-  // key, so the build→match roundtrip is unaffected; the collision only arises
-  // for hand-crafted/adversarial URLs where a query shadows a path segment.
-  #mergeQueryParams(
+  // Parses the query string into its OWN object — the query channel (RFC-4 M2 /
+  // #1548). Returns undefined (→ match yields undefined) when the URL is
+  // unmatchable: the injected parser threw, or strict mode saw an undeclared
+  // key. The injected parser (searchParams.ts) already hardens `__proto__` as an
+  // own key (#855/#1293), so the parsed object is returned directly — no per-key
+  // re-hardening (that folding, and `assignQueryParam`, live on only for the A3
+  // back-compat merge into `params`).
+  #parseSearch(
     route: CompiledRoute,
-    params: Record<string, unknown>,
     queryString: string,
-  ): boolean {
-    let queryParams: Record<string, unknown>;
+  ): Record<string, unknown> | undefined {
+    let search: Record<string, unknown>;
 
     try {
-      queryParams = this.#options.parseQueryString(queryString);
+      search = this.#options.parseQueryString(queryString);
     } catch {
       // The injected query parser decodes percent-encoding too, so the same
       // valid-hex/invalid-UTF-8 sequence that breaks path params (e.g.
       // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw —
       // treat the whole URL as unmatched so the router resolves to
       // UNKNOWN_ROUTE instead of crashing on start() (#737).
-      return false;
+      return undefined;
     }
 
     if (this.#options.strictQueryParams) {
       const declared = route.declaredQueryParamsSet;
 
-      for (const key in queryParams) {
+      for (const key in search) {
         if (!declared.has(key)) {
-          return false;
+          return undefined;
         }
-
-        assignQueryParam(params, key, queryParams[key]);
-      }
-    } else {
-      for (const key in queryParams) {
-        assignQueryParam(params, key, queryParams[key]);
       }
     }
 
-    return true;
+    return search;
   }
 
   #checkTrailingSlash(cleanPath: string, route: CompiledRoute): boolean {

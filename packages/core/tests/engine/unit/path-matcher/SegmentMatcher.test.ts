@@ -83,11 +83,13 @@ describe("type compilation", () => {
     const result: MatchResult = {
       segments: [],
       params: {},
+      search: {},
       meta: {},
     };
 
     expect(result.segments).toStrictEqual([]);
     expect(result.params).toStrictEqual({});
+    expect(result.search).toStrictEqual({});
   });
 
   it("should compile SegmentMatcherOptions interface", () => {

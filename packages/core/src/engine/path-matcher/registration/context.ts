@@ -29,6 +29,11 @@ export const EMPTY_PARAMS: Readonly<Record<string, unknown>> = Object.freeze(
   {},
 );
 
+/** Frozen empty query bag for precomputed query-less cached results (RFC-4 M2). */
+export const EMPTY_SEARCH: Readonly<Record<string, unknown>> = Object.freeze(
+  {},
+);
+
 // Shared frozen sentinel for a route whose every segment has an empty
 // paramTypeMap (all-static chain): `buildMeta` returns this instead of a fresh
 // per-route `{ [fullName]: {} }` record — with N distinct route names those

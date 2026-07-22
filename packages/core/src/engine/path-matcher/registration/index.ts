@@ -9,6 +9,7 @@ import { buildFullPath, normalizeTrailingSlash } from "../pathUtils";
 import { compileBuildParts } from "./buildParts";
 import {
   EMPTY_PARAMS,
+  EMPTY_SEARCH,
   EMPTY_ROUTE_META,
   EMPTY_STRINGS,
   EMPTY_STRING_SET,
@@ -177,6 +178,7 @@ function compileAndRegisterRoute(
     compiled.cachedResult = Object.freeze({
       segments: compiled.matchSegments,
       params: EMPTY_PARAMS,
+      search: EMPTY_SEARCH,
       meta: compiled.meta,
     });
   }
