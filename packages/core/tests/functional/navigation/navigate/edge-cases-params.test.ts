@@ -75,11 +75,15 @@ describe("router.navigate() - edge cases params", () => {
         const state = await router.navigate("users.view", arrayLikeParams, {});
 
         expect(state.name).toBe("users.view");
+        // `id` fills the `:id` path slot (stays in .params); the undeclared
+        // keys are captured as query params (re-channeled to .search).
         expect(state.params).toStrictEqual({
+          id: 123,
+        });
+        expect(state.search).toStrictEqual({
           length: 2,
           0: "a",
           1: "b",
-          id: 123,
         });
       });
 
@@ -89,10 +93,14 @@ describe("router.navigate() - edge cases params", () => {
         const state = await router.navigate("users.view", numericKeyParams, {});
 
         expect(state.name).toBe("users.view");
+        // `id` fills the `:id` path slot (stays in .params); the undeclared
+        // numeric keys are captured as query params (re-channeled to .search).
         expect(state.params).toStrictEqual({
+          id: 456,
+        });
+        expect(state.search).toStrictEqual({
           0: "first",
           1: "second",
-          id: 456,
         });
       });
     });

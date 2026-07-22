@@ -12,7 +12,8 @@ import {
   rebuildTreeInPlace,
   resetStore,
 } from "./routesStore";
-import { constants, DEFAULT_TRANSITION } from "../../constants";
+import { constants, DEFAULT_TRANSITION, EMPTY_SEARCH } from "../../constants";
+import { splitParamsBySearch } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -293,12 +294,15 @@ export class RoutesNamespace<
     let builtPath = path;
 
     if (opts.rewritePathOnMatch) {
+      // Reunite the matched query with the resolved bag so the rebuilt URL keeps
+      // its query string — buildPath is still v1/single-bag (the search-aware
+      // slot-shift is a separate step, RFC-4 M2 / #1548). `search` is always
+      // present (frozen empty when query-less), so the spread is unconditional.
+      const buildBag = { ...(routeParams as Params), ...search } as Params;
       const buildParams =
         typeof this.#store.config.encoders[routeName] === "function"
-          ? this.#store.config.encoders[routeName]({
-              ...(routeParams as Params),
-            })
-          : (routeParams as Record<string, unknown>);
+          ? this.#store.config.encoders[routeName]({ ...buildBag })
+          : (buildBag as Record<string, unknown>);
 
       const ts = opts.trailingSlash;
 
@@ -322,12 +326,10 @@ export class RoutesNamespace<
       }
     }
 
-    // A3.1: `search` is the query channel from the matcher (RFC-4 M2 / #1548).
-    // Query is ALSO still folded into `params` during the back-compat window;
-    // the params-cleanup lands in A3.2.
-    // `search as SearchParams`: the matcher yields query values as loose
-    // `unknown` (engine boundary), narrowed here to the core query type — the
-    // same boundary cast `params as P` makes for the path bag.
+    // `state.search` carries the matched query; `state.params` keeps the
+    // resolved path bag. Query-typed defaults and decoder-injected keys stay in
+    // `params` on the matchPath path — the clean two-channel split there is a
+    // В2.5 follow-up; the navigate path already splits fully (RFC-4 M2 / #1548).
     return this.#deps.makeState<P>(
       routeName,
       routeParams,
@@ -466,9 +468,19 @@ export class RoutesNamespace<
         ? { ...defaultParams, ...params }
         : params;
 
+      // Split the target bag into path and query channels so `areStatesEqual`
+      // compares each against the active state's own channels (RFC-4 M2 /
+      // #1548) — `activeState.params` is now path-only, query is in
+      // `activeState.search`.
+      const { params: pathParams, search } = splitParamsBySearch(
+        effectiveParams,
+        this.getUrlParams(name),
+      );
+
       const targetState: State = {
         name,
-        params: effectiveParams,
+        params: pathParams,
+        search: search ?? EMPTY_SEARCH,
         path: "",
         transition: DEFAULT_TRANSITION,
         context: {},
@@ -490,8 +502,15 @@ export class RoutesNamespace<
       return false;
     }
 
-    // Hierarchical check: activeState is a descendant of target (name)
-    const activeParams = activeState.params;
+    // Hierarchical check: activeState is a descendant of target (name).
+    // This comparison was written against v1's single merged bag; reconstruct
+    // it from the two channels (path params + query) so the existing
+    // paramsMatch / stripQueryDefaults / paramsMatchExcluding logic keeps its
+    // exact semantics after the M2 split (RFC-4 M2 / #1548).
+    const activeParams = {
+      ...activeState.params,
+      ...activeState.search,
+    } as Params;
 
     if (!paramsMatch(params, activeParams)) {
       return false;

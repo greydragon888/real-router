@@ -8,7 +8,12 @@ import {
 import { completeTransition } from "./transition/completeTransition";
 import { routeTransitionError } from "./transition/errorHandling";
 import { executeGuardPipeline } from "./transition/guardPhase";
-import { EMPTY_PARAMS, errorCodes, constants } from "../../constants";
+import {
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+  errorCodes,
+  constants,
+} from "../../constants";
 import { RouterError } from "../../RouterError";
 import { getStateMetaParams, setStateMetaParams } from "../../stateMetaStore";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
@@ -179,6 +184,10 @@ export class NavigationNamespace {
     const writableState = {
       name: state.name,
       params: state.params,
+      // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
+      // without this, start()'s navigateToState(matchPath(...)) would drop the
+      // matched query from the committed state.
+      search: state.search,
       path: state.path,
       context: { ...state.context },
     } as State;
@@ -285,6 +294,7 @@ export class NavigationNamespace {
     const state: State = {
       name: constants.UNKNOWN_ROUTE,
       params: EMPTY_PARAMS,
+      search: EMPTY_SEARCH,
       path,
       transition: transitionMeta,
       context: {},

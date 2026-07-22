@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { matchPath } from "./helpers";
+import { matchPath, matchSegments } from "./helpers";
 import { createRouteTree, getSegmentsByName } from "../../../../src/engine";
 
 describe("New API - matchPath", () => {
@@ -87,11 +87,13 @@ describe("New API - matchPath", () => {
       { name: "route", path: "/route?flag" },
     ]);
 
-    const result = matchPath(tree, "/route?flag=true", {
+    // Query keys live on the search channel (RFC-4 M2 / #1548); use
+    // matchSegments to read the full MatchResult (matchPath drops .search).
+    const result = matchSegments(tree, "/route?flag=true", {
       queryParams: { booleanFormat: "auto" },
     });
 
-    expect(result?.params.flag).toBe(true);
+    expect(result?.search.flag).toBe(true);
   });
 
   it("should match with numberFormat auto in matchOptions", () => {
@@ -99,12 +101,12 @@ describe("New API - matchPath", () => {
       { name: "route", path: "/route?page&sort" },
     ]);
 
-    const result = matchPath(tree, "/route?page=5&sort=name", {
+    const result = matchSegments(tree, "/route?page=5&sort=name", {
       queryParams: { numberFormat: "auto" },
     });
 
-    expect(result?.params.page).toBe(5);
-    expect(result?.params.sort).toBe("name");
+    expect(result?.search.page).toBe(5);
+    expect(result?.search.sort).toBe("name");
   });
 
   it("should match with urlParamsEncoding option", () => {
@@ -255,11 +257,11 @@ describe("New API - matchPath", () => {
   it("should handle remaining query params in non-strict mode", () => {
     const tree = createRouteTree("", "", [{ name: "home", path: "/home" }]);
 
-    const result = matchPath(tree, "/home?extra=value", {
+    const result = matchSegments(tree, "/home?extra=value", {
       queryParamsMode: "default",
     });
 
-    expect(result?.params.extra).toBe("value");
+    expect(result?.search.extra).toBe("value");
   });
 
   it("should match root with query params", () => {
@@ -267,11 +269,11 @@ describe("New API - matchPath", () => {
       { name: "route", path: "/path?b" },
     ]);
 
-    const result = matchPath(tree, "/path?a=1&b=2");
+    const result = matchSegments(tree, "/path?a=1&b=2");
 
-    expect(result?.name).toBe("route");
+    expect(result?.segments.at(-1)?.fullName).toBe("route");
     // No queryParams config ⇒ default (auto) strategies. (#744)
-    expect(result?.params).toStrictEqual({ a: 1, b: 2 });
+    expect(result?.search).toStrictEqual({ a: 1, b: 2 });
   });
 
   it("should handle empty query string in loose mode (fast path)", () => {
@@ -293,13 +295,13 @@ describe("New API - matchPath", () => {
     // Tests loose mode normal path with actual query params
     const tree = createRouteTree("", "", [{ name: "home", path: "/home" }]);
 
-    const result = matchPath(tree, "/home?extra=value&other=123", {
+    const result = matchSegments(tree, "/home?extra=value&other=123", {
       queryParamsMode: "loose",
     });
 
-    expect(result?.name).toBe("home");
+    expect(result?.segments.at(-1)?.fullName).toBe("home");
     // No queryParams config ⇒ default (auto) strategies. (#744)
-    expect(result?.params).toStrictEqual({ extra: "value", other: 123 });
+    expect(result?.search).toStrictEqual({ extra: "value", other: 123 });
   });
 
   it("should include root with parser in segments", () => {

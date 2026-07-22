@@ -33,28 +33,6 @@ function stringifyParamValue(value: unknown): string {
   return String(value);
 }
 
-/** Folds a parsed query param into the accumulator as an own DATA property. A
- *  plain `params[name] = value` invokes the inherited `__proto__` accessor for the
- *  literal key `"__proto__"` — so the param silently vanishes (string value) or
- *  swaps the local prototype (object value), annulling search-params' #855 own-key
- *  hardening one layer up. `defineProperty` writes a genuine own entry. (#1293) */
-function assignQueryParam(
-  params: Record<string, unknown>,
-  name: string,
-  value: unknown,
-): void {
-  if (name === "__proto__") {
-    Object.defineProperty(params, name, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true,
-    });
-  } else {
-    params[name] = value;
-  }
-}
-
 /** Shared frozen empty query object reused for every query-less match. */
 const EMPTY_SEARCH: Readonly<Record<string, unknown>> = Object.freeze({});
 
@@ -422,16 +400,10 @@ export class SegmentMatcher {
         return undefined;
       }
 
+      // Query goes ONLY into its own channel now (RFC-4 M2 / #1548). `params`
+      // stays path-only — the A2 back-compat fold into `params`, and with it
+      // the query-overwrites-path precedence (#843), are gone.
       search = parsed;
-
-      // Back-compat (removed in the A3 params-cleanup, RFC-4 M2 / #1548): keep
-      // folding the query into `params` too, so readers of
-      // `state.params[queryKey]` keep working until the split completes.
-      // `search` above is the real query channel; this loop — and the
-      // query-overwrites-path precedence it preserves (#843) — dies in A3.
-      for (const key in parsed) {
-        assignQueryParam(params, key, parsed[key]);
-      }
     }
 
     return {

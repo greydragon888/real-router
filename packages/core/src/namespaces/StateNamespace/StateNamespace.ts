@@ -191,22 +191,35 @@ export class StateNamespace {
       return true;
     }
 
-    const state1Keys = Object.keys(state1.params);
-    const state2Keys = Object.keys(state2.params);
+    // Compare BOTH channels — path params and query (search). Query moved out
+    // of `params` into `search` in M2 (#1548), so a full comparison must check
+    // both. `search` is always present (makeState fills EMPTY_SEARCH).
+    return (
+      recordsShallowEqual(state1.params, state2.params) &&
+      recordsShallowEqual(state1.search, state2.search)
+    );
+  }
+}
 
-    if (state1Keys.length !== state2Keys.length) {
+/**
+ * Shallow key/value equality of two param-like records (path params or query),
+ * using {@link areParamValuesEqual} per key so array values compare by content.
+ */
+function recordsShallowEqual(
+  left: Readonly<Record<string, unknown>>,
+  right: Readonly<Record<string, unknown>>,
+): boolean {
+  const leftKeys = Object.keys(left);
+
+  if (leftKeys.length !== Object.keys(right).length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    if (!(key in right) || !areParamValuesEqual(left[key], right[key])) {
       return false;
     }
-
-    for (const param of state1Keys) {
-      if (
-        !(param in state2.params) ||
-        !areParamValuesEqual(state1.params[param], state2.params[param])
-      ) {
-        return false;
-      }
-    }
-
-    return true;
   }
+
+  return true;
 }

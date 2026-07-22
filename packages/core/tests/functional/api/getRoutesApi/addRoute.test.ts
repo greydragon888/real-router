@@ -918,9 +918,9 @@ describe("core/routes/addRoute", () => {
       );
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
-      expect(state?.params.page).toBe(1);
-      expect(state?.params.sort).toBe("asc");
+      expect(state?.search?.q).toBe("test");
+      expect(state?.search?.page).toBe(1);
+      expect(state?.search?.sort).toBe("asc");
     });
 
     it("should handle route with all options combined", async () => {
@@ -1020,7 +1020,7 @@ describe("core/routes/addRoute", () => {
         "docs",
       );
       expect(
-        getPluginApi(router).matchPath("/docs?section=intro")?.params.section,
+        getPluginApi(router).matchPath("/docs?section=intro")?.search?.section,
       ).toBe("intro");
 
       // Without query param

@@ -30,8 +30,8 @@ describe("router.navigate() - query params", () => {
       name: "users.view",
       path: "/users/view/123?q=search&page=2",
     });
-    expect(state?.params).toStrictEqual({
-      id: 123,
+    expect(state?.params).toStrictEqual({ id: 123 });
+    expect(state?.search).toStrictEqual({
       q: "search",
       page: "2",
     });
@@ -45,7 +45,8 @@ describe("router.navigate() - query params", () => {
     });
 
     expect(state?.path).toBe("/users/view/42?q=a%20b&tag=x%2Fy");
-    expect(state?.params).toStrictEqual({ id: 42, q: "a b", tag: "x/y" });
+    expect(state?.params).toStrictEqual({ id: 42 });
+    expect(state?.search).toStrictEqual({ q: "a b", tag: "x/y" });
   });
 
   it("should handle empty query params correctly", async () => {
@@ -111,20 +112,20 @@ describe("router.navigate() / router.buildPath() — undefined params contract",
 
     const state = router.getState()!;
 
-    expect(state.params).toStrictEqual({
-      id: 42,
+    expect(state.params).toStrictEqual({ id: 42 });
+    expect(state.search).toStrictEqual({
       zero: 0,
       empty: "",
       falseFlag: false,
     });
   });
 
-  it("navigate() strips undefined from state.params (in key)", async () => {
+  it("navigate() strips undefined query params from state.search (in key)", async () => {
     await router.navigate("users.view", { id: 42, sort: undefined });
 
     const state = router.getState()!;
 
-    expect("sort" in state.params).toBe(false);
+    expect("sort" in state.search).toBe(false);
     expect(state.params).toStrictEqual({ id: 42 });
   });
 

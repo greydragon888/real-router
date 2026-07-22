@@ -45,7 +45,7 @@ describe("router.navigate() - same states", () => {
         const state1 = await router.navigate("profile", { userId: "123" });
 
         expect(state1?.name).toBe("profile");
-        expect(state1?.params).toStrictEqual({ userId: "123" });
+        expect(state1?.search).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with same param - should fail
         await expect(
@@ -60,13 +60,13 @@ describe("router.navigate() - same states", () => {
         const state1 = await router.navigate("profile", { userId: "123" });
 
         expect(state1?.name).toBe("profile");
-        expect(state1?.params).toStrictEqual({ userId: "123" });
+        expect(state1?.search).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with different param - should succeed
         const state2 = await router.navigate("profile", { userId: "456" });
 
         expect(state2?.name).toBe("profile");
-        expect(state2?.params).toStrictEqual({ userId: "456" });
+        expect(state2?.search).toStrictEqual({ userId: "456" });
       });
     });
 
@@ -189,8 +189,8 @@ describe("router.navigate() - same states", () => {
         );
 
         expect(state.name).toBe("section.query");
-        expect(state.params).toStrictEqual({
-          section: "section1",
+        expect(state.params).toStrictEqual({ section: "section1" });
+        expect(state.search).toStrictEqual({
           param1: 42,
           param2: "b",
           param3: "c",
@@ -217,8 +217,8 @@ describe("router.navigate() - same states", () => {
         );
 
         expect(state.name).toBe("section.query");
-        expect(state.params).toStrictEqual({
-          section: "section1",
+        expect(state.params).toStrictEqual({ section: "section1" });
+        expect(state.search).toStrictEqual({
           param1: ["x", "y"],
           param2: "b",
           param3: "c",

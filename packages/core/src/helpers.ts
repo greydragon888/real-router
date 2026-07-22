@@ -105,21 +105,24 @@ export function normalizeParams(
 }
 
 /**
- * Splits the query params out of a params bag by route declaration: any key
- * that is NOT a path (URL) param name of the route is a query param (RFC-4 M2 /
- * #1548). Mirrors the matcher's read-side split for the navigate/build path,
- * where the caller still passes one v1-style bag. Lazy — returns `undefined`
- * when there are no query keys, so `makeState` reuses the frozen EMPTY_SEARCH
- * singleton (zero transient alloc, #1027).
+ * Splits a v1-style params bag into its path and query channels by route
+ * declaration: any key that is NOT a path (URL) param name of the route is a
+ * query param (RFC-4 M2 / #1548). Mirrors the matcher's read-side split for the
+ * navigate/build path, where the caller still passes one bag.
  *
  * `pathNames` is the route's cached URL-param list (`getUrlParams`), covering
  * ancestor path params too; undeclared keys (loose mode) fall through to
  * search, matching the matcher's loose behavior.
+ *
+ * Fast path — when there are no query keys the ORIGINAL `params` is returned
+ * unchanged (no copy, so an all-path or empty bag preserves the EMPTY_PARAMS
+ * singleton, #1027) and `search` is `undefined` so `makeState` reuses the
+ * frozen EMPTY_SEARCH.
  */
-export function extractSearchFromParams(
+export function splitParamsBySearch(
   params: Params,
   pathNames: readonly string[],
-): SearchParams | undefined {
+): { params: Params; search: SearchParams | undefined } {
   let search: Record<string, unknown> | undefined;
 
   for (const key in params) {
@@ -131,7 +134,26 @@ export function extractSearchFromParams(
     search[key] = params[key];
   }
 
-  // Boundary cast (like `params as P` at the matcher edge): the non-path bag
-  // keys carry query values (SearchParamValue), typed loosely here as `unknown`.
-  return search as SearchParams | undefined;
+  if (search === undefined) {
+    return { params, search: undefined };
+  }
+
+  // Some query keys were split out — rebuild the path-only bag (params minus
+  // the query keys). Boundary cast on `search` (like `params as P` at the
+  // matcher edge): non-path keys carry query values, typed loosely as unknown.
+  let pathParams: Params | undefined;
+
+  for (const key in params) {
+    if (!Object.hasOwn(params, key) || key in search) {
+      continue;
+    }
+
+    pathParams ??= {};
+    pathParams[key] = params[key];
+  }
+
+  return {
+    params: pathParams ?? EMPTY_PARAMS,
+    search: search as SearchParams,
+  };
 }

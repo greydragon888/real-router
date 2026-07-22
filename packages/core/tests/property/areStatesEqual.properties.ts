@@ -23,6 +23,7 @@ describe("areStatesEqual Properties", () => {
     return {
       name: "users.view",
       params,
+      search: {},
       path: "/users/x",
       transition: DEFAULT_TRANSITION,
       context: {},

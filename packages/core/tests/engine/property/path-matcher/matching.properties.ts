@@ -278,8 +278,15 @@ describe("Matching Properties", () => {
         expect(resultWithHash!.segments.map((s) => s.fullName)).toStrictEqual(
           resultPlain!.segments.map((s) => s.fullName),
         );
+        // `id` is the path param (from `/:id`); `ref` is an undeclared query
+        // param (from `?ref=…`), so after RFC-4 M2 (#1548) it rides the `search`
+        // channel, not `params`. The result must match the no-fragment match on
+        // BOTH channels, and `ref` must recover intact in `search` — proving the
+        // fragment was stripped before query parsing (not folded into `ref`).
         expect(resultWithHash!.params).toStrictEqual(resultPlain!.params);
-        expect(resultWithHash!.params).toStrictEqual({ id, ref: refValue });
+        expect(resultWithHash!.search).toStrictEqual(resultPlain!.search);
+        expect(resultWithHash!.params).toStrictEqual({ id });
+        expect(resultWithHash!.search).toStrictEqual({ ref: refValue });
       },
     );
   });

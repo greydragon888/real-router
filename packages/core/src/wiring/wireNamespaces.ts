@@ -1,6 +1,6 @@
 // packages/core/src/wiring/wireNamespaces.ts
 
-import { extractSearchFromParams, normalizeParams } from "../helpers";
+import { normalizeParams, splitParamsBySearch } from "../helpers";
 import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
 
@@ -192,22 +192,23 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
 
       const forwarded = ctx.forwardState(routeName, routeParams);
       const name = forwarded.name;
-      const params = normalizeParams(forwarded.params);
+      const fullParams = normalizeParams(forwarded.params);
       const meta = ns.routes.getMetaForState(name);
 
       if (meta === undefined) {
         return;
       }
 
-      // A3.2: split the query channel out of the incoming bag by declaration
-      // (keys that are not path params — RFC-4 M2 / #1548). buildPath still
-      // takes the full v1 bag (the facade slot-shift is a separate step); query
-      // is ALSO still folded into `params` during the back-compat window.
-      const search = extractSearchFromParams(
-        params,
+      // Split the incoming v1 bag into path and query channels by declaration
+      // (keys that are not path params — RFC-4 M2 / #1548). `buildPath` still
+      // takes the FULL bag (the facade slot-shift is a separate step), so the
+      // URL keeps its query string; `state.params` gets the path-only bag and
+      // `state.search` the query.
+      const { params, search } = splitParamsBySearch(
+        fullParams,
         ns.routes.getUrlParams(name),
       );
-      const path = ctx.buildPath(name, params);
+      const path = ctx.buildPath(name, fullParams);
 
       return ns.state.makeState(name, params, search, path, meta, true);
     },

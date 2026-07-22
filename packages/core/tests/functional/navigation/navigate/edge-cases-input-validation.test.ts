@@ -94,11 +94,14 @@ describe("router.navigate() - edge cases input validation", () => {
         id: "1",
       });
 
-      // Unicode key survives untouched in params; the path-param `id` matched
-      // the route segment, the extra key is serialized as a (URL-encoded) query.
+      // Path-param `id` matched the route segment and stays in params; the
+      // undeclared unicode key is a query param (RFC-4 M2 search channel) and
+      // survives untouched there, then serializes as a (URL-encoded) query.
       expect(state.name).toBe("items");
       expect(state.params).toMatchObject({
         id: "1",
+      });
+      expect(state.search).toMatchObject({
         "ключ-тест": "значение",
       });
       expect(state.path).toContain("/items/1");

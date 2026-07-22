@@ -64,7 +64,7 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(router).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
+      expect(state?.search?.q).toBe("test");
     });
 
     it("should match first query param correctly (regression test)", () => {
@@ -74,8 +74,8 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(router).matchPath("/search?first=1&second=2");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.first).toBe(1);
-      expect(state?.params.second).toBe(2);
+      expect(state?.search?.first).toBe(1);
+      expect(state?.search?.second).toBe(2);
     });
   });
 
@@ -534,9 +534,9 @@ describe("core/routes/routePath/matchPath", () => {
       );
 
       expect(state?.name).toBe("search");
-      // Undeclared query params are included in default mode
-      expect(state?.params.q).toBe("test");
-      expect(state?.params.limit).toBe(10);
+      // Undeclared query params are included in default mode (search channel)
+      expect(state?.search?.q).toBe("test");
+      expect(state?.search?.limit).toBe(10);
     });
 
     it("should NOT match path with undeclared query params in strict mode", async () => {
@@ -572,7 +572,7 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(customRouter).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
+      expect(state?.search?.q).toBe("test");
     });
 
     it("should NOT match with extra undeclared params in strict mode", async () => {
@@ -602,10 +602,10 @@ describe("core/routes/routePath/matchPath", () => {
       );
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
-      expect(state?.params.page).toBe(2);
-      // Extra undeclared param also included in default mode
-      expect(state?.params.sort).toBe("name");
+      expect(state?.search?.q).toBe("test");
+      expect(state?.search?.page).toBe(2);
+      // Extra undeclared param also included in default mode (search channel)
+      expect(state?.search?.sort).toBe("name");
     });
   });
 
@@ -694,7 +694,9 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(customRouter).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
+      expect(state?.search?.q).toBe("test");
+      // `sort` is absent from the URL, so it comes from defaultParams via the
+      // matchPath merge and stays in `.params` (only URL query hits `.search`).
       expect(state?.params.sort).toBe("date");
       // rewritePathOnMatch rebuilds path including defaultParams
       expect(state?.path).toContain("sort=date");
@@ -792,7 +794,7 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(customRouter).matchPath("/enc?q=1");
 
       expect(state?.name).toBe("enc");
-      expect(state?.params.q).toBe(1);
+      expect(state?.search?.q).toBe(1);
       // path kept un-rewritten (source), match preserved
       expect(state?.path).toBe("/enc?q=1");
     });

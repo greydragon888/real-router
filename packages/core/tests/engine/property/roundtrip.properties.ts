@@ -69,8 +69,8 @@ describe("Roundtrip Properties", () => {
         const result = matcher.match(path);
 
         expect(result).toBeDefined();
-        expect(result!.params.q).toBe(q);
-        expect(result!.params.page).toBe(page);
+        expect(result!.search.q).toBe(q);
+        expect(result!.search.page).toBe(page);
       },
     );
   });
@@ -85,7 +85,7 @@ describe("Roundtrip Properties", () => {
 
         expect(result).toBeDefined();
 
-        const decoded = result!.params.tags as string | string[];
+        const decoded = result!.search.tags as string | string[];
 
         if (
           format === "brackets" ||
@@ -173,7 +173,7 @@ describe("Roundtrip Properties", () => {
         expect(paramsMeta.category).toBe("url");
         expect(paramsMeta.q).toBe("query");
         expect(result!.params.category).toBe(category);
-        expect(result!.params.q).toBe(q);
+        expect(result!.search.q).toBe(q);
       },
     );
   });

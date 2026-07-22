@@ -27,11 +27,10 @@ export interface SimpleState<
   params: P;
   /**
    * Query channel — see {@link SearchParams}. Split out of the former single
-   * `params` bag (RFC-4 M2 / #1548). Optional only during the M2 rollout;
-   * tightens to always-present once every State/SimpleState producer populates
-   * it. Readers must not rely on its absence.
+   * `params` bag (RFC-4 M2 / #1548). Always present: a frozen empty object when
+   * there are no query params.
    */
-  search?: S;
+  search: S;
 }
 
 export type TransitionPhase = "deactivating" | "activating";
@@ -61,11 +60,10 @@ export interface State<
   params: P;
   /**
    * Query channel — see {@link SearchParams}. Holds ONLY query-string params;
-   * path params live in {@link State.params} (RFC-4 M2 / #1548). Optional only
-   * during the M2 rollout; tightens to always-present (a frozen `{}` when there
-   * are no query params) once every producer populates it.
+   * path params live in {@link State.params} (RFC-4 M2 / #1548). Always present:
+   * a frozen empty object when there are no query params.
    */
-  search?: S;
+  search: S;
   path: string;
   transition: TransitionMeta;
   /**

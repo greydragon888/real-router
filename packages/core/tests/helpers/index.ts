@@ -28,6 +28,7 @@ export const makeState = (
     name,
     path: `/${name.replaceAll(".", "/")}`,
     params,
+    search: {},
     transition: DEFAULT_TRANSITION,
     context: {},
   };

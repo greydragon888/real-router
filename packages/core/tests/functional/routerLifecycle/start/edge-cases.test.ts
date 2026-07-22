@@ -24,7 +24,10 @@ describe("router.start() - edge cases", () => {
   // Bare core does NOT validate param VALUES — value validation is opt-in via
   // @real-router/validation-plugin (#934/#942). A function / class instance /
   // plain object is ACCEPTED: it round-trips into the query string and is kept
-  // BY REFERENCE in state.params (no structuredClone). These pin the documented
+  // BY REFERENCE in state.search (no structuredClone). Because these keys are
+  // undeclared (not path `:param` slots on users.list), they are captured as
+  // QUERY params — carried in state.search, not state.params (RFC-4 M2, #1548).
+  // These pin the documented
   // carve-out. (The previous tests here CLAIMED bare core rejects these values —
   // via a self-catching `try { … expect.fail() } catch { expect(e).toBeDefined() }`
   // that swallowed its own AssertionError on a FALSE premise; bare core accepts
@@ -41,7 +44,7 @@ describe("router.start() - edge cases", () => {
       const state = await router.navigate("users.list", { extra: fn });
 
       expect(state.name).toBe("users.list");
-      expect(state.params.extra).toBe(fn); // same reference, not cloned/coerced
+      expect(state.search?.extra).toBe(fn); // same reference, not cloned/coerced
     });
 
     it("accepts a class-instance param value — resolves, kept by reference", async () => {
@@ -54,7 +57,7 @@ describe("router.start() - edge cases", () => {
       const state = await router.navigate("users.list", { extra: instance });
 
       expect(state.name).toBe("users.list");
-      expect(state.params.extra).toBe(instance);
+      expect(state.search?.extra).toBe(instance);
     });
 
     it("accepts a plain-object param value — resolves, kept by reference", async () => {
@@ -63,7 +66,7 @@ describe("router.start() - edge cases", () => {
       const state = await router.navigate("users.list", { extra: obj });
 
       expect(state.name).toBe("users.list");
-      expect(state.params.extra).toBe(obj);
+      expect(state.search?.extra).toBe(obj);
     });
   });
 

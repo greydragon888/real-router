@@ -82,6 +82,7 @@ describe("getPluginApi()", () => {
       (_next, _name, params) => ({
         name: "users",
         params,
+        search: {},
       }),
     );
 

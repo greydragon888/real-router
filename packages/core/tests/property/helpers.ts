@@ -156,6 +156,7 @@ export const arbState: fc.Arbitrary<State> = fc
   .map((r) => ({
     name: r.name,
     params: r.params,
+    search: {},
     path: r.path,
     transition: DEFAULT_TRANSITION,
     context: {},

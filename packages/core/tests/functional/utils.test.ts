@@ -170,7 +170,7 @@ describe("core/utils", () => {
         param: boolean;
       }>("/query?param1=true&param2=false");
 
-      expect(match?.params).toStrictEqual({
+      expect(match?.search).toStrictEqual({
         param1: true,
         param2: false,
       });
@@ -181,7 +181,7 @@ describe("core/utils", () => {
     it("should match on start", async () => {
       await router.start("/query?param1=true&param2=false");
 
-      expect(router.getState()?.params).toStrictEqual({
+      expect(router.getState()?.search).toStrictEqual({
         param1: true,
         param2: false,
       });

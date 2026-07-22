@@ -59,6 +59,7 @@ describe("matchPath: interceptor application audit (#525, Q1)", () => {
       return {
         name: result.name,
         params: { ...result.params, intercepted: "yes" },
+        search: {},
       };
     });
 

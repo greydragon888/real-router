@@ -101,8 +101,8 @@ describe("createMatcher", () => {
     const result = matcher.match("/search?q=hello&active=true");
 
     expect(result).toBeDefined();
-    expect(result?.params.q).toBe("hello");
-    expect(result?.params.active).toBe(true); // booleanFormat: "auto" parses "true" → true
+    expect(result?.search.q).toBe("hello");
+    expect(result?.search.active).toBe(true); // booleanFormat: "auto" parses "true" → true
   });
 
   it("should inject buildQueryString from search-params", () => {
@@ -207,8 +207,8 @@ describe("createMatcher", () => {
     const result = matcher.match("/search?page=3&limit=20");
 
     expect(result).toBeDefined();
-    expect(result?.params.page).toBe(3); // numberFormat: "auto" parses "3" → 3
-    expect(result?.params.limit).toBe(20);
+    expect(result?.search.page).toBe(3); // numberFormat: "auto" parses "3" → 3
+    expect(result?.search.limit).toBe(20);
   });
 });
 
@@ -221,9 +221,9 @@ describe("createMatcher — legal '?' inside a query value (#1292)", () => {
 
     // "?" is legal inside a query value per RFC 3986; SegmentMatcher already split
     // the URL at the first "?", so the DI parser must not split again (#1292).
-    expect(matcher.match("/r?x=a?b")?.params).toStrictEqual({ x: "a?b" });
+    expect(matcher.match("/r?x=a?b")?.search).toStrictEqual({ x: "a?b" });
     // control — no inner "?"
-    expect(matcher.match("/r?x=ab")?.params).toStrictEqual({ x: "ab" });
+    expect(matcher.match("/r?x=ab")?.search).toStrictEqual({ x: "ab" });
   });
 
   it("does not unmatch a legal '?'-in-value URL under strictQueryParams (#1292)", () => {
@@ -234,9 +234,9 @@ describe("createMatcher — legal '?' inside a query value (#1292)", () => {
 
     // the second split spawned a phantom undeclared key → strict rejected the whole
     // URL; the declared "q" must carry the full "a?b" value.
-    expect(matcher.match("/s?q=a?b")?.params).toStrictEqual({ q: "a?b" });
+    expect(matcher.match("/s?q=a?b")?.search).toStrictEqual({ q: "a?b" });
     // control
-    expect(matcher.match("/s?q=ab")?.params).toStrictEqual({ q: "ab" });
+    expect(matcher.match("/s?q=ab")?.search).toStrictEqual({ q: "ab" });
   });
 });
 
@@ -253,6 +253,6 @@ describe("createMatcher — a literal '__proto__' query key survives (#1293)", (
     const result = matcher.match("/r?__proto__=zzz");
 
     expect(result).toBeDefined();
-    expect(Object.hasOwn(result!.params, "__proto__")).toBe(true);
+    expect(Object.hasOwn(result!.search, "__proto__")).toBe(true);
   });
 });
