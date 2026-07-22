@@ -322,7 +322,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
       const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
 
-      router.replaceHistoryState("home", {}, { hash: "x" });
+      router.replaceHistoryState("home", {}, undefined, { hash: "x" });
 
       // `#` is the route delimiter here — { hash } must be dropped, not spliced
       // as "#x" (which the shared explicit-hash branch would otherwise do). Same

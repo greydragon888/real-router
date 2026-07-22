@@ -88,6 +88,7 @@ export function createReplaceHistoryState(
 ): (
   name: string,
   params?: Params,
+  search?: SearchParams,
   options?: ReplaceHistoryStateOptions,
 ) => void {
   // Reusable buffer — browsers structured-clone state synchronously inside
@@ -103,6 +104,7 @@ export function createReplaceHistoryState(
   return (
     name: string,
     params: Params = {},
+    search?: SearchParams,
     options?: ReplaceHistoryStateOptions,
   ) => {
     const state = api.buildState(name, params);
@@ -116,13 +118,14 @@ export function createReplaceHistoryState(
     const builtState = api.makeState(
       state.name,
       state.params,
-      // `api.buildState` yields a single (path+query) bag with no separate
-      // search channel (RouteTreeState has no `search`), so pass none here —
-      // `makeState` fills `builtState.search` with the frozen empty bag, which
-      // the buffer below serializes into `history.state` (RFC-4 M2 / #1548). A
-      // caller-supplied `search` on `replaceHistoryState` is a follow-up.
-      undefined,
-      router.buildPath(state.name, state.params),
+      // Explicit query channel (RFC-4 M2 / #1548): the caller's `search` reaches
+      // the built State's `search` and the rebuilt path below, so the
+      // `history.state` record (serialized from the buffer) carries the query —
+      // mirroring the search-aware `buildUrl`. `api.buildState` yields a single
+      // path bag with no `search`, so the caller's `search` is the only query
+      // source here; omitted → `makeState` fills the frozen empty search bag.
+      search,
+      router.buildPath(state.name, state.params, search),
       // No meta arg: since #1548 the per-segment param-source map is read from
       // the live matcher by `state.name` (getMetaForState), not carried onto the
       // built State — the removed `stateMetaStore` sidecar.
@@ -150,8 +153,10 @@ export function createReplaceHistoryState(
     // always called without options. For browser/navigation-plugin hashSegment
     // carries the explicit or preserved fragment; for hash-plugin it is always
     // "" (preserveHash=false), and the plugin strips { hash } before this runs
-    // (#1230), so no stray fragment is spliced into a hash-route URL.
-    const url = buildUrlFn(name, params) + hashSegment;
+    // (#1230), so no stray fragment is spliced into a hash-route URL. The
+    // caller's `search` (RFC-4 M2 / #1548) threads through so the query lands in
+    // the rebuilt URL, matching the built State above.
+    const url = buildUrlFn(name, params, search) + hashSegment;
 
     buffer.name = builtState.name;
     buffer.params = builtState.params;

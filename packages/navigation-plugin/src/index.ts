@@ -50,6 +50,7 @@ declare module "@real-router/core" {
     replaceHistoryState(
       name: string,
       params?: Params,
+      search?: SearchParams,
       options?: { hash?: string },
     ): void;
     peekBack(): State | undefined;

@@ -56,7 +56,7 @@ The plugin extends the router instance with three methods via [`extendRouter()`]
 | --------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `buildUrl(name, params?, search?, options?: { hash? })`   | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. `options.hash` (decoded) is encoded and appended. |
 | `matchUrl(url)`                                           | `State \| undefined` | Parse URL to router state                                                                                                                           |
-| `replaceHistoryState(name, params?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                 |
+| `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                 |
 
 ```typescript
 router.buildUrl("users", { id: "123" });

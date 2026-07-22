@@ -593,7 +593,7 @@ describe("Browser Plugin — URL", () => {
       // replaceHistoryState re-syncs it (#1212 — the sibling replaceState writer
       // to the nav-write that #1019 already syncs). Without the sync, a later
       // preserve-navigate reads the stale cache and wipes the fragment.
-      router.replaceHistoryState("home", {}, { hash: "ch1" });
+      router.replaceHistoryState("home", {}, undefined, { hash: "ch1" });
 
       // A preserve-navigate (opts.hash === undefined) must carry that fragment.
       await router.navigate("users.list");

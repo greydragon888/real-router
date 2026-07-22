@@ -106,13 +106,14 @@ export class HashPlugin {
       replaceHistoryState: (
         name: string,
         params?: Params,
+        search?: SearchParams,
         opts?: { hash?: string },
       ) => {
         if (opts?.hash !== undefined) {
           warnHashIgnored();
         }
 
-        replaceHistoryStateImpl(name, params);
+        replaceHistoryStateImpl(name, params, search);
       },
     });
 

@@ -18,6 +18,7 @@ describe("plugin-utils factories", () => {
     router = createRouter([
       { name: "home", path: "/" },
       { name: "users", path: "/users/:id" },
+      { name: "list", path: "/list?tab&sort" },
     ]);
   });
 
@@ -106,7 +107,8 @@ describe("plugin-utils factories", () => {
         api,
         router,
         browser,
-        (name, params) => createPluginBuildUrl(router, "")(name, params),
+        (name, params, search) =>
+          createPluginBuildUrl(router, "")(name, params, search),
         preserveHash,
       );
     }
@@ -145,7 +147,7 @@ describe("plugin-utils factories", () => {
     it("sets an explicit hash, encoded", () => {
       const replace = makeReplace();
 
-      replace("users", { id: "1" }, { hash: "sec one" });
+      replace("users", { id: "1" }, undefined, { hash: "sec one" });
 
       expect(browser.replaceState).toHaveBeenCalledWith(
         expect.anything(),
@@ -156,7 +158,7 @@ describe("plugin-utils factories", () => {
     it("clears the fragment for an explicitly empty hash", () => {
       const replace = makeReplace();
 
-      replace("users", { id: "1" }, { hash: "" });
+      replace("users", { id: "1" }, undefined, { hash: "" });
 
       expect(browser.replaceState).toHaveBeenCalledWith(
         expect.anything(),
@@ -172,6 +174,24 @@ describe("plugin-utils factories", () => {
       expect(browser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "home", params: {}, path: "/" }),
         "/",
+      );
+    });
+
+    it("threads a caller-supplied search channel into state and URL (RFC-4 M2 / #1548)", () => {
+      const replace = makeReplace(false);
+
+      replace("list", {}, { tab: "posts" });
+
+      // The query lands in the buffered `history.state` (dedicated `search`
+      // channel, path-only `params`) AND the rebuilt URL.
+      expect(browser.replaceState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "list",
+          params: {},
+          search: { tab: "posts" },
+          path: "/list?tab=posts",
+        }),
+        "/list?tab=posts",
       );
     });
   });

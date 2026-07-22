@@ -165,7 +165,7 @@ Comparison is via `isSameHref(finalUrl, browser.currentEntry?.url)` (`href-utils
 
 ### replaceHistoryState hash semantics
 
-`replaceHistoryState(name, params, options?)` accepts an optional `{ hash }` field with the same tri-state semantics as `router.navigate` (undefined preserves, `""` clears, value sets). When omitted, current `browser.getHash()` is preserved — symmetric with `onTransitionSuccess`.
+`replaceHistoryState(name, params, search?, options?)` accepts a `search` query channel (position 3, RFC-4 M2 #1548) and an optional `{ hash }` field with the same tri-state semantics as `router.navigate` (undefined preserves, `""` clears, value sets). When omitted, current `browser.getHash()` is preserved — symmetric with `onTransitionSuccess`.
 
 ### traverseToLast Excludes Current Entry
 
@@ -300,7 +300,7 @@ Plugin uses `api.extendRouter()` to register all extensions. The returned unsubs
 | --------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `buildUrl(name, params?, search?, options?: { hash? })`   | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
 | `matchUrl(url)`                                           | `State \| undefined` | Parse URL to router state                                                                                                                                                                                    |
-| `replaceHistoryState(name, params?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                                                                          |
+| `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                                                                          |
 
 ### Exclusive extensions (Navigation API only)
 
