@@ -449,9 +449,36 @@ describe("@real-router/logger-plugin", () => {
 
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          '[logger-plugin]  Changed: { id: "123" → "456" }',
+          '[logger-plugin]  params Changed: { id: "123" → "456" }',
         ),
       );
+    });
+
+    it("shows a search diff when only the query changes within a route (RFC-4 M2 / #1548)", async () => {
+      // A declared query param so the path differs between the two navigations
+      // (a same-path query-only change would dedupe as SAME_STATES).
+      const r = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "search", path: "/search?sort" },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      r.usePlugin(loggerPluginFactory());
+      await r.start("/");
+      await r.navigate("search", {}, { sort: "asc" });
+      loggerSpy.mockClear();
+
+      await r.navigate("search", {}, { sort: "desc" });
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[logger-plugin]  search Changed: { sort: "asc" → "desc" }',
+        ),
+      );
+
+      r.stop();
     });
 
     it("should not show diff when navigating to different route", async () => {
