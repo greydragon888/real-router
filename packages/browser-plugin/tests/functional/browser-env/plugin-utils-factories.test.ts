@@ -64,15 +64,15 @@ describe("plugin-utils factories", () => {
     it("appends an encoded fragment for a non-empty hash", () => {
       const buildUrl = createPluginBuildUrl(router, "");
 
-      expect(buildUrl("users", { id: "1" }, { hash: "sec one" })).toBe(
-        "/users/1#sec%20one",
-      );
+      expect(
+        buildUrl("users", { id: "1" }, undefined, { hash: "sec one" }),
+      ).toBe("/users/1#sec%20one");
     });
 
     it("normalizes a '#'-prefixed hash before encoding", () => {
       const buildUrl = createPluginBuildUrl(router, "");
 
-      expect(buildUrl("users", { id: "1" }, { hash: "#sec" })).toBe(
+      expect(buildUrl("users", { id: "1" }, undefined, { hash: "#sec" })).toBe(
         "/users/1#sec",
       );
     });
@@ -80,7 +80,9 @@ describe("plugin-utils factories", () => {
     it("omits the fragment for an explicitly empty hash", () => {
       const buildUrl = createPluginBuildUrl(router, "");
 
-      expect(buildUrl("users", { id: "1" }, { hash: "" })).toBe("/users/1");
+      expect(buildUrl("users", { id: "1" }, undefined, { hash: "" })).toBe(
+        "/users/1",
+      );
     });
   });
 

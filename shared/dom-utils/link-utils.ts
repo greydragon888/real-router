@@ -2,6 +2,7 @@ import type {
   NavigationOptions,
   Params,
   Router,
+  SearchParams,
   State,
 } from "@real-router/core";
 
@@ -39,6 +40,7 @@ function encodeFragmentInline(decoded: string): string {
 type BuildUrlFn = (
   name: string,
   params: Params,
+  search?: SearchParams,
   options?: { hash?: string },
 ) => string | undefined;
 
@@ -74,6 +76,9 @@ export function buildHref(
       const url = buildUrl(
         routeName,
         routeParams,
+        // Slot-shift (RFC-4 M2 / #1548): query channel at position 3 (a link's
+        // query rides in routeParams for now), hash options at position 4.
+        undefined,
         normHash === undefined ? undefined : { hash: normHash },
       );
 

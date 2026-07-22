@@ -67,10 +67,10 @@ types.ts  ← imported by factory.ts, plugin.ts, navigate-handler.ts, navigation
 
 External dependencies:
 
-| Dependency           | What it provides                                                                                                                                | Used in                                                                                   |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `@real-router/core`  | `getPluginApi`, types (`Router`, `PluginApi`, `State`, `Plugin`, etc.)                                                                          | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `index.ts`                              |
-| `@real-router/types` | `StateContext` interface (for module augmentation)                                                                                               | `index.ts`                                                                                |
+| Dependency           | What it provides                                                                                                                                                                                                      | Used in                                                                                                                                |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `@real-router/core`  | `getPluginApi`, types (`Router`, `PluginApi`, `State`, `Plugin`, etc.)                                                                                                                                                | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `index.ts`                                                                           |
+| `@real-router/types` | `StateContext` interface (for module augmentation)                                                                                                                                                                    | `index.ts`                                                                                                                             |
 | `browser-env`        | `normalizeBase`, `safelyEncodePath`, `safeParseUrl`, `shouldReplaceHistory`, `isBrowserEnvironment`, `createWarnOnce`, `createOptionsValidator`, `extractPath`, `buildUrl`, `urlToPath`, `extractPathFromAbsoluteUrl` | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `navigation-browser.ts`, `ssr-fallback.ts`, `validation.ts`, `history-extensions.ts` |
 
 ## Factory + Class Pattern
@@ -369,7 +369,7 @@ router.navigate(name, params, opts)
         │              └── router.buildPath() + buildUrl(path, base)
         ├── finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url
         │
-        ├── historyState = { name, params, path }
+        ├── historyState = { name, params, search, path }
         │
         ├── #pendingTraverseKey set?
         │     YES: browser.traverseTo(key)
@@ -516,7 +516,9 @@ All history extensions in `history-extensions.ts` use `entryToState()` to conver
 ```typescript
 function entryToState(entry, api, base): State | undefined {
   if (!entry?.url) return undefined;
-  return api.matchPath(extractPathFromAbsoluteUrl(entry.url, base)) ?? undefined;
+  return (
+    api.matchPath(extractPathFromAbsoluteUrl(entry.url, base)) ?? undefined
+  );
 }
 ```
 
@@ -601,7 +603,10 @@ if (
 ) {
   this.#browser.updateCurrentEntry({ state: historyState });
 } else {
-  this.#browser.navigate(finalUrl, { state: historyState, history: replace ? "replace" : "push" });
+  this.#browser.navigate(finalUrl, {
+    state: historyState,
+    history: replace ? "replace" : "push",
+  });
 }
 ```
 
@@ -611,16 +616,16 @@ if (
 
 ## Performance
 
-| Optimization                     | Location                | Effect                                                                          |
-| -------------------------------- | ----------------------- | ------------------------------------------------------------------------------- |
-| `String.startsWith` + `slice`    | `url-utils.ts`          | No regex needed for base path stripping                                          |
-| Navigation API serialization     | Browser (native)        | No deferred queue needed — browser handles concurrency                           |
-| `state.context.navigation`       | `plugin.ts`             | Metadata lives on state — no separate storage needed                             |
-| `Object.freeze(meta)`            | `plugin.ts`             | Subscriber mutation protection without copies                                    |
-| `entryToState` via URL matching  | `history-extensions.ts` | Always authoritative — no stale state issues                                     |
-| `createNavigationBrowser()` once | `factory.ts`            | Environment check and browser wrapping don't repeat                              |
-| `PLUGIN_SYNC_INFO` identity check | `navigate-handler.ts`  | Constant-time, timing-independent detection of plugin-originated events (#580)  |
-| Same-URL guard (`isSameHref`)    | `plugin.ts` + `href-utils.ts` | Same-URL transitions skip nav.navigate entirely → no event to short-circuit |
+| Optimization                      | Location                      | Effect                                                                         |
+| --------------------------------- | ----------------------------- | ------------------------------------------------------------------------------ |
+| `String.startsWith` + `slice`     | `url-utils.ts`                | No regex needed for base path stripping                                        |
+| Navigation API serialization      | Browser (native)              | No deferred queue needed — browser handles concurrency                         |
+| `state.context.navigation`        | `plugin.ts`                   | Metadata lives on state — no separate storage needed                           |
+| `Object.freeze(meta)`             | `plugin.ts`                   | Subscriber mutation protection without copies                                  |
+| `entryToState` via URL matching   | `history-extensions.ts`       | Always authoritative — no stale state issues                                   |
+| `createNavigationBrowser()` once  | `factory.ts`                  | Environment check and browser wrapping don't repeat                            |
+| `PLUGIN_SYNC_INFO` identity check | `navigate-handler.ts`         | Constant-time, timing-independent detection of plugin-originated events (#580) |
+| Same-URL guard (`isSameHref`)     | `plugin.ts` + `href-utils.ts` | Same-URL transitions skip nav.navigate entirely → no event to short-circuit    |
 
 ## Related Documents
 

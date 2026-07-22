@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/method-signature-style -- method syntax required for declaration merging overload (property syntax causes TS2717) */
 
-import type { Params, State } from "@real-router/core";
+import type { Params, SearchParams, State } from "@real-router/core";
 
 // Main plugin factory
 export { browserPluginFactory } from "./factory";
@@ -58,6 +58,7 @@ declare module "@real-router/core" {
     buildUrl(
       name: string,
       params?: Params,
+      search?: SearchParams,
       options?: { hash?: string },
     ): string;
 

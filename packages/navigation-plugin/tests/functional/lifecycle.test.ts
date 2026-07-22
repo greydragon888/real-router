@@ -507,12 +507,14 @@ describe("Navigation Plugin — Lifecycle", () => {
       const state = mockNav.currentEntry?.getState() as {
         name: string;
         params: Record<string, unknown>;
+        search: Record<string, unknown>;
         path: string;
       };
 
       expect(state).toStrictEqual({
         name: "users.view",
         params: { id: "123" },
+        search: {},
         path: "/users/view/123",
       });
       expect(mockNav.currentUrl).toBe("http://localhost/users/view/123");
@@ -524,12 +526,14 @@ describe("Navigation Plugin — Lifecycle", () => {
       const state = mockNav.currentEntry?.getState() as {
         name: string;
         params: Record<string, unknown>;
+        search: Record<string, unknown>;
         path: string;
       };
 
       expect(state).toStrictEqual({
         name: "home",
         params: {},
+        search: {},
         path: "/home",
       });
     });
@@ -716,25 +720,29 @@ describe("Navigation Plugin — Lifecycle", () => {
 
     it("router.buildUrl(name, params, { hash }) appends fragment", () => {
       expect(
-        router.buildUrl("users.view", { id: "1" }, { hash: "anchor" }),
+        router.buildUrl("users.view", { id: "1" }, undefined, {
+          hash: "anchor",
+        }),
       ).toBe("/users/view/1#anchor");
     });
 
     it("router.buildUrl encodes RFC-3986 unsafe chars but preserves sub-delims", () => {
       // space → %20, & preserved, # escaped to %23
-      expect(router.buildUrl("home", {}, { hash: "a b&c#d" })).toBe(
+      expect(router.buildUrl("home", {}, undefined, { hash: "a b&c#d" })).toBe(
         "/home#a%20b&c%23d",
       );
     });
 
     it("router.buildUrl strips leading # defensively", () => {
-      expect(router.buildUrl("home", {}, { hash: "#section" })).toBe(
+      expect(router.buildUrl("home", {}, undefined, { hash: "#section" })).toBe(
         "/home#section",
       );
     });
 
     it("router.buildUrl returns base URL when hash is empty string", () => {
-      expect(router.buildUrl("home", {}, { hash: "" })).toBe("/home");
+      expect(router.buildUrl("home", {}, undefined, { hash: "" })).toBe(
+        "/home",
+      );
     });
 
     it("router.buildUrl ignores hash option when it is undefined", () => {

@@ -30,7 +30,9 @@ describe("dom-utils integration (copy from shared/)", () => {
     } as unknown as Parameters<typeof buildHref>[0];
 
     expect(buildHref(urlRouter, "users", {}, "#sec")).toBe("/users?x=1#sec");
-    expect(buildUrl).toHaveBeenCalledWith("users", {}, { hash: "sec" });
+    expect(buildUrl).toHaveBeenCalledWith("users", {}, undefined, {
+      hash: "sec",
+    });
   });
 
   it("buildHref guards empty-string and non-string buildPath results (defensive arm)", () => {

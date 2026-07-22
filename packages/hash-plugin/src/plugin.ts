@@ -16,6 +16,7 @@ import type {
   NavigationOptions,
   Params,
   Router,
+  SearchParams,
   State,
   Plugin,
 } from "@real-router/core";
@@ -72,13 +73,16 @@ export class HashPlugin {
     const pluginBuildUrl = (
       route: string,
       params?: Params,
+      search?: SearchParams,
       opts?: { hash?: string },
     ) => {
       if (opts?.hash !== undefined) {
         warnHashIgnored();
       }
 
-      return this.#urlPrefix + router.buildPath(route, params);
+      // Search-aware buildPath (RFC-4 M2 / #1548): the query comes from the
+      // explicit `search` channel when supplied.
+      return this.#urlPrefix + router.buildPath(route, params, search);
     };
 
     this.#warnHashIgnored = warnHashIgnored;

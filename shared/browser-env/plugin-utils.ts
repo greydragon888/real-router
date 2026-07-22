@@ -5,6 +5,7 @@ import type {
   NavigationOptions,
   Params,
   Router,
+  SearchParams,
   State,
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
@@ -50,9 +51,17 @@ export function createStartInterceptor(
 export function createPluginBuildUrl(
   router: Router,
   base: string,
-): (route: string, params?: Params, opts?: { hash?: string }) => string {
-  return (route, params, opts) => {
-    const path = router.buildPath(route, params);
+): (
+  route: string,
+  params?: Params,
+  search?: SearchParams,
+  opts?: { hash?: string },
+) => string {
+  return (route, params, search, opts) => {
+    // Search-aware buildUrl (RFC-4 M2 / #1548): the explicit query channel
+    // threads through to `buildPath`, so a colliding name resolves and the URL
+    // query comes from `search` when supplied. Omitted → the v1 single-bag path.
+    const path = router.buildPath(route, params, search);
     const url = buildUrl(path, base);
 
     if (opts?.hash === undefined) {
@@ -72,6 +81,7 @@ export function createReplaceHistoryState(
   buildUrlFn: (
     name: string,
     params?: Params,
+    search?: SearchParams,
     options?: ReplaceHistoryStateOptions,
   ) => string,
   preserveHash = true,
@@ -86,6 +96,7 @@ export function createReplaceHistoryState(
   const buffer = {
     name: "",
     params: {} as Params,
+    search: {} as SearchParams,
     path: "",
   };
 
@@ -105,8 +116,11 @@ export function createReplaceHistoryState(
     const builtState = api.makeState(
       state.name,
       state.params,
-      // `buildState` yields no separate query channel yet (the search-aware
-      // write path is a slot-shift follow-up, RFC-4 M2 / #1548) — pass none.
+      // `api.buildState` yields a single (path+query) bag with no separate
+      // search channel (RouteTreeState has no `search`), so pass none here —
+      // `makeState` fills `builtState.search` with the frozen empty bag, which
+      // the buffer below serializes into `history.state` (RFC-4 M2 / #1548). A
+      // caller-supplied `search` on `replaceHistoryState` is a follow-up.
       undefined,
       router.buildPath(state.name, state.params),
       {
@@ -141,6 +155,7 @@ export function createReplaceHistoryState(
 
     buffer.name = builtState.name;
     buffer.params = builtState.params;
+    buffer.search = builtState.search;
     buffer.path = builtState.path;
 
     browser.replaceState(buffer, url);

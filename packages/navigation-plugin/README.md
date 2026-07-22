@@ -53,20 +53,20 @@ router.usePlugin(
 );
 ```
 
-| Option            | Type      | Default | Description                                                            |
-| ----------------- | --------- | ------- | ---------------------------------------------------------------------- |
-| `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"` → URLs start with `/app/...`) |
+| Option            | Type      | Default | Description                                                                                                            |
+| ----------------- | --------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"` → URLs start with `/app/...`)                                                 |
 | `forceDeactivate` | `boolean` | `false` | If `true`, browser back/forward skip `canDeactivate` guards. Default `false` respects guards — matches browser-plugin. |
 
 ## Router Extensions
 
 ### Compatible extensions (same as browser-plugin)
 
-| Method                                                | Returns              | Description                                                                                          |
-| ----------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
-| `buildUrl(name, params?, options?: { hash? })`        | `string`             | Build full URL with base path. `options.hash` (decoded) is encoded and appended.                     |
-| `matchUrl(url)`                                       | `State \| undefined` | Parse URL to router state                                                                            |
-| `replaceHistoryState(name, params?, options?: { hash? })` | `void`           | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets. |
+| Method                                                    | Returns              | Description                                                                                                                                         |
+| --------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `buildUrl(name, params?, search?, options?: { hash? })`   | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. `options.hash` (decoded) is encoded and appended. |
+| `matchUrl(url)`                                           | `State \| undefined` | Parse URL to router state                                                                                                                           |
+| `replaceHistoryState(name, params?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                 |
 
 ```typescript
 router.buildUrl("users", { id: "123" });
@@ -81,17 +81,17 @@ router.replaceHistoryState("users", { id: "456" });
 
 ### Exclusive extensions (Navigation API only)
 
-| Method                          | Returns                       | Description                                     |
-| ------------------------------- | ----------------------------- | ----------------------------------------------- |
-| `peekBack()`                    | `State \| undefined`          | State of the previous history entry             |
-| `peekForward()`                 | `State \| undefined`          | State of the next history entry                 |
-| `hasVisited(routeName)`         | `boolean`                     | Whether any history entry matches the route     |
-| `getVisitedRoutes()`            | `string[]`                    | Unique route names across all history entries   |
-| `getRouteVisitCount(routeName)` | `number`                      | How many history entries match the route        |
-| `traverseToLast(routeName)`     | `Promise<State>`              | Navigate to the last history entry for a route  |
-| `canGoBack()`                   | `boolean`                     | Whether there's a previous history entry        |
-| `canGoForward()`                | `boolean`                     | Whether there's a next history entry            |
-| `canGoBackTo(routeName)`        | `boolean`                     | Whether any previous entry matches the route    |
+| Method                          | Returns              | Description                                    |
+| ------------------------------- | -------------------- | ---------------------------------------------- |
+| `peekBack()`                    | `State \| undefined` | State of the previous history entry            |
+| `peekForward()`                 | `State \| undefined` | State of the next history entry                |
+| `hasVisited(routeName)`         | `boolean`            | Whether any history entry matches the route    |
+| `getVisitedRoutes()`            | `string[]`           | Unique route names across all history entries  |
+| `getRouteVisitCount(routeName)` | `number`             | How many history entries match the route       |
+| `traverseToLast(routeName)`     | `Promise<State>`     | Navigate to the last history entry for a route |
+| `canGoBack()`                   | `boolean`            | Whether there's a previous history entry       |
+| `canGoForward()`                | `boolean`            | Whether there's a next history entry           |
+| `canGoBackTo(routeName)`        | `boolean`            | Whether any previous entry matches the route   |
 
 #### `peekBack` / `peekForward`
 
@@ -147,17 +147,17 @@ if (router.canGoBackTo("users.list")) {
 
 ## URL Fragment ("hash") Support
 
-`navigation-plugin` ships first-class URL-fragment support: `<Link hash>` from any framework adapter, programmatic `router.navigate(name, params, { hash })`, and a `state.context.url = { hash, hashChanged }` namespace populated on every transition.
+`navigation-plugin` ships first-class URL-fragment support: `<Link hash>` from any framework adapter, programmatic `router.navigate(name, params, search?, { hash })` (options at position 4 since RFC-4 M2, #1548), and a `state.context.url = { hash, hashChanged }` namespace populated on every transition.
 
 ```typescript
-// Programmatic — tri-state opts.hash
-router.navigate("settings", {}, { hash: "profile" }); // set
-router.navigate("settings", {}, { hash: "" });        // clear
-router.navigate("settings");                          // preserve current
+// Programmatic — tri-state opts.hash (options at position 4 since RFC-4 M2)
+router.navigate("settings", {}, undefined, { hash: "profile" }); // set
+router.navigate("settings", {}, undefined, { hash: "" }); // clear
+router.navigate("settings"); // preserve current
 
 // In subscribers
 router.subscribe(({ route }) => {
-  console.log(route.context.url?.hash);        // "profile"
+  console.log(route.context.url?.hash); // "profile"
   console.log(route.context.url?.hashChanged); // true on hash-only nav
 });
 ```
@@ -175,10 +175,10 @@ Navigation metadata is available on `state.context.navigation` after each transi
 router.subscribe((state) => {
   const meta = state.context.navigation;
   console.log(meta?.navigationType); // "push" | "replace" | "traverse" | "reload"
-  console.log(meta?.userInitiated);  // true if user clicked back/forward/link
-  console.log(meta?.direction);      // "forward" | "back" | "unknown"
-  console.log(meta?.sourceElement);  // the DOM element that initiated the nav, or null
-  console.log(meta?.info);           // data passed via navigation.navigate({ info })
+  console.log(meta?.userInitiated); // true if user clicked back/forward/link
+  console.log(meta?.direction); // "forward" | "back" | "unknown"
+  console.log(meta?.sourceElement); // the DOM element that initiated the nav, or null
+  console.log(meta?.info); // data passed via navigation.navigate({ info })
 });
 ```
 
@@ -207,13 +207,13 @@ const meta = route.context.navigation;
 
 ### NavigationMeta
 
-| Field             | Type                                               | Description                                            |
-| ----------------- | -------------------------------------------------- | ------------------------------------------------------ |
-| `navigationType`  | `"push" \| "replace" \| "traverse" \| "reload"`   | Type of navigation                                     |
-| `userInitiated`   | `boolean`                                          | Whether the user clicked back/forward/link              |
-| `direction`       | `"forward" \| "back" \| "unknown"`                 | Direction in the history stack                          |
-| `sourceElement`   | `Element \| null`                                  | DOM element that initiated the navigation, or null      |
-| `info`            | `unknown`                                          | Ephemeral data from `navigation.navigate({ info })`    |
+| Field            | Type                                            | Description                                         |
+| ---------------- | ----------------------------------------------- | --------------------------------------------------- |
+| `navigationType` | `"push" \| "replace" \| "traverse" \| "reload"` | Type of navigation                                  |
+| `userInitiated`  | `boolean`                                       | Whether the user clicked back/forward/link          |
+| `direction`      | `"forward" \| "back" \| "unknown"`              | Direction in the history stack                      |
+| `sourceElement`  | `Element \| null`                               | DOM element that initiated the navigation, or null  |
+| `info`           | `unknown`                                       | Ephemeral data from `navigation.navigate({ info })` |
 
 ### NavigationDirection
 

@@ -236,6 +236,8 @@ function syncUrlToRouterState(
       const url = router.buildUrl(
         currentState.name,
         currentState.params,
+        // Slot-shift (RFC-4 M2 / #1548): query channel at position 3, hash opts at 4.
+        undefined,
         ctxHash ? { hash: ctxHash } : undefined,
       );
 

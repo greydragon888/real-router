@@ -463,8 +463,8 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
     it("warns once on router.buildUrl(name, params, { hash })", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
-      router.buildUrl("home", {}, { hash: "section" });
-      router.buildUrl("home", {}, { hash: "other" });
+      router.buildUrl("home", {}, undefined, { hash: "section" });
+      router.buildUrl("home", {}, undefined, { hash: "other" });
 
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
@@ -502,7 +502,9 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       vi.spyOn(console, "warn").mockImplementation(noop);
 
       // hashPrefix defaults to "" → urlPrefix = "#"
-      expect(router.buildUrl("home", {}, { hash: "anchor" })).toBe("#/home");
+      expect(router.buildUrl("home", {}, undefined, { hash: "anchor" })).toBe(
+        "#/home",
+      );
     });
   });
 

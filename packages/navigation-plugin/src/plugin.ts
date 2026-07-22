@@ -87,12 +87,17 @@ export class NavigationPlugin {
   // browser.navigate / browser.updateCurrentEntry. The Navigation API
   // structured-clones state synchronously inside the call, so this object
   // never escapes — same trick createReplaceHistoryState uses.
-  readonly #historyStateBuffer: { name: string; params: object; path: string } =
-    {
-      name: "",
-      params: {},
-      path: "",
-    };
+  readonly #historyStateBuffer: {
+    name: string;
+    params: object;
+    search: object;
+    path: string;
+  } = {
+    name: "",
+    params: {},
+    search: {},
+    path: "",
+  };
 
   constructor(
     router: Router,
@@ -347,6 +352,7 @@ export class NavigationPlugin {
 
           this.#historyStateBuffer.name = toState.name;
           this.#historyStateBuffer.params = toState.params;
+          this.#historyStateBuffer.search = toState.search;
           this.#historyStateBuffer.path = toState.path;
 
           // Two cases route through `updateCurrentEntry` (state-only mutation

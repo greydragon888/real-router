@@ -44,11 +44,11 @@ types.ts  ← imported by factory.ts, validation.ts, index.ts
 
 External dependencies:
 
-| Dependency          | What it provides                                                         | Used in                          |
-| ------------------- | ------------------------------------------------------------------------ | -------------------------------- |
-| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)             | `factory.ts`, `index.ts`         |
-| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing, URL utils, `createUpdateBrowserState` | `factory.ts`, `validation.ts`    |
-| `type-guards`       | `isStateStrict` (`history.state` validation)                             | `index.ts` (re-exported as `isState`) |
+| Dependency          | What it provides                                                                                       | Used in                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)                                           | `factory.ts`, `index.ts`              |
+| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing, URL utils, `createUpdateBrowserState` | `factory.ts`, `validation.ts`         |
+| `type-guards`       | `isStateStrict` (`history.state` validation)                                                           | `index.ts` (re-exported as `isState`) |
 
 ## Factory Pattern
 
@@ -78,7 +78,7 @@ browserPluginFactory(opts?, browser?)         ← public
                             │  Per-plugin-instance setup:
                             │  - api.claimContextNamespace("browser")
                             │  - createUpdateBrowserState() — closure with reusable
-                            │    mutable {name, params, path} buffer (browser
+                            │    mutable {name, params, search, path} buffer (browser
                             │    structured-clones synchronously, so reuse is safe)
                             │  - createStartInterceptor (via browser-env)
                             │  - api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
@@ -306,7 +306,7 @@ router.navigate(name, params, opts)
         │
         └── updateState(toState, finalUrl, shouldReplace, browser)   ← createUpdateBrowserState() closure
                   │
-                   ├── Reuse mutable buffer { name, params, path } (overwritten in place)
+                   ├── Reuse mutable buffer { name, params, search, path } (overwritten in place)
                    └── browser.pushState() or browser.replaceState()  (browser structured-clones)
 ```
 
@@ -412,7 +412,7 @@ Popstate event handling, critical error recovery, and deferred event processing 
 
 - `shared/browser-env/popstate-utils.ts` — `getRouteFromEvent` (validates `history.state` via `isStateStrict`, falls back to `api.matchPath(browser.getLocation())` when invalid), `updateBrowserState` (legacy), `createUpdateBrowserState` (mutable-buffer factory used by browser-plugin on the hot path)
 - `shared/browser-env/popstate-handler.ts` — `createPopstateHandler` (deferred-queue, last-write-wins, `RouterError` vs critical-error split), `createPopstateLifecycle` (popstate listener add/remove + `cleanup` callback)
-- `historyState` is a subset of `State`: only `{ name, params, path }` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
+- `historyState` is a subset of `State`: only `{ name, params, search, path }` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
 - Error categorization in `popstate-handler.ts`: `RouterError` instances are routed through `rollbackUrlToCurrentState()` (sync URL with current router state); anything else triggers `recoverFromCriticalError()` (warns + `replaceState` to last good URL)
 
 ## Options Validation
@@ -497,7 +497,8 @@ URL fragments are first-class state via the `state.context.url` namespace, writt
 // + the plugin's own nav-writes), NOT a per-nav location.hash read (#1019).
 const browserHash = currentHash;
 const publishedPrevHash =
-  (fromState?.context as { url?: { hash?: string } } | undefined)?.url?.hash ?? "";
+  (fromState?.context as { url?: { hash?: string } } | undefined)?.url?.hash ??
+  "";
 
 const hash =
   navOptions.hash === undefined
@@ -506,11 +507,14 @@ const hash =
 
 currentHash = hash; // keep the cache in sync with the fragment we are committing
 
-urlClaim.write(toState, Object.freeze({
-  hash,
-  // hashChanged compares the chosen hash against the PUBLISHED previous hash
-  hashChanged: navOptions.hashChange ?? hash !== publishedPrevHash,
-}));
+urlClaim.write(
+  toState,
+  Object.freeze({
+    hash,
+    // hashChanged compares the chosen hash against the PUBLISHED previous hash
+    hashChanged: navOptions.hashChange ?? hash !== publishedPrevHash,
+  }),
+);
 
 const url = buildUrl(toState.path, options.base);
 const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
@@ -524,30 +528,30 @@ const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
 
 ## Performance
 
-| Optimization                                          | Location                                  | Effect                                                                                    |
-| ----------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `String.startsWith` + `slice`                         | `browser-env/url-utils.ts`                | No regex needed for base path stripping                                                   |
-| `isTransitioning` flag                                | `browser-env`                             | Blocks concurrent popstate processing without a queue                                     |
-| Last-write-wins for deferred events                   | `browser-env`                             | Intermediate states are skipped without accumulation                                      |
-| `historyState` as a subset of `State`                 | `browser-env`                             | Less data stored in `history.state`                                                       |
-| `createSafeBrowser()` called once                     | `factory.ts`                              | Environment check doesn't repeat                                                          |
-| `FROZEN_POPSTATE` / `FROZEN_NAVIGATE` constants       | `factory.ts:32-33`                        | Pre-frozen `BrowserContext` literals — no `Object.freeze()` allocation per `onTransitionSuccess` |
-| Mutable `historyState` buffer (`createUpdateBrowserState`) | `browser-env/popstate-utils.ts`      | Per-instance closure reuses one `{ name, params, path }` object across `pushState`/`replaceState` (browser structured-clones synchronously, so reuse is safe) |
-| Memoized `getLocation` (`createDefaultBrowser`)       | `factory.ts:79-97`                        | Skips `extractPath + safelyEncodePath` when `(pathname, search)` is unchanged since the last call (popstate-storm benefit) |
-| `buildUrl(toState.path, base)` instead of `buildPath` | `factory.ts:170`                          | Skips re-running `buildPath()` in `onTransitionSuccess` — `toState.path` is already final |
+| Optimization                                               | Location                        | Effect                                                                                                                                                                |
+| ---------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `String.startsWith` + `slice`                              | `browser-env/url-utils.ts`      | No regex needed for base path stripping                                                                                                                               |
+| `isTransitioning` flag                                     | `browser-env`                   | Blocks concurrent popstate processing without a queue                                                                                                                 |
+| Last-write-wins for deferred events                        | `browser-env`                   | Intermediate states are skipped without accumulation                                                                                                                  |
+| `historyState` as a subset of `State`                      | `browser-env`                   | Less data stored in `history.state`                                                                                                                                   |
+| `createSafeBrowser()` called once                          | `factory.ts`                    | Environment check doesn't repeat                                                                                                                                      |
+| `FROZEN_POPSTATE` / `FROZEN_NAVIGATE` constants            | `factory.ts:32-33`              | Pre-frozen `BrowserContext` literals — no `Object.freeze()` allocation per `onTransitionSuccess`                                                                      |
+| Mutable `historyState` buffer (`createUpdateBrowserState`) | `browser-env/popstate-utils.ts` | Per-instance closure reuses one `{ name, params, search, path }` object across `pushState`/`replaceState` (browser structured-clones synchronously, so reuse is safe) |
+| Memoized `getLocation` (`createDefaultBrowser`)            | `factory.ts:79-97`              | Skips `extractPath + safelyEncodePath` when `(pathname, search)` is unchanged since the last call (popstate-storm benefit)                                            |
+| `buildUrl(toState.path, base)` instead of `buildPath`      | `factory.ts:170`                | Skips re-running `buildPath()` in `onTransitionSuccess` — `toState.path` is already final                                                                             |
 
 ## Stress Test Coverage
 
 Stress tests in `tests/stress/` validate behavior under extreme conditions:
 
-| Category  | Tests                                                              | What they verify                                                            |
-| --------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| Popstate  | popstate-storm, popstate-navigate-interleave                       | Rapid back/forward, popstate during navigation                              |
-| Guards    | cannot-deactivate-storm, mixed-guards                              | canDeactivate guard blocking under rapid back/forward; mixed sync/async timing |
-| State     | corrupted-state-storm, history-state-accumulation, exotic-state    | Corrupted `history.state` recovery, history entry growth, non-cloneable state values |
+| Category  | Tests                                                              | What they verify                                                                              |
+| --------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Popstate  | popstate-storm, popstate-navigate-interleave                       | Rapid back/forward, popstate during navigation                                                |
+| Guards    | cannot-deactivate-storm, mixed-guards                              | canDeactivate guard blocking under rapid back/forward; mixed sync/async timing                |
+| State     | corrupted-state-storm, history-state-accumulation, exotic-state    | Corrupted `history.state` recovery, history entry growth, non-cloneable state values          |
 | Lifecycle | plugin-lifecycle-churn, teardown-mid-nav, factory-instance-cleanup | Rapid plugin register/unregister, teardown during in-flight navigation, factory pool disposal |
-| Memory    | history-state-accumulation (10K + heap snapshot)                   | Heap stability across long-running session                                  |
-| Race      | replace-vs-navigate                                                | `replaceHistoryState` racing concurrent `navigate()` calls                  |
+| Memory    | history-state-accumulation (10K + heap snapshot)                   | Heap stability across long-running session                                                    |
+| Race      | replace-vs-navigate                                                | `replaceHistoryState` racing concurrent `navigate()` calls                                    |
 
 ## Related Documents
 

@@ -166,12 +166,14 @@ describe("Navigation Plugin — Navigate", () => {
       const state = entry?.getState() as {
         name: string;
         params: Record<string, unknown>;
+        search: Record<string, unknown>;
         path: string;
       };
 
       expect(state).toStrictEqual({
         name: "users.list",
         params: {},
+        search: {},
         path: "/users/list",
       });
       expect(mockNav.currentUrl).toBe("http://localhost/users/list");

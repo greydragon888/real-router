@@ -106,6 +106,7 @@ describe("buildHref", () => {
       "users.profile",
       { id: "123" },
       undefined,
+      undefined,
     );
     expect(router.buildPath).not.toHaveBeenCalled();
   });
@@ -131,7 +132,12 @@ describe("buildHref", () => {
 
     buildHref(router, "home", {});
 
-    expect(router.buildUrl).toHaveBeenCalledWith("home", {}, undefined);
+    expect(router.buildUrl).toHaveBeenCalledWith(
+      "home",
+      {},
+      undefined,
+      undefined,
+    );
   });
 
   it("4 — passes empty params to buildPath fallback", () => {
@@ -228,6 +234,7 @@ describe("buildHref", () => {
       "items.item",
       { id: 42 },
       undefined,
+      undefined,
     );
   });
 
@@ -242,6 +249,7 @@ describe("buildHref", () => {
     expect(router.buildUrl).toHaveBeenCalledWith(
       "users.view",
       { id: "иван" },
+      undefined,
       undefined,
     );
   });

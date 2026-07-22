@@ -426,14 +426,23 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
-      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined);
+      expect(buildUrlSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        undefined,
+      );
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/custom-url");
     });
 
     it("should pass hash option to buildUrl when hash prop is set (#532)", () => {
       const buildUrlSpy = vi.fn(
-        (_name: string, _params?: object, opts?: { hash?: string }): string =>
-          opts?.hash ? `/url#${opts.hash}` : "/url",
+        (
+          _name: string,
+          _params?: object,
+          _search?: object,
+          opts?: { hash?: string },
+        ): string => (opts?.hash ? `/url#${opts.hash}` : "/url"),
       );
 
       router.buildUrl = buildUrlSpy;
@@ -445,13 +454,9 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
-      expect(buildUrlSpy).toHaveBeenCalledWith(
-        "one-more-test",
-        {},
-        {
-          hash: "anchor",
-        },
-      );
+      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined, {
+        hash: "anchor",
+      });
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#anchor");
     });
 
