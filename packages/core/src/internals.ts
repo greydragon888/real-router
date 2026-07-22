@@ -261,11 +261,12 @@ export function createInterceptable<T extends (...args: any[]) => any>(
 /**
  * Three-argument interceptor wrapper — preserves the exact
  * `(a: A, b: B, c: C) => R` signature that the variadic
- * {@link createInterceptable} widens to `any[]`. Used for the search-aware
- * `buildPath(route, params, search)` interceptable (RFC-4 M2 / #1548): a legacy
- * two-arg interceptor stays valid (TS allows fewer params, and `next(a, b)`
- * leaves `c` `undefined` — the v1 single-bag path), while a search-aware
- * interceptor can read and forward the third argument.
+ * {@link createInterceptable} widens to `any[]`. Backs both search-aware
+ * interceptables — `buildPath(route, params, search)` and
+ * `forwardState(name, params, search)` (RFC-4 M2 / #1548). Every first-party
+ * plugin registers the full three-argument form; a shorter-arity interceptor
+ * from a third party remains type-valid (TS allows fewer params, and `next(a,
+ * b)` leaves the third arg `undefined`).
  */
 export function createTernaryInterceptable<A, B, C, R>(
   name: string,

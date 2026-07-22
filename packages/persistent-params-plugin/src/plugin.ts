@@ -4,7 +4,7 @@ import { ERROR_PREFIX } from "./constants";
 import { extractOwnParams, mergeParams } from "./param-utils";
 import { validateParamValue } from "./validation";
 
-import type { Params, State, Plugin } from "@real-router/core";
+import type { Params, SearchParams, State, Plugin } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 export class PersistentParamsPlugin {
@@ -49,8 +49,26 @@ export class PersistentParamsPlugin {
 
       removeBuildPath = api.addInterceptor(
         "buildPath",
-        (next, route, navParams) =>
-          next(route, this.#buildPathParams(navParams ?? {})),
+        (next, route, navParams, navSearch) =>
+          // Persistent params are QUERY params (declared on the root path as
+          // `?a&b`), so they belong in whichever channel the built URL takes its
+          // query from (RFC-4 M2 / #1548): the explicit `search` channel when the
+          // caller supplies one (search-aware buildPath), else the single params
+          // bag on the v1 path (buildPath extracts the query from it). Either way
+          // `#buildPathParams` injects the persistent values and drops the keys
+          // the paired forwardState just removed.
+          navSearch === undefined
+            ? next(route, this.#buildPathParams(navParams ?? {}))
+            : next(
+                route,
+                navParams,
+                // Persistent (query) params and the search channel are the same
+                // query-bag shape at runtime; the `Params`/`SearchParams` type
+                // split is structural only, so cast across the seam.
+                this.#buildPathParams(
+                  navSearch as unknown as Params,
+                ) as unknown as SearchParams,
+              ),
       );
 
       removeForwardState = api.addInterceptor(

@@ -208,6 +208,16 @@ describe("Persistent params plugin", () => {
       expect(builtPath).toBe("/route2/2?mode=dev");
     });
 
+    it("injects persistent params into the explicit search channel (search-aware buildPath)", () => {
+      // buildPath(name, params, search) — RFC-4 M2 slot-shift (#1548): persistent
+      // (query) params land in the search channel, not the path bag. Passing an
+      // explicit search (even `{}`) takes the search-aware interceptor branch,
+      // so `mode=dev` is injected into the query the URL builds from `search`.
+      const builtPath = router.buildPath("route2", { id: "2" }, {});
+
+      expect(builtPath).toBe("/route2/2?mode=dev");
+    });
+
     it("buildPath should prioritize explicit value over stored", async () => {
       // beforeEach already called router.start(), navigate to set mode from URL
       await router.navigate("route1", { id: "1", mode: "dev" });

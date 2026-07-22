@@ -44,6 +44,8 @@ The two interceptors are **two phases of one synchronous window** (core's `build
 - **`#forwardStateParams`** (forwardState phase, runs first) — `extractOwnParams` → for a tracked param passed as `undefined`, RECORD it in the transient `#pendingRemovals` set (does **not** mutate the tracked set/snapshot — that would drop the param before guards run, #803) → `mergeParams` (honors `undefined` as a delete for this transition).
 - **`#buildPathParams`** (buildPath phase, runs second) — `extractOwnParams` → validate → `mergeParams` → drop the `#pendingRemovals` keys so the built URL matches the forwarded params (the `undefined` marker is gone by now, so a plain re-merge would re-inject the removed param) → clear `#pendingRemovals`. A standalone `router.buildPath()` sees an empty set and injects normally.
 
+Both interceptors take the third `search` argument (RFC-4 M2 / #1548). The `forwardState` interceptor **forwards** it down the chain (so a downstream `search-schema` interceptor still sees the matched query on the URL→State path) and keeps injecting persistent params into the **path bag** (the navigate split re-routes the query-typed ones into `state.search`). The `buildPath` interceptor is **search-aware**: when the caller passes an explicit `search` channel (`buildPath(name, params, search)` / the descriptor navigate path), persistent params are injected into `search` — the channel the built URL takes its query from; otherwise into the params bag (the v1 single-bag path). The `#pendingRemovals` window works identically in either channel.
+
 **Permanent removal happens in `onTransitionSuccess`, not in the interceptors** — keyed on the committed state, so a rejected/cancelled navigation never drops the param (#803).
 
 ## State Context
