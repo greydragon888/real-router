@@ -1,5 +1,6 @@
 import type {
   NavigationOptions,
+  NavigationTarget,
   Params,
   Navigator,
   SearchParams,
@@ -16,19 +17,11 @@ export type RouteContext<P extends Params = Params> = RouteState<P> & {
   navigator: Navigator;
 };
 
-export interface LinkProps<P extends Params = Params> extends Omit<
+/** Props shared by both `<Link>` forms (see react `LinkProps` for the rationale). */
+interface LinkCommonProps extends Omit<
   HTMLAttributes<HTMLAnchorElement>,
   "className"
 > {
-  routeName: string;
-  routeParams?: P;
-  /**
-   * Query (search) params for the link's target (RFC-4 M2, #1548) — parallel to
-   * `routeParams`, the path/query split's view-layer channel. Feeds the URL's
-   * query on click and `href`, and (with `ignoreQueryParams={false}`) the
-   * active-state check.
-   */
-  routeSearch?: SearchParams;
   routeOptions?: NavigationOptions;
   className?: string;
   activeClassName?: string;
@@ -46,3 +39,26 @@ export interface LinkProps<P extends Params = Params> extends Omit<
   hash?: string;
   target?: string;
 }
+
+/** Channel form: `routeName` + optional `routeParams` / `routeSearch`. */
+interface LinkChannelProps<P extends Params = Params> {
+  routeName: string;
+  routeParams?: P;
+  /**
+   * Query (search) params for the link's target (RFC-4 M2, #1548) — parallel to
+   * `routeParams`, the path/query split's view-layer channel.
+   */
+  routeSearch?: SearchParams;
+  to?: never;
+}
+
+/** Descriptor form (RFC-4 M2 B2, #1548): `to={NavigationTarget}`, exclusive with channel props. */
+interface LinkDescriptorProps<P extends Params = Params> {
+  to: NavigationTarget<P>;
+  routeName?: never;
+  routeParams?: never;
+  routeSearch?: never;
+}
+
+export type LinkProps<P extends Params = Params> = LinkCommonProps &
+  (LinkChannelProps<P> | LinkDescriptorProps<P>);

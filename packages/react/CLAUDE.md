@@ -521,6 +521,29 @@ Active state is hash-aware: when `hash` is set, the Link is active iff route mat
 A route's query still works when passed inside `routeParams` (the pre-split path);
 `routeSearch` is the explicit, type-clean channel. `InkLink` accepts the same prop.
 
+### `to` Descriptor Prop (#1548)
+
+`<Link>` accepts two **mutually-exclusive** forms — the channel props above
+(`routeName` + `routeParams` + `routeSearch`) OR a single `to={NavigationTarget}`
+descriptor (`{ name, params?, search? }`). `LinkProps` is a discriminated union
+(`to?: never` in the channel branch, `routeName?: never` in the descriptor
+branch), so mixing them is a **compile error**. At runtime the shared
+`resolveLinkTarget` helper is the backstop — `to` wins and a `console.warn` fires
+if channel props leak in via a JS consumer or a spread.
+
+```tsx
+// Channel form
+<Link routeName="users.view" routeParams={{ id: "7" }} routeSearch={{ tab: "posts" }} />
+
+// Descriptor form — equivalent, one object
+<Link to={{ name: "users.view", params: { id: "7" }, search: { tab: "posts" } }} />
+```
+
+`routeOptions` / `hash` are separate props under BOTH forms (hash is not part of
+`NavigationTarget` — #532). `InkLink` stays channel-only. react/preact/solid
+enforce the exclusion in the type; svelte/vue/angular enforce it at runtime only
+(their prop systems preclude a strict never-union).
+
 ### fallback and keepAlive Together
 
 `fallback` and `keepAlive` can be combined. The `<Suspense>` boundary wraps the children; `<Activity>` wraps the whole match including the boundary:

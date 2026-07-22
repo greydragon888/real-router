@@ -9,7 +9,12 @@ import {
 } from "@angular/core";
 import { createActiveSource } from "@real-router/sources";
 
-import { buildHref, navigateWithHash, shouldNavigate } from "../dom-utils";
+import {
+  buildHref,
+  navigateWithHash,
+  resolveLinkTarget,
+  shouldNavigate,
+} from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
 import { createStableParams } from "../internal/createStableParams";
 import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
@@ -17,6 +22,7 @@ import { subscribeSourceToSignal } from "../internal/subscribeSourceToSignal";
 import type {
   Params,
   NavigationOptions,
+  NavigationTarget,
   SearchParams,
 } from "@real-router/core";
 
@@ -47,6 +53,12 @@ export class RealLink {
    * `routeParams`, the path/query split's view-layer channel.
    */
   readonly routeSearch = input<SearchParams | undefined>(undefined);
+  /**
+   * Descriptor form (RFC-4 M2 B2, #1548): `[to]="{ name, params?, search? }"` —
+   * mutually exclusive with the routeName/routeParams/routeSearch channels
+   * (runtime dev-warn on conflict via `resolveLinkTarget`, `to` wins).
+   */
+  readonly to = input<NavigationTarget | undefined>(undefined);
   readonly routeOptions = input<NavigationOptions>({});
   readonly activeClassName = input<string>("active");
   readonly activeStrict = input(false);
@@ -74,15 +86,22 @@ export class RealLink {
   // equality already collapses repeated `string` results, so no custom
   // comparator is required (review §8b note 3 — applies after verifying that
   // `buildHref` returns a primitive).
-  private readonly href = computed(() =>
-    buildHref(
-      this.router,
+  private readonly href = computed(() => {
+    const resolved = resolveLinkTarget(
+      this.to(),
       this.routeName(),
-      this.stableParams() ?? EMPTY_PARAMS,
+      this.stableParams(),
       this.routeSearch(),
+    );
+
+    return buildHref(
+      this.router,
+      resolved.name,
+      resolved.params ?? EMPTY_PARAMS,
+      resolved.search,
       this.hash(),
-    ),
-  );
+    );
+  });
   private prevActiveClass = "";
   private prevHref: string | undefined = undefined;
   // Skip-same-value: only re-touch the DOM `class` list when the active state
@@ -99,11 +118,20 @@ export class RealLink {
     effect((onCleanup) => {
       // Fast path (#1103) for default-options links — shared name selector
       // instead of a per-link source; see `createActiveSource`.
-      const source = createActiveSource(
-        this.router,
+      // Resolve the two prop forms (RFC-4 M2 B2, #1548): `to` supersedes the
+      // channel inputs (dev-warn on conflict).
+      const resolved = resolveLinkTarget(
+        this.to(),
         this.routeName(),
         this.stableParams(),
         this.routeSearch(),
+      );
+
+      const source = createActiveSource(
+        this.router,
+        resolved.name,
+        resolved.params,
+        resolved.search,
         this.activeStrict(),
         this.ignoreQueryParams(),
         this.hash(),
@@ -136,11 +164,18 @@ export class RealLink {
     }
 
     event.preventDefault();
+    const resolved = resolveLinkTarget(
+      this.to(),
+      this.routeName(),
+      this.routeParams(),
+      this.routeSearch(),
+    );
+
     navigateWithHash(
       this.router,
-      this.routeName(),
-      this.routeParams() ?? EMPTY_PARAMS,
-      this.routeSearch(),
+      resolved.name,
+      resolved.params ?? EMPTY_PARAMS,
+      resolved.search,
       this.hash(),
       this.routeOptions(),
     ).catch(NOOP_CATCH);

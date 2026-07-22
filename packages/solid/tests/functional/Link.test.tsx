@@ -46,6 +46,39 @@ describe("Link component", () => {
     expect(link).toHaveAttribute("href", "/test");
   });
 
+  it("should decompose a `to` descriptor into href + navigation (#1548)", async () => {
+    const navigateSpy = vi.spyOn(router, "navigate");
+
+    render(
+      () => (
+        <Link
+          to={{ name: "one-more-test", search: { tab: "x" } }}
+          data-testid="link"
+        >
+          Test
+        </Link>
+      ),
+      { wrapper },
+    );
+
+    const link = screen.getByTestId("link");
+
+    // href resolves from the descriptor: route "one-more-test" → "/test", and
+    // the descriptor's `search` rides into the query string (proof it decomposed).
+    expect(link).toHaveAttribute("href", "/test?tab=x");
+
+    fireEvent.click(link);
+
+    // navigate(name, params, search, opts) — the descriptor's search channel
+    // lands at position 3.
+    expect(navigateSpy).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      { tab: "x" },
+      expect.anything(),
+    );
+  });
+
   it("should render component with passed class name", () => {
     const testClass = "test-class";
 

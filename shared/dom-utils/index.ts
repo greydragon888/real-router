@@ -13,9 +13,12 @@ export {
   buildHref,
   buildActiveClassName,
   navigateWithHash,
+  resolveLinkTarget,
   shallowEqual,
   applyLinkA11y,
 } from "./link-utils.js";
+
+export type { ResolvedLinkTarget } from "./link-utils.js";
 
 export type { RouteAnnouncerOptions } from "./route-announcer.js";
 

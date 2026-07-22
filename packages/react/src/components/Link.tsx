@@ -6,6 +6,7 @@ import {
   buildHref,
   buildActiveClassName,
   navigateWithHash,
+  resolveLinkTarget,
   shallowEqual,
 } from "../dom-utils";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
@@ -31,6 +32,7 @@ function areLinkPropsEqual(
     prev.hash === next.hash &&
     shallowEqual(prev.routeParams, next.routeParams) &&
     shallowEqual(prev.routeSearch, next.routeSearch) &&
+    shallowEqual(prev.to, next.to) &&
     shallowEqual(prev.routeOptions, next.routeOptions)
   );
 }
@@ -39,6 +41,7 @@ const LinkImpl: FC<LinkProps> = ({
   routeName,
   routeParams,
   routeSearch,
+  to,
   routeOptions = EMPTY_OPTIONS,
   className,
   activeClassName = "active",
@@ -57,7 +60,18 @@ const LinkImpl: FC<LinkProps> = ({
 
   const router = useRouter();
 
-  // Pass `routeParams` straight through (possibly `undefined`) — do NOT default
+  // Resolve the two prop forms into one channel triple (RFC-4 M2 B2, #1548):
+  // a `to` descriptor supersedes the channel props (dev-warn on conflict). The
+  // `routeName ?? ""` keeps a descriptor-form Link (no `routeName`) on the
+  // canonical empty-name path that `buildHref` / `isActiveRoute` already handle.
+  const { name, params, search } = resolveLinkTarget(
+    to,
+    routeName ?? "",
+    routeParams,
+    routeSearch,
+  );
+
+  // Pass `params` straight through (possibly `undefined`) — do NOT default
   // to EMPTY_PARAMS before the active-route call. `createActiveRouteSource` keys
   // params as `params === undefined ? "" : canonicalJson(params)`, so a no-params
   // `<Link>` and a manual `useIsActiveRoute(routeName)` both key "" and share ONE
@@ -70,20 +84,20 @@ const LinkImpl: FC<LinkProps> = ({
   // match (#532). Without this, three tab links sharing routeName="settings"
   // would all be marked active by route-name alone, defeating tab semantics.
   const isActive = useIsActiveRoute(
-    routeName,
-    routeParams,
-    routeSearch,
+    name,
+    params,
+    search,
     activeStrict,
     ignoreQueryParams,
     hash,
   );
 
   // Navigation/href building need a concrete params object — default here only.
-  // `routeSearch` stays raw (`undefined` when unset): buildHref / navigateWithHash
+  // `search` stays raw (`undefined` when unset): buildHref / navigateWithHash
   // pass it straight to the query slot, which tolerates `undefined`.
-  const paramsForNav = routeParams ?? EMPTY_PARAMS;
+  const paramsForNav = params ?? EMPTY_PARAMS;
 
-  const href = buildHref(router, routeName, paramsForNav, routeSearch, hash);
+  const href = buildHref(router, name, paramsForNav, search, hash);
 
   // useCallback was wasteful: 7 deps recreated the closure on every meaningful
   // render anyway, and `<a onClick>` does not benefit from a stable function
@@ -117,9 +131,9 @@ const LinkImpl: FC<LinkProps> = ({
     evt.preventDefault();
     navigateWithHash(
       router,
-      routeName,
+      name,
       paramsForNav,
-      routeSearch,
+      search,
       hash,
       routeOptions,
     ).catch(() => {});

@@ -538,6 +538,61 @@ describe("Link - Integration Tests", () => {
       );
     });
 
+    it("should decompose a `to` descriptor into name/params/search (#1548)", () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        <Link
+          to={{
+            name: "one-more-test",
+            params: { id: "7" },
+            search: { tab: "posts" },
+          }}
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"));
+
+      // The descriptor's three fields land in the positional navigate channels.
+      expect(navigateSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        { id: "7" },
+        { tab: "posts" },
+        expect.anything(),
+      );
+    });
+
+    it("should warn when `to` and channel props are both supplied (#1548)", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      render(
+        // @ts-expect-error — the union rejects mixing `to` with channel props;
+        // this exercises the runtime backstop for JS consumers / spreads.
+        <Link
+          to={{ name: "one-more-test" }}
+          routeName="users"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      // `to` wins, and the conflict is surfaced. The href resolves from
+      // `to.name` ("one-more-test" → "/test"), NOT the ignored channel
+      // `routeName="users"` (→ "/users") — proof the descriptor took over.
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("received both `to` and channel props"),
+      );
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
+
+      warnSpy.mockRestore();
+    });
+
     it("should re-render href when the hash prop changes (#532)", () => {
       const buildUrlSpy = vi.fn(
         (

@@ -1,10 +1,62 @@
 import type {
   NavigationOptions,
+  NavigationTarget,
   Params,
   Router,
   SearchParams,
   State,
 } from "@real-router/core";
+
+/**
+ * Resolved navigation channels for a `<Link>` — the single `{ name, params,
+ * search }` shape every adapter feeds into `buildHref` / `navigateWithHash` /
+ * the active-route source, regardless of which prop form the consumer used.
+ */
+export interface ResolvedLinkTarget {
+  name: string;
+  params: Params | undefined;
+  search: SearchParams | undefined;
+}
+
+/**
+ * Collapses a `<Link>`'s two prop forms (RFC-4 M2 B2, #1548) into one channel
+ * triple:
+ *
+ * - **Descriptor** — `to={{ name, params?, search? }}` (a `NavigationTarget`).
+ * - **Channel props** — `routeName` + `routeParams?` + `routeSearch?`.
+ *
+ * The forms are mutually exclusive: the TS union on each adapter's `LinkProps`
+ * rejects mixing them at compile time, and this helper is the runtime backstop —
+ * when `to` is present it **wins**, and a `dev`-visible `console.warn` fires if
+ * channel props were also supplied (a JS consumer, an object spread, or an
+ * adapter without a strict union can still slip both through). `routeOptions` /
+ * `hash` are separate props under BOTH forms (hash is not part of
+ * `NavigationTarget` — #532), so they are resolved by the caller, not here.
+ */
+export function resolveLinkTarget(
+  to: NavigationTarget | undefined,
+  routeName: string,
+  routeParams: Params | undefined,
+  routeSearch: SearchParams | undefined,
+): ResolvedLinkTarget {
+  if (to !== undefined) {
+    if (
+      routeName !== "" ||
+      routeParams !== undefined ||
+      routeSearch !== undefined
+    ) {
+      console.warn(
+        "[real-router] <Link> received both `to` and channel props " +
+          "(routeName / routeParams / routeSearch). `to` wins; the channel " +
+          "props are ignored. Use one form or the other.",
+      );
+    }
+
+    return { name: to.name, params: to.params, search: to.search };
+  }
+
+  return { name: routeName, params: routeParams, search: routeSearch };
+}
 
 export function shouldNavigate(evt: MouseEvent): boolean {
   return (

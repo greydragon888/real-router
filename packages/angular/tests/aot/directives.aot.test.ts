@@ -67,6 +67,57 @@ describe("RealLink / RealLinkActive (AOT)", () => {
     expect(anchor.getAttribute("href")).toBe("/users");
   });
 
+  it("realLink binds a `to` descriptor → href decomposes name/params (#1548)", () => {
+    // The descriptor form is only reachable under AOT — a signal `[to]` input
+    // stays at its `undefined` default under JIT, so the `resolveLinkTarget`
+    // descriptor arm never runs there.
+    @Component({
+      template: `<a
+        realLink
+        [to]="{ name: 'users.profile', params: { id: '7' } }"
+        >Profile</a
+      >`,
+      imports: [RealLink],
+    })
+    class TestHost {}
+
+    const fixture = mount(TestHost);
+    const anchor = fixture.nativeElement.querySelector(
+      "a",
+    ) as HTMLAnchorElement;
+
+    // href resolves from the descriptor's { name, params }, not the (absent)
+    // channel props.
+    expect(anchor.getAttribute("href")).toBe("/users/7");
+  });
+
+  it("realLink `to` click navigates via the decomposed descriptor (#1548)", async () => {
+    // Covers `onClick` under AOT (the jit twin exists, but the AOT-emit onClick
+    // is only reached by a real click here — the other AOT tests drive
+    // navigation through `router.navigate()` directly).
+    @Component({
+      template: `<a
+        realLink
+        [to]="{ name: 'users.profile', params: { id: '9' } }"
+        >Go</a
+      >`,
+      imports: [RealLink],
+    })
+    class TestHost {}
+
+    const fixture = mount(TestHost);
+    const anchor = fixture.nativeElement.querySelector(
+      "a",
+    ) as HTMLAnchorElement;
+
+    anchor.dispatchEvent(new MouseEvent("click", { cancelable: true }));
+    await fixture.whenStable();
+
+    // The descriptor's { name, params } drove navigation.
+    expect(router.getState()?.name).toBe("users.profile");
+    expect(router.getState()?.params).toStrictEqual({ id: "9" });
+  });
+
   it("active-state flip toggles the active class via the source subscription", async () => {
     @Component({
       template: `<a realLink [routeName]="'users'">Users</a>`,
