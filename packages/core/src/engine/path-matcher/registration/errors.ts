@@ -197,18 +197,6 @@ export function throwInvalidQueryParamName(
   );
 }
 
-export function throwPathQueryNameCollision(
-  routeName: string,
-  name: string,
-): never {
-  throw new Error(
-    `[SegmentMatcher.registerTree] Name collision in route "${routeName}": "${name}" ` +
-      `is declared as BOTH a path param (':${name}') and a query param ('?${name}'). ` +
-      `buildPath would emit its value twice (once in the path, once in the query). ` +
-      `Rename one.`,
-  );
-}
-
 export function throwDuplicateRoutePath(
   existingName: string,
   newName: string,

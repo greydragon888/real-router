@@ -296,9 +296,13 @@ export class RoutesNamespace<
     if (opts.rewritePathOnMatch) {
       // Reunite the matched query with the resolved bag so the rebuilt URL keeps
       // its query string — buildPath is still v1/single-bag (the search-aware
-      // slot-shift is a separate step, RFC-4 M2 / #1548). `search` is always
-      // present (frozen empty when query-less), so the spread is unconditional.
-      const buildBag = { ...(routeParams as Params), ...search } as Params;
+      // slot-shift is a separate step, RFC-4 M2 / #1548). PATH params win over a
+      // same-named query param (`/items/:id?id`): query must NOT overwrite the
+      // path value in the rebuild — that is the killed #843 precedence. (The
+      // query value of a colliding name in the rebuilt URL is imperfect until
+      // buildPath is search-aware — a В2.5 follow-up; the path identity, and the
+      // split state.params/state.search, are correct.)
+      const buildBag = { ...search, ...(routeParams as Params) } as Params;
       const buildParams =
         typeof this.#store.config.encoders[routeName] === "function"
           ? this.#store.config.encoders[routeName]({ ...buildBag })

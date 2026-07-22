@@ -434,10 +434,13 @@ describe("validateRoutePath (via public validateRoute)", () => {
         }).toThrow(/invalid query-param name/u);
       });
 
-      it("should throw for a path-param / query-param name collision (#1242 §5.3)", () => {
+      it("accepts a path-param / query-param name collision (RFC-4 M2 / #1548)", () => {
+        // `tab` as BOTH a path param and a query param is legal under M2 — the
+        // two live in separate channels (`state.params.tab` / `state.search.tab`).
+        // The former "declared as both" rejection (#1242 §5.3) is gone.
         expect(() => {
           validatePath("/a/:tab?tab", routeName, methodName);
-        }).toThrow(/declared as both a path param and a query param/u);
+        }).not.toThrow();
       });
 
       it("should NOT flag clean query declarations, incl. tolerated ?name=value (control, #1242)", () => {

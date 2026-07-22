@@ -77,6 +77,20 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state?.search?.first).toBe(1);
       expect(state?.search?.second).toBe(2);
     });
+
+    it("splits a path/query name collision into both channels (RFC-4 M2 / #1548)", () => {
+      // The motivating case: `id` is BOTH a path param and a query param. The
+      // former collision gate rejected this; under M2 the two coexist as
+      // separate channels, and the query does NOT overwrite the path (#843 is
+      // gone), so the rebuilt path keeps the path value.
+      routesApi.add({ name: "collide", path: "/coll/:id?id" });
+      const state = getPluginApi(router).matchPath("/coll/5?id=7");
+
+      expect(state?.name).toBe("collide");
+      expect(state?.params).toStrictEqual({ id: "5" });
+      expect(state?.search).toStrictEqual({ id: 7 });
+      expect(state?.path.startsWith("/coll/5")).toBe(true);
+    });
   });
 
   describe("unicode", () => {

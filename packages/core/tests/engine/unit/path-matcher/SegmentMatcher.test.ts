@@ -779,10 +779,15 @@ describe("SegmentMatcher", () => {
       ).toThrow(/Optional params are not supported/u);
     });
 
-    it("throws on a path-param / query-param name collision (§5.3)", () => {
-      expect(() => createMatcher([{ name: "r", path: "/a/:tab?tab" }])).toThrow(
-        /Name collision/,
-      );
+    it("accepts a path-param / query-param name collision (RFC-4 M2 / #1548)", () => {
+      // `tab` as BOTH a path and a query param is legal under M2 — separate
+      // channels. registerTree no longer rejects it, and the two round-trip
+      // independently through `params` and `search`.
+      const matcher = createMatcher([{ name: "r", path: "/a/:tab?tab" }]);
+      const result = matcher.match("/a/x?tab=y");
+
+      expect(result?.params).toStrictEqual({ tab: "x" });
+      expect(result?.search).toStrictEqual({ tab: "y" });
     });
 
     it("throws on a query-param name carrying '<'/'>' (backstop survivor, §5.1)", () => {

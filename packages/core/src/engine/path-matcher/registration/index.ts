@@ -18,7 +18,6 @@ import {
 import {
   throwDuplicateParamName,
   throwInvalidQueryParamName,
-  throwPathQueryNameCollision,
   throwSegmentGrammarError,
 } from "./errors";
 import { insertIntoTrie, insertSlashChildIntoTrie } from "./trie";
@@ -146,13 +145,9 @@ function compileAndRegisterRoute(
   // #1242 §5.1/§5.2/§5.3: validate query-param DECLARATIONS. A declared query name
   // must be a clean token — reject one carrying constraint/query metacharacters
   // (`:b?<\d+>` declares query `<\d+>`; `?tab=1` declares `tab=1`), and reject a name
-  // shared with a path param (`/a/:tab?tab`), where buildPath would emit the value
-  // twice (`/a/x?tab=x`). Both degraded silently before.
-  validateQueryParamDeclarations(
-    node.fullName,
-    declaredQueryParams,
-    buildParamNamesSet,
-  );
+  // never round-trips (`<`/`>` in the name). A name shared with a path param
+  // (`/a/:tab?tab`) is legal under M2 — separate params/search channels (#1548).
+  validateQueryParamDeclarations(node.fullName, declaredQueryParams);
 
   const compiled: CompiledRoute = {
     name: node.fullName,
@@ -293,15 +288,14 @@ function collectDeclaredQueryParams(
 function validateQueryParamDeclarations(
   routeName: string,
   queryParams: readonly string[],
-  urlParamNames: ReadonlySet<string>,
 ): void {
+  // A path/query name collision (`/a/:tab?tab`) is legal under M2 — `tab` lives
+  // in `state.params` AND `state.search` as separate channels (RFC-4 M2 /
+  // #1548); the former "declared as both" rejection is gone. Only a query name
+  // that can never round-trip (contains `<`/`>`) is still rejected.
   for (const name of queryParams) {
     if (INVALID_QUERY_NAME_RGX.test(name)) {
       throwInvalidQueryParamName(routeName, name);
-    }
-
-    if (urlParamNames.has(name)) {
-      throwPathQueryNameCollision(routeName, name);
     }
   }
 }

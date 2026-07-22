@@ -64,26 +64,20 @@ function validateUniqueParamNames(
  * route-contextual message.
  */
 function validateQueryParamDeclarations(
-  urlParams: readonly string[],
   queryParams: readonly string[],
   routeName: string,
   methodName: string,
   path: string,
 ): void {
-  const urlParamSet = new Set(urlParams);
-
+  // A path/query name collision (`/a/:tab?tab`) is legal under M2: `tab` lives
+  // in both `state.params` and `state.search` as separate channels (RFC-4 M2 /
+  // #1548), so the former "declared as both" rejection is gone. Only a query
+  // name that can never round-trip (contains `<`/`>`) is still rejected.
   for (const name of queryParams) {
     if (INVALID_QUERY_NAME_RGX.test(name)) {
       throw createRouterError(
         methodName,
         `Invalid path for route "${routeName}": invalid query-param name "${name}" in "${path}" (a query-param name cannot contain '<' or '>' — it would never round-trip; rename the query param)`,
-      );
-    }
-
-    if (urlParamSet.has(name)) {
-      throw createRouterError(
-        methodName,
-        `Invalid path for route "${routeName}": "${name}" is declared as both a path param and a query param in "${path}" — buildPath would emit its value twice (rename one)`,
       );
     }
   }
@@ -264,15 +258,10 @@ export function validateRoutePath(
   // Duplicate param name within this route's own path (`/:id/:id`, `/:x/*x`, #1151).
   validateUniqueParamNames(urlParams, routeName, methodName, path);
 
-  // Malformed query-param declarations (#1242 §5.1/§5.2/§5.3): a query name with
-  // `<>`, or one that collides with a path-param name.
-  validateQueryParamDeclarations(
-    urlParams,
-    queryParams,
-    routeName,
-    methodName,
-    path,
-  );
+  // Malformed query-param declarations (#1242 §5.1): a query name with `<>`
+  // (never round-trips). Name collisions with a path param are legal under M2
+  // (separate params/search channels, #1548).
+  validateQueryParamDeclarations(queryParams, routeName, methodName, path);
 
   // Removed-form (M1) rejection first — a `:x?` optional or a `<re>` constraint —
   // with the RICH route-contextual replacement recipe (the offending segment plus,
