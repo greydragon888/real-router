@@ -72,6 +72,24 @@ export async function run(): Promise<void> {
     );
   }
 
+  // routeSearch active-recompute (RFC-4 M2 / #1548): query-only ?tab swap on
+  // the same route — RouteView/param subscribers stay put; the five routeSearch
+  // <Link>s recompute active (ignoreQueryParams=false slow-path active source).
+  {
+    const app = await mountTestApp(newContainer(), "/search?tab=t0");
+    const tabs = ["t1", "t0"] as const;
+    let i = 0;
+
+    bench.add(
+      "preact/navigate-search-active-swap",
+      batched(2, () => {
+        app.commitNavigate("search", undefined, {
+          tab: tabs[i++ % tabs.length],
+        });
+      }),
+    );
+  }
+
   await settleHeap();
   await bench.run();
   console.table(bench.table());

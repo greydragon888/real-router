@@ -27,6 +27,7 @@ const routes: Route[] = [
     children: [{ name: "details", path: "/details" }],
   },
   { name: "about", path: "/about" },
+  { name: "search", path: "/search?tab" },
 ];
 
 const indices = [0, 1, 2, 3, 4];
@@ -80,6 +81,21 @@ function LinkPanel() {
       >
         Details 1
       </Link>
+      {/* routeSearch active-recompute panel (RFC-4 M2 / #1548): 5 tab Links on
+          the same route, distinguished ONLY by their query. `ignoreQueryParams`
+          false → each is active for exactly one `?tab=tN`, so a query-only swap
+          recomputes active for all five (slow-path createActiveRouteSource). */}
+      {indices.map((i) => (
+        <Link
+          key={`tab${String(i)}`}
+          routeName="search"
+          routeSearch={{ tab: `t${String(i)}` }}
+          ignoreQueryParams={false}
+          activeClassName="active"
+        >
+          Tab {i}
+        </Link>
+      ))}
     </nav>
   );
 }
@@ -133,9 +149,9 @@ export async function mountTestApp(
   });
 
   return {
-    commitNavigate: (name, params) => {
+    commitNavigate: (name, params, search) => {
       flushSync(() => {
-        void router.navigate(name, params);
+        void router.navigate(name, params, search);
       });
     },
     commitHistory: (dir) => {

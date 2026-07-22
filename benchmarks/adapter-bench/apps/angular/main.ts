@@ -32,6 +32,7 @@ const routes: Route[] = [
     children: [{ name: "details", path: "/details" }],
   },
   { name: "about", path: "/about" },
+  { name: "search", path: "/search?tab" },
 ];
 
 @Component({
@@ -105,6 +106,19 @@ class ItemsPageComponent {
         activeClassName="active"
         >Details 1</a
       >
+      <!-- routeSearch active-recompute panel (RFC-4 M2 / #1548): 5 tab Links on
+           the same route, distinguished ONLY by query; ignoreQueryParams=false →
+           a query-only swap recomputes active for all five. -->
+      @for (i of indices; track i) {
+        <a
+          realLink
+          routeName="search"
+          [routeSearch]="{ tab: 't' + i }"
+          [ignoreQueryParams]="false"
+          activeClassName="active"
+          >Tab {{ i }}</a
+        >
+      }
     </nav>
     @if (isItems()) {
       <items-page />
@@ -143,8 +157,8 @@ export async function mountTestApp(
   appRef.tick();
 
   return {
-    commitNavigate: (name, params) => {
-      void router.navigate(name, params);
+    commitNavigate: (name, params, search) => {
+      void router.navigate(name, params, search);
       appRef.tick();
     },
     commitHistory: (dir) => {

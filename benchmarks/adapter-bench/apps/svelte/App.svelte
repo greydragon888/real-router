@@ -31,6 +31,19 @@
   >
     Details 1
   </Link>
+  <!-- routeSearch active-recompute panel (RFC-4 M2 / #1548): 5 tab Links on the
+       same route, distinguished ONLY by query; ignoreQueryParams=false → a
+       query-only swap recomputes active for all five. -->
+  {#each indices as i (`tab${i}`)}
+    <Link
+      routeName="search"
+      routeSearch={{ tab: `t${i}` }}
+      ignoreQueryParams={false}
+      activeClassName="active"
+    >
+      Tab {i}
+    </Link>
+  {/each}
 </nav>
 {#if routeName.startsWith("items")}
   <ItemsPage />
