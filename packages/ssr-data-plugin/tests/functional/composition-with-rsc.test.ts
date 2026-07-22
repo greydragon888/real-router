@@ -75,10 +75,12 @@ describe("@real-router/ssr-data-plugin — composition with rsc-server-plugin", 
   it("populates state.context.data and state.context.rsc independently for the same start()", async () => {
     router.usePlugin(
       ssrDataPluginFactory({
-        "users.profile": () => async (params) => ({
-          jsonId: params.id,
-          source: "ssr-data",
-        }),
+        "users.profile":
+          () =>
+          async ({ params }) => ({
+            jsonId: params.id,
+            source: "ssr-data",
+          }),
       }),
       rscServerPluginFactoryProxy({
         "users.profile": () => () => rscNode("UserProfile", { userId: "42" }),
@@ -99,7 +101,9 @@ describe("@real-router/ssr-data-plugin — composition with rsc-server-plugin", 
   it("teardown of ssr-data-plugin leaves rsc namespace claim intact", async () => {
     const unsubData = router.usePlugin(
       ssrDataPluginFactory({
-        "users.profile": () => async (params) => ({ id: params.id }),
+        "users.profile":
+          () =>
+          async ({ params }) => ({ id: params.id }),
       }),
     );
 
@@ -126,7 +130,9 @@ describe("@real-router/ssr-data-plugin — composition with rsc-server-plugin", 
   it("teardown of rsc-proxy leaves ssr-data-plugin's claim intact", async () => {
     router.usePlugin(
       ssrDataPluginFactory({
-        "users.profile": () => async (params) => ({ id: params.id }),
+        "users.profile":
+          () =>
+          async ({ params }) => ({ id: params.id }),
       }),
     );
 
@@ -155,10 +161,12 @@ describe("@real-router/ssr-data-plugin — composition with rsc-server-plugin", 
         "users.profile": () => () => rscNode("UserProfile"),
       }),
       ssrDataPluginFactory({
-        "users.profile": () => async (params) => ({
-          jsonId: params.id,
-          source: "ssr-data",
-        }),
+        "users.profile":
+          () =>
+          async ({ params }) => ({
+            jsonId: params.id,
+            source: "ssr-data",
+          }),
       }),
     );
 

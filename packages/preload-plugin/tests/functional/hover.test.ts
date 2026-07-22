@@ -43,7 +43,10 @@ describe("preload-plugin — hover", () => {
 
     await waitForTimer(65);
 
-    expect(preloadFn).toHaveBeenCalledExactlyOnceWith({});
+    expect(preloadFn).toHaveBeenCalledExactlyOnceWith({
+      params: {},
+      search: {},
+    });
 
     router.stop();
   });
@@ -303,7 +306,10 @@ describe("preload-plugin — hover", () => {
     fireMouseOver(anchor);
     await waitForTimer(65);
 
-    expect(preloadFn).toHaveBeenCalledWith({ id: "42" });
+    expect(preloadFn).toHaveBeenCalledWith({
+      params: { id: "42" },
+      search: {},
+    });
 
     router.stop();
   });

@@ -36,7 +36,10 @@ describe("Concurrent Loaders Stress", () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: DataLoaderFactoryMap = {
       home: () => () => Promise.resolve({ page: "home" }),
-      "users.profile": () => (params) => Promise.resolve({ userId: params.id }),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve({ userId: params.id }),
       about: () => () => Promise.resolve({ page: "about" }),
       settings: () => () => Promise.resolve({ page: "settings" }),
     };
@@ -74,14 +77,16 @@ describe("Concurrent Loaders Stress", () => {
     let callCount = 0;
 
     const loaders: DataLoaderFactoryMap = {
-      "users.profile": () => (params) => {
-        callCount++;
+      "users.profile":
+        () =>
+        ({ params }) => {
+          callCount++;
 
-        return Promise.resolve({
-          id: params.id,
-          order: callCount,
-        });
-      },
+          return Promise.resolve({
+            id: params.id,
+            order: callCount,
+          });
+        },
     };
 
     const results = await Promise.all(
@@ -111,7 +116,10 @@ describe("Concurrent Loaders Stress", () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: DataLoaderFactoryMap = {
       // Only profile has a loader
-      "users.profile": () => (params) => Promise.resolve({ id: params.id }),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve({ id: params.id }),
     };
 
     const results = await Promise.all(

@@ -20,6 +20,7 @@ export { ALL_SSR_MODES } from "./types.js";
 
 export type {
   SsrLoaderContext,
+  SsrLoaderTarget,
   SsrLoaderFn,
   SsrLoaderFnFactory,
   SsrLoaderFactoryMap,

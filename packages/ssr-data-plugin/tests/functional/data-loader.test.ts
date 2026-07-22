@@ -125,7 +125,9 @@ describe("@real-router/ssr-data-plugin", () => {
       await router.start("/users/42");
 
       expect(loader).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "42" }),
+        expect.objectContaining({
+          params: expect.objectContaining({ id: "42" }),
+        }),
       );
     });
 
@@ -543,7 +545,7 @@ describe("@real-router/ssr-data-plugin", () => {
       const next = await router.start("/users/99");
 
       expect(loader).toHaveBeenCalledTimes(1);
-      expect(loader).toHaveBeenCalledWith({ id: "99" });
+      expect(loader).toHaveBeenCalledWith({ params: { id: "99" }, search: {} });
       expect(next.context.data).toStrictEqual({ from: "csr" });
     });
 
@@ -597,7 +599,10 @@ describe("@real-router/ssr-data-plugin", () => {
       const N = 500;
       const base = createRouter(routes, { defaultRoute: "home" });
       const loaders: DataLoaderFactoryMap = {
-        "users.profile": () => (params) => Promise.resolve({ id: params.id }),
+        "users.profile":
+          () =>
+          ({ params }) =>
+            Promise.resolve({ id: params.id }),
       };
 
       const results = await Promise.all(
@@ -1632,7 +1637,9 @@ describe("@real-router/ssr-data-plugin", () => {
       // `undefined` for `[1]`. Note: `toHaveBeenCalledWith(params, undefined)`
       // would NOT work here — vitest treats `f(x)` and `f(x, undefined)`
       // as distinct by arity, and the start path passes a single argument.
-      expect(loader.mock.calls[0]).toStrictEqual([{ id: "42" }]);
+      expect(loader.mock.calls[0]).toStrictEqual([
+        { params: { id: "42" }, search: {} },
+      ]);
 
       invalidate(router, "data");
       await router.navigate("users.profile", { id: "42" }, undefined, {

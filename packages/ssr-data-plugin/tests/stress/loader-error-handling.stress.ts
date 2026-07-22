@@ -58,15 +58,17 @@ describe("Loader Error Handling Under Stress", () => {
   it("100 concurrent starts with mixed success/failure: each resolves correctly", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: DataLoaderFactoryMap = {
-      "users.profile": () => (params) => {
-        const id = Number(params.id);
+      "users.profile":
+        () =>
+        ({ params }) => {
+          const id = Number(params.id);
 
-        if (id % 3 === 0) {
-          return Promise.reject(new Error(`loader failed for ${id}`));
-        }
+          if (id % 3 === 0) {
+            return Promise.reject(new Error(`loader failed for ${id}`));
+          }
 
-        return Promise.resolve({ id: params.id });
-      },
+          return Promise.resolve({ id: params.id });
+        },
     };
 
     const results = await Promise.allSettled(

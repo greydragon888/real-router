@@ -378,7 +378,12 @@ export function createSsrLoaderPlugin<
           dataClaim.write(state, hydrationState.context[config.namespace] as T);
           reconstructDeferredFromHydration(state, hydrationState.context);
         } else if (entry.loader !== undefined) {
-          writeLoaderResult(state, await entry.loader(state.params));
+          // Two-channel loader target (RFC-4 M2 / #1548): path in `params`,
+          // query in `search`.
+          writeLoaderResult(
+            state,
+            await entry.loader({ params: state.params, search: state.search }),
+          );
         }
 
         return state;
@@ -403,7 +408,10 @@ export function createSsrLoaderPlugin<
         // navigation supersedes this one. The post-await `signal.aborted`
         // check below remains as the final gate — loaders that ignore the
         // signal still benefit from the cancel-safety contract (#605).
-        const data = await entry.loader(nextRoute.params, { signal });
+        const data = await entry.loader(
+          { params: nextRoute.params, search: nextRoute.search },
+          { signal },
+        );
 
         if (signal.aborted) return;
 

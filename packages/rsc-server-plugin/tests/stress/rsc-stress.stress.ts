@@ -45,8 +45,10 @@ describe("RSC Loader Stress", () => {
   it("500 concurrent clone+start+dispose: per-request isolation preserved", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: RscLoaderFactoryMap = {
-      "users.profile": () => (params) =>
-        Promise.resolve(node("Profile", { id: params.id })),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve(node("Profile", { id: params.id })),
     };
 
     const results = await Promise.all(
@@ -94,15 +96,17 @@ describe("RSC Loader Stress", () => {
   it("100 concurrent starts with mixed success/failure: each resolves correctly", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: RscLoaderFactoryMap = {
-      "users.profile": () => (params) => {
-        const id = Number(params.id);
+      "users.profile":
+        () =>
+        ({ params }) => {
+          const id = Number(params.id);
 
-        if (id % 3 === 0) {
-          return Promise.reject(new Error(`rsc fail for ${id}`));
-        }
+          if (id % 3 === 0) {
+            return Promise.reject(new Error(`rsc fail for ${id}`));
+          }
 
-        return Promise.resolve(node("Profile", { id: params.id }));
-      },
+          return Promise.resolve(node("Profile", { id: params.id }));
+        },
     };
 
     const results = await Promise.allSettled(
@@ -188,8 +192,10 @@ describe("RSC Loader Stress", () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: RscLoaderFactoryMap = {
       home: () => () => Promise.resolve(node("Home")),
-      "users.profile": () => (params) =>
-        Promise.resolve(node("Profile", { userId: params.id })),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve(node("Profile", { userId: params.id })),
       about: () => () => Promise.resolve(node("About")),
       settings: () => () => Promise.resolve(node("Settings")),
     };
@@ -283,7 +289,7 @@ describe("RSC Loader Stress", () => {
         // Yield enough microtasks to land inside `await loader(…)` of the
         // leave handler. Mirrors YIELDS_TO_REACH_LOADER_AWAIT in
         // rsc-loader.test.ts:1160-1172 — same priming sequence for the
-        // leave handler's `await loader(params, { signal })` boundary.
+        // leave handler's `await loader({ params }, { signal })` boundary.
         const YIELDS_TO_REACH_LOADER_AWAIT = 3;
 
         for (let y = 0; y < YIELDS_TO_REACH_LOADER_AWAIT; y++) {
@@ -338,10 +344,12 @@ describe("RSC Loader Stress", () => {
 
       clone.usePlugin(
         rscServerPluginFactory({
-          "users.profile": () => (params) =>
-            // Build a fresh payload object each call so WeakRef can observe
-            // collection — a constant payload would be retained module-side.
-            Promise.resolve(node("Profile", { id: params.id, capture: i })),
+          "users.profile":
+            () =>
+            ({ params }) =>
+              // Build a fresh payload object each call so WeakRef can observe
+              // collection — a constant payload would be retained module-side.
+              Promise.resolve(node("Profile", { id: params.id, capture: i })),
         }),
       );
 
@@ -444,22 +452,24 @@ describe("RSC Loader Stress", () => {
 
     router.usePlugin(
       rscServerPluginFactory({
-        "users.profile": () => async (params, ctx) => {
-          const seq = ++loaderSeq;
+        "users.profile":
+          () =>
+          async ({ params }, ctx) => {
+            const seq = ++loaderSeq;
 
-          // Microtask-yielded loader so a newer navigate() can cancel
-          // us mid-flight via the ctx.signal. Robust loaders check
-          // upfront — we mirror that to spot the cancellation early.
-          await Promise.resolve();
+            // Microtask-yielded loader so a newer navigate() can cancel
+            // us mid-flight via the ctx.signal. Robust loaders check
+            // upfront — we mirror that to spot the cancellation early.
+            await Promise.resolve();
 
-          if (ctx?.signal.aborted) {
-            throw new Error(`aborted-${seq}`);
-          }
+            if (ctx?.signal.aborted) {
+              throw new Error(`aborted-${seq}`);
+            }
 
-          loaderCalls.push(seq);
+            loaderCalls.push(seq);
 
-          return node("Profile", { id: params.id, seq });
-        },
+            return node("Profile", { id: params.id, seq });
+          },
       }),
     );
 
@@ -726,8 +736,10 @@ describe("RSC Loader Stress", () => {
 
     router.usePlugin(
       rscServerPluginFactory({
-        "users.profile": () => (params) =>
-          Promise.resolve(node("Profile", { id: params.id })),
+        "users.profile":
+          () =>
+          ({ params }) =>
+            Promise.resolve(node("Profile", { id: params.id })),
       }),
     );
 

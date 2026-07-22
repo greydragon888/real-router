@@ -1,6 +1,7 @@
 export type {
   RscActionResult,
   RscLoaderFn,
+  RscLoaderTarget,
   RscLoaderFactoryMap,
   RscLoaderFnFactory,
   RscPayload,

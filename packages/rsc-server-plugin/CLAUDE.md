@@ -10,7 +10,8 @@
 | `rscActionPluginFactory`  | function | Plugin factory — pass `() => RscActionResult \| undefined`, claims `"rscAction"` |
 | `getSsrRscMode`           | function | Read `state.context.ssrRscMode` with `"full"` fallback                      |
 | `invalidate`              | function | `(router, "rsc") => void` — mark `"rsc"` stale; next navigation re-runs the RSC loader |
-| `RscLoaderFn`             | type     | Compiled loader signature: `(params) => Promise<ReactNode> \| ReactNode`   |
+| `RscLoaderFn`             | type     | Compiled loader signature: `({ params, search }) => Promise<ReactNode> \| ReactNode` (RFC-4 M2 / #1548) |
+| `RscLoaderTarget`         | type     | `{ params, search }` — the two destination channels handed to a loader     |
 | `RscLoaderFnFactory`      | type     | Factory signature: `(router, getDependency) => RscLoaderFn`                |
 | `RscRouteEntry`           | type     | Per-route entry: factory (short form) or `{ ssr?, loader? }` object        |
 | `RscLoaderFactoryMap`     | type     | Record of route entries — pass to `rscServerPluginFactory()`               |

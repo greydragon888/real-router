@@ -113,7 +113,9 @@ describe("@real-router/rsc-server-plugin", () => {
       await router.start("/users/42");
 
       expect(loader).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "42" }),
+        expect.objectContaining({
+          params: expect.objectContaining({ id: "42" }),
+        }),
       );
     });
 
@@ -668,7 +670,7 @@ describe("@real-router/rsc-server-plugin", () => {
       const next = await router.start("/users/99");
 
       expect(loader).toHaveBeenCalledTimes(1);
-      expect(loader).toHaveBeenCalledWith({ id: "99" });
+      expect(loader).toHaveBeenCalledWith({ params: { id: "99" }, search: {} });
       expect(next.context.rsc).toStrictEqual(node("Loaded"));
     });
   });
@@ -756,8 +758,10 @@ describe("@real-router/rsc-server-plugin", () => {
       const N = 500;
       const base = createRouter(routes, { defaultRoute: "home" });
       const loaders: RscLoaderFactoryMap = {
-        "users.profile": () => (params) =>
-          Promise.resolve(node("Profile", { id: params.id })),
+        "users.profile":
+          () =>
+          ({ params }) =>
+            Promise.resolve(node("Profile", { id: params.id })),
       };
 
       const results = await Promise.all(
@@ -1511,7 +1515,7 @@ describe("@real-router/rsc-server-plugin", () => {
       // `await loader(…)`. The empirically-required count is 3 yields:
       //   tick 1 — navigate() schedules LEAVE_APPROVE
       //   tick 2 — leave handler's `await router…` resolves
-      //   tick 3 — handler enters `await loader(params, { signal })`
+      //   tick 3 — handler enters `await loader({ params }, { signal })`
       // The number is brittle to additions of `await` upstream in
       // `createSsrLoaderPlugin.ts`; tighten the count only after
       // re-verifying empirically. Looping rather than three open-coded
@@ -1738,7 +1742,9 @@ describe("@real-router/rsc-server-plugin", () => {
       // the loader entirely would surface as `undefined.toStrictEqual(…)`
       // rather than a meaningful "expected 1 call, got 0".
       expect(loader).toHaveBeenCalledTimes(1);
-      expect(loader.mock.calls[0]).toStrictEqual([{ id: "42" }]);
+      expect(loader.mock.calls[0]).toStrictEqual([
+        { params: { id: "42" }, search: {} },
+      ]);
 
       invalidate(router, "rsc");
       await router.navigate("users.profile", { id: "42" }, undefined, {

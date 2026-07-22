@@ -8,7 +8,8 @@
 | ------------------------ | -------- | ------------------------------------------------------------ |
 | `preloadPluginFactory`   | function | Plugin factory — pass to `router.usePlugin()`                |
 | `PreloadPluginOptions`   | type     | Configuration options (`delay`, `networkAware`)              |
-| `PreloadFn`              | type     | Compiled preload signature: `(params) => Promise<unknown>`   |
+| `PreloadFn`              | type     | Compiled preload signature: `({ params, search }) => Promise<unknown>` (RFC-4 M2 / #1548) |
+| `PreloadTarget`          | type     | `{ params, search }` — the two destination channels handed to a preload fn |
 | `PreloadFnFactory`       | type     | Factory signature: `(router, getDependency) => PreloadFn`    |
 
 ## How It Works

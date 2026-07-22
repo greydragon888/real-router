@@ -100,11 +100,13 @@ describe("loader arguments: loader receives correct route params", () => {
       let receivedParams: Record<string, unknown> = {};
 
       const { router } = createSsrDataRouter({
-        "users.profile": () => async (params) => {
-          receivedParams = { ...params };
+        "users.profile":
+          () =>
+          async ({ params }) => {
+            receivedParams = { ...params };
 
-          return null;
-        },
+            return null;
+          },
       });
 
       await router.start(`/users/${id}`);
@@ -257,7 +259,9 @@ describe("isolation: cloned routers have independent data", () => {
     async (id1, id2) => {
       const base = createRouter(ROUTES, { defaultRoute: "home" });
       const loaders: DataLoaderFactoryMap = {
-        "users.profile": () => async (params) => ({ userId: params.id }),
+        "users.profile":
+          () =>
+          async ({ params }) => ({ userId: params.id }),
       };
 
       const clone1 = cloneRouter(base);

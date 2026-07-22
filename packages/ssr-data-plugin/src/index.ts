@@ -1,5 +1,6 @@
 export type {
   DataLoaderFn,
+  DataLoaderTarget,
   DataLoaderFactoryMap,
   DataLoaderFnFactory,
   DataRouteEntry,

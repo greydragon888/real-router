@@ -12,7 +12,8 @@
 | `defer`                  | function | `(opts: { critical, deferred }) => DeferredPayload` — declares a critical/deferred split returned from a loader (#610) |
 | `isDeferred`             | function | Type guard — `true` iff value is a `defer()` payload                |
 | `DeferredPayload`        | type     | Branded `{ critical, deferred }` shape returned by `defer()`        |
-| `DataLoaderFn`           | type     | Compiled loader signature: `(params, context?: { signal: AbortSignal }) => Promise<unknown> \| unknown` |
+| `DataLoaderFn`           | type     | Compiled loader signature: `({ params, search }, context?: { signal: AbortSignal }) => Promise<unknown> \| unknown` (RFC-4 M2 / #1548) |
+| `DataLoaderTarget`       | type     | `{ params, search }` — the two destination channels handed to a loader |
 | `SsrLoaderContext`       | type     | `{ signal: AbortSignal }` — passed by the leave handler so cancellation-aware loaders can abort in-flight work |
 | `DataLoaderFnFactory`    | type     | Factory signature: `(router, getDependency) => DataLoaderFn`       |
 | `DataRouteEntry`         | type     | Per-route entry: factory (short form) or `{ ssr?, loader? }` object |

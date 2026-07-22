@@ -8,6 +8,7 @@ export type {
   PreloadPluginOptions,
   PreloadFn,
   PreloadFnFactory,
+  PreloadTarget,
 } from "./types";
 
 declare module "@real-router/core" {

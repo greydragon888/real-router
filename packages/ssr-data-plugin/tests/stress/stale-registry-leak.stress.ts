@@ -36,7 +36,9 @@ describe("Stale registry leak budget", () => {
     // a successful navigation, or as a Set-size assertion drift on a
     // long run.
     const loaders: DataLoaderFactoryMap = {
-      "users.profile": () => (params) => ({ id: params.id }),
+      "users.profile":
+        () =>
+        ({ params }) => ({ id: params.id }),
     };
 
     const router = createRouter(routes, { defaultRoute: "home" });
