@@ -726,17 +726,28 @@ describe("RouterProvider — scrollRestoration", () => {
       });
     });
 
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
-
     setScrollY(140);
 
-    // Leaving it captures the route → keyOf runs canonicalReplacer over the
-    // params (function → "<fn>", nested object → sorted keys, primitive → as-is).
+    // Leaving "about" captures its scroll position under a key built by keyOf →
+    // canonicalJson over BOTH channels — path params AND query (search), merged
+    // (RFC-4 M2 / #1548). The presence of an "about:" entry proves the capture
+    // ran AND canonicalJson tolerated the function / nested-object values without
+    // crashing (function → "<fn>", nested object → sorted keys).
+    //
+    // Asserts on the persisted store (the observable outcome), like the sibling
+    // capture tests: `vi.spyOn(Storage.prototype, "setItem")` does not intercept
+    // `sessionStorage.setItem` under this jsdom (its `setItem` is not the
+    // prototype method), so a setItem-spy assertion silently never fires.
     await act(async () => {
       await plain.navigate("home");
     });
 
-    expect(setItem).toHaveBeenCalled(); // capture succeeded, no serializer crash
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY)!) as Record<
+      string,
+      number
+    >;
+
+    expect(Object.keys(saved).some((k) => k.startsWith("about:"))).toBe(true);
 
     plain.stop();
   });
