@@ -2,8 +2,8 @@
   import { useRoute } from "@real-router/svelte";
 
   const { route } = useRoute();
-  const lang = $derived((route.current.params.lang as string | undefined) ?? "en");
-  const theme = $derived((route.current.params.theme as string | undefined) ?? "light");
+  const lang = $derived((route.current.search.lang as string | undefined) ?? "en");
+  const theme = $derived((route.current.search.theme as string | undefined) ?? "light");
 </script>
 
 <div>

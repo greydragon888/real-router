@@ -261,6 +261,7 @@ describe("AbortSignal cancellation", () => {
     const navPromise = router.navigate(
       "checkout",
       {},
+      undefined,
       {
         signal: controller.signal,
       },

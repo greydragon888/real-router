@@ -23,7 +23,9 @@ export function Home(): JSX.Element {
     const current = routeState().route;
 
     invalidate(router, "data");
-    void router.navigate(current.name, current.params, { reload: true });
+    void router.navigate(current.name, current.params, undefined, {
+      reload: true,
+    });
   };
 
   return (

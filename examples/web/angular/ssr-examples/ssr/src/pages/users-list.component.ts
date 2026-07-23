@@ -13,7 +13,7 @@ import type { UsersListData } from "../router/loaders";
       <a
         realLink
         routeName="users"
-        [routeParams]="{ sort: otherSort() }"
+        [routeSearch]="{ sort: otherSort() }"
         data-testid="toggle-sort"
       >
         Toggle to {{ otherSort() }}

@@ -11,7 +11,7 @@ export function Home(): JSX.Element {
       <p>
         Navigate to a user profile and change the <code>page</code> query param.
         Notice that the Header section (reading <code>params.id</code>) does NOT
-        re-render when only <code>params.page</code> changes.
+        re-render when only <code>search.page</code> changes.
       </p>
     </div>
   );

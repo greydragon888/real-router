@@ -19,7 +19,9 @@ export function Home() {
   // re-render with the fresh snapshot.
   const handleRefresh = (): void => {
     invalidate(router, "data");
-    void router.navigate(route.name, route.params, { reload: true });
+    void router.navigate(route.name, route.params, route.search, {
+      reload: true,
+    });
   };
 
   return (

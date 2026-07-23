@@ -17,14 +17,15 @@ function ParamsToolbar(): JSX.Element {
   const { route } = useRoute();
   const navigator = useNavigator();
 
-  const lang = (route.params.lang as string | undefined) ?? "en";
-  const theme = (route.params.theme as string | undefined) ?? "light";
+  const lang = (route.search.lang as string | undefined) ?? "en";
+  const theme = (route.search.theme as string | undefined) ?? "light";
 
   const navigate = (newParams: Record<string, string>) => {
     void navigator.navigate(
       route.name,
+      route.params,
       {
-        ...route.params,
+        ...route.search,
         ...newParams,
       },
       { reload: true },

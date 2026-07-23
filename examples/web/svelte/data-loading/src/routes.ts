@@ -2,6 +2,7 @@ import { api } from "../../../../shared/api";
 import { store } from "../../../../shared/store";
 
 import type { Params, Route } from "@real-router/core";
+import type { PreloadTarget } from "@real-router/preload-plugin";
 
 let controller: AbortController | null = null;
 
@@ -61,8 +62,8 @@ function getParamId(params: Params): string {
   return typeof params.id === "string" ? params.id : "";
 }
 
-async function preloadProductDetail(params: Params): Promise<void> {
-  const data = await api.getProduct(getParamId(params));
+async function preloadProductDetail(target: PreloadTarget): Promise<void> {
+  const data = await api.getProduct(getParamId(target.params));
 
   store.set("products.detail", data);
 }

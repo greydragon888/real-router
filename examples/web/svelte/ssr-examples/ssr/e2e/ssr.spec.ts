@@ -443,11 +443,11 @@ test.describe("SSR (Svelte)", () => {
 
     const ssrStateMatch = html.match(/window\.__SSR_STATE__=({.*?})<\/script>/);
     const ssrState = JSON.parse(ssrStateMatch![1]) as {
-      params: { sort?: string };
+      search: { sort?: string };
       context?: { data?: { sort?: string } };
     };
 
-    expect(ssrState.params.sort).toBe("desc");
+    expect(ssrState.search.sort).toBe("desc");
     expect(ssrState.context?.data?.sort).toBe("desc");
 
     await context.close();
@@ -777,24 +777,24 @@ test.describe("SSR (Svelte)", () => {
     );
   });
 
-  test("query params: ?sort=desc surfaces in __SSR_STATE__.params", async ({
+  test("query params: ?sort=desc surfaces in __SSR_STATE__.search", async ({
     page,
   }) => {
     // Existing "query params" test verifies DOM order; this test pins the
-    // wire-format guarantee that params land in __SSR_STATE__ for the client
-    // to use — separate concern from server-rendered HTML order.
+    // wire-format guarantee that search params land in __SSR_STATE__ for the
+    // client to use — separate concern from server-rendered HTML order.
     await page.goto("/users?sort=desc");
 
     const state = await page.evaluate(
       () =>
         (
           globalThis as unknown as Window & {
-            __SSR_STATE__?: { params?: Record<string, unknown> };
+            __SSR_STATE__?: { search?: Record<string, unknown> };
           }
         ).__SSR_STATE__,
     );
 
-    expect(state?.params?.sort).toBe("desc");
+    expect(state?.search?.sort).toBe("desc");
   });
 
   test("per-request isolation under mixed guards: /, /users, /dashboard, /admin, /users/1/posts in parallel with different auth contexts", async ({

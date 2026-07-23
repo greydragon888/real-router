@@ -1,9 +1,10 @@
 import type {
   DataLoaderFactoryMap,
+  DataLoaderTarget,
   SsrLoaderContext,
   SsrMode,
 } from "@real-router/ssr-data-plugin";
-import type { Params, State } from "@real-router/core";
+import type { State } from "@real-router/core";
 
 /**
  * Per-route SSR mode demonstration.
@@ -21,7 +22,7 @@ export const loaders: DataLoaderFactoryMap = {
   home: () => {
     let aborts = 0;
 
-    return async (_params: Params, ctx?: SsrLoaderContext) => {
+    return async (_target: DataLoaderTarget, ctx?: SsrLoaderContext) => {
       await new Promise<void>((resolve, reject) => {
         const t = setTimeout(resolve, 25);
 
@@ -52,18 +53,20 @@ export const loaders: DataLoaderFactoryMap = {
 
   "users.profile": {
     ssr: "data-only",
-    loader: () => (params) => ({
+    loader: () => ({ params }) => ({
       id: String(params.id),
       name: `User-${String(params.id)}`,
     }),
   },
 
   "docs.detail": {
+    // `format` is the `?format` query param — lives on `state.search`, not
+    // `state.params` (RFC-4 M2 / #1548). `id` stays path (`/:id`).
     ssr: (state: State): SsrMode =>
-      state.params.format === "pdf" ? "client-only" : "full",
-    loader: () => (params) => ({
+      state.search.format === "pdf" ? "client-only" : "full",
+    loader: () => ({ params, search }) => ({
       id: String(params.id),
-      format: String(params.format),
+      format: String(search.format),
       body: `Doc body for ${String(params.id)}`,
     }),
   },

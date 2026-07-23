@@ -5,9 +5,9 @@ import type { JSX } from "solid-js";
 export function Home(): JSX.Element {
   const routeState = useRoute();
   const lang = () =>
-    (routeState().route.params.lang as string | undefined) ?? "en";
+    (routeState().route.search.lang as string | undefined) ?? "en";
   const theme = () =>
-    (routeState().route.params.theme as string | undefined) ?? "light";
+    (routeState().route.search.theme as string | undefined) ?? "light";
 
   return (
     <div>

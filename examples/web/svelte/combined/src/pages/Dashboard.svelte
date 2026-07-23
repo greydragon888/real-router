@@ -13,7 +13,7 @@
     return store.subscribe(() => { user = store.get("user") as User | null; });
   });
 
-  const lang = $derived((route.current.params.lang as string | undefined) ?? "en");
+  const lang = $derived((route.current.search.lang as string | undefined) ?? "en");
 </script>
 
 <div>
@@ -29,7 +29,7 @@
     <button onclick={() => {
       const current = navigator.getState();
       if (!current) return;
-      void navigator.navigate(current.name, { ...current.params, lang: lang === "en" ? "ru" : "en" }, { reload: true });
+      void navigator.navigate(current.name, current.params, { ...current.search, lang: lang === "en" ? "ru" : "en" }, { reload: true });
     }}>
       Toggle lang ({lang === "en" ? "→ RU" : "→ EN"})
     </button>

@@ -33,7 +33,7 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
         <a
           realLink
           routeName="queryDemo"
-          [routeParams]="{ filter: value }"
+          [routeSearch]="{ filter: value }"
           [ignoreQueryParams]="false"
         >
           {{ value }}
@@ -52,12 +52,12 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
   `,
 })
 export class QueryDemoComponent {
-  private readonly state = injectRoute<{ filter?: Filter }>();
+  private readonly state = injectRoute();
 
   readonly filters = FILTERS;
 
   readonly filter = computed<Filter>(
-    () => this.state.routeState().route.params.filter ?? "all",
+    () => (this.state.routeState().route.search.filter as Filter) ?? "all",
   );
 
   readonly visible = computed(() => {

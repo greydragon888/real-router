@@ -32,10 +32,10 @@ useRouteAnimation(root, {
 
 useListFlip(list);
 
-const { route } = useRoute<{ sort?: SortDirection }>();
+const { route } = useRoute();
 
 const sort = computed<SortDirection>(() =>
-  route.value?.params.sort === "desc" ? "desc" : "asc",
+  route.value?.search.sort === "desc" ? "desc" : "asc",
 );
 
 const items = computed(() => {
@@ -62,7 +62,7 @@ const items = computed(() => {
       <span>Sort:</span>
       <Link
         routeName="products"
-        :routeParams="{ sort: 'asc' }"
+        :routeSearch="{ sort: 'asc' }"
         :ignoreQueryParams="false"
       >
         A → Z
@@ -70,7 +70,7 @@ const items = computed(() => {
       {{ " · " }}
       <Link
         routeName="products"
-        :routeParams="{ sort: 'desc' }"
+        :routeSearch="{ sort: 'desc' }"
         :ignoreQueryParams="false"
       >
         Z → A

@@ -11,7 +11,7 @@ pnpm -F react-scroll-restoration-example build         # tsc -b + vite build
 pnpm -F react-scroll-restoration-example test:e2e      # 13 tests / 7 describe blocks
 ```
 
-The floating **Scroll Meter** in the bottom-right corner shows live `scrollY`, the published `state.context.navigation` direction / navigationType, and the `sessionStorage` scroll-restore store keyed by `state.name + ":" + canonicalJson(state.params)`. Stable Playwright selectors live on `[data-testid="scroll-meter"]` (with `data-scroll-y` attribute for rAF-stable reads) and per-route `[data-testid="nav-*"]`.
+The floating **Scroll Meter** in the bottom-right corner shows live `scrollY`, the published `state.context.navigation` direction / navigationType, and the `sessionStorage` scroll-restore store keyed by `state.name + ":" + canonicalJson({ ...state.params, ...state.search })`. Stable Playwright selectors live on `[data-testid="scroll-meter"]` (with `data-scroll-y` attribute for rAF-stable reads) and per-route `[data-testid="nav-*"]`.
 
 ## Why not a plugin
 

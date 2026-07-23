@@ -52,11 +52,11 @@ export class DocComponent implements OnInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) return;
     if (this.mode() !== "client-only" || this.ssrData() !== undefined) return;
 
-    const params = this.route.routeState().route.params;
+    const { params, search } = this.route.routeState().route;
     this.handle = setTimeout(() => {
       this.clientData.set({
         id: String(params.id),
-        format: String(params.format),
+        format: String(search.format),
         body: `(client) PDF placeholder for ${String(params.id)}`,
       });
     }, 50);

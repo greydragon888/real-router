@@ -2,7 +2,7 @@
   import { useRoute } from "@real-router/svelte";
 
   const { route } = useRoute();
-  const lang = $derived((route.current.params.lang as string | undefined) ?? "en");
+  const lang = $derived((route.current.search.lang as string | undefined) ?? "en");
 </script>
 
 <div>

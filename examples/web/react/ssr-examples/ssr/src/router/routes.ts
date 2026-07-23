@@ -8,7 +8,7 @@ export const routes = [
   { name: "home", path: "/" },
   {
     name: "users",
-    // ?sort declares `sort` as a query parameter; available as state.params.sort.
+    // ?sort declares `sort` as a query parameter; available as state.search.sort.
     path: "/users?sort",
     children: [
       {

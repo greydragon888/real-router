@@ -18,7 +18,7 @@ export default function Dashboard({ onLogout }: DashboardProps): JSX.Element {
   const { route } = useRoute();
   const navigator = useNavigator();
 
-  const lang = (route.params.lang as string | undefined) ?? "en";
+  const lang = (route.search.lang as string | undefined) ?? "en";
 
   return (
     <div>
@@ -48,8 +48,9 @@ export default function Dashboard({ onLogout }: DashboardProps): JSX.Element {
           onClick={() =>
             void navigator.navigate(
               route.name,
+              route.params,
               {
-                ...route.params,
+                ...route.search,
                 lang: lang === "en" ? "ru" : "en",
               },
               { reload: true },

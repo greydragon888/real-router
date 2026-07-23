@@ -481,14 +481,14 @@ test.describe("SSR", () => {
     expect(charlieIdx).toBeLessThan(bobIdx);
     expect(bobIdx).toBeLessThan(aliceIdx);
 
-    // __SSR_STATE__ carries sort=desc in params + sort label in data
+    // __SSR_STATE__ carries sort=desc in search + sort label in data
     const ssrStateMatch = html.match(/window\.__SSR_STATE__=({.*?})<\/script>/);
     const ssrState = JSON.parse(ssrStateMatch![1]) as {
-      params: { sort?: string };
+      search: { sort?: string };
       context?: { data?: { sort?: string } };
     };
 
-    expect(ssrState.params.sort).toBe("desc");
+    expect(ssrState.search.sort).toBe("desc");
     expect(ssrState.context?.data?.sort).toBe("desc");
 
     await context.close();
@@ -694,7 +694,7 @@ test.describe("SSR", () => {
   test("Per-route meta: /users meta reflects the active sort param", async ({
     request,
   }) => {
-    // getMetaForState() reads state.params.sort and folds it into the
+    // getMetaForState() reads state.search.sort and folds it into the
     // title — proves meta is computed from the resolved router state.
     const ascResponse = await request.get("/users");
     const ascHtml = await ascResponse.text();

@@ -35,7 +35,7 @@ export const loaders: DataLoaderFactoryMap = {
   "products.list": () => () =>
     Promise.resolve({ products: listProducts() } satisfies ProductsListData),
 
-  "products.detail": () => (params) => {
+  "products.detail": () => ({ params }) => {
     const id = params.id as string;
     const product = getProduct(id);
 

@@ -24,7 +24,7 @@ export const loaders: DataLoaderFactoryMap = {
       users: database.users.list(),
     }),
 
-  "users.profile": () => (params) => {
+  "users.profile": () => ({ params }) => {
     const id = params.id as string;
     const user = database.users.findById(id);
 
@@ -43,7 +43,7 @@ export const loaders: DataLoaderFactoryMap = {
   // the parent user (catches stale entries.ts ids that point at
   // missing parents). Charlie ("3") has no posts → empty array
   // exercises the empty-state UI in UserPosts.vue.
-  "users.profile.posts": () => (params) => {
+  "users.profile.posts": () => ({ params }) => {
     const id = params.id as string;
     const user = database.users.findById(id);
 

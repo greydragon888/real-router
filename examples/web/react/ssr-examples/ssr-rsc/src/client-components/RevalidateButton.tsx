@@ -29,7 +29,9 @@ export function RevalidateButton(): ReactElement {
       // loader. Reload bypasses stabilizeState dedupe (#605) so subscribers
       // re-render with the new payload.
       invalidate(router, "rsc");
-      await router.navigate(state.name, state.params, { reload: true });
+      await router.navigate(state.name, state.params, state.search, {
+        reload: true,
+      });
     } catch (error) {
       if (
         error instanceof RouterError &&

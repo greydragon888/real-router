@@ -22,7 +22,7 @@ export function Doc() {
     const handle = setTimeout(() => {
       setClientData({
         id: String(route.params.id),
-        format: String(route.params.format),
+        format: String(route.search.format),
         body: `(client) PDF placeholder for ${String(route.params.id)}`,
       });
     }, 50);
@@ -30,7 +30,7 @@ export function Doc() {
     return () => {
       clearTimeout(handle);
     };
-  }, [mode, ssrData, route.params.id, route.params.format]);
+  }, [mode, ssrData, route.params.id, route.search.format]);
 
   const data = ssrData ?? clientData;
 

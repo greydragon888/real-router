@@ -4,36 +4,48 @@
   const { route } = useRoute();
   const navigator = useNavigator();
 
-  let params = $derived(route.current.params);
+  let params = $derived(route.current.search);
   let query = $derived((params.q as string | undefined) ?? "");
   let page = $derived((params.page as number | undefined) ?? 1);
   let sort = $derived((params.sort as string | undefined) ?? "name");
 
   function setSearch(value: string) {
-    void navigator.navigate("products", {
-      ...navigator.getState()?.params,
-      q: value || undefined,
-      page: 1,
-    });
+    void navigator.navigate(
+      "products",
+      {},
+      {
+        ...navigator.getState()?.search,
+        q: value || undefined,
+        page: 1,
+      },
+    );
   }
 
   function setPage(newPage: number) {
-    void navigator.navigate("products", {
-      ...navigator.getState()?.params,
-      page: newPage,
-    });
+    void navigator.navigate(
+      "products",
+      {},
+      {
+        ...navigator.getState()?.search,
+        page: newPage,
+      },
+    );
   }
 
   function setSort(value: string) {
-    void navigator.navigate("products", {
-      ...navigator.getState()?.params,
-      sort: value,
-      page: 1,
-    });
+    void navigator.navigate(
+      "products",
+      {},
+      {
+        ...navigator.getState()?.search,
+        sort: value,
+        page: 1,
+      },
+    );
   }
 
   function tryInvalid() {
-    void navigator.navigate("products", { page: -1, sort: "invalid" });
+    void navigator.navigate("products", {}, { page: -1, sort: "invalid" });
   }
 </script>
 

@@ -21,7 +21,7 @@ const otherSort = computed(() => (data.value.sort === "asc" ? "desc" : "asc"));
     <p data-testid="current-sort">Sorted: {{ data.sort }}</p>
     <Link
       routeName="users"
-      :routeParams="{ sort: otherSort }"
+      :routeSearch="{ sort: otherSort }"
       data-testid="toggle-sort"
     >
       Toggle to {{ otherSort }}

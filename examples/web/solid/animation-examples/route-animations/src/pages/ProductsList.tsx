@@ -21,10 +21,10 @@ const PRODUCTS: Product[] = [
 type SortDirection = "asc" | "desc";
 
 export function ProductsList(): JSX.Element {
-  const routeState = useRoute<{ sort?: SortDirection }>();
+  const routeState = useRoute();
 
   const sort = createMemo<SortDirection>(() =>
-    routeState().route.params.sort === "desc" ? "desc" : "asc",
+    routeState().route.search.sort === "desc" ? "desc" : "asc",
   );
 
   const items = createMemo(() => {
@@ -51,7 +51,7 @@ export function ProductsList(): JSX.Element {
         <span>Sort:</span>
         <Link
           routeName="products"
-          routeParams={{ sort: "asc" }}
+          routeSearch={{ sort: "asc" }}
           ignoreQueryParams={false}
         >
           A → Z
@@ -59,7 +59,7 @@ export function ProductsList(): JSX.Element {
         {" · "}
         <Link
           routeName="products"
-          routeParams={{ sort: "desc" }}
+          routeSearch={{ sort: "desc" }}
           ignoreQueryParams={false}
         >
           Z → A

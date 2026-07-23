@@ -28,9 +28,9 @@ export function QueryDemo(): JSX.Element {
     exitClass: "fade-out",
   });
 
-  const routeState = useRoute<{ filter?: Filter }>();
+  const routeState = useRoute();
   const filter = createMemo<Filter>(
-    () => routeState().route.params.filter ?? "all",
+    () => (routeState().route.search.filter as Filter | undefined) ?? "all",
   );
 
   const visible = createMemo(() => {
@@ -62,7 +62,7 @@ export function QueryDemo(): JSX.Element {
           {(value) => (
             <Link
               routeName="queryDemo"
-              routeParams={{ filter: value }}
+              routeSearch={{ filter: value }}
               ignoreQueryParams={false}
             >
               {value}

@@ -4,10 +4,10 @@ import { computed } from "vue";
 
 const { route } = useRoute();
 const lang = computed(
-  () => (route.value.params.lang as string | undefined) ?? "en",
+  () => (route.value.search.lang as string | undefined) ?? "en",
 );
 const theme = computed(
-  () => (route.value.params.theme as string | undefined) ?? "light",
+  () => (route.value.search.theme as string | undefined) ?? "light",
 );
 </script>
 

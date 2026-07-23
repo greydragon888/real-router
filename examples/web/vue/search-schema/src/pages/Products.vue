@@ -5,38 +5,50 @@ import { computed } from "vue";
 const { route } = useRoute();
 const navigator = useNavigator();
 
-const params = computed(() => route.value.params);
-const query = computed(() => (params.value.q as string | undefined) ?? "");
-const page = computed(() => (params.value.page as number | undefined) ?? 1);
+const search = computed(() => route.value.search);
+const query = computed(() => (search.value.q as string | undefined) ?? "");
+const page = computed(() => (search.value.page as number | undefined) ?? 1);
 const sort = computed(
-  () => (params.value.sort as string | undefined) ?? "name",
+  () => (search.value.sort as string | undefined) ?? "name",
 );
 
 function setSearch(value: string) {
-  void navigator.navigate("products", {
-    ...params.value,
-    q: value || undefined,
-    page: 1,
-  });
+  void navigator.navigate(
+    "products",
+    {},
+    {
+      ...search.value,
+      q: value || undefined,
+      page: 1,
+    },
+  );
 }
 
 function setPage(newPage: number) {
-  void navigator.navigate("products", {
-    ...params.value,
-    page: newPage,
-  });
+  void navigator.navigate(
+    "products",
+    {},
+    {
+      ...search.value,
+      page: newPage,
+    },
+  );
 }
 
 function setSort(value: string) {
-  void navigator.navigate("products", {
-    ...params.value,
-    sort: value,
-    page: 1,
-  });
+  void navigator.navigate(
+    "products",
+    {},
+    {
+      ...search.value,
+      sort: value,
+      page: 1,
+    },
+  );
 }
 
 function tryInvalid() {
-  void navigator.navigate("products", { page: -1, sort: "invalid" });
+  void navigator.navigate("products", {}, { page: -1, sort: "invalid" });
 }
 </script>
 

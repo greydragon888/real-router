@@ -13,7 +13,7 @@ export const routes: Route<AppDependencies>[] = [
     name: "users",
     path: "/users",
     children: [
-      // ?role declares `role` as a query parameter; available as state.params.role.
+      // ?role declares `role` as a query parameter; available as state.search.role.
       { name: "list", path: "/?role" },
       { name: "profile", path: "/:id" },
     ],

@@ -63,7 +63,7 @@ Routes are nested in `src/router/createAppRouter.ts`: `users` (`/users`) is the 
 | Route name      | Path                  | Server Component                  | Loader                                    |
 | --------------- | --------------------- | --------------------------------- | ----------------------------------------- |
 | `home`          | `/`                   | `<HomePage />`                    | sync factory                              |
-| `users.list`    | `/users` `?role`      | `<UsersList roleFilter={...} />` (async — calls `db.users.list()` inside the Server Component) | sync factory; `params.role` (`"admin"` \| `"user"` \| `undefined`) forwarded as `roleFilter` |
+| `users.list`    | `/users` `?role`      | `<UsersList roleFilter={...} />` (async — calls `db.users.list()` inside the Server Component) | sync factory; `search.role` (`"admin"` \| `"user"` \| `undefined`) forwarded as `roleFilter` |
 | `users.profile` | `/users/:id`          | `<UserProfile user={...} />` + `<RevalidateButton />` (Client Component) | async + DI (`getDep("db").users.findById(params.id)`); throws `LoaderNotFound` for unknown ids |
 | `boom`          | `/boom`               | —                                 | rejects with `Error("Loader exploded")` — surfaces as 500 + server-rendered `<server-error>` (no Flight payload). Verified by Scenario 9 |
 

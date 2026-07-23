@@ -464,11 +464,11 @@ test.describe("SSR (Solid)", () => {
 
     const ssrStateMatch = html.match(/window\.__SSR_STATE__=({.*?})<\/script>/);
     const ssrState = JSON.parse(ssrStateMatch![1]) as {
-      params: { sort?: string };
+      search: { sort?: string };
       context?: { data?: { sort?: string } };
     };
 
-    expect(ssrState.params.sort).toBe("desc");
+    expect(ssrState.search.sort).toBe("desc");
     expect(ssrState.context?.data?.sort).toBe("desc");
 
     await context.close();
@@ -750,7 +750,7 @@ test.describe("SSR (Solid)", () => {
   test("head injection per-route: /users title reflects current ?sort param", async ({
     request,
   }) => {
-    // The `users` route's meta resolver reads state.params.sort; verify it
+    // The `users` route's meta resolver reads state.search.sort; verify it
     // actually flows through to the SSR'd <title>.
     const ascending = await request.get("/users?sort=asc");
     const ascendingHtml = await ascending.text();

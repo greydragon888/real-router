@@ -6,6 +6,7 @@ import { store } from "../../../../shared/store";
 
 import type { AppDependencies } from "./types";
 import type { GuardFnFactory, Params, Route } from "@real-router/core";
+import type { PreloadTarget } from "@real-router/preload-plugin";
 
 const productsListSchema = z.object({
   page: z.number().int().positive().default(1),
@@ -87,8 +88,8 @@ function onEnterProducts(): void {
   loadRoute("products", fetchProducts);
 }
 
-async function preloadProductDetail(params: Params): Promise<void> {
-  const data = await api.getProduct(getParamId(params));
+async function preloadProductDetail(target: PreloadTarget): Promise<void> {
+  const data = await api.getProduct(getParamId(target.params));
 
   store.set("products.detail", data);
 }

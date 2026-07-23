@@ -24,7 +24,7 @@ export const loaders: DataLoaderFactoryMap = {
       users: database.users.list(),
     }),
 
-  "users.profile": () => (params) => {
+  "users.profile": () => ({ params }) => {
     const id = params.id as string;
     const user = database.users.findById(id);
 
@@ -37,7 +37,7 @@ export const loaders: DataLoaderFactoryMap = {
 
   // Leaf loader for nested /users/:id/posts route. Charlie ("3") has
   // no posts → empty array exercises the empty-state UI.
-  "users.profile.posts": () => (params) => {
+  "users.profile.posts": () => ({ params }) => {
     const id = params.id as string;
     const user = database.users.findById(id);
 

@@ -43,7 +43,8 @@ import { UserProfileComponent } from "./pages/user-profile.component";
         <a
           realLink
           routeName="docs.detail"
-          [routeParams]="{ id: 'guide', format: 'pdf' }"
+          [routeParams]="{ id: 'guide' }"
+          [routeSearch]="{ format: 'pdf' }"
         >
           Doc PDF (client-only)
         </a>

@@ -22,10 +22,11 @@ export function Doc(): JSX.Element {
     if (mode() !== "client-only" || ssrData() !== undefined) return;
 
     const params = routeState().route.params;
+    const search = routeState().route.search;
     const handle = setTimeout(() => {
       setClientData({
         id: String(params.id),
-        format: String(params.format),
+        format: String(search.format),
         body: `(client) PDF placeholder for ${String(params.id)}`,
       });
     }, 50);

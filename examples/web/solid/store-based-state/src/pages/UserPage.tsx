@@ -32,19 +32,19 @@ function SidebarStore(): JSX.Element {
   const [count, setCount] = createSignal(0);
 
   createEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- subscribe to params.page changes
-    state.route?.params.page;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- subscribe to search.page changes
+    state.route?.search.page;
     setCount((c) => c + 1);
     console.log(
-      `[Sidebar Store] effect ran — page=${state.route?.params.page as string | undefined}, count=${count()}`,
+      `[Sidebar Store] effect ran — page=${state.route?.search.page as string | undefined}, count=${count()}`,
     );
   });
 
   return (
     <div class="card">
-      <strong>Sidebar (useRouteStore → params.page)</strong>
+      <strong>Sidebar (useRouteStore → search.page)</strong>
       <p>
-        Page: {(state.route?.params.page as string | undefined) ?? "default"}
+        Page: {(state.route?.search.page as string | undefined) ?? "default"}
       </p>
       <p style={{ "font-size": "13px", color: "#888" }}>
         Effect count: {count()}

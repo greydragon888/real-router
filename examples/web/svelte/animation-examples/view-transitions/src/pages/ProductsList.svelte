@@ -18,10 +18,10 @@
 
   type SortDirection = "asc" | "desc";
 
-  const { route } = useRoute<{ sort?: SortDirection }>();
+  const { route } = useRoute();
 
   const sort: SortDirection = $derived(
-    route.current.params.sort === "desc" ? "desc" : "asc",
+    route.current.search.sort === "desc" ? "desc" : "asc",
   );
 
   const items = $derived.by(() => {
@@ -37,7 +37,7 @@
   <span>Sort:</span>
   <Link
     routeName="products"
-    routeParams={{ sort: "asc" }}
+    routeSearch={{ sort: "asc" }}
     ignoreQueryParams={false}
   >
     A → Z
@@ -45,7 +45,7 @@
   {" · "}
   <Link
     routeName="products"
-    routeParams={{ sort: "desc" }}
+    routeSearch={{ sort: "desc" }}
     ignoreQueryParams={false}
   >
     Z → A

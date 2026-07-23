@@ -18,7 +18,12 @@ const data = computed(() => route.value.context.data as HomeData | undefined);
 // with the fresh snapshot written by the plugin's subscribeLeave handler.
 function handleRefresh(): void {
   invalidate(router, "data");
-  void router.navigate(route.value.name, route.value.params, { reload: true });
+  void router.navigate(
+    route.value.name,
+    route.value.params,
+    route.value.search,
+    { reload: true },
+  );
 }
 </script>
 

@@ -6,18 +6,21 @@ export function Products(): JSX.Element {
   const routeState = useRoute();
   const navigator = useNavigator();
 
-  const q = () => (routeState().route.params.q as string | undefined) ?? "";
+  const q = () => (routeState().route.search.q as string | undefined) ?? "";
   const page = () =>
-    (routeState().route.params.page as number | undefined) ?? 1;
+    (routeState().route.search.page as number | undefined) ?? 1;
   const sort = () =>
-    (routeState().route.params.sort as string | undefined) ?? "name";
+    (routeState().route.search.sort as string | undefined) ?? "name";
 
   const navigate = (
     params: Record<string, string | number | boolean | undefined>,
   ) => {
     const route = routeState().route;
 
-    void navigator.navigate("products", { ...route.params, ...params });
+    void navigator.navigate("products", route.params, {
+      ...route.search,
+      ...params,
+    });
   };
 
   return (
@@ -121,7 +124,7 @@ export function Products(): JSX.Element {
         <div style={{ "margin-top": "8px" }}>
           <Link
             routeName="products"
-            routeParams={{ page: -1, sort: "invalid" }}
+            routeSearch={{ page: -1, sort: "invalid" }}
           >
             <button class="danger">/products?page=-1&sort=invalid</button>
           </Link>
