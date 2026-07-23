@@ -124,8 +124,9 @@ export function getPluginApi<
       return ctx.makeState(
         routeInfo.name,
         routeInfo.params,
-        // buildState builds from resolved params (no URL match); query is still
-        // in `params` during the back-compat window, so no search here.
+        // buildState builds from resolved params (no URL match) — no explicit
+        // search bag; makeState routes declared query names (defaults included)
+        // from the resolved bag into `state.search` (#1549).
         undefined,
         ctx.buildPath(routeInfo.name, routeInfo.params),
       );

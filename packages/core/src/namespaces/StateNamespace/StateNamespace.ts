@@ -100,6 +100,15 @@ export class StateNamespace {
    * This keeps params-freezing invariants independent of transition-pipeline
    * mutation (e.g. `completeTransition` attaching `state.transition`).
    *
+   * Channel routing (#1549): the committed channels are canonical — a DECLARED
+   * query name (`?a&b`, colliding path names excluded) always lands in
+   * `state.search` (whether it arrived as a default, a caller param, or a
+   * decoder-injected key), with an explicit `search` value winning over any
+   * params-bag/default value. `defaultParams` are applied channel-aware: a
+   * query-declared default joins `search`; every other default keeps its v1
+   * home in `params`, overridden only by a params-given value (the channels
+   * are independent — a search-given key is the query twin, not an override).
+   *
    * `context` is initialized as a fresh empty object — intentionally NOT frozen
    * so plugins can publish data via `claim.write(state, value)` after creation.
    */
@@ -113,33 +122,56 @@ export class StateNamespace {
     // Optimization: O(1) lookup instead of O(depth) ancestor iteration
     const defaultParamsConfig = this.#deps.getDefaultParams();
     const hasDefaultParams = Object.hasOwn(defaultParamsConfig, name);
+    const queryNames = this.#deps.getQueryParams(name);
 
     // Conditional allocation: avoid spreading when no defaultParams exist
     let mergedParams: P;
+    let mergedSearch: S;
 
-    if (hasDefaultParams) {
-      mergedParams = Object.freeze({
-        ...defaultParamsConfig[name],
-        ...params,
-      }) as P;
-    } else if (!params || params === EMPTY_PARAMS) {
-      mergedParams = EMPTY_PARAMS as P;
+    // Fast path — no declared query names means no key can change channel
+    // (defaults and caller params all belong to `params`; `search` passes
+    // through untouched). Keeps the pre-#1549 allocation profile
+    // (EMPTY_PARAMS / EMPTY_SEARCH reuse, #1027).
+    if (queryNames.length === 0) {
+      if (hasDefaultParams) {
+        mergedParams = Object.freeze({
+          ...defaultParamsConfig[name],
+          ...params,
+        }) as P;
+      } else if (!params || params === EMPTY_PARAMS) {
+        mergedParams = EMPTY_PARAMS as P;
+      } else {
+        mergedParams = Object.freeze({ ...params });
+      }
+
+      mergedSearch = (
+        search === undefined ? EMPTY_SEARCH : Object.freeze(search)
+      ) as S;
     } else {
-      mergedParams = Object.freeze({ ...params });
+      const bags: ChannelBags = { params: undefined, search: undefined };
+
+      routeDefaultsByChannel(
+        hasDefaultParams ? defaultParamsConfig[name] : undefined,
+        queryNames,
+        params,
+        bags,
+      );
+      routeCallerParamsByChannel(params, queryNames, search, bags);
+
+      mergedParams = (
+        bags.params === undefined ? EMPTY_PARAMS : Object.freeze(bags.params)
+      ) as P;
+      mergedSearch = sealSearchChannel(bags.search, search) as S;
     }
 
     const state = {
       name,
       params: mergedParams,
-      // Query channel (RFC-4 M2 / #1548). Callers with no query pass `undefined`
-      // → the shared frozen EMPTY_SEARCH singleton is reused (zero transient
-      // alloc, #1027); a real query bag from the matcher is frozen like
-      // `params`. During the A2/A3.1 back-compat window query is ALSO still
-      // folded into `params` by the matcher — the params-cleanup lands in A3.2.
-      search: (search === undefined
-        ? EMPTY_SEARCH
-        : Object.freeze(search)) as S,
-      path: path ?? this.#deps.buildPath(name, params),
+      // Query channel (RFC-4 M2 / #1548): canonical after the channel routing
+      // above — declared query names (defaults included) live here, never in
+      // `params`.
+      search: mergedSearch,
+      path: path ?? this.#deps.buildPath(name, params, search),
       context: {},
       ...(!skipFreeze && { transition: DEFAULT_TRANSITION }),
     } as State<P, S>;
@@ -192,6 +224,98 @@ export class StateNamespace {
       recordsShallowEqual(state1.search, state2.search)
     );
   }
+}
+
+/**
+ * Lazily-allocated output bags of the #1549 channel routing — `undefined`
+ * until a key actually lands in the channel, so an untouched channel reuses
+ * its frozen empty singleton.
+ */
+interface ChannelBags {
+  params: Record<string, unknown> | undefined;
+  search: Record<string, unknown> | undefined;
+}
+
+/**
+ * Routes a route's `defaultParams` into the channel each key's declaration
+ * owns (#1549): a params-given value overwrites its default (same-channel
+ * override), a query-declared default joins the search bag, and every other
+ * default keeps its v1 home in params. A search-given key never suppresses a
+ * params-channel default — the channels are independent (`/coll/:id?id`:
+ * `search.id` is the query twin, not the path slot); a query-declared default
+ * defers to an explicit `search` value later, via `sealSearchChannel`'s spread
+ * order.
+ */
+function routeDefaultsByChannel(
+  defaults: Params | undefined,
+  queryNames: readonly string[],
+  params: Params | undefined,
+  bags: ChannelBags,
+): void {
+  for (const key in defaults) {
+    if (
+      !Object.hasOwn(defaults, key) ||
+      (params !== undefined && Object.hasOwn(params, key))
+    ) {
+      continue;
+    }
+
+    if (queryNames.includes(key)) {
+      bags.search ??= {};
+      bags.search[key] = defaults[key];
+    } else {
+      bags.params ??= {};
+      bags.params[key] = defaults[key];
+    }
+  }
+}
+
+/**
+ * Routes the caller's params bag by declaration (#1549): a declared query name
+ * belongs to the search channel (an explicit `search` value wins over it);
+ * everything else stays in params.
+ */
+function routeCallerParamsByChannel(
+  params: Params | undefined,
+  queryNames: readonly string[],
+  search: SearchParams | undefined,
+  bags: ChannelBags,
+): void {
+  for (const key in params) {
+    if (!Object.hasOwn(params, key)) {
+      continue;
+    }
+
+    if (!queryNames.includes(key)) {
+      bags.params ??= {};
+      bags.params[key] = params[key];
+      continue;
+    }
+
+    if (search === undefined || !Object.hasOwn(search, key)) {
+      bags.search ??= {};
+      bags.search[key] = params[key];
+    }
+  }
+}
+
+/**
+ * Seals the search channel: merges the routed extras under the explicit
+ * `search` bag (an explicit value wins) and freezes the result; with no extras
+ * the input is frozen as-is, and an absent input reuses the shared frozen
+ * EMPTY_SEARCH singleton (#1027).
+ */
+function sealSearchChannel(
+  extra: Record<string, unknown> | undefined,
+  search: SearchParams | undefined,
+): SearchParams {
+  if (extra !== undefined) {
+    // Boundary cast (like splitParamsBySearch's): routed keys carry query
+    // values typed loosely as unknown.
+    return Object.freeze({ ...extra, ...search }) as SearchParams;
+  }
+
+  return search === undefined ? EMPTY_SEARCH : Object.freeze(search);
 }
 
 /**

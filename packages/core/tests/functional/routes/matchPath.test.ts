@@ -694,9 +694,12 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(customRouter).matchPath("/page");
 
       expect(state?.name).toBe("page");
-      // defaultParams are merged into state.params
-      expect(state?.params.sort).toBe("name");
+      // defaultParams are routed by channel (#1549): the query-declared `sort`
+      // lands in state.search, the arbitrary `limit` keeps its v1 home in
+      // state.params.
+      expect(state?.search.sort).toBe("name");
       expect(state?.params.limit).toBe("10");
+      expect(state?.params.sort).toBeUndefined();
     });
 
     it("should rebuild path with defaultParams query params when rewritePathOnMatch is true", () => {
@@ -712,9 +715,10 @@ describe("core/routes/routePath/matchPath", () => {
 
       expect(state?.name).toBe("search");
       expect(state?.search?.q).toBe("test");
-      // `sort` is absent from the URL, so it comes from defaultParams via the
-      // matchPath merge and stays in `.params` (only URL query hits `.search`).
-      expect(state?.params.sort).toBe("date");
+      // `sort` is absent from the URL, so it comes from defaultParams — routed
+      // into `.search` as a query-declared default (#1549).
+      expect(state?.search?.sort).toBe("date");
+      expect(state?.params.sort).toBeUndefined();
       // rewritePathOnMatch rebuilds path including defaultParams
       expect(state?.path).toContain("sort=date");
     });
@@ -801,10 +805,13 @@ describe("core/routes/routePath/matchPath", () => {
         name: "enc",
         path: "/enc?q",
         // deliberately out-of-domain: hands buildPath an unserialisable query
-        // value so the codec throws during the rewrite
+        // value so the codec throws during the rewrite. Placed in the SEARCH
+        // channel — the declared-query rebuild resolves `q` search-first
+        // (#1549), so a params-channel plant would be shadowed by the matched
+        // query value and never reach the serializer.
         encodeParams: ({ params, search }) => ({
-          params: { ...params, q: [undefined] as unknown as string[] },
-          search,
+          params,
+          search: { ...search, q: [undefined] as unknown as string[] },
         }),
       });
 

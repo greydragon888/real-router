@@ -111,7 +111,7 @@ In `mode: "development"`, a `console.error` is emitted with the route name and v
 
 ### `defaultParams` must satisfy the schema (contract)
 
-The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming_ param (from the URL or a `navigate()` call) never reaches `state`. It does **not** validate `defaultParams` at runtime — those are **trusted developer config**, injected by the router core _below_ the layer this plugin intercepts. So a `defaultParams` value that violates its own `searchSchema` **will reach `state.params` and the URL** (`state.path`), on every navigation, in **every** `mode` — including `mode: "production"`:
+The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming_ param (from the URL or a `navigate()` call) never reaches `state`. It does **not** validate `defaultParams` at runtime — those are **trusted developer config**, injected by the router core _below_ the layer this plugin intercepts. So a `defaultParams` value that violates its own `searchSchema` **will reach `state.search` and the URL** (`state.path`), on every navigation, in **every** `mode` — including `mode: "production"` (a query-declared default lands in `state.search` since core routes defaults by channel, #1549):
 
 ```typescript
 {
@@ -121,7 +121,7 @@ The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming
   searchSchema: z.object({ page: z.number().positive() }),
 }
 await router.navigate("products");          // no input supplied by the caller
-router.getState().params;                   // { page: -5 }  ← invalid default reaches state
+router.getState().search;                   // { page: -5 }  ← invalid default reaches state
 router.getState().path;                     // "/products?page=-5"  ← and the URL
 ```
 

@@ -157,7 +157,7 @@ function wireNamespaces(ns: NamespaceBag) {
   wirePlugins(ns, compileFactory, getValidator); // plugins get addEventListener + canNavigate
   wireNavigation(ns); // navigation gets state, routes, eventBus, ...
   wireRouterLifecycle(ns); // start/stop get navigate, matchPath, ...
-  wireState(ns); // state gets defaultParams, buildPath, getUrlParams
+  wireState(ns); // state gets defaultParams, buildPath, getUrlParams, getQueryParams
 }
 ```
 

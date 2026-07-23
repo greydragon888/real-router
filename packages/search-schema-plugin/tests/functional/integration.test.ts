@@ -326,7 +326,8 @@ describe("Search schema plugin", () => {
       const state = router.getState();
 
       expect(state?.name).toBe("search");
-      expect(state?.params.page).toBe(1);
+      // The query-declared default lands in the search channel (#1549).
+      expect(state?.search.page).toBe(1);
     });
   });
 
@@ -484,7 +485,7 @@ describe("Search schema plugin", () => {
       expect(router.getState()?.params).toStrictEqual({});
     });
 
-    it("limitation: an invalid defaultParams value reaches state.params AND state.path (mode: production)", async () => {
+    it("limitation: an invalid defaultParams value reaches state.search AND state.path (mode: production)", async () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -500,12 +501,15 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      // No input supplied by the caller — the invalid default is injected by core.
+      // No input supplied by the caller — the invalid default is injected by
+      // core. Since #1549 the query-declared default lands in state.search
+      // (previously state.params); it still bypasses schema validation.
       await router.navigate("bad");
 
       const state = router.getState();
 
-      expect(state?.params).toStrictEqual({ page: -5 });
+      expect(state?.search).toStrictEqual({ page: -5 });
+      expect(state?.params).toStrictEqual({});
       expect(state?.path).toBe("/bad?page=-5");
     });
   });

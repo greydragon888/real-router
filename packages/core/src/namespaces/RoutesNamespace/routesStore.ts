@@ -63,6 +63,13 @@ export interface RoutesStore<
    * stay frozen to a route's pre-mutation param shape (#723).
    */
   readonly urlParamsCache: Map<string, string[]>;
+  /**
+   * Per-route-name cache of declared query param names (`?a&b` across the
+   * route's segments), read by `RoutesNamespace.getQueryParams` (powers the
+   * defaultParams channel routing, #1549). Same lifecycle as `urlParamsCache`:
+   * cleared on every `matcher` rebuild.
+   */
+  readonly queryParamsCache: Map<string, string[]>;
   resolvedForwardMap: Record<string, string>;
   routeCustomFields: Record<string, Record<string, unknown>>;
   rootPath: string;
@@ -106,6 +113,7 @@ export function rebuildTreeInPlace<
   store.tree = result.tree;
   store.matcher = result.matcher;
   store.urlParamsCache.clear();
+  store.queryParamsCache.clear();
 }
 
 export function commitTreeChanges<
@@ -780,6 +788,7 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store.tree = artifacts.tree;
   store.matcher = artifacts.matcher;
   store.urlParamsCache.clear();
+  store.queryParamsCache.clear();
   store.resolvedForwardMap = artifacts.resolvedForwardMap;
 
   // Install pre-compiled guards — no re-compile, no throw.
@@ -1132,6 +1141,7 @@ export function createRoutesStore<
     tree: artifacts.tree,
     matcher: artifacts.matcher,
     urlParamsCache: new Map(),
+    queryParamsCache: new Map(),
     resolvedForwardMap: artifacts.resolvedForwardMap,
     routeCustomFields: artifacts.routeCustomFields,
     rootPath: "",

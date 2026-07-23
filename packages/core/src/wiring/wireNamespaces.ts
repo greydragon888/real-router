@@ -228,10 +228,14 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       // v1 single-bag path: split the forwarded bag into path and query channels
       // by declaration (keys that are not path params). `buildPath` still takes
       // the FULL bag, so the URL keeps its query string; `state.params` gets the
-      // path-only bag and `state.search` the query.
+      // path-only bag and `state.search` the query. Non-query default keys are
+      // pinned to the params channel (#1549): the forwarded bag has defaults
+      // merged in, and an arbitrary default must keep its v1 home in
+      // `state.params` instead of being routed like an explicit undeclared key.
       const { params, search } = splitParamsBySearch(
         fullParams,
         ns.routes.getUrlParams(name),
+        ns.routes.getNonQueryDefaultKeys(name),
       );
       const path = ctx.buildPath(name, fullParams);
 
@@ -330,11 +334,12 @@ function wireState<Dependencies extends DefaultDependencies>(
 ): void {
   ns.state.setDependencies({
     getDefaultParams: () => ns.routes.getStore().config.defaultParams,
-    buildPath: (name, params) => {
+    buildPath: (name, params, search) => {
       const ctx = getInternals(ns.router);
 
-      return ctx.buildPath(name, params);
+      return ctx.buildPath(name, params, search);
     },
     getUrlParams: (name) => ns.routes.getUrlParams(name),
+    getQueryParams: (name) => ns.routes.getQueryParams(name),
   });
 }

@@ -114,6 +114,14 @@ export function normalizeParams(
  * ancestor path params too; undeclared keys (loose mode) fall through to
  * search, matching the matcher's loose behavior.
  *
+ * `keepNames` (#1549) additionally pins keys to the params channel — the
+ * route's non-query `defaultParams` keys (`getNonQueryDefaultKeys`). The bag
+ * arrives with defaults already merged in (`forwardState`), so without this an
+ * arbitrary default (`defaultParams: { theme: "dark" }` on a route that never
+ * declared `?theme`) would be routed to search like an explicitly-passed
+ * undeclared key, duplicating it across channels once `makeState` re-applies
+ * the default to `params`.
+ *
  * Fast path — when there are no query keys the ORIGINAL `params` is returned
  * unchanged (no copy, so an all-path or empty bag preserves the EMPTY_PARAMS
  * singleton, #1027) and `search` is `undefined` so `makeState` reuses the
@@ -122,11 +130,16 @@ export function normalizeParams(
 export function splitParamsBySearch(
   params: Params,
   pathNames: readonly string[],
+  keepNames?: readonly string[],
 ): { params: Params; search: SearchParams | undefined } {
   let search: Record<string, unknown> | undefined;
 
   for (const key in params) {
-    if (!Object.hasOwn(params, key) || pathNames.includes(key)) {
+    if (
+      !Object.hasOwn(params, key) ||
+      pathNames.includes(key) ||
+      keepNames?.includes(key)
+    ) {
       continue;
     }
 
