@@ -163,37 +163,49 @@ This guarantees the router is never left in a partially-initialized state.
 ### buildPath interceptor
 
 ```
-router.buildPath(routeName, navParams)
+router.buildPath(routeName, navParams, navSearch?)        ← navSearch is RFC-4 M2 / #1548
         │
         ▼
-  buildPath interceptor (registered in constructor)
+  buildPath interceptor (registered in constructor) — search-aware
         │
-        ├── extractOwnParams(navParams ?? {})
-        │     └── strips inherited properties (prototype pollution guard)
+        ├── navSearch === undefined?
         │
-        ├── #buildPathParams(safeParams)
-        │     ├── validateParamValue(key, value) for each key
-        │     ├── mergeParams(#persistentParams, safeParams)
-        │     │     ├── copy all persistent keys with defined values
-        │     │     └── overlay safeParams (undefined → delete, else overwrite)
-        │     └── drop #pendingRemovals keys (recorded by the paired
-        │           forwardState this transition), then clear #pendingRemovals
+        │     YES — v1 single-bag path:
+        │       ├── extractOwnParams(navParams ?? {})
+        │       │     └── strips inherited properties (prototype pollution guard)
+        │       ├── #buildPathParams(safeParams)          ← inject into the params bag
+        │       │     ├── validateParamValue(key, value) for each key
+        │       │     ├── mergeParams(#persistentParams, safeParams)
+        │       │     │     ├── copy all persistent keys with defined values
+        │       │     │     └── overlay safeParams (undefined → delete, else overwrite)
+        │       │     └── drop #pendingRemovals keys (recorded by the paired
+        │       │           forwardState this transition), then clear #pendingRemovals
+        │       └── next(route, mergedParams)             → core builds path
         │
-        └── next(route, mergedParams)  → core builds path
+        └──   NO — caller supplied an explicit search channel:
+                ├── navParams passed through UNCHANGED (not merged)
+                ├── #buildPathParams(navSearch)            ← inject into the search bag instead
+                │     (same validate → mergeParams → drop-#pendingRemovals steps as above)
+                └── next(route, navParams, mergedSearch)   → core builds path from both channels
 ```
+
+Either branch runs the same `#buildPathParams` merge + `#pendingRemovals` drop — only the channel the injected values land in (and the arity of the `next()` call) differs.
 
 ### forwardState interceptor
 
 ```
-router.navigate(name, params, opts)
-        │
+router.navigate(name, params, search?)     ← RFC-4 M2 / #1548: search is arg 3;
+        │                                      the old 3rd-slot "opts" shape is gone
         ▼
   forwardState interceptor (registered in constructor)
         │
-        ├── result = next(routeName, routeParams)
-        │     └── core builds State object
+        ├── result = next(routeName, routeParams, routeSearch)
+        │     └── core builds State object; routeSearch flows through this call untouched
         │
-        ├── #forwardStateParams(result.params)  ← runs BEFORE buildPath, same tick
+        ├── #forwardStateParams(result.params)  ← runs BEFORE buildPath, same tick;
+        │     │                                     always injects into the PATH bag — core's
+        │     │                                     own navigate split re-routes the query-typed
+        │     │                                     keys into state.search downstream of this
         │     ├── clear #pendingRemovals
         │     ├── for each key in safeParams:
         │     │     value === undefined && paramNamesSet.has(key)?
@@ -201,7 +213,7 @@ router.navigate(name, params, opts)
         │     │       NO:  validateParamValue(key, value)
         │     └── mergeParams(#persistentParams, safeParams)  (undefined → delete)
         │
-        └── return { ...result, params: mergedParams }
+        └── return { ...result, params: mergedParams }   ← result.search passed through as-is
 ```
 
 The two interceptors are two phases of core's synchronous `buildNavigateState` (forwardState, then buildPath). `#forwardStateParams` **records** removals into the transient `#pendingRemovals` set but does **not** mutate `paramNamesSet` / `#persistentParams` — that would drop the param before the deactivation/activation guards run, so a rejected or cancelled transition would lose it (#803). `#buildPathParams` consumes the record to keep the built URL consistent. The permanent removal is committed in `onTransitionSuccess`, against the state that actually committed.
@@ -212,9 +224,12 @@ The two interceptors are two phases of core's synchronous `buildNavigateState` (
 Transition committed → onTransitionSuccess(toState)
         │
         ├── for each key in paramNamesSet:
-        │     value = toState.params[key]
+        │     inSearch = hasOwn(toState.search, key)          ← RFC-4 M2 / #1548:
+        │     present  = inSearch || hasOwn(toState.params, key)  search is canonical,
+        │     value    = inSearch ? toState.search[key]           params is the
+        │                          : toState.params[key]           makeState fallback
         │
-        │     !hasOwn(toState.params, key) || value === undefined?
+        │     !present || value === undefined?
         │       YES: PRIMARY removal (#803) — if stored value was defined,
         │            delete it from #persistentParams AND paramNamesSet.
         │            Covers explicit navigate({key: undefined}) removals and
@@ -241,21 +256,24 @@ router.navigate("route2", { id: "2" })
         │
         ▼
   forwardState interceptor
-        ├── next("route2", { id: "2" }) → State { params: { id: "2" } }
+        ├── next("route2", { id: "2" }) → State { params: { id: "2" }, search: {} }
         └── mergeParams({ mode: "dev" }, { id: "2" })
-              → State { params: { id: "2", mode: "dev" } }
-        │
+              → State { params: { id: "2", mode: "dev" }, search: {} }
+        │        (injected into the path bag here — this plugin never writes search
+        │         directly; core's own navigate split re-routes "mode", a ?-declared
+        │         root-path param, into state.search afterward)
         ▼
   buildPath interceptor (called internally by core during transition)
         ├── mergeParams({ mode: "dev" }, { id: "2" })
         └── next(route, { id: "2", mode: "dev" }) → "/route2/2?mode=dev"
         │
         ▼
-  Transition committed
+  Transition committed — core's navigate split moves "mode" into search
         │
         ▼
-  onTransitionSuccess({ params: { id: "2", mode: "dev" } })
-        ├── #persistentParams stays { mode: "dev" } (no change)
+  onTransitionSuccess({ params: { id: "2" }, search: { mode: "dev" } })
+        ├── #persistentParams stays { mode: "dev" } (no change; read from
+        │     toState.search, the canonical channel)
         └── claim.write(toState, { mode: "dev" })
               → state.context.persistentParams = { mode: "dev" }
 ```

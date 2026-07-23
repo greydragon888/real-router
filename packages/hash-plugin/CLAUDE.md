@@ -79,7 +79,7 @@ Both listeners share the single `shared.removePopStateListener` slot as a combin
 
 ```typescript
 router.replaceHistoryState(name, params); // URL only, no transition
-router.navigate(name, params, { replace: true }); // Full transition
+router.navigate(name, params, undefined, { replace: true }); // Full transition
 ```
 
 ### buildUrl vs buildPath
@@ -110,7 +110,7 @@ Hash-plugin **does not** support this surface — `#` is the route delimiter her
 
 - `pluginBuildUrl` accepts the `{ hash }` option for typing parity (TS interface merge requires identical signatures across all 3 URL plugins) but ignores it at runtime.
 - A one-time `console.warn` is emitted on the first invocation with `opts.hash !== undefined`, telling the user to switch to browser-plugin / navigation-plugin if URL fragments are required. Inline `let warned = false` pattern.
-- `state.context.url` is **not** claimed by hash-plugin → `state.context.url === undefined` at runtime. Hash-aware sources (`createActiveRouteSource({ hash })`, `useIsActiveRoute(name, params, { hash })`) consequently return `false` for any non-undefined `hash`.
+- `state.context.url` is **not** claimed by hash-plugin → `state.context.url === undefined` at runtime. Hash-aware sources (`createActiveRouteSource({ hash })`, `useIsActiveRoute(..., hash)`) consequently return `false` for any non-undefined `hash`.
 - Mutually exclusive with browser-plugin / navigation-plugin: only one URL plugin may be installed per router instance.
 
 See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragment ('hash') Support" for design context.
@@ -141,6 +141,7 @@ When guard blocks navigation but browser already changed URL — critical error 
 history.state = {
   name: "users.view",
   params: { id: "123" },
+  search: {},
   path: "/users/123",
 };
 ```

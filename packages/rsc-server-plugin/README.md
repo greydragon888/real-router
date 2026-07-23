@@ -37,7 +37,7 @@ import type { RscLoaderFactoryMap } from "@real-router/rsc-server-plugin";
 import { renderToReadableStream } from "@vitejs/plugin-rsc/rsc";
 
 const loaders: RscLoaderFactoryMap = {
-  "users.profile": () => async (params) => {
+  "users.profile": () => async ({ params }) => {
     const user = await fetchUser(params.id);
     return <UserProfile user={user} />;
   },
@@ -73,7 +73,7 @@ import type { RscLoaderFactoryMap } from "@real-router/rsc-server-plugin";
 
 const loaders: RscLoaderFactoryMap = {
   home: () => () => <HomePage />,                         // sync ReactNode
-  "users.profile": () => async (params) => {              // async ReactNode
+  "users.profile": () => async ({ params }) => {          // async ReactNode
     const user = await fetchUser(params.id);
     return <UserProfile user={user} />;
   },
@@ -96,7 +96,7 @@ const loaders: RscLoaderFactoryMap = {
   home: () => () => <HomePage />,                                 // short form, defaults to "full"
   "admin.dashboard": { ssr: false },                              // false → "client-only"
   "docs.detail": {
-    ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
+    ssr: (state) => state.search.format === "pdf" ? "client-only" : "full",
     loader: () => () => <Doc />,
   },
 };
@@ -173,7 +173,7 @@ invalidate(router, "rsc");
 
 // Explicit await — pair with a same-route reload.
 invalidate(router, "rsc");
-await router.navigate(state.name, state.params, { reload: true });
+await router.navigate(state.name, state.params, state.search, { reload: true });
 ```
 
 The flag is **preserved** until a successful, non-cancelled loader write. So a navigation that lands on a route without an entry, a `client-only` route, a mode-only entry, or one that gets cancelled mid-loader (newer `navigate()` aborts the older controller) all leave the flag set for the next attempt. A loader rejection also leaves the flag set — retry re-runs the loader.
@@ -187,7 +187,7 @@ Idempotent — multiple `invalidate()` calls between refreshes collapse to one r
 The leave handler passes the navigation's `AbortController.signal` as the second loader argument so loaders can abort their in-flight work (DB query, RSC stream, …) when a newer navigation supersedes:
 
 ```typescript
-"users.profile": (_router, getDep) => async (params, ctx) => {
+"users.profile": (_router, getDep) => async ({ params }, ctx) => {
   const db = getDep("db");
   const user = await db.users.findById(params.id, { signal: ctx?.signal });
 
@@ -197,7 +197,7 @@ The leave handler passes the navigation's `AbortController.signal` as the second
 
 The start interceptor calls the loader without a context. **Robust loaders check `signal.aborted` upfront** — a signal aborted before `addEventListener("abort", …)` does NOT auto-fire the listener.
 
-Non-breaking via TypeScript contravariance — existing `(params) => …` loaders continue to compile and work unchanged.
+Non-breaking via TypeScript contravariance — existing `({ params }) => …` loaders continue to compile and work unchanged.
 
 ## Post-hydration loader skip
 
@@ -218,7 +218,7 @@ import {
 } from "@real-router/rsc-server-plugin/errors";
 
 const loaders: RscLoaderFactoryMap = {
-  "users.profile": (_router, getDep) => async (params) => {
+  "users.profile": (_router, getDep) => async ({ params }) => {
     const user = await getDep("db").users.findById(params.id);
     if (!user) throw new LoaderNotFound(`user:${params.id}`);
     return <UserProfile user={user} />;

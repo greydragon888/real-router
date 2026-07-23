@@ -35,7 +35,7 @@
 | #   | Invariant                                           | Description                                                                                                                                                                      |
 | --- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | buildPath is idempotent with respect to persistence | `buildPath` called with an explicit persistent param produces the same path as `buildPath` called without it after the param has been stored. The plugin does not double-inject. |
-| 2   | Param appears exactly once in state                 | After multiple navigations, a persistent param key appears exactly once in the committed state params. The merge logic never duplicates keys.                                    |
+| 2   | Param appears exactly once in state                 | After multiple navigations, a persistent param key appears exactly once in the committed state's `search` params (`state.search` — the channel persisted query params occupy post-RFC-4 M2 / #1548). The merge logic never duplicates keys.                                    |
 
 ## Removal
 
@@ -89,7 +89,7 @@
 | #   | Invariant                                              | Description                                                                                                                                                                                                       |
 | --- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | state.context.persistentParams reflects stored snapshot | After every successful transition, `state.context.persistentParams` deep-equals the plugin's internal `#persistentParams` snapshot. It contains only the currently tracked persistent params, not route-specific params. |
-| 2   | state.context.persistentParams is a subset of state.params | Every key in `state.context.persistentParams` also exists in `state.params` with the same value. The context snapshot is always a subset of the full merged params.                                                 |
+| 2   | state.context.persistentParams is a subset of state.search (or state.params via makeState) | Every key in `state.context.persistentParams` also exists in `state.search` with the same value — the canonical channel for a committed query param post-RFC-4 M2 (#1548). For a state built via `makeState` (e.g. `start()`'s injected default, or a `navigateToState` commit) that hasn't been slot-shifted yet, the value instead rides in `state.params`. Either way, the context snapshot is always a subset of whichever channel actually carries the persisted keys.                                                 |
 
 ## Test Files
 

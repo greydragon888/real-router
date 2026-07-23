@@ -36,7 +36,7 @@ const routes = [
   {
     name: "users.profile",
     path: "/users/:id",
-    preload: async (params) => {
+    preload: async ({ params }) => {
       await queryClient.prefetchQuery({
         queryKey: ["user", params.id],
         queryFn: () => fetchUser(params.id),
@@ -46,7 +46,7 @@ const routes = [
   {
     name: "products.detail",
     path: "/products/:slug",
-    preload: async (params) => {
+    preload: async ({ params }) => {
       await productStore.prefetch(params.slug);
     },
   },
@@ -58,7 +58,7 @@ router.usePlugin(browserPluginFactory(), preloadPluginFactory());
 await router.start();
 ```
 
-When a user hovers over a `<Link routeName="users.profile" routeParams={{ id: '123' }}>` for 65ms, the plugin calls `preload({ id: '123' })` — warming up your data layer before navigation.
+When a user hovers over a `<Link routeName="users.profile" routeParams={{ id: '123' }}>` for 65ms, the plugin calls `preload({ params: { id: '123' }, search: {} })` — warming up your data layer before navigation.
 
 ## Options
 
@@ -148,7 +148,7 @@ The plugin is **data-agnostic** — it calls your `preload` function and doesn't
 {
   name: "users.profile",
   path: "/users/:id",
-  preload: async (params) => {
+  preload: async ({ params }) => {
     await queryClient.prefetchQuery({
       queryKey: ["user", params.id],
       queryFn: () => fetchUser(params.id),
@@ -163,7 +163,7 @@ The plugin is **data-agnostic** — it calls your `preload` function and doesn't
 {
   name: "products.detail",
   path: "/products/:slug",
-  preload: async (params) => {
+  preload: async ({ params }) => {
     await productStore.prefetch(params.slug);
   },
 }

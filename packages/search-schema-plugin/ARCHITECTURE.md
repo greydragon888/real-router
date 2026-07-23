@@ -126,9 +126,9 @@ this.#validateExistingDefaultParams(); // dev mode: walk route tree
 
 this.#removeForwardStateInterceptor = this.#pluginApi.addInterceptor(
   "forwardState",
-  (next, routeName, routeParams) => {
-    const result = next(routeName, routeParams); // core resolves state first
-    return this.#validateState(result); // then schema validates
+  (next, routeName, routeParams, routeSearch) => {
+    const result = next(routeName, routeParams, routeSearch); // core resolves state first
+    return this.#validateState(result, routeSearch !== undefined); // then schema validates whichever channel holds the query (RFC-4 M2 / #1548)
   },
 );
 
@@ -150,39 +150,44 @@ this.#removeChangesSubscription =
 ### forwardState interceptor
 
 ```
-navigate(name, params)
+navigate(name, params, search) / matchPath(url)
         │
         ▼
   forwardState interceptor (registered in constructor)
         │
-        ├── result = next(routeName, routeParams)
-        │     └── core builds State { name, params }
-        │         (merges route defaultParams for undefined keys)
+        ├── result = next(routeName, routeParams, routeSearch)
+        │     └── core builds/resolves State { name, params, search }
+        │         (merges route defaultParams for undefined keys, channel-aware since #1549)
         │
-        └── #validateState(result)
+        └── #validateState(result, useSearch = routeSearch !== undefined)
               │
               ├── schema = pluginApi.getRouteConfig(result.name)?.searchSchema
               │
               ├── no schema?
               │     YES: return result unchanged
               │
-              ├── schema["~standard"].validate(result.params)
+              ├── channel = useSearch ? result.search : result.params
+              │     (URL→State/matchPath: query already in result.search;
+              │      State→URL/navigate: query still rides in the params bag,
+              │      not yet slot-shifted — RFC-4 M2 / #1548)
+              │
+              ├── schema["~standard"].validate(channel)
               │
               ├── validation returns Promise?
               │     YES: throw TypeError  ← async schemas not supported
               │
               ├── "value" in validation (success path)
               │     │
-              │     ├── strict: false → { ...result.params, ...validation.value }
+              │     ├── strict: false → writeBack({ ...channel, ...validation.value })
               │     │                   (unknown keys preserved from original)
               │     │
-              │     └── strict: true  → validation.value
+              │     └── strict: true  → writeBack(validation.value)
               │                         (only schema output, unknowns removed)
               │
               └── "issues" in validation (error path)
                     │
                     ├── onError set?
-                    │     YES: return { ...result, params: onError(name, params, issues) }
+                    │     YES: return writeBack(onError(result.name, channel, issues))
                     │          (no logging, no strip — full callback control)
                     │
                     ├── mode === "development"?
@@ -191,12 +196,15 @@ navigate(name, params)
                     ├── invalidKeys = getInvalidKeys(issues)
                     │     └── extracts top-level path[0] key from each issue with a path
                     │
-                    ├── stripped = omitKeys(result.params, invalidKeys)
+                    ├── stripped = omitKeys(channel, invalidKeys)
                     │
                     ├── defaults = routesApi.get(result.name)?.defaultParams
                     │
-                    └── return { ...result, params: { ...defaults, ...stripped } }
+                    └── return writeBack(defaults ? { ...defaults, ...stripped } : stripped)
                                   ← defaults fill stripped keys; valid keys kept as-is
+
+  writeBack(validated) → useSearch ? { ...result, search: validated }
+                                    : { ...result, params: validated }
 ```
 
 ### Happy path (valid params)
@@ -250,8 +258,8 @@ URL → State:
   → State committed
 
 State → URL:
-  navigate(name, params) → core forwardState (merges defaults)
-  → [forwardState interceptor: schema validates]
+  navigate(name, params, search) → core forwardState (merges defaults)
+  → [forwardState interceptor: schema validates whichever channel holds the query]
   → encodeParams → URL built
 ```
 
@@ -368,14 +376,15 @@ Recovery applies only when `onError` is not set. The sequence is:
             extract issue.path[0] as string key
             → Set<string> of invalid top-level keys
 
-2. omitKeys(result.params, invalidKeys)
-      └── shallow copy of params without invalid keys
+2. omitKeys(channel, invalidKeys)
+      └── shallow copy of the validated channel (state.search or state.params —
+          RFC-4 M2 / #1548) without invalid keys
           → "stripped" params
 
 3. { ...defaults, ...stripped }
       └── spread defaults first (fills stripped keys with route defaults)
           spread stripped second (keeps valid keys at their navigated values)
-          → restored params
+          → restored params, written back to the same channel
 ```
 
 **Mode behavior:**

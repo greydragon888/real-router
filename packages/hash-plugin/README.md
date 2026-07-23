@@ -55,7 +55,7 @@ The plugin extends the router instance with three methods via [`extendRouter()`]
 
 | Method                                       | Returns              | Description                           |
 | -------------------------------------------- | -------------------- | ------------------------------------- |
-| `buildUrl(name, params?)`                    | `string`             | Build full URL with hash and prefix   |
+| `buildUrl(name, params?, search?)`           | `string`             | Build full URL with hash and prefix   |
 | `matchUrl(url)`                              | `State \| undefined` | Parse hash URL to router state        |
 | `replaceHistoryState(name, params?, search?)`         | `void`               | Update browser URL without navigation |
 
@@ -64,7 +64,7 @@ router.buildUrl("users", { id: "123" });
 // => "#!/users/123" (with hashPrefix "!")
 
 router.matchUrl("https://example.com/#!/users/123");
-// => { name: "users", params: { id: "123" }, path: "/users/123" }
+// => { name: "users", params: { id: "123" }, search: {}, path: "/users/123" }
 
 // Update URL silently (no transition, no guards)
 router.replaceHistoryState("users", { id: "456" });
@@ -99,7 +99,7 @@ lifecycle.addDeactivateGuard(
 
 ### URL Fragments via `<Link hash>` / `opts.hash`
 
-Hash-plugin uses `#` as the route delimiter — URL fragments are structurally incompatible. The signatures of `router.buildUrl(name, params, options?)` and `router.replaceHistoryState(name, params, options?)` accept `{ hash }` for typing parity with the other URL plugins, but at runtime the option is **silently ignored** and a one-time `console.warn` is emitted on the first invocation:
+Hash-plugin uses `#` as the route delimiter — URL fragments are structurally incompatible. The signatures of `router.buildUrl(name, params, search, options?)` and `router.replaceHistoryState(name, params, search, options?)` accept `{ hash }` for typing parity with the other URL plugins (options at position 4 since RFC-4 M2, #1548), but at runtime the option is **silently ignored** and a one-time `console.warn` is emitted on the first invocation:
 
 ```text
 [@real-router/hash-plugin] `hash` option is ignored — `#` is reserved for the route delimiter.

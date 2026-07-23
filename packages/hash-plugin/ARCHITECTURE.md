@@ -187,9 +187,13 @@ TypeScript allows extending existing interfaces via `declare module`. The plugin
 // index.ts
 declare module "@real-router/core" {
   interface Router {
-    buildUrl: (name: string, params?: Params) => string;
+    buildUrl: (name: string, params?: Params, search?: SearchParams) => string;
     matchUrl: (url: string) => State | undefined;
-    replaceHistoryState: (name: string, params?: Params) => void;
+    replaceHistoryState: (
+      name: string,
+      params?: Params,
+      search?: SearchParams,
+    ) => void;
     start(path?: string): Promise<State>; // overload — makes path optional
   }
 }
@@ -202,8 +206,11 @@ TypeScript augmentation is type-level only. The actual methods are registered in
 ```typescript
 // plugin.ts, constructor
 const urlPrefix = `${options.base}#${options.hashPrefix}`;
-const pluginBuildUrl = (route: string, params?: Params) =>
-  urlPrefix + router.buildPath(route, params);
+const pluginBuildUrl = (
+  route: string,
+  params?: Params,
+  search?: SearchParams,
+) => urlPrefix + router.buildPath(route, params, search);
 
 this.#removeExtensions = api.extendRouter({
   buildUrl: pluginBuildUrl, // pre-computed urlPrefix + buildPath()
@@ -289,7 +296,7 @@ Each new plugin instance registers its own popstate + hashchange listeners in `o
 ## Data Flow: Navigation
 
 ```
-router.navigate(name, params, opts)
+router.navigate(name, params, search, opts)
         │
         ▼
   Transition completed successfully
@@ -309,7 +316,7 @@ router.navigate(name, params, opts)
         │
         └── updateBrowserState(toState, url, shouldReplace, browser)
                   │
-                   ├── Create historyState = { name, params, path }
+                   ├── Create historyState = { name, params, search, path }
                    └── browser.pushState() or browser.replaceState()
 ```
 
@@ -342,7 +349,7 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │               └── Hash URL matching as fallback
         │
         ├── route found?
-        │     YES: await router.navigate(route.name, route.params, transitionOptions)
+        │     YES: await router.navigate(route.name, route.params, route.search, transitionOptions)
         │     NO + allowNotFound: router.navigateToNotFound(location)
         │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + rollbackUrlToCurrentState()
         │                          (no silent navigateToDefault — see #483)

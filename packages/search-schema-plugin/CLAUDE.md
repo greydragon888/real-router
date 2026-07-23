@@ -77,8 +77,8 @@ The strip-and-recover path removes only the keys a validation issue **names** in
 const schema = z
   .object({ min: z.number(), max: z.number() })
   .refine((v) => v.min < v.max, { message: "min must be < max" }); // no `path`
-await router.navigate("range", { min: 10, max: 5 });
-router.getState().params; // { min: 10, max: 5 } — NOT stripped
+await router.navigate("range", {}, { min: 10, max: 5 }); // min/max are query-declared (?min&max)
+router.getState().search; // { min: 10, max: 5 } — NOT stripped
 ```
 
 So the "schema validate → strip invalid → merge defaults" contract holds **per key**; it cannot recover a rule class for which strip-by-key is structurally impossible. To recover from a cross-field failure, give the refine a `path` (`{ message, path: ["max"] }`) so the offending key is stripped and its default restored, or handle it in `onError` (which sees the raw issues). A whole-object reset on a path-less failure is not built in — add it via `onError` if you need it.

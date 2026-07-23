@@ -12,7 +12,8 @@
 [logger-plugin] Router started
 ▼ Router transition
   [logger-plugin] Transition: home → users.profile {from: {...}, to: {...}}
-  [logger-plugin]   Changed: { id: "123" → "456" }, Added: {"sort":"name"}
+  [logger-plugin]  params Changed: { id: "123" → "456" }
+  [logger-plugin]  search Added: {"sort":"name"}
   [logger-plugin] Leave approved {to: {...}, from: {...}}
   [logger-plugin] Transition success (1.23ms) {to: {...}, from: {...}}
 ```
@@ -78,10 +79,14 @@ router.usePlugin(loggerPluginFactory({ level: "errors" }));
 
 ### Parameter Diff
 
-Logs added, changed, and removed params when navigating within the same route:
+Logs added, changed, and removed params when navigating within the same route. The path
+(`params`) and query (`search`) channels are diffed independently and printed on labelled
+lines, so a query-only change (e.g. pagination) still shows under `search` even when
+`params` is unchanged (RFC-4 M2):
 
 ```
-[logger-plugin]   Changed: { id: "123" → "456" }, Added: {"sort":"name"}
+[logger-plugin]  params Changed: { id: "123" → "456" }
+[logger-plugin]  search Added: {"sort":"name"}
 ```
 
 ### Performance API

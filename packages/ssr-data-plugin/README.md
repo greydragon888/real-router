@@ -36,7 +36,7 @@ import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
 import { routes } from "./routes"; // your app's route tree
 
 const loaders: DataLoaderFactoryMap = {
-  "users.profile": () => async (params) => fetchUser(params.id),
+  "users.profile": () => async ({ params }) => fetchUser(params.id),
   "users.list": () => async () => fetchUsers(),
 };
 
@@ -56,7 +56,7 @@ router.dispose();
 
 ## Configuration
 
-Entries are keyed by **route name** (not path). Each value is either a **factory function** `(router, getDependency) => loaderFn` (short form) or an object `{ ssr?, loader? }` with optional per-route SSR mode. The factory runs once at plugin registration; the returned loader is cached. Each loader receives route `params` and returns `Promise<unknown> | unknown`:
+Entries are keyed by **route name** (not path). Each value is either a **factory function** `(router, getDependency) => loaderFn` (short form) or an object `{ ssr?, loader? }` with optional per-route SSR mode. The factory runs once at plugin registration; the returned loader is cached. Each loader receives `{ params, search }` and returns `Promise<unknown> | unknown`:
 
 ```typescript
 import type { DataLoaderFactoryMap } from "@real-router/ssr-data-plugin";
@@ -71,13 +71,13 @@ const loaders: DataLoaderFactoryMap = {
   // Object form — server fetches data, app ships shell + JSON
   "users.profile": {
     ssr: "data-only",
-    loader: () => async (params) => ({ user: await fetchUser(params.id) }),
+    loader: () => async ({ params }) => ({ user: await fetchUser(params.id) }),
   },
 
   // Function-form resolver — mode resolved per-navigation
   "docs.detail": {
-    ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
-    loader: () => async (params) => ({ doc: await fetchDoc(params.id) }),
+    ssr: (state) => state.search.format === "pdf" ? "client-only" : "full",
+    loader: () => async ({ params }) => ({ doc: await fetchDoc(params.id) }),
   },
 };
 ```
@@ -109,7 +109,7 @@ if (mode === "full") {
 return `<div data-ssr-mode="${mode}"></div>`;
 ```
 
-The function-form resolver receives `state` **before** the mode is written, so it should not read `state.context.ssrDataMode`. Branch on `state.params`, `state.path`, or `state.name`.
+The function-form resolver receives `state` **before** the mode is written, so it should not read `state.context.ssrDataMode`. Branch on `state.params`, `state.search`, `state.path`, or `state.name`.
 
 See [`examples/web/react/ssr-examples/ssr-mixed/`](../../examples/web/react/ssr-examples/ssr-mixed) for a hybrid pipeline that demonstrates all three modes from a single `entry-server.tsx`.
 
@@ -146,7 +146,7 @@ invalidate(router, "data");
 
 // Explicit await — pair with a same-route reload.
 invalidate(router, "data");
-await router.navigate(state.name, state.params, { reload: true });
+await router.navigate(state.name, state.params, state.search, { reload: true });
 ```
 
 The flag is **preserved** until a successful, non-cancelled loader write. So a navigation that lands on a route without a loader entry, a `client-only` route, a mode-only entry, or one that gets cancelled mid-loader (newer `navigate()` aborts the older controller) all leave the flag set for the next attempt.
@@ -160,7 +160,7 @@ Idempotent — multiple `invalidate()` calls between refreshes collapse to one r
 The leave handler passes the navigation's `AbortController.signal` as the second loader argument so loaders can abort their in-flight work (fetch, DB query, …) when a newer navigation supersedes:
 
 ```typescript
-"users.profile": () => async (params, ctx) => {
+"users.profile": () => async ({ params }, ctx) => {
   // Network layer cancels on rapid double-click — second click aborts
   // the first nav's controller, fetch sees `signal.aborted` and rejects.
   const response = await fetch(`/api/user/${params.id}`, {
@@ -175,7 +175,7 @@ The start interceptor calls the loader without a context — SSR boot path apps 
 
 **Robust loaders check `signal.aborted` upfront** — a signal aborted before `addEventListener("abort", …)` does NOT auto-fire the listener. Pattern documented in the `home` loader of every `ssr-mixed/` example.
 
-Non-breaking via TypeScript contravariance — existing `(params) => …` loaders without the second arg continue to work; they just don't observe cancellation.
+Non-breaking via TypeScript contravariance — existing `({ params }) => …` loaders without the second arg continue to work; they just don't observe cancellation.
 
 ## Post-hydration loader skip
 
@@ -207,7 +207,7 @@ import {
 } from "@real-router/ssr-data-plugin/errors";
 
 const loaders: DataLoaderFactoryMap = {
-  "users.profile": (_router, getDep) => (params) => {
+  "users.profile": (_router, getDep) => ({ params }) => {
     const upstreamSignal = (
       getDep as unknown as (k: string) => AbortSignal | undefined
     )("abortSignal");
@@ -225,7 +225,7 @@ const loaders: DataLoaderFactoryMap = {
       { upstreamSignal },
     );
   },
-  "users.legacy": () => (params) => {
+  "users.legacy": () => ({ params }) => {
     throw new LoaderRedirect(`/users/${params.id}`, 301);
   },
 };
@@ -251,7 +251,7 @@ Loaders may return a `defer({ critical, deferred })` payload to split the respon
 ```typescript
 import { defer, LoaderNotFound } from "@real-router/ssr-data-plugin";
 
-"products.detail": () => (params) => {
+"products.detail": () => ({ params }) => {
   const product = getProduct(params.id);
   if (!product) throw new LoaderNotFound(`product:${params.id}`);
 

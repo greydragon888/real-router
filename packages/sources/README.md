@@ -42,7 +42,7 @@ const unsubscribe = source.subscribe(() => {
 | ------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------- |
 | `createRouteSource(router)`                             | `RouterSource<{ route, previousRoute }>`                 | not cached                                    |
 | `createRouteNodeSource(router, node)`                   | `RouterSource<{ route, previousRoute }>`                 | per-router + per-nodeName                     |
-| `createActiveRouteSource(router, name, params?, opts?)` | `RouterSource<boolean>`                                  | per-router + canonical-args                   |
+| `createActiveRouteSource(router, name, params?, search?, opts?)` | `RouterSource<boolean>`                                  | per-router + canonical-args                   |
 | `createTransitionSource(router)`                        | `RouterSource<{ isTransitioning, isLeaveApproved, toRoute, fromRoute }>` | not cached (advanced)         |
 | `getTransitionSource(router)`                           | same as above                                            | **per-router** — recommended for integrations |
 | `createErrorSource(router)`                             | `RouterSource<{ error, toRoute, fromRoute, version }>`   | not cached (advanced)                         |
@@ -90,7 +90,7 @@ All route-state sources (`createRouteSource`, `createRouteNodeSource`, `createAc
 ### `createActiveRouteSource` Options
 
 ```typescript
-const source = createActiveRouteSource(router, "users", undefined, {
+const source = createActiveRouteSource(router, "users", undefined, undefined, {
   strict: false, // default: false — match descendants too
   ignoreQueryParams: true, // default: true
   hash: undefined, // default: undefined — ignore URL fragment.
@@ -104,7 +104,7 @@ const source = createActiveRouteSource(router, "users", undefined, {
 | `ignoreQueryParams` | `boolean`   | `true`        | Whether to drop query-string params before comparing.                                                                                                                                                                                                          |
 | `hash`              | `string`    | `undefined`   | When set, source is active iff route matches **and** `state.context.url.hash` equals this value. Requires a URL-publishing plugin (browser/navigation); under hash-plugin or memory-plugin (no `context.url` namespace), a **non-empty** hash is always `false`, while `hash: ""` still matches an active route (the missing namespace reads as "no fragment", #532). |
 
-Params are hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/circular refs fall back to a fresh non-cached source with a working `destroy()` — call it to release the router subscription.
+`params` and `search` are each hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/circular refs fall back to a fresh non-cached source with a working `destroy()` — call it to release the router subscription.
 
 ## Usage Examples
 

@@ -128,7 +128,7 @@ rscServerPluginFactory(loaders)              ← factory.ts (~25 LOC incl. JSDoc
                 │               └── typeof check on each returned loader
                 │   catch: rollback(acquired) — release ALL acquired claims in reverse order + rethrow
                 ├── api.addInterceptor("start", ...)
-                │       └── claim.write(state, await loader(state.params)) + modeClaim.write(state, resolveMode(...))
+                │       └── claim.write(state, await loader({ params: state.params, search: state.search })) + modeClaim.write(state, resolveMode(...))
                 ├── api.subscribeLeave(consumesStaleFlag)
                 └── return { teardown }
                         └── removeStartInterceptor() + removeLeaveListener() + claim.release() + modeClaim.release()
@@ -209,7 +209,7 @@ router.start(url)
         │     └── core resolves route: matchPath → forwardState → guards → State
         │
         ├── loader = compiledLoaders.get(state.name)
-        │     found: rsc = await loader(state.params)
+        │     found: rsc = await loader({ params: state.params, search: state.search })
         │            claim.write(state, rsc)            ← state.context.rsc = ReactNode
         │     not found: skip
         │
@@ -251,7 +251,7 @@ router.navigate(...) (any CSR navigation)
         │
         ├── client-only / no-loader entry → return (flag preserved)
         │
-        ├── rsc = await loader(nextRoute.params)
+        ├── rsc = await loader({ params: nextRoute.params, search: nextRoute.search })
         │
         ├── signal.aborted? yes → return (flag preserved for the new nav)
         │
@@ -354,7 +354,7 @@ Factory-time validation checks the `loaders` object. Plugin-registration-time va
 
 ### Sync return allowed
 
-`RscLoaderFn = (params) => Promise<ReactNode> | ReactNode` — many Server Components are pure, synchronous functions. Forcing `async` would be ceremonial. `claim.write(state, await loader(...))` correctly handles both cases (`await` on a non-Promise resolves synchronously).
+`RscLoaderFn = ({ params, search }) => Promise<ReactNode> | ReactNode` — many Server Components are pure, synchronous functions. Forcing `async` would be ceremonial. `claim.write(state, await loader(...))` correctly handles both cases (`await` on a non-Promise resolves synchronously).
 
 ### Prototype safety via `Object.entries`
 
@@ -393,7 +393,7 @@ Loader factories follow the same DI pattern as `GuardFnFactory` / `LifecycleHook
 
 ```typescript
 const loaders: RscLoaderFactoryMap = {
-  "users.profile": (router, getDependency) => async (params) => {
+  "users.profile": (router, getDependency) => async ({ params }) => {
     const db = getDependency("db");
     const user = await db.users.findById(params.id);
     return <UserProfile user={user} />;

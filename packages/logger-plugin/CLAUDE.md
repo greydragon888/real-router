@@ -31,7 +31,7 @@ router.usePlugin(loggerPluginFactory(options))
                     └── getPlugin(): return Plugin with 7 hooks + teardown
 
 onStart()                  → perf.mark("router:start") + log if logLifecycle
-onTransitionStart()        → groups.open + record timing + perf.mark + log + paramsDiff if same route
+onTransitionStart()        → groups.open + record timing + perf.mark + log + params+search diff (channel-labelled, RFC-4 M2) if same route
 onTransitionLeaveApprove() → perf.mark("router:leave-approved:{label}") + log "Leave approved" if logTransition
 onTransitionSuccess()      → perf.mark + perf.measure + log with timing + resetTransitionState
 onTransitionCancel()       → perf.mark + perf.measure + warn + resetTransitionState
@@ -74,6 +74,10 @@ Closure-based `isOpened` flag prevents `console.group()` from being called twice
 
 `validateOptions` checks `options === (null as never)` before the `typeof` check. This is a runtime defense: `typeof null === "object"` in JavaScript, so without this guard null would pass the type check and crash on property access. TypeScript excludes null from the parameter type, so `as never` satisfies `@typescript-eslint/no-unnecessary-condition`.
 
+### Params diff runs on both channels independently (RFC-4 M2 / #1548)
+
+`#logParamsIfNeeded` calls `getParamsDiff`/`logParamsDiff` twice per same-route transition — once for `state.params` (path), once for `state.search` (query) — each gated on its own `hasChanges` result. A transition can therefore print 0, 1, or 2 diff lines (`params …` / `search …`); a query-only change (e.g. `?page=2` → `?page=3`) now surfaces under `search` even though `params` is unchanged.
+
 ## Log Level Matrix
 
 | Level          | logLifecycle | logTransition | logWarning | logError |
@@ -98,7 +102,7 @@ src/
 └── internal/
     ├── console-groups.ts   — GroupManager (closure): open/close with duplicate guard
     ├── formatting.ts       — formatRouteName, formatTiming (adaptive μs/ms), createTransitionLabel
-    ├── params-diff.ts      — getParamsDiff (shallow), logParamsDiff (formatted output)
+    ├── params-diff.ts      — getParamsDiff (shallow, channel-agnostic), logParamsDiff (channel-labelled: params/search)
     ├── performance-marks.ts — PerformanceTracker (closure): mark/measure with env detection
     └── timing.ts           — now() provider: performance.now() or monotonic Date.now() fallback
 ```

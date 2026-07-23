@@ -182,7 +182,7 @@ dist/
 Link uses `.catch(() => {})` to suppress unhandled rejection warnings:
 
 ```typescript
-router.navigate(routeName, routeParams, routeOptions).catch(() => {});
+router.navigate(routeName, routeParams, routeSearch, routeOptions).catch(() => {});
 ```
 
 ## SSR-feature surface — `@real-router/solid/ssr`
@@ -326,13 +326,14 @@ return <p>{state().route.name}</p>;
 
 ### Typed route params via generic
 
-`useRoute<P>()` accepts an optional generic so `route.params` is typed without `as` casts at the call site. The cast happens once inside the hook; no runtime change.
+`useRoute<P>()` accepts an optional generic so `route.params` is typed without `as` casts at the call site. The cast happens once inside the hook; no runtime change. The generic types the **path** channel (`route.params`) only — `route.search` (query channel, RFC-4 M2 / #1548) keeps its own `SearchParams` shape from `@real-router/core`, always present (`{}` when there are no query params).
 
 ```typescript
-type SearchParams = { q: string; sort: string } & Params;
+type RouteParams = { id: string } & Params;
 
-const routeState = useRoute<SearchParams>();
-const q = routeState().route.params.q; // typed as string
+const routeState = useRoute<RouteParams>();
+const id = routeState().route.params.id; // typed as string (path channel)
+const sort = routeState().route.search.sort; // query channel — not narrowed by the generic
 ```
 
 ### useRouteNode Semantics
@@ -446,6 +447,44 @@ RouteView renders only the active match. On navigation, the previous component d
 <Link routeName="users" /> // Active even if ?page=2 differs
 ```
 
+### `routeSearch` Prop (#1548)
+
+`routeSearch?: SearchParams` — the query (search) channel of the path/query split
+(RFC-4 M2), parallel to `routeParams`. Feeds the URL query string on click and in
+`href` (passed to `buildHref` at the search position), and — paired with
+`ignoreQueryParams={false}` — the active-state check.
+
+```tsx
+// Pagination link with an explicit query channel; active only on ?page=2
+<Link routeName="users" routeSearch={{ page: "2" }} ignoreQueryParams={false} />
+```
+
+A route's query still works when passed inside `routeParams` (the pre-split path);
+`routeSearch` is the explicit, type-clean channel.
+
+### `to` Descriptor Prop (#1548)
+
+`<Link>` accepts two **mutually-exclusive** forms — the channel props above
+(`routeName` + `routeParams` + `routeSearch`) OR a single `to={NavigationTarget}`
+descriptor (`{ name, params?, search? }`). `LinkProps` is a discriminated union
+(`to?: never` in the channel branch, `routeName?: never` in the descriptor
+branch), so mixing them is a **compile error**. At runtime the shared
+`resolveLinkTarget` helper is the backstop — `to` wins and a `console.warn` fires
+if channel props leak in via a JS consumer or a spread.
+
+```tsx
+// Channel form
+<Link routeName="users.view" routeParams={{ id: "7" }} routeSearch={{ tab: "posts" }} />
+
+// Descriptor form — equivalent, one object
+<Link to={{ name: "users.view", params: { id: "7" }, search: { tab: "posts" } }} />
+```
+
+`routeOptions` / `hash` are separate props under BOTH forms (hash is not part of
+`NavigationTarget` — #532). Solid enforces the exclusion in the type (react/preact
+do too; svelte/vue/angular enforce it at runtime only, their prop systems
+preclude a strict never-union).
+
 ### Empty `routeName` Link is inactive in every router state (#1427)
 
 `<Link routeName="">` is a misuse pattern (an empty name matches no route). The
@@ -480,9 +519,9 @@ Solid components run once. Link's slow-path `isActive` subscription (`createActi
 
 The fast path (`createSelector`) IS reactive for `routeName` because `local.routeName` is read inside the accessor each time.
 
-**Slow path is used when:** `activeStrict=true`, `ignoreQueryParams=false`, custom `routeParams`, or `hash !== undefined` (#532).
+**Slow path is used when:** `activeStrict=true`, `ignoreQueryParams=false`, custom `routeParams`, a `routeSearch` value, a `to` descriptor, or `hash !== undefined` (#532, #1548) — the shared `routeSelector` is name-only and query-blind, so a `routeSearch`/`to` link needs the slow path exactly like a custom `hash`.
 
-The `useFastPath` decision itself is also captured at init — changing `activeStrict`/`ignoreQueryParams`/`routeParams`/`hash` mid-session does NOT switch fast↔slow path. The Link stays on whichever path it chose on first render. In particular, if `hash` flips from `undefined` to a value (or vice versa) mid-session, the path decision does not flip — workaround: force remount via `<Show keyed when={...}>` (see example below).
+The `useFastPath` decision itself is also captured at init — changing `activeStrict`/`ignoreQueryParams`/`routeParams`/`routeSearch`/`hash` mid-session does NOT switch fast↔slow path. The Link stays on whichever path it chose on first render. In particular, if `hash` flips from `undefined` to a value (or vice versa) mid-session, the path decision does not flip — workaround: force remount via `<Show keyed when={...}>` (see example below).
 
 **Workaround:** Use static props on Link. For dynamic route switching, force a fresh Link instance per route via `<Show keyed>` — Solid mounts a new subtree every time the `when` accessor's value changes by reference, which gives the slow path a fresh init capture.
 
@@ -587,7 +626,7 @@ All source caches live inside `@real-router/sources` — no local WeakMaps in th
 | `useRouteNodeStore(name)` | cached `createRouteNodeSource(router, nodeName)`                                                                                                                                                                                   |
 | `useRouterTransition()`   | cached `getTransitionSource(router)`                                                                                                                                                                                               |
 | `RouterErrorBoundary`     | cached `createDismissableError(router)` — shared error source with integrated dismissal state                                                                                                                                      |
-| Link (slow path)          | cached `createActiveRouteSource(router, name, params, opts)` — params hashed via `canonicalJson` (key-order-insensitive)                                                                                                           |
+| Link (slow path)          | cached `createActiveRouteSource(router, name, params, search, opts)` — params/search hashed via `canonicalJson` (key-order-insensitive)                                                                                             |
 
 > **`useRoute()` vs `useRouteStore()` sharing.** `useRoute()` is shared
 > per-`RouterProvider`: the Provider builds one `createRouteSource` and hands the

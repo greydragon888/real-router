@@ -9,7 +9,7 @@ src/
 ├── BaseSource.ts                — Internal Set-based listener management + destroy safety
 ├── createRouteSource.ts         — Full route state source with lazy-connection pattern (non-cached)
 ├── createRouteNodeSource.ts     — Node-scoped source with lazy-connection + per-(router, nodeName) cache
-├── createActiveRouteSource.ts   — Boolean active-route source with per-(router, name, params, opts) cache
+├── createActiveRouteSource.ts   — Boolean active-route source with per-(router, name, params, search, opts) cache
 ├── createTransitionSource.ts    — Transition lifecycle + cached getTransitionSource wrapper
 ├── createErrorSource.ts         — Error lifecycle + cached getErrorSource wrapper
 ├── createDismissableError.ts    — Derived source: getErrorSource wrapped with dismissedVersion state
@@ -39,7 +39,7 @@ Most factories return a cached instance keyed by router and, where applicable, b
 | `createActiveNameSelector` | `WeakMap<Router, selector>` | until router GC |
 | `createTransitionSource` / `createErrorSource` | none (advanced-use) | owner-driven; `destroy()` tears down |
 
-**Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${strict}|${ignoreQueryParams}|${hashKey}` `` — 5-component since #532, where `hashKey` is `hash === undefined ? "" : `#${hash}``, isolating hash-aware tab-link variants (`createActiveRouteSource.ts:50,66`). Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry.
+**Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${canonicalJson(search)}|${strict}|${ignoreQueryParams}|${hashKey}` `` — 6-component since RFC-4 M2 (#1548) added the `search` channel (was 5-component since #532), where `hashKey` is `hash === undefined ? "" : `#${hash}``, isolating hash-aware tab-link variants (`createActiveRouteSource.ts:50,66`). Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry (checked per field: `params` and `search` each normalize independently).
 
 **Non-serializable fallback:** if `canonicalJson(params)` throws, `createActiveRouteSource` bypasses the cache and returns a fresh non-cached source for that specific call. Throw-triggers include `BigInt` (native `JSON.stringify`), `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp` (eager `TypeError` — these would otherwise collapse to `"{}"` and cause cache-key collisions), and circular references (path-based detector in `canonicalize()`). `Symbol`-valued fields are silently dropped (standard JSON semantics) — they do not bypass the cache.
 
@@ -121,7 +121,7 @@ State reference stabilization keyed on `path` **+** `state.context.url.hash` (#5
 
 ### `canonicalJson`
 
-Explicit `canonicalize()` clone that sorts object keys via byte-order comparison (`<` / `>`, locale-independent) before `JSON.stringify`. Used by `createActiveRouteSource` to build a stable cache key from the `params` argument. Throws `TypeError` on `BigInt` (standard `JSON.stringify` behaviour), `Map` / `Set` / `WeakMap` / `WeakSet` / `RegExp` (would otherwise collapse to `"{}"` and collide on cache keys), and circular references (path-based detector via `Set<object>` with `try/finally` cleanup — DAGs with shared refs serialise normally). `__proto__` is preserved as an own property (null-prototype sorted record). The caller falls back to a non-cached source on any throw.
+Explicit `canonicalize()` clone that sorts object keys via byte-order comparison (`<` / `>`, locale-independent) before `JSON.stringify`. Used by `createActiveRouteSource` to build a stable cache key from the `params` and `search` arguments (each normalized independently, RFC-4 M2 / #1548). Throws `TypeError` on `BigInt` (standard `JSON.stringify` behaviour), `Map` / `Set` / `WeakMap` / `WeakSet` / `RegExp` (would otherwise collapse to `"{}"` and collide on cache keys), and circular references (path-based detector via `Set<object>` with `try/finally` cleanup — DAGs with shared refs serialise normally). `__proto__` is preserved as an own property (null-prototype sorted record). The caller falls back to a non-cached source on any throw.
 
 ### `normalizeActiveOptions`
 

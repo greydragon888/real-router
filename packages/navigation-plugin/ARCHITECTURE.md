@@ -234,9 +234,19 @@ declare module "@real-router/types" {
 
 declare module "@real-router/core" {
   interface Router {
-    buildUrl: (name: string, params?: Params) => string;
+    buildUrl: (
+      name: string,
+      params?: Params,
+      search?: SearchParams,
+      options?: { hash?: string },
+    ) => string;
     matchUrl: (url: string) => State | undefined;
-    replaceHistoryState: (name: string, params?: Params) => void;
+    replaceHistoryState: (
+      name: string,
+      params?: Params,
+      search?: SearchParams,
+      options?: { hash?: string },
+    ) => void;
     peekBack: () => State | undefined;
     peekForward: () => State | undefined;
     hasVisited: (routeName: string) => boolean;
@@ -412,7 +422,7 @@ User clicks back/forward/link, or navigation.navigate() fires
         │
         ├── matchedState found?
         │     YES: event.intercept({ handler: async () => {
-        │           await router.navigate(matchedState.name, matchedState.params, { ...transitionOptions, signal: event.signal })
+        │           await router.navigate(matchedState.name, matchedState.params, undefined, { ...transitionOptions, signal: event.signal })
         │           catch RouterError → ignore (CANNOT_DEACTIVATE, etc.)
         │           catch other → recoverFromNavigateError()
         │         }})
@@ -612,7 +622,7 @@ if (
 
 `isSameHref(target, currentHref)` lives in `href-utils.ts` as a pure helper. It returns `true` when `new URL(target, currentHref).href === new URL(currentHref).href` — URL-canonical equality, so `scheme://host` and `scheme://host/` (special-scheme trailing-slash canonicalisation) compare equal. Returns `false` when `currentHref` is null/empty or either URL construction throws. The function is total over `string × (string | null | undefined)` and never throws. Property-tested in `tests/property/href-utils.properties.ts` (K1–K9 in INVARIANTS.md).
 
-**Behavioural consequence**: same-URL transitions (initial transition to a route whose path equals the bootstrap URL; `router.navigate(name, params, { reload: true })` to current state; `forwardTo` redirects that don't change the path) no longer fire navigate events. `state.context.navigation.navigationType` still reports `"reload"` / `"replace"` for downstream consumers.
+**Behavioural consequence**: same-URL transitions (initial transition to a route whose path equals the bootstrap URL; `router.navigate(name, params, undefined, { reload: true })` to current state; `forwardTo` redirects that don't change the path) no longer fire navigate events. `state.context.navigation.navigationType` still reports `"reload"` / `"replace"` for downstream consumers.
 
 ## Performance
 

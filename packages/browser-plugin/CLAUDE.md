@@ -65,7 +65,7 @@ Only the **last** deferred event is kept (intermediate states skipped).
 
 ```typescript
 router.replaceHistoryState(name, params); // URL only, no transition
-router.navigate(name, params, { replace: true }); // Full transition
+router.navigate(name, params, undefined, { replace: true }); // Full transition
 ```
 
 ### buildUrl vs buildPath

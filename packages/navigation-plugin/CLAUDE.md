@@ -53,7 +53,7 @@ The Navigation API serializes navigation via `event.intercept()` — only one na
 
 ```typescript
 router.replaceHistoryState(name, params); // URL only, no transition
-router.navigate(name, params, { replace: true }); // Full transition
+router.navigate(name, params, undefined, { replace: true }); // Full transition
 ```
 
 ### buildUrl vs buildPath
@@ -144,7 +144,7 @@ When `navigateToNotFound` is called, the plugin uses `browser.updateCurrentEntry
 
 ### Same-URL guard in onTransitionSuccess (#580)
 
-When the target URL of a transition is canonically equal to the browser's current URL — for example the initial transition into a route whose path already matches the bootstrap URL, or `router.navigate(name, params, { reload: true })` to the current state — the plugin writes router state via `browser.updateCurrentEntry({ state })` instead of `browser.navigate(url, { history: "replace" })`. Both leave a single history entry with the new state, but `updateCurrentEntry` does not fire a navigate event.
+When the target URL of a transition is canonically equal to the browser's current URL — for example the initial transition into a route whose path already matches the bootstrap URL, or `router.navigate(name, params, undefined, { reload: true })` to the current state — the plugin writes router state via `browser.updateCurrentEntry({ state })` instead of `browser.navigate(url, { history: "replace" })`. Both leave a single history entry with the new state, but `updateCurrentEntry` does not fire a navigate event.
 
 This avoids two problems:
 
@@ -161,7 +161,7 @@ Comparison is via `isSameHref(finalUrl, browser.currentEntry?.url)` (`href-utils
 
 ### Explicit `replace: false` on first navigation → push
 
-`router.navigate(..., { replace: false })` before any successful navigation creates a **push** entry (not replace). The `??` operator keeps the explicit `false`. Omit `replace` (or set `true`) if you want replace-on-first behavior.
+`router.navigate(name, params, undefined, { replace: false })` before any successful navigation creates a **push** entry (not replace). The `??` operator keeps the explicit `false`. Omit `replace` (or set `true`) if you want replace-on-first behavior.
 
 ### replaceHistoryState hash semantics
 

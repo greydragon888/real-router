@@ -90,7 +90,7 @@
 
 | #   | Invariant                                                       | Description                                                                                                                                                                 |
 | --- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Initial value matches router.isActiveRoute                      | At creation time, `getSnapshot()` equals `router.isActiveRoute(routeName, params, strict, ignoreQueryParams)` for any combination of options.                               |
+| 1   | Initial value matches router.isActiveRoute                      | At creation time, `getSnapshot()` equals `router.isActiveRoute(routeName, params, search, strict, ignoreQueryParams)` for any combination of options.                               |
 | 2   | Snapshot consistent with router.isActiveRoute after navigations | After any sequence of navigations, `getSnapshot()` always equals the result of `router.isActiveRoute` with the same arguments.                                              |
 | 3   | Listener called only when boolean value changes                 | The listener is invoked only when the active state transitions from `true` to `false` or vice versa. Navigations that don't change the boolean do not trigger the listener. |
 | 4   | strict=false: parent route active when on descendant            | With `strict: false` (the default), a parent route is considered active when the current route is any of its descendants.                                                   |

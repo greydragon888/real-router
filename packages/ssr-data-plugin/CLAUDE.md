@@ -81,12 +81,12 @@ ssrDataPluginFactory({
   "admin.dashboard": { ssr: false },                       // false → "client-only", no loader
   "users.profile": {
     ssr: "data-only",
-    loader: (router, getDep) => async (params) => fetchUser(params.id),
+    loader: (router, getDep) => async ({ params }) => fetchUser(params.id),
   },
   "docs.detail": {
     // Function-form resolver, called once per start() before the loader.
-    ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
-    loader: (router, getDep) => async (params) => fetchDoc(params.id),
+    ssr: (state) => state.search.format === "pdf" ? "client-only" : "full",
+    loader: (router, getDep) => async ({ params }) => fetchDoc(params.id),
   },
 });
 ```
@@ -123,7 +123,7 @@ if (mode === "full") {
 
 **`"client-only"` skips the loader unconditionally** — both on the server and on the client. The application is responsible for client-side fetching (React Query, `useEffect`, Suspense, etc.) when it detects the mode marker. This is the simplest semantic: no environment detection in the plugin, fully symmetric.
 
-The function-form resolver receives `state` **before** the mode is written to context, so resolvers should not read `state.context.ssrDataMode` (it will be `undefined`). Branch on `state.params`, `state.path`, or `state.name` instead.
+The function-form resolver receives `state` **before** the mode is written to context, so resolvers should not read `state.context.ssrDataMode` (it will be `undefined`). Branch on `state.params`, `state.search`, `state.path`, or `state.name` instead.
 
 ## Module Structure
 
@@ -176,7 +176,7 @@ bundle (resolved before the shell renders) and a record of deferred promises
 ```ts
 import { defer } from "@real-router/ssr-data-plugin";
 
-"products.detail": () => (params) => {
+"products.detail": () => ({ params }) => {
   const product = getProduct(params.id);
   if (!product) throw new LoaderNotFound(`product:${params.id}`);
 
@@ -253,9 +253,10 @@ to `injectDeferredScripts` for non-JSON deferred payloads. Pair with
 critical-data side.
 
 Composes with `invalidate(router, "data")`:
-`router.navigate({ reload: true })` after `invalidate(...)` re-runs the
-loader, overwrites both critical data and the deferred map. The new deferred
-promises replace the old ones in `state.context.ssrDataDeferred`.
+`router.navigate(state.name, state.params, state.search, { reload: true })`
+after `invalidate(...)` re-runs the loader, overwrites both critical data and
+the deferred map. The new deferred promises replace the old ones in
+`state.context.ssrDataDeferred`.
 
 ### `invalidate(router, "data")` — CSR revalidation
 
@@ -267,7 +268,7 @@ invalidate(router, "data");
 
 // Explicit await — pair with a same-route reload
 invalidate(router, "data");
-await router.navigate(state.name, state.params, { reload: true });
+await router.navigate(state.name, state.params, state.search, { reload: true });
 ```
 
 Mechanics: `invalidate()` flips a per-router `Set<namespace>` flag (`WeakMap` keyed by router). The plugin's `subscribeLeave` listener peeks the flag in the awaited LEAVE_APPROVE phase of every navigation. When the destination route has a loader-bearing entry, it runs the loader for `nextRoute.name`, writes fresh data to `nextRoute.context.data` and a mode marker to `nextRoute.context.ssrDataMode`, then clears the flag. Activation guards run, `completeTransition` fires `TRANSITION_SUCCESS`, and subscribers see the new payload.
@@ -286,7 +287,7 @@ Idempotent — multiple `invalidate()` calls before the next refresh collapse to
 The leave handler passes the navigation's `AbortController.signal` to the loader as the second argument:
 
 ```ts
-"users.profile": () => async (params, ctx) => {
+"users.profile": () => async ({ params }, ctx) => {
   // Real-world: thread signal into fetch so the network layer cancels
   // when the navigation is superseded by a newer click.
   const response = await fetch(`/api/user/${params.id}`, {
@@ -323,7 +324,7 @@ return async (_params, ctx) => {
 };
 ```
 
-Non-breaking change via TypeScript contravariance — existing `(params) => …` loaders without the second arg compile and run unchanged.
+Non-breaking change via TypeScript contravariance — existing `({ params }) => …` loaders without the second arg compile and run unchanged.
 
 ### Hydration scratchpad: presence wins (`{ data: undefined }` skips the loader)
 
@@ -352,12 +353,12 @@ import { rscServerPluginFactory } from "@real-router/rsc-server-plugin";
 
 router.usePlugin(
   ssrDataPluginFactory({
-    "users.profile": () => async (params) => ({
+    "users.profile": () => async ({ params }) => ({
       preferences: await prefs.get(params.id),
     }),
   }),
   rscServerPluginFactory({
-    "users.profile": () => async (params) => {
+    "users.profile": () => async ({ params }) => {
       const user = await db.users.findById(params.id);
       return <UserProfile user={user} />;
     },

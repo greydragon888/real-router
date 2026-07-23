@@ -165,7 +165,7 @@ A fourth `@internal` key — `HTTP_STATUS_KEY` (provider/inject pair behind `<Ht
 Link uses `.catch(() => {})` to suppress unhandled rejection warnings:
 
 ```typescript
-router.navigate(routeName, routeParams, routeOptions).catch(() => {});
+router.navigate(routeName, routeParams, routeSearch, routeOptions).catch(() => {});
 ```
 
 ## SSR-feature surface — `@real-router/vue/ssr`
@@ -347,13 +347,14 @@ const id = route.value.params.id;
 
 ### Typed route params via generic
 
-`useRoute<P>()` accepts an optional generic so `route.value.params` is typed without `as` casts. `RouteContext<P>` is likewise generic. Runtime is unchanged — the cast happens once inside the composable.
+`useRoute<P>()` accepts an optional generic so `route.value.params` is typed without `as` casts. `RouteContext<P>` is likewise generic. Runtime is unchanged — the cast happens once inside the composable. The generic narrows only the path channel (`state.params`) — `useRoute` takes a single type parameter, so `route.value.search` (the query channel, RFC-4 M2 / #1548) stays typed as core's `SearchParams` regardless of `P`.
 
 ```typescript
-type SearchParams = { q: string; sort: string } & Params;
+const { route } = useRoute<{ id: string }>();
+const id = route.value.params.id; // typed as string
 
-const { route } = useRoute<SearchParams>();
-const q = route.value.params.q; // typed as string
+// Query-string fields (e.g. ?q=&sort=) live on the untyped search channel:
+const q = route.value.search.q; // SearchParamValue | undefined
 ```
 
 ### useRouteNode Semantics
@@ -535,6 +536,41 @@ Works with both `keepAlive` and non-`keepAlive` modes. Without `fallback`, no `<
 <Link routeName="users" /> // Active even if ?page=2 differs
 ```
 
+### `routeSearch` Prop (#1548)
+
+`routeSearch?: SearchParams` — the query (search) channel of the path/query split
+(RFC-4 M2), parallel to `routeParams`. Feeds the URL query string in `href`
+(passed to `buildHref` at position 3) and — paired with
+`:ignoreQueryParams="false"` — the active-state check.
+
+```typescript
+// Pagination link with an explicit query channel; active only on ?page=2
+<Link routeName="users" :routeSearch="{ page: '2' }" :ignoreQueryParams="false" />
+```
+
+A route's query still works when passed inside `routeParams` (the pre-split path);
+`routeSearch` is the explicit, type-clean channel.
+
+### `to` Descriptor Prop (#1548)
+
+`<Link>` accepts two forms — the channel props above (`routeName` + `routeParams` +
+`routeSearch`) OR a single `to` descriptor (`NavigationTarget` — `{ name, params?,
+search? }`). Vue's prop system can't express a discriminated union the way
+react/preact/solid's JSX types do, so the exclusion is enforced at **runtime
+only**: the shared `resolveLinkTarget` helper prefers `to` when present and
+`console.warn`s if channel props leak in alongside it (`to` still wins).
+
+```typescript
+// Channel form
+<Link routeName="users.view" :routeParams="{ id: '7' }" :routeSearch="{ tab: 'posts' }" />
+
+// Descriptor form — equivalent, one object
+<Link :to="{ name: 'users.view', params: { id: '7' }, search: { tab: 'posts' } }" />
+```
+
+`routeOptions` / `hash` are separate props under BOTH forms (hash is not part of
+`NavigationTarget` — #532).
+
 ### Object Params and Memoization
 
 `<Link>` stabilizes `routeParams` by **content** (`shallowEqual` — `Object.is`
@@ -563,7 +599,7 @@ const params = computed(() => ({ filters: [1, 2] }));
 
 - `undefined` (default) — preserves the current `state.context.url.hash` on click.
 - `""` — clears the hash.
-- `"value"` — sets the hash; click routes through `navigateWithHash`, which auto-adds `force: true, hashChange: true` when the requested hash differs from `state.context.url.hash` on the same route+params (bypasses core's `SAME_STATES`).
+- `"value"` — sets the hash; click routes through `navigateWithHash`, which auto-adds `force: true, hashChange: true` when the requested hash differs from `state.context.url.hash` on the same route with unchanged `params`/`search` (bypasses core's `SAME_STATES`; a `routeSearch` change is a real state change and does not auto-bypass — mirrors the `params` case).
 
 ```vue
 <Link routeName="settings" hash="profile">Profile</Link>

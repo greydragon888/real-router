@@ -249,14 +249,14 @@ const id = route.params.id;
 
 ### Typed route params via generic
 
-`useRoute<P>()` accepts an optional generic for typed `route.params`. The cast happens inside the hook once, not at every call site. `RouteContext<P>` is likewise generic.
+`useRoute<P>()` accepts an optional generic to type `route.params` — the path channel (RFC-4 M2 / #1548) — without `as` casts at the call site. The cast happens inside the hook once, not at every call site. The generic types `route.params` only; `route.search` (the query channel) has no dedicated generic slot on this hook today and stays typed as the base `SearchParams`. `RouteContext<P>` is likewise generic.
 
 ```typescript
-type SearchParams = { q: string; sort: string } & Params;
+type RouteParams = { id: string } & Params;
 
-const { route } = useRoute<SearchParams>();
+const { route } = useRoute<RouteParams>();
 
-route.params.q; // typed as string
+route.params.id; // typed as string
 ```
 
 ### useRouteNode Semantics
@@ -288,6 +288,11 @@ const params = useMemo(() => ({ filters: [1, 2] }), [...]);
 ```
 
 Params stabilization is handled by `createActiveRouteSource` in `@real-router/sources` — it hashes params via `canonicalJson` and returns the same cached source for canonical-equal shapes. No `useStableValue` wrapper needed.
+
+The comparator covers all explicit `LinkProps` (`routeName`, `className`, `activeClassName`,
+`activeStrict`, `ignoreQueryParams`, `hash`, `onClick`, `target`, `style`, `children`) plus
+`routeParams`/`routeSearch`/`routeOptions` via `shallowEqual`. Anchor-spread props (`data-*`, `aria-*`, `id`,
+etc.) are NOT compared — they don't affect Link's hooks.
 
 ### `<Link hash>` Prop (#532)
 
@@ -339,6 +344,44 @@ const LazyDashboard = lazy(() => import("./Dashboard"));
 // Default: query params don't affect active state
 <Link routeName="users" /> // Active even if ?page=2 differs
 ```
+
+### `routeSearch` Prop (#1548)
+
+`routeSearch?: SearchParams` — the query (search) channel of the path/query split
+(RFC-4 M2), parallel to `routeParams`. Feeds the URL query string on click and in
+`href` (passed to `buildUrl` / `buildPath` at position 3), and — paired with
+`ignoreQueryParams={false}` — the active-state check.
+
+```tsx
+// Pagination link with an explicit query channel; active only on ?page=2
+<Link routeName="users" routeSearch={{ page: "2" }} ignoreQueryParams={false} />
+```
+
+A route's query still works when passed inside `routeParams` (the pre-split path);
+`routeSearch` is the explicit, type-clean channel.
+
+### `to` Descriptor Prop (#1548)
+
+`<Link>` accepts two **mutually-exclusive** forms — the channel props above
+(`routeName` + `routeParams` + `routeSearch`) OR a single `to={NavigationTarget}`
+descriptor (`{ name, params?, search? }`). `LinkProps` is a discriminated union
+(`to?: never` in the channel branch, `routeName?: never` in the descriptor
+branch), so mixing them is a **compile error**. At runtime the shared
+`resolveLinkTarget` helper is the backstop — `to` wins and a `console.warn` fires
+if channel props leak in via a JS consumer or a spread.
+
+```tsx
+// Channel form
+<Link routeName="users.view" routeParams={{ id: "7" }} routeSearch={{ tab: "posts" }} />
+
+// Descriptor form — equivalent, one object
+<Link to={{ name: "users.view", params: { id: "7" }, search: { tab: "posts" } }} />
+```
+
+`routeOptions` / `hash` are separate props under BOTH forms (hash is not part of
+`NavigationTarget` — #532). react/preact/solid enforce the exclusion in the type;
+svelte/vue/angular enforce it at runtime only (their prop systems preclude a
+strict never-union).
 
 ### `RouteView.Match` Identity Check — Wrapping Silently Hides It
 

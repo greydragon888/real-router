@@ -25,16 +25,17 @@ Validation runs at factory call time (param names) and again at navigation time 
 ## Navigation Flow
 
 ```
-navigate(name, params)  →  core buildNavigateState (synchronous):
+navigate(name, params, search)  →  core buildNavigateState (synchronous):
   → forwardState interceptor
-      → next(routeName, routeParams)       ← get base state
-      → #forwardStateParams(result.params) ← inject persistent; RECORD removals (#pendingRemovals)
+      → next(routeName, routeParams, routeSearch) ← get base state; routeSearch forwarded untouched
+      → #forwardStateParams(result.params)  ← inject persistent into the path bag; RECORD removals (#pendingRemovals)
   → buildPath interceptor
-      → #buildPathParams(forwardedParams)  ← inject persistent; DROP #pendingRemovals from URL; clear
-      → next(route, mergedParams)
+      → #buildPathParams(navParams or navSearch) ← inject persistent into whichever channel the caller supplied; DROP #pendingRemovals from URL; clear
+      → next(route, mergedParams[, mergedSearch])
 
 onTransitionSuccess(toState)   ← only fires if the transition actually committed
-  → reads toState.params for each tracked key
+  → reads toState.search for each tracked key (canonical); falls back to toState.params
+    for a makeState-built state (start()/navigateToState — not yet slot-shifted)
   → updates #persistentParams snapshot; COMMITS removals (deletes from snapshot + #paramNamesSet)
   → claim.write(toState, #persistentParams)   ← publishes to state.context.persistentParams
 ```
@@ -57,7 +58,7 @@ The plugin publishes a read-only snapshot of current persistent params to `state
 - **Release:** `claim.release()` called in `teardown`, before the `setRootPath` restore.
 - **Type:** Module augmentation on `@real-router/types` adds `persistentParams?: Params` to `StateContext`.
 
-Components can use `state.context.persistentParams` to distinguish persistent params from route-specific params in `state.params`, which contains both merged together.
+Components can use `state.context.persistentParams` to distinguish persistent (query) params from route-specific (path) params in `state.params`. Post-RFC-4-M2 (#1548) the two normally live in different channels — persistent params in `state.search`, route path params in `state.params` — so `state.context.persistentParams` gives a stable, channel-independent read regardless of which bag a value currently rides in (see the `onTransitionSuccess` gotcha below for the one case — a `makeState`-built state — where a persisted value still rides in `state.params`).
 
 ## Gotchas
 
@@ -72,7 +73,7 @@ router.navigate("page", { lang: "en" });       // lang NOT re-added — Set no l
 
 Once removed, the param is gone for the lifetime of the plugin instance.
 
-**The removal is committed in `onTransitionSuccess`, not in the interceptor (#803).** If the removal navigation is rejected by a guard or superseded by a concurrent navigate, it never reaches `onTransitionSuccess`, so the param stays persisted — the drop is not permanent until the transition actually commits. Within the current transition the param is still absent from both `state.params` and `state.path` (the `buildPath` phase honors the pending removal); it is only re-persisted for **later** navigations when the removal did not commit.
+**The removal is committed in `onTransitionSuccess`, not in the interceptor (#803).** If the removal navigation is rejected by a guard or superseded by a concurrent navigate, it never reaches `onTransitionSuccess`, so the param stays persisted — the drop is not permanent until the transition actually commits. Within the current transition the param is still absent from the built state (`state.search` normally, `state.params` for a `makeState`-built state) and from `state.path` (the `buildPath` phase honors the pending removal); it is only re-persisted for **later** navigations when the removal did not commit.
 
 ### `setRootPath` throws during `router.dispose()`
 
@@ -98,7 +99,7 @@ The factory creates one `paramNamesSet` from the config. Each `PluginFactory` in
 
 ### `onTransitionSuccess` — secondary sync for injection, PRIMARY for removal
 
-The primary param **injection** happens in the interceptors. `onTransitionSuccess` updates `#persistentParams` to reflect what actually committed. For **removal**, though, it is the primary site (#803): a tracked key that is missing or `undefined` in the committed `toState.params` is deleted from **both** `#persistentParams` and `#paramNamesSet` here — covering the explicit `navigate({ key: undefined })` removal (mergeParams dropped it for this transition) and the defensive `navigateToState` bypass (which skips the `forwardState` injection) with the same branch. Only a key that was really persisted (present with a defined value) is removed; a still-empty tracked key stays tracked so it can persist later.
+The primary param **injection** happens in the interceptors. `onTransitionSuccess` updates `#persistentParams` to reflect what actually committed. For **removal**, though, it is the primary site (#803): a tracked key that is missing or `undefined` in the committed state (checked in `toState.search` first — the canonical channel post-M2 / #1548 — falling back to `toState.params` for a `makeState`-built state) is deleted from **both** `#persistentParams` and `#paramNamesSet` here — covering the explicit `navigate({ key: undefined })` removal (mergeParams dropped it for this transition) and the defensive `navigateToState` bypass (which skips the `forwardState` injection) with the same branch. Only a key that was really persisted (present with a defined value) is removed; a still-empty tracked key stays tracked so it can persist later.
 
 After updating the snapshot, `onTransitionSuccess` publishes it to `state.context.persistentParams` via `claim.write(toState, #persistentParams)`. This happens before subscriber callbacks fire, so `router.subscribe()` listeners always see the current persistent params snapshot on `state.context.persistentParams`.
 

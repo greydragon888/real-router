@@ -66,7 +66,7 @@ router.usePlugin(
 | --------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `buildUrl(name, params?, search?, options?: { hash? })`   | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. `options.hash` (decoded) is encoded and appended. |
 | `matchUrl(url)`                                           | `State \| undefined` | Parse URL to router state                                                                                                                           |
-| `replaceHistoryState(name, params?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                 |
+| `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`      | Update browser URL without triggering navigation. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Tri-state `hash`: `undefined` preserves, `""` clears, value sets. |
 
 ```typescript
 router.buildUrl("users", { id: "123" });
@@ -249,7 +249,7 @@ router.buildUrl("users", { id: 1 }); // "/app/users/1"   — plugin, with base
 
 ```typescript
 router.replaceHistoryState(name, params); // URL only, no transition
-router.navigate(name, params, { replace: true }); // Full transition + URL update
+router.navigate(name, params, undefined, { replace: true }); // Full transition + URL update
 ```
 
 ## Feature Detection

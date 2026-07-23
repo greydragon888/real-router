@@ -10,12 +10,12 @@
 ```typescript
 // Without plugin — tampered URL params reach your app unvalidated:
 // User visits: /products?page=-1&limit=99999
-router.getState().params; // { page: -1, limit: 99999 } — crashes pagination
+router.getState().search; // { page: -1, limit: 99999 } — crashes pagination
 
 // With plugin — invalid params stripped, route defaults restored automatically:
 router.usePlugin(searchSchemaPlugin());
 // User visits: /products?page=-1&limit=99999
-router.getState().params; // { page: 1, limit: 20 } — safe defaults from defaultParams
+router.getState().search; // { page: 1, limit: 20 } — safe defaults from defaultParams
 ```
 
 ## Installation

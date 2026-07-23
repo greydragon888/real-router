@@ -143,7 +143,8 @@ Navigation link with automatic active state detection. Re-renders only when its 
 ```tsx
 <Link
   routeName="users.profile"
-  routeParams={{ id: "123" }}
+  routeParams={{ id: "123" }} // path channel (RFC-4 M2)
+  routeSearch={{ tab: "posts" }} // query channel (RFC-4 M2)
   activeClassName="active" // default: "active"
   activeStrict={false} // default: false (ancestor match)
   ignoreQueryParams={true} // default: true

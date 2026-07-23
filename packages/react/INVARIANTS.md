@@ -46,7 +46,7 @@
 | 3   | Both throw → `undefined` + console.error           | Logs `"[real-router] Route \"<name>\" is not defined. The element will render without an href attribute."` and returns `undefined`.                                                                          |
 | 4   | Hash encoding (RFC 3986 + defensive `%23`)         | On the `buildPath` fallback path, the appended fragment is `encodeURI`'d with `#` defensively replaced by `%23`. No literal `#` remains in the rendered fragment.                                          |
 | 5   | Leading `#` is stripped before encoding/forwarding | `<Link hash="#section">` and `<Link hash="section">` produce identical hrefs — the leading `#` is a convenience for callers and is not part of the fragment.                                                |
-| 6   | `buildUrl` receives `{ hash }` only when defined   | No-hash call → `buildUrl(name, params, undefined)`; with-hash call → `buildUrl(name, params, { hash: <stripped> })`. The helper must NOT pass `{ hash: undefined }` — plugins distinguish absent from empty. |
+| 6   | `buildUrl` receives `{ hash }` only when defined   | No-hash call → `buildUrl(name, params, search, undefined)`; with-hash call → `buildUrl(name, params, search, { hash: <stripped> })`. Query channel at position 3 (RFC-4 M2 / #1548), hash options at position 4. The helper must NOT pass `{ hash: undefined }` — plugins distinguish absent from empty. |
 | 7   | No literal `#` in fragment                         | Generalizes the implicit assertion in #4: across all input shapes (incl. emoji / RTL / ZWJ-composed text) the fragment portion of the rendered href never contains a literal `#` — only `%23`.            |
 
 ## Navigate Helper (navigateWithHash, #532)

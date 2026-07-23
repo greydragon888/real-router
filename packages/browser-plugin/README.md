@@ -76,11 +76,11 @@ router.buildPath("users", { id: 1 }); // "/users/1"       — core, no base
 router.buildUrl("users", { id: 1 }); // "/app/users/1"   — plugin, with base
 ```
 
-### `replaceHistoryState` vs `navigate({ replace: true })`
+### `replaceHistoryState` vs `navigate(..., { replace: true })`
 
 ```typescript
 router.replaceHistoryState(name, params); // URL only, no transition
-router.navigate(name, params, { replace: true }); // Full transition + URL update
+router.navigate(name, params, undefined, { replace: true }); // Full transition + URL update
 ```
 
 ## URL Fragment ("hash") Support

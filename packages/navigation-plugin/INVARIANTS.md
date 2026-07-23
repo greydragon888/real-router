@@ -70,8 +70,8 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Postcondition (by `opts.hash` value):**
 - `opts.hash === undefined` (or omitted) → **preserve** the current fragment, regardless of whether the target path equals the source path. `router.navigate("home")` from `/users#section` lands on `/home#section`.
-- `opts.hash === ""` → **clear** the fragment. `router.navigate("home", {}, { hash: "" })` lands on `/home`.
-- `opts.hash === "value"` (non-empty string) → **set** the fragment. `router.navigate("home", {}, { hash: "footer" })` lands on `/home#footer`. Decoded form (no leading `#`); the plugin encodes per RFC 3986 (`encodeHashFragment`).
+- `opts.hash === ""` → **clear** the fragment. `router.navigate("home", {}, undefined, { hash: "" })` lands on `/home`.
+- `opts.hash === "value"` (non-empty string) → **set** the fragment. `router.navigate("home", {}, undefined, { hash: "footer" })` lands on `/home#footer`. Decoded form (no leading `#`); the plugin encodes per RFC 3986 (`encodeHashFragment`).
 
 `state.context.url.hashChanged` is `true` only when the resolved hash differs from the previous transition's published hash (`fromState.context.url.hash`), or when the browser fires `event.hashChange === true` for a hash-only navigation. Subscribers should branch on `hashChanged`, not on the overloaded `force` flag.
 
@@ -380,7 +380,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Precondition:**
 - Current state: `{ name: "home", path: "/" }`
-- Call `router.navigate("users.list", {}, { reload: true })`
+- Call `router.navigate("users.list", {}, undefined, { reload: true })`
 
 **Postcondition:**
 - If `reload: true` and `toState.path === fromState.path`: `navigationType = "reload"`

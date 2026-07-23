@@ -105,7 +105,7 @@ unsubscribe();
 
 ## State Context: `state.context.persistentParams`
 
-The plugin publishes a snapshot of the current persistent params to `state.context.persistentParams` after each successful transition. This lets components distinguish persistent params from route-specific params.
+The plugin publishes a snapshot of the current persistent params to `state.context.persistentParams` after each successful transition. This lets components read persistent (query) params independent of which channel they currently ride in.
 
 ```typescript
 import { createRouter } from "@real-router/core";
@@ -115,13 +115,19 @@ const router = createRouter(routes);
 router.usePlugin(persistentParamsPluginFactory({ lang: "en", theme: "light" }));
 
 router.subscribe(({ route, previousRoute }) => {
-  const { params, context } = route;
+  const { params, search, context } = route;
 
-  // params contains BOTH route-specific and persistent params merged together
-  console.log(params);              // { id: "42", lang: "en", theme: "light" }
+  // params contains ONLY route-specific (path) params — RFC-4 M2 (#1548)
+  console.log(params);                    // { id: "42" }
 
-  // context.persistentParams contains ONLY the persistent params
-  console.log(context.persistentParams); // { lang: "en", theme: "light" }
+  // search contains ONLY query params — persistent params normally land here
+  // (exception: a state built via router.start()/navigateToState still carries
+  // them in `params`, with `search` left `{}`, until the next navigate())
+  console.log(search);                    // { lang: "en", theme: "light" }
+
+  // context.persistentParams is a channel-independent view of ONLY the
+  // persistent params, regardless of which channel currently carries them
+  console.log(context.persistentParams);  // { lang: "en", theme: "light" }
 });
 ```
 

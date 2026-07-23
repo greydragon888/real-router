@@ -90,7 +90,7 @@ back() / forward() / go(delta)
         ├── #navigatingFromHistory = true
         ├── #index = targetIndex  (optimistic sync update)
         │
-        └── router.navigate(entry.name, entry.params, { replace: true })
+        └── router.navigate(entry.name, entry.params, undefined, { replace: true })
             ├── SUCCESS → onTransitionSuccess consumes #navigatingFromHistory on commit
             └── .catch()  → if (generation === #goGeneration)
                                #index = previousIndex; #navigatingFromHistory = false
@@ -125,7 +125,7 @@ router.back()
     #index = targetIndex           (optimistic sync update)
     generation = ++#goGeneration
     │
-    router.navigate(entry.name, entry.params, { replace: true })
+    router.navigate(entry.name, entry.params, undefined, { replace: true })
     │
     ├── SUCCESS → onTransitionSuccess → #navigatingFromHistory = false (consume on commit)
     └── BLOCKED → .catch() → if (generation === #goGeneration)

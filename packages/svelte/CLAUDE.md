@@ -173,7 +173,7 @@ dist/
 Link uses `.catch(() => {})` to suppress unhandled rejection warnings:
 
 ```typescript
-router.navigate(routeName, routeParams, routeOptions).catch(() => {});
+router.navigate(routeName, routeParams, routeSearch, routeOptions).catch(() => {});
 ```
 
 ## SSR-feature surface — `@real-router/svelte/ssr`
@@ -408,13 +408,14 @@ is a legitimate business state, not lifecycle misuse.
 
 ### Typed route params via generic
 
-`useRoute<P>()` accepts an optional generic so `route.current.params` is typed without `as` casts. `RouteContext<P>` is likewise generic. Runtime is unchanged — the cast happens once inside the composable.
+`useRoute<P>()` accepts an optional generic so `route.current.params` is typed without `as` casts. `RouteContext<P>` is likewise generic. Runtime is unchanged — the cast happens once inside the composable. The generic covers the **params** (path) channel only — `route.current.search` (query channel, RFC-4 M2 / #1548) is always present but stays the ambient `SearchParams` shape, read directly rather than through the generic.
 
 ```typescript
-type SearchParams = { q: string; sort: string } & Params;
+type RouteParams = { id: string } & Params;
 
-const { route } = useRoute<SearchParams>();
-const q = route.current.params.q; // typed as string
+const { route } = useRoute<RouteParams>();
+const id = route.current.params.id; // typed as string — path channel
+const q = route.current.search.q; // SearchParamValue | undefined — query channel
 ```
 
 ### useRouteNode Semantics

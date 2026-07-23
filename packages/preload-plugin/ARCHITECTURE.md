@@ -11,7 +11,7 @@
 ```
 preload-plugin/
 ├── src/
-│   ├── types.ts      — PreloadPluginOptions (2 fields), PreloadFn, PreloadFnFactory
+│   ├── types.ts      — PreloadPluginOptions (2 fields), PreloadFn, PreloadTarget, PreloadFnFactory
 │   ├── constants.ts  — defaultOptions, 3 timing constants, LISTENER_OPTIONS
 │   ├── network.ts    — isSlowConnection() (navigator.connection duck-type)
 │   ├── plugin.ts     — PreloadPlugin class (event handlers, timer management, resolvePreload)
@@ -56,7 +56,7 @@ DOM event (mouseover / touchstart)
     │
     ├── empty touches guard (touchstart/touchmove only) → skip if event.touches.length === 0
     │
-    └── setTimeout(delay) → #runPreload: try{ preload(state.params) } catch → return
+    └── setTimeout(delay) → #runPreload: try{ preload({ params: state.params, search: state.search }) } catch → return
                             → Promise.resolve(result).catch(() => {})  (swallows sync-throw / non-Promise / rejection)
 ```
 
