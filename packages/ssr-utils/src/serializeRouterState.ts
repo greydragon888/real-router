@@ -38,9 +38,10 @@ export interface SerializeRouterStateOptions {
  *
  * Strips `state.transition` (per-navigation `TransitionMeta` — meaningless after
  * hydration; the client's hydration commit produces its own `transition`).
- * Keeps `name`, `params`, `path`, and `context` (plugin context namespaces are
- * preserved as-is — server's `state.context.data` from `ssr-data-plugin` and
- * any other plugin claims travel to the client untouched).
+ * Keeps `name`, `params`, `search`, `path`, and `context` (plugin context
+ * namespaces are preserved as-is — server's `state.context.data` from
+ * `ssr-data-plugin` and any other plugin claims travel to the client
+ * untouched).
  *
  * Pass `options.excludeContext` to strip specific namespaces from the output —
  * required for plugins that publish non-JSON-serializable values (e.g., RSC
@@ -105,6 +106,7 @@ export function serializeRouterState(
   const payload = {
     name: state.name,
     params: state.params,
+    search: state.search,
     path: state.path,
     context,
   };

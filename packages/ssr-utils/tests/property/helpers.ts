@@ -31,6 +31,13 @@ const arbParams = fc.dictionary(
   { maxKeys: 5 },
 );
 
+/** Arbitrary search (query channel) dictionary — same value space as params. */
+const arbSearch = fc.dictionary(
+  fc.stringMatching(/^[a-zA-Z_]\w{0,10}$/),
+  arbParamValue,
+  { maxKeys: 5 },
+);
+
 /**
  * Arbitrary State object. `transition` is a minimal valid `TransitionMeta`
  * shape — its content is never asserted on by the consuming property tests
@@ -42,12 +49,13 @@ export const arbState: fc.Arbitrary<State> = fc
   .record({
     name: arbRouteName,
     params: arbParams,
+    search: arbSearch,
     path: fc.string({ minLength: 1, maxLength: 50 }).map((s) => `/${s}`),
   })
   .map((r) => ({
     name: r.name,
     params: r.params,
-    search: {},
+    search: r.search,
     path: r.path,
     transition: {
       phase: "activating" as const,
