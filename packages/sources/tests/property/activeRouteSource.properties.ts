@@ -27,6 +27,7 @@ describe("boolean tracking", () => {
         router,
         routeName,
         params,
+        undefined,
         options,
       );
 
@@ -60,6 +61,7 @@ describe("boolean tracking", () => {
         router,
         routeName,
         params,
+        undefined,
         options,
       );
 
@@ -98,6 +100,7 @@ describe("boolean tracking", () => {
         router,
         routeName,
         params,
+        undefined,
         options,
       );
       const listener = vi.fn();
@@ -141,9 +144,13 @@ describe("boolean tracking", () => {
 
       await router.navigate(childRoute, params);
 
-      const source = createActiveRouteSource(router, "users", undefined, {
-        strict: false,
-      });
+      const source = createActiveRouteSource(
+        router,
+        "users",
+        undefined,
+        undefined,
+        { strict: false },
+      );
 
       expect(source.getSnapshot()).toStrictEqual(true);
 
@@ -162,9 +169,13 @@ describe("boolean tracking", () => {
 
       await router.navigate(childRoute, params);
 
-      const source = createActiveRouteSource(router, "users", undefined, {
-        strict: true,
-      });
+      const source = createActiveRouteSource(
+        router,
+        "users",
+        undefined,
+        undefined,
+        { strict: true },
+      );
 
       expect(source.getSnapshot()).toStrictEqual(false);
 
@@ -183,14 +194,26 @@ describe("boolean tracking", () => {
 
       await executeNavigations(router, navigations).catch(() => undefined);
 
-      const sourceStrict = createActiveRouteSource(router, routeName, params, {
-        strict: true,
-        ignoreQueryParams,
-      });
-      const sourceLoose = createActiveRouteSource(router, routeName, params, {
-        strict: false,
-        ignoreQueryParams,
-      });
+      const sourceStrict = createActiveRouteSource(
+        router,
+        routeName,
+        params,
+        undefined,
+        {
+          strict: true,
+          ignoreQueryParams,
+        },
+      );
+      const sourceLoose = createActiveRouteSource(
+        router,
+        routeName,
+        params,
+        undefined,
+        {
+          strict: false,
+          ignoreQueryParams,
+        },
+      );
 
       // Filter out cases where strict-mode is inactive — `fc.pre` discards
       // them so we don't silent-pass when the implication's antecedent
@@ -221,6 +244,7 @@ describe("areRoutesRelated filter", () => {
         router,
         routeName,
         params,
+        undefined,
         options,
       );
 
@@ -284,6 +308,7 @@ describe("areRoutesRelated filter", () => {
         router,
         "admin.dashboard",
         undefined,
+        undefined,
         options,
       );
       const listener = vi.fn();
@@ -339,8 +364,20 @@ describe("cache identity (canonicalJson-keyed)", () => {
     "params equivalent under canonicalJson hit the same cache entry",
     async (routeName, { a, b }, options) => {
       const router = await createStartedRouter();
-      const sourceA = createActiveRouteSource(router, routeName, a, options);
-      const sourceB = createActiveRouteSource(router, routeName, b, options);
+      const sourceA = createActiveRouteSource(
+        router,
+        routeName,
+        a,
+        undefined,
+        options,
+      );
+      const sourceB = createActiveRouteSource(
+        router,
+        routeName,
+        b,
+        undefined,
+        options,
+      );
 
       expect(sourceA).toBe(sourceB);
 
@@ -358,12 +395,14 @@ describe("cache identity (canonicalJson-keyed)", () => {
         routerA,
         routeName,
         paramsForRoute(routeName),
+        undefined,
         options,
       );
       const sourceB = createActiveRouteSource(
         routerB,
         routeName,
         paramsForRoute(routeName),
+        undefined,
         options,
       );
 
@@ -395,6 +434,7 @@ describe("hash-aware monotonicity (#532)", () => {
         router,
         routeName,
         paramsForRoute(routeName),
+        undefined,
         { hash },
       );
 
@@ -420,12 +460,14 @@ describe("hash-aware monotonicity (#532)", () => {
         router,
         routeName,
         paramsForRoute(routeName),
+        undefined,
         baseOptions,
       );
       const withHash = createActiveRouteSource(
         router,
         routeName,
         paramsForRoute(routeName),
+        undefined,
         { ...baseOptions, hash: "anchor" },
       );
 
@@ -466,6 +508,7 @@ describe("destroy (cached shared source — no-op)", () => {
         router,
         routeName,
         params,
+        undefined,
         options,
       );
 
@@ -493,6 +536,7 @@ describe("destroy (cached shared source — no-op)", () => {
         router,
         routeName,
         params,
+        undefined,
         options,
       );
 
