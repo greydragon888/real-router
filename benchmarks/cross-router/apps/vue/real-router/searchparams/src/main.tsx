@@ -1,6 +1,6 @@
 // real-router (Vue) search-param-scaling variant — routes with N query params
-// (/sN?k1=v1&...&kN=vN). Query declared in the path pattern (`?k1&...`), merged into
-// `route.value.params`, parsed eagerly by the matcher. The leaf reads EVERY value.
+// (/sN?k1=v1&...&kN=vN). Query declared in the path pattern (`?k1&...`), lives in
+// `route.value.search`, parsed eagerly by the matcher. The leaf reads EVERY value.
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { Link, RouteView, RouterProvider, useRoute } from "@real-router/vue";
@@ -33,7 +33,7 @@ const SearchLeaf = defineComponent({
   setup() {
     const { route } = useRoute();
     return () => {
-      const { count, checksum } = readSearch(Object.entries(route.value.params));
+      const { count, checksum } = readSearch(Object.entries(route.value.search));
       return (
         <main data-testid="page-search" data-count={count}>
           {count} search · Σ{checksum}
@@ -52,7 +52,7 @@ const App = defineComponent({
             <Link
               key={n}
               routeName={`s${n}`}
-              routeParams={searchValues(n)}
+              routeSearch={searchValues(n)}
               data-testid={`link-search-${n}`}
             >
               {n}

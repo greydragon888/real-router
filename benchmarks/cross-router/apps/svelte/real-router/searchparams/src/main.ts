@@ -1,8 +1,8 @@
 // real-router search-param-scaling variant — routes with N *query* params
 // (/sN?k1=v1&...&kN=vN). real-router declares query params in the path pattern
-// (`?k1&k2&...` via searchDecl) and merges them into route params, parsed EAGERLY
-// by the matcher (search-params). The leaf reads EVERY value (readSearch → checksum)
-// so the number is honest, not a keys-only skim.
+// (`?k1&k2&...` via searchDecl); they live in route.search (query channel),
+// parsed EAGERLY by the matcher (search-params). The leaf reads EVERY value
+// (readSearch → checksum) so the number is honest, not a keys-only skim.
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { mount } from "svelte";

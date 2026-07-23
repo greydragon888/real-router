@@ -180,7 +180,6 @@ describe("core/limits (integration via public API)", () => {
   // 🟡 IMPORTANT: Warn/error threshold logging for dependencies
   describe("dependency thresholds", () => {
     it("should NOT log warning at warn threshold without validation plugin", async () => {
-      const { vi } = await import("vitest");
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const router = createRouter<Record<string, number>>([], {
@@ -199,7 +198,6 @@ describe("core/limits (integration via public API)", () => {
     });
 
     it("should NOT log error at error threshold without validation plugin", async () => {
-      const { vi } = await import("vitest");
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const router = createRouter<Record<string, number>>([], {
@@ -221,7 +219,6 @@ describe("core/limits (integration via public API)", () => {
   // 🟡 IMPORTANT: Warn/error threshold logging for lifecycle handlers
   describe("lifecycle handler thresholds", () => {
     it("should NOT log warning at warn threshold without validation plugin", async () => {
-      const { vi } = await import("vitest");
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const router = createRouter([], {
@@ -238,7 +235,6 @@ describe("core/limits (integration via public API)", () => {
     });
 
     it("should NOT log error at error threshold without validation plugin", async () => {
-      const { vi } = await import("vitest");
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const router = createRouter([], {

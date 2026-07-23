@@ -6,6 +6,7 @@ import {
   cloneRouter,
   getDependenciesApi,
   getRoutesApi,
+  getLifecycleApi,
 } from "@real-router/core/api";
 
 import {
@@ -120,7 +121,6 @@ describe("cloneRouter Properties", () => {
 
   it("cloned router preserves guards from source", async () => {
     const source = createFixtureRouter();
-    const { getLifecycleApi } = await import("@real-router/core/api");
     const lifecycle = getLifecycleApi(source);
 
     lifecycle.addActivateGuard("admin.settings", () => () => false);
