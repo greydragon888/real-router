@@ -306,7 +306,7 @@ describe("Browser-env Properties", () => {
     test.prop([arbFullState, arbUrlPath, fc.boolean()], {
       numRuns: NUM_RUNS.standard,
     })(
-      "only name, params, path are stored in history state",
+      "name, params, search, path are stored in history state",
       (state, url, replace) => {
         const browser = createSpyBrowser();
 
@@ -317,6 +317,7 @@ describe("Browser-env Properties", () => {
         expect(storedState).toStrictEqual({
           name: state.name,
           params: state.params,
+          search: state.search,
           path: state.path,
         });
       },

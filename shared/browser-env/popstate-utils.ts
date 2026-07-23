@@ -160,9 +160,20 @@ export function canSkipPopstateHistoryWrite(
 
   const live = browser.getState();
 
-  return (
-    isState(live) &&
-    live.path === toState.path &&
-    areStatesEqual(toState, live, false)
-  );
+  if (!isState(live) || live.path !== toState.path) {
+    return false;
+  }
+
+  // A history entry written before the M2 search channel existed (#1548) is a
+  // structurally-valid State WITHOUT `search` — `isState` accepts it (query is
+  // optional for backward-compat, matching `getRouteFromEvent`), but
+  // `areStatesEqual` reads both channels and throws on a missing one. Backfill
+  // the empty query bag so a back/forward to a legacy entry compares (and can
+  // skip) instead of crashing the popstate handler.
+  const liveState: State =
+    (live as Partial<State>).search === undefined
+      ? { ...live, search: {} }
+      : live;
+
+  return areStatesEqual(toState, liveState, false);
 }

@@ -121,7 +121,9 @@ export async function executeAction(
         return true;
       }
       case "navigate_replace": {
-        await router.navigate(action.name, action.params, { replace: true });
+        await router.navigate(action.name, action.params, undefined, {
+          replace: true,
+        });
 
         return true;
       }
