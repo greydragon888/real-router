@@ -3,13 +3,14 @@ import { getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
+  canSkipPopstateHistoryWrite,
   createStartInterceptor,
   createPluginBuildUrl,
   createReplaceHistoryState,
 } from "../../../src/browser-env";
 
-import type { ReplaceStateBrowser } from "../../../src/browser-env";
-import type { Router } from "@real-router/core";
+import type { Browser, ReplaceStateBrowser } from "../../../src/browser-env";
+import type { Router, State } from "@real-router/core";
 
 describe("plugin-utils factories", () => {
   let router: Router;
@@ -194,5 +195,53 @@ describe("plugin-utils factories", () => {
         "/list?tab=posts",
       );
     });
+  });
+});
+
+describe("canSkipPopstateHistoryWrite — search-channel handling (#1548)", () => {
+  // areStatesEqual never touches the route tree, so any router works as the
+  // reference (no start needed).
+  const cmp = createRouter([{ name: "home", path: "/" }]);
+  const areStatesEqual = (a: State, b: State, ignoreQuery: boolean): boolean =>
+    cmp.areStatesEqual(a, b, ignoreQuery);
+
+  const toState = {
+    name: "home",
+    params: {},
+    search: {},
+    path: "/",
+    transition: {
+      phase: "activating",
+      reason: "success",
+      segments: { deactivated: [], activated: [], intersection: "" },
+    },
+    context: {},
+  } as unknown as State;
+
+  const browserWith = (live: unknown): Browser =>
+    ({ getState: () => live }) as unknown as Browser;
+
+  it("backfills an empty query bag for a pre-M2 (search-less) entry and skips", () => {
+    // A history entry written before the M2 `search` channel existed: no
+    // `search` field. `isStateStrict` accepts it, so canSkip must fill the empty
+    // query bag and compare (value-equal → skip) instead of throwing in
+    // `areStatesEqual`.
+    expect(
+      canSkipPopstateHistoryWrite(
+        toState,
+        browserWith({ name: "home", params: {}, path: "/" }),
+        areStatesEqual,
+      ),
+    ).toBe(true);
+  });
+
+  it("compares an M2 entry that carries `search` directly and skips", () => {
+    expect(
+      canSkipPopstateHistoryWrite(
+        toState,
+        browserWith({ name: "home", params: {}, search: {}, path: "/" }),
+        areStatesEqual,
+      ),
+    ).toBe(true);
   });
 });
