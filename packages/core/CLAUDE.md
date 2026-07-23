@@ -47,11 +47,11 @@ Validation has two tiers: **invariant protection** in core (structural guards + 
 
 ```typescript
 // Router.ts (facade)
-buildPath(route: string, params?: Params): string {
+buildPath(route: string, params?: Params, search?: SearchParams): string {
   const ctx = getInternals(this);
   ctx.validator?.routes.validateBuildPathArgs(route);      // no-op if plugin absent
   ctx.validator?.navigation.validateParams(params, "buildPath");
-  return ctx.buildPath(route, params);  // via WeakMap — applies interceptor pipeline
+  return ctx.buildPath(route, params, search);  // via WeakMap — applies interceptor pipeline; search = query channel (M2 #1548)
 }
 
 // api/getRoutesApi.ts (standalone API)
@@ -276,7 +276,7 @@ Concrete consumer of both: `shared/dom-utils/scroll-restore.ts` reads `route.tra
 All navigation methods return `Promise<State>`. The pipeline uses **optimistic sync execution** — guards run synchronously until one returns a Promise, then switches to async.
 
 ```
-router.navigate(name, params, opts)
+router.navigate(name, params, search, opts)   // search = query channel; opts at slot 4 (M2 #1548)
   │
   ├── Build target state (buildNavigateState)
   ├── Same-state check (path comparison)
@@ -421,7 +421,7 @@ The asymmetry is intentional: `clear`/`replace` are destructive whole-tree swaps
 
 ### `update()` does not revalidate the active state
 
-`getRoutesApi(router).update(name, ...)` mutates config in place and **does not rebuild the tree or recompute the current state** (NO_TREE_REBUILD). So when you update the **currently-active** route's `encodeParams` / `decodeParams` / `defaultParams` / `forwardTo`, the committed `getState().path` keeps the value built by the _old_ config — it can disagree with a fresh `buildPath(name, params)` until the next navigation. This is by-design (update is O(1), not a re-navigation); call `router.navigate(name, params, { reload: true })` if you need the active path rebuilt with the new config.
+`getRoutesApi(router).update(name, ...)` mutates config in place and **does not rebuild the tree or recompute the current state** (NO_TREE_REBUILD). So when you update the **currently-active** route's `encodeParams` / `decodeParams` / `defaultParams` / `forwardTo`, the committed `getState().path` keeps the value built by the _old_ config — it can disagree with a fresh `buildPath(name, params)` until the next navigation. This is by-design (update is O(1), not a re-navigation); call `router.navigate(name, params, undefined, { reload: true })` if you need the active path rebuilt with the new config.
 
 ### Plugin System
 
@@ -652,9 +652,11 @@ lifecycle.addActivateGuard("admin", () => (toState) => {
 
 ### areStatesEqual Ignores Query Params by Default
 
+Query params live in `state.search` (RFC-4 M2 / #1548); `ignoreQueryParams` (default `true`) controls whether that channel participates. `state.params` (path) is always compared. Signature unchanged: `areStatesEqual(s1, s2, ignoreQueryParams = true)`.
+
 ```typescript
-router.areStatesEqual(state1, state2); // Ignores query params
-router.areStatesEqual(state1, state2, false); // Compares all params
+router.areStatesEqual(state1, state2); // Ignores state.search (query)
+router.areStatesEqual(state1, state2, false); // Compares state.params AND state.search
 ```
 
 ### Hook Execution Order
@@ -805,7 +807,7 @@ All navigation methods (`navigate`, `navigateToDefault`, `start`) return `Promis
 - **Pre-commit failure** (route not found, an activation guard blocked the start navigation, a sync interceptor throw before `next()`): no `TRANSITION_SUCCESS` was emitted, so the half-started FSM unwinds back to IDLE (two-phase start) — `getState()` is `undefined`, `isActive()` is `false`.
 - **Post-commit interceptor failure** (a loader throws after `next()` committed): subscribers already observed `TRANSITION_SUCCESS`, so core does **not** roll back — the committed state stands, `isActive()` stays `true`, and the loader error surfaces **only** via the rejected `start()` promise. Rolling back here would retract an observed success ("phantom success"). Plugins must not swallow the loader error (that violates "Loader errors propagate"); core owns the state-consistency half by keeping the commit.
 
-**UNKNOWN_ROUTE state shape:** `{ name: UNKNOWN_ROUTE, params: {}, path: "/the/url", transition: TransitionMeta }` — note: `params` is always `{}` (path is in `state.path`, not `state.params.path`).
+**UNKNOWN_ROUTE state shape:** `{ name: UNKNOWN_ROUTE, params: {}, search: {}, path: "/the/url", transition: TransitionMeta }` — note: `params` and `search` are always `{}` (the URL is in `state.path`, not `state.params.path`).
 
 **`UNKNOWN_ROUTE` export:** Available as standalone `import { UNKNOWN_ROUTE } from "@real-router/core"` and via `constants.UNKNOWN_ROUTE`.
 

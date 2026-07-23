@@ -240,6 +240,7 @@ In the isolated matcher microbench ([`matcher-bench`](benchmarks/cross-router/ma
 - **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, Angular, or vanilla JS
 - **First-class SSR / Streaming / SSG / RSC** — same primitives across React 19, Preact 10, Vue 3, Solid, Svelte 5, Angular 22+ — no meta-framework lock-in. [See above](#first-class-ssr--streaming--ssg)
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
+- **Typed path & query channels** — `state.params` (path) and `state.search` (query) are separate, each independently typed (`State<Params, Search>`); `navigate` / `buildPath` / `isActiveRoute` take path then query
 - **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
 - **AbortController** — cancel navigations via standard `AbortSignal`
 - **Dynamic route management** — add, remove, update, replace routes at runtime

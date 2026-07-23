@@ -53,18 +53,22 @@ await router.navigate("users.profile", { id: "123" });
 
 | Method                              | Returns          | Description                                         |
 | ----------------------------------- | ---------------- | --------------------------------------------------- |
-| `navigate(name, params?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe           |
+| `navigate(name, params?, search?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe |
 | `navigateToDefault(options?)`       | `Promise<State>` | Navigate to the default route. Fire-and-forget safe |
 | `navigateToNotFound(path?)`         | `State`          | Synchronously set UNKNOWN_ROUTE state               |
 | `canNavigateTo(name, params?)`      | `boolean`        | Check if guards allow navigation                    |
 
 ```typescript
 await router.navigate("users.profile", { id: "123" });
-await router.navigate("dashboard", {}, { replace: true });
+// RFC-4 M2 (#1548): the 3rd arg is the query/search channel; options move to the 4th
+await router.navigate("dashboard", {}, undefined, { replace: true });
+await router.navigate("products", {}, { page: 2, sort: "name" }); // query via the search channel
+// Descriptor form — navigate(target, options?), target = { name, params?, search? }:
+await router.navigate({ name: "products", search: { page: 2 } }, { replace: true });
 
 // Cancellable navigation
 const controller = new AbortController();
-router.navigate("users", {}, { signal: controller.signal });
+router.navigate("users", {}, undefined, { signal: controller.signal });
 controller.abort();
 ```
 
@@ -75,8 +79,8 @@ controller.abort();
 | `getState()`                                       | `State \| undefined` | Current router state (deeply frozen) |
 | `getPreviousState()`                               | `State \| undefined` | Previous router state                |
 | `areStatesEqual(s1, s2, ignoreQP?)`                | `boolean`            | Compare two states                   |
-| `isActiveRoute(name, params?, strict?, ignoreQP?)` | `boolean`            | Check if route is active             |
-| `buildPath(name, params?)`                         | `string`             | Build URL path from route name       |
+| `isActiveRoute(name, params?, search?, strict?, ignoreQP?)` | `boolean`   | Check if route is active             |
+| `buildPath(name, params?, search?)`                | `string`             | Build URL path from route name       |
 | `isLeaveApproved()`                                | `boolean`            | True when deactivation guards pass   |
 
 ### Events & Plugins
@@ -237,11 +241,11 @@ const routes: Route[] = [
 
 ## Params Contract
 
-`router.navigate(name, params)` and `router.buildPath(name, params)` follow a stable contract for how each value type is serialized into the URL and preserved in `state.params`:
+`router.navigate(name, params, search?)` and `router.buildPath(name, params, search?)` follow a stable contract for how each value type is serialized into the URL and stored back — **path** params land in `state.params`, **query** params in `state.search` (two channels since RFC-4 M2 / #1548). The value-coercion rules below are identical for both channels; only the storage location differs:
 
 ### Input — `params` object values
 
-| Value                        | URL path param (`:id`)                  | URL query param (`?q`)                               | `state.params` after navigation           |
+| Value                        | URL path param (`:id`)                  | URL query param (`?q`)                               | Stored value (`state.params` path · `state.search` query) |
 | ---------------------------- | --------------------------------------- | ---------------------------------------------------- | ----------------------------------------- |
 | `undefined`                  | Error — path param is required          | **stripped** — parameter absent from URL             | Key absent (`"q" in params` is `false`)   |
 | `null`                       | Same as `undefined`                     | `?q` (key-only, via `nullFormat: "default"`)         | `null`                                    |
@@ -268,7 +272,8 @@ const routes: Route[] = [
 ### Example
 
 ```typescript
-router.navigate("search", {
+// Query params go through the search channel (3rd arg); path params (none here) use the 2nd.
+router.navigate("search", {}, {
   q: "hello",
   page: undefined, // stripped
   sort: null, // becomes ?sort (key-only)
@@ -277,9 +282,9 @@ router.navigate("search", {
 });
 // URL: /search?q=hello&sort&filter=&active=true
 //
-// state.params:
+// state.search:
 //   { q: "hello", sort: null, filter: "", active: true }
-//   ("page" key is absent)
+//   ("page" key is absent) — state.params is {} (this route has no path params)
 ```
 
 ### Configuration

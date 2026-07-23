@@ -42,7 +42,7 @@
 
 ## buildPath / matchPath Roundtrip
 
-`router.buildPath(name, params)` and `pluginApi.matchPath(path)` form an inverse pair. These invariants verify that the URL-building and URL-matching layers are consistent with each other.
+`router.buildPath(name, params?, search?)` and `pluginApi.matchPath(path)` form an inverse pair (path params via `params`, query via the `search` channel — RFC-4 M2 / #1548). These invariants verify that the URL-building and URL-matching layers are consistent with each other.
 
 | #   | Invariant              | Description                                                                                                                                                                  |
 | --- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -55,16 +55,16 @@
 
 ## isActiveRoute
 
-`router.isActiveRoute(name, params?, strictEquality?, ignoreQueryParams?)` checks whether a route is currently active. It requires a started router with a current state.
+`router.isActiveRoute(name, params?, search?, strictEquality?, ignoreQueryParams?)` checks whether a route is currently active (query goes through the `search` slot at position 3 since RFC-4 M2 / #1548; `strictEquality` / `ignoreQueryParams` shifted to 4 / 5). It requires a started router with a current state.
 
 | #   | Invariant                          | Description                                                                                                                                                                               |
 | --- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Current route is active            | `isActiveRoute(currentState.name, currentState.params) === true`. The current route is always reported as active.                                                                         |
-| 2   | Current route with strict equality | `isActiveRoute(currentState.name, currentState.params, true) === true`. Exact-match mode still recognizes the current route.                                                              |
+| 2   | Current route with strict equality | `isActiveRoute(currentState.name, currentState.params, currentState.search, true) === true`. Exact-match mode still recognizes the current route.                                         |
 | 3   | Ancestor is active                 | `isActiveRoute(parentName) === true` when the current route is a descendant of `parentName`. Ancestor routes are active by default.                                                       |
-| 4   | Strict equality blocks ancestor    | `isActiveRoute(parentName, {}, true) === false` when `parentName !== currentState.name`. Strict mode requires an exact name match.                                                        |
-| 5   | Monotonicity of strict             | If `isActiveRoute(name, params, true) === true`, then `isActiveRoute(name, params, false) === true`. Strict active implies loose active.                                                  |
-| 6   | Monotonicity of ignoreQueryParams  | If `isActiveRoute(name, params, strict, false) === true`, then `isActiveRoute(name, params, strict, true) === true`. Ignoring query params can only make a route more active, never less. |
+| 4   | Strict equality blocks ancestor    | `isActiveRoute(parentName, {}, undefined, true) === false` when `parentName !== currentState.name`. Strict mode requires an exact name match.                                             |
+| 5   | Monotonicity of strict             | If `isActiveRoute(name, params, undefined, true) === true`, then `isActiveRoute(name, params, undefined, false) === true`. Strict active implies loose active.                            |
+| 6   | Monotonicity of ignoreQueryParams  | If `isActiveRoute(name, params, undefined, strict, false) === true`, then `isActiveRoute(name, params, undefined, strict, true) === true`. Ignoring query params can only make a route more active, never less. |
 | 7   | Empty string returns false         | `isActiveRoute("") === false`. An empty route name is never considered active, regardless of current state.                                                                               |
 
 ## shouldUpdateNode
@@ -80,14 +80,14 @@
 
 ## buildState / makeState (state factories)
 
-`pluginApi.buildState(name, params)` and `pluginApi.makeState(name, params, path)` are factory functions for creating state objects. They are used internally by the navigation pipeline and by plugins.
+`pluginApi.buildState(name, params)` and `pluginApi.makeState(name, params, search?, path?)` are factory functions for creating state objects (`makeState` gained the `search` channel at slot 3 in RFC-4 M2 / #1548; `path` shifted to slot 4). They are used internally by the navigation pipeline and by plugins.
 
 | #   | Invariant                         | Description                                                                                                                                                                                      |
 | --- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | buildState path matches buildPath | `buildState(name, params).path === buildPath(name, params)`. The path embedded in the state object matches the URL that `buildPath` would generate.                                              |
 | 2   | buildState name matches request   | `buildState(name, params).name === name`. The state name is the requested route name (or its forwarded target).                                                                                  |
-| 3   | makeState returns frozen state    | `Object.isFrozen(makeState(name, params, path)) === true`. All state objects are deeply frozen at creation.                                                                                      |
-| 4   | makeState determinism             | `makeState(name, params, path)` with identical arguments produces structurally equal states (same name, path, and params). The `id` field differs between calls but all other fields are stable. |
+| 3   | makeState returns frozen state    | `Object.isFrozen(makeState(name, params, search, path)) === true`. All state objects are deeply frozen at creation.                                                                              |
+| 4   | makeState determinism             | `makeState(name, params, search, path)` with identical arguments produces structurally equal states (same name, path, params, and search). The `id` field differs between calls but all other fields are stable. |
 
 ## Router Lifecycle (start / stop / dispose)
 

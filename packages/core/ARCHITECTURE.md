@@ -106,11 +106,11 @@ Router.ts (facade — validates and delegates)
 
 ```typescript
 // Router.ts — facade
-buildPath(route: string, params?: Params): string {
+buildPath(route: string, params?: Params, search?: SearchParams): string {
   const ctx = getInternals(this);
   ctx.validator?.routes.validateBuildPathArgs(route);      // no-op if plugin absent
   ctx.validator?.navigation.validateParams(params, "buildPath");
-  return ctx.buildPath(route, params);
+  return ctx.buildPath(route, params, search);             // search = query channel (M2 #1548)
 }
 ```
 
@@ -195,7 +195,7 @@ fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
 ### navigate() Flow
 
 ```
- router.navigate(name, params, opts)
+ router.navigate(name, params, search, opts)
            │
            ▼
 ┌──────────────────────┐

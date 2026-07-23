@@ -290,7 +290,7 @@ All navigation methods return `Promise<State>`. The pipeline uses **optimistic s
 
 ```mermaid
 flowchart TD
-    NAV["router.navigate(name, params, options)"] --> BUILD
+    NAV["router.navigate(name, params, search, options)"] --> BUILD
     BUILD["buildNavigateState()
     forwardState + buildPath + makeState"] --> DEACTIVATE
     DEACTIVATE["Deactivation guards
@@ -344,8 +344,8 @@ Plugins intercept router methods via `addInterceptor()` on `PluginApi`. `Interce
 | Method         | Signature                                                                | Used by                                                                                          |
 | -------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | `start`        | `(path?: string) => Promise<State>`                                      | browser-plugin, hash-plugin, navigation-plugin (via `createStartInterceptor` from `shared/browser-env`); ssr-data-plugin, rsc-server-plugin (via `createSsrLoaderPlugin` from `shared/ssr`) |
-| `buildPath`    | `(route: string, params?: Params) => string`                             | persistent-params-plugin                                                                         |
-| `forwardState` | `(routeName: string, routeParams: Params) => SimpleState`                | persistent-params-plugin, search-schema-plugin                                                   |
+| `buildPath`    | `(route: string, params?: Params, search?: SearchParams) => string`                             | persistent-params-plugin                                                                         |
+| `forwardState` | `(routeName: string, routeParams: Params, routeSearch?: SearchParams) => SimpleState`                | persistent-params-plugin, search-schema-plugin                                                   |
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` (original or previously-wrapped function) plus the method's arguments. Applied via `createInterceptable()` in `RouterInternals`.
 
@@ -383,6 +383,7 @@ These are deliberately designed constraints. Violating them will break the syste
 ### State & Immutability
 
 - **All `State` objects are deeply frozen** (`Object.freeze`). Never mutate — always create new.
+- **`State` has two param channels** — `state.params` (path params) and `state.search` (query params) are separate and independently typed (`State<Params, Search>`), split in RFC-4 M2 (#1548). Both are always present (a frozen `{}` when empty); `navigate` / `buildPath` / `isActiveRoute` take `search` as the argument after `params`.
 - **Router options are immutable** — deep-frozen at construction time.
 
 ### FSM & Events
