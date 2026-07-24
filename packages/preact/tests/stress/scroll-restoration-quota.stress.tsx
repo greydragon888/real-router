@@ -40,6 +40,37 @@ import type { Router } from "@real-router/core";
 
 const STORAGE_KEY = "real-router:scroll";
 
+// jsdom 29 wraps `sessionStorage` in a Proxy whose `getItem`/`setItem` are NOT
+// the global `Storage.prototype` methods, so `vi.spyOn(Storage.prototype, …)`
+// silently no-ops (the spy never intercepts, the real storage runs, and the
+// quota / corrupted-storage path under test is never exercised). A store-backed
+// plain-object mock installed via `vi.stubGlobal` is spyable and controllable —
+// make `setItem`/`getItem` throw to drive the failure paths.
+function createMockStorage(): Storage {
+  const store = new Map<string, string>();
+
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+  };
+}
+
 function withQuotaExceeded(
   setItemImpl: (key: string, value: string) => void = () => {
     throw new DOMException("QuotaExceededError", "QuotaExceededError");
@@ -49,7 +80,7 @@ function withQuotaExceeded(
   setItemSpy: ReturnType<typeof vi.spyOn>;
 } {
   const setItemSpy = vi
-    .spyOn(Storage.prototype, "setItem")
+    .spyOn(sessionStorage, "setItem")
     .mockImplementation(setItemImpl);
 
   return {
@@ -64,6 +95,7 @@ describe("preact stress — scrollRestoration sessionStorage quota overflow", ()
   let router: Router;
 
   beforeEach(async () => {
+    vi.stubGlobal("sessionStorage", createMockStorage());
     sessionStorage.clear();
     history.scrollRestoration = "auto";
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -84,8 +116,7 @@ describe("preact stress — scrollRestoration sessionStorage quota overflow", ()
     cleanup();
   });
 
-  // eslint-disable-next-line vitest/no-disabled-tests
-  it.skip("setItem throws QuotaExceededError on every write → provider survives, navigations keep working", async () => {
+  it("setItem throws QuotaExceededError on every write → provider survives, navigations keep working", async () => {
     const { restore, setItemSpy } = withQuotaExceeded();
 
     render(
@@ -119,8 +150,7 @@ describe("preact stress — scrollRestoration sessionStorage quota overflow", ()
     restore();
   });
 
-  // eslint-disable-next-line vitest/no-disabled-tests
-  it.skip("pagehide → putPos catches quota error → cached state survives within session", async () => {
+  it("pagehide → putPos catches quota error → cached state survives within session", async () => {
     const { restore } = withQuotaExceeded();
 
     render(
@@ -146,8 +176,7 @@ describe("preact stress — scrollRestoration sessionStorage quota overflow", ()
     restore();
   });
 
-  // eslint-disable-next-line vitest/no-disabled-tests
-  it.skip("intermittent quota: half of writes succeed → store grows, partial loss does not crash", async () => {
+  it("intermittent quota: half of writes succeed → store grows, partial loss does not crash", async () => {
     // More realistic quota model: writes fail randomly (e.g. tab quota fills
     // up). The router must NOT cascade-fail on the first failure — each
     // putPos call is independent.
@@ -191,7 +220,7 @@ describe("preact stress — scrollRestoration sessionStorage quota overflow", ()
 
   it("getItem throws (corrupted storage) → loadStore falls back to empty map, no crash", async () => {
     const getItemSpy = vi
-      .spyOn(Storage.prototype, "getItem")
+      .spyOn(sessionStorage, "getItem")
       .mockImplementation(() => {
         throw new DOMException("SecurityError", "SecurityError");
       });

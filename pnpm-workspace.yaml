@@ -77,8 +77,13 @@ overrides:
   devalue: '>=5.8.1'
   esbuild: '>=0.28.1'
   vite: '>=7.3.5 <8'
-  fast-uri: '>=3.1.2'
-  hono: '>=4.12.21'
+  fast-uri: '>=3.1.4 <4'
+  hono: '>=4.12.27'
+  # @hono/node-server: GHSA-frvp-7c67-39w9 (Medium) has no v1 fix — the patch is v2-only, so a
+  # bounded major bump. Like hono / fast-uri above, it's transitive via the Angular dev/build
+  # toolchain (@angular/build SSR dev server; ajv -> fast-uri) in angular examples only — not in
+  # any published @real-router/* package. Bump/drop when the toolchain moves off these floors.
+  '@hono/node-server': '>=2.0.5 <3'
   ip-address: '>=10.1.1'
   js-cookie: '>=3.0.7'
   tmp: '>=0.2.6'
