@@ -210,7 +210,7 @@ const removeExtensions = api.extendRouter({
 });
 ```
 
-`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it builds state via `api.buildState`/`api.makeState` and calls `browser.replaceState`.
+`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target via `api.buildNavigationState`, builds the record via `api.makeState` and calls `browser.replaceState`.
 
 `extendRouter()` validates that no property with the same name already exists on the router (throws `PLUGIN_CONFLICT` if it does), adds the properties, and returns an unsubscribe function that removes them.
 

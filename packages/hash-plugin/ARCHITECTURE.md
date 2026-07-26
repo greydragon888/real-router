@@ -227,7 +227,7 @@ this.#removeExtensions = api.extendRouter({
 });
 ```
 
-`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it builds state via `api.buildState`/`api.makeState` and calls `browser.replaceState`.
+`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target via `api.buildNavigationState`, builds the record via `api.makeState` and calls `browser.replaceState`.
 
 ### Cleanup on teardown
 

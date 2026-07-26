@@ -78,14 +78,14 @@
 | 3   | Unrelated segment returns false   | `shouldUpdateNode("admin")(toState, fromState) === false` when navigating between routes that do not touch the `admin` subtree. Unchanged segments are not flagged.                |
 | 4   | Intersection segment returns true | `shouldUpdateNode(intersection)(toState, fromState) === true` when navigating between siblings. The shared ancestor is included in the update check.                               |
 
-## buildState / makeState (state factories)
+## buildNavigationState / makeState (state factories)
 
-`pluginApi.buildState(name, params)` and `pluginApi.makeState(name, params, search?, path?)` are factory functions for creating state objects (`makeState` gained the `search` channel at slot 3 in RFC-4 M2 / #1548; `path` shifted to slot 4). They are used internally by the navigation pipeline and by plugins.
+`pluginApi.buildNavigationState(name, params?)` and `pluginApi.makeState(name, params, search?, path?)` are factory functions for creating state objects (`makeState` gained the `search` channel at slot 3 in RFC-4 M2 / #1548; `path` shifted to slot 4; the partial `buildState` factory was removed in favor of `buildNavigationState` — #1548). They are used internally by the navigation pipeline and by plugins.
 
 | #   | Invariant                         | Description                                                                                                                                                                                      |
 | --- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | buildState path matches buildPath | `buildState(name, params).path === buildPath(name, params)`. The path embedded in the state object matches the URL that `buildPath` would generate.                                              |
-| 2   | buildState name matches request   | `buildState(name, params).name === name`. The state name is the requested route name (or its forwarded target).                                                                                  |
+| 1   | buildNavigationState path matches buildPath | `buildNavigationState(name, params).path === buildPath(name, params)` for a route without `forwardTo` (with one, the built path uses the RESOLVED target name). The path embedded in the built State matches the URL `buildPath` would generate. |
+| 2   | buildNavigationState resolves the request   | `buildNavigationState(name, params).name` is the requested route name or its `forwardTo` target; an unknown route yields `undefined` instead of a State.                                        |
 | 3   | makeState returns frozen state    | `Object.isFrozen(makeState(name, params, search, path)) === true`. All state objects are deeply frozen at creation.                                                                              |
 | 4   | makeState determinism             | `makeState(name, params, search, path)` with identical arguments produces structurally equal states (same name, path, params, and search). The `id` field differs between calls but all other fields are stable. |
 
