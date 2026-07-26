@@ -107,7 +107,13 @@ export function createReplaceHistoryState(
     search?: SearchParams,
     options?: ReplaceHistoryStateOptions,
   ) => {
-    const state = api.buildState(name, params);
+    // buildNavigationState resolves forwardTo and existence in one call
+    // (undefined = unknown route) and hands back canonical path-only params —
+    // the query-typed twins a caller rode in `params` are dropped by the
+    // forwardState canonicalization, exactly as the removed `api.buildState`
+    // did. Only its `.name`/`.params` are used here; the record's State is
+    // rebuilt below with the caller's `search`.
+    const state = api.buildNavigationState(name, params);
 
     if (!state) {
       throw new Error(
@@ -121,9 +127,10 @@ export function createReplaceHistoryState(
       // Explicit query channel (RFC-4 M2 / #1548): the caller's `search` reaches
       // the built State's `search` and the rebuilt path below, so the
       // `history.state` record (serialized from the buffer) carries the query —
-      // mirroring the search-aware `buildUrl`. `api.buildState` yields a single
-      // path bag with no `search`, so the caller's `search` is the only query
-      // source here; omitted → `makeState` fills the frozen empty search bag.
+      // mirroring the search-aware `buildUrl`. The caller's `search` is the only
+      // query source for this record; omitted → `makeState` fills the frozen
+      // empty search bag. (`state.params` already carries the route's
+      // defaultParams — makeState/buildPath re-merge them idempotently.)
       search,
       router.buildPath(state.name, state.params, search),
       // No meta arg: since #1548 the per-segment param-source map is read from

@@ -93,8 +93,10 @@ describe("core/without validation plugin", () => {
         ).not.toThrow();
       });
 
-      it("should handle buildState without throwing", () => {
-        expect(() => getPluginApi(router).buildState("home", {})).not.toThrow();
+      it("should handle buildNavigationState without throwing", () => {
+        expect(() =>
+          getPluginApi(router).buildNavigationState("home", {}),
+        ).not.toThrow();
       });
 
       it("should handle shouldUpdateNode with empty string gracefully", () => {

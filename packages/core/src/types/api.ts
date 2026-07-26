@@ -14,7 +14,6 @@ import type { EventMethodMap, EventName } from "./constants";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
 // type-only cycle with the barrel is deliberate — see the note in ./index.
 import type { NavigationOptions, StateContext } from "./index";
-import type { RouteTreeState } from "./route-node-types";
 import type {
   DefaultDependencies,
   GuardFnFactory,
@@ -105,11 +104,6 @@ export interface PluginApi {
     search?: S,
     path?: string,
   ) => State<P, S>;
-
-  buildState: (
-    routeName: string,
-    routeParams: Params,
-  ) => RouteTreeState | undefined;
 
   forwardState: <
     P extends Params = Params,

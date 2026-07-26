@@ -538,7 +538,7 @@ describe("Navigation Plugin — Lifecycle", () => {
       });
     });
 
-    it("throws if buildState returns undefined", () => {
+    it("throws if the route cannot be resolved (buildNavigationState returns undefined)", () => {
       expect(() => {
         router.replaceHistoryState("definitely.nonexistent.route");
       }).toThrow("[real-router] Cannot replace state");

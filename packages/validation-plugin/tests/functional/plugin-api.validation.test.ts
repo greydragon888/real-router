@@ -72,33 +72,6 @@ describe("plugin API validation — with validationPlugin", () => {
     });
   });
 
-  describe("buildState validation", () => {
-    it("throws TypeError for non-string routeName", () => {
-      const api = getPluginApi(router);
-      const raw = api as unknown as {
-        buildState: (n: unknown, p?: unknown) => unknown;
-      };
-
-      expect(() => raw.buildState(123)).toThrow(TypeError);
-      expect(() => raw.buildState(null)).toThrow(TypeError);
-    });
-
-    it("throws TypeError for invalid routeParams", () => {
-      const api = getPluginApi(router);
-      const raw = api as unknown as {
-        buildState: (n: unknown, p?: unknown) => unknown;
-      };
-
-      expect(() => raw.buildState("home", "not-object")).toThrow(TypeError);
-    });
-
-    it("accepts valid arguments", () => {
-      const api = getPluginApi(router);
-
-      expect(() => api.buildState("home", {})).not.toThrow();
-    });
-  });
-
   describe("forwardState validation", () => {
     it("throws TypeError for non-string routeName", () => {
       const api = getPluginApi(router);

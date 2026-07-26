@@ -5,40 +5,9 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { createFixtureRouter, arbIdParam, NUM_RUNS } from "./helpers";
 
-describe("buildState / makeState Properties", () => {
+describe("makeState Properties", () => {
   const router = createFixtureRouter();
   const pluginApi = getPluginApi(router);
-
-  test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
-    "buildState + makeState path matches buildPath",
-    (params) => {
-      const result = pluginApi.buildState("users.view", params);
-      const path = router.buildPath("users.view", params);
-
-      expect(result).toBeDefined();
-
-      const buildStateResult = result!;
-      const state = pluginApi.makeState(
-        buildStateResult.name,
-        buildStateResult.params,
-        undefined,
-        path,
-      );
-
-      expect(state.path).toBe(path);
-    },
-  );
-
-  test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
-    "buildState preserves name and params",
-    (params) => {
-      const result = pluginApi.buildState("users.view", params);
-
-      expect(result).toBeDefined();
-      expect(result!.name).toBe("users.view");
-      expect(result!.params).toStrictEqual(params);
-    },
-  );
 
   test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
     "makeState returns a frozen state",

@@ -528,8 +528,8 @@ export class RoutesNamespace<
 
   /**
    * Builds a RouteTreeState from already-resolved route name and params.
-   * Called by Router.buildState after forwardState is applied at facade level.
-   * This allows plugins to intercept forwardState.
+   * Called by getPluginApi().buildNavigationState after the interceptable
+   * forwardState resolved the target — so plugins can intercept forwardState.
    */
   buildStateResolved(
     resolvedName: string,

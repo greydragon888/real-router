@@ -43,17 +43,6 @@ export function getPluginApi<
       // `state.name`, so a caller-supplied meta had no effect and is gone.
       return ctx.makeState(name, params, search, path);
     },
-    buildState: (routeName, routeParams) => {
-      ctx.validator?.routes.validateStateBuilderArgs(
-        routeName,
-        routeParams,
-        "buildState",
-      );
-
-      const { name, params } = ctx.forwardState(routeName, routeParams);
-
-      return ctx.buildStateResolved(name, params);
-    },
     forwardState: <
       P extends Params = Params,
       S extends SearchParams = SearchParams,

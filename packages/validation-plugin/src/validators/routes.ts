@@ -231,7 +231,8 @@ export function validateIsActiveRouteArgs(
 }
 
 /**
- * Validates forwardState/buildState arguments.
+ * Validates state-builder arguments (navigate / forwardState /
+ * buildNavigationState).
  */
 export function validateStateBuilderArgs(
   routeName: unknown,

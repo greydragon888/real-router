@@ -260,7 +260,7 @@ export class Router<
     // .name)`): a declared query key a plugin/decoder left in the params bag
     // moves to the query channel, everything else stays a path param. So
     // forwardState's result is ALWAYS channel-separated by construction — every
-    // consumer (makeState, matchPath, canNavigateTo, buildState) receives
+    // consumer (makeState, matchPath, canNavigateTo, buildNavigationState) receives
     // path-only params + the full query and never re-splits. `as unknown as` is
     // required: the closure is non-generic, but RouterInternals["forwardState"]
     // is declared generic `<P, S>`, which tsc will not infer from a non-generic

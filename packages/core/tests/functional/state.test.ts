@@ -282,13 +282,13 @@ describe("core/stateBuilder", () => {
       );
     });
 
-    it("should work with buildState after dynamic forward resolution", () => {
+    it("should work with buildNavigationState after dynamic forward resolution", () => {
       routesApi.add([
         { name: "build-fn", path: "/build-fn", forwardTo: () => "build-dest" },
         { name: "build-dest", path: "/build-dest" },
       ]);
 
-      const state = getPluginApi(router).buildState("build-fn", {});
+      const state = getPluginApi(router).buildNavigationState("build-fn", {});
 
       expect(state?.name).toBe("build-dest");
     });
