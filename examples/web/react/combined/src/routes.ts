@@ -108,17 +108,17 @@ function onEnterProductDetail(toState: { params: Params }): void {
 }
 
 export const publicRoutes: Route[] = [
-  { name: "home", path: "/" },
-  { name: "login", path: "/login" },
+  { name: "home", path: "/?lang" },
+  { name: "login", path: "/login?lang" },
 ];
 
 export const privateRoutes: Route<AppDependencies>[] = [
-  { name: "home", path: "/", forwardTo: "dashboard" },
-  { name: "dashboard", path: "/dashboard" },
+  { name: "home", path: "/?lang", forwardTo: "dashboard" },
+  { name: "dashboard", path: "/dashboard?lang" },
   {
     name: "products",
-    path: "/products?page&sort",
-    defaultParams: { page: 1, sort: "name" },
+    path: "/products?page&sort&lang",
+    defaultSearch: { page: 1, sort: "name" },
     searchSchema: productsListSchema,
     preload: () => preloadProducts,
     onEnter: () => onEnterProducts,
@@ -133,22 +133,22 @@ export const privateRoutes: Route<AppDependencies>[] = [
   },
   {
     name: "users",
-    path: "/users",
+    path: "/users?lang",
     children: [{ name: "profile", path: "/:id" }],
   },
   {
     name: "settings",
-    path: "/settings",
+    path: "/settings?lang",
     canDeactivate: settingsDeactivateGuard,
   },
   {
     name: "admin",
-    path: "/admin",
+    path: "/admin?lang",
     canActivate: adminGuard,
   },
   {
     name: "checkout",
-    path: "/checkout",
+    path: "/checkout?lang",
     canActivate: checkoutGuard,
   },
 ];

@@ -19,7 +19,7 @@ export const routes: Route[] = [
       {
         name: "detail",
         path: "/:id?format",
-        defaultParams: { format: "html" },
+        defaultSearch: { format: "html" },
       },
     ],
   },

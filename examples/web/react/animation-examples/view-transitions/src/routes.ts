@@ -5,13 +5,13 @@ export const routes: Route[] = [
   {
     name: "products",
     path: "/products?sort",
-    defaultParams: { sort: "asc" },
+    defaultSearch: { sort: "asc" },
     children: [{ name: "detail", path: "/:id" }],
   },
   { name: "about", path: "/about" },
   {
     name: "queryDemo",
     path: "/query-demo?filter",
-    defaultParams: { filter: "all" },
+    defaultSearch: { filter: "all" },
   },
 ];
