@@ -26,6 +26,7 @@ import type {
   GuardFn,
   Params,
   ParamsSearch,
+  SearchParams,
   RouteConfigUpdate,
   RouterLogger,
   GuardFnFactory,
@@ -302,6 +303,10 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
 
   if (route.defaultParams) {
     config.defaultParams[fullName] = route.defaultParams;
+  }
+
+  if (route.defaultSearch) {
+    config.defaultSearch[fullName] = route.defaultSearch;
   }
 }
 
@@ -825,12 +830,14 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
 ): {
   forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
   defaultParams?: Params | null | undefined;
+  defaultSearch?: SearchParams | null | undefined;
   decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
   encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 } {
   const {
     forwardTo,
     defaultParams,
+    defaultSearch,
     decodeParams,
     encodeParams,
     canActivate,
@@ -892,6 +899,7 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
 
   commitScalarConfig(store, name, {
     defaultParams,
+    defaultSearch,
     decodeParams,
     encodeParams,
   });
@@ -901,7 +909,13 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   commitGuardUpdate(lifecycle, "activate", name, canActivate, activateFn);
   commitGuardUpdate(lifecycle, "deactivate", name, canDeactivate, deactivateFn);
 
-  return { forwardTo, defaultParams, decodeParams, encodeParams };
+  return {
+    forwardTo,
+    defaultParams,
+    defaultSearch,
+    decodeParams,
+    encodeParams,
+  };
 }
 
 /**
@@ -1019,8 +1033,29 @@ function prepareCustomFields<
 }
 
 /**
+ * Applies one nullable scalar-config update in place: `undefined` is a no-op
+ * (field not in the patch), `null` deletes the entry, any other value sets it.
+ */
+function commitScalarField<T>(
+  map: Record<string, T>,
+  name: string,
+  value: T | null | undefined,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (value === null) {
+    delete map[name];
+  } else {
+    map[name] = value;
+  }
+}
+
+/**
  * COMMIT step for the scalar config fields of an update (#951): writes
- * `defaultParams` / `decodeParams` / `encodeParams` in place. These assignments
+ * `defaultParams` / `defaultSearch` / `decodeParams` / `encodeParams` in place.
+ * These assignments
  * are pure and never throw, so they run in the COMMIT phase after every throwing
  * field has been validated in PREPARE. `forwardTo` is handled separately — it
  * has its own throwing prepare step ({@link prepareForwardTo}).
@@ -1032,19 +1067,15 @@ function commitScalarConfig<
   name: string,
   updates: {
     defaultParams?: Params | null | undefined;
+    defaultSearch?: SearchParams | null | undefined;
     decodeParams?:
       ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
     encodeParams?:
       ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
   },
 ): void {
-  if (updates.defaultParams !== undefined) {
-    if (updates.defaultParams === null) {
-      delete store.config.defaultParams[name];
-    } else {
-      store.config.defaultParams[name] = updates.defaultParams;
-    }
-  }
+  commitScalarField(store.config.defaultParams, name, updates.defaultParams);
+  commitScalarField(store.config.defaultSearch, name, updates.defaultSearch);
 
   if (updates.decodeParams !== undefined) {
     if (updates.decodeParams === null) {

@@ -8,10 +8,10 @@ import type { Params, SearchParams } from "../../types";
 export interface StateNamespaceDependencies {
   /** Get defaultParams config for a route */
   getDefaultParams: () => Record<string, Params>;
+  /** Get defaultSearch config for a route (query-channel defaults, #1548) */
+  getDefaultSearch: () => Record<string, SearchParams>;
   /** Build URL path for a route */
   buildPath: (name: string, params?: Params, search?: SearchParams) => string;
   /** Get URL params for a route (for areStatesEqual) */
   getUrlParams: (name: string) => string[];
-  /** Get declared query param names for a route (channel routing, #1549) */
-  getQueryParams: (name: string) => string[];
 }

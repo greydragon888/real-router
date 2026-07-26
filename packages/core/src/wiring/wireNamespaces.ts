@@ -1,6 +1,6 @@
 // packages/core/src/wiring/wireNamespaces.ts
 
-import { normalizeParams, splitParamsBySearch } from "../helpers";
+import { normalizeParams } from "../helpers";
 import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
 
@@ -198,48 +198,33 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         "navigate",
       );
 
-      const forwarded = ctx.forwardState(routeName, routeParams);
+      // forwardState canonicalizes the channels at ITS boundary (#1548/#1549):
+      // `forwarded.params` is path-only, `forwarded.search` the full query. The
+      // `routeSearch` arg (positional `navigate(name, params, search)` /
+      // descriptor form), any declared `?key` riding in the caller's `params`
+      // bag, and persistent params a plugin injected there all land in the query
+      // channel there — so ONE makeState call serves both the positional and the
+      // v1 single-bag forms with no explicit/v1 split here. A colliding name
+      // (`/items/:id?id`) keeps its path slot and query twin independent.
+      const forwarded = ctx.forwardState(routeName, routeParams, routeSearch);
       const name = forwarded.name;
-      const fullParams = normalizeParams(forwarded.params);
+      const params = normalizeParams(forwarded.params);
       const meta = ns.routes.getMetaForState(name);
 
       if (meta === undefined) {
         return;
       }
 
-      // Explicit query channel (RFC-4 M2 / #1548): the descriptor
-      // `navigate(target)` and positional `navigate(name, params, search)` forms
-      // supply `search` directly. Path comes from the path bag, query from
-      // `routeSearch` — buildPath is search-aware, so a colliding name
-      // (`/items/:id?id`) keeps the path value in its slot and the query value
-      // in its own (the killed #843 precedence).
-      if (routeSearch !== undefined) {
-        const explicitPath = ctx.buildPath(name, fullParams, routeSearch);
-
-        return ns.state.makeState(
-          name,
-          fullParams,
-          routeSearch,
-          explicitPath,
-          true,
-        );
-      }
-
-      // v1 single-bag path: split the forwarded bag into path and query channels
-      // by declaration (keys that are not path params). `buildPath` still takes
-      // the FULL bag, so the URL keeps its query string; `state.params` gets the
-      // path-only bag and `state.search` the query. Non-query default keys are
-      // pinned to the params channel (#1549): the forwarded bag has defaults
-      // merged in, and an arbitrary default must keep its v1 home in
-      // `state.params` instead of being routed like an explicit undeclared key.
-      const { params, search } = splitParamsBySearch(
-        fullParams,
-        ns.routes.getUrlParams(name),
-        ns.routes.getNonQueryDefaultKeys(name),
+      // path omitted → makeState builds it from the merged channels (buildPath
+      // is search-aware and re-applies defaults idempotently), keeping
+      // `state.path` in step with `state.search`.
+      return ns.state.makeState(
+        name,
+        params,
+        forwarded.search,
+        undefined,
+        true,
       );
-      const path = ctx.buildPath(name, fullParams);
-
-      return ns.state.makeState(name, params, search, path, true);
     },
     resolveDefault: () => {
       const options = ns.options.get();
@@ -334,12 +319,12 @@ function wireState<Dependencies extends DefaultDependencies>(
 ): void {
   ns.state.setDependencies({
     getDefaultParams: () => ns.routes.getStore().config.defaultParams,
+    getDefaultSearch: () => ns.routes.getStore().config.defaultSearch,
     buildPath: (name, params, search) => {
       const ctx = getInternals(ns.router);
 
       return ctx.buildPath(name, params, search);
     },
     getUrlParams: (name) => ns.routes.getUrlParams(name),
-    getQueryParams: (name) => ns.routes.getQueryParams(name),
   });
 }

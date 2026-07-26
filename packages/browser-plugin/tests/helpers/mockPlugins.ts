@@ -210,8 +210,14 @@ export const createPersistentParamsPlugin = (
     return {
       onTransitionSuccess: (toState: State) => {
         persistentParams.forEach((param) => {
-          if (toState.search[param] !== undefined) {
-            persistentParamsValues[param] = toState.search[param];
+          // #1549 3a: an undeclared persisted key lands in state.params (the
+          // removed splitParamsBySearch used to route it to state.search). Capture
+          // from whichever channel holds it — params for undeclared keys, search
+          // for query-declared ones — so re-injection below actually persists it.
+          const value = toState.params[param] ?? toState.search[param];
+
+          if (value !== undefined) {
+            persistentParamsValues[param] = value;
           }
         });
       },

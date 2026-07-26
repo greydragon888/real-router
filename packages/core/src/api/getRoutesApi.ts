@@ -37,6 +37,7 @@ import type {
   NavigationOptions,
   Params,
   ParamsSearch,
+  SearchParams,
   Router,
   RouterLogger,
   State,
@@ -79,6 +80,7 @@ function clearRouteConfigurations<
   clearConfigEntries(config.decoders, shouldClear);
   clearConfigEntries(config.encoders, shouldClear);
   clearConfigEntries(config.defaultParams, shouldClear);
+  clearConfigEntries(config.defaultSearch, shouldClear);
   clearConfigEntries(config.forwardMap, shouldClear);
   clearConfigEntries(config.forwardFnMap, shouldClear);
   clearConfigEntries(routeCustomFields, shouldClear);
@@ -137,6 +139,10 @@ function assignRouteConfig<
 
   if (lookupName in config.defaultParams) {
     route.defaultParams = config.defaultParams[lookupName];
+  }
+
+  if (lookupName in config.defaultSearch) {
+    route.defaultSearch = config.defaultSearch[lookupName];
   }
 
   if (lookupName in config.decoders) {
@@ -363,6 +369,7 @@ function buildStructuralPatch<
 >(fields: {
   forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
   defaultParams?: Params | null | undefined;
+  defaultSearch?: SearchParams | null | undefined;
   decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
   encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 }): Readonly<TreeStructuralPatch<Dependencies>> {
@@ -374,6 +381,10 @@ function buildStructuralPatch<
 
   if (fields.defaultParams !== undefined) {
     patch.defaultParams = fields.defaultParams;
+  }
+
+  if (fields.defaultSearch !== undefined) {
+    patch.defaultSearch = fields.defaultSearch;
   }
 
   if (fields.encodeParams !== undefined) {

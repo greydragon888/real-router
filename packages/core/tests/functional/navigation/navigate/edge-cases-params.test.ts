@@ -80,16 +80,17 @@ describe("router.navigate() - edge cases params", () => {
         );
 
         expect(state.name).toBe("users.view");
-        // `id` fills the `:id` path slot (stays in .params); the undeclared
-        // keys are captured as query params (re-channeled to .search).
+        // `id` fills the `:id` path slot; the undeclared array-like keys are
+        // not query-declared on `/users/view/:id`, so under RFC-4 M2 / #1548
+        // (decision 3a) an undeclared key in the params bag routes to
+        // state.params, never state.search / the URL query.
         expect(state.params).toStrictEqual({
           id: 123,
-        });
-        expect(state.search).toStrictEqual({
           length: 2,
           0: "a",
           1: "b",
         });
+        expect(state.search).toStrictEqual({});
       });
 
       it("should handle object with numeric keys", async () => {
@@ -103,15 +104,15 @@ describe("router.navigate() - edge cases params", () => {
         );
 
         expect(state.name).toBe("users.view");
-        // `id` fills the `:id` path slot (stays in .params); the undeclared
-        // numeric keys are captured as query params (re-channeled to .search).
+        // `id` fills the `:id` path slot; the undeclared numeric keys route to
+        // state.params (not state.search / the URL query) under RFC-4 M2 /
+        // #1548 (decision 3a).
         expect(state.params).toStrictEqual({
           id: 456,
-        });
-        expect(state.search).toStrictEqual({
           0: "first",
           1: "second",
         });
+        expect(state.search).toStrictEqual({});
       });
     });
 

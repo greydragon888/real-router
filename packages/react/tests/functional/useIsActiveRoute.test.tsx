@@ -172,10 +172,20 @@ describe("useIsActiveRoute", () => {
         filter: "active",
         sort: "date",
         page: 1,
-        nested: { a: 1, b: 2 },
+        // A primitive array is a valid route-param value (SearchParamValue) and
+        // compares by CONTENT (areParamValuesEqual). A nested object is NOT a
+        // valid param value (M2 params are primitives / primitive arrays) and
+        // would compare by reference — fragile across adapters.
+        tags: [1, 2],
       };
 
-      await act(() => router.navigate("complex", complexParams));
+      // `/complex` has no path params and these keys are undeclared, so they
+      // don't render to the URL — both navigations build the same path. `reload`
+      // allows the same-URL re-navigation; isActiveRoute still compares the
+      // params bag (path/arbitrary channel), which is what this test exercises.
+      await act(() =>
+        router.navigate("complex", complexParams, undefined, { reload: true }),
+      );
 
       const { result } = renderHook(
         () => useIsActiveRoute("complex", complexParams),
@@ -186,16 +196,14 @@ describe("useIsActiveRoute", () => {
 
       // Navigate to route with different params
       await act(() =>
-        router.navigate("complex", { ...complexParams, page: 2 }),
+        router.navigate("complex", { ...complexParams, page: 2 }, undefined, {
+          reload: true,
+        }),
       );
 
       // Now check with the different params - should be active
       const { result: result2 } = renderHook(
-        () =>
-          useIsActiveRoute("complex", {
-            ...complexParams,
-            page: 2,
-          }),
+        () => useIsActiveRoute("complex", { ...complexParams, page: 2 }),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 

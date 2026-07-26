@@ -663,6 +663,53 @@ describe("core/routes/routePath/matchPath", () => {
         "Decoder intentionally failed",
       );
     });
+
+    it("routes a decoder-injected declared query key into state.path AND state.search (#1549)", () => {
+      // A decoder that injects a DECLARED `?tag` into the params bag: the key
+      // rides in `routeParams` on the matchPath rebuild — the same shape a
+      // plugin's forwardState injection produces (persistent-params on start()).
+      // The rebuild must route it into the URL query, in step with the
+      // `state.search` makeState commits — never leave state.search carrying
+      // `tag` while the rebuilt URL omits it.
+      const customRouter = createTestRouter();
+
+      getRoutesApi(customRouter).add({
+        name: "tagged",
+        path: "/tagged/:id?tag",
+        decodeParams: ({ params, search }) => ({
+          params: { ...params, tag: "dev" },
+          search,
+        }),
+      });
+
+      const state = getPluginApi(customRouter).matchPath("/tagged/1");
+
+      expect(state?.params).toStrictEqual({ id: "1" });
+      expect(state?.search).toStrictEqual({ tag: "dev" });
+      expect(state?.path).toBe("/tagged/1?tag=dev");
+    });
+
+    it("routes a decoder-injected query key on a route WITHOUT path params (#1549)", () => {
+      // The decoder injects only a DECLARED query key and the route has no path
+      // params, so after channel separation the path bag is empty — covers the
+      // all-query rebuild branch (canonical params → EMPTY_PARAMS).
+      const customRouter = createTestRouter();
+
+      getRoutesApi(customRouter).add({
+        name: "plain",
+        path: "/plain?tag",
+        decodeParams: ({ params, search }) => ({
+          params: { ...params, tag: "dev" },
+          search,
+        }),
+      });
+
+      const state = getPluginApi(customRouter).matchPath("/plain");
+
+      expect(state?.params).toStrictEqual({});
+      expect(state?.search).toStrictEqual({ tag: "dev" });
+      expect(state?.path).toBe("/plain?tag=dev");
+    });
   });
 
   // =========================================================================
@@ -688,18 +735,22 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "page",
         path: "/page?sort",
-        defaultParams: { sort: "name", limit: "10" },
+        // The query-declared default (`sort`) lives in defaultSearch; the
+        // arbitrary `limit` stays in defaultParams (RFC-4 M2 / #1548, rule 1).
+        defaultParams: { limit: "10" },
+        defaultSearch: { sort: "name" },
       });
 
       const state = getPluginApi(customRouter).matchPath("/page");
 
       expect(state?.name).toBe("page");
-      // defaultParams are routed by channel (#1549): the query-declared `sort`
-      // lands in state.search, the arbitrary `limit` keeps its v1 home in
-      // state.params.
+      // defaultSearch → state.search (query channel); defaultParams → state.params.
       expect(state?.search.sort).toBe("name");
       expect(state?.params.limit).toBe("10");
       expect(state?.params.sort).toBeUndefined();
+      // Anti-masking (rule 6): the query default also lands in the rebuilt URL,
+      // so state.search and state.path stay in step on the matchPath channel.
+      expect(state?.path).toContain("sort=name");
     });
 
     it("should rebuild path with defaultParams query params when rewritePathOnMatch is true", () => {
@@ -708,7 +759,8 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "search",
         path: "/search?q&sort",
-        defaultParams: { sort: "date" },
+        // `sort` is query-declared → defaultSearch (RFC-4 M2 / #1548, rule 1).
+        defaultSearch: { sort: "date" },
       });
 
       const state = getPluginApi(customRouter).matchPath("/search?q=test");

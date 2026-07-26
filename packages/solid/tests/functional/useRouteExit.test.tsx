@@ -77,7 +77,7 @@ describe("useRouteExit", () => {
     await router.navigate("users.view", { id: "1" });
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
 
     expect(handler).not.toHaveBeenCalled();
   });
@@ -98,7 +98,7 @@ describe("useRouteExit", () => {
     await router.navigate("users.view", { id: "1" });
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
 
     expect(handler).toHaveBeenCalledTimes(1);
   });
@@ -282,7 +282,7 @@ describe("useRouteExit — explicit guard pins (Mini-sprint F.5 — audit-6 Stag
 
     // Same route name, different params → counts as same-route for
     // the exit handler.
-    await router.navigate("users.view", { id: "1", sort: "asc" });
+    await router.navigate("users.view", { id: "1" }, { sort: "asc" });
 
     expect(handler).not.toHaveBeenCalled();
 

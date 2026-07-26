@@ -104,14 +104,15 @@ describe("useIsActiveRoute", () => {
 
   it("should distinguish routes by query params when ignoreQueryParams is false", async () => {
     // Navigate to items.item with query param
-    await router.navigate("items.item", { id: "6", page: "1" });
+    await router.navigate("items.item", { id: "6" }, { page: "1" });
     flushSync();
 
     let result!: { readonly current: boolean };
 
     renderWithRouter(router, ActiveRouteCapture, {
       routeName: "items.item",
-      routeParams: { id: "6", page: "1" },
+      routeParams: { id: "6" },
+      search: { page: "1" },
       strict: true,
       ignoreQueryParams: false,
       onCapture: (r: { readonly current: boolean }) => {
@@ -123,7 +124,7 @@ describe("useIsActiveRoute", () => {
     expect(result.current).toBe(true);
 
     // Navigate to the same route but different query params
-    await router.navigate("items.item", { id: "6", page: "2" });
+    await router.navigate("items.item", { id: "6" }, { page: "2" });
     flushSync();
 
     // With ignoreQueryParams=false, different query params → NOT active
@@ -132,7 +133,7 @@ describe("useIsActiveRoute", () => {
 
   it("should ignore query params by default (ignoreQueryParams=true)", async () => {
     // Navigate to items.item with query param
-    await router.navigate("items.item", { id: "6", page: "1" });
+    await router.navigate("items.item", { id: "6" }, { page: "1" });
     flushSync();
 
     let result!: { readonly current: boolean };
@@ -149,7 +150,7 @@ describe("useIsActiveRoute", () => {
     expect(result.current).toBe(true);
 
     // Navigate to the same route with different query params
-    await router.navigate("items.item", { id: "6", page: "2" });
+    await router.navigate("items.item", { id: "6" }, { page: "2" });
     flushSync();
 
     // With ignoreQueryParams=true, different query params → still active

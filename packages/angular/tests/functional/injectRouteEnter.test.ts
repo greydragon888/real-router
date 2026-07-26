@@ -139,7 +139,7 @@ describe("injectRouteEnter", () => {
 
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
     TestBed.tick();
 
     expect(handler).not.toHaveBeenCalled();
@@ -154,7 +154,7 @@ describe("injectRouteEnter", () => {
     TestBed.tick();
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
     TestBed.tick();
 
     expect(handler).toHaveBeenCalledTimes(1);

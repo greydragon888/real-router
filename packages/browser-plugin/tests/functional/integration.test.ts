@@ -55,14 +55,17 @@ const createMockedBrowser = (): Browser => {
 
 const routerConfig = [
   {
+    // Persistent params are QUERY params — declared as `?…` so they route to
+    // state.search (and the URL query). Children inherit the parent's query
+    // segment. Since #1549 3a, an UNdeclared key would stay in state.params.
     name: "users",
-    path: "/users",
+    path: "/users?lang&theme&sessionId",
     children: [
       { name: "view", path: "/view/:id" },
       { name: "list", path: "/list" },
     ],
   },
-  { name: "home", path: "/home" },
+  { name: "home", path: "/home?lang&theme&sessionId" },
   { name: "index", path: "/" },
 ];
 
@@ -206,7 +209,9 @@ describe("Browser Plugin Integration", () => {
       // At minimum two forwardState calls: initial start → "home"
       // (defaultRoute) and navigate → "users.view". Core may call it
       // additionally for internal resolutions — asserting lower-bound 2.
-      expect(currentHistoryState?.search.modified).toBe(true);
+      // #1549 3a: an undeclared caller/plugin-written key stays in state.params
+      // (was routed to state.search by the removed splitParamsBySearch).
+      expect(currentHistoryState?.params.modified).toBe(true);
       expect(modifiedStates.length).toBeGreaterThanOrEqual(2);
       // Last recorded state must reflect the navigation target.
       expect(modifiedStates.at(-1)?.params.modified).toBe(true);
@@ -232,7 +237,8 @@ describe("Browser Plugin Integration", () => {
       expect(router.getState()?.search.lang).toBe("en");
       expect(router.getState()?.search.theme).toBe("dark");
 
-      // Browser history should include persistent params
+      // Browser history includes the persistent (query) params — they live in
+      // state.search (the routes declare `?lang&theme`).
       expect(currentHistoryState?.search.lang).toBe("en");
       expect(currentHistoryState?.search.theme).toBe("dark");
     });
@@ -357,6 +363,7 @@ describe("Browser Plugin Integration", () => {
       // Persistent params worked
       await router.navigate("home");
 
+      // Persistent (query) param lives in state.search (route declares `?sessionId`).
       expect(router.getState()?.search.sessionId).toBe("abc");
 
       // Browser plugin updated history
@@ -447,10 +454,11 @@ describe("Browser Plugin Integration", () => {
       await router.navigate("users.list");
 
       // Browser plugin should handle complex params
-      expect(currentHistoryState?.search.nested).toStrictEqual({
+      // #1549 3a: undeclared plugin-written keys stay in state.params.
+      expect(currentHistoryState?.params.nested).toStrictEqual({
         deep: { value: 42 },
       });
-      expect(currentHistoryState?.search.array).toStrictEqual([1, 2, 3]);
+      expect(currentHistoryState?.params.array).toStrictEqual([1, 2, 3]);
     });
   });
 

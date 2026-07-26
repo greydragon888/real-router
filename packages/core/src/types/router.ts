@@ -440,12 +440,21 @@ export interface Route<
    */
   decodeParams?: (channels: ParamsSearch) => ParamsSearch;
   /**
-   * Default parameters for this route.
-   *
-   * These values are merged into state.params when creating route states.
-   * Missing URL params are filled from defaultParams.
+   * Default **path** parameters for this route (and arbitrary app-level
+   * defaults). Merged into `state.params`; missing path params are filled from
+   * here. Query defaults live in {@link defaultSearch} (RFC-4 M2 / #1548) — a
+   * query-declared name (`?name`) placed here is NOT routed to the query string.
    */
   defaultParams?: Params;
+  /**
+   * Default **query** (search) parameters for this route (RFC-4 M2 / #1548) —
+   * the query-channel twin of {@link defaultParams}. Merged into `state.search`
+   * and, subject to `queryParamsMode`, printed into the URL query string. A key
+   * the route does not declare as a query param (`?name`) follows the same
+   * `queryParamsMode` rules as a runtime `search` value (loose prints,
+   * default/strict drops).
+   */
+  defaultSearch?: SearchParams;
 }
 
 /**
@@ -480,6 +489,8 @@ export interface RouteConfigUpdate<
   forwardTo?: string | ForwardToCallback<Dependencies> | null;
   /** Set to null to remove defaultParams */
   defaultParams?: Params | null;
+  /** Set to null to remove defaultSearch (RFC-4 M2 / #1548) */
+  defaultSearch?: SearchParams | null;
   /** Set to null to remove decoder */
   decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null;
   /** Set to null to remove encoder */

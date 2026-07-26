@@ -12,7 +12,7 @@ import {
   guardDependencies,
   guardRouteStructure,
 } from "./guards";
-import { createLimits, normalizeParams } from "./helpers";
+import { createLimits, normalizeParams, separateChannels } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -252,23 +252,51 @@ export class Router<
 
     const interceptorsMap: RouterInternals["interceptors"] = new Map();
 
+    // THE single forwardState boundary (#1548/#1549). The interceptable resolves
+    // the route (forwardTo) and runs the whole interceptor chain — persistent
+    // params injected into the params bag, a search-schema validation, etc. The
+    // outer layer then canonicalizes the channels ONCE via `separateChannels`,
+    // keyed on the RESOLVED route's `?`-declaration (`getQueryParams(forwarded
+    // .name)`): a declared query key a plugin/decoder left in the params bag
+    // moves to the query channel, everything else stays a path param. So
+    // forwardState's result is ALWAYS channel-separated by construction — every
+    // consumer (makeState, matchPath, canNavigateTo, buildState) receives
+    // path-only params + the full query and never re-splits. `as unknown as` is
+    // required: the closure is non-generic, but RouterInternals["forwardState"]
+    // is declared generic `<P, S>`, which tsc will not infer from a non-generic
+    // source (Sonar S4325 misclassifies this as a redundant cast).
+    const rawForwardState = createTernaryInterceptable(
+      "forwardState",
+      (name: string, params: Params, search?: SearchParams) =>
+        this.#routes.forwardState(name, params, search),
+      interceptorsMap,
+    );
+
+    const forwardState = ((
+      name: string,
+      params: Params,
+      search?: SearchParams,
+    ) => {
+      const forwarded = rawForwardState(name, params, search);
+      const separated = separateChannels(
+        forwarded.params,
+        this.#routes.getQueryParams(forwarded.name),
+        forwarded.search,
+      );
+
+      return {
+        name: forwarded.name,
+        params: separated.params ?? EMPTY_PARAMS,
+        search: separated.search,
+      };
+    }) as unknown as RouterInternals["forwardState"];
+
     registerInternals(this, {
       logger,
       makeState: (name, params, search, path) =>
         this.#state.makeState(name, params, search, path),
       getMetaForState: (name) => this.#routes.getMetaForState(name),
-      // `as unknown as` is required: createTernaryInterceptable returns a
-      // non-generic `(a, b, c) => R`, but RouterInternals["forwardState"]
-      // is declared with generic parameters `<P extends Params, S extends
-      // SearchParams>`, which tsc will not infer from the non-generic source.
-      // Sonar S4325
-      // misclassifies this as a redundant cast.
-      forwardState: createTernaryInterceptable(
-        "forwardState",
-        (name: string, params: Params, search?: SearchParams) =>
-          this.#routes.forwardState(name, params, search),
-        interceptorsMap,
-      ) as unknown as RouterInternals["forwardState"],
+      forwardState,
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
       matchPath: (path, matchOptions) =>
@@ -702,10 +730,11 @@ export class Router<
       return false;
     }
 
-    const { name: resolvedName, params: resolvedParams } = ctx.forwardState(
-      name,
-      params ?? {},
-    );
+    const {
+      name: resolvedName,
+      params: resolvedParams,
+      search: resolvedSearch,
+    } = ctx.forwardState(name, params ?? {}, search);
 
     // Build `toState` exactly as `buildNavigateState` does — WITH route-meta and
     // normalized params — so `getTransitionPath` takes its STANDARD PATH and
@@ -727,15 +756,20 @@ export class Router<
 
     try {
       const normalizedParams = normalizeParams(resolvedParams);
-      const path = ctx.buildPath(resolvedName, normalizedParams, search);
+      const path = ctx.buildPath(
+        resolvedName,
+        normalizedParams,
+        resolvedSearch,
+      );
 
       toState = this.#state.makeState(
         resolvedName,
         normalizedParams,
-        // The explicit query channel (RFC-4 M2 / #1548): `toState.search` mirrors
-        // what a real navigate would commit, so guards that read `toState.search`
-        // and `areStatesEqual`'s query comparison see the same shape as navigate.
-        search,
+        // Query channel canonical from forwardState (#1548/#1549): `toState
+        // .search` mirrors what a real navigate would commit, so guards reading
+        // `toState.search` and `areStatesEqual`'s query comparison see navigate's
+        // shape.
+        resolvedSearch,
         path,
         true,
       );

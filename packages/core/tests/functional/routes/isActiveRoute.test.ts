@@ -261,7 +261,8 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         routesApi.add({
           name: "products",
           path: "/products?sort",
-          defaultParams: { sort: "asc" },
+          // `sort` is query-declared → defaultSearch (RFC-4 M2 / #1548, rule 1).
+          defaultSearch: { sort: "asc" },
           children: [{ name: "detail", path: "/:id" }],
         });
       });
@@ -296,16 +297,15 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("preserves URL-typed defaults during the strip (URL key first)", async () => {
-        // URL key first in iteration order — the stripper sees the URL key
-        // BEFORE allocating `filtered`, so the URL key never enters the
-        // append branch. It still survives because the final return uses
-        // the original `defaultParams` reference when no query was found —
-        // here `q` IS query, so `filtered` is allocated when q is reached
-        // and contains the slot prefix from the inner break loop.
+        // Mixed defaults split by channel (RFC-4 M2 / #1548, rule 1): the
+        // path-typed `slot` stays in defaultParams (always enforced), the
+        // query-declared `q` moves to defaultSearch (stripped when
+        // ignoreQueryParams=true). The parent link stays active iff `slot` matches.
         routesApi.add({
           name: "mixedA",
           path: "/mixedA/:slot?q",
-          defaultParams: { slot: "a", q: "x" },
+          defaultParams: { slot: "a" },
+          defaultSearch: { q: "x" },
           children: [{ name: "leaf", path: "/leaf" }],
         });
 
@@ -323,12 +323,15 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("strips multiple consecutive query defaults", async () => {
-        // Two query defaults in a row — exercises the `filtered !== null`
-        // branch on the second query key (no re-allocation).
+        // Two query-declared defaults (`a`, `b`) move to defaultSearch; the
+        // non-query `slot` stays in defaultParams (RFC-4 M2 / #1548, rule 1).
+        // With ignoreQueryParams=true both query defaults are stripped, leaving
+        // only the path-channel `slot` to be enforced.
         routesApi.add({
           name: "twoQ",
           path: "/twoQ?a&b&:slot",
-          defaultParams: { a: "1", b: "2", slot: "x" },
+          defaultParams: { slot: "x" },
+          defaultSearch: { a: "1", b: "2" },
           children: [{ name: "leaf", path: "/leaf" }],
         });
 
@@ -359,13 +362,14 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("preserves URL-typed defaults during the strip (query key first)", async () => {
-        // Query key first in iteration order — `filtered` is allocated on
-        // the first iteration and the subsequent URL key flows into the
-        // `filtered[key] = defaultParams[key]` append branch.
+        // Same split as mixedA, query key declared first (RFC-4 M2 / #1548,
+        // rule 1): query-declared `q` → defaultSearch, path-typed `slot` →
+        // defaultParams. The parent link stays active iff `slot` matches.
         routesApi.add({
           name: "mixedB",
           path: "/mixedB/:slot?q",
-          defaultParams: { q: "x", slot: "a" },
+          defaultParams: { slot: "a" },
+          defaultSearch: { q: "x" },
           children: [{ name: "leaf", path: "/leaf" }],
         });
 
@@ -552,6 +556,30 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
           router.isActiveRoute("usersFiltered", { filter: "active" }),
         ).toBe(false);
       });
+    });
+  });
+
+  describe("defaultSearch hierarchical (#1549)", () => {
+    it("parent defaultSearch must match the active descendant when query is not ignored", async () => {
+      routesApi.add({
+        name: "tagged",
+        path: "/tagged?tag",
+        defaultSearch: { tag: "on" },
+        children: [{ name: "view", path: "/view/:id" }],
+      });
+
+      // Active descendant carries the parent's query default (tag=on): with query
+      // considered (ignoreQueryParams=false), the parent's defaultSearch matches
+      // the active descendant → the parent is active.
+      await router.navigate("tagged.view", { id: "1" }, { tag: "on" });
+
+      expect(router.isActiveRoute("tagged", {}, {}, false, false)).toBe(true);
+
+      // Descendant carries a DIFFERENT query value → the parent's defaultSearch no
+      // longer matches → the parent is not active (query-sensitive).
+      await router.navigate("tagged.view", { id: "2" }, { tag: "off" });
+
+      expect(router.isActiveRoute("tagged", {}, {}, false, false)).toBe(false);
     });
   });
 });

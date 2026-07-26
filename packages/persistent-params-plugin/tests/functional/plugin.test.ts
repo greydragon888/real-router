@@ -13,9 +13,13 @@ describe("Persistent params plugin", () => {
     router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "route1", path: "/route1/:id" },
-        { name: "route2", path: "/route2/:id" },
-        { name: "route3", path: "/route3/:id" },
+        // Persistent params ARE query params (plugin contract): declare them as
+        // `?…` so they route to state.search and reach the URL. Since #1549 3a
+        // removed splitParamsBySearch, an UNdeclared caller key stays in
+        // state.params and never reaches the URL query.
+        { name: "route1", path: "/route1/:id?mode&lang&theme" },
+        { name: "route2", path: "/route2/:id?mode&lang&theme" },
+        { name: "route3", path: "/route3/:id?mode&lang&theme" },
       ],
       { defaultRoute: "home", queryParamsMode: "default" },
     );
@@ -1102,7 +1106,8 @@ describe("Persistent params plugin", () => {
 
   describe("Multiple Parameter Removal", () => {
     it("should remove multiple parameters in single navigation", async () => {
-      const routes = [{ name: "route", path: "/route/:id" }];
+      // Persistent params declared as query (#1549 3a) so they reach state.search.
+      const routes = [{ name: "route", path: "/route/:id?a&b&c&d&e" }];
 
       const router = createRouter(routes, {
         queryParamsMode: "default",
@@ -1143,7 +1148,8 @@ describe("Persistent params plugin", () => {
 
   describe("onTransitionSuccess Removal", () => {
     it("should inject persistent param during start() even when URL doesn't contain it", async () => {
-      const routes = [{ name: "route", path: "/route/:id" }];
+      // Persistent param declared as query (#1549 3a) so it reaches state.search + URL.
+      const routes = [{ name: "route", path: "/route/:id?mode" }];
 
       const router = createRouter(routes, {
         queryParamsMode: "default",
@@ -1159,7 +1165,10 @@ describe("Persistent params plugin", () => {
       const state = router.getState();
 
       expect(state?.path).toBe("/route/1?mode=dev");
-      expect(state?.params).toStrictEqual({ id: "1", mode: "dev" });
+      // `mode` is query-declared → it rides in state.search (#1549 3a); the path
+      // param stays in state.params.
+      expect(state?.params).toStrictEqual({ id: "1" });
+      expect(state?.search).toStrictEqual({ mode: "dev" });
 
       // Persistent param carries over to subsequent navigations
       await router.navigate("route", { id: "2" });

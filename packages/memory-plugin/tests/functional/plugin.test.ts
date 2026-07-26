@@ -904,14 +904,17 @@ describe("Memory plugin", () => {
   // deterministic time-travel even when interceptors / route config /
   // dependency-driven dynamic state change between record and replay.
   describe("Snapshot semantics (#561)", () => {
-    it("commits stored entry verbatim when defaultParams change between record and replay", async () => {
+    it("commits stored entry verbatim when defaultSearch changes between record and replay", async () => {
       const router2 = createRouter(
         [
           { name: "home", path: "/" },
           {
             name: "users",
             path: "/users?sort&page",
-            defaultParams: { sort: "asc", page: "1" },
+            // sort/page are QUERY-declared (`?sort&page`) → their defaults live
+            // in `defaultSearch` (the query channel) since #1549; keeping them
+            // in `defaultParams` would also (redundantly) pollute state.params.
+            defaultSearch: { sort: "asc", page: "1" },
           },
         ],
         { defaultRoute: "home", queryParamsMode: "loose" },
@@ -928,7 +931,7 @@ describe("Memory plugin", () => {
 
       expect(recordedSearch).toMatchObject({ sort: "asc", page: "2" });
 
-      // Mutate defaultParams between record and replay. A re-resolve flow
+      // Mutate defaultSearch between record and replay. A re-resolve flow
       // would observe the new defaults; a snapshot flow does not.
       router2.stop();
       router2.dispose();

@@ -147,8 +147,7 @@ describe("Link component", () => {
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
       await act(() =>
-        router.navigate(linkRouteName, {
-          ...linkRouteParams,
+        router.navigate(linkRouteName, linkRouteParams, {
           a: "b",
           c: "d",
         }),
@@ -169,8 +168,7 @@ describe("Link component", () => {
       );
 
       await act(() =>
-        router.navigate(linkRouteName, {
-          ...linkRouteParams,
+        router.navigate(linkRouteName, linkRouteParams, {
           e: "f",
           g: "h",
         }),

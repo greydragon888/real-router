@@ -111,11 +111,11 @@ export function getPluginApi<
         "buildNavigationState",
       );
 
-      const { name: resolvedName, params: resolvedParams } = ctx.forwardState(
-        name,
-        params,
+      const forwarded = ctx.forwardState(name, params);
+      const routeInfo = ctx.buildStateResolved(
+        forwarded.name,
+        forwarded.params,
       );
-      const routeInfo = ctx.buildStateResolved(resolvedName, resolvedParams);
 
       if (!routeInfo) {
         return;
@@ -124,11 +124,11 @@ export function getPluginApi<
       return ctx.makeState(
         routeInfo.name,
         routeInfo.params,
-        // buildState builds from resolved params (no URL match) — no explicit
-        // search bag; makeState routes declared query names (defaults included)
-        // from the resolved bag into `state.search` (#1549).
-        undefined,
-        ctx.buildPath(routeInfo.name, routeInfo.params),
+        // forwardState canonicalized the channels (#1548/#1549): declared query
+        // names (defaults included) are already in `forwarded.search`, path-only
+        // params in `routeInfo.params`. makeState merges defaults, no re-split.
+        forwarded.search,
+        ctx.buildPath(routeInfo.name, routeInfo.params, forwarded.search),
       );
     },
     getOptions: ctx.getOptions,

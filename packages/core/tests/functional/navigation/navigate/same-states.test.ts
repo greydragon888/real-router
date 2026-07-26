@@ -41,15 +41,18 @@ describe("router.navigate() - same states", () => {
       });
 
       it("should handle same states with different parameter values", async () => {
-        // Navigate to profile with param
-        const state1 = await router.navigate("profile", { userId: "123" });
+        // `userId` is the declared PATH param of `profile.user` (`/profile/:userId`),
+        // so it routes to state.params and differentiates the URL (RFC-4 M2 /
+        // #1548). An undeclared key on bare `profile` would land in params but
+        // never reach the path, making every value the same state.
+        const state1 = await router.navigate("profile.user", { userId: "123" });
 
-        expect(state1?.name).toBe("profile");
-        expect(state1?.search).toStrictEqual({ userId: "123" });
+        expect(state1?.name).toBe("profile.user");
+        expect(state1?.params).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with same param - should fail
         await expect(
-          router.navigate("profile", { userId: "123" }),
+          router.navigate("profile.user", { userId: "123" }),
         ).rejects.toMatchObject({
           code: errorCodes.SAME_STATES,
         });
@@ -57,16 +60,16 @@ describe("router.navigate() - same states", () => {
 
       it("should allow navigation to same route with different parameters", async () => {
         // Navigate to profile with param
-        const state1 = await router.navigate("profile", { userId: "123" });
+        const state1 = await router.navigate("profile.user", { userId: "123" });
 
-        expect(state1?.name).toBe("profile");
-        expect(state1?.search).toStrictEqual({ userId: "123" });
+        expect(state1?.name).toBe("profile.user");
+        expect(state1?.params).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with different param - should succeed
-        const state2 = await router.navigate("profile", { userId: "456" });
+        const state2 = await router.navigate("profile.user", { userId: "456" });
 
-        expect(state2?.name).toBe("profile");
-        expect(state2?.search).toStrictEqual({ userId: "456" });
+        expect(state2?.name).toBe("profile.user");
+        expect(state2?.params).toStrictEqual({ userId: "456" });
       });
     });
 

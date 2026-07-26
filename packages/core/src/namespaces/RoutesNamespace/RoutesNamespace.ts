@@ -5,15 +5,14 @@ import {
   matchSourceTrailingSlash,
   paramsMatch,
   paramsMatchExcluding,
-  stripQueryDefaults,
 } from "./helpers";
 import {
   createRoutesStore,
   rebuildTreeInPlace,
   resetStore,
 } from "./routesStore";
-import { constants, DEFAULT_TRANSITION, EMPTY_SEARCH } from "../../constants";
-import { splitParamsBySearch } from "../../helpers";
+import { constants, EMPTY_SEARCH } from "../../constants";
+import { separateChannels } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -59,24 +58,6 @@ function collectQueryParamsArray(segments: readonly RouteTree[]): string[] {
   }
 
   return params;
-}
-
-/**
- * Overwrites each declared query name in `buildParams` with its search-channel
- * value when one exists (#1549): the rebuilt URL resolves declared names
- * search-first, so a query-typed default riding in the path bag cannot shadow
- * the URL's own query value. Mutates `buildParams` in place.
- */
-function applySearchWinsForDeclaredQuery(
-  buildParams: Record<string, unknown>,
-  queryNames: readonly string[],
-  search: SearchParams,
-): void {
-  for (const queryName of queryNames) {
-    if (Object.hasOwn(search, queryName)) {
-      buildParams[queryName] = search[queryName];
-    }
-  }
 }
 
 function createRouteState<P extends RouteParams = RouteParams>(
@@ -288,14 +269,14 @@ export class RoutesNamespace<
       : /* v8 ignore next -- @preserve: V8 can't track ?? branch in ternary; covered by buildPath tests without params */ (params ??
         {});
 
-    // #1549: with an explicit `search` bag the matcher builds the query string
-    // from it alone, so a query-typed default (declared `?page` +
-    // `defaultParams.page`) must join the search channel or it silently drops
-    // out of the URL. An explicitly-passed search value wins over the default.
-    // A v1 call (`search === undefined`) keeps the single-bag fallback, where
-    // the matcher extracts query-typed defaults from `paramsWithDefault`.
-    const searchWithDefault =
-      search === undefined ? search : this.#mergeQueryDefaults(route, search);
+    // #1549 (RFC-4 M2): the route's query defaults (`defaultSearch`) join the
+    // search channel so they reach the URL query string — including when the
+    // caller omits `search` (the navigate path), which keeps `state.path` in
+    // step with makeState's `state.search`. An explicitly-passed search value
+    // wins over the default. When the route has no `defaultSearch`, an omitted
+    // `search` stays `undefined` (single-bag fallback: the matcher extracts any
+    // query the caller rode in `paramsWithDefault`).
+    const searchWithDefault = this.#mergeDefaultSearch(route, search);
 
     // `search` (RFC-4 M2 / #1548) is the explicit query channel. The route codec
     // (if any) now sees BOTH channels — `encodeParams({ params, search })` returns
@@ -366,62 +347,62 @@ export class RoutesNamespace<
     // Thread the decoded channels through forwardState (RFC-4 M2 / #1548): a
     // search-schema interceptor validates the query on the URL→State path here
     // (the `routeSearch` argument is defined, marking this as a re-parse, not a
-    // navigate). `forwardedSearch` is what the (possibly validating) interceptor
-    // chain returns — use it for the committed `state.search`.
-    const {
-      name: routeName,
-      params: routeParams,
-      search: forwardedSearch,
-    } = this.#deps.forwardState<P>(name, decoded.params as P, decoded.search);
+    // navigate).
+    const forwarded = this.#deps.forwardState<P>(
+      name,
+      decoded.params as P,
+      decoded.search,
+    );
+    const routeName = forwarded.name;
+
+    // forwardState canonicalizes the channels at ITS boundary (#1548/#1549): the
+    // result is already path-only params + the user query — a declared `?key`
+    // that a plugin's forwardState injection (persistent-params on `start()`) or
+    // a decoder left in the params bag has already moved to the query channel.
+    // forwardState does NOT fold in the TARGET route's defaults (that would
+    // outrank a user params-twin at separation, #1549), so apply them below the
+    // user channel HERE — but only `defaultSearch`. The asymmetry is real, not
+    // the forwardState one: query defaults are URL-DEFINING (absent from a
+    // minimally-matched URL, they must be printed into the rebuilt query string),
+    // whereas path/arbitrary `defaultParams` never need merging for the URL — a
+    // path default either arrived in the matched URL or, being arbitrary, is
+    // dropped by the matcher — and `state.params` receives them from makeState
+    // downstream regardless (verified: merging defaultParams here is an
+    // equivalent no-op). `state.path` and `state.search` still can't diverge:
+    // makeState re-applies the same `defaultSearch` idempotently.
+    const routeParams = forwarded.params;
+    const forwardedSearch = this.#mergeDefaultSearch(
+      routeName,
+      forwarded.search,
+    );
 
     let builtPath = path;
 
     if (opts.rewritePathOnMatch) {
-      // Two-channel encode for the URL rebuild (RFC-4 M2 / #1548, §4): the codec
-      // sees `{ params: routeParams, search }` and returns `{ params, search }`,
-      // so it can shape either channel of the rebuilt URL.
+      // Two-channel encode for the URL rebuild (RFC-4 M2 / #1548, §4): path slots
+      // from `routeParams` (canonical, path-only), the query string from
+      // `forwardedSearch` (the full canonical query) — never the raw matched
+      // query — so the rebuilt `state.path` stays in step with `state.search`.
       const encoded =
         typeof this.#store.config.encoders[routeName] === "function"
           ? this.#store.config.encoders[routeName]({
               params: routeParams,
-              search,
+              search: forwardedSearch,
             })
-          : { params: routeParams, search };
-
-      // Reunite the (encoded) query with the path bag so the rebuilt URL keeps
-      // its query string. PATH params win over a same-named query param
-      // (`/items/:id?id`): the path bag is spread LAST so query never
-      // overwrites the path value in the rebuild — the killed #843 precedence.
-      const buildParams: Record<string, unknown> = {
-        ...encoded.search,
-        ...encoded.params,
-      };
-
-      // #1549: for a DECLARED query name the search channel wins the rebuild —
-      // the path bag may carry a query-typed default (forwardState merges all
-      // defaults into params), and without this the default would shadow the
-      // URL's own query value in the rebuilt `state.path`. `getQueryParams`
-      // excludes colliding names (`/items/:id?id` — path-owned), so path slots
-      // stay protected by the spread order above.
-      applySearchWinsForDeclaredQuery(
-        buildParams,
-        this.getQueryParams(routeName),
-        encoded.search,
-      );
+          : { params: routeParams, search: forwardedSearch };
 
       const ts = opts.trailingSlash;
 
       try {
-        // `search` omitted (v1 single-bag rebuild): the matched query is folded
-        // into `buildParams` above (declared names resolved search-first), so
-        // the matcher extracts the query half from it — undeclared loose-mode
-        // keys in either channel keep reaching the URL, and query-typed
-        // defaultParams still reach it too. The write path (navigate /
-        // buildPath) passes an explicit `search` (RFC-4 M2 / #1548).
+        // Explicit two-channel build (RFC-4 M2 / #1548): path slots from
+        // `encoded.params`, the query string from `encoded.search`. The channels
+        // stay separate, so a `/coll/:id?id` collision keeps its path slot and
+        // query twin independent — no single-bag reunification, no
+        // search-wins-for-declared-query fixup.
         builtPath = this.#store.matcher.buildPath(
           routeName,
-          buildParams,
-          undefined,
+          encoded.params,
+          encoded.search,
           {
             trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
             queryParamsMode: opts.queryParamsMode,
@@ -442,12 +423,10 @@ export class RoutesNamespace<
       }
     }
 
-    // `state.search` carries the matched query as returned by forwardState (a
-    // search-schema interceptor may have validated/stripped it); `state.params`
-    // keeps the resolved path bag. A query-declared `defaultParam` (and a
-    // decoder-injected query key) still rides in `routeParams` here —
-    // `makeState` routes declared query names into `state.search` (#1549), so
-    // the committed channels are canonical regardless of the producer.
+    // `routeParams` / `forwardedSearch` are already canonical (forwardState
+    // boundary), so `state.path` (the rebuild) and `state.search` (makeState)
+    // derive from the SAME separated bags by construction. makeState only merges
+    // route defaults idempotently — it no longer re-splits.
     return this.#deps.makeState<P>(
       routeName,
       routeParams,
@@ -472,11 +451,24 @@ export class RoutesNamespace<
     params: P,
     search?: S,
   ): { name: string; params: P; search: S } {
-    // The query channel passes through forwardState untouched (RFC-4 M2 / #1548):
-    // forwardTo resolution and defaultParams merging operate on the path bag,
-    // while `search` carries the already-parsed query (from matchPath's re-parse
-    // or the navigate split) so a search-schema interceptor can validate it on
-    // the URL→State path. Frozen empty singleton when absent.
+    // TARGET-route defaults are NOT applied here for EITHER channel — they are
+    // merged strictly BELOW the user channels at the terminal points only
+    // (`makeState` for state, `matchPath` / `buildPath` for the URL). Folding a
+    // target default into this result would ride ABOVE a user params-twin at the
+    // channel-separation boundary (the interceptable's outer `separateChannels`
+    // merges the params-twin UNDER `result.search`), inverting the priority — a
+    // `navigate(x, { page: 2 })` on a `?page` route with `defaultSearch{page:1}`
+    // would wrongly commit `page=1`. So both channels pass through as the user
+    // gave them: `search` stays `resolvedSearch`, `params` stays the raw bag.
+    //
+    // The ONE default forwardState still merges is the forwardTo SOURCE route's
+    // path defaults (`paramsWithSourceDefaults` in the forward branches): when
+    // `a` forwards to `b`, `a`'s `defaultParams` fill in before the redirect and
+    // flow to `b`. This canNOT move to a terminal point — `makeState`/`buildPath`
+    // see only the RESOLVED target `b` and cannot reconstruct source `a`'s
+    // defaults. It is path-only because forwardTo's source semantics are
+    // path-based (there is no source-`defaultSearch` flow). Frozen empty search
+    // singleton when absent.
     const resolvedSearch = (search ?? EMPTY_SEARCH) as S;
 
     if (Object.hasOwn(this.#store.config.forwardFnMap, name)) {
@@ -490,7 +482,7 @@ export class RoutesNamespace<
 
       return {
         name: resolved,
-        params: this.#mergeDefaultParams(resolved, paramsWithSourceDefaults),
+        params: paramsWithSourceDefaults,
         search: resolvedSearch,
       };
     }
@@ -512,7 +504,7 @@ export class RoutesNamespace<
 
       return {
         name: resolved,
-        params: this.#mergeDefaultParams(resolved, paramsWithSourceDefaults),
+        params: paramsWithSourceDefaults,
         search: resolvedSearch,
       };
     }
@@ -522,17 +514,14 @@ export class RoutesNamespace<
 
       return {
         name: staticForward,
-        params: this.#mergeDefaultParams(
-          staticForward,
-          paramsWithSourceDefaults,
-        ),
+        params: paramsWithSourceDefaults,
         search: resolvedSearch,
       };
     }
 
     return {
       name,
-      params: this.#mergeDefaultParams(name, params),
+      params,
       search: resolvedSearch,
     };
   }
@@ -556,8 +545,9 @@ export class RoutesNamespace<
     const meta = this.#store.matcher.getMetaByName(resolvedName)!;
 
     return createRouteState(
-      // Resolved (non-match) path: query is still folded into `params` during
-      // the A2 back-compat window, so `search` is empty here (RFC-4 M2 / #1548).
+      // forwardState already separated the channels upstream (#1548/#1549), so
+      // `resolvedParams` is path-only; this RouteTreeState carries the path
+      // channel only — the query is threaded separately by the caller (makeState).
       { segments, params: resolvedParams, search: {}, meta },
       resolvedName,
     );
@@ -600,32 +590,24 @@ export class RoutesNamespace<
 
     // Exact match case
     if (strictEquality || activeName === name) {
-      const effectiveParams = defaultParams
-        ? { ...defaultParams, ...params }
-        : params;
-
-      // Split the target bag into path and query channels so `areStatesEqual`
-      // compares each against the active state's own channels (RFC-4 M2 /
-      // #1548) — `activeState.params` is now path-only, query is in
-      // `activeState.search`. `params` may still carry query keys (a v1
-      // single-bag call that omits `searchArg`); the explicit `searchArg` (the
-      // slot-shifted query channel) then wins over any split/default query
-      // value. Non-query default keys are pinned to the params channel (#1549)
-      // so the target splits the same way the committed state was built.
-      const { params: pathParams, search: splitSearch } = splitParamsBySearch(
-        effectiveParams,
-        this.getUrlParams(name),
-        this.getNonQueryDefaultKeys(name),
+      // Build the canonical target the same way navigate / canNavigateTo do:
+      // separate the caller bag into channels by this route's `?`-declaration
+      // (a declared query key handed in `params` moves to search, explicit
+      // `searchArg` winning the collision), then hand the CLEAN channels to
+      // makeState — which merges defaults but no longer re-splits (#1548/#1549).
+      // So the comparison target can never drift from how the committed state was
+      // built. Path "" skips the URL build (areStatesEqual compares channels).
+      const { params: targetParams, search: targetSearch } = separateChannels(
+        params,
+        this.getQueryParams(name),
+        searchArg,
       );
-
-      const targetState: State = {
+      const targetState = this.#deps.makeState(
         name,
-        params: pathParams,
-        search: { ...splitSearch, ...searchArg },
-        path: "",
-        transition: DEFAULT_TRANSITION,
-        context: {},
-      };
+        targetParams,
+        targetSearch,
+        "",
+      );
 
       return this.#deps.areStatesEqual(
         targetState,
@@ -644,50 +626,45 @@ export class RoutesNamespace<
     }
 
     // Hierarchical check: activeState is a descendant of target (name).
-    // This comparison was written against v1's single merged bag; reconstruct
-    // it from the two channels (path params + query) so the existing
-    // paramsMatch / stripQueryDefaults / paramsMatchExcluding logic keeps its
-    // exact semantics after the M2 split (RFC-4 M2 / #1548).
+    // Recombine each state's two channels into a single bag for the subset
+    // match: the explicit query `searchArg` wins over any query key still riding
+    // in `params` (a v1 single-bag call) — RFC-4 M2 / #1548.
     const activeParams = {
       ...activeState.params,
       ...activeState.search,
     } as Params;
 
-    // Recombine the target's two channels for the single-bag comparison logic
-    // below: the explicit query `searchArg` wins over any query key still riding
-    // in `params` (a v1 single-bag call) — RFC-4 M2 / #1548.
     const combinedTarget = { ...params, ...searchArg } as Params;
 
     if (!paramsMatch(combinedTarget, activeParams)) {
       return false;
     }
 
-    if (!defaultParams) {
-      return true;
+    // Enforce the route's defaults against the active descendant, excluding any
+    // key the caller supplied explicitly. Path defaults (`defaultParams`) always
+    // count; query defaults (`defaultSearch`) count only when `ignoreQueryParams`
+    // is false — a query-only default must not disqualify an ancestor link when
+    // query is ignored (RFC-4 M2 / #1548).
+    if (
+      defaultParams &&
+      !paramsMatchExcluding(defaultParams, activeParams, combinedTarget)
+    ) {
+      return false;
     }
 
-    // Honor `ignoreQueryParams` symmetrically with the exact-match branch
-    // above: query-only param differences (e.g. parent has
-    // `defaultParams: { sort: "asc" }` while the active descendant is
-    // `products.detail` with `params: { id: "6" }` and no sort) must not
-    // disqualify an ancestor link from being active. Strip query-typed
-    // keys of `name` from the defaults before comparison; URL-typed keys
-    // (`:id`, `:role`, etc.) are still enforced.
-    // `name` reaches this point only after the fast-path established a valid
-    // hierarchical relation AND `defaultParams` is non-null — both imply the
-    // matcher has registered the route. Since the #1414 skip-empty meta, a
-    // fully-static route resolves to the shared EMPTY_ROUTE_META with no own
-    // entry, so `getMetaByName(name)?.[name]` is undefined there — exactly the
-    // "nothing to strip" signal stripQueryDefaults short-circuits on (a static
-    // route cannot declare query params, hence cannot carry query defaults).
-    const defaultsToCheck = ignoreQueryParams
-      ? stripQueryDefaults(
-          defaultParams,
-          this.#store.matcher.getMetaByName(name)?.[name],
-        )
-      : defaultParams;
+    if (!ignoreQueryParams) {
+      const defaultSearch = this.#store.config.defaultSearch[name] as
+        Params | undefined;
 
-    return paramsMatchExcluding(defaultsToCheck, activeParams, combinedTarget);
+      if (
+        defaultSearch &&
+        !paramsMatchExcluding(defaultSearch, activeParams, combinedTarget)
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   getMetaForState(
@@ -749,39 +726,6 @@ export class RoutesNamespace<
     return result;
   }
 
-  /**
-   * Keys of a route's `defaultParams` that are NOT declared query params — the
-   * path and "arbitrary" defaults that keep their v1 home in `state.params`
-   * (#1549). The v1 single-bag split (`splitParamsBySearch`) excludes them from
-   * its non-path → search routing so a default-originated arbitrary key never
-   * lands in the query channel (path keys are already kept by `pathNames`, so
-   * their inclusion here is harmless). `undefined` when the route has no such
-   * keys (the common case — zero allocation).
-   *
-   * Not cached: `defaultParams` is mutable via `update()` without a tree
-   * rebuild, so a cache here would go stale where `urlParamsCache` cannot.
-   */
-  getNonQueryDefaultKeys(name: string): readonly string[] | undefined {
-    if (!Object.hasOwn(this.#store.config.defaultParams, name)) {
-      return undefined;
-    }
-
-    const defaults = this.#store.config.defaultParams[name];
-    const queryParams = this.getQueryParams(name);
-    let keys: string[] | undefined;
-
-    for (const key in defaults) {
-      if (!Object.hasOwn(defaults, key) || queryParams.includes(key)) {
-        continue;
-      }
-
-      keys ??= [];
-      keys.push(key);
-    }
-
-    return keys;
-  }
-
   getStore(): RoutesStore<Dependencies> {
     return this.#store;
   }
@@ -801,38 +745,33 @@ export class RoutesNamespace<
   }
 
   /**
-   * Merges a route's query-typed defaults (declared query names present in its
-   * `defaultParams`) into an explicit search bag — the search-channel twin of
-   * {@link #mergeDefaultParams} (#1549). An explicitly-passed search value wins
-   * over the default. Returns the original bag untouched (no allocation) when
-   * the route has no query-typed defaults to add.
+   * Merges a route's query-channel defaults (`defaultSearch`) into a search bag
+   * — the search-channel twin of {@link #mergeDefaultParams} (RFC-4 M2 / #1548).
+   * An explicitly-passed search value wins over the default (spread order).
+   * Returns the input untouched (no allocation, including `undefined`) when the
+   * route declares no `defaultSearch`, so a route without query defaults keeps
+   * the caller's `undefined` and the matcher's single-bag fallback.
    */
-  #mergeQueryDefaults<S extends SearchParams = SearchParams>(
+  #mergeDefaultSearch<S extends SearchParams = SearchParams>(
     routeName: string,
     search: S,
-  ): S {
-    if (!Object.hasOwn(this.#store.config.defaultParams, routeName)) {
+  ): S;
+  #mergeDefaultSearch<S extends SearchParams = SearchParams>(
+    routeName: string,
+    search: S | undefined,
+  ): S | undefined;
+  #mergeDefaultSearch<S extends SearchParams = SearchParams>(
+    routeName: string,
+    search: S | undefined,
+  ): S | undefined {
+    if (!Object.hasOwn(this.#store.config.defaultSearch, routeName)) {
       return search;
     }
 
-    const defaults = this.#store.config.defaultParams[routeName];
-    let queryDefaults: Record<string, unknown> | undefined;
-
-    for (const queryName of this.getQueryParams(routeName)) {
-      if (
-        !Object.hasOwn(defaults, queryName) ||
-        Object.hasOwn(search, queryName)
-      ) {
-        continue;
-      }
-
-      queryDefaults ??= {};
-      queryDefaults[queryName] = defaults[queryName];
-    }
-
-    return queryDefaults === undefined
-      ? search
-      : { ...queryDefaults, ...search };
+    return {
+      ...this.#store.config.defaultSearch[routeName],
+      ...search,
+    } as S;
   }
 
   #getBuildPathOptions(options?: Options): CachedBuildPathOpts {

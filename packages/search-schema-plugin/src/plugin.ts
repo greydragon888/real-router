@@ -83,15 +83,16 @@ export class SearchSchemaPlugin {
       case "replace": {
         // `added` is FLAT (full dotted names, descendants included).
         for (const route of event.added) {
-          this.#validateSingleRouteDefaultParams(route.name);
+          this.#validateSingleRouteDefaultSearch(route.name);
         }
 
         break;
       }
       case "update": {
-        // Only a defaultParams change can newly violate the schema.
-        if (event.patch.defaultParams !== undefined) {
-          this.#validateSingleRouteDefaultParams(event.name);
+        // Only a defaultSearch change can newly violate the schema — the schema
+        // validates the query channel; defaultParams is path/arbitrary (#1548).
+        if (event.patch.defaultSearch !== undefined) {
+          this.#validateSingleRouteDefaultSearch(event.name);
         }
 
         break;
@@ -152,7 +153,14 @@ export class SearchSchemaPlugin {
     const invalidKeys = getInvalidKeys(validation.issues);
     const stripped = omitKeys(channel, invalidKeys);
     const route = this.#routesApi.get(result.name);
-    const defaults = route?.defaultParams;
+    // Recovery fills from the SAME channel being validated (RFC-4 M2 / #1548):
+    // `defaultSearch` for the query channel (URL→State, `useSearch`),
+    // `defaultParams` for the params bag (State→URL). Pre-M2 this always read
+    // `defaultParams`, which silently restored nothing once query defaults moved
+    // to `defaultSearch`.
+    const defaults = (
+      useSearch ? route?.defaultSearch : route?.defaultParams
+    ) as Params | undefined;
     const restored = defaults ? { ...defaults, ...stripped } : stripped;
 
     return writeBack(restored);
@@ -180,7 +188,7 @@ export class SearchSchemaPlugin {
     children?: ReadonlyMap<string, unknown>;
   }): void {
     if (node.fullName) {
-      this.#validateSingleRouteDefaultParams(node.fullName);
+      this.#validateSingleRouteDefaultSearch(node.fullName);
     }
 
     /* v8 ignore next 3 -- @preserve: children is always a Map in RouteTree */
@@ -198,7 +206,7 @@ export class SearchSchemaPlugin {
     }
   }
 
-  #validateSingleRouteDefaultParams(routeName: string): void {
+  #validateSingleRouteDefaultSearch(routeName: string): void {
     const schema = this.#getSchema(routeName);
 
     if (!schema) {
@@ -206,13 +214,13 @@ export class SearchSchemaPlugin {
     }
 
     const route = this.#routesApi.get(routeName);
-    const defaultParams = route?.defaultParams;
+    const defaultSearch = route?.defaultSearch;
 
-    if (!defaultParams) {
+    if (!defaultSearch) {
       return;
     }
 
-    const validation = schema["~standard"].validate(defaultParams);
+    const validation = schema["~standard"].validate(defaultSearch);
 
     if (validation instanceof Promise) {
       return;
@@ -220,13 +228,13 @@ export class SearchSchemaPlugin {
 
     if ("issues" in validation) {
       // The plugin gates invalid user *input*, not developer *config*: core
-      // injects `defaultParams` into `state.params` / `state.path` below the
+      // injects `defaultSearch` into `state.search` / `state.path` below the
       // interceptor seam this plugin hooks, so an invalid default reaches state
       // and the URL at runtime regardless of this warning (documented contract,
       // #802). Hence the message states the consequence + the fix, rather than
       // implying the value was blocked.
       console.warn(
-        `${ERROR_PREFIX} Route "${routeName}": defaultParams do not pass searchSchema — they are trusted config and will still reach state and the URL at runtime (the plugin validates user input, not config). Fix the route's defaultParams to satisfy its searchSchema.`,
+        `${ERROR_PREFIX} Route "${routeName}": defaultSearch does not pass searchSchema — it is trusted config and will still reach state and the URL at runtime (the plugin validates user input, not config). Fix the route's defaultSearch to satisfy its searchSchema.`,
         validation.issues,
       );
     }

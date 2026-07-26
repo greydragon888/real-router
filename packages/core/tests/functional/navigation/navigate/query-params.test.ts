@@ -4,7 +4,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter, pickRouteIdentity } from "../../../helpers";
 
-import type { Params, Router } from "@real-router/core";
+import type { Params, Router, SearchParams } from "@real-router/core";
 
 let router: Router;
 
@@ -22,7 +22,13 @@ describe("router.navigate() - query params", () => {
   });
 
   it("should append query parameters to path", async () => {
-    await router.navigate("users.view", { id: 123, q: "search", page: "2" });
+    // `q`/`page` are undeclared on `/users/view/:id`, so they must be passed in
+    // the SEARCH arg to reach the URL query string (RFC-4 M2 / #1548, rule 2).
+    await router.navigate(
+      "users.view",
+      { id: 123 },
+      { q: "search", page: "2" },
+    );
 
     const state = router.getState();
 
@@ -38,11 +44,11 @@ describe("router.navigate() - query params", () => {
   });
 
   it("should encode query parameters correctly", async () => {
-    const state = await router.navigate("users.view", {
-      id: 42,
-      q: "a b",
-      tag: "x/y",
-    });
+    const state = await router.navigate(
+      "users.view",
+      { id: 42 },
+      { q: "a b", tag: "x/y" },
+    );
 
     expect(state?.path).toBe("/users/view/42?q=a%20b&tag=x%2Fy");
     expect(state?.params).toStrictEqual({ id: 42 });
@@ -82,33 +88,31 @@ describe("router.navigate() / router.buildPath() — undefined params contract",
   });
 
   it("navigate() strips undefined query params from URL", async () => {
-    await router.navigate("users.view", {
-      id: 42,
-      q: "search",
-      sort: undefined,
-    });
+    await router.navigate(
+      "users.view",
+      { id: 42 },
+      { q: "search", sort: undefined },
+    );
 
     expect(router.getState()?.path).toBe("/users/view/42?q=search");
   });
 
   it("navigate() strips all undefined values, leaving only defined", async () => {
-    await router.navigate("users.view", {
-      id: 42,
-      q: undefined,
-      sort: undefined,
-      page: "2",
-    });
+    await router.navigate(
+      "users.view",
+      { id: 42 },
+      { q: undefined, sort: undefined, page: "2" },
+    );
 
     expect(router.getState()?.path).toBe("/users/view/42?page=2");
   });
 
   it("navigate() preserves falsy-but-defined query values", async () => {
-    await router.navigate("users.view", {
-      id: 42,
-      zero: 0,
-      empty: "",
-      falseFlag: false,
-    });
+    await router.navigate(
+      "users.view",
+      { id: 42 },
+      { zero: 0, empty: "", falseFlag: false },
+    );
 
     const state = router.getState()!;
 
@@ -140,11 +144,13 @@ describe("router.navigate() / router.buildPath() — undefined params contract",
   });
 
   it("buildPath() and navigate() produce identical URLs for same params", async () => {
-    const params: Params = { id: 42, q: "search", sort: undefined, page: "2" };
+    // The query keys live in the SEARCH channel; passing them identically to
+    // buildPath() and navigate() keeps the two URLs in lockstep (M2 #1548).
+    const search: SearchParams = { q: "search", sort: undefined, page: "2" };
 
-    const built = router.buildPath("users.view", params);
+    const built = router.buildPath("users.view", { id: 42 }, search);
 
-    await router.navigate("users.view", params);
+    await router.navigate("users.view", { id: 42 }, search);
 
     expect(router.getState()?.path).toBe(built);
   });

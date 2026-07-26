@@ -207,7 +207,7 @@ describe("useRouteEnter", () => {
     // Same-route navigation: route name stays "users.view", only params
     // change. Handler must be skipped under default skipSameRoute=true.
     await act(async () => {
-      await router.navigate("users.view", { id: "1", q: "x" });
+      await router.navigate("users.view", { id: "1" }, { q: "x" });
     });
 
     expect(handler).not.toHaveBeenCalled();
@@ -228,7 +228,7 @@ describe("useRouteEnter", () => {
     handler.mockClear();
 
     await act(async () => {
-      await router.navigate("users.view", { id: "1", q: "x" });
+      await router.navigate("users.view", { id: "1" }, { q: "x" });
     });
 
     expect(handler).toHaveBeenCalledTimes(1);

@@ -28,7 +28,7 @@ describe("forwardState", () => {
     expect(state.params.id).toBe(1);
   });
 
-  it("forwards to another route with merged params", () => {
+  it("forwards to another route, layering source defaults (target defaults are terminal)", async () => {
     // Add routes with defaultParams
     routesApi.add([
       { name: "srcRoute", path: "/src", defaultParams: { a: 1 } },
@@ -36,7 +36,17 @@ describe("forwardState", () => {
     ]);
     routesApi.update("srcRoute", { forwardTo: "dstRoute" });
 
-    const state = getPluginApi(router).forwardState("srcRoute", { c: 3 });
+    // forwardState resolves the forward and layers the SOURCE route's defaults
+    // (a:1) — a forwardTo-specific merge the terminal builders cannot reconstruct
+    // (they see only the resolved target). The TARGET's defaults (b:2) are NOT
+    // merged here; they are applied downstream by makeState (#1549).
+    const forwarded = getPluginApi(router).forwardState("srcRoute", { c: 3 });
+
+    expect(forwarded.name).toBe("dstRoute");
+    expect(forwarded.params).toStrictEqual({ a: 1, c: 3 });
+
+    // The committed state (navigate → makeState) carries the target default too.
+    const state = await router.navigate("srcRoute", { c: 3 });
 
     expect(state.name).toBe("dstRoute");
     expect(state.params).toStrictEqual({ a: 1, b: 2, c: 3 });
@@ -64,7 +74,7 @@ describe("forwardState", () => {
     expect(state.params).toStrictEqual({ a: 1, c: 3 });
   });
 
-  it("forwards with only target route defaults (line 598)", () => {
+  it("forwards with only target route defaults — applied by the state builder, not forwardState (line 598)", async () => {
     // Add routes: source has no defaults, target has defaults
     routesApi.add([
       { name: "srcNoDefaults", path: "/src-no-defaults" },
@@ -78,9 +88,17 @@ describe("forwardState", () => {
       forwardTo: "dstWithDefaults",
     });
 
-    const state = getPluginApi(router).forwardState("srcNoDefaults", {
+    // Source has no defaults; forwardState returns the user params only — the
+    // TARGET's b:2 is NOT merged here (terminal now, #1549).
+    const forwarded = getPluginApi(router).forwardState("srcNoDefaults", {
       c: 3,
     });
+
+    expect(forwarded.name).toBe("dstWithDefaults");
+    expect(forwarded.params).toStrictEqual({ c: 3 });
+
+    // The committed state (navigate → makeState) applies the target default.
+    const state = await router.navigate("srcNoDefaults", { c: 3 });
 
     expect(state.name).toBe("dstWithDefaults");
     expect(state.params).toStrictEqual({ b: 2, c: 3 });

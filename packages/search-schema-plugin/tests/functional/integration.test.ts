@@ -12,6 +12,7 @@ import {
   schemaWithDefaults,
 } from "./test-utils";
 
+import type { StandardSchemaV1Issue } from "./test-utils";
 import type { Router } from "@real-router/core";
 
 let router: Router;
@@ -271,7 +272,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: searchSchema(),
           },
         ],
@@ -289,6 +290,9 @@ describe("Search schema plugin", () => {
       expect(state?.name).toBe("search");
       expect(state?.search.q).toBe("hello");
       expect(state?.search.page).toBe(1);
+      // Anti-masking: the recovered query default must also surface in the URL,
+      // so the search and path channels agree (RFC-4 M2 / #1548).
+      expect(state?.path).toBe("/search?q=hello&page=1");
       expect(consoleSpy).toHaveBeenCalled();
 
       consoleSpy.mockRestore();
@@ -438,13 +442,13 @@ describe("Search schema plugin", () => {
   });
 
   // Documented contract boundary for #802. The plugin gates invalid user INPUT
-  // (see the stripping tests above); `defaultParams` are trusted config injected
+  // (see the stripping tests above); `defaultSearch` is trusted config injected
   // by core BELOW the interceptor seam the plugin hooks, so an invalid default
   // reaches state and the URL at runtime. These tests PIN that documented
   // limitation deliberately — a tripwire: if core ever starts stripping invalid
   // defaults (e.g. a single-merge-point refactor), they fail and flag that the
   // README / wiki / CLAUDE contract must be revisited.
-  describe("Documented limitation: invalid defaultParams reach state (#802)", () => {
+  describe("Documented limitation: invalid defaultSearch reaches state (#802)", () => {
     /** `page` must be a positive number when present; no defaults, no coercion. */
     function positivePageSchema() {
       return createMockSchema({
@@ -485,14 +489,14 @@ describe("Search schema plugin", () => {
       expect(router.getState()?.params).toStrictEqual({});
     });
 
-    it("limitation: an invalid defaultParams value reaches state.search AND state.path (mode: production)", async () => {
+    it("limitation: an invalid defaultSearch value reaches state.search AND state.path (mode: production)", async () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
           {
             name: "bad",
             path: "/bad?page",
-            defaultParams: { page: -5 },
+            defaultSearch: { page: -5 },
             searchSchema: positivePageSchema(),
           },
         ],
@@ -511,6 +515,67 @@ describe("Search schema plugin", () => {
       expect(state?.search).toStrictEqual({ page: -5 });
       expect(state?.params).toStrictEqual({});
       expect(state?.path).toBe("/bad?page=-5");
+    });
+  });
+
+  // The regression the whole `defaultSearch` work chased. On the URL→State path
+  // (`start(url)` / matchPath) invalid query is stripped and RECOVERED from
+  // `defaultSearch` — and the committed `state.path` MUST show the RECOVERED
+  // value, not the raw invalid one. The bug: `state.search` was recovered while
+  // `state.path` was rebuilt from the RAW matched query → the two channels
+  // diverged. Recovery unit tests asserting ONLY `state.search` could not see
+  // it; the e2e (which asserts the URL) did. This locks BOTH channels together
+  // on the recovery path — an anti-remask tripwire. (Reverting the matchPath
+  // rebuild to feed the raw query fails this on `state.path`, not `state.search`.)
+  describe("URL→State recovery keeps state.path in step with recovered state.search (#1548)", () => {
+    function guardSchema() {
+      return createMockSchema({
+        validate: (value) => {
+          const p = value as Record<string, unknown>;
+          const issues: StandardSchemaV1Issue[] = [];
+
+          if ("page" in p && !(typeof p.page === "number" && p.page > 0)) {
+            issues.push({ message: "page must be positive", path: ["page"] });
+          }
+
+          if ("sort" in p && p.sort !== "name" && p.sort !== "date") {
+            issues.push({ message: "sort invalid", path: ["sort"] });
+          }
+
+          return issues.length > 0 ? { issues } : { value: p };
+        },
+      });
+    }
+
+    it("start(url) with invalid query: state.search AND state.path show the recovered defaults", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "products",
+            path: "/products?page&sort",
+            defaultSearch: { page: 1, sort: "name" },
+            searchSchema: guardSchema(),
+          },
+        ],
+        { defaultRoute: "home", queryParams: { numberFormat: "auto" } },
+      );
+      router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+
+      // URL→State: both query values are invalid → stripped → recovered from
+      // defaultSearch. `page=-1` parses to the number -1 (numberFormat auto),
+      // failing `> 0`; `sort=invalid` is not in the allowed set.
+      await router.start("/products?page=-1&sort=invalid");
+
+      const state = router.getState();
+
+      expect(state?.name).toBe("products");
+      // Recovered query channel.
+      expect(state?.search).toStrictEqual({ page: 1, sort: "name" });
+      expect(state?.params).toStrictEqual({});
+      // ANTI-REMASK: the committed URL shows the RECOVERED values, never the raw
+      // `page=-1&sort=invalid` — the assertion the masked recovery tests lacked.
+      expect(state?.path).toBe("/products?page=1&sort=name");
     });
   });
 });

@@ -18,7 +18,7 @@ import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 describe("core/state — defaultParams channel routing (#1549)", () => {
   const QUERY_DEFAULT_ROUTES = [
     { name: "home", path: "/home" },
-    { name: "x", path: "/x?page&sort", defaultParams: { page: "5" } },
+    { name: "x", path: "/x?page&sort", defaultSearch: { page: "5" } },
   ];
 
   describe("match path (start / matchPath)", () => {
@@ -160,6 +160,44 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
       expect(state.params).toStrictEqual({ theme: "dark" });
       expect(state.search).toStrictEqual({ theme: "light" });
     });
+
+    it("drops a query-declared params-bag key when the same name is also in search (search wins, #843)", async () => {
+      const router = createRouter([{ name: "x", path: "/x?page" }]);
+
+      await router.start("/x");
+
+      // `page` (declared `?page`) handed in BOTH the params bag AND search:
+      // forwardState canonicalization routes the params-bag copy into the query
+      // channel, where the explicit search value wins — params drops it.
+      const state = await router.navigate(
+        "x",
+        { page: "fromParams" },
+        { page: "fromSearch" },
+      );
+
+      expect(state.params).toStrictEqual({});
+      expect(state.search).toStrictEqual({ page: "fromSearch" });
+    });
+
+    it("lets a query-declared params-bag value win over defaultSearch (user > default)", async () => {
+      const router = createRouter([
+        { name: "x", path: "/x?page", defaultSearch: { page: "1" } },
+      ]);
+
+      await router.start("/x");
+
+      // `page` (declared `?page`) handed in the params bag; defaultSearch is
+      // page:1. The user's params-twin MUST win over the default. Regression
+      // guard for the ordering bug where forwardState folded defaultSearch into
+      // its result BEFORE channel separation, so the default outranked the user
+      // params-twin (`{ page: 2 }` wrongly committing page=1). Both channels AND
+      // the URL are asserted (anti-remask — search must reconstruct from path).
+      const state = await router.navigate("x", { page: "2" });
+
+      expect(state.params).toStrictEqual({});
+      expect(state.search).toStrictEqual({ page: "2" });
+      expect(state.path).toBe("/x?page=2");
+    });
   });
 
   describe("buildPath", () => {
@@ -184,7 +222,8 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
         {
           name: "x",
           path: "/x?page",
-          defaultParams: { page: "5", limit: "10" },
+          defaultParams: { limit: "10" },
+          defaultSearch: { page: "5" },
         },
       ]);
 
@@ -208,6 +247,24 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
       expect(state.params).toStrictEqual({});
       expect(state.search).toStrictEqual({});
     });
+
+    it("treats params and search as pre-separated channels — no re-split", () => {
+      const router = createRouter([{ name: "x", path: "/x?page" }]);
+
+      // makeState is a pure constructor from ALREADY-separated channels: channel
+      // canonicalization happens upstream in forwardState (#1548/#1549), not
+      // here. A query-declared key handed in the params bag STAYS in params — the
+      // primitive never re-routes. (Callers reconstructing a serialized split
+      // state — browser-plugin popstate restore — hand each channel its own bag.)
+      const state = getPluginApi(router).makeState(
+        "x",
+        { page: "fromParams" },
+        { page: "fromSearch" },
+      );
+
+      expect(state.params).toStrictEqual({ page: "fromParams" });
+      expect(state.search).toStrictEqual({ page: "fromSearch" });
+    });
   });
 
   describe("path/query name collision (/coll/:id?id)", () => {
@@ -226,42 +283,16 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
   });
 
   describe("cache freshness across mutations", () => {
-    it("re-routes a default to params after replace() drops the query declaration", async () => {
+    it("applies a defaultSearch update() to the query channel on the next navigation", async () => {
       const router = createRouter([
         { name: "home", path: "/home" },
-        { name: "x", path: "/x?page", defaultParams: { page: "5" } },
-      ]);
-
-      await router.start("/home");
-
-      // Warm the query-params cache: page is query-declared → search.
-      const before = await router.navigate("x");
-
-      expect(before.search).toStrictEqual({ page: "5" });
-
-      getRoutesApi(router).replace([
-        { name: "home", path: "/home" },
-        { name: "x", path: "/x", defaultParams: { page: "5" } },
-      ]);
-
-      // The declaration is gone — a stale cache would still route page to
-      // search; the fresh tree routes it to params (arbitrary default).
-      const after = await router.navigate("x", {}, undefined, { reload: true });
-
-      expect(after.params).toStrictEqual({ page: "5" });
-      expect(after.search).toStrictEqual({});
-    });
-
-    it("applies a defaultParams update() to the query channel on the next navigation", async () => {
-      const router = createRouter([
-        { name: "home", path: "/home" },
-        { name: "x", path: "/x?page", defaultParams: { page: "5" } },
+        { name: "x", path: "/x?page", defaultSearch: { page: "5" } },
       ]);
 
       await router.start("/home");
       await router.navigate("x");
 
-      getRoutesApi(router).update("x", { defaultParams: { page: "7" } });
+      getRoutesApi(router).update("x", { defaultSearch: { page: "7" } });
 
       await router.navigate("home");
 
@@ -275,7 +306,7 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
   describe("loose queryParamsMode", () => {
     it("routes a query-declared default to search while keeping undeclared URL query", async () => {
       const router = createRouter(
-        [{ name: "x", path: "/x?page", defaultParams: { page: "5" } }],
+        [{ name: "x", path: "/x?page", defaultSearch: { page: "5" } }],
         { queryParamsMode: "loose" },
       );
 
@@ -285,6 +316,57 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
 
       expect(state.params).toStrictEqual({});
       expect(state.search).toStrictEqual({ page: "5", q: 1 });
+    });
+  });
+
+  describe("defaultSearch storage lifecycle (#1549)", () => {
+    it("get() reflects it, update() patches (value then null), TREE_CHANGED carries it", () => {
+      const router = createRouter([
+        { name: "home", path: "/" },
+        { name: "x", path: "/x?page", defaultSearch: { page: "5" } },
+      ]);
+      const routes = getRoutesApi(router);
+
+      // get() reconstructs defaultSearch from the config store.
+      expect(routes.get("x")?.defaultSearch).toStrictEqual({ page: "5" });
+
+      const patched: unknown[] = [];
+
+      routes.subscribeChanges((event) => {
+        if (event.op === "update") {
+          patched.push(event.patch.defaultSearch);
+        }
+      });
+
+      // update() with a new value: buildStructuralPatch carries defaultSearch and
+      // the store writes it.
+      routes.update("x", { defaultSearch: { page: "9" } });
+
+      expect(routes.get("x")?.defaultSearch).toStrictEqual({ page: "9" });
+
+      // update() with null: the store deletes the entry; the patch carries null.
+      routes.update("x", { defaultSearch: null });
+
+      expect(routes.get("x")?.defaultSearch).toBeUndefined();
+      expect(patched).toStrictEqual([{ page: "9" }, null]);
+    });
+  });
+
+  describe("defaultSearch on a query-less route (makeState fast path)", () => {
+    it("core honors defaultSearch in state.search even with no ?query declaration", () => {
+      // The key is NOT `?`-declared, so `queryNames` is empty and makeState takes
+      // its fast path. Core is tolerant: it still routes `defaultSearch` into
+      // `state.search`. (An undeclared key is dropped from the URL under the
+      // default queryParamsMode — declare `?a` to persist it there;
+      // validation-plugin warns on the mismatch.)
+      const router = createRouter([
+        { name: "s", path: "/s", defaultSearch: { a: "1" } },
+      ]);
+
+      const state = getPluginApi(router).makeState("s");
+
+      expect(state.params).toStrictEqual({});
+      expect(state.search).toStrictEqual({ a: "1" });
     });
   });
 });

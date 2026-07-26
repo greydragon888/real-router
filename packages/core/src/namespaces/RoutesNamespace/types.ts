@@ -100,6 +100,9 @@ export interface RouteConfig {
   /** Default params per route */
   defaultParams: Record<string, Params>;
 
+  /** Default search (query) params per route (RFC-4 M2 / #1548) */
+  defaultSearch: Record<string, SearchParams>;
+
   /** Forward mappings (source -> target) */
   forwardMap: Record<string, string>;
 

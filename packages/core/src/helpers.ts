@@ -6,6 +6,70 @@ import type { Params, SearchParams, State, LimitsConfig } from "./types";
 import type { Limits } from "./types/internal";
 
 // =============================================================================
+// Channel separation (RFC-4 M2 / #1548, #1549)
+// =============================================================================
+
+/**
+ * THE single point where the path / query channels are separated by
+ * declaration (#1549). A DECLARED `?key` that rides in the `params` bag — a
+ * plugin's `forwardState` injection (persistent-params on `start()`), a
+ * decoder-injected key, a v1 single-bag `navigate(name, { q })` — moves to the
+ * query channel; everything else stays a path param. An explicit `search` value
+ * wins over a params-bag twin (the #843 collision precedence).
+ *
+ * Every State producer routes through this ONE function — `makeState` (the state
+ * factory) and the `matchPath` URL rebuild — so `state.path` and `state.search`
+ * can never derive from differently-split bags. Returns the inputs untouched (no
+ * allocation) when there is nothing to route: no params, no declared query
+ * names, or no declared key actually riding in the params bag (the common path).
+ */
+export function separateChannels(
+  params: Params | undefined,
+  queryNames: readonly string[],
+  search: SearchParams,
+): { params: Params | undefined; search: SearchParams };
+
+export function separateChannels(
+  params: Params | undefined,
+  queryNames: readonly string[],
+  search: SearchParams | undefined,
+): { params: Params | undefined; search: SearchParams | undefined };
+
+export function separateChannels(
+  params: Params | undefined,
+  queryNames: readonly string[],
+  search: SearchParams | undefined,
+): { params: Params | undefined; search: SearchParams | undefined } {
+  if (params === undefined || queryNames.length === 0) {
+    return { params, search };
+  }
+
+  let routedParams: Params | undefined;
+  let routedQuery: Record<string, unknown> | undefined;
+
+  for (const [key, value] of Object.entries(params)) {
+    if (queryNames.includes(key)) {
+      routedQuery ??= {};
+      routedQuery[key] = value;
+    } else {
+      routedParams ??= {};
+      routedParams[key] = value;
+    }
+  }
+
+  if (routedQuery === undefined) {
+    // No declared query name rode in the params bag — channels already canonical.
+    return { params, search };
+  }
+
+  // `search` wins over a params-bag twin via the spread order (#843).
+  return {
+    params: routedParams,
+    search: { ...routedQuery, ...search } as SearchParams,
+  };
+}
+
+// =============================================================================
 // State Helpers
 // =============================================================================
 
@@ -102,71 +166,4 @@ export function normalizeParams(
   // Reuse the shared singleton when nothing survived so makeState's
   // `params === EMPTY_PARAMS` reuse branch fires (#1027).
   return normalized ?? EMPTY_PARAMS;
-}
-
-/**
- * Splits a v1-style params bag into its path and query channels by route
- * declaration: any key that is NOT a path (URL) param name of the route is a
- * query param (RFC-4 M2 / #1548). Mirrors the matcher's read-side split for the
- * navigate/build path, where the caller still passes one bag.
- *
- * `pathNames` is the route's cached URL-param list (`getUrlParams`), covering
- * ancestor path params too; undeclared keys (loose mode) fall through to
- * search, matching the matcher's loose behavior.
- *
- * `keepNames` (#1549) additionally pins keys to the params channel — the
- * route's non-query `defaultParams` keys (`getNonQueryDefaultKeys`). The bag
- * arrives with defaults already merged in (`forwardState`), so without this an
- * arbitrary default (`defaultParams: { theme: "dark" }` on a route that never
- * declared `?theme`) would be routed to search like an explicitly-passed
- * undeclared key, duplicating it across channels once `makeState` re-applies
- * the default to `params`.
- *
- * Fast path — when there are no query keys the ORIGINAL `params` is returned
- * unchanged (no copy, so an all-path or empty bag preserves the EMPTY_PARAMS
- * singleton, #1027) and `search` is `undefined` so `makeState` reuses the
- * frozen EMPTY_SEARCH.
- */
-export function splitParamsBySearch(
-  params: Params,
-  pathNames: readonly string[],
-  keepNames?: readonly string[],
-): { params: Params; search: SearchParams | undefined } {
-  let search: Record<string, unknown> | undefined;
-
-  for (const key in params) {
-    if (
-      !Object.hasOwn(params, key) ||
-      pathNames.includes(key) ||
-      keepNames?.includes(key)
-    ) {
-      continue;
-    }
-
-    search ??= {};
-    search[key] = params[key];
-  }
-
-  if (search === undefined) {
-    return { params, search: undefined };
-  }
-
-  // Some query keys were split out — rebuild the path-only bag (params minus
-  // the query keys). Boundary cast on `search` (like `params as P` at the
-  // matcher edge): non-path keys carry query values, typed loosely as unknown.
-  let pathParams: Params | undefined;
-
-  for (const key in params) {
-    if (!Object.hasOwn(params, key) || key in search) {
-      continue;
-    }
-
-    pathParams ??= {};
-    pathParams[key] = params[key];
-  }
-
-  return {
-    params: pathParams ?? EMPTY_PARAMS,
-    search: search as SearchParams,
-  };
 }
