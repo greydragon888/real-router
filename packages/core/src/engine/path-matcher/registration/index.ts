@@ -126,7 +126,6 @@ function compileAndRegisterRoute(
     slashChild ? segments.slice(0, -1) : segments,
     state.options.urlParamsEncoding,
     state.rootUrlParams,
-    state.rootSplatParams,
   );
 
   // #1151: reject a duplicate param name within one route's full path (`/:id/:id`,

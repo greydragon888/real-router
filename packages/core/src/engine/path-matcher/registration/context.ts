@@ -56,5 +56,4 @@ export interface RegistrationState {
   // QUERY declarations already had to be threaded separately (#1556); its PATH
   // slots need the same treatment for the build side (#1567).
   readonly rootUrlParams: readonly string[];
-  readonly rootSplatParams: readonly string[];
 }

@@ -109,19 +109,19 @@ describe("core/routes/routePath/buildPath", () => {
         expect(matched?.path).toBe(built);
       });
 
-      it("should encode a root SPLAT as a splat, keeping its separators", () => {
-        // The root's splat names have to travel with its param names, or the
-        // slot falls back to the scalar encoder and `/` becomes `%2F`.
-        // (Round-tripping a non-terminal splat is a separate, pre-existing
-        // limitation — the value is asserted here, not the match. No index
-        // route: one under a splat parent is rejected at registerTree.)
+      it("should collapse a root SPLAT, which can never bind (#1568)", () => {
+        // A route path always follows the root, so a root splat is never the
+        // final segment and always matches empty — the built URL must omit it,
+        // and it now round-trips. (No index route: one under a splat parent is
+        // rejected at registerTree.)
         const splatRouter = createRouter([{ name: "home", path: "/home" }]);
 
         getPluginApi(splatRouter).setRootPath("/app/*rest");
 
-        expect(splatRouter.buildPath("home", { rest: "a/b" })).toBe(
-          "/app/a/b/home",
-        );
+        const built = splatRouter.buildPath("home", {});
+
+        expect(built).toBe("/app/home");
+        expect(getPluginApi(splatRouter).matchPath(built)?.name).toBe("home");
       });
     });
   });

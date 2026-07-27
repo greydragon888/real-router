@@ -95,7 +95,6 @@ export class SegmentMatcher {
         staticCache: this.#staticCache,
         rootQueryParams: this.#rootQueryParams,
         rootUrlParams: node.paramMeta.urlParams,
-        rootSplatParams: node.paramMeta.spatParams,
       },
       node,
       "",

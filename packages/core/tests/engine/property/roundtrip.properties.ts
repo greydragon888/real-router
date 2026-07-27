@@ -1,6 +1,6 @@
 // packages/route-tree/tests/property/roundtrip.properties.ts
 
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 
 import {
   arbArrayFormat,
@@ -174,6 +174,55 @@ describe("Roundtrip Properties", () => {
         expect(paramsMeta.q).toBe("query");
         expect(result!.params.category).toBe(category);
         expect(result!.search.q).toBe(q);
+      },
+    );
+  });
+
+  describe("splat with a more-specific child (INVARIANTS Matching #24)", () => {
+    // A splat node's children match at the splat's OWN position, so the splat
+    // captures nothing for them. buildPath used to emit a value there anyway,
+    // printing a URL that fell back to the wildcard or matched nothing (#1568).
+    // The guard is a NAME roundtrip, not "matches something": the broken build
+    // did match — it just resolved to the parent.
+    const arbSegments = fc.array(
+      fc.stringMatching(/^[a-z][a-z0-9]{0,6}$/).filter((s) => s !== "index"),
+      { minLength: 1, maxLength: 3 },
+    );
+
+    test.prop([arbSegments, arbSplatValue], { numRuns: NUM_RUNS.standard })(
+      "a route reached through a splat builds a URL that matches that same route",
+      (tail: string[], fallback: string) => {
+        const matcher = createMatcher();
+
+        matcher.registerTree(
+          createRouteTree("", "", [
+            {
+              name: "root",
+              path: "/root",
+              children: [
+                {
+                  name: "all",
+                  path: "/*rest",
+                  children: [{ name: "leaf", path: `/${tail.join("/")}` }],
+                },
+              ],
+            },
+          ]),
+        );
+
+        const childPath = matcher.buildPath("root.all.leaf", {});
+
+        expect(matcher.match(childPath)?.segments.at(-1)?.fullName).toBe(
+          "root.all.leaf",
+        );
+
+        // The splat still binds where it IS terminal — the collapse must not
+        // swallow the fallback route's own capture.
+        const splatPath = matcher.buildPath("root.all", { rest: fallback });
+        const splatResult = matcher.match(splatPath);
+
+        expect(splatResult?.segments.at(-1)?.fullName).toBe("root.all");
+        expect(splatResult?.params.rest).toBe(fallback);
       },
     );
   });

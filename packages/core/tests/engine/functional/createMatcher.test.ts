@@ -257,3 +257,75 @@ describe("createMatcher — a literal '__proto__' query key survives (#1293)", (
     expect(Object.hasOwn(result!.search, "__proto__")).toBe(true);
   });
 });
+
+describe("build agrees with a splat that has a more-specific child (#1568)", () => {
+  // INVARIANTS Matching #24: when a splat node has a child route, a remainder
+  // that matches the child resolves to the CHILD — the splat captures nothing.
+  // buildPath must therefore emit no value for it, or it prints a URL that
+  // falls back to the wildcard (or matches nothing at all).
+  const tree = createRouteTree("", "", [
+    {
+      name: "n",
+      path: "/n",
+      children: [
+        {
+          name: "all",
+          path: "/*rest",
+          children: [{ name: "edit", path: "/edit" }],
+        },
+      ],
+    },
+  ]);
+
+  const build = (): Matcher => {
+    const matcher = createMatcher();
+
+    matcher.registerTree(tree);
+
+    return matcher;
+  };
+
+  it("builds the child without demanding the splat it can never bind", () => {
+    expect(build().buildPath("n.all.edit", {})).toBe("/n/edit");
+  });
+
+  it("round-trips the child back to itself", () => {
+    const matcher = build();
+    const path = matcher.buildPath("n.all.edit", {});
+
+    expect(matcher.match(path)?.segments.at(-1)?.fullName).toBe("n.all.edit");
+  });
+
+  it("still binds the splat where it IS the last segment", () => {
+    const matcher = build();
+    const path = matcher.buildPath("n.all", { rest: "x/y" });
+
+    expect(path).toBe("/n/x/y");
+    expect(matcher.match(path)?.segments.at(-1)?.fullName).toBe("n.all");
+    expect(matcher.match(path)?.params.rest).toBe("x/y");
+  });
+
+  it("builds a route whose own path continues past a splat", () => {
+    const own = createRouteTree("", "", [{ name: "x", path: "/a/*rest/b" }]);
+    const matcher = createMatcher();
+
+    matcher.registerTree(own);
+
+    const path = matcher.buildPath("x", {});
+
+    expect(path).toBe("/a/b");
+    expect(matcher.match(path)?.segments.at(-1)?.fullName).toBe("x");
+  });
+
+  it("binds only the LAST splat when a path carries two", () => {
+    const two = createRouteTree("", "", [{ name: "t", path: "/a/*x/*y" }]);
+    const matcher = createMatcher();
+
+    matcher.registerTree(two);
+
+    const path = matcher.buildPath("t", { y: "1/2" });
+
+    expect(path).toBe("/a/1/2");
+    expect(matcher.match(path)?.params).toStrictEqual({ y: "1/2" });
+  });
+});
