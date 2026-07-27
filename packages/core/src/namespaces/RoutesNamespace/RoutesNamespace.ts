@@ -545,6 +545,23 @@ export class RoutesNamespace<
 
   /**
    * Checks if a route is currently active.
+   *
+   * Two arms, `literal || destination` (#1573). The literal arm is the whole
+   * predicate below, unchanged. The destination arm repeats THAT SAME predicate
+   * on the full output of stage ① — the resolved terminal name together with
+   * the forwarding chain's defaults layered into the TARGET's channels — so a
+   * `<Link to="alias">` reads active on the page it actually navigates to.
+   *
+   * It is a FALLBACK, never a pre-resolution: resolving before comparing would
+   * send a section link (`users` forwarding to `users.list`) to the leaf and
+   * darken it while a sibling descendant (`users.profile`) is active.
+   *
+   * It repeats the predicate on ①'s OUTPUT rather than substituting the name,
+   * because the chain's `defaultParams` live on the forwarding SOURCE and are
+   * layered by `forwardState` (#1566/#1570) — never by the forward map — and a
+   * dynamic `forwardTo` is not in that map at all. Name substitution therefore
+   * fixes neither, and it also carries no `search`, which is where ① routes a
+   * hop default whose key the target declares with `?`.
    */
   isActiveRoute(
     name: string,
@@ -552,6 +569,139 @@ export class RoutesNamespace<
     searchArg: SearchParams = {},
     strictEquality = false,
     ignoreQueryParams = true,
+  ): boolean {
+    if (
+      this.#matchesActiveState(
+        name,
+        params,
+        searchArg,
+        strictEquality,
+        ignoreQueryParams,
+      )
+    ) {
+      return true;
+    }
+
+    // O(1) gate: only a route that actually forwards can have a second arm.
+    // Every `<Link>` in six adapters runs this predicate on every render, so a
+    // non-forwarding route must not pay for the arm at all.
+    if (
+      !Object.hasOwn(this.#store.config.forwardMap, name) &&
+      !Object.hasOwn(this.#store.config.forwardFnMap, name)
+    ) {
+      return false;
+    }
+
+    let forwarded;
+
+    try {
+      // The NAMESPACE primitive, not the interceptable seam: a predicate on the
+      // render path must not run the plugin interceptor chain once per `<Link>`.
+      forwarded = this.forwardState(name, params, searchArg);
+    } catch (error) {
+      // A dynamic `forwardTo` is user code and may throw. A predicate answers,
+      // it never throws from inside a render — same policy as `canNavigateTo`
+      // on a throwing guard (#959): honest `false` plus an operational log.
+      this.#deps.logger.warn(
+        "router.isActiveRoute",
+        `Dynamic forwardTo of route "${name}" threw while resolving the active-link destination; treating the link as inactive.`,
+        error,
+      );
+
+      return false;
+    }
+
+    // No `forwarded.name === name` guard: the O(1) gate above already proved the
+    // route forwards, and a self-returning dynamic callback throws on the cycle
+    // check before `forwardState` can hand one back — so the terminal name is
+    // always a different route (measured; the branch was unreachable).
+    return this.#matchesActiveState(
+      forwarded.name,
+      forwarded.params,
+      forwarded.search,
+      strictEquality,
+      ignoreQueryParams,
+    );
+  }
+
+  getMetaForState(
+    name: string,
+  ): Record<string, Record<string, "url" | "query">> | undefined {
+    return this.#store.matcher.hasRoute(name)
+      ? this.#store.matcher.getMetaByName(name)
+      : undefined;
+  }
+
+  getUrlParams(name: string): string[] {
+    const cached = this.#store.urlParamsCache.get(name);
+
+    // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (getUrlParams is deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const segments = this.#store.matcher.getSegmentsByName(name);
+    const result = segments
+      ? collectUrlParamsArray(segments as readonly RouteTree[])
+      : [];
+
+    this.#store.urlParamsCache.set(name, result);
+
+    return result;
+  }
+
+  /**
+   * Declared query param names of a route (`?a&b` across its segments,
+   * ancestors included) that are NOT also path params — the query-channel twin
+   * of {@link getUrlParams}, powering the defaultParams channel routing
+   * (#1549). A colliding name (`/items/:id?id` — legal under M2, the channels
+   * coexist) is path-owned for routing purposes: excluding it here keeps the
+   * path slot's value in `state.params` and the rebuild's #843 precedence
+   * intact. Same cache lifecycle: cleared on every matcher rebuild.
+   *
+   * Reads the matcher's `declaredQueryParams` — the SAME registry the
+   * query-string build uses — rather than walking `matchSegments` (#1556). The
+   * segment walk missed the ROOT node's `?`-declarations (`setRootPath("?a&b")`,
+   * how persistent-params declares its keys), because the root is captured
+   * separately at `registerTree` and never appears in `matchSegments`. That
+   * made a root-declared key print as query but classify as a path param: it
+   * landed in `state.params`, vanished from `state.path` on the intent side,
+   * and no `isActiveRoute` spelling matched a link to the active page. One
+   * registry classifies and prints, so the two cannot drift again.
+   */
+  getQueryParams(name: string): string[] {
+    const cached = this.#store.queryParamsCache.get(name);
+
+    // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (getQueryParams is deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const declared = this.#store.matcher.getDeclaredQueryParams(name);
+    let result: string[] = [];
+
+    if (declared) {
+      const urlParams = this.getUrlParams(name);
+
+      result = declared.filter((param) => !urlParams.includes(param));
+    }
+
+    this.#store.queryParamsCache.set(name, result);
+
+    return result;
+  }
+
+  getStore(): RoutesStore<Dependencies> {
+    return this.#store;
+  }
+
+  /** The literal arm of {@link isActiveRoute} — unchanged by #1573. */
+  #matchesActiveState(
+    name: string,
+    params: Params,
+    searchArg: SearchParams,
+    strictEquality: boolean,
+    ignoreQueryParams: boolean,
   ): boolean {
     // Note: empty string check is handled by Router.ts facade
     const activeState = this.#deps.getState();
@@ -651,77 +801,6 @@ export class RoutesNamespace<
     }
 
     return true;
-  }
-
-  getMetaForState(
-    name: string,
-  ): Record<string, Record<string, "url" | "query">> | undefined {
-    return this.#store.matcher.hasRoute(name)
-      ? this.#store.matcher.getMetaByName(name)
-      : undefined;
-  }
-
-  getUrlParams(name: string): string[] {
-    const cached = this.#store.urlParamsCache.get(name);
-
-    // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (getUrlParams is deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const segments = this.#store.matcher.getSegmentsByName(name);
-    const result = segments
-      ? collectUrlParamsArray(segments as readonly RouteTree[])
-      : [];
-
-    this.#store.urlParamsCache.set(name, result);
-
-    return result;
-  }
-
-  /**
-   * Declared query param names of a route (`?a&b` across its segments,
-   * ancestors included) that are NOT also path params — the query-channel twin
-   * of {@link getUrlParams}, powering the defaultParams channel routing
-   * (#1549). A colliding name (`/items/:id?id` — legal under M2, the channels
-   * coexist) is path-owned for routing purposes: excluding it here keeps the
-   * path slot's value in `state.params` and the rebuild's #843 precedence
-   * intact. Same cache lifecycle: cleared on every matcher rebuild.
-   *
-   * Reads the matcher's `declaredQueryParams` — the SAME registry the
-   * query-string build uses — rather than walking `matchSegments` (#1556). The
-   * segment walk missed the ROOT node's `?`-declarations (`setRootPath("?a&b")`,
-   * how persistent-params declares its keys), because the root is captured
-   * separately at `registerTree` and never appears in `matchSegments`. That
-   * made a root-declared key print as query but classify as a path param: it
-   * landed in `state.params`, vanished from `state.path` on the intent side,
-   * and no `isActiveRoute` spelling matched a link to the active page. One
-   * registry classifies and prints, so the two cannot drift again.
-   */
-  getQueryParams(name: string): string[] {
-    const cached = this.#store.queryParamsCache.get(name);
-
-    // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (getQueryParams is deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const declared = this.#store.matcher.getDeclaredQueryParams(name);
-    let result: string[] = [];
-
-    if (declared) {
-      const urlParams = this.getUrlParams(name);
-
-      result = declared.filter((param) => !urlParams.includes(param));
-    }
-
-    this.#store.queryParamsCache.set(name, result);
-
-    return result;
-  }
-
-  getStore(): RoutesStore<Dependencies> {
-    return this.#store;
   }
 
   /**

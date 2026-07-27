@@ -588,4 +588,128 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       expect(router.isActiveRoute("tagged", {}, {}, false, false)).toBe(false);
     });
   });
+
+  describe("forwardTo destination arm (#1573)", () => {
+    /**
+     * `isActiveRoute` compared the given name against the committed state and
+     * never resolved `forwardTo`, so a `<Link to="alias">` was dark on the very
+     * page it navigates to.
+     *
+     * The arm is a FALLBACK — `literal || destination` — and the destination is
+     * a repeat of the SAME predicate on the full output of stage ①, i.e. the
+     * resolved name together with the chain's defaults layered into the
+     * target's channels. Substituting only the name does not work: the default
+     * lives on the SOURCE route and is layered by `forwardState`, never by the
+     * forward map, and a dynamic `forwardTo` is not in that map at all.
+     */
+    afterEach(() => {
+      router.stop();
+    });
+
+    it("highlights an alias whose chain default is layered into a PATH slot", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "d2", path: "/d2/:z" },
+        { name: "s2", path: "/s2", forwardTo: "d2", defaultParams: { z: "5" } },
+      ]);
+      await router.start("/home");
+
+      const state = await router.navigate("s2", {});
+
+      expect(state.path).toBe("/d2/5");
+      // The link the user clicked lands exactly here, so it must read active.
+      expect(router.isActiveRoute("s2", {})).toBe(true);
+    });
+
+    it("highlights an alias whose chain default is layered into the QUERY channel", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "d", path: "/d?z" },
+        { name: "s", path: "/s", forwardTo: "d", defaultParams: { z: "5" } },
+      ]);
+      await router.start("/home");
+
+      const state = await router.navigate("s", {});
+
+      expect(state.path).toBe("/d?z=5");
+      // Sharper than the path case: the arm matches only if the repeat carries
+      // the SEARCH channel too — stage ① routes the hop default there when the
+      // target declares the key with `?` (#1570).
+      expect(router.isActiveRoute("s", {}, {}, false, false)).toBe(true);
+    });
+
+    it("highlights an alias whose forwardTo is DYNAMIC", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "d3", path: "/d3" },
+        { name: "dyn", path: "/dyn", forwardTo: () => "d3" },
+      ]);
+      await router.start("/home");
+      await router.navigate("dyn", {});
+
+      // A function target is absent from the static forward map entirely.
+      expect(router.isActiveRoute("dyn", {})).toBe(true);
+    });
+
+    it("keeps a section link lit when a SIBLING descendant is active", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "users",
+          path: "/users",
+          forwardTo: "users.list",
+          children: [
+            { name: "list", path: "/list" },
+            { name: "profile", path: "/profile/:id" },
+          ],
+        },
+      ]);
+      await router.start("/home");
+      await router.navigate("users.profile", { id: "7" });
+
+      // The literal arm answers this one. Resolving BEFORE comparing (instead
+      // of falling back) would send `users` to `users.list` and darken the
+      // section link — which is why the arm is a fallback, not a replacement.
+      expect(router.isActiveRoute("users")).toBe(true);
+    });
+
+    it("stays false when the alias lands on a DIFFERENT page", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "other", path: "/other" },
+        { name: "alias", path: "/alias", forwardTo: "other" },
+        { name: "elsewhere", path: "/elsewhere" },
+      ]);
+      await router.start("/home");
+      await router.navigate("elsewhere", {});
+
+      // Discrimination: the arm must not turn the predicate into a tautology.
+      expect(router.isActiveRoute("alias")).toBe(false);
+      expect(router.isActiveRoute("other")).toBe(false);
+    });
+
+    it("answers false, not throws, when a dynamic forwardTo callback throws", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "boom",
+          path: "/boom",
+          forwardTo: () => {
+            throw new Error("dynamic forward exploded");
+          },
+        },
+      ]);
+      await router.start("/home");
+
+      // A predicate on the render path must never throw — six adapters call it
+      // for every `<Link>`.
+      expect(() => router.isActiveRoute("boom")).not.toThrow();
+      expect(router.isActiveRoute("boom")).toBe(false);
+      expect(warnSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+  });
 });
