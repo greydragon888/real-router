@@ -103,4 +103,101 @@ describe("forwardState", () => {
     expect(state.name).toBe("dstWithDefaults");
     expect(state.params).toStrictEqual({ b: 2, c: 3 });
   });
+
+  describe("multi-hop chains layer every forwarding hop's defaults (#1566)", () => {
+    it("layers an INTERMEDIATE hop's defaults, not only the entered route's", async () => {
+      routesApi.add([
+        { name: "m1", path: "/m1", forwardTo: "m2" },
+        {
+          name: "m2",
+          path: "/m2",
+          forwardTo: "m3",
+          defaultParams: { p: "P2" },
+        },
+        { name: "m3", path: "/m3/:p" },
+      ]);
+
+      expect(getPluginApi(router).forwardState("m1", {}).params).toStrictEqual({
+        p: "P2",
+      });
+
+      const state = await router.navigate("m1");
+
+      expect(state.path).toBe("/m3/P2");
+    });
+
+    it("lets an EARLIER hop win over a later one, and the caller over both", async () => {
+      routesApi.add([
+        {
+          name: "e1",
+          path: "/e1",
+          forwardTo: "e2",
+          defaultParams: { p: "P1" },
+        },
+        {
+          name: "e2",
+          path: "/e2",
+          forwardTo: "e3",
+          defaultParams: { p: "P2" },
+        },
+        { name: "e3", path: "/e3/:p" },
+      ]);
+
+      const earliest = await router.navigate("e1");
+
+      expect(earliest.path).toBe("/e3/P1");
+
+      const explicit = await router.navigate("e1", { p: "CALL" });
+
+      expect(explicit.path).toBe("/e3/CALL");
+    });
+
+    it("layers hops of a DYNAMIC chain", async () => {
+      routesApi.add([
+        { name: "d1", path: "/d1", forwardTo: () => "d2" },
+        {
+          name: "d2",
+          path: "/d2",
+          forwardTo: () => "d3",
+          defaultParams: { p: "DP2" },
+        },
+        { name: "d3", path: "/d3/:p" },
+      ]);
+
+      const state = await router.navigate("d1");
+
+      expect(state.path).toBe("/d3/DP2");
+    });
+
+    it("layers hops of a MIXED static→dynamic chain", async () => {
+      routesApi.add([
+        { name: "x1", path: "/x1", forwardTo: "x2" },
+        {
+          name: "x2",
+          path: "/x2",
+          forwardTo: () => "x3",
+          defaultParams: { p: "XP2" },
+        },
+        { name: "x3", path: "/x3/:p" },
+      ]);
+
+      const state = await router.navigate("x1");
+
+      expect(state.path).toBe("/x3/XP2");
+    });
+
+    it("still leaves the TARGET's own defaults to the state builder", () => {
+      routesApi.add([
+        { name: "t1", path: "/t1", forwardTo: "t2" },
+        { name: "t2", path: "/t2", forwardTo: "t3" },
+        { name: "t3", path: "/t3/:p", defaultParams: { p: "P3" } },
+      ]);
+
+      // No forwarding hop declares `p`, so forwardState must not invent it —
+      // the terminal default is merged downstream (#1549).
+      expect(getPluginApi(router).forwardState("t1", {}).params).toStrictEqual(
+        {},
+      );
+    });
+  });
 });

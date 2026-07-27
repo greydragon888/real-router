@@ -460,17 +460,16 @@ export class RoutesNamespace<
     const resolvedSearch = (search ?? EMPTY_SEARCH) as S;
 
     if (Object.hasOwn(this.#store.config.forwardFnMap, name)) {
-      const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
       const dynamicForward = this.#store.config.forwardFnMap[name];
-      const resolved = this.#resolveDynamicForward(
+      const { target, chain } = this.#resolveDynamicForward(
         name,
         dynamicForward,
         params,
       );
 
       return {
-        name: resolved,
-        params: paramsWithSourceDefaults,
+        name: target,
+        params: this.#mergeChainDefaults(chain, params),
         search: resolvedSearch,
       };
     }
@@ -481,28 +480,34 @@ export class RoutesNamespace<
       staticForward !== name &&
       Object.hasOwn(this.#store.config.forwardFnMap, staticForward)
     ) {
-      const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
       const targetDynamicForward =
         this.#store.config.forwardFnMap[staticForward];
-      const resolved = this.#resolveDynamicForward(
+      const { target, chain } = this.#resolveDynamicForward(
         staticForward,
         targetDynamicForward,
         params,
       );
 
       return {
-        name: resolved,
-        params: paramsWithSourceDefaults,
+        name: target,
+        // The static prefix stops AT `staticForward` (it has no static forward
+        // of its own), and the dynamic walk starts THERE — so the two halves
+        // concatenate without repeating a hop.
+        params: this.#mergeChainDefaults(
+          [...this.#collectStaticChain(name), ...chain],
+          params,
+        ),
         search: resolvedSearch,
       };
     }
 
     if (staticForward !== name) {
-      const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
-
       return {
         name: staticForward,
-        params: paramsWithSourceDefaults,
+        params: this.#mergeChainDefaults(
+          this.#collectStaticChain(name),
+          params,
+        ),
         search: resolvedSearch,
       };
     }
@@ -726,21 +731,53 @@ export class RoutesNamespace<
     return this.#store;
   }
 
-  #mergeDefaultParams<P extends Params = Params>(
-    routeName: string,
+  /**
+   * Every node on a `forwardTo` chain that FORWARDS, in walk order — the
+   * terminal is excluded (its own defaults belong to the state builder, #1549).
+   * `forwardMap` is proven acyclic at registration (`refreshForwardMap` runs
+   * `resolveForwardChain`, which throws on a cycle), so the walk terminates.
+   */
+  #collectStaticChain(name: string): string[] {
+    const chain: string[] = [];
+    let current = name;
+
+    while (Object.hasOwn(this.#store.config.forwardMap, current)) {
+      chain.push(current);
+      current = this.#store.config.forwardMap[current];
+    }
+
+    return chain;
+  }
+
+  /**
+   * Layers the path defaults of every forwarding hop UNDER the caller's params.
+   * Folding in walk order makes an EARLIER hop win over a later one (each merge
+   * puts the next hop's defaults below what is already accumulated), and the
+   * caller wins over all of them. Only the entered route was consulted before,
+   * so a default declared on an intermediate hop never reached the target and
+   * a required slot was left empty (#1566).
+   */
+  #mergeChainDefaults<P extends Params = Params>(
+    chain: readonly string[],
     params: P,
   ): P {
-    // `undefined` is absence on both sides (#1550 / #1551): a source default
-    // carrying `undefined` must not ride out of `forwardState` as an own key.
-    return mergeDefined(
-      this.#store.config.defaultParams[routeName] as P | undefined,
-      params,
-    );
+    let merged = params;
+
+    for (const routeName of chain) {
+      // `undefined` is absence on both sides (#1550 / #1551): a source default
+      // carrying `undefined` must not ride out of `forwardState` as an own key.
+      merged = mergeDefined(
+        this.#store.config.defaultParams[routeName] as P | undefined,
+        merged,
+      );
+    }
+
+    return merged;
   }
 
   /**
    * Merges a route's query-channel defaults (`defaultSearch`) into a search bag
-   * — the search-channel twin of {@link #mergeDefaultParams} (RFC-4 M2 / #1548).
+   * — the search-channel twin of {@link #mergeChainDefaults} (RFC-4 M2 / #1548).
    * An explicitly-passed search value wins over the default (spread order).
    * Returns the input untouched (no allocation, including `undefined`) when the
    * route declares no `defaultSearch`, so a route without query defaults keeps
@@ -797,8 +834,12 @@ export class RoutesNamespace<
     startName: string,
     startFn: ForwardToCallback<Dependencies>,
     params: Params,
-  ): string {
+  ): { target: string; chain: string[] } {
     const visited = new Set<string>([startName]);
+    // Every node that forwards, in walk order — `startName` does by definition.
+    // The terminal is never pushed, so the caller can layer hop defaults without
+    // pulling in the target's (#1566/#1549).
+    const chain: string[] = [startName];
 
     let current = startFn(this.#deps.getDependency, params);
     let depth = 0;
@@ -816,9 +857,9 @@ export class RoutesNamespace<
       }
 
       if (visited.has(current)) {
-        const chain = [...visited, current].join(" → ");
+        const cycle = [...visited, current].join(" → ");
 
-        throw new Error(`Circular forwardTo: ${chain}`);
+        throw new Error(`Circular forwardTo: ${cycle}`);
       }
 
       visited.add(current);
@@ -828,6 +869,7 @@ export class RoutesNamespace<
           current
         ] as ForwardToCallback<Dependencies>;
 
+        chain.push(current);
         current = fn(this.#deps.getDependency, params);
 
         depth++;
@@ -838,12 +880,13 @@ export class RoutesNamespace<
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (staticForward !== undefined) {
+        chain.push(current);
         current = staticForward;
         depth++;
         continue;
       }
 
-      return current;
+      return { target: current, chain };
     }
 
     throw new Error(`forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
