@@ -1,14 +1,11 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
-import {
-  DEFAULT_TRANSITION,
-  EMPTY_PARAMS,
-  EMPTY_SEARCH,
-} from "../../constants";
+import { EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import {
   areParamValuesEqual,
+  createStateObject,
   freezeStateInPlace,
-  mergeDefined,
+  mergeWithDefault,
 } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -147,23 +144,20 @@ export class StateNamespace {
       EMPTY_SEARCH,
     ) as S;
 
-    const state = {
+    // Query channel (RFC-4 M2 / #1548): the input is already canonical
+    // (separated upstream), so declared query names live in `search`, never in
+    // `params`. The URL is built from the MERGED channels (not the raw args) so
+    // a state built without an explicit path — canNavigateTo, isActiveRoute —
+    // has `state.path` in step with `state.search`; buildPath re-applies the
+    // same defaults idempotently. `createStateObject` is shared with
+    // `pipeline/materialize` so both producers emit one state shape.
+    return createStateObject(
       name,
-      params: mergedParams,
-      // Query channel (RFC-4 M2 / #1548): the input is already canonical
-      // (separated upstream), so declared query names live here, never in
-      // `params`.
-      search: mergedSearch,
-      // Build the URL from the merged channels (not the raw args) so a state
-      // built without an explicit path — canNavigateTo, isActiveRoute — has
-      // `state.path` in step with `state.search` (RFC-4 M2 / #1548). buildPath
-      // re-applies the same defaults idempotently.
-      path: path ?? this.#deps.buildPath(name, mergedParams, mergedSearch),
-      context: {},
-      ...(!skipFreeze && { transition: DEFAULT_TRANSITION }),
-    } as State<P, S>;
-
-    return skipFreeze ? state : freezeStateInPlace(state);
+      mergedParams,
+      mergedSearch,
+      path ?? this.#deps.buildPath(name, mergedParams, mergedSearch),
+      skipFreeze,
+    );
   }
 
   // =========================================================================
@@ -211,39 +205,6 @@ export class StateNamespace {
       recordsShallowEqual(state1.search, state2.search)
     );
   }
-}
-
-/**
- * Merges a channel's route default UNDER a routed value (the value wins) and
- * freezes the result. Reuses the shared frozen `empty` singleton (EMPTY_PARAMS /
- * EMPTY_SEARCH, #1027) when there is neither a default nor a value — so the hot
- * path (no defaults, empty params) allocates zero objects. A defaulted channel
- * always spreads (a fresh frozen object); an undefined-default channel freezes a
- * copy of the value (never the caller's object).
- *
- * `undefined` is absence on BOTH sides (`mergeDefined`, #1550 / #1551): an
- * explicitly-`undefined` caller value leaves the default in place, and a default
- * that carries `undefined` behaves like no entry — so the frozen state never
- * exposes an `undefined`-valued own key on either channel.
- */
-function mergeWithDefault(
-  defaultValue: Record<string, unknown> | undefined,
-  value: Record<string, unknown> | undefined,
-  empty: Readonly<Record<string, never>>,
-): Readonly<Record<string, unknown>> {
-  if (defaultValue !== undefined) {
-    return Object.freeze(mergeDefined(defaultValue, value));
-  }
-
-  if (value === undefined || value === empty) {
-    return empty;
-  }
-
-  // `mergeDefined` returns the argument itself when there is nothing to strip,
-  // so copy before freezing — the caller's bag must never be frozen.
-  const defined = mergeDefined(undefined, value);
-
-  return Object.freeze(defined === value ? { ...value } : defined);
 }
 
 /**

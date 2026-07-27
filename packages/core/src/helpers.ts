@@ -1,6 +1,6 @@
 // packages/core/src/helpers.ts
 
-import { DEFAULT_LIMITS, EMPTY_PARAMS } from "./constants";
+import { DEFAULT_LIMITS, DEFAULT_TRANSITION, EMPTY_PARAMS } from "./constants";
 
 import type { Params, SearchParams, State, LimitsConfig } from "./types";
 import type { Limits } from "./types/internal";
@@ -274,6 +274,84 @@ export function freezeStateInPlace<T extends State>(state: T): T {
   // (`state ? freezeStateInPlace(state) : undefined`) and `T extends State` is
   // typed non-null.
   return Object.freeze(state);
+}
+
+/**
+ * Merges a channel's route default UNDER a routed value (the value wins) and
+ * freezes the result. Reuses the shared frozen `empty` singleton (EMPTY_PARAMS /
+ * EMPTY_SEARCH, #1027) when there is neither a default nor a value — so the hot
+ * path (no defaults, empty params) allocates zero objects. A defaulted channel
+ * always spreads (a fresh frozen object); an undefined-default channel freezes a
+ * copy of the value (never the caller's object).
+ *
+ * `undefined` is absence on BOTH sides (`mergeDefined`, #1550 / #1551): an
+ * explicitly-`undefined` caller value leaves the default in place, and a default
+ * that carries `undefined` behaves like no entry — so the frozen state never
+ * exposes an `undefined`-valued own key on either channel.
+ *
+ * Lives here, not in a namespace, because stage ③ (`applyDefaults`) has TWO
+ * callers since the pipeline landed — `StateNamespace.makeState` and
+ * `pipeline/canonicalize` — and a second copy of "default under value" would be
+ * a second source of truth for the rule, the same drift trap #1550/#1551 closed
+ * by collapsing the four merge sites onto `mergeDefined`.
+ *
+ * @internal
+ */
+export function mergeWithDefault(
+  defaultValue: Record<string, unknown> | undefined,
+  value: Record<string, unknown> | undefined,
+  empty: Readonly<Record<string, never>>,
+): Readonly<Record<string, unknown>> {
+  if (defaultValue !== undefined) {
+    return Object.freeze(mergeDefined(defaultValue, value));
+  }
+
+  if (value === undefined || value === empty) {
+    return empty;
+  }
+
+  // `mergeDefined` returns the argument itself when there is nothing to strip,
+  // so copy before freezing — the caller's bag must never be frozen.
+  const defined = mergeDefined(undefined, value);
+
+  return Object.freeze(defined === value ? { ...value } : defined);
+}
+
+/**
+ * THE shape of a router State — one constructor for both producers
+ * (`StateNamespace.makeState` and `pipeline/materialize`). Channels arrive
+ * already merged and frozen (`mergeWithDefault`); `path` arrives already built.
+ *
+ * `skipFreeze` governs the freeze of the STATE OBJECT only — never the channels.
+ * `params` / `search` are frozen at merge time regardless, so a state handed to
+ * a guard mid-pipeline (`skipFreeze: true`, the navigate path) still exposes
+ * immutable bags while `completeTransition` is free to attach `transition`.
+ *
+ * `context` is a fresh empty object, intentionally NOT frozen — plugins publish
+ * into it via `claim.write(state, value)` after creation.
+ *
+ * @internal
+ */
+export function createStateObject<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+>(
+  name: string,
+  params: P,
+  search: S,
+  path: string,
+  skipFreeze?: boolean,
+): State<P, S> {
+  const state = {
+    name,
+    params,
+    search,
+    path,
+    context: {},
+    ...(!skipFreeze && { transition: DEFAULT_TRANSITION }),
+  } as State<P, S>;
+
+  return skipFreeze ? state : freezeStateInPlace(state);
 }
 
 /**

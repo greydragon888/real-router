@@ -292,7 +292,7 @@ All navigation methods return `Promise<State>`. The pipeline uses **optimistic s
 flowchart TD
     NAV["router.navigate(name, params, search, options)"] --> BUILD
     BUILD["buildNavigateState()
-    forwardState + buildPath + makeState"] --> DEACTIVATE
+    src/pipeline: canonicalize → buildURL + materialize"] --> DEACTIVATE
     DEACTIVATE["Deactivation guards
     inner→outer"]
 

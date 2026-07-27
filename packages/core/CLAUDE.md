@@ -20,6 +20,12 @@ Router.ts (facade)
     ├── RouteLifecycleNamespace — canActivate/canDeactivate guards
     └── RouterLifecycleNamespace — start/stop
 
+src/pipeline/ (navigation delivery — three primitives over one opaque type)
+    ├── canonicalize(port, name, params, search) → Canonical  — ① forwardTo + ③ route defaults, one pass
+    ├── buildURL(canonical, port)                → string     — ⑤a
+    ├── materialize(canonical, opts)             → State      — ⑤b
+    └── RouteResolver                                          — the port the router implements at wiring time
+
 api/ (standalone functions — tree-shakeable)
     ├── getRoutesApi(router)      — route CRUD
     ├── getDependenciesApi(router) — dependency CRUD
@@ -38,6 +44,17 @@ api/ (standalone functions — tree-shakeable)
 
 All router events are consequences of FSM transitions (via `fsm.on(from, event, action)`), not manual calls.
 No boolean flags (`#started`, `#active`, `#navigating` removed).
+
+### Navigation pipeline (`src/pipeline/`, RFC nav-pipeline milestone 1)
+
+`navigate()` builds its target state through the pipeline: `canonicalize` is the **sole producer** of `Canonical`, and `buildURL` / `materialize` physically accept nothing else (the brand is a `unique symbol` that is never exported, so `materialize({name, path, query})` does not compile). Six of the remaining seven entry points still compose `forwardState` + `makeState` themselves and migrate one per commit; `buildPath` is the exception — it has its own interceptor zone, with neither stage ① nor `makeState`.
+
+Two wiring facts are load-bearing and were measured, not assumed — changing either is a behaviour change, not a refactor:
+
+- **`port.resolveForward` is the `forwardState` SEAM** (`Router.ts:268-292`) — the interceptable chain *plus* the channel-separation wrapper. Channel separation therefore lives in the port implementation, never inside the pipeline module, which is what lets the module hold its target shape while legacy single-bag callers still work.
+- **`port.buildPath` is the interceptable `ctx.buildPath`** — one `navigate()` runs BOTH the `forwardState` and the `buildPath` interceptor today (`persistent-params` registers both). Reaching for the engine's `matcher.buildPath` would silently stop running the latter on the navigate path.
+
+Stage ③ (route default UNDER the caller's value) has two callers — `canonicalize` and `StateNamespace.makeState` — and both go through the shared `mergeWithDefault` / `createStateObject` helpers in `src/helpers.ts`: one source of truth for the merge rule and one state shape. Channels are frozen at merge time, independently of `materialize`'s `skipFreeze` (which defers only the state-object freeze, for the transition pipeline).
 
 ### Validation Pattern
 
@@ -659,7 +676,7 @@ router.areStatesEqual(state1, state2); // Ignores state.search (query)
 router.areStatesEqual(state1, state2, false); // Compares state.params AND state.search
 ```
 
-**`undefined` is absence on both sides of the default merge (#1550 / #1551).** `mergeDefined` (`src/helpers.ts`) is the single owner of "route default UNDER the value": a key survives only when its winning value is defined. So a caller's explicit `undefined` means "I said nothing" and the route default keeps the slot (`navigate("x", {}, { page: undefined })` on `defaultSearch { page: "1" }` commits `page: "1"`, symmetric with the path channel), and a default that itself carries `undefined` behaves exactly like no entry (no `undefined`-valued own key ever reaches the frozen state, a codec, or `forwardState`'s result). The rule lives in the merge rather than in a separately-ordered normalize stage — that is what makes it order-insensitive and true for every producer (`makeState`, `matchPath`, `buildPath`, `forwardState` source-layering). `normalizeParams` stays as the path-channel entry guard (it also collapses an empty bag to the `EMPTY_PARAMS` singleton, #1027).
+**`undefined` is absence on both sides of the default merge (#1550 / #1551).** `mergeDefined` (`src/helpers.ts`) is the single owner of "route default UNDER the value": a key survives only when its winning value is defined. So a caller's explicit `undefined` means "I said nothing" and the route default keeps the slot (`navigate("x", {}, { page: undefined })` on `defaultSearch { page: "1" }` commits `page: "1"`, symmetric with the path channel), and a default that itself carries `undefined` behaves exactly like no entry (no `undefined`-valued own key ever reaches the frozen state, a codec, or `forwardState`'s result). The rule lives in the merge rather than in a separately-ordered normalize stage — that is what makes it order-insensitive and true for every producer (`makeState`, `pipeline/canonicalize`, `matchPath`, `buildPath`, `forwardState` source-layering). `normalizeParams` stays as the path-channel entry guard (it also collapses an empty bag to the `EMPTY_PARAMS` singleton, #1027).
 
 **One registry decides the channel, and it is the one that prints (#1556).** `RoutesNamespace.getQueryParams` (the input to `separateChannels`) reads the matcher's `declaredQueryParams` — the very list `#buildQueryStringForBuild` prints from — minus the route's `urlParams`. It used to walk the route's `matchSegments` instead, which never contains the **root** node, so a key declared via `setRootPath("?lang&theme")` (how `persistent-params` declares its keys, `plugin.ts:48`) printed as a query param but classified as a **path** param: it landed in `state.params`, disappeared from `state.path` on the intent direction, and made `isActiveRoute` false in _both_ spellings for a link to the active page. The invariant is now structural — a key is separated into the query channel **iff** the build prints it — with one deliberate carve-out: a name that also occupies a path slot (`/items/:id?id`) stays path-owned in the params bag, and only an explicit `search` twin reaches the query channel (#843/#1549).
 
@@ -704,7 +721,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - **Cached error rejections** — pre-allocated `Promise.reject()` for SAME_STATES, ROUTER_NOT_STARTED, ROUTE_NOT_FOUND (zero alloc per rejection)
 - **`getFunctions()` cached tuple** — `RouteLifecycleNamespace` returns pre-allocated `[deactivate, activate]` array (no alloc per navigate)
 - **Segment array reuse** — `toActivate`/`toDeactivate` reuse arrays from `getTransitionPath()`
-- **`buildNavigateState()`** — single-pass state construction (merged forwardState + buildPath + makeState)
+- **`buildNavigateState()`** — single-pass state construction through `src/pipeline`: one `canonicalize` (① forwardState seam + ③ defaults) feeding `buildURL` + `materialize`. Costs two object literals per navigation over the pre-pipeline form (the `Canonical` and `materialize`'s options bag); the merge itself still allocates nothing when the route has no defaults
 - **Empty-params reuse** — `normalizeParams()` returns the shared frozen `EMPTY_PARAMS` singleton when nothing survives (empty input, or all values `undefined`), so `makeState`'s `params === EMPTY_PARAMS` branch reuses it: an empty-params navigation allocates **zero** transient `{}` (lazy allocation in `normalizeParams` + singleton reuse, #1027)
 - **Single-pass freeze** — `freezeStateInPlace` consolidated into one recursive traversal
 

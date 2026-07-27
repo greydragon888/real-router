@@ -1,8 +1,8 @@
 // packages/core/src/wiring/wireNamespaces.ts
 
-import { normalizeParams } from "../helpers";
 import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
+import { buildURL, canonicalize, materialize } from "../pipeline";
 
 import type { NamespaceBag } from "./types";
 import type { NavigationDependencies } from "../namespaces/NavigationNamespace";
@@ -10,6 +10,7 @@ import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
+import type { RouteResolver } from "../pipeline";
 import type { Router } from "../Router";
 import type { DefaultDependencies, Params, SearchParams } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
@@ -177,9 +178,51 @@ function wirePlugins<Dependencies extends DefaultDependencies>(
   ns.plugins.setDependencies(deps);
 }
 
+/**
+ * The router's implementation of the pipeline's read-model (`RouteResolver`).
+ *
+ * ⚠ Both ends are wired to the INTERCEPTABLE primitives on purpose — see the
+ * port's own docs. `resolveForward` is the `forwardState` seam (interceptors +
+ * the channel-separation wrapper, `Router.ts:268-292`), so stage ② lives here,
+ * in the port implementation, and never inside the pipeline module. `buildPath`
+ * is `ctx.buildPath`, because today's navigate path prints its URL through that
+ * interceptable — reaching for the engine's matcher instead would silently drop
+ * `persistent-params`' `buildPath` interceptor from the navigate path.
+ */
+function createRouteResolver<Dependencies extends DefaultDependencies>(
+  ns: NamespaceBag<Dependencies>,
+): RouteResolver {
+  // Hoisted once per router, NOT per call: `navigate` is the hot path, and
+  // `getInternals` is a WeakMap lookup. Safe because both references are stable
+  // for the router's lifetime — internals are registered before wiring (#1331)
+  // and the object is mutated in place, never swapped; `store` is `readonly` on
+  // RoutesNamespace, assigned once in its constructor. ⚠ Only `store` itself is
+  // stable: `add`/`replace`/`clear` DO swap `store.config`'s sub-maps wholesale
+  // (`Object.assign(store.config, artifacts.config)`), so the accessors below
+  // must keep re-reading `store.config.defaultParams` per call — hoisting the
+  // sub-map would freeze the pre-mutation defaults. The interceptable methods
+  // are stable closures that read the live interceptor map on every call, so
+  // hoisting them keeps plugin registration fully dynamic.
+  const ctx = getInternals(ns.router);
+  const store = ns.routes.getStore();
+
+  return {
+    resolveForward: (name, params, search) =>
+      ctx.forwardState(name, params, search),
+    // `config.*` maps are null-prototype, so a missing entry reads as
+    // `undefined` (never a proto value). O(1) lookup, no ancestor walk.
+    defaultParams: (name) => store.config.defaultParams[name],
+    defaultSearch: (name) => store.config.defaultSearch[name],
+    buildPath: (name, params, search) => ctx.buildPath(name, params, search),
+  };
+}
+
 function wireNavigation<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
 ): void {
+  // One port per router instance — allocated at wiring time, not per navigate.
+  const port = createRouteResolver(ns);
+
   const deps: NavigationDependencies = {
     logger: getInternals(ns.router).logger,
     getOptions: () => ns.options.get(),
@@ -198,33 +241,33 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         "navigate",
       );
 
-      // forwardState canonicalizes the channels at ITS boundary (#1548/#1549):
-      // `forwarded.params` is path-only, `forwarded.search` the full query. The
-      // `routeSearch` arg (positional `navigate(name, params, search)` /
-      // descriptor form), any declared `?key` riding in the caller's `params`
-      // bag, and persistent params a plugin injected there all land in the query
-      // channel there — so ONE makeState call serves both the positional and the
-      // v1 single-bag forms with no explicit/v1 split here. A colliding name
+      // The pipeline (RFC nav-pipeline, milestone 1): `canonicalize` is the sole
+      // producer of the canonical intent (① forwardTo resolution through the
+      // interceptor zone + ③ route defaults under the caller's value), and both
+      // `buildURL` and `materialize` physically accept nothing else — so the URL
+      // and the State can never derive from differently-merged channels.
+      //
+      // Channels stay correct at the seam (#1548/#1549): `routeSearch` (the
+      // positional / descriptor form), a declared `?key` riding in the caller's
+      // `params` bag, and persistent params injected by a plugin all land in the
+      // query channel inside `port.resolveForward`, so one path serves both the
+      // positional and the v1 single-bag forms. A colliding name
       // (`/items/:id?id`) keeps its path slot and query twin independent.
-      const forwarded = ctx.forwardState(routeName, routeParams, routeSearch);
-      const name = forwarded.name;
-      const params = normalizeParams(forwarded.params);
-      const meta = ns.routes.getMetaForState(name);
+      const canonical = canonicalize(port, routeName, routeParams, routeSearch);
+      const meta = ns.routes.getMetaForState(canonical.name);
 
       if (meta === undefined) {
         return;
       }
 
-      // path omitted → makeState builds it from the merged channels (buildPath
-      // is search-aware and re-applies defaults idempotently), keeping
-      // `state.path` in step with `state.search`.
-      return ns.state.makeState(
-        name,
-        params,
-        forwarded.search,
-        undefined,
-        true,
-      );
+      // ⑤a then ⑤b: the URL is built from the merged channels (not the raw
+      // args), so `state.path` stays in step with `state.search`. `skipFreeze`
+      // defers the freeze of the state OBJECT for the transition pipeline; the
+      // channels were already frozen at merge time.
+      return materialize(canonical, {
+        path: buildURL(canonical, port),
+        skipFreeze: true,
+      });
     },
     resolveDefault: () => {
       const options = ns.options.get();

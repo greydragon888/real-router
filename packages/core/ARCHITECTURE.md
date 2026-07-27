@@ -29,6 +29,8 @@ core/
 │   │
 │   ├── engine/                      — Merged routing engine: route-tree + path-matcher + search-params layers (#1510)
 │   │
+│   ├── pipeline/                    — Navigation delivery: canonicalize → buildURL / materialize over the opaque `Canonical` (RFC nav-pipeline, milestone 1)
+│   │
 │   ├── namespaces/
 │   │   ├── RoutesNamespace/         — Route tree, path operations, forwarding
 │   │   ├── StateNamespace/          — State storage (current, previous)
@@ -192,6 +194,20 @@ fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
 
 ## Navigation Pipeline
 
+### The delivery pipeline (`src/pipeline/`)
+
+"Navigation intent → committed State + URL" is owned by one module of three primitives over one opaque type, rather than re-composed at each entry point:
+
+```ts
+canonicalize(port, name, params, search) // ① forwardTo resolution + ③ route defaults → Canonical
+buildURL(canonical, port)                // ⑤a — the URL of that intent
+materialize(canonical, opts)             // ⑤b — the State of that intent
+```
+
+`Canonical` carries a `unique symbol` brand that is never exported, so it cannot be fabricated outside `canonicalize` — "build a URL or a State out of un-defaulted channels" is unrepresentable, not merely discouraged. The module reaches the routes layer through a narrow port (`RouteResolver`), implemented by the router at wiring time.
+
+**Milestone 1 wiring (deliberate, measured).** The port's `resolveForward` is the interceptable `forwardState` **seam** — so channel separation stays in the port implementation, never inside the pipeline — and its `buildPath` is the interceptable `ctx.buildPath`, because one `navigate()` runs both interceptors today. `navigate()` is the only entry point on the pipeline so far; the remaining seven migrate one per commit.
+
 ### navigate() Flow
 
 ```
@@ -211,7 +227,7 @@ fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
            │
            ▼
 ┌──────────────────────┐
-│  Build target state  │  buildNavigateState() (single-pass: forwardState + buildPath + makeState)
+│  Build target state  │  buildNavigateState() → src/pipeline: canonicalize → buildURL + materialize
 │  + force replace     │  forceReplaceFromUnknown(opts, fromState)
 │  + SAME_STATES check │  fromState.path === toState.path — canonical path comparison
 └──────────┬───────────┘
