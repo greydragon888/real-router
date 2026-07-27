@@ -48,18 +48,6 @@ function collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
   return params;
 }
 
-function collectQueryParamsArray(segments: readonly RouteTree[]): string[] {
-  const params: string[] = [];
-
-  for (const segment of segments) {
-    for (const param of segment.paramMeta.queryParams) {
-      params.push(param);
-    }
-  }
-
-  return params;
-}
-
 function createRouteState<P extends RouteParams = RouteParams>(
   matchResult: {
     readonly segments: readonly { fullName: string }[];
@@ -701,6 +689,16 @@ export class RoutesNamespace<
    * coexist) is path-owned for routing purposes: excluding it here keeps the
    * path slot's value in `state.params` and the rebuild's #843 precedence
    * intact. Same cache lifecycle: cleared on every matcher rebuild.
+   *
+   * Reads the matcher's `declaredQueryParams` — the SAME registry the
+   * query-string build uses — rather than walking `matchSegments` (#1556). The
+   * segment walk missed the ROOT node's `?`-declarations (`setRootPath("?a&b")`,
+   * how persistent-params declares its keys), because the root is captured
+   * separately at `registerTree` and never appears in `matchSegments`. That
+   * made a root-declared key print as query but classify as a path param: it
+   * landed in `state.params`, vanished from `state.path` on the intent side,
+   * and no `isActiveRoute` spelling matched a link to the active page. One
+   * registry classifies and prints, so the two cannot drift again.
    */
   getQueryParams(name: string): string[] {
     const cached = this.#store.queryParamsCache.get(name);
@@ -710,15 +708,13 @@ export class RoutesNamespace<
       return cached;
     }
 
-    const segments = this.#store.matcher.getSegmentsByName(name);
+    const declared = this.#store.matcher.getDeclaredQueryParams(name);
     let result: string[] = [];
 
-    if (segments) {
+    if (declared) {
       const urlParams = this.getUrlParams(name);
 
-      result = collectQueryParamsArray(segments as readonly RouteTree[]).filter(
-        (param) => !urlParams.includes(param),
-      );
+      result = declared.filter((param) => !urlParams.includes(param));
     }
 
     this.#store.queryParamsCache.set(name, result);

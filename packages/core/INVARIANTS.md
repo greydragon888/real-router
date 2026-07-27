@@ -392,6 +392,7 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | --- | ----------------- | ---------------------------------------------------------------------------------------- |
 | 1   | Set-get roundtrip | After `setRootPath("/app")`, `getRootPath() === "/app"`. The value survives a roundtrip. |
 | 2   | Default is empty  | `getRootPath()` returns `""` on a fresh router. No root path is set by default.          |
+| 3   | A root `?`-declaration is a declared query param everywhere (#1556) | After `setRootPath("?lang")`, `lang` is declared for EVERY route: it is separated into the query channel (`state.search`, never `state.params`) and printed into `state.path` on both the URL and the intent direction, in every `queryParamsMode`. Classification and printing read ONE registry (the matcher's `declaredQueryParams`, which unions the root node's declarations), so they cannot drift — a key is separated into the query channel **iff** the build prints it, modulo a path-slot twin (`/items/:id?id` stays path-owned, #843 / #1549). |
 
 ## pluginApi — getOptions
 

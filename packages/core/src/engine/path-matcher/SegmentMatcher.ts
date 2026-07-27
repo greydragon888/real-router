@@ -197,6 +197,22 @@ export class SegmentMatcher {
     return this.#routesByName.get(name)?.meta;
   }
 
+  /**
+   * The route's declared query-param names — the SAME registry the query-string
+   * build reads (`#buildQueryStringForBuild`), so a consumer classifying keys
+   * into channels cannot drift from what this matcher actually prints (#1556).
+   *
+   * Unlike a walk over {@link getSegmentsByName}, this includes the ROOT node's
+   * `?`-declarations (`setRootPath("?a&b")` — how persistent-params declares its
+   * keys): the root is captured in `#rootQueryParams` at `registerTree` and is
+   * deliberately NOT part of `matchSegments`, so a segment walk silently misses
+   * it. Path-slot collisions (`/items/:id?id`) are NOT filtered here — the
+   * caller owns that policy (core subtracts its `urlParams`, #843 / #1549).
+   */
+  getDeclaredQueryParams(name: string): readonly string[] | undefined {
+    return this.#routesByName.get(name)?.declaredQueryParams;
+  }
+
   hasRoute(name: string): boolean {
     return this.#routesByName.has(name);
   }
