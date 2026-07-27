@@ -39,6 +39,7 @@
 | 5   | Monotonicity of ignoreQueryParams | If `areStatesEqual(s1, s2, false) === true`, then `areStatesEqual(s1, s2, true) === true`. Ignoring query params can only make states more equal, never less. |
 | 6   | Different names implies not equal | If `s1.name !== s2.name`, then `areStatesEqual(s1, s2) === false`. Route name is the primary equality discriminant.                                           |
 | 7   | Transitivity                      | If `areStatesEqual(a, b)` and `areStatesEqual(b, c)`, then `areStatesEqual(a, c)`. Equality is transitive.                                                    |
+| 8   | Provenance independence (#1554)   | A state built from an intent equals the state its own `path` matches back to: `areStatesEqual(makeState(name, params, search), matchPath(thatState.path), false) === true`. The URL direction parses values (`?page=2` → `2`), the intent direction keeps the caller's — values printing into the same URL compare equal (`string` / `number` / `boolean` by printed form, arrays element-wise, a singleton array against its scalar). `null` / `undefined` / objects stay strict: they print differently (`?a` vs `?a=` vs nothing). |
 
 ## buildPath / matchPath Roundtrip
 
@@ -66,6 +67,7 @@
 | 5   | Monotonicity of strict             | If `isActiveRoute(name, params, undefined, true) === true`, then `isActiveRoute(name, params, undefined, false) === true`. Strict active implies loose active.                            |
 | 6   | Monotonicity of ignoreQueryParams  | If `isActiveRoute(name, params, undefined, strict, false) === true`, then `isActiveRoute(name, params, undefined, strict, true) === true`. Ignoring query params can only make a route more active, never less. |
 | 7   | Empty string returns false         | `isActiveRoute("") === false`. An empty route name is never considered active, regardless of current state.                                                                               |
+| 8   | Provenance independence (#1554)    | Both branches answer independently of how a value was written: on `/users/123` (URL decode yields the string `"123"`), `isActiveRoute("users.view", { id: 123 })` and the hierarchical `isActiveRoute("users", { id: 123 }, undefined, false, false)` are `true`. Shares the comparison predicate with areStatesEqual invariant 8. |
 
 ## shouldUpdateNode
 
@@ -541,9 +543,9 @@ Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and 
 | ------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
 | `tests/property/createRouter.properties.ts`             | 3          | Factory function                                                                                        |
 | `tests/property/nameToIDs.properties.ts`                | 7          | Pure function with 5 fast-path branches                                                                 |
-| `tests/property/areStatesEqual.properties.ts`           | 7          | State equality predicate                                                                                |
+| `tests/property/areStatesEqual.properties.ts`           | 8          | State equality predicate                                                                                |
 | `tests/property/pathRoundtrip.properties.ts`            | 6          | buildPath / matchPath inverse pair                                                                      |
-| `tests/property/isActiveRoute.properties.ts`            | 7          | Active route predicate with 4 flags                                                                     |
+| `tests/property/isActiveRoute.properties.ts`            | 8          | Active route predicate with 4 flags                                                                     |
 | `tests/property/shouldUpdateNode.properties.ts`         | 4          | View-layer update predicate                                                                             |
 | `tests/property/stateFactory.properties.ts`             | 4          | State factory functions                                                                                 |
 | `tests/property/lifecycle.properties.ts`                | 9          | Router FSM lifecycle (start / stop / dispose)                                                           |

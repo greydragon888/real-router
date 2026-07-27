@@ -659,6 +659,8 @@ router.areStatesEqual(state1, state2); // Ignores state.search (query)
 router.areStatesEqual(state1, state2, false); // Compares state.params AND state.search
 ```
 
+**Value comparison is provenance-tolerant, not `===` (#1554).** The URL direction parses query values (`?page=2` → `2` number, `?a=1&a=2` → `[1, 2]`, a path slot decodes to a string) while an intent keeps whatever the caller passed, so a strict comparison reported two states on the SAME location (byte-identical `state.path`) as unequal — an active link rendered inactive. `areParamValuesEqual` (`src/helpers.ts`, shared by `areStatesEqual` **and** `isActiveRoute`'s hierarchical `paramsMatch` branch) therefore treats values as equal when they print into the same URL: `string` / `number` / `boolean` by printed form (`2 ≡ "2"`, `true ≡ "true"`), arrays element-wise under the same rule, and a singleton array against a bare scalar (`["1"]` and `1` both print `?a=1`). `null`, `undefined` and objects stay strict — they print differently (`?a` vs `?a=` vs nothing), so tolerating them would equate different URLs. Storage is untouched: `state.search` keeps the mixed domain (URL → parsed, intent → as supplied); comparison is the single place that knows both domains describe one location.
+
 ### Hook Execution Order
 
 For `users.profile` → `admin.dashboard`:

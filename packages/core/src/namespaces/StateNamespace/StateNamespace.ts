@@ -1,12 +1,11 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
-import { areParamValuesEqual } from "./helpers";
 import {
   DEFAULT_TRANSITION,
   EMPTY_PARAMS,
   EMPTY_SEARCH,
 } from "../../constants";
-import { freezeStateInPlace } from "../../helpers";
+import { areParamValuesEqual, freezeStateInPlace } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
 import type { Params, SearchParams, State } from "../../types";

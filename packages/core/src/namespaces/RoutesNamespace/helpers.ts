@@ -1,5 +1,7 @@
 // packages/core/src/namespaces/RoutesNamespace/helpers.ts
 
+import { areParamValuesEqual } from "../../helpers";
+
 import type { RouteConfig } from "./types";
 import type { RouteDefinition } from "../../engine";
 import type {
@@ -60,7 +62,12 @@ export function assignConfigEntries(
  */
 export function paramsMatch(source: Params, target: Params): boolean {
   for (const key in source) {
-    if (source[key] !== target[key]) {
+    // Provenance-tolerant per value (#1554) — the hierarchical isActiveRoute
+    // branch compares a caller bag against the COMMITTED state, whose values
+    // may have come from the URL parser (`?tab=2` → `2`) while the caller wrote
+    // strings. Same predicate as the exact branch (`areStatesEqual`), so both
+    // branches answer identically for one location.
+    if (!areParamValuesEqual(source[key], target[key])) {
       return false;
     }
   }
@@ -80,7 +87,7 @@ export function paramsMatchExcluding(
     if (key in skipKeys) {
       continue;
     }
-    if (source[key] !== target[key]) {
+    if (!areParamValuesEqual(source[key], target[key])) {
       return false;
     }
   }

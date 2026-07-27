@@ -306,14 +306,23 @@ describe("useIsActiveRoute", () => {
 
       expect(stringParam.current).toBe(true);
 
-      // URL params are always parsed as strings — numeric 123 does not match
-      // the stored string "123", so the hook returns false for number inputs.
+      // URL params decode as strings, but a caller commonly passes the number —
+      // both print the same path (/users/123), so the hook reports active for
+      // either form (#1554, provenance-tolerant comparison in core).
       const { result: numericParam } = renderHook(
         () => useIsActiveRoute("users.view", { id: 123 }),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
-      expect(numericParam.current).toBe(false);
+      expect(numericParam.current).toBe(true);
+
+      // Still discriminating: a genuinely different value is not active.
+      const { result: otherParam } = renderHook(
+        () => useIsActiveRoute("users.view", { id: 124 }),
+        { wrapper: (props) => wrapper({ ...props, router }) },
+      );
+
+      expect(otherParam.current).toBe(false);
 
       await act(async () => {
         const navErr = await router
@@ -324,7 +333,8 @@ describe("useIsActiveRoute", () => {
       });
 
       expect(stringParam.current).toBe(true);
-      expect(numericParam.current).toBe(false);
+      expect(numericParam.current).toBe(true);
+      expect(otherParam.current).toBe(false);
     });
   });
 

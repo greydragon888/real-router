@@ -70,6 +70,80 @@ export function separateChannels(
 }
 
 // =============================================================================
+// Param value comparison (#1554)
+// =============================================================================
+
+/** The value types a channel prints into (and parses back from) a URL. */
+const PRINTABLE_TYPES = new Set(["string", "number", "boolean"]);
+
+/** A value the two channels can carry across a URL round-trip. */
+function isPrintableScalar(value: unknown): value is string | number | boolean {
+  return PRINTABLE_TYPES.has(typeof value);
+}
+
+/**
+ * Compares two param / query values for equality **independently of where they
+ * came from** (#1554).
+ *
+ * The two directions produce different value DOMAINS for the same location: the
+ * URL direction parses (`?page=2` → `2`, `?a=1&a=2` → `[1, 2]`, a path slot is
+ * always a string), the intent direction keeps whatever the caller supplied
+ * (`{ page: "2" }` stays a string). Both build the SAME `state.path`, so a
+ * `===`-based comparison reported a URL-derived state and an intent-derived
+ * state on one location as UNEQUAL — an active link rendered inactive.
+ *
+ * The rule is therefore "equal when both values print the same query string":
+ * - **scalars** (string / number / boolean) compare by their printed form, so
+ *   `2 ≡ "2"` and `true ≡ "true"`;
+ * - **arrays** compare element-wise under the same rule, and a **singleton
+ *   array** compares against a bare scalar (`["1"]` and `1` both print `?a=1`);
+ * - everything else (`null`, `undefined`, objects) keeps strict semantics —
+ *   those print differently (`?a` vs `?a=` vs nothing at all), so tolerating
+ *   them would equate genuinely different URLs.
+ *
+ * Value normalization is deliberately NOT done: `state.search` keeps the mixed
+ * domain (RFC-4 M2 / §10.14 decision (б)) and comparison is the single place
+ * that knows the two domains describe the same location. Unifying the domain
+ * itself belongs to the typed search-schema stage.
+ */
+export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
+  if (val1 === val2) {
+    return true;
+  }
+
+  if (Array.isArray(val1)) {
+    // A singleton array prints exactly like its element (`["1"]` and `1` both
+    // print `?a=1`), so compare across the shape instead of rejecting on it.
+    if (!Array.isArray(val2)) {
+      return val1.length === 1 && areParamValuesEqual(val1[0], val2);
+    }
+
+    if (val1.length !== val2.length) {
+      return false;
+    }
+
+    // eslint-disable-next-line unicorn/no-for-loop -- hot path: for-of entries() allocates iterator per recursive call
+    for (let i = 0; i < val1.length; i++) {
+      if (!areParamValuesEqual(val1[i], val2[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  if (Array.isArray(val2)) {
+    return val2.length === 1 && areParamValuesEqual(val1, val2[0]);
+  }
+
+  return (
+    isPrintableScalar(val1) &&
+    isPrintableScalar(val2) &&
+    String(val1) === String(val2)
+  );
+}
+
+// =============================================================================
 // State Helpers
 // =============================================================================
 

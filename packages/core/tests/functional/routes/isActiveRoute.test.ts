@@ -409,11 +409,17 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         expect(router.isActiveRoute("users", {})).toBe(true);
       });
 
-      it("should use strict equality for param comparison (number !== string)", async () => {
+      it("should match a number against the same value as a string (#1554)", async () => {
         await router.navigate("users.view", { id: "123" });
 
-        // 123 !== "123" with strict equality
-        expect(router.isActiveRoute("users.view", { id: 123 })).toBe(false);
+        // Provenance tolerance (#1554): `123` and `"123"` build the same path
+        // (`/users/123`), so the comparison must not depend on which side wrote
+        // a string — the URL decode always does, a caller often does not. This
+        // replaced the former strict-`===` pin (`number !== string`).
+        expect(router.isActiveRoute("users.view", { id: 123 })).toBe(true);
+
+        // Still discriminating: a value that prints differently stays unequal.
+        expect(router.isActiveRoute("users.view", { id: 124 })).toBe(false);
       });
 
       it("should not match null against string param", async () => {

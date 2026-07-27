@@ -41,6 +41,38 @@ describe("isActiveRoute Properties", () => {
     expect(router.isActiveRoute("users", {}, undefined, true)).toBe(false);
   });
 
+  // #1554 — both branches (exact via areStatesEqual, hierarchical via
+  // paramsMatch) must answer independently of how the value was written: the URL
+  // decode hands a path slot over as a string, a caller commonly passes a number.
+  test.prop([fc.integer({ min: 0, max: 99_999 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "provenance independence: numeric path param matches its URL form",
+    async (id) => {
+      const provenanceRouter = await createStartedRouter(`/users/${id}`);
+
+      try {
+        // exact branch
+        expect(provenanceRouter.isActiveRoute("users.view", { id })).toBe(true);
+        expect(
+          provenanceRouter.isActiveRoute("users.view", { id }, undefined, true),
+        ).toBe(true);
+        // hierarchical branch (ancestor carrying the descendant's param)
+        expect(
+          provenanceRouter.isActiveRoute(
+            "users",
+            { id },
+            undefined,
+            false,
+            false,
+          ),
+        ).toBe(true);
+      } finally {
+        provenanceRouter.stop();
+      }
+    },
+  );
+
   test.prop([arbFixtureRoute, fc.boolean()], { numRuns: NUM_RUNS.fast })(
     "monotonicity of strict: strict=true → strict=false",
     (name, ignoreQP) => {
