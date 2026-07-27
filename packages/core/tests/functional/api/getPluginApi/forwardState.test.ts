@@ -4,7 +4,7 @@ import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router, SearchParams } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
 
 let router: Router;
@@ -198,6 +198,186 @@ describe("forwardState", () => {
       expect(getPluginApi(router).forwardState("t1", {}).params).toStrictEqual(
         {},
       );
+    });
+  });
+
+  describe("chain defaults land in the channel the TARGET declares (#1570)", () => {
+    /**
+     * A forwarding hop can only declare a default in `defaultParams` — that is
+     * the single slot it has. But the CHANNEL is decided by the resolved
+     * TARGET: if the target declares that key with `?`, the value belongs in
+     * the query channel.
+     *
+     * Asserted on the RAW stage-① output, which is what a `forwardState`
+     * interceptor sees: `next(...)` returns the namespace primitive's result,
+     * before the seam's `separateChannels` runs. That is the surface the
+     * producer contract (RFC §4.3) is about — `search-schema` and friends read
+     * these bags — and the only place the classification is observable, since
+     * the seam moves the key one line later and the committed state is
+     * therefore identical either way.
+     */
+    function captureStageOne(): {
+      calls: { params: Params; search: SearchParams }[];
+    } {
+      const captured: { params: Params; search: SearchParams }[] = [];
+
+      getPluginApi(router).addInterceptor(
+        "forwardState",
+        (next, name, params, search) => {
+          const raw = next(name, params, search);
+
+          captured.push({ params: raw.params, search: raw.search });
+
+          return raw;
+        },
+      );
+
+      return { calls: captured };
+    }
+
+    it("routes a chain default into `search` when the target declares it as a query param", async () => {
+      routesApi.add([
+        { name: "q-dst", path: "/q-dst?lang" },
+        {
+          name: "q-src",
+          path: "/q-src",
+          forwardTo: "q-dst",
+          defaultParams: { lang: "fr" },
+        },
+      ]);
+
+      const stageOne = captureStageOne();
+
+      await router.navigate("q-src", {}, undefined, { reload: true });
+
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "fr" });
+      expect(stageOne.calls.at(-1)?.params).toStrictEqual({});
+    });
+
+    it("keeps a chain default in `params` when the target declares it as a path slot", async () => {
+      routesApi.add([
+        { name: "p-dst", path: "/p-dst/:lang" },
+        {
+          name: "p-src",
+          path: "/p-src",
+          forwardTo: "p-dst",
+          defaultParams: { lang: "es" },
+        },
+      ]);
+
+      const stageOne = captureStageOne();
+
+      await router.navigate("p-src", {}, undefined, { reload: true });
+
+      // The discriminator: the split is by DECLARATION, not a blanket move.
+      expect(stageOne.calls.at(-1)?.params).toStrictEqual({ lang: "es" });
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({});
+    });
+
+    it("splits an INTERMEDIATE hop's default of a multi-hop chain", async () => {
+      routesApi.add([
+        { name: "h-dst", path: "/h-dst?lang" },
+        {
+          name: "h-mid",
+          path: "/h-mid",
+          forwardTo: "h-dst",
+          defaultParams: { lang: "de" },
+        },
+        { name: "h-src", path: "/h-src", forwardTo: "h-mid" },
+      ]);
+
+      const stageOne = captureStageOne();
+
+      await router.navigate("h-src", {}, undefined, { reload: true });
+
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "de" });
+      expect(stageOne.calls.at(-1)?.params).toStrictEqual({});
+    });
+
+    it("splits a DYNAMIC chain's hop default", async () => {
+      routesApi.add([
+        { name: "d-dst", path: "/d-dst?lang" },
+        {
+          name: "d-src",
+          path: "/d-src",
+          forwardTo: () => "d-dst",
+          defaultParams: { lang: "it" },
+        },
+      ]);
+
+      const stageOne = captureStageOne();
+
+      await router.navigate("d-src", {}, undefined, { reload: true });
+
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "it" });
+      expect(stageOne.calls.at(-1)?.params).toStrictEqual({});
+    });
+
+    it("splits a MIXED static→dynamic chain's hop default", async () => {
+      routesApi.add([
+        { name: "mx-dst", path: "/mx-dst?lang" },
+        {
+          name: "mx-mid",
+          path: "/mx-mid",
+          forwardTo: () => "mx-dst",
+          defaultParams: { lang: "pt" },
+        },
+        { name: "mx-src", path: "/mx-src", forwardTo: "mx-mid" },
+      ]);
+
+      const stageOne = captureStageOne();
+
+      await router.navigate("mx-src", {}, undefined, { reload: true });
+
+      // The third branch: a static prefix concatenated with a dynamic walk.
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "pt" });
+      expect(stageOne.calls.at(-1)?.params).toStrictEqual({});
+    });
+
+    it("keeps a colliding name path-owned when the target declares both slots", async () => {
+      routesApi.add([
+        { name: "c-dst", path: "/c-dst/:id?id" },
+        {
+          name: "c-src",
+          path: "/c-src",
+          forwardTo: "c-dst",
+          defaultParams: { id: "X" },
+        },
+      ]);
+
+      const stageOne = captureStageOne();
+
+      await router.navigate("c-src", {}, undefined, { reload: true });
+
+      // `/c-dst/:id?id` — the name occupies a path slot, so it is path-owned
+      // (#843 / #1549 carve-out) and `getQueryParams` excludes it. The split
+      // must inherit that carve-out rather than re-derive its own rule.
+      expect(stageOne.calls.at(-1)?.params).toStrictEqual({ id: "X" });
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({});
+    });
+
+    it("lets the caller beat the layered default in BOTH channels", async () => {
+      routesApi.add([
+        { name: "w-dst", path: "/w-dst/:slot?lang" },
+        {
+          name: "w-src",
+          path: "/w-src",
+          forwardTo: "w-dst",
+          defaultParams: { lang: "fr", slot: "DEFAULT" },
+        },
+      ]);
+
+      const stageOne = captureStageOne();
+
+      await router.navigate(
+        "w-src",
+        { slot: "CALLER" },
+        { lang: "en" },
+        { reload: true },
+      );
+
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "en" });
+      expect(stageOne.calls.at(-1)?.params).toStrictEqual({ slot: "CALLER" });
     });
   });
 });

@@ -6,6 +6,8 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { NUM_RUNS } from "./helpers";
 
+import type { Params, SearchParams } from "@real-router/core";
+
 /**
  * ONE registry classifies and prints (#1556).
  *
@@ -115,6 +117,88 @@ describe("query-channel registry properties (#1556)", () => {
 
       expect(forwarded.params).toStrictEqual({ [key]: "V" });
       expect(forwarded.search).toStrictEqual({});
+    },
+  );
+
+  /**
+   * Class-guard for #1570: `params(①) ∩ queryNames(target) = ∅`.
+   *
+   * A forwarding hop can only spell a default in `defaultParams`, but the
+   * channel belongs to the resolved TARGET. Stated over the RAW stage-① output
+   * (what a `forwardState` interceptor sees via `next(...)`), because the seam's
+   * `separateChannels` moves the key one line later and would mask a producer
+   * that classifies wrongly — the very masking that kept this defect invisible.
+   *
+   * The oracle is the FIXTURE, not the implementation: the property re-derives
+   * the expected channel from the route path it just built, so it cannot agree
+   * with a wrong `getQueryParams` by construction.
+   */
+  test.prop(
+    [
+      fc.uniqueArray(arbKey, { minLength: 1, maxLength: 3 }), // query-declared on the target
+      fc.uniqueArray(arbKey, { minLength: 0, maxLength: 2 }), // path slots on the target
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "a forwarding hop's default never lands in the path channel of a query-declared key",
+    async (rawQueryKeys, rawPathKeys) => {
+      // Disjoint: a name occupying BOTH is the #843 carve-out, pinned above.
+      const pathKeys = rawPathKeys.filter((k) => !rawQueryKeys.includes(k));
+      const slots = pathKeys.map((k) => `/:${k}`).join("");
+      const target = `/dst${slots}?${rawQueryKeys.join("&")}`;
+
+      const hopDefaults = Object.fromEntries(
+        [...rawQueryKeys, ...pathKeys].map((k) => [k, `D-${k}`]),
+      );
+
+      const router = createRouter(
+        [
+          { name: "home", path: "/home" },
+          { name: "dst", path: target },
+          {
+            name: "src",
+            path: "/src",
+            forwardTo: "dst",
+            defaultParams: hopDefaults,
+          },
+        ],
+        { queryParams: { booleanFormat: "none" } } as never,
+      );
+
+      let stageOne: { params: Params; search: SearchParams } | undefined;
+
+      getPluginApi(router).addInterceptor(
+        "forwardState",
+        (next, name, params, search) => {
+          const result = next(name, params, search);
+
+          stageOne = { params: result.params, search: result.search };
+
+          return result;
+        },
+      );
+
+      await router.start("/home");
+      await router.navigate("src", {}, undefined, { reload: true });
+
+      // The invariant itself.
+      for (const key of rawQueryKeys) {
+        expect(Object.hasOwn(stageOne!.params, key)).toBe(false);
+      }
+
+      // …and the value is ROUTED, not dropped — otherwise the invariant would
+      // be satisfiable by throwing the default away.
+      for (const key of rawQueryKeys) {
+        expect(stageOne!.search[key]).toBe(`D-${key}`);
+      }
+
+      // Path-declared hop defaults stay where they were (discrimination: the
+      // split is by declaration, not a blanket move to `search`).
+      for (const key of pathKeys) {
+        expect(stageOne!.params[key]).toBe(`D-${key}`);
+      }
+
+      router.stop();
     },
   );
 });

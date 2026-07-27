@@ -449,13 +449,14 @@ export class RoutesNamespace<
     // would wrongly commit `page=1`. So both channels pass through as the user
     // gave them: `search` stays `resolvedSearch`, `params` stays the raw bag.
     //
-    // The ONE default forwardState still merges is the forwardTo SOURCE route's
-    // path defaults (`paramsWithSourceDefaults` in the forward branches): when
-    // `a` forwards to `b`, `a`'s `defaultParams` fill in before the redirect and
-    // flow to `b`. This canNOT move to a terminal point — `makeState`/`buildPath`
-    // see only the RESOLVED target `b` and cannot reconstruct source `a`'s
-    // defaults. It is path-only because forwardTo's source semantics are
-    // path-based (there is no source-`defaultSearch` flow). Frozen empty search
+    // The ONE default forwardState still merges is the forwardTo CHAIN's own
+    // defaults (`#layerChainDefaults` in the forward branches): when `a` forwards
+    // to `b`, `a`'s `defaultParams` fill in before the redirect and flow to `b`.
+    // This canNOT move to a terminal point — `makeState`/`buildPath` see only the
+    // RESOLVED target `b` and cannot reconstruct source `a`'s defaults. A hop can
+    // only SPELL such a default in `defaultParams` (its single slot), but the
+    // CHANNEL is the target's: a key the target declares with `?` is layered
+    // under `search`, everything else under `params` (#1570). Frozen empty search
     // singleton when absent.
     const resolvedSearch = (search ?? EMPTY_SEARCH) as S;
 
@@ -467,11 +468,7 @@ export class RoutesNamespace<
         params,
       );
 
-      return {
-        name: target,
-        params: this.#mergeChainDefaults(chain, params),
-        search: resolvedSearch,
-      };
+      return this.#layerChainDefaults(target, chain, params, resolvedSearch);
     }
 
     const staticForward = this.#store.resolvedForwardMap[name] ?? name;
@@ -488,28 +485,24 @@ export class RoutesNamespace<
         params,
       );
 
-      return {
-        name: target,
-        // The static prefix stops AT `staticForward` (it has no static forward
-        // of its own), and the dynamic walk starts THERE — so the two halves
-        // concatenate without repeating a hop.
-        params: this.#mergeChainDefaults(
-          [...this.#collectStaticChain(name), ...chain],
-          params,
-        ),
-        search: resolvedSearch,
-      };
+      // The static prefix stops AT `staticForward` (it has no static forward of
+      // its own), and the dynamic walk starts THERE — so the two halves
+      // concatenate without repeating a hop.
+      return this.#layerChainDefaults(
+        target,
+        [...this.#collectStaticChain(name), ...chain],
+        params,
+        resolvedSearch,
+      );
     }
 
     if (staticForward !== name) {
-      return {
-        name: staticForward,
-        params: this.#mergeChainDefaults(
-          this.#collectStaticChain(name),
-          params,
-        ),
-        search: resolvedSearch,
-      };
+      return this.#layerChainDefaults(
+        staticForward,
+        this.#collectStaticChain(name),
+        params,
+        resolvedSearch,
+      );
     }
 
     return {
@@ -750,29 +743,61 @@ export class RoutesNamespace<
   }
 
   /**
-   * Layers the path defaults of every forwarding hop UNDER the caller's params.
+   * Layers the defaults of every forwarding hop UNDER the caller's channels.
    * Folding in walk order makes an EARLIER hop win over a later one (each merge
    * puts the next hop's defaults below what is already accumulated), and the
    * caller wins over all of them. Only the entered route was consulted before,
    * so a default declared on an intermediate hop never reached the target and
    * a required slot was left empty (#1566).
+   *
+   * The hops are folded ALONE, then split by the TARGET's declaration (#1570).
+   * A hop can only write `defaultParams` — that is the single slot it has — but
+   * the CHANNEL belongs to the resolved target: when the target declares the key
+   * with `?`, the value is a query value that happened to be spelled in a path
+   * slot upstream. Splitting here rather than downstream keeps stage ① itself
+   * channel-correct, so the producer contract holds for core's own output and
+   * not merely for plugins (RFC nav-pipeline §4.2, decision A-3).
+   *
+   * The split reuses `separateChannels` over `getQueryParams` — the same
+   * classifier and the same printing registry the URL build uses (#1556) — so
+   * no second derivation of "which channel is this key" can drift from it.
    */
-  #mergeChainDefaults<P extends Params = Params>(
+  #layerChainDefaults<
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
+    target: string,
     chain: readonly string[],
     params: P,
-  ): P {
-    let merged = params;
+    search: S,
+  ): { name: string; params: P; search: S } {
+    let hopDefaults: Params | undefined;
 
     for (const routeName of chain) {
       // `undefined` is absence on both sides (#1550 / #1551): a source default
       // carrying `undefined` must not ride out of `forwardState` as an own key.
-      merged = mergeDefined(
-        this.#store.config.defaultParams[routeName] as P | undefined,
-        merged,
+      hopDefaults = mergeDefined(
+        this.#store.config.defaultParams[routeName] as Params | undefined,
+        hopDefaults,
       );
     }
 
-    return merged;
+    // The caller's `search` is spread last inside `separateChannels`, so an
+    // explicit query value still beats the hop default it collides with.
+    const split = separateChannels(
+      hopDefaults,
+      this.getQueryParams(target),
+      search,
+    );
+
+    return {
+      name: target,
+      // The caller's params stay ABOVE the path half, and their `undefined`
+      // keys are stripped exactly as before — this merge runs whether or not
+      // the chain contributed anything.
+      params: mergeDefined(split.params as P | undefined, params),
+      search: split.search as S,
+    };
   }
 
   /**
