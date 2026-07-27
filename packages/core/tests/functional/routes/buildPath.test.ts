@@ -1,5 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
@@ -74,6 +75,54 @@ describe("core/routes/routePath/buildPath", () => {
       const path = router.buildPath("home");
 
       expect(path).toBe("/base/home");
+    });
+
+    describe("a param declared on the root path (#1567)", () => {
+      it("should substitute the root slot instead of emitting it literally", () => {
+        getPluginApi(router).setRootPath("/app/:tenant");
+
+        expect(router.buildPath("home", { tenant: "t1" })).toBe("/app/t1/home");
+      });
+
+      it("should not leak the value into the query string", () => {
+        getPluginApi(router).setRootPath("/app/:tenant");
+
+        expect(router.buildPath("home", { tenant: "t1" })).not.toContain("?");
+      });
+
+      it("should reject a missing value like any other required param", () => {
+        getPluginApi(router).setRootPath("/app/:tenant");
+
+        expect(() => router.buildPath("home", {})).toThrow(
+          "Missing required param 'tenant'",
+        );
+      });
+
+      it("should round-trip through match", () => {
+        getPluginApi(router).setRootPath("/app/:tenant");
+
+        const built = router.buildPath("home", { tenant: "t1" });
+        const matched = getPluginApi(router).matchPath(built);
+
+        expect(matched?.name).toBe("home");
+        expect(matched?.params).toStrictEqual({ tenant: "t1" });
+        expect(matched?.path).toBe(built);
+      });
+
+      it("should encode a root SPLAT as a splat, keeping its separators", () => {
+        // The root's splat names have to travel with its param names, or the
+        // slot falls back to the scalar encoder and `/` becomes `%2F`.
+        // (Round-tripping a non-terminal splat is a separate, pre-existing
+        // limitation — the value is asserted here, not the match. No index
+        // route: one under a splat parent is rejected at registerTree.)
+        const splatRouter = createRouter([{ name: "home", path: "/home" }]);
+
+        getPluginApi(splatRouter).setRootPath("/app/*rest");
+
+        expect(splatRouter.buildPath("home", { rest: "a/b" })).toBe(
+          "/app/a/b/home",
+        );
+      });
     });
   });
 

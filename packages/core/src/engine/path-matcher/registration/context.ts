@@ -51,4 +51,10 @@ export interface RegistrationState {
   readonly routesByName: Map<string, CompiledRoute>;
   readonly staticCache: Map<string, CompiledRoute>;
   readonly rootQueryParams: readonly string[];
+  // The root node is deliberately absent from `matchSegments` (see SegmentMatcher
+  // `registerTree`), so anything derived from a segment walk is root-blind. Its
+  // QUERY declarations already had to be threaded separately (#1556); its PATH
+  // slots need the same treatment for the build side (#1567).
+  readonly rootUrlParams: readonly string[];
+  readonly rootSplatParams: readonly string[];
 }

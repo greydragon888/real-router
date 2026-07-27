@@ -40,12 +40,18 @@ export function compileBuildParts(
   normalizedPath: string,
   segments: readonly MatcherInputNode[],
   encoding: URLParamsEncodingType,
+  rootUrlParams: readonly string[],
+  rootSplatParams: readonly string[],
 ): {
   buildStaticParts: readonly string[];
   buildParamSlots: readonly BuildParamSlot[];
 } {
-  const allUrlParams = new Set<string>();
-  const allSplatParams = new Set<string>();
+  // `normalizedPath` carries the ROOT path as its prefix, but the root node is
+  // absent from `segments` — so seeding these from the segment walk alone made a
+  // root-declared slot invisible here, and the fast path below emitted the whole
+  // path (`:tenant` included) as literal static text (#1567).
+  const allUrlParams = new Set<string>(rootUrlParams);
+  const allSplatParams = new Set<string>(rootSplatParams);
 
   for (const segment of segments) {
     for (const param of segment.paramMeta.urlParams) {

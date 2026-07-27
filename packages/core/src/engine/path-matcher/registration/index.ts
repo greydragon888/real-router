@@ -125,6 +125,8 @@ function compileAndRegisterRoute(
     // Stryker disable next-line MethodExpression: equivalent — slash-child buildParts: dropping the last segment vs keeping it yields identical buildStaticParts here (no own params on the slash-child). Proven by injection (full suite green).
     slashChild ? segments.slice(0, -1) : segments,
     state.options.urlParamsEncoding,
+    state.rootUrlParams,
+    state.rootSplatParams,
   );
 
   // #1151: reject a duplicate param name within one route's full path (`/:id/:id`,
