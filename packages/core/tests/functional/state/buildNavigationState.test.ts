@@ -181,4 +181,67 @@ describe("getPluginApi().buildNavigationState()", () => {
       noValidateRouter.stop();
     });
   });
+
+  describe("query channel (#1571)", () => {
+    /**
+     * `buildNavigationState` was the ONE pipeline entry point without a query
+     * slot — `navigate` / `buildPath` / `canNavigateTo` / `isActiveRoute` /
+     * `makeState` all take one. A caller could only reach the query channel by
+     * riding declared keys in the `params` bag, which is exactly what the
+     * always-on channel guard is meant to reject.
+     */
+    beforeEach(() => {
+      routesApi.add([{ name: "q", path: "/q?lang&page" }]);
+    });
+
+    it("threads an explicit search argument into state.search and state.path", () => {
+      const state = api.buildNavigationState("q", {}, { lang: "fr" });
+
+      expect(state?.search).toStrictEqual({ lang: "fr" });
+      expect(state?.path).toBe("/q?lang=fr");
+    });
+
+    it("lets an explicit search value beat a params-bag twin", () => {
+      // Precedence parity with the other five entry points: the explicit
+      // channel wins over a declared key that rode in `params`.
+      const state = api.buildNavigationState(
+        "q",
+        { lang: "PARAM" },
+        { lang: "SEARCH" },
+      );
+
+      expect(state?.search).toStrictEqual({ lang: "SEARCH" });
+      expect(state?.params).toStrictEqual({});
+      expect(state?.path).toBe("/q?lang=SEARCH");
+    });
+
+    it("keeps the two-argument form working — the slot is additive", () => {
+      // The single-bag shape its only consumer relies on today must not move.
+      const state = api.buildNavigationState("q", { lang: "fr" });
+
+      expect(state?.search).toStrictEqual({ lang: "fr" });
+      expect(state?.path).toBe("/q?lang=fr");
+    });
+
+    it("treats an omitted and an explicitly undefined search alike", () => {
+      const omitted = api.buildNavigationState("q", { page: "2" });
+      const explicit = api.buildNavigationState("q", { page: "2" }, undefined);
+
+      expect(explicit?.search).toStrictEqual(omitted?.search);
+      expect(explicit?.path).toBe(omitted?.path);
+    });
+
+    it("carries the query channel through a forwardTo resolution", () => {
+      routesApi.add([
+        { name: "q-dst", path: "/q-dst?lang" },
+        { name: "q-src", path: "/q-src", forwardTo: "q-dst" },
+      ]);
+
+      const state = api.buildNavigationState("q-src", {}, { lang: "it" });
+
+      expect(state?.name).toBe("q-dst");
+      expect(state?.search).toStrictEqual({ lang: "it" });
+      expect(state?.path).toBe("/q-dst?lang=it");
+    });
+  });
 });

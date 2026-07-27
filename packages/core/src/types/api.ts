@@ -149,7 +149,22 @@ export interface PluginApi {
     cb: Plugin[EventMethodMap[E]],
   ) => Unsubscribe;
 
-  buildNavigationState: (name: string, params?: Params) => State | undefined;
+  /**
+   * Builds the State `navigate` would commit, without committing it: resolves
+   * `forwardTo`, checks existence (`undefined` = unknown route) and merges the
+   * route defaults.
+   *
+   * `search` is the query channel (#1571). It was the ONE pipeline entry point
+   * without the slot — `navigate` / `buildPath` / `canNavigateTo` /
+   * `isActiveRoute` / `makeState` all take one — so a query intent could only
+   * be spelled by riding declared keys in the `params` bag. An explicit value
+   * beats such a twin, matching the other five.
+   */
+  buildNavigationState: (
+    name: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => State | undefined;
 
   getOptions: () => Options;
 

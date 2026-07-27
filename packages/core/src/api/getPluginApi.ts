@@ -93,14 +93,20 @@ export function getPluginApi<
 
       return ctx.addEventListener(eventName, cb);
     },
-    buildNavigationState: (name, params = {}) => {
+    buildNavigationState: (name, params = {}, search) => {
       ctx.validator?.routes.validateStateBuilderArgs(
         name,
         params,
         "buildNavigationState",
       );
 
-      const forwarded = ctx.forwardState(name, params);
+      // `search` flows THROUGH the forwardState seam, not past it (#1571): the
+      // seam is where an explicit query value wins over a declared twin the
+      // caller rode in `params`, and where a `search-schema` interceptor sees
+      // the query channel. Left undefined it stays undefined — the frozen
+      // empty-search singleton is applied downstream, so the two-argument form
+      // allocates exactly as before.
+      const forwarded = ctx.forwardState(name, params, search);
       const routeInfo = ctx.buildStateResolved(
         forwarded.name,
         forwarded.params,
