@@ -5,7 +5,11 @@ import {
   EMPTY_PARAMS,
   EMPTY_SEARCH,
 } from "../../constants";
-import { areParamValuesEqual, freezeStateInPlace } from "../../helpers";
+import {
+  areParamValuesEqual,
+  freezeStateInPlace,
+  mergeDefined,
+} from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
 import type { Params, SearchParams, State } from "../../types";
@@ -216,6 +220,11 @@ export class StateNamespace {
  * path (no defaults, empty params) allocates zero objects. A defaulted channel
  * always spreads (a fresh frozen object); an undefined-default channel freezes a
  * copy of the value (never the caller's object).
+ *
+ * `undefined` is absence on BOTH sides (`mergeDefined`, #1550 / #1551): an
+ * explicitly-`undefined` caller value leaves the default in place, and a default
+ * that carries `undefined` behaves like no entry — so the frozen state never
+ * exposes an `undefined`-valued own key on either channel.
  */
 function mergeWithDefault(
   defaultValue: Record<string, unknown> | undefined,
@@ -223,12 +232,18 @@ function mergeWithDefault(
   empty: Readonly<Record<string, never>>,
 ): Readonly<Record<string, unknown>> {
   if (defaultValue !== undefined) {
-    return Object.freeze({ ...defaultValue, ...value });
+    return Object.freeze(mergeDefined(defaultValue, value));
   }
 
-  return value === undefined || value === empty
-    ? empty
-    : Object.freeze({ ...value });
+  if (value === undefined || value === empty) {
+    return empty;
+  }
+
+  // `mergeDefined` returns the argument itself when there is nothing to strip,
+  // so copy before freezing — the caller's bag must never be frozen.
+  const defined = mergeDefined(undefined, value);
+
+  return Object.freeze(defined === value ? { ...value } : defined);
 }
 
 /**

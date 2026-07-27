@@ -90,6 +90,7 @@
 | 2   | buildNavigationState resolves the request   | `buildNavigationState(name, params).name` is the requested route name or its `forwardTo` target; an unknown route yields `undefined` instead of a State.                                        |
 | 3   | makeState returns frozen state    | `Object.isFrozen(makeState(name, params, search, path)) === true`. All state objects are deeply frozen at creation.                                                                              |
 | 4   | makeState determinism             | `makeState(name, params, search, path)` with identical arguments produces structurally equal states (same name, path, params, and search). The `id` field differs between calls but all other fields are stable. |
+| 5   | `undefined` is absence on both sides of the default merge (#1550 / #1551) | No own key of `state.params` / `state.search` ever holds `undefined`, for any mix of route defaults and caller values. A caller's explicit `undefined` means "I said nothing" — the route default keeps the slot (`navigate("x", {}, { page: undefined })` with `defaultSearch { page: "1" }` commits `page: "1"`); a default that itself carries `undefined` behaves exactly like no entry (`defaultParams: { id: undefined }` neither leaks the key nor changes the "missing required param" error). Enforced in the merge (`mergeDefined`), not in an ordered normalize stage, so it holds for every producer. |
 
 ## Router Lifecycle (start / stop / dispose)
 
@@ -547,7 +548,7 @@ Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and 
 | `tests/property/pathRoundtrip.properties.ts`            | 6          | buildPath / matchPath inverse pair                                                                      |
 | `tests/property/isActiveRoute.properties.ts`            | 8          | Active route predicate with 4 flags                                                                     |
 | `tests/property/shouldUpdateNode.properties.ts`         | 4          | View-layer update predicate                                                                             |
-| `tests/property/stateFactory.properties.ts`             | 4          | State factory functions                                                                                 |
+| `tests/property/stateFactory.properties.ts`             | 5          | State factory functions                                                                                 |
 | `tests/property/lifecycle.properties.ts`                | 9          | Router FSM lifecycle (start / stop / dispose)                                                           |
 | `tests/property/transitionSegments.properties.ts`       | 12         | navigate() and transition segment structure                                                             |
 | `tests/property/navigateToNotFound.properties.ts`       | 8          | Synchronous unknown-route setter                                                                        |

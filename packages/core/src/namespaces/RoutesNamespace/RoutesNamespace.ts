@@ -12,7 +12,7 @@ import {
   resetStore,
 } from "./routesStore";
 import { constants, EMPTY_SEARCH } from "../../constants";
-import { separateChannels } from "../../helpers";
+import { mergeDefined, separateChannels } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -253,21 +253,21 @@ export class RoutesNamespace<
    */
   buildPath(
     route: string,
-    params?: Params,
+    params: Params,
     search?: SearchParams,
     options?: Options,
   ): string {
     if (route === constants.UNKNOWN_ROUTE) {
-      return typeof params?.path === "string" ? params.path : "";
+      return typeof params.path === "string" ? params.path : "";
     }
 
-    const paramsWithDefault = Object.hasOwn(
-      this.#store.config.defaultParams,
-      route,
-    )
-      ? { ...this.#store.config.defaultParams[route], ...params }
-      : /* v8 ignore next -- @preserve: V8 can't track ?? branch in ternary; covered by buildPath tests without params */ (params ??
-        {});
+    // `undefined` is absence on both sides (#1550 / #1551) — neither an
+    // explicitly-undefined caller value nor an undefined-valued default reaches
+    // the codec or the matcher as an own key.
+    const paramsWithDefault = mergeDefined(
+      this.#store.config.defaultParams[route] as Params | undefined,
+      params,
+    );
 
     // #1549 (RFC-4 M2): the route's query defaults (`defaultSearch`) join the
     // search channel so they reach the URL query string — including when the
@@ -734,14 +734,12 @@ export class RoutesNamespace<
     routeName: string,
     params: P,
   ): P {
-    if (Object.hasOwn(this.#store.config.defaultParams, routeName)) {
-      return {
-        ...this.#store.config.defaultParams[routeName],
-        ...params,
-      };
-    }
-
-    return params;
+    // `undefined` is absence on both sides (#1550 / #1551): a source default
+    // carrying `undefined` must not ride out of `forwardState` as an own key.
+    return mergeDefined(
+      this.#store.config.defaultParams[routeName] as P | undefined,
+      params,
+    );
   }
 
   /**
@@ -764,14 +762,13 @@ export class RoutesNamespace<
     routeName: string,
     search: S | undefined,
   ): S | undefined {
-    if (!Object.hasOwn(this.#store.config.defaultSearch, routeName)) {
-      return search;
-    }
-
-    return {
-      ...this.#store.config.defaultSearch[routeName],
-      ...search,
-    } as S;
+    // `undefined` is absence on both sides (#1550 / #1551), and `undefined` in ⇒
+    // `undefined` out with no default, which keeps the matcher's single-bag
+    // fallback (`search ?? params`) reachable for a v1 caller.
+    return mergeDefined(
+      this.#store.config.defaultSearch[routeName] as S | undefined,
+      search,
+    );
   }
 
   #getBuildPathOptions(options?: Options): CachedBuildPathOpts {

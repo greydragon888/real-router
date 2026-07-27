@@ -70,6 +70,110 @@ export function separateChannels(
 }
 
 // =============================================================================
+// Default merge — `undefined` ≡ absence (#1550 / #1551)
+// =============================================================================
+
+/**
+ * Merges a route default UNDER a value (the value wins), treating `undefined` as
+ * **absence on both sides** (#1550 / #1551).
+ *
+ * A key survives only when its winning value is defined:
+ * - `mergeDefined({ page: "1" }, { page: undefined })` → `{ page: "1" }` — an
+ *   explicit `undefined` from the caller does not outrank the default (this is
+ *   what the path channel always did via `normalizeParams`, and what the query
+ *   channel did not, #1550);
+ * - `mergeDefined({ q: undefined }, undefined)` → `{}` — a default that itself
+ *   carries `undefined` behaves exactly like no default entry, instead of
+ *   leaking an `undefined`-valued own key into the frozen state (#1551).
+ *
+ * Because the rule lives in the merge rather than in a separately-ordered
+ * "normalize" stage, it holds for every producer and cannot be reintroduced by
+ * whichever side is merged last.
+ *
+ * Allocation contract: **may return the `value` argument itself** when there is
+ * no default and nothing to strip (the hot path — callers pass an
+ * already-normalized bag), so a caller that freezes or stores the result must
+ * copy it first. `undefined` in ⇒ `undefined` out when there is no default, which
+ * keeps the matcher's single-bag fallback (`search ?? params`) reachable.
+ */
+export function mergeDefined<T extends Record<string, unknown>>(
+  defaultValue: T,
+  value: T | undefined,
+): T;
+
+export function mergeDefined<T extends Record<string, unknown>>(
+  defaultValue: T | undefined,
+  value: T,
+): T;
+
+export function mergeDefined<T extends Record<string, unknown>>(
+  defaultValue: T | undefined,
+  value: T | undefined,
+): T | undefined;
+
+export function mergeDefined<T extends Record<string, unknown>>(
+  defaultValue: T | undefined,
+  value: T | undefined,
+): T | undefined {
+  if (defaultValue === undefined) {
+    return stripUndefined(value);
+  }
+
+  const merged: Record<string, unknown> = {};
+
+  for (const key in defaultValue) {
+    if (Object.hasOwn(defaultValue, key) && defaultValue[key] !== undefined) {
+      merged[key] = defaultValue[key];
+    }
+  }
+
+  if (value !== undefined) {
+    for (const key in value) {
+      if (!Object.hasOwn(value, key)) {
+        continue;
+      }
+
+      // `undefined` means "I said nothing", so the default keeps the slot.
+      if (value[key] === undefined) {
+        continue;
+      }
+
+      merged[key] = value[key];
+    }
+  }
+
+  return merged as T;
+}
+
+/**
+ * Drops `undefined`-valued own keys, returning the input **unchanged** when there
+ * are none (no allocation on the common path). `undefined` in ⇒ `undefined` out —
+ * unlike {@link normalizeParams}, which collapses an all-`undefined` bag to the
+ * shared `EMPTY_PARAMS` singleton and is the path-channel entry guard.
+ */
+function stripUndefined<T extends Record<string, unknown>>(
+  value: T | undefined,
+): T | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  let stripped: Record<string, unknown> | undefined;
+
+  for (const key in value) {
+    if (!(Object.hasOwn(value, key) && value[key] === undefined)) {
+      continue;
+    }
+
+    stripped ??= { ...value };
+
+    delete stripped[key];
+  }
+
+  return (stripped as T | undefined) ?? value;
+}
+
+// =============================================================================
 // Param value comparison (#1554)
 // =============================================================================
 
