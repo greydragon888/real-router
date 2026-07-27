@@ -14,6 +14,7 @@ import {
   errorCodes,
   constants,
 } from "../../constants";
+import { findMisChanneledKey, misChanneledKeyMessage } from "../../helpers";
 import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
@@ -173,6 +174,42 @@ export class NavigationNamespace {
       // skip your .catch()", so leaving it unset lets the facade attach its
       // own suppression. Setting it here leaked an unhandledRejection on
       // fire-and-forget calls (#721).
+      return Promise.reject(err);
+    }
+
+    // Channel guard, position P3 (#1572). `navigateToState` is the ONE producer
+    // that takes a ready-made `State` instead of a `params` argument, so the
+    // predicate reads `state.params ∩ queryNames(state.name)`. What it commits
+    // becomes `getState()`, so a pre-M2 layout would be silent corruption: the
+    // key sits in `state.params` and never reaches `state.path`.
+    //
+    // Costs nothing on healthy flows — a state produced by core (`matchPath`,
+    // `makeState`) is channel-correct by construction, so the predicate is
+    // empty on every popstate / memory-restore / SSR-hydration commit. `start()`
+    // commits THROUGH here (`RouterLifecycleNamespace`), which is why the guard
+    // lives in the namespace rather than on the plugin-API door.
+    //
+    // Rejects rather than throwing, mirroring the ROUTE_NOT_FOUND guard above:
+    // this method returns `Promise<State>` and its URL-plugin callers invoke it
+    // from popstate handlers, where a new synchronous throw would be a change
+    // of failure shape rather than a new failure.
+    const misChanneled = findMisChanneledKey(
+      state.params,
+      deps.getQueryParams(state.name),
+    );
+
+    if (misChanneled !== undefined) {
+      const err = new RouterError(errorCodes.WRONG_CHANNEL, {
+        routeName: state.name,
+        message: `[router.navigateToState] ${misChanneledKeyMessage(
+          state.name,
+          misChanneled,
+          "`state.params`",
+        )}`,
+      });
+
+      deps.emitTransitionError(undefined, deps.getState(), err);
+
       return Promise.reject(err);
     }
 

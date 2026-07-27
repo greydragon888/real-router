@@ -18,6 +18,7 @@ import {
   createTernaryInterceptable,
   getInternals,
   registerInternals,
+  warnOnMisChanneledKey,
 } from "./internals";
 import {
   EventBusNamespace,
@@ -296,6 +297,7 @@ export class Router<
       makeState: (name, params, search, path) =>
         this.#state.makeState(name, params, search, path),
       getMetaForState: (name) => this.#routes.getMetaForState(name),
+      getQueryParams: (name) => this.#routes.getQueryParams(name),
       forwardState,
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
@@ -905,6 +907,8 @@ export class Router<
       search = routeSearch;
       opts = options ?? EMPTY_OPTS;
     }
+
+    warnOnMisChanneledKey(ctx, "navigate", routeName, routeParams);
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);
     ctx.validator?.navigation.validateParams(routeParams, "navigate");

@@ -1,6 +1,6 @@
 import { throwIfDisposed } from "./helpers";
 import { errorCodes } from "../constants";
-import { getInternals } from "../internals";
+import { getInternals, warnOnMisChanneledKey } from "../internals";
 import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
@@ -33,6 +33,8 @@ export function getPluginApi<
   const ctx = getInternals(router);
   const api: PluginApi = {
     makeState: (name, params, search, path) => {
+      warnOnMisChanneledKey(ctx, "makeState", name, params);
+
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
 
       // Public PluginApi.makeState carries the query channel (RFC-4 M2 / #1548)
@@ -94,6 +96,8 @@ export function getPluginApi<
       return ctx.addEventListener(eventName, cb);
     },
     buildNavigationState: (name, params = {}, search) => {
+      warnOnMisChanneledKey(ctx, "buildNavigationState", name, params);
+
       ctx.validator?.routes.validateStateBuilderArgs(
         name,
         params,

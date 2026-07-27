@@ -1,3 +1,5 @@
+import { findMisChanneledKey, misChanneledKeyMessage } from "./helpers";
+
 import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
@@ -46,6 +48,13 @@ export interface RouterInternals<
   readonly getMetaForState: (
     name: string,
   ) => Record<string, Record<string, "url" | "query">> | undefined;
+
+  /**
+   * The route's DECLARED query-param names — the same registry the URL build
+   * prints from (#1556), minus path slots. Feeds the always-on channel guard
+   * (#1572); read here rather than re-derived, so classification cannot drift.
+   */
+  readonly getQueryParams: (name: string) => readonly string[];
 
   readonly forwardState: <
     P extends Params = Params,
@@ -215,6 +224,32 @@ export function getInternals<D extends DefaultDependencies>(
   }
 
   return ctx as RouterInternals<D>;
+}
+
+/**
+ * Channel guard, position P1 (#1572) — the caller's RAW `params` argument, at
+ * the API boundary and BEFORE any interceptor runs, so what it reports is what
+ * the CALLER wrote (a plugin's later injection is P2's population, not this one).
+ *
+ * Warns rather than throws for now: the single-bag form still WORKS today —
+ * channel separation moves the key one line downstream — and it is pinned by a
+ * benchmark, a stress test, a property and an INVARIANTS row. Announcing the
+ * contract first makes every call site self-identify in the logs; promoting it
+ * to a throw is a deliberate break with its own test migration.
+ *
+ * @internal
+ */
+export function warnOnMisChanneledKey<D extends DefaultDependencies>(
+  ctx: RouterInternals<D>,
+  method: string,
+  routeName: string,
+  params: Params | undefined,
+): void {
+  const key = findMisChanneledKey(params, ctx.getQueryParams(routeName));
+
+  if (key !== undefined) {
+    ctx.logger.warn(`router.${method}`, misChanneledKeyMessage(routeName, key));
+  }
 }
 
 export function registerInternals<D extends DefaultDependencies>(

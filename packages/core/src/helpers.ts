@@ -70,6 +70,83 @@ export function separateChannels(
 }
 
 // =============================================================================
+// Channel guard — detect, never normalise (#1572)
+// =============================================================================
+
+/**
+ * THE predicate of the always-on channel guard: the first key the caller put in
+ * the PATH bag while the route declares it as a QUERY param, or `undefined`
+ * when the bag is channel-correct.
+ *
+ * A DETECTOR, not a normaliser — the key is never moved. Moving it is what
+ * {@link separateChannels} (stage ②) does, and the nav-pipeline design removes
+ * that stage precisely so channel-correctness becomes the producer's contract
+ * rather than a repair the pipeline performs behind everyone's back.
+ *
+ * Scans `queryNames` (a route's declared query names — small, cached) rather
+ * than the bag, so there is no `Object.keys` allocation, and short-circuits on
+ * a route with no query declarations, which is the common case.
+ *
+ * `undefined` is absence on both sides (#1550 / #1551), so an
+ * `undefined`-valued key is NOT a mis-channel: it is the documented removal
+ * marker `persistent-params` relies on, and it never reaches a built state
+ * anyway. A name that also occupies a path slot (`/items/:id?id`) is absent
+ * from `queryNames` by construction (#843 / #1549 carve-out), so the collision
+ * form is legitimately path-owned and passes.
+ *
+ * @internal
+ */
+export function findMisChanneledKey(
+  params: Params | undefined,
+  queryNames: readonly string[],
+): string | undefined {
+  if (queryNames.length === 0 || params === undefined) {
+    return undefined;
+  }
+
+  for (const key of queryNames) {
+    if (!Object.hasOwn(params, key)) {
+      continue;
+    }
+
+    let value: unknown;
+
+    try {
+      value = params[key];
+    } catch {
+      // A DIAGNOSTIC must never become the thing that throws. The bag may be
+      // backed by accessors (a Proxy, a getter, a framework's reactive object),
+      // and reading one here happens EARLIER than any consumer would have read
+      // it — so an accessor that throws would surface from the guard instead of
+      // from the code that actually needed the value, moving the origin of an
+      // existing failure. Treat it as "nothing to report" and let the real
+      // consumer hit the same accessor exactly as it did before.
+      return undefined;
+    }
+
+    if (value !== undefined) {
+      return key;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * The guard's actionable message. One builder for every position, so the
+ * wording a user sees does not depend on which door they came through.
+ *
+ * @internal
+ */
+export function misChanneledKeyMessage(
+  routeName: string,
+  key: string,
+  source = "the `params` argument",
+): string {
+  return `Route "${routeName}" declares \`${key}\` as a query param, but it was passed in ${source} — the path channel. Pass it in \`search\` instead; the two channels are separate since RFC-4 M2.`;
+}
+
+// =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
 

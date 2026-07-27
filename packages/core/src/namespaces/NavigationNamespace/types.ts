@@ -37,6 +37,13 @@ export interface NavigationDependencies {
   hasRoute: (name: string) => boolean;
 
   /**
+   * The route's DECLARED query-param names — the same registry the URL build
+   * prints from (#1556), minus path slots. Feeds the always-on channel guard
+   * (#1572); read here rather than re-derived, so classification cannot drift.
+   */
+  getQueryParams: (name: string) => readonly string[];
+
+  /**
    * Per-segment param-source map for a route name (`{ segment: { param: "url" |
    * "query" } }`), read from the live matcher — the ownership channel for
    * `getTransitionPath` (RFC-4 M2 / #1548, replaced the removed `stateMetaStore`

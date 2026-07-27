@@ -227,6 +227,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     logger: getInternals(ns.router).logger,
     getOptions: () => ns.options.get(),
     hasRoute: (name) => ns.routes.hasRoute(name),
+    getQueryParams: (name) => ns.routes.getQueryParams(name),
     getMetaForState: (name) => ns.routes.getMetaForState(name),
     getState: () => ns.state.get(),
     setState: (state) => {

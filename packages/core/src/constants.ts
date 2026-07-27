@@ -39,6 +39,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   CONTEXT_NAMESPACE_ALREADY_CLAIMED: "CONTEXT_NAMESPACE_ALREADY_CLAIMED", // Plugin tried to claim a context namespace already owned by another plugin
   REENTRANT_NAVIGATION: "REENTRANT_NAVIGATION", // navigate() called synchronously from inside a transition-event listener (banned — use await/async listener)
   REENTRANT_TREE_MUTATION: "REENTRANT_TREE_MUTATION", // route-CRUD called synchronously from inside a subscribeChanges handler (banned — use await/async/queueMicrotask)
+  WRONG_CHANNEL: "WRONG_CHANNEL", // a declared query key was supplied in the path channel (`params`) instead of `search` (#1572)
 });
 
 /**
