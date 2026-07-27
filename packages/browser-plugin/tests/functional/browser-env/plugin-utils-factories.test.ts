@@ -10,7 +10,7 @@ import {
 } from "../../../src/browser-env";
 
 import type { Browser, ReplaceStateBrowser } from "../../../src/browser-env";
-import type { Router, State } from "@real-router/core";
+import type { Router, SearchParams, State } from "@real-router/core";
 
 describe("plugin-utils factories", () => {
   let router: Router;
@@ -20,6 +20,18 @@ describe("plugin-utils factories", () => {
       { name: "home", path: "/" },
       { name: "users", path: "/users/:id" },
       { name: "list", path: "/list?tab&sort" },
+      // A forwarding source whose chain defaults straddle BOTH channels of the
+      // target: `id` is a path segment of `posts`, `tab` is declared with `?`.
+      // forwardState (#1570) layers each into the channel the TARGET declares,
+      // so the two halves of one `defaultParams` bag come back split — which is
+      // what makes this pair a discriminator for #1574.
+      {
+        name: "archive",
+        path: "/archive",
+        forwardTo: "posts",
+        defaultParams: { id: "7", tab: "old", sort: "asc" },
+      },
+      { name: "posts", path: "/posts/:id?tab&sort" },
     ]);
   });
 
@@ -194,6 +206,65 @@ describe("plugin-utils factories", () => {
         }),
         "/list?tab=posts",
       );
+    });
+
+    it("keeps the query half of a forwardTo chain's defaults in the record (#1574)", () => {
+      const replace = makeReplace(false);
+
+      replace("archive");
+
+      // `archive`'s single `defaultParams` bag splits across both channels of
+      // the target: `id` is a path segment, `tab` is declared with `?`. Both
+      // halves belong in the record — the path half was never in doubt, and it
+      // is what makes the query half's absence a proven asymmetry rather than a
+      // guess about where defaults live.
+      expect(browser.replaceState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "posts",
+          params: { id: "7" },
+          search: { tab: "old", sort: "asc" },
+          path: "/posts/7?tab=old&sort=asc",
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("unions the caller's query with the chain's, caller winning a collision (#1574)", () => {
+      const replace = makeReplace(false);
+
+      replace("archive", {}, { sort: "date" });
+
+      // `tab` is the discriminator: the chain contributes it and the caller does
+      // NOT, so it exists only in the resolved `search`. A record rebuilt from
+      // the caller's raw bag keeps `sort` and loses `tab` — which is why the
+      // collision alone (caller overriding every chain key) would prove nothing.
+      expect(browser.replaceState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "posts",
+          params: { id: "7" },
+          search: { tab: "old", sort: "date" },
+          path: "/posts/7?tab=old&sort=date",
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("hands the caller's query channel to the forwardState seam (#1574)", () => {
+      const api = getPluginApi(router);
+      const seen: (SearchParams | undefined)[] = [];
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        seen.push(search);
+
+        return next(name, params, search);
+      });
+
+      makeReplace(false)("list", {}, { tab: "posts" });
+
+      // The seam is where a `search-schema` / `persistent-params` interceptor
+      // reads the query channel. Reaching it with `undefined` while the caller
+      // did supply a query is the same defect seen from the plugin side.
+      expect(seen).toStrictEqual([{ tab: "posts" }]);
     });
   });
 });

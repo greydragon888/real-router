@@ -108,12 +108,16 @@ export function createReplaceHistoryState(
     options?: ReplaceHistoryStateOptions,
   ) => {
     // buildNavigationState resolves forwardTo and existence in one call
-    // (undefined = unknown route) and hands back canonical path-only params —
-    // the query-typed twins a caller rode in `params` are dropped by the
-    // forwardState canonicalization, exactly as the removed `api.buildState`
-    // did. Only its `.name`/`.params` are used here; the record's State is
-    // rebuilt below with the caller's `search`.
-    const state = api.buildNavigationState(name, params);
+    // (undefined = unknown route) and canonicalizes BOTH channels — so the
+    // caller's `search` goes IN (#1571's third slot) and the resolved channels
+    // come back out. Passing it is not a formality: the seam is where a
+    // `forwardState` interceptor (`search-schema`, `persistent-params`) reads the
+    // query channel, and where the forwarding chain's own `defaultParams` are
+    // layered into whichever channel the TARGET declares (#1570) — the query
+    // half of that split exists only in `state.search`, never in the caller's
+    // bag, so rebuilding the record from the raw `search` silently dropped it
+    // (#1574).
+    const state = api.buildNavigationState(name, params, search);
 
     if (!state) {
       throw new Error(
@@ -124,15 +128,17 @@ export function createReplaceHistoryState(
     const builtState = api.makeState(
       state.name,
       state.params,
-      // Explicit query channel (RFC-4 M2 / #1548): the caller's `search` reaches
-      // the built State's `search` and the rebuilt path below, so the
-      // `history.state` record (serialized from the buffer) carries the query —
-      // mirroring the search-aware `buildUrl`. The caller's `search` is the only
-      // query source for this record; omitted → `makeState` fills the frozen
-      // empty search bag. (`state.params` already carries the route's
-      // defaultParams — makeState/buildPath re-merge them idempotently.)
-      search,
-      router.buildPath(state.name, state.params, search),
+      // Explicit query channel (RFC-4 M2 / #1548), taken from the RESOLVED
+      // state rather than the caller's bag: `state.search` is the caller's
+      // `search` after the seam layered the chain's query-channel defaults
+      // under it (an explicit value still wins — `separateChannels` spreads the
+      // caller's bag last). Both channels of the record therefore come from the
+      // same canonicalization that produced `state.name`/`state.params`, so the
+      // `history.state` record agrees with the URL instead of carrying a
+      // half-resolved query (#1574). Omitted by the caller and contributed by
+      // no hop → the frozen empty search bag, as before.
+      state.search,
+      router.buildPath(state.name, state.params, state.search),
       // No meta arg: since #1548 the per-segment param-source map is read from
       // the live matcher by `state.name` (getMetaForState), not carried onto the
       // built State — the removed `stateMetaStore` sidecar.

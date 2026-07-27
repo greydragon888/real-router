@@ -210,7 +210,7 @@ const removeExtensions = api.extendRouter({
 });
 ```
 
-`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target via `api.buildNavigationState`, builds the record via `api.makeState` and calls `browser.replaceState`.
+`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target **and both channels** via `api.buildNavigationState` (the caller's `search` goes in, the resolved `params`/`search` come out), builds the record from that resolved pair via `api.makeState` and calls `browser.replaceState`. Taking the query from the resolved state rather than the raw argument is what keeps a `forwardTo` chain's query-channel `defaultParams` in `history.state` (#1574).
 
 `extendRouter()` validates that no property with the same name already exists on the router (throws `PLUGIN_CONFLICT` if it does), adds the properties, and returns an unsubscribe function that removes them.
 
