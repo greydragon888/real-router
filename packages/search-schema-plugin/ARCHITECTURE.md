@@ -126,10 +126,10 @@ this.#validateExistingDefaultParams(); // dev mode: walk route tree
 
 this.#removeForwardStateInterceptor = this.#pluginApi.addInterceptor(
   "forwardState",
-  (next, routeName, routeParams, routeSearch) => {
-    const result = next(routeName, routeParams, routeSearch); // core resolves state first
-    return this.#validateState(result, routeSearch !== undefined); // then schema validates whichever channel holds the query (RFC-4 M2 / #1548)
-  },
+  (next, routeName, routeParams, routeSearch) =>
+    // core resolves state first, then the schema validates the QUERY CHANNEL of
+    // the result — one rule for both directions (#1564)
+    this.#validateState(next(routeName, routeParams, routeSearch)),
 );
 
 // dev mode only — re-validate defaultParams on add/update/replace
@@ -159,17 +159,24 @@ navigate(name, params, search) / matchPath(url)
         │     └── core builds/resolves State { name, params, search }
         │         (merges route defaultParams for undefined keys, channel-aware since #1549)
         │
-        └── #validateState(result, useSearch = routeSearch !== undefined)
+        └── #validateState(result)
               │
               ├── schema = pluginApi.getRouteConfig(result.name)?.searchSchema
               │
               ├── no schema?
               │     YES: return result unchanged
               │
-              ├── channel = useSearch ? result.search : result.params
-              │     (URL→State/matchPath: query already in result.search;
-              │      State→URL/navigate: query still rides in the params bag,
-              │      not yet slot-shifted — RFC-4 M2 / #1548)
+              ├── pathParams = #pathParams(result.name)          ← the route's PATH slots,
+              │     (its own + every ancestor's `paramMeta.urlParams`, read off the
+              │      engine's own metadata via pluginApi.getTree(); cached per tree
+              │      identity, an ABSOLUTE node restarts the accumulation)
+              │
+              ├── channel = { ...omitKeys(result.params, pathParams), ...result.search }
+              │     ← the QUERY CHANNEL, wherever it lives (#1564): `search` is the
+              │       canonical half (and where an inner interceptor injects), the
+              │       params bag still carries a v1 single-bag caller's query. Path
+              │       slots are excluded — the schema never sees or rewrites them.
+              │       A twin goes to `search`, mirroring core's precedence (#843)
               │
               ├── schema["~standard"].validate(channel)
               │
@@ -198,13 +205,21 @@ navigate(name, params, search) / matchPath(url)
                     │
                     ├── stripped = omitKeys(channel, invalidKeys)
                     │
-                    ├── defaults = routesApi.get(result.name)?.defaultParams
+                    ├── defaults = { ...omitKeys(route.defaultParams, pathParams),
+                    │                 ...route.defaultSearch }
+                    │     ← the route's query-channel defaults (`defaultSearch` is the
+                    │       M2 home, #1549; a `defaultParams` entry still reaches the
+                    │       query channel for a declared query key — minus path slots)
                     │
-                    └── return writeBack(defaults ? { ...defaults, ...stripped } : stripped)
+                    └── return writeBack({ ...defaults, ...stripped })
                                   ← defaults fill stripped keys; valid keys kept as-is
 
-  writeBack(validated) → useSearch ? { ...result, search: validated }
-                                    : { ...result, params: validated }
+  #writeBack(result, pathParams, validated)
+        ├── params := path slots verbatim + the validated value for every key that
+        │             rode in the params bag (a key the schema dropped is removed)
+        └── search := every validated key that did NOT go back to params, plus the
+                      keys that came from `search` (a schema-invented key is a query
+                      value by definition, so it lands here)
 ```
 
 ### Happy path (valid params)

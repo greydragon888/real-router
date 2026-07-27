@@ -418,3 +418,97 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
     );
   });
 });
+
+// =============================================================================
+// Channel isolation (#1564)
+// =============================================================================
+
+/** Route with TWO path slots and a query declaration. */
+const CHANNEL_ROUTE_PATH = "/items/:kind/:id?q&tag";
+const PATH_KEYS = ["kind", "id"] as const;
+
+const arbPathValues = fc.dictionary(
+  fc.constantFrom(...PATH_KEYS),
+  fc.stringMatching(/^[a-z]{1,6}$/),
+  { minKeys: PATH_KEYS.length, maxKeys: PATH_KEYS.length },
+);
+
+const arbQueryValues = fc.dictionary(
+  fc.constantFrom("q", "tag", "extra"),
+  fc.stringMatching(/^[a-z]{1,6}$/),
+  { minKeys: 0, maxKeys: 3 },
+);
+
+describe("Channel isolation (#1564)", () => {
+  it("the schema never sees a path slot, whichever channel the caller used", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        arbPathValues,
+        arbQueryValues,
+        fc.boolean(),
+        fc.boolean(),
+        async (pathValues, queryValues, viaSearch, strict) => {
+          const seen: Params[] = [];
+          const router = createRouter(
+            [
+              { name: "home", path: "/" },
+              {
+                name: "item",
+                path: CHANNEL_ROUTE_PATH,
+                searchSchema: {
+                  "~standard": {
+                    version: 1,
+                    vendor: "test",
+                    validate: (value: unknown) => {
+                      seen.push({ ...(value as Params) });
+
+                      return { value };
+                    },
+                  },
+                },
+              },
+            ],
+            { defaultRoute: "home" },
+          );
+
+          router.usePlugin(searchSchemaPlugin({ mode: "production", strict }));
+          await router.start("/");
+
+          await (viaSearch
+            ? router.navigate("item", pathValues, queryValues)
+            : router.navigate("item", { ...pathValues, ...queryValues }));
+
+          const handed = seen.at(-1) ?? {};
+
+          // (1) No path slot is ever handed to a query schema.
+          for (const key of PATH_KEYS) {
+            expect(handed).not.toHaveProperty(key);
+          }
+
+          // (2) Every query value the caller supplied — in either channel — is.
+          for (const [key, value] of Object.entries(queryValues)) {
+            expect(handed[key]).toBe(value);
+          }
+
+          // (3) Every path slot commits the caller's value verbatim, so the URL
+          //     still builds — a schema that rewrote or (under `strict`)
+          //     filtered the path bag would corrupt or drop a required slot.
+          //     `state.params` may hold MORE than the slots: an UNdeclared key
+          //     stays in the path bag by core's own rule (#1553), untouched by
+          //     this fix.
+          const state = router.getState();
+
+          for (const key of PATH_KEYS) {
+            expect(state?.params[key]).toBe(pathValues[key]);
+          }
+
+          expect(state?.path).toContain(
+            `/items/${pathValues.kind}/${pathValues.id}`,
+          );
+
+          router.stop();
+        },
+      ),
+    );
+  });
+});

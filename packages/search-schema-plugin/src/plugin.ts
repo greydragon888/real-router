@@ -1,5 +1,5 @@
 import { ERROR_PREFIX } from "./constants";
-import { getInvalidKeys, omitKeys } from "./helpers";
+import { collectPathParams, getInvalidKeys, omitKeys } from "./helpers";
 
 import type {
   SearchSchemaPluginOptions,
@@ -9,6 +9,7 @@ import type {
 import type {
   Params,
   Plugin,
+  RouteTree,
   SearchParams,
   SimpleState,
   TreeChangedEvent,
@@ -29,6 +30,9 @@ export class SearchSchemaPlugin {
     | undefined;
   readonly #removeForwardStateInterceptor: () => void;
   readonly #removeChangesSubscription: () => void;
+  readonly #pathParamsCache = new Map<string, ReadonlySet<string>>();
+
+  #cachedTree: RouteTree | undefined;
 
   constructor(
     pluginApi: PluginApi,
@@ -45,15 +49,13 @@ export class SearchSchemaPlugin {
 
     this.#removeForwardStateInterceptor = this.#pluginApi.addInterceptor(
       "forwardState",
-      (next, routeName, routeParams, routeSearch) => {
-        const result = next(routeName, routeParams, routeSearch);
-
-        // `routeSearch` defined → URL→State (matchPath): the query rides in
-        // `result.search`. `undefined` → State→URL (navigate): it rides in the
-        // params bag (query not yet slot-shifted). Validate whichever channel
-        // holds the query (RFC-4 M2 / #1548).
-        return this.#validateState(result, routeSearch !== undefined);
-      },
+      (next, routeName, routeParams, routeSearch) =>
+        // ONE rule for both directions (#1564): the schema governs the QUERY
+        // channel, which is `result.search` plus whatever a v1 single-bag
+        // caller left in the params bag — everything there that is not a path
+        // slot. Deriving it from the call shape (`routeSearch !== undefined`)
+        // asked a different question and got both directions half-wrong.
+        this.#validateState(next(routeName, routeParams, routeSearch)),
     );
 
     // Dev-time defaultParams validation for runtime tree mutations. Replaces the
@@ -106,22 +108,23 @@ export class SearchSchemaPlugin {
       StandardSchemaV1 | undefined;
   }
 
-  #validateState(result: SimpleState, useSearch: boolean): SimpleState {
+  #validateState(result: SimpleState): SimpleState {
     const schema = this.#getSchema(result.name);
 
     if (!schema) {
       return result;
     }
 
-    // The query channel to validate: `state.search` on the URL→State (matchPath)
-    // path where the query is already slot-shifted, else the params bag on the
-    // State→URL (navigate) path (RFC-4 M2 / #1548). `writeBack` returns the
-    // result with the validated values in whichever channel was read.
-    const channel = (useSearch ? result.search : result.params) as Params;
-    const writeBack = (validated: Params): SimpleState =>
-      useSearch
-        ? { ...result, search: validated as SearchParams }
-        : { ...result, params: validated };
+    // The route's PATH slots — the one thing the schema must never see or
+    // rewrite. Everything else the state carries is the query channel, whether
+    // it rides in `search` (canonical, and where an inner interceptor injects)
+    // or in the params bag (a v1 single-bag caller). `search` wins a twin,
+    // mirroring core's own separation precedence (#843).
+    const pathParams = this.#pathParams(result.name);
+    const channel = {
+      ...omitKeys(result.params, pathParams),
+      ...result.search,
+    } as Params;
 
     const validation = schema["~standard"].validate(channel);
 
@@ -132,7 +135,9 @@ export class SearchSchemaPlugin {
     }
 
     if ("value" in validation) {
-      return writeBack(
+      return this.#writeBack(
+        result,
+        pathParams,
         this.#strict
           ? (validation.value as Params)
           : { ...channel, ...(validation.value as Params) },
@@ -140,7 +145,11 @@ export class SearchSchemaPlugin {
     }
 
     if (this.#onError) {
-      return writeBack(this.#onError(result.name, channel, validation.issues));
+      return this.#writeBack(
+        result,
+        pathParams,
+        this.#onError(result.name, channel, validation.issues),
+      );
     }
 
     if (this.#mode === "development") {
@@ -153,17 +162,84 @@ export class SearchSchemaPlugin {
     const invalidKeys = getInvalidKeys(validation.issues);
     const stripped = omitKeys(channel, invalidKeys);
     const route = this.#routesApi.get(result.name);
-    // Recovery fills from the SAME channel being validated (RFC-4 M2 / #1548):
-    // `defaultSearch` for the query channel (URL→State, `useSearch`),
-    // `defaultParams` for the params bag (State→URL). Pre-M2 this always read
-    // `defaultParams`, which silently restored nothing once query defaults moved
-    // to `defaultSearch`.
-    const defaults = (
-      useSearch ? route?.defaultSearch : route?.defaultParams
-    ) as Params | undefined;
-    const restored = defaults ? { ...defaults, ...stripped } : stripped;
+    // Recovery fills from the route's query-channel defaults. `defaultSearch`
+    // is the M2 home (#1549); a `defaultParams` entry still reaches the query
+    // channel for a declared query key (core merges it below the user channel
+    // and separates afterwards), so it is honoured too — minus the path slots,
+    // which are core's business, not the schema's.
+    const defaults = {
+      ...omitKeys(route?.defaultParams ?? {}, pathParams),
+      ...((route?.defaultSearch ?? {}) as Params),
+    };
+    const restored = { ...defaults, ...stripped };
 
-    return writeBack(restored);
+    return this.#writeBack(result, pathParams, restored);
+  }
+
+  /**
+   * Puts the validated query back where it came from: a key stays in the bag(s)
+   * that carried it, a key the schema invented lands in `search` (a schema
+   * output is a query value by definition), and a key the schema dropped
+   * (strict mode, or an unrecoverable issue) is removed from both. Path slots
+   * are copied through untouched — they were never part of the input.
+   */
+  #writeBack(
+    result: SimpleState,
+    pathParams: ReadonlySet<string>,
+    validated: Params,
+  ): SimpleState {
+    const params: Params = {};
+
+    for (const [key, value] of Object.entries(result.params)) {
+      if (pathParams.has(key)) {
+        params[key] = value;
+      } else if (Object.hasOwn(validated, key)) {
+        params[key] = validated[key];
+      }
+    }
+
+    const search: Params = {};
+
+    for (const [key, value] of Object.entries(validated)) {
+      const wentToParams =
+        Object.hasOwn(result.params, key) && !pathParams.has(key);
+
+      if (!wentToParams || Object.hasOwn(result.search, key)) {
+        search[key] = value;
+      }
+    }
+
+    return { ...result, params, search: search as SearchParams };
+  }
+
+  /**
+   * Path-slot names per route, cached against the tree identity. Every mutation
+   * that can change a path rebuilds the tree object (`add` / `remove` /
+   * `replace` / `clear` / `setRootPath` — verified), and the one that patches in
+   * place (`update`) cannot touch `path`/`children`, so a reference compare is a
+   * complete invalidation check. No TREE_CHANGED subscription: a permanent
+   * internal listener would force core's listener-gated O(N) mutation diff to
+   * run on every tree change forever (#723).
+   */
+  #pathParams(routeName: string): ReadonlySet<string> {
+    const tree = this.#pluginApi.getTree();
+
+    if (tree !== this.#cachedTree) {
+      this.#cachedTree = tree;
+      this.#pathParamsCache.clear();
+    }
+
+    const cached = this.#pathParamsCache.get(routeName);
+
+    if (cached) {
+      return cached;
+    }
+
+    const pathParams = collectPathParams(tree, routeName);
+
+    this.#pathParamsCache.set(routeName, pathParams);
+
+    return pathParams;
   }
 
   #validateExistingDefaultParams(): void {

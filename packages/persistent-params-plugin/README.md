@@ -152,7 +152,7 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Register this plugin **before** `search-schema-plugin` to have persistent params validated (the safer default); after it only when they must deliberately skip validation.
 
-> **Caveat — the recommended order covers one direction, not both.** `search-schema-plugin` validates `state.search` on the URL→State direction (`start()` / `matchPath`) and the params bag on the State→URL direction (`navigate`). Since #1563 this plugin injects into `search` on both, so the schema sees the persisted values on the URL→State direction and misses them on a plain `navigate`. And `state.path` is out of the schema's reach entirely: this plugin also registers a **`buildPath`** interceptor, which `search-schema-plugin` does not wrap. A route default is not a workaround — every route default merges *under* the injected value. (#1231, #1563; the schema-side fix is #1564)
+> **Caveat:** `search-schema-plugin` validates the injected values on **both** directions since #1564 (it validates the route's query channel, not a bag picked by call shape) — but `state.path` remains out of its reach: this plugin also registers a **`buildPath`** interceptor, which `search-schema-plugin` does not wrap. A route default is not a workaround — every route default merges *under* the injected value. (#1231, #1563, #1564)
 
 ## Documentation
 

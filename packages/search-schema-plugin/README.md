@@ -157,7 +157,9 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Prefer the recommended order (schema outermost) so `state` is validated as a whole. Reach for the alternative only when persistent/infra params must deliberately skip the schema. Swapping the two `usePlugin` lines silently flips the guarantee.
 
-> **Caveat — the recommended order covers one direction, and never `state.path`.** This plugin validates `state.search` on the URL→State direction (`start()` / `matchPath`) and the params bag on the State→URL direction (`navigate`). Since #1563 `persistent-params-plugin` injects into `search` on both, so in the recommended order the schema sees the persisted values on the URL→State direction and misses them on a plain `navigate`. `state.path` is out of reach entirely — `persistent-params-plugin` also registers a **`buildPath`** interceptor, which this plugin does not wrap. A route default is not a workaround: every route default merges *under* the injected value. (#1231, #1563; schema-side fix tracked as #1564)
+> **What gets validated:** the route's **query channel** — the explicit `search` argument, a v1 single-bag caller's query riding in the params bag, and anything an inner interceptor injected there (e.g. `persistent-params-plugin`) — on **both** directions (`navigate` and URL→State). The route's **path slots** are never shown to the schema, so a query schema cannot rewrite or (under `strict`) delete them. (#1564)
+>
+> **Caveat:** `state.path` is still out of reach — `persistent-params-plugin` also registers a **`buildPath`** interceptor, which this plugin does not wrap, so an invalid persisted value can still reach the URL. A route default is not a workaround: every route default merges *under* the injected value. (#1231, #1563)
 
 ## Use Cases
 

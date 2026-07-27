@@ -31,6 +31,12 @@
 | 5   | Non-strict mode: override + preservation | With `strict: false`, schema-transformed values (uppercased) override originals for known keys, while extra keys pass through unchanged. Tests with transforming schema to prove override, not identity. |
 | 6   | Async rejection                          | If `~standard.validate()` returns a Promise, TypeError is thrown. The plugin never awaits.                                                                                                               |
 
+## Channel Isolation
+
+| #   | Invariant                                   | Description                                                                                                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | The schema is handed the QUERY channel only | For every call shape (`navigate(name, bag)` single-bag or `navigate(name, params, search)`) and either `strict` setting, no PATH slot of the route — its own or an ancestor's — is passed to the schema, and every query value the caller supplied in EITHER channel is. The committed `state.params` still carries each slot's value verbatim, so the URL builds (#1564). |
+
 ## Factory Options Validation
 
 | #   | Invariant                | Description                                                                                                |
@@ -48,4 +54,4 @@
 | ----------------------------------------- | ---------- | ---------------------------------------------- |
 | `tests/property/helpers.properties.ts`    | 8          | getInvalidKeys, omitKeys                       |
 | `tests/property/validation.properties.ts` | 6          | Factory Options Validation                     |
-| `tests/property/pipeline.properties.ts`   | 6          | Validation Pipeline (forwardState interceptor) |
+| `tests/property/pipeline.properties.ts`   | 7          | Validation Pipeline (forwardState interceptor), Channel Isolation |
