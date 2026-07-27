@@ -1,4 +1,4 @@
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 import { getLifecycleApi } from "@real-router/core/api";
 import { describe, expect } from "vitest";
 
@@ -422,6 +422,72 @@ describe("multi-param: multiple persistent params coexist correctly", () => {
 
       expect(search[param1]).toBe(val1Override);
       expect(search[param2]).toBe(val2);
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Channel correctness (#1563)
+// =============================================================================
+
+describe("channel: persisted values ride the query channel, never the path bag", () => {
+  test.prop([arbParamName, arbParamValue, fc.boolean()], {
+    numRuns: NUM_RUNS.async,
+  })(
+    "a value set through either channel is committed to state.search only",
+    async (paramName, paramValue, viaSearch) => {
+      const router = await createStartedRouter([paramName]);
+
+      const idA = nextId();
+      const idB = nextId();
+
+      await (viaSearch
+        ? router.navigate("routeA", { id: idA }, { [paramName]: paramValue })
+        : router.navigate("routeA", { id: idA, [paramName]: paramValue }));
+      await router.navigate("routeB", { id: idB });
+
+      const state = router.getState();
+
+      expect(state?.search[paramName]).toBe(paramValue);
+      // The path bag carries the route's own params and nothing else — the
+      // plugin declared this key as query and injects it there.
+      expect(state?.params).toStrictEqual({ id: idB });
+
+      router.stop();
+    },
+  );
+
+  test.prop([arbParamName, arbParamValue, fc.boolean()], {
+    numRuns: NUM_RUNS.async,
+  })(
+    "an undefined removal marker is honored in either channel",
+    async (paramName, paramValue, viaSearch) => {
+      const router = await createStartedRouter([paramName]);
+
+      const idA = nextId();
+      const idB = nextId();
+      const idC = nextId();
+
+      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+
+      const removal = await (viaSearch
+        ? router.navigate("routeB", { id: idB }, { [paramName]: undefined })
+        : router.navigate("routeB", { id: idB, [paramName]: undefined }));
+
+      // The marker must reach the URL build too — a plugin that reads removals
+      // from one channel only drops the key from `search` while the built path
+      // keeps re-injecting the stored value.
+      expect(removal.search).not.toHaveProperty(paramName);
+      expect(removal.path).not.toContain(`${paramName}=`);
+
+      await router.navigate("routeC", { id: idC });
+
+      const state = router.getState();
+
+      expect(state?.search).not.toHaveProperty(paramName);
+      expect(state?.params).not.toHaveProperty(paramName);
 
       router.stop();
     },

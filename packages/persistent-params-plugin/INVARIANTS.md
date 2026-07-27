@@ -37,6 +37,13 @@
 | 1   | buildPath is idempotent with respect to persistence | `buildPath` called with an explicit persistent param produces the same path as `buildPath` called without it after the param has been stored. The plugin does not double-inject. |
 | 2   | Param appears exactly once in state                 | After multiple navigations, a persistent param key appears exactly once in the committed state's `search` params (`state.search` — the channel persisted query params occupy post-RFC-4 M2 / #1548). The merge logic never duplicates keys.                                    |
 
+## Channel
+
+| #   | Invariant                                              | Description                                                                                                                                                                                                                                          |
+| --- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Persisted values ride the query channel                | A value set through EITHER channel (`navigate(name, { lang })` — legacy single-bag — or `navigate(name, {}, { lang })`) is committed to `state.search`; `state.params` carries the route's own path params and never a tracked key. The plugin declares its keys as query (`setRootPath("?a&b")`) and injects them there, so core has nothing to re-route (#1563). |
+| 2   | Removal markers are honored in either channel          | `{ key: undefined }` passed in `search` **or** in the path bag removes the key from the committed state AND from the built URL — a plugin reading removals from one channel only would drop it from `state.search` while `buildPath` keeps re-injecting the stored value (#1563).                                                        |
+
 ## Removal
 
 | #   | Invariant                                           | Description                                                                                                                                                                                               |
@@ -89,12 +96,12 @@
 | #   | Invariant                                              | Description                                                                                                                                                                                                       |
 | --- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | state.context.persistentParams reflects stored snapshot | After every successful transition, `state.context.persistentParams` deep-equals the plugin's internal `#persistentParams` snapshot. It contains only the currently tracked persistent params, not route-specific params. |
-| 2   | state.context.persistentParams is a subset of state.search (or state.params via makeState) | Every key in `state.context.persistentParams` also exists in `state.search` with the same value — the canonical channel for a committed query param post-RFC-4 M2 (#1548). For a state built via `makeState` (e.g. `start()`'s injected default, or a `navigateToState` commit) that hasn't been slot-shifted yet, the value instead rides in `state.params`. Either way, the context snapshot is always a subset of whichever channel actually carries the persisted keys.                                                 |
+| 2   | state.context.persistentParams is a subset of state.search (or state.params for a hand-built state) | Every key in `state.context.persistentParams` also exists in `state.search` with the same value — the channel the plugin injects into (#1563) and the canonical one for a committed query param post-RFC-4 M2 (#1548). For a hand-built state committed via `navigateToState` (which bypasses the interceptors) the value can instead ride in `state.params`. Either way, the context snapshot is always a subset of whichever channel actually carries the persisted keys.                                                 |
 
 ## Test Files
 
 | File                                            | Invariants | Category                                                                                    |
 | ----------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------- |
-| `tests/property/persistentParams.properties.ts` | 17         | Persistence, Override, No-Clobber, Scope, Idempotency, Removal, Default Values, Multi-Param |
+| `tests/property/persistentParams.properties.ts` | 19         | Persistence, Override, No-Clobber, Scope, Idempotency, Removal, Default Values, Multi-Param, Channel |
 | `tests/property/paramUtils.properties.ts`       | 6          | Merge Semantics, Own-Property Extraction                                                    |
 | `tests/property/validation.properties.ts`       | 4          | Validation                                                                                  |

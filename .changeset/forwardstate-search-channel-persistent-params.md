@@ -9,5 +9,5 @@ Both interceptors now take the third `search` argument (RFC-4 M2). The
 `search-schema-plugin` interceptor still observes the matched query on the
 URL→State path. The `buildPath` interceptor is search-aware: when the caller
 supplies an explicit `search` channel, persistent (query) params are injected
-there — the channel the built URL takes its query from — otherwise into the
-params bag (the v1 single-bag path).
+there — the channel the built URL takes its query from. (#1563 completes the
+move: the single-bag call shape injects into `search` as well.)

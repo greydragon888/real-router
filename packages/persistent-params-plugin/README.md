@@ -120,9 +120,9 @@ router.subscribe(({ route, previousRoute }) => {
   // params contains ONLY route-specific (path) params — RFC-4 M2 (#1548)
   console.log(params);                    // { id: "42" }
 
-  // search contains ONLY query params — persistent params normally land here
-  // (exception: a state built via router.start()/navigateToState still carries
-  // them in `params`, with `search` left `{}`, until the next navigate())
+  // search contains ONLY query params — the channel persistent params are
+  // injected into (#1563); a hand-built state committed via navigateToState is
+  // the one case where they can ride in `params` instead
   console.log(search);                    // { lang: "en", theme: "light" }
 
   // context.persistentParams is a channel-independent view of ONLY the
@@ -152,7 +152,7 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Register this plugin **before** `search-schema-plugin` to have persistent params validated (the safer default); after it only when they must deliberately skip validation.
 
-> **Caveat:** the recommended order validates `state.params`, not `state.path`. This plugin also registers a **`buildPath`** interceptor, which `search-schema-plugin` does not wrap — so an invalid persisted value is stripped from `state.params` but still reaches `state.path` (persistent, reload-stable). Give persisted keys a `defaultParams` on schema'd routes to close it (core's merge overrides the injected value). Also: the alternative-order leak only affects keys **without** a route default — stored params fill *under* incoming ones, so a key with a default is supplied by core and never leaks. (#1231)
+> **Caveat — the recommended order covers one direction, not both.** `search-schema-plugin` validates `state.search` on the URL→State direction (`start()` / `matchPath`) and the params bag on the State→URL direction (`navigate`). Since #1563 this plugin injects into `search` on both, so the schema sees the persisted values on the URL→State direction and misses them on a plain `navigate`. And `state.path` is out of the schema's reach entirely: this plugin also registers a **`buildPath`** interceptor, which `search-schema-plugin` does not wrap. A route default is not a workaround — every route default merges *under* the injected value. (#1231, #1563; the schema-side fix is #1564)
 
 ## Documentation
 
