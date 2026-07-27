@@ -22,5 +22,3 @@ export { materialize } from "./materialize";
 export type { Canonical } from "./types";
 
 export type { RouteResolver } from "./port";
-
-export type { MaterializeOptions } from "./materialize";

@@ -25,24 +25,48 @@ import type { Route, Router, State } from "@real-router/core";
  * ONLY `state.search`, so the divergence hid; the e2e (which asserts the URL)
  * was the only thing that caught it. This property pins the two channels
  * together at the CORE level, across every state-producing path, so a future
- * regression in makeState's internal `buildPath`
- * (`path: buildPath(name, mergedParams, mergedSearch)`), the `defaultSearch`
- * merge (`#mergeDefaultSearch`), or any commit path can never again print one
- * query while committing another.
+ * regression in the pipeline's ⑤a (`buildURL` → `port.buildPath`, the navigate
+ * path), in makeState's internal fallback
+ * (`path: buildPath(name, mergedParams, mergedSearch)`, still used by every
+ * entry point not yet migrated), in makeState's `defaultSearch` merge, or in the
+ * `matchPath` URL rebuild can never again print one query while committing
+ * another. (`buildPath`'s own `#mergeDefaultSearch` is NOT among them — see the
+ * measured map below.)
  *
- * DISCRIMINATING POWER — the blocks are NON-REDUNDANT: each guards a DISTINCT
- * state-commit path builder (verified mutationally, two independent mutations):
- *  - blocks 1 & 6 (positional navigate) guard `ctx.buildPath`'s search-awareness
- *    on the explicit-path build (`wireNamespaces` `buildPath(name, params, search)`).
- *    Dropping its `search` arg fails 1 & 6 ONLY.
- *  - blocks 2 & 3 (v1 single-bag navigate + direct makeState) guard makeState's
- *    internal fallback (`path: buildPath(name, mergedParams, mergedSearch)`).
- *    Dropping its `mergedSearch` arg fails 2 & 3 ONLY (the positional path builds
- *    its URL elsewhere; the default-only case is served by buildPath's own merge).
- *  - block 4 guards the `matchPath` URL rebuild (the exact site of the e2e
+ * DISCRIMINATING POWER — re-measured on the nav-pipeline milestone (five
+ * independent mutations, each applied and reverted; the previous map was written
+ * before `navigate` moved onto `src/pipeline` and two of its four claims no
+ * longer held). What each mutation actually kills:
+ *
+ *  | mutation                                                   | blocks red |
+ *  |------------------------------------------------------------|------------|
+ *  | `pipeline/buildURL` drops the query from `port.buildPath`   | 1, 2, 6    |
+ *  | `makeState`'s path fallback drops `mergedSearch`            | 3          |
+ *  | `matchPath`'s URL rebuild prints without the query          | 4, 7       |
+ *  | `makeState` stops merging `defaultSearch`                   | 3, 5       |
+ *  | `buildPath` stops merging `defaultSearch`                   | none       |
+ *
+ *  - blocks 1, 2 AND 6 (both navigate forms) now guard ONE builder — the
+ *    pipeline's ⑤a. Block 2 used to sit with block 3: before the milestone the
+ *    single-bag navigate reached its URL through makeState's internal fallback.
+ *    It does not any more, so a `mergedSearch` regression is invisible to every
+ *    navigate block and is pinned by block 3 alone.
+ *  - block 3 is the only guard left on `makeState`'s own path build — the one
+ *    still used by `canNavigateTo` / `isActiveRoute` and by direct plugin calls,
+ *    i.e. by the seven entry points not yet on the pipeline.
+ *  - blocks 4 and 7 guard the `matchPath` URL rebuild (the exact site of the e2e
  *    divergence — raw vs recovered query).
- *  - block 5 guards buildPath's `#mergeDefaultSearch` (a `defaultSearch` value in
- *    `state.search` but absent from `state.path` fails here, and only here).
+ *  - block 5 guards makeState's `defaultSearch` merge, NOT buildPath's
+ *    `#mergeDefaultSearch` as previously claimed: dropping the latter kills
+ *    nothing here (measured), because makeState merges the default itself and
+ *    hands it to buildPath as an explicit `search`, making buildPath's own merge
+ *    redundant on this path. That claim was already wrong before the milestone —
+ *    `RoutesNamespace` is untouched by it. ⚠ No mutation in this set kills block 5
+ *    alone (both that reach it also reach block 3), so its unique contribution is
+ *    the VALUE assertion (`state.search` equals the route default), not the
+ *    consistency invariant. Five mutations are not proof of redundancy; treat it
+ *    as the open end of this map.
+ *
  * A `state.search`-only assertion (the masking shape the e2e exposed) survives
  * EVERY one of these mutations — this property is exactly what that shape could
  * not see.

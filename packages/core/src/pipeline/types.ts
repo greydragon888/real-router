@@ -27,13 +27,21 @@ declare const CANON: unique symbol;
  * Honest boundary: the brand stops *accidental* fabrication, not a deliberate
  * `as` cast, and not spread-drift INSIDE this module (`{ ...c, path: … }`
  * inherits the brand without a cast). The single cast site is `canonicalize`.
+ *
+ * Deliberately NOT generic over the channel shapes. `matchPath<P>` does carry a
+ * narrowed `P` today (through `makeState<P>`) and will want it back when it
+ * migrates here, but type parameters on THIS interface do not provide that:
+ * with non-generic primitives they are unreachable — `canonicalize` returns
+ * `Canonical<Params, SearchParams>`, which is not assignable to a narrowed one —
+ * and with generic primitives they are unnecessary (a generic `materialize<P, S>`
+ * over a plain `Canonical` type-checks on its own). Both were verified with tsc.
+ * So the parameters belong to the same edit that makes the FUNCTIONS generic,
+ * whenever a caller needs it; added now they would be exactly the dead weight
+ * nothing detects that this module refuses elsewhere (knip reports neither).
  */
-export interface Canonical<
-  P extends Params = Params,
-  S extends SearchParams = SearchParams,
-> {
+export interface Canonical {
   readonly name: string;
-  readonly path: P;
-  readonly query: S;
+  readonly path: Params;
+  readonly query: SearchParams;
   readonly [CANON]: true;
 }
