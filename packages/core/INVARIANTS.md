@@ -173,6 +173,7 @@ The emit machinery re-entering itself from inside a transition listener (`subscr
 | 2   | Idempotency              | `forwardState(forwardState(name, params).name, params).name === forwardState(name, params).name`. Applying `forwardState` twice gives the same result as applying it once. |
 | 3   | navigate follows forward | `navigate("oldUsers")` resolves to the forwarded target (`"users"`), not the alias. Navigation always lands on the terminal route.                                         |
 | 4   | Params preserved         | `forwardState(name, params).params` contains all params passed in. Forwarding does not discard parameters.                                                                 |
+| 5   | Every hop layers its defaults (#1566) | On a chain `r0 → … → rN`, the `defaultParams` of EVERY forwarding node are layered under the caller's params, an earlier hop winning over a later one; the terminal `rN` is excluded (its defaults are merged downstream by the state builder, #1549). Consulting only `r0` left a slot declared on an intermediate hop empty, so `navigate` threw `Missing required param` while `matchPath` committed the resolved name with the SOURCE path. Holds for static, dynamic (`forwardTo: () => …`) and mixed chains. |
 
 ## Route Management (getRoutesApi)
 
@@ -392,6 +393,7 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | --- | ----------------- | ---------------------------------------------------------------------------------------- |
 | 1   | Set-get roundtrip | After `setRootPath("/app")`, `getRootPath() === "/app"`. The value survives a roundtrip. |
 | 2   | Default is empty  | `getRootPath()` returns `""` on a fresh router. No root path is set by default.          |
+| 4   | A root `:`-declaration is a real path slot everywhere (#1567) | After `setRootPath("/app/:tenant")`, `tenant` is a path param of EVERY route: `buildPath` substitutes it (`/app/t1/home`, never the literal `/app/:tenant/home`), a missing value throws `Missing required param`, the value is NOT echoed into the query string, and `buildPath` → `matchPath` round-trips. The root node is absent from `matchSegments`, so the build template takes its param AND splat names from the root separately — the same threading `declaredQueryParams` needed in #1556. A root splat keeps its separators (splat encoder), not `%2F`. |
 | 3   | A root `?`-declaration is a declared query param everywhere (#1556) | After `setRootPath("?lang")`, `lang` is declared for EVERY route: it is separated into the query channel (`state.search`, never `state.params`) and printed into `state.path` on both the URL and the intent direction, in every `queryParamsMode`. Classification and printing read ONE registry (the matcher's `declaredQueryParams`, which unions the root node's declarations), so they cannot drift — a key is separated into the query channel **iff** the build prints it, modulo a path-slot twin (`/items/:id?id` stays path-owned, #843 / #1549). |
 
 ## pluginApi — getOptions
