@@ -1045,4 +1045,36 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state?.path).toBe("/match-target");
     });
   });
+
+  describe("query-value round-trip under numberFormat auto (#1565)", () => {
+    // `matchPath` rebuilds `state.path` from the parsed channels, so a value the
+    // number strategy coerces lossily comes back as a DIFFERENT URL than the one
+    // that was matched — under a URL plugin that string reaches the address bar.
+    it.each([
+      "2.0",
+      "2.10",
+      "0.50",
+      "100.00",
+      "0.0",
+      "-2.0",
+      "1.0000000000000000001",
+      "9007199254740993.5",
+    ])("should keep the query value %s byte-identical in state.path", (raw) => {
+      routesApi.add({ name: "rt", path: "/rt?page" });
+
+      const state = getPluginApi(router).matchPath(`/rt?page=${raw}`);
+
+      expect(state?.path).toBe(`/rt?page=${raw}`);
+      expect(state?.search.page).toBe(raw);
+    });
+
+    it("still coerces values whose text survives the round-trip", () => {
+      routesApi.add({ name: "rt-ok", path: "/rt-ok?page" });
+
+      const state = getPluginApi(router).matchPath("/rt-ok?page=2.5");
+
+      expect(state?.path).toBe("/rt-ok?page=2.5");
+      expect(state?.search.page).toBe(2.5);
+    });
+  });
 });

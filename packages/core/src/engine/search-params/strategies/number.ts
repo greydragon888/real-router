@@ -84,13 +84,22 @@ export const autoNumberStrategy: NumberStrategy = {
 
     const num = Number(value);
 
-    // Negative zero is not round-trippable: build(-0) emits "0" and
-    // String(-0) === "0", so "-0"/"-0.0" must stay strings. (#898)
-    if (Object.is(num, -0)) {
+    // The stated criterion is round-trip stability, enforced directly rather than
+    // through per-case guards: `build` prints a number with String(), so a value
+    // may be coerced only when String() reproduces the exact text we parsed. This
+    // subsumes the former negative-zero guard (String(-0) === "0" ≠ "-0", #898)
+    // and closes the decimal family the safe-integer check below deliberately
+    // exempts — trailing zeros ("2.0" → 2 → "2") and precision loss
+    // ("9007199254740993.5" → 9007199254740994), both of which rebuilt a URL
+    // different from the one that was matched. (#1565)
+    if (String(num) !== value) {
       return null;
     }
 
-    // Reject unsafe integers — precision loss would corrupt the value on roundtrip.
+    // Unsafe integers pass the text check (2**53 prints back exactly) but lose
+    // precision in arithmetic, so they stay strings. Decimals are exempt: a
+    // fractional value is never a "safe integer", and the check above already
+    // proves its text round-trips.
     if (!Number.isSafeInteger(num) && !hasDot) {
       return null;
     }

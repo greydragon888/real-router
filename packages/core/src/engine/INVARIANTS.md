@@ -140,6 +140,7 @@
 | #   | Invariant           | Description                                                                                                                                                                                     |
 | --- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 9   | Empty array erasure | `build({key: []})` produces an empty string for that key (all formats **including comma**), so `parseQuery(build({key: []}))` does not contain `key`. Cited by `search-params/searchParams.ts`. |
+| 16  | Number format: auto non-canonical | Under `numberFormat: "auto"` a numeric-looking string is coerced **iff its text survives the round-trip** — `String(Number(v)) === v`. Everything else stays a string, preserving its exact text: leading zeros (`"007"`), exponent notation (`"1e5"`), negative zero (`"-0"`, `"-0.0"`), and — since **#1565** — decimals `String()` cannot reproduce, both trailing-zero (`"2.0"`, `"0.50"`) and precision-losing (`"9007199254740993.5"`). Unsafe **integer** magnitudes (`> 2^53`) stay strings on top of that: they round-trip textually but lose arithmetic precision. Without this, `matchPath` rebuilt a URL different from the one it matched. Cited by `search-params/strategies/number.ts`; generator: `arbNonCanonicalNumericString`. |
 
 ## Test Files
 
@@ -151,3 +152,4 @@
 | `tests/engine/property/queryParams.properties.ts`          | Q1–Q2                      | Query param extraction and separation                                                                         |
 | `tests/engine/property/validation.properties.ts`           | VN1–VN4, VP1–VP16, VD1–VD5 | Route name/path validation + duplicate detection (VP6/9/10/11/15/16 are the optional/constraint-rejection checks)       |
 | `tests/engine/property/gate-backstop-parity.properties.ts` | GBP1–GBP7                  | Gate ↔ backstop reject-parity for the parallel scans (#1320 Tier 2; GBP3/GBP4 are the optional/constraint parity) |
+| `tests/engine/property/search-params/formats.properties.ts` | 9, 16                      | Parse/build format contracts; #16 via `arbNonCanonicalNumericString` (#1565)                                  |
