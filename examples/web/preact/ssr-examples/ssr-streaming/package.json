@@ -20,8 +20,8 @@
     "preact-render-to-string": "~6.7.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.60.0",
-    "@preact/preset-vite": "2.10.5",
+    "@playwright/test": "1.62.0",
+    "@preact/preset-vite": "2.10.6",
     "@types/express": "5.0.6",
     "@types/node": "24.13.2",
     "tsx": "4.23.1",
