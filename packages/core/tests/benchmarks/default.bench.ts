@@ -287,10 +287,15 @@ export async function run(): Promise<void> {
 
   // query navigation under the DEFAULT loose queryParamsMode — the form apps
   // run unless they opt into strict (that branch lives in
-  // strict-query.bench.ts). Query values ride normalizeParams + the
-  // search-params stringify on every build; alternating sets keep the paths
-  // distinct (the same-state check compares paths, and query params are part
-  // of the path), so every iteration is a real transition.
+  // strict-query.bench.ts). Query values ride the search-params stringify on
+  // every build; alternating sets keep the paths distinct (the same-state check
+  // compares paths, and query params are part of the path), so every iteration
+  // is a real transition.
+  //
+  // The bags go in the `search` argument, not `params` (RFC-4 M2 / #1548): the
+  // single-bag spelling this arm used to carry now throws at the facade
+  // (channel guard P1, #1572), so it is not a form that can be measured — the
+  // same reason `navigate/search-single-bag` was retired below.
   {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -298,7 +303,7 @@ export async function run(): Promise<void> {
     ]);
 
     await router.start("/");
-    const targets: Params[] = [
+    const targets: SearchParams[] = [
       { q: "alpha", page: "1" },
       { q: "beta", page: "2" },
     ];
@@ -307,7 +312,7 @@ export async function run(): Promise<void> {
     bench.add(
       "navigate/query-params",
       batched(192, () => {
-        void router.navigate("search", targets[i++ % targets.length]);
+        void router.navigate("search", {}, targets[i++ % targets.length]);
       }),
     );
   }
@@ -506,8 +511,11 @@ export async function run(): Promise<void> {
     ]);
 
     await eq.start("/");
-    const sA = await eq.navigate("search", { q: "a", page: "1" });
-    const sB = await eq.navigate("search", { q: "a", page: "2" });
+    // Two-channel spelling (RFC-4 M2 / #1548) — setup only, and it commits the
+    // same two states the single-bag form used to: the query keys land in
+    // `state.search` either way, so what `areStatesEqual` compares is unchanged.
+    const sA = await eq.navigate("search", {}, { q: "a", page: "1" });
+    const sB = await eq.navigate("search", {}, { q: "a", page: "2" });
 
     bench.add(
       "state/areStatesEqual-ignoreQuery",
