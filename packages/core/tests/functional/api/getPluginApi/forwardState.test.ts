@@ -356,6 +356,108 @@ describe("forwardState", () => {
       expect(stageOne.calls.at(-1)?.search).toStrictEqual({});
     });
 
+    it("lets a caller's PATH-bag value beat a chain default the target declares as query", async () => {
+      routesApi.add([
+        { name: "p-dst", path: "/p-dst?lang" },
+        {
+          name: "p-src",
+          path: "/p-src",
+          forwardTo: "p-dst",
+          defaultParams: { lang: "fr" },
+        },
+      ]);
+
+      // The caller names `lang` in the PATH bag while the chain default for the
+      // same key belongs to the QUERY channel (the target declares `?lang`). The
+      // two would sit in DIFFERENT bags, where no merge ranks them — and the
+      // downstream channel separation spreads `search` last, handing the win to
+      // the default. The caller must win regardless of which bag they used.
+      const state = await router.navigate("p-src", { lang: "de" }, undefined, {
+        reload: true,
+      });
+
+      expect(state.search).toStrictEqual({ lang: "de" });
+      expect(state.path).toBe("/p-dst?lang=de");
+    });
+
+    it("lets a caller's PATH-bag value beat a MID-CHAIN default across hops", async () => {
+      routesApi.add([
+        { name: "j3", path: "/j3?lang" },
+        {
+          name: "j2",
+          path: "/j2",
+          forwardTo: "j3",
+          defaultParams: { lang: "fr" },
+        },
+        { name: "j1", path: "/j1", forwardTo: "j2" },
+      ]);
+
+      const state = await router.navigate("j1", { lang: "de" }, undefined, {
+        reload: true,
+      });
+
+      expect(state.search).toStrictEqual({ lang: "de" });
+      expect(state.path).toBe("/j3?lang=de");
+    });
+
+    it("lets a caller's PATH bag beat BOTH halves of a split chain default", async () => {
+      routesApi.add([
+        { name: "x-dst", path: "/x-dst/:z?lang" },
+        {
+          name: "x-src",
+          path: "/x-src",
+          forwardTo: "x-dst",
+          defaultParams: { lang: "fr", z: "5" },
+        },
+      ]);
+
+      const state = await router.navigate(
+        "x-src",
+        { lang: "de", z: "9" },
+        undefined,
+        { reload: true },
+      );
+
+      expect(state.params).toStrictEqual({ z: "9" });
+      expect(state.search).toStrictEqual({ lang: "de" });
+      expect(state.path).toBe("/x-dst/9?lang=de");
+    });
+
+    it("keeps a chain default alive against an explicit `undefined` in EITHER bag", async () => {
+      routesApi.add([
+        { name: "u-dst", path: "/u-dst?lang" },
+        {
+          name: "u-src",
+          path: "/u-src",
+          forwardTo: "u-dst",
+          defaultParams: { lang: "fr" },
+        },
+      ]);
+
+      // `undefined` is ABSENCE on both sides of the merge (#1550 / #1551), so it
+      // means "I said nothing" and the default keeps the slot — symmetric with a
+      // route-level `defaultSearch`, where this already held.
+      const viaSearch = await router.navigate(
+        "u-src",
+        {},
+        { lang: undefined },
+        { reload: true },
+      );
+
+      expect(viaSearch.search).toStrictEqual({ lang: "fr" });
+      expect(viaSearch.path).toBe("/u-dst?lang=fr");
+
+      const viaParams = await router.navigate(
+        "u-src",
+        { lang: undefined },
+        undefined,
+        { reload: true },
+      );
+
+      expect(viaParams.search).toStrictEqual({ lang: "fr" });
+      expect(viaParams.path).toBe("/u-dst?lang=fr");
+    });
+
     it("lets the caller beat the layered default in BOTH channels", async () => {
       routesApi.add([
         { name: "w-dst", path: "/w-dst/:slot?lang" },

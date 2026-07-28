@@ -875,13 +875,49 @@ export class RoutesNamespace<
       );
     }
 
-    // The caller's `search` is spread last inside `separateChannels`, so an
-    // explicit query value still beats the hop default it collides with.
+    // Split the DEFAULTS ALONE by the target's channels — the caller's bags are
+    // never routed here (that is stage ②, which this design removes: channel
+    // correctness is the producer's contract, §4.3). Each half is then layered
+    // UNDER the caller in its OWN channel, below.
     const split = separateChannels(
       hopDefaults,
       this.getQueryParams(target),
-      search,
+      EMPTY_SEARCH,
     );
+
+    // A default is never applied to a key the caller already named — in EITHER
+    // bag (#1570). Without this the caller's params-twin and the query half of
+    // the defaults sit in DIFFERENT channels, where no merge ranks them, and the
+    // seam's `separateChannels` (which spreads `search` last) hands the win to
+    // the DEFAULT: `navigate("src", { lang: "de" })` on a chain default
+    // `{ lang: "fr" }` committed `?lang=fr` and lost the caller's value — the
+    // §1.1 priority inversion this whole channel split exists to remove.
+    // Nothing is moved between channels: the caller's key stays where the caller
+    // put it, we merely decline to default a slot they already filled.
+    // `separateChannels` was handed a defined `search` (the frozen empty
+    // singleton), so its `search` half is defined too — no guard needed here.
+    let chainQuery: SearchParams | undefined = split.search;
+
+    {
+      let kept: Record<string, unknown> | undefined;
+      let dropped = false;
+
+      for (const [key, value] of Object.entries(chainQuery)) {
+        // `undefined` is absence (#1550 / #1551), so a caller's removal marker
+        // does NOT count as "already named" — the default keeps the slot.
+        if (params[key] !== undefined) {
+          dropped = true;
+          continue;
+        }
+
+        kept ??= {};
+        kept[key] = value;
+      }
+
+      if (dropped) {
+        chainQuery = kept as SearchParams | undefined;
+      }
+    }
 
     return {
       name: target,
@@ -889,7 +925,11 @@ export class RoutesNamespace<
       // keys are stripped exactly as before — this merge runs whether or not
       // the chain contributed anything.
       params: mergeDefined(split.params as P | undefined, params),
-      search: split.search as S,
+      // `mergeDefined`, not a spread: an explicit `undefined` from the caller is
+      // ABSENCE (#1550 / #1551), so it must not delete the hop default. A spread
+      // copied the `undefined` key over and killed it — asymmetric with a
+      // route-level `defaultSearch`, where the rule already held.
+      search: mergeDefined(chainQuery, search) as S,
     };
   }
 
