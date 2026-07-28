@@ -24,6 +24,7 @@ import type {
   RouteTree,
   RouteTreeState,
 } from "../../engine";
+import type { RouteResolver } from "../../pipeline";
 import type { RouteMetaLookup } from "../../transitionPath";
 import type {
   DefaultDependencies,
@@ -699,6 +700,17 @@ export class RoutesNamespace<
 
   getStore(): RoutesStore<Dependencies> {
     return this.#store;
+  }
+
+  /**
+   * The pipeline's read-model, for entry points that live on the FACADE rather
+   * than in a namespace (`canNavigateTo`). The port is created during wiring,
+   * after `registerInternals` has already run, so the facade cannot hold it —
+   * it reaches it through the namespace that does, exactly as the resolver
+   * itself reaches the store through {@link getStore}.
+   */
+  getPort(): RouteResolver {
+    return this.#deps.port;
   }
 
   /**

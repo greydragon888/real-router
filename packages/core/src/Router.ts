@@ -37,6 +37,7 @@ import {
   createDependenciesStore,
 } from "./namespaces";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
+import { buildURL, canonicalize, materialize } from "./pipeline";
 import { RouterError } from "./RouterError";
 import { createRouterFSM } from "./routerFSM";
 import { getTransitionPath } from "./transitionPath";
@@ -773,10 +774,21 @@ export class Router<
     // design (an unbuildable path is a normal "unreachable with this input"
     // answer, #725), while user code crashing is an operational fault that must
     // never vanish — the same split #959 draws for a throwing guard.
-    let forwarded;
+    // Stages ① + ③ + the mode gate, one pass through the pipeline (nav-pipeline
+    // Phase 2, step 2-3). `canonicalize` reaches the same `forwardState` seam
+    // this method used to call directly (`port.resolveForward` IS
+    // `ctx.forwardState`), so the resolution, the interceptor zone and the
+    // channel separation on the seam are all unchanged — what the pipeline
+    // replaces is the hand-rolled composition that followed.
+    let canonical;
 
     try {
-      forwarded = ctx.forwardState(name, params ?? {}, search);
+      canonical = canonicalize(
+        this.#routes.getPort(),
+        name,
+        params ?? {},
+        search,
+      );
     } catch (error) {
       ctx.logger.warn(
         "router.canNavigateTo",
@@ -786,12 +798,6 @@ export class Router<
 
       return false;
     }
-
-    const {
-      name: resolvedName,
-      params: resolvedParams,
-      search: resolvedSearch,
-    } = forwarded;
 
     // Build `toState` exactly as `buildNavigateState` does — WITH route-meta and
     // normalized params — so `getTransitionPath` takes its STANDARD PATH and
@@ -812,24 +818,17 @@ export class Router<
     let toState: State;
 
     try {
-      const normalizedParams = normalizeParams(resolvedParams);
-      const path = ctx.buildPath(
-        resolvedName,
-        normalizedParams,
-        resolvedSearch,
-      );
-
-      toState = this.#state.makeState(
-        resolvedName,
-        normalizedParams,
-        // Query channel canonical from forwardState (#1548/#1549): `toState
-        // .search` mirrors what a real navigate would commit, so guards reading
-        // `toState.search` and `areStatesEqual`'s query comparison see navigate's
-        // shape.
-        resolvedSearch,
-        path,
-        true,
-      );
+      // ⑤a then ⑤b. `buildURL` is usable HERE (unlike in `buildPath` itself,
+      // where it would recurse through the interceptable `ctx.buildPath` that
+      // wraps that very method): this point is not the one the port prints
+      // through, so the URL is built by the pipeline and the state materialised
+      // from the SAME canonical intent — `toState.search` and `toState.path`
+      // cannot drift. `skipFreeze` mirrors the navigate guard phase, where
+      // guards see an unfrozen, transition-less `toState`.
+      toState = materialize(canonical, {
+        path: buildURL(canonical, this.#routes.getPort()),
+        skipFreeze: true,
+      });
     } catch {
       return false;
     }
