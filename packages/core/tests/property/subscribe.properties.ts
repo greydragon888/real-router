@@ -9,6 +9,7 @@ import {
   createStartedRouter,
   arbNavigableRoute,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
 
 import type { State } from "@real-router/core";
@@ -16,18 +17,6 @@ import type { State } from "@real-router/core";
 interface SubscribePayload {
   route: State;
   previousRoute: State | undefined;
-}
-
-function getParamsForRoute(name: string): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id: "abc" };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
 }
 
 describe("subscribe() Event Delivery Properties", () => {
@@ -41,7 +30,7 @@ describe("subscribe() Event Delivery Properties", () => {
 
       router.subscribe(listener);
 
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       expect(listener).toHaveBeenCalled();
 
@@ -63,7 +52,7 @@ describe("subscribe() Event Delivery Properties", () => {
 
       router.subscribe(listener);
 
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       const { previousRoute } = listener.mock.calls[0][0] as SubscribePayload;
 
@@ -85,7 +74,7 @@ describe("subscribe() Event Delivery Properties", () => {
 
       router.subscribe(listener);
 
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       expect(listener).toHaveBeenCalledTimes(1);
 
@@ -125,7 +114,7 @@ describe("subscribe() Event Delivery Properties", () => {
 
       router.subscribe(listener);
 
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       const payload = listener.mock.calls[0][0] as SubscribePayload;
 
@@ -156,14 +145,14 @@ describe("subscribe() Event Delivery Properties", () => {
       const router = await createStartedRouter("/");
 
       // Commit the target first so the second navigate is a same-state no-op.
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       const listener = vi.fn();
 
       router.subscribe(listener);
 
       await expect(
-        router.navigate(targetRoute, getParamsForRoute(targetRoute)),
+        router.navigate(targetRoute, ...navArgsForRoute(targetRoute)),
       ).rejects.toMatchObject({ code: errorCodes.SAME_STATES });
 
       expect(listener).not.toHaveBeenCalled();
@@ -193,7 +182,7 @@ describe("subscribe() Event Delivery Properties", () => {
       router.subscribe(listener);
 
       await expect(
-        router.navigate(targetRoute, getParamsForRoute(targetRoute)),
+        router.navigate(targetRoute, ...navArgsForRoute(targetRoute)),
       ).rejects.toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
 
       expect(listener).not.toHaveBeenCalled();
@@ -221,7 +210,7 @@ describe("subscribe() Event Delivery Properties", () => {
         router.subscribe(listener);
       }
 
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       const orders = listeners.map((listener) => {
         expect(listener).toHaveBeenCalledTimes(1);
@@ -265,7 +254,7 @@ describe("subscribe() Event Delivery Properties", () => {
         bodyRan = true;
       });
 
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       // navigate() resolved though the listener's body is still parked on `gate`.
       expect(bodyRan).toBe(false);

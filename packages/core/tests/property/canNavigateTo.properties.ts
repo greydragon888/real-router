@@ -10,21 +10,10 @@ import {
   FIXTURE_ROUTE_NAMES,
   ROUTE_PATHS,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
 
 import type { Router } from "@real-router/core";
-
-function getParamsForRoute(name: string): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id: "abc" };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
-}
 
 /** Register a single sync guard (last-add-wins) on a router. */
 function applyGuard(
@@ -74,7 +63,7 @@ describe("canNavigateTo Properties", () => {
 
       await router.start("/");
 
-      expect(router.canNavigateTo(route, getParamsForRoute(route))).toBe(true);
+      expect(router.canNavigateTo(route, ...navArgsForRoute(route))).toBe(true);
 
       router.stop();
     },
@@ -92,7 +81,7 @@ describe("canNavigateTo Properties", () => {
 
       await router.start("/");
 
-      expect(router.canNavigateTo(route, getParamsForRoute(route))).toBe(true);
+      expect(router.canNavigateTo(route, ...navArgsForRoute(route))).toBe(true);
 
       router.stop();
     },
@@ -110,7 +99,9 @@ describe("canNavigateTo Properties", () => {
 
       await router.start("/");
 
-      expect(router.canNavigateTo(route, getParamsForRoute(route))).toBe(false);
+      expect(router.canNavigateTo(route, ...navArgsForRoute(route))).toBe(
+        false,
+      );
 
       router.stop();
     },
@@ -148,7 +139,7 @@ describe("canNavigateTo Properties", () => {
 
       const before = router.getState();
 
-      router.canNavigateTo(route, getParamsForRoute(route));
+      router.canNavigateTo(route, ...navArgsForRoute(route));
 
       expect(router.getState()).toBe(before);
 
@@ -164,11 +155,11 @@ describe("canNavigateTo Properties", () => {
 
       await router.start("/");
 
-      const params = getParamsForRoute(route);
-      const first = router.canNavigateTo(route, params);
+      const [params, search] = navArgsForRoute(route);
+      const first = router.canNavigateTo(route, params, search);
 
-      expect(router.canNavigateTo(route, params)).toBe(first);
-      expect(router.canNavigateTo(route, params)).toBe(first);
+      expect(router.canNavigateTo(route, params, search)).toBe(first);
+      expect(router.canNavigateTo(route, params, search)).toBe(first);
 
       router.stop();
     },
@@ -194,7 +185,7 @@ describe("canNavigateTo Properties", () => {
   )(
     "sound — canNavigateTo(to)=true implies navigate(to) resolves (ex-same-state)",
     async (from, to, guard) => {
-      const params = getParamsForRoute(to);
+      const [params, search] = navArgsForRoute(to);
 
       // Twin instances: `a` answers the predicate, `b` actually commits.
       const a = createFixtureRouter();
@@ -213,11 +204,11 @@ describe("canNavigateTo Properties", () => {
       // route): canNavigateTo returns true by design while navigate rejects
       // SAME_STATES — an intentional divergence, not unsoundness. Every distinct
       // fixture route has a distinct path, so from≠to is never a same-state.
-      if (from !== to && a.canNavigateTo(to, params)) {
+      if (from !== to && a.canNavigateTo(to, params, search)) {
         let resolved: boolean;
 
         try {
-          await b.navigate(to, params);
+          await b.navigate(to, params, search);
           resolved = true;
         } catch {
           resolved = false;
@@ -249,7 +240,7 @@ describe("canNavigateTo Properties", () => {
   )(
     "complete — navigate(to) resolving implies canNavigateTo(to)=true (ex-same-state)",
     async (from, to, guard) => {
-      const params = getParamsForRoute(to);
+      const [params, search] = navArgsForRoute(to);
 
       // Twin instances: `a` answers the predicate, `b` actually commits.
       const a = createFixtureRouter();
@@ -270,14 +261,14 @@ describe("canNavigateTo Properties", () => {
         let resolved: boolean;
 
         try {
-          await b.navigate(to, params);
+          await b.navigate(to, params, search);
           resolved = true;
         } catch {
           resolved = false;
         }
 
         if (resolved) {
-          expect(a.canNavigateTo(to, params)).toBe(true);
+          expect(a.canNavigateTo(to, params, search)).toBe(true);
         }
       }
 

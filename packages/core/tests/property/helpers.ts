@@ -142,6 +142,37 @@ export const arbSearchParams = fc.record({
   page: fc.constantFrom("1", "2", "3", "4", "5"),
 });
 
+/**
+ * The navigate arguments a fixture route needs, split across the two channels
+ * (RFC-4 M2 / #1548): path params in slot 2, query params in slot 3.
+ *
+ * `search` (`/search?q&page`) declares BOTH its keys with `?`, so they belong in
+ * the query bag — passing them in `params` is what the always-on channel guard
+ * (#1572) rejects with a synchronous `TypeError`. Spread it into the call:
+ *
+ * ```ts
+ * await router.navigate(name, ...navArgsForRoute(name));
+ * await router.navigate(name, ...navArgsForRoute(name), { reload: true });
+ * ```
+ *
+ * Lives here rather than being re-declared per suite: it used to be copied into
+ * eight property files, and a channel change had to land in all eight or the
+ * copies drifted apart.
+ */
+export function navArgsForRoute(
+  name: string,
+): [params: Record<string, string>, search: Record<string, string>] {
+  if (name === "users.view" || name === "users.edit") {
+    return [{ id: "abc" }, {}];
+  }
+
+  if (name === "search") {
+    return [{}, { q: "test", page: "1" }];
+  }
+
+  return [{}, {}];
+}
+
 // =============================================================================
 // State Generator
 // =============================================================================

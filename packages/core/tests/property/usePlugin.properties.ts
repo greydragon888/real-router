@@ -9,21 +9,10 @@ import {
   createStartedRouter,
   arbNavigableRoute,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
 
 import type { PluginFactory, State } from "@real-router/core";
-
-function getParamsForRoute(name: string): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id: "abc" };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
-}
 
 function createSpyPlugin(): {
   factory: PluginFactory;
@@ -123,7 +112,7 @@ describe("usePlugin Properties", () => {
       router.usePlugin(plugin1, plugin2);
 
       await router.start("/");
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       expect(received1.to).toBe(received2.to);
       expect(received1.from).toBe(received2.from);

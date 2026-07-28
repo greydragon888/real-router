@@ -96,11 +96,19 @@ describe("query-channel registry properties (#1556)", () => {
 
       await router.start("/home");
 
-      const state = await router.navigate("r", { [key]: "V" });
+      // Passed in the QUERY bag: a root declaration makes the key a query name
+      // of EVERY route, so this is the channel-correct spelling.
+      const state = await router.navigate("r", {}, { [key]: "V" });
 
       expect(state.params).toStrictEqual({});
       expect(state.search).toStrictEqual({ [key]: "V" });
       expect(state.path).toBe(`/r?${key}=V`);
+
+      // The same registry drives the always-on channel guard (#1572), so the
+      // params-bag spelling — what this arm asserted before the guard shipped,
+      // when stage ② rerouted it — is now rejected at the API boundary. Both
+      // halves read `queryNames`, which is what keeps them from drifting apart.
+      expect(() => router.navigate("r", { [key]: "V" })).toThrow(TypeError);
 
       router.stop();
     },

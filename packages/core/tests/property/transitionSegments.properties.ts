@@ -14,21 +14,10 @@ import {
   createStartedRouter,
   arbNavigableRoute,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
 
 import type { PluginFactory, Route, State } from "@real-router/core";
-
-function getParamsForRoute(name: string, id = "abc"): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
-}
 
 // =============================================================================
 // Deep, param-less route tree + independent model oracle
@@ -320,14 +309,9 @@ describe("navigate() → transition.segments Properties", () => {
       controller.abort();
 
       try {
-        await router.navigate(
-          targetRoute,
-          getParamsForRoute(targetRoute),
-          undefined,
-          {
-            signal: controller.signal,
-          },
-        );
+        await router.navigate(targetRoute, ...navArgsForRoute(targetRoute), {
+          signal: controller.signal,
+        });
 
         expect.unreachable("should have thrown");
       } catch (error) {
@@ -397,8 +381,7 @@ describe("navigate() → transition.segments Properties", () => {
 
       const state = await router.navigate(
         target,
-        getParamsForRoute(target),
-        undefined,
+        ...navArgsForRoute(target),
         opts,
       );
 
@@ -431,20 +414,20 @@ describe("navigate() → transition.segments Properties", () => {
   )(
     "same-route navigate rejects SAME_STATES iff neither reload nor force is set",
     async (target, opts) => {
-      const params = getParamsForRoute(target);
+      const [params, search] = navArgsForRoute(target);
       const router = createFixtureRouter();
 
-      await router.start(router.buildPath(target, params));
+      await router.start(router.buildPath(target, params, search));
 
       expect(router.getState()?.name).toBe(target);
 
       if ("reload" in opts || "force" in opts) {
-        const state = await router.navigate(target, params, undefined, opts);
+        const state = await router.navigate(target, params, search, opts);
 
         expect(state.name).toBe(target);
       } else {
         await expect(
-          router.navigate(target, params, undefined, opts),
+          router.navigate(target, params, search, opts),
         ).rejects.toMatchObject({ code: errorCodes.SAME_STATES });
       }
 
@@ -462,7 +445,7 @@ describe("navigate() → transition.segments Properties", () => {
     async (target) => {
       fc.pre(target !== "home");
 
-      const params = getParamsForRoute(target);
+      const [params, search] = navArgsForRoute(target);
 
       const syncRouter = createFixtureRouter();
       const asyncRouter = createFixtureRouter();
@@ -476,8 +459,8 @@ describe("navigate() → transition.segments Properties", () => {
         () => () => Promise.resolve(true),
       );
 
-      const sync = await syncRouter.navigate(target, params);
-      const async = await asyncRouter.navigate(target, params);
+      const sync = await syncRouter.navigate(target, params, search);
+      const async = await asyncRouter.navigate(target, params, search);
 
       expect(async.name).toBe(sync.name);
       expect(async.path).toBe(sync.path);
@@ -518,7 +501,7 @@ describe("navigate() → transition.segments Properties", () => {
       controller.abort(reason);
 
       const error = await router
-        .navigate(target, getParamsForRoute(target), undefined, {
+        .navigate(target, ...navArgsForRoute(target), {
           signal: controller.signal,
         })
         .catch((error_: unknown) => error_);

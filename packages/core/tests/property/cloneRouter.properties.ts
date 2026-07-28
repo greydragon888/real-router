@@ -18,19 +18,8 @@ import {
   createStartedRouter,
   FIXTURE_ROUTE_NAMES,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
-
-function getParamsForRoute(name: string): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id: "abc" };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
-}
 
 describe("cloneRouter Properties", () => {
   it("route preservation: clone contains every route from the source", () => {
@@ -144,13 +133,13 @@ describe("cloneRouter Properties (generative)", () => {
       const source = createFixtureRouter();
       const cloneA = cloneRouter(source);
       const cloneB = cloneRouter(source);
-      const params = getParamsForRoute(routeName);
+      const [params, search] = navArgsForRoute(routeName);
 
-      expect(cloneA.buildPath(routeName, params)).toBe(
-        source.buildPath(routeName, params),
+      expect(cloneA.buildPath(routeName, params, search)).toBe(
+        source.buildPath(routeName, params, search),
       );
-      expect(cloneB.buildPath(routeName, params)).toBe(
-        cloneA.buildPath(routeName, params),
+      expect(cloneB.buildPath(routeName, params, search)).toBe(
+        cloneA.buildPath(routeName, params, search),
       );
     },
   );
@@ -242,7 +231,7 @@ describe("cloneRouter Properties (generative)", () => {
 
       const state = await clone.navigate(
         routeName,
-        getParamsForRoute(routeName),
+        ...navArgsForRoute(routeName),
       );
 
       expect(state.name).toBe(routeName);

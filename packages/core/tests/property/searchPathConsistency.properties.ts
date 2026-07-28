@@ -199,11 +199,37 @@ describe("core/state — search ↔ path consistency (#1548/#1549)", () => {
     },
   );
 
-  // 2. navigate via the params bag (v1 single-bag) — query-declared keys route
-  //    to state.search; state.path must show exactly that query.
+  // 2. The v1 single-bag form no longer produces a state at all: the always-on
+  //    channel guard (#1572) rejects a declared query key riding the params bag
+  //    with a SYNCHRONOUS TypeError, before any transition exists. This used to
+  //    assert that stage ② routed such keys into `state.search` — the routing
+  //    the nav-pipeline design removes in favour of the producer contract
+  //    (RFC §4.3). Keeping the arm as a rejection property preserves what it was
+  //    guarding: there is no way to commit a state whose path and search were
+  //    built from differently-split bags, because this bag never reaches a
+  //    builder.
   test.prop([arbSearch], { numRuns: NUM_RUNS.standard })(
-    "navigate(name, searchInParamsBag): committed state.path encodes state.search",
+    "navigate(name, searchInParamsBag): rejected by the channel guard, no state produced",
     async (search) => {
+      // The guard is `undefined`-blind (#1550 / #1551): an `undefined` value is
+      // absence, not a mis-channel, so only a DEFINED key trips it. An empty (or
+      // all-`undefined`) bag is channel-correct by vacuity and still commits.
+      const misChanneled = Object.values(search).some(
+        (value) => value !== undefined,
+      );
+
+      if (misChanneled) {
+        const before = router.getState();
+
+        expect(() =>
+          router.navigate("search", search, undefined, { reload: true }),
+        ).toThrow(TypeError);
+
+        expect(router.getState()).toBe(before);
+
+        return;
+      }
+
       const state = await router.navigate("search", search, undefined, {
         reload: true,
       });
