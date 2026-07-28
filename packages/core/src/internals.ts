@@ -3,6 +3,7 @@ import { findMisChanneledKey, misChanneledKeyMessage } from "./helpers";
 import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
+import type { RouteResolver } from "./pipeline";
 import type { Router as RouterClass } from "./Router";
 import type {
   DefaultDependencies,
@@ -107,6 +108,15 @@ export interface RouterInternals<
     params?: Params,
     search?: SearchParams,
   ) => string;
+
+  /**
+   * The navigation pipeline's read-model, for entry points that live on this
+   * plugin-facing surface rather than in a namespace. Resolved LAZILY: the port
+   * is created during wiring, and `registerInternals` runs before that, so the
+   * accessor is a closure rather than a value — the same shape the interceptable
+   * methods above already use.
+   */
+  readonly port: () => RouteResolver;
 
   readonly emitTransitionError: (error: Error) => void;
 

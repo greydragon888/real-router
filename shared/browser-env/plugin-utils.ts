@@ -131,12 +131,20 @@ export function createReplaceHistoryState(
       // Explicit query channel (RFC-4 M2 / #1548), taken from the RESOLVED
       // state rather than the caller's bag: `state.search` is the caller's
       // `search` after the seam layered the chain's query-channel defaults
-      // under it (an explicit value still wins — `separateChannels` spreads the
-      // caller's bag last). Both channels of the record therefore come from the
-      // same canonicalization that produced `state.name`/`state.params`, so the
+      // under it. Both channels of the record therefore come from the same
+      // canonicalization that produced `state.name`/`state.params`, so the
       // `history.state` record agrees with the URL instead of carrying a
       // half-resolved query (#1574). Omitted by the caller and contributed by
       // no hop → the frozen empty search bag, as before.
+      //
+      // ⚠ Why an explicit value still outranks a hop default is #1570's rule —
+      // a default is never applied to a slot the caller already filled, in
+      // EITHER bag — NOT the spread order inside `separateChannels`. The two
+      // are easy to confuse because today they agree: the seam does spread the
+      // caller's bag last. But that is stage ②, which the nav-pipeline work
+      // removes in Phase 4, whereas the withholding rule is a property of the
+      // merge and survives it. Anchoring the guarantee on the spread order would
+      // make this comment silently false the day the seam's wrapper goes.
       state.search,
       router.buildPath(state.name, state.params, state.search),
       // No meta arg: since #1548 the per-segment param-source map is read from

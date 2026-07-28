@@ -307,6 +307,7 @@ export class Router<
       forwardState,
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
+      port: () => this.#routes.getPort(),
       matchPath: (path, matchOptions) =>
         this.#routes.matchPath(path, matchOptions),
       getOptions: () => this.#options.get(),

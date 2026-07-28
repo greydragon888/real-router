@@ -1,3 +1,4 @@
+import { buildURL, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
@@ -104,31 +105,31 @@ export function getPluginApi<
         "buildNavigationState",
       );
 
-      // `search` flows THROUGH the forwardState seam, not past it (#1571): the
-      // seam is where an explicit query value wins over a declared twin the
-      // caller rode in `params`, and where a `search-schema` interceptor sees
-      // the query channel. Left undefined it stays undefined — the frozen
-      // empty-search singleton is applied downstream, so the two-argument form
-      // allocates exactly as before.
-      const forwarded = ctx.forwardState(name, params, search);
-      const routeInfo = ctx.buildStateResolved(
-        forwarded.name,
-        forwarded.params,
-      );
+      // Stages ① + ③ + the mode gate, one pass through the pipeline
+      // (nav-pipeline Phase 2, step 2-4). `search` flows THROUGH the forwardState
+      // seam, not past it (#1571) — `port.resolveForward` IS `ctx.forwardState`,
+      // so the seam is still where an explicit query value wins over a declared
+      // twin the caller rode in `params`, and where a `search-schema`
+      // interceptor sees the query channel.
+      const canonical = canonicalize(ctx.port(), name, params, search);
 
-      if (!routeInfo) {
+      // Existence is checked BEFORE the URL is built, and the order is
+      // load-bearing: `buildURL` prints through the matcher, which throws on an
+      // unknown route, whereas this entry point answers `undefined` for one —
+      // including when a `forwardTo` chain resolves to a target that does not
+      // exist. (`canonicalize` itself is total here: a missing route simply has
+      // no defaults and no declared query names.)
+      if (!ctx.buildStateResolved(canonical.name, canonical.path)) {
         return;
       }
 
-      return ctx.makeState(
-        routeInfo.name,
-        routeInfo.params,
-        // forwardState canonicalized the channels (#1548/#1549): declared query
-        // names (defaults included) are already in `forwarded.search`, path-only
-        // params in `routeInfo.params`. makeState merges defaults, no re-split.
-        forwarded.search,
-        ctx.buildPath(routeInfo.name, routeInfo.params, forwarded.search),
-      );
+      // ⑤a then ⑤b from ONE canonical intent, so `state.search` and `state.path`
+      // cannot derive from differently-merged bags. `buildURL` is usable here for
+      // the same reason it is in `canNavigateTo`: this point is not the one the
+      // port prints through, so there is no recursion (contrast `buildPath`).
+      return materialize(canonical, {
+        path: buildURL(canonical, ctx.port()),
+      });
     },
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,
