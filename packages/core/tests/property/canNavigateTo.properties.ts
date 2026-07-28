@@ -13,7 +13,7 @@ import {
   navArgsForRoute,
 } from "./helpers";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 
 /** Register a single sync guard (last-add-wins) on a router. */
 function applyGuard(
@@ -35,6 +35,53 @@ const arbGuard = fc.record({
   kind: fc.constantFrom("activate", "deactivate"),
   val: fc.boolean(),
 });
+
+/**
+ * A params bag that fights back (#1577). Built here rather than drawn as a
+ * fast-check value on purpose: the reporter stringifies counterexamples, and a
+ * throwing accessor would then blow up inside the reporter instead of inside
+ * the predicate. The labels cover the three surfaces a bag can weaponise —
+ * a value getter, a `[[Get]]` trap, and an `ownKeys` trap (which is what
+ * `Object.entries` reaches first).
+ */
+function makeHostileBag(kind: string): Params {
+  if (kind === "throwing-getter") {
+    const bag = {};
+
+    Object.defineProperty(bag, "id", {
+      get() {
+        throw new Error("hostile getter");
+      },
+      enumerable: true,
+    });
+
+    return bag;
+  }
+
+  if (kind === "proxy-throws-get") {
+    return new Proxy(
+      { id: "1" },
+      {
+        get() {
+          throw new Error("hostile [[Get]]");
+        },
+      },
+    );
+  }
+
+  if (kind === "proxy-throws-ownKeys") {
+    return new Proxy(
+      {},
+      {
+        ownKeys() {
+          throw new Error("hostile ownKeys");
+        },
+      },
+    );
+  }
+
+  return {};
+}
 
 describe("canNavigateTo Properties", () => {
   test.prop([arbSegmentName], { numRuns: NUM_RUNS.standard })(
@@ -107,12 +154,30 @@ describe("canNavigateTo Properties", () => {
     },
   );
 
-  // #725 — the predicate must answer, never throw, on incomplete input. Routes
-  // with required path params (e.g. users.view "/users/:id") used to throw a
-  // raw buildPath Error when called with empty params; they now resolve to false.
-  test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.fast })(
-    "missing required params resolve to false instead of throwing",
-    async (route) => {
+  // TOTALITY (#725, widened by #1577) — the predicate ANSWERS, it never throws,
+  // for ANY bag. Routes with required path params (e.g. users.view "/users/:id")
+  // used to throw a raw buildPath Error on empty params; #1577 closed the other
+  // half, where user code running during resolution (a dynamic `forwardTo`, a
+  // `forwardState` interceptor, or the bag's own accessor read by channel
+  // separation) escaped as an exception.
+  //
+  // The bag is chosen by LABEL and built inside the body, never drawn as a
+  // value: fast-check stringifies counterexamples, and a hostile getter would
+  // throw inside the reporter rather than inside the code under test.
+  test.prop(
+    [
+      arbNavigableRoute,
+      fc.constantFrom(
+        "empty",
+        "throwing-getter",
+        "proxy-throws-get",
+        "proxy-throws-ownKeys",
+      ),
+    ],
+    { numRuns: NUM_RUNS.fast },
+  )(
+    "answers for any params bag — hostile accessors included, never throws",
+    async (route, bagKind) => {
       const router = createFixtureRouter();
 
       await router.start("/");
@@ -120,7 +185,7 @@ describe("canNavigateTo Properties", () => {
       let result: boolean | undefined;
 
       expect(() => {
-        result = router.canNavigateTo(route, {});
+        result = router.canNavigateTo(route, makeHostileBag(bagKind));
       }).not.toThrow();
       expect(typeof result).toBe("boolean");
 

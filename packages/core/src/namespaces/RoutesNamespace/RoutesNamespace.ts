@@ -709,8 +709,45 @@ export class RoutesNamespace<
     return this.#store;
   }
 
-  /** The literal arm of {@link isActiveRoute} — unchanged by #1573. */
+  /**
+   * The literal arm of {@link isActiveRoute} — unchanged by #1573.
+   *
+   * Safe boundary (#1577): both branches below READ the caller's bags — the
+   * exact branch splits them (`separateChannels`), the descendant branch spreads
+   * them into one — so an accessor-backed key, a `Proxy` or a framework's
+   * reactive object throws HERE, on the render path. The predicate's stated
+   * policy is that it answers and never throws from inside a render (see the
+   * `forwardState` wrap below), and #1573 implemented that for the destination
+   * arm only. One boundary around the whole walk rather than a `try` per read —
+   * the same shape `isParams` took for the same class of hostile input (#1052).
+   */
   #matchesActiveState(
+    name: string,
+    params: Params,
+    searchArg: SearchParams,
+    strictEquality: boolean,
+    ignoreQueryParams: boolean,
+  ): boolean {
+    try {
+      return this.#matchesActiveStateUnsafe(
+        name,
+        params,
+        searchArg,
+        strictEquality,
+        ignoreQueryParams,
+      );
+    } catch (error) {
+      this.#deps.logger.warn(
+        "router.isActiveRoute",
+        `Reading the arguments for route "${name}" threw while resolving the active-link state; treating the link as inactive.`,
+        error,
+      );
+
+      return false;
+    }
+  }
+
+  #matchesActiveStateUnsafe(
     name: string,
     params: Params,
     searchArg: SearchParams,

@@ -759,11 +759,39 @@ export class Router<
       return false;
     }
 
+    // Resolution runs USER code and must not escape as an exception (#1577):
+    // a dynamic `forwardTo` callback, a plugin's `forwardState` interceptor, and
+    // the caller's own bag (channel separation walks it with `Object.entries`,
+    // so an accessor-backed key throws here) all sit on this one call. The
+    // predicate is documented TOTAL — it answers, it never throws (INVARIANTS
+    // canNavigateTo #5, #725) — and its sibling `isActiveRoute` has wrapped the
+    // very same primitive since #1573 (`RoutesNamespace.ts:611-626`). Leaving
+    // this one bare made the two render-path predicates disagree about what a
+    // throwing resolution means.
+    //
+    // A separate `try` rather than widening the one below: that one is SILENT by
+    // design (an unbuildable path is a normal "unreachable with this input"
+    // answer, #725), while user code crashing is an operational fault that must
+    // never vanish — the same split #959 draws for a throwing guard.
+    let forwarded;
+
+    try {
+      forwarded = ctx.forwardState(name, params ?? {}, search);
+    } catch (error) {
+      ctx.logger.warn(
+        "router.canNavigateTo",
+        `Resolving route "${name}" threw while answering the predicate; treating the route as unreachable.`,
+        error,
+      );
+
+      return false;
+    }
+
     const {
       name: resolvedName,
       params: resolvedParams,
       search: resolvedSearch,
-    } = ctx.forwardState(name, params ?? {}, search);
+    } = forwarded;
 
     // Build `toState` exactly as `buildNavigateState` does — WITH route-meta and
     // normalized params — so `getTransitionPath` takes its STANDARD PATH and
