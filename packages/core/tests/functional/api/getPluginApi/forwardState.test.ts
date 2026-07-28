@@ -1,5 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
@@ -480,6 +481,54 @@ describe("forwardState", () => {
 
       expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "en" });
       expect(stageOne.calls.at(-1)?.params).toStrictEqual({ slot: "CALLER" });
+    });
+  });
+
+  describe("primitive contracts (nav-pipeline Phase 2, step 2-6)", () => {
+    it("forwardState is stage ① ALONE — it does not apply the target's own defaults", () => {
+      const router = createRouter([
+        { name: "src", path: "/src", forwardTo: "dst" },
+        { name: "dst", path: "/dst?tab", defaultSearch: { tab: "new" } },
+      ]);
+
+      // ① resolves the chain; ③ (the TERMINAL route's own defaults) is the
+      // caller's job. A producer that needs the whole intent runs both through
+      // `canonicalize`; one that needs only the resolved identity does not pay
+      // for the merge.
+      expect(getPluginApi(router).forwardState("src", {})).toStrictEqual({
+        name: "dst",
+        params: {},
+        search: {},
+      });
+    });
+
+    it("makeState is the LITERAL form — it never resolves forwardTo", () => {
+      const router = createRouter([
+        { name: "src", path: "/src", forwardTo: "dst" },
+        { name: "dst", path: "/dst" },
+      ]);
+
+      const state = getPluginApi(router).makeState("src");
+
+      // Equivalent to `canonicalize(..., { resolveForward: false })` — the same
+      // form buildPath and isActiveRoute take. A plugin can build a state for an
+      // alias without being teleported off it.
+      expect(state.name).toBe("src");
+      expect(state.path).toBe("/src");
+    });
+
+    it("makeState still applies stage ③ of the route it was NAMED", () => {
+      const router = createRouter([
+        { name: "x", path: "/x?page", defaultSearch: { page: "5" } },
+      ]);
+
+      const state = getPluginApi(router).makeState("x");
+
+      // Literal about the NAME, not about the defaults: skipping ① does not skip
+      // ③. This is the pair that makes the contract discriminating — without it
+      // "literal" could be read as "no merging at all".
+      expect(state.search).toStrictEqual({ page: "5" });
+      expect(state.path).toBe("/x?page=5");
     });
   });
 });
