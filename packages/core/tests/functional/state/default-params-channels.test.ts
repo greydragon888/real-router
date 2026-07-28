@@ -381,4 +381,112 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
       expect(state.search).toStrictEqual({ a: "1" });
     });
   });
+
+  // The two halves below were left unpinned by the M2 migration: this file's
+  // `QUERY_DEFAULT_ROUTES` fixture moved to `defaultSearch`, so every pin above
+  // proves the NEW slot while the describe still promises `defaultParams`
+  // routing. The form the tests stopped covering is exactly the one #1549 is
+  // about — and it is not merely mis-channelled any more, it CRASHES.
+  describe("a route's OWN defaultParams naming a declared query key (#1549)", () => {
+    const OWN_QUERY_DEFAULT = [
+      { name: "home", path: "/home" },
+      { name: "x", path: "/x?page&sort", defaultParams: { page: "5" } },
+    ];
+
+    it("start() commits instead of throwing WRONG_CHANNEL on a legal config", async () => {
+      const router = createRouter(OWN_QUERY_DEFAULT);
+
+      // `start` commits through `navigateToState`, where the channel guard's P3
+      // rejects a declared query key sitting in `state.params` — so core's own
+      // default made core's own guard reject core's own state.
+      await router.start("/x");
+
+      const state = router.getState()!;
+
+      expect(state.params).toStrictEqual({});
+      expect(state.search).toStrictEqual({ page: "5" });
+      expect(state.path).toBe("/x?page=5");
+    });
+
+    it("routes the default into state.search on the navigate path", async () => {
+      const router = createRouter(OWN_QUERY_DEFAULT);
+
+      await router.start("/home");
+
+      const state = await router.navigate("x", {});
+
+      expect(state.params).toStrictEqual({});
+      expect(state.search).toStrictEqual({ page: "5" });
+      expect(state.path).toBe("/x?page=5");
+    });
+
+    it("keeps every producer in agreement — no channel divergence (#1554 class)", async () => {
+      const router = createRouter(OWN_QUERY_DEFAULT);
+      const api = getPluginApi(router);
+
+      await router.start("/home");
+
+      const navigated = await router.navigate("x", {});
+      const matched = api.matchPath("/x")!;
+
+      // A producer that leaves the default in `params` while another routes it
+      // to `search` makes two states for the SAME location compare unequal —
+      // the shape that renders an active link inactive.
+      expect(matched.params).toStrictEqual(navigated.params);
+      expect(matched.search).toStrictEqual(navigated.search);
+      expect(router.areStatesEqual(navigated, matched, false)).toBe(true);
+
+      const built = api.buildNavigationState("x", {})!;
+
+      expect(built.params).toStrictEqual(navigated.params);
+      expect(built.search).toStrictEqual(navigated.search);
+      expect(built.path).toBe(navigated.path);
+    });
+  });
+
+  describe("a forwarding hop's defaultSearch (#1549, second half)", () => {
+    it("layers a hop's defaultSearch into the target's query channel", async () => {
+      // The mirror of #1570: a hop's `defaultParams` is routed into whichever
+      // channel the TARGET declares, but its `defaultSearch` was read by nobody
+      // — `#layerChainDefaults` folds `config.defaultParams` only, so the slot
+      // was silently inert on a forwarding node.
+      const router = createRouter([
+        { name: "home", path: "/" },
+        {
+          name: "src",
+          path: "/src",
+          forwardTo: "dst",
+          defaultSearch: { lang: "fr" },
+        },
+        { name: "dst", path: "/dst?lang" },
+      ]);
+
+      await router.start("/");
+
+      const state = await router.navigate("src", {});
+
+      expect(state.name).toBe("dst");
+      expect(state.search).toStrictEqual({ lang: "fr" });
+      expect(state.path).toBe("/dst?lang=fr");
+    });
+
+    it("lets the caller outrank a hop's defaultSearch, in either bag (#1570)", async () => {
+      const router = createRouter([
+        { name: "home", path: "/" },
+        {
+          name: "src",
+          path: "/src",
+          forwardTo: "dst",
+          defaultSearch: { lang: "fr" },
+        },
+        { name: "dst", path: "/dst?lang" },
+      ]);
+
+      await router.start("/");
+
+      const state = await router.navigate("src", {}, { lang: "de" });
+
+      expect(state.search).toStrictEqual({ lang: "de" });
+    });
+  });
 });

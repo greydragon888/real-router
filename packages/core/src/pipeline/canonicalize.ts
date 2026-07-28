@@ -1,7 +1,12 @@
 // packages/core/src/pipeline/canonicalize.ts
 
 import { EMPTY_PARAMS, EMPTY_SEARCH } from "../constants";
-import { admittedSearch, mergeWithDefault, normalizeParams } from "../helpers";
+import {
+  admittedSearch,
+  mergeWithDefault,
+  normalizeParams,
+  separateChannels,
+} from "../helpers";
 
 import type { RouteResolver } from "./port";
 import type { Canonical } from "./types";
@@ -45,23 +50,33 @@ export function canonicalize(
   // path allocates nothing downstream.
   const pathBag = normalizeParams(forwarded.params);
 
+  // The route's OWN defaults, split by the channel the route DECLARES (#1549) —
+  // the same rule #1570 applies to a forwarding hop's defaults, now applied to
+  // the terminal's. `defaultParams` is a route's only default slot in v1 configs
+  // and stays legal for a `?`-declared name, so a default spelled there for a
+  // query key belongs to the query channel; `defaultSearch` is spread last and
+  // therefore wins the collision (the explicit slot outranks the implicit one).
+  // `separateChannels` short-circuits on a route with no query declarations, so
+  // the zero-declaration hot path pays a length check.
+  const routeDefaults = separateChannels(
+    port.defaultParams(resolvedName),
+    port.queryNames(resolvedName),
+    port.defaultSearch(resolvedName),
+  );
+
   // ③ — route defaults UNDER the routed value, each channel independent. Read
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
   // accessor) so the merge itself allocates nothing on the zero-defaults hot
   // path — the `Canonical` literal below is the pipeline's one added allocation.
   const query = mergeWithDefault(
-    port.defaultSearch(resolvedName),
+    routeDefaults.search,
     forwarded.search,
     EMPTY_SEARCH,
   );
 
   return {
     name: resolvedName,
-    path: mergeWithDefault(
-      port.defaultParams(resolvedName),
-      pathBag,
-      EMPTY_PARAMS,
-    ),
+    path: mergeWithDefault(routeDefaults.params, pathBag, EMPTY_PARAMS),
     // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
     // for an undeclared key is dropped with it — under `default`/`strict` that
     // config is dead by the same rule, not a back door around it. Runs on the

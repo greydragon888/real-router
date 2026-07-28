@@ -249,13 +249,45 @@ export class RoutesNamespace<
       return typeof params.path === "string" ? params.path : "";
     }
 
+    // The route's OWN defaults, split by the channel the route DECLARES (#1549)
+    // — the third and last place a terminal's defaults are applied, after
+    // `canonicalize` and `makeState`. It has to happen HERE too, not only in the
+    // state builders: `buildNavigationState` and the `matchPath` rebuild ask for
+    // the URL through this method BEFORE `makeState` splits, so a split done
+    // only downstream would print a path that contradicts `state.search`
+    // (INVARIANTS makeState #6). The query half is handed to
+    // `#mergeDefaultSearch` below via the split, so `defaultSearch` still wins.
+    // `defaultSearch` goes in as the third argument, which `separateChannels`
+    // spreads LAST — so the explicit query slot outranks the query half of
+    // `defaultParams`, the same precedence `canonicalize` and `makeState` use.
+    // Passing it (rather than `EMPTY_SEARCH`) also keeps `undefined` flowing
+    // through when the route declares neither: the matcher's single-bag
+    // fallback (`search ?? params`) must stay reachable for a v1 caller.
+    // ⚠ Only when the caller SPELLED a query channel. A single-bag caller
+    // (`buildPath(name, { q, page })`, still legal until the entry point
+    // migrates) relies on the matcher's `search ?? params` fallback to print the
+    // query out of the one bag they passed. Splitting the defaults would make
+    // `searchWithDefault` defined, the fallback would stop firing, and the
+    // caller's own query values would vanish from the URL — measured as four
+    // red `search-schema-plugin` tests. With no explicit `search`, the defaults
+    // stay in the params bag exactly as before and the fallback prints them.
+    const routeDefaults =
+      search === undefined
+        ? {
+            params: this.#store.config.defaultParams[route] as
+              Params | undefined,
+            search: undefined,
+          }
+        : separateChannels(
+            this.#store.config.defaultParams[route],
+            this.getQueryParams(route),
+            this.#store.config.defaultSearch[route],
+          );
+
     // `undefined` is absence on both sides (#1550 / #1551) — neither an
     // explicitly-undefined caller value nor an undefined-valued default reaches
     // the codec or the matcher as an own key.
-    const paramsWithDefault = mergeDefined(
-      this.#store.config.defaultParams[route] as Params | undefined,
-      params,
-    );
+    const paramsWithDefault = mergeDefined(routeDefaults.params, params);
 
     // #1549 (RFC-4 M2): the route's query defaults (`defaultSearch`) join the
     // search channel so they reach the URL query string — including when the
@@ -264,7 +296,16 @@ export class RoutesNamespace<
     // wins over the default. When the route has no `defaultSearch`, an omitted
     // `search` stays `undefined` (single-bag fallback: the matcher extracts any
     // query the caller rode in `paramsWithDefault`).
-    const searchWithDefault = this.#mergeDefaultSearch(route, search);
+    // Annotated, not inferred: `separateChannels` short-circuits by RETURNING
+    // the `search` it was handed, so this stays `undefined` for a route with
+    // neither kind of query default — which is what keeps the matcher's
+    // single-bag fallback (`search ?? params`) reachable for a v1 caller. The
+    // inferred type loses that branch and would make the `?? {}` below read as
+    // dead code.
+    const searchWithDefault: SearchParams | undefined = mergeDefined(
+      routeDefaults.search,
+      search,
+    );
 
     // `search` (RFC-4 M2 / #1548) is the explicit query channel. The route codec
     // (if any) now sees BOTH channels — `encodeParams({ params, search })` returns
@@ -278,6 +319,7 @@ export class RoutesNamespace<
         // object (the `params ?? {}` branch above aliases it) — a copy, as the
         // v1 single-bag call (`encoders[route]({ ...paramsWithDefault })`) did.
         params: { ...paramsWithDefault },
+
         search: searchWithDefault ?? {},
       });
 
@@ -358,8 +400,20 @@ export class RoutesNamespace<
     // downstream regardless (verified: merging defaultParams here is an
     // equivalent no-op). `state.path` and `state.search` still can't diverge:
     // makeState re-applies the same `defaultSearch` idempotently.
+    // The route's OWN defaults, split by its declared channel (#1549). The URL
+    // direction needs the same split as the intent direction, and it needs it
+    // HERE: the rebuild below calls the matcher's `buildPath` directly, not this
+    // namespace's, so it never passes the split done in `buildPath`. Without it
+    // `makeState` routed the default into `state.search` while the rebuilt
+    // `state.path` never showed it — the two halves of one state disagreeing
+    // (INVARIANTS makeState #6).
+    const routeDefaults = separateChannels(
+      this.#store.config.defaultParams[routeName],
+      this.getQueryParams(routeName),
+      this.#store.config.defaultSearch[routeName],
+    );
     const routeParams = forwarded.params;
-    const mergedSearch = this.#mergeDefaultSearch(routeName, forwarded.search);
+    const mergedSearch = mergeDefined(routeDefaults.search, forwarded.search);
     // The mode gate (#1575), the URL half of the same rule the intent side
     // applies. `default` accepts an undeclared key in the URL — that is what
     // separates it from `strict` — but the rebuilt path below prints declared
@@ -902,6 +956,7 @@ export class RoutesNamespace<
     search: S,
   ): { name: string; params: P; search: S } {
     let hopDefaults: Params | undefined;
+    let hopSearchDefaults: SearchParams | undefined;
 
     for (const routeName of chain) {
       // `undefined` is absence on both sides (#1550 / #1551): a source default
@@ -909,6 +964,15 @@ export class RoutesNamespace<
       hopDefaults = mergeDefined(
         this.#store.config.defaultParams[routeName] as Params | undefined,
         hopDefaults,
+      );
+      // A hop's `defaultSearch` was read by NOBODY until #1549: this fold only
+      // took `defaultParams`, so the slot was silently inert on a forwarding
+      // node while working on a terminal — the mirror of the terminal's own
+      // defect, where `defaultParams` worked on a hop and broke on the route
+      // itself. Each slot has to mean the same thing in both positions.
+      hopSearchDefaults = mergeDefined(
+        this.#store.config.defaultSearch[routeName] as SearchParams | undefined,
+        hopSearchDefaults,
       );
     }
 
@@ -919,7 +983,11 @@ export class RoutesNamespace<
     const split = separateChannels(
       hopDefaults,
       this.getQueryParams(target),
-      EMPTY_SEARCH,
+      // Spread last, so a hop's explicit `defaultSearch` outranks the query half
+      // of its `defaultParams` — the same precedence the terminal's own defaults
+      // get. `EMPTY_SEARCH` keeps the `search` half defined when no hop spelled
+      // one, which the withholding loop below relies on.
+      hopSearchDefaults ?? EMPTY_SEARCH,
     );
 
     // A default is never applied to a key the caller already named — in EITHER
@@ -968,35 +1036,6 @@ export class RoutesNamespace<
       // route-level `defaultSearch`, where the rule already held.
       search: mergeDefined(chainQuery, search) as S,
     };
-  }
-
-  /**
-   * Merges a route's query-channel defaults (`defaultSearch`) into a search bag
-   * — the search-channel twin of {@link #mergeChainDefaults} (RFC-4 M2 / #1548).
-   * An explicitly-passed search value wins over the default (spread order).
-   * Returns the input untouched (no allocation, including `undefined`) when the
-   * route declares no `defaultSearch`, so a route without query defaults keeps
-   * the caller's `undefined` and the matcher's single-bag fallback.
-   */
-  #mergeDefaultSearch<S extends SearchParams = SearchParams>(
-    routeName: string,
-    search: S,
-  ): S;
-  #mergeDefaultSearch<S extends SearchParams = SearchParams>(
-    routeName: string,
-    search: S | undefined,
-  ): S | undefined;
-  #mergeDefaultSearch<S extends SearchParams = SearchParams>(
-    routeName: string,
-    search: S | undefined,
-  ): S | undefined {
-    // `undefined` is absence on both sides (#1550 / #1551), and `undefined` in ⇒
-    // `undefined` out with no default, which keeps the matcher's single-bag
-    // fallback (`search ?? params`) reachable for a v1 caller.
-    return mergeDefined(
-      this.#store.config.defaultSearch[routeName] as S | undefined,
-      search,
-    );
   }
 
   #getBuildPathOptions(options?: Options): CachedBuildPathOpts {

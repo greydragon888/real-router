@@ -7,6 +7,7 @@ import {
   createStateObject,
   freezeStateInPlace,
   mergeWithDefault,
+  separateChannels,
 } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -134,13 +135,26 @@ export class StateNamespace {
     // re-split here. Each channel merges its route default UNDER the given value
     // (caller wins), reusing the EMPTY_PARAMS / EMPTY_SEARCH singleton (#1027)
     // when neither a default nor a value survives.
-    const mergedParams = mergeWithDefault(
+    // The route's OWN defaults are split by the channel the route DECLARES
+    // (#1549), mirroring what #1570 does for a forwarding hop's defaults.
+    // `defaultParams` is a v1 config's only default slot and stays legal for a
+    // `?`-declared name, so a default spelled there for a query key belongs to
+    // the query channel; `defaultSearch` is spread last and wins the collision.
+    // Without this the key rode `state.params` while `state.path` never showed
+    // it — and the always-on P3 guard then rejected core's OWN state on `start`.
+    const routeDefaults = separateChannels(
       routeDefaultParams,
+      this.#deps.getQueryParams(name),
+      routeDefaultSearch,
+    );
+
+    const mergedParams = mergeWithDefault(
+      routeDefaults.params,
       params,
       EMPTY_PARAMS,
     ) as P;
     const rawSearch = mergeWithDefault(
-      routeDefaultSearch,
+      routeDefaults.search,
       search,
       EMPTY_SEARCH,
     ) as S;
