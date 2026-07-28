@@ -78,7 +78,10 @@ import {
   guardRouteCallbacks,
   guardNoAsyncCallbacks,
 } from "./validators/routes";
-import { validateMakeStateArgs } from "./validators/state";
+import {
+  reportDroppedQueryKey,
+  validateMakeStateArgs,
+} from "./validators/state";
 
 import type { EventName, EventMethodMap } from "./validators/eventBus";
 import type {
@@ -273,6 +276,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
     },
     state: {
       validateMakeStateArgs,
+      reportDroppedQueryKey,
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {
           throw new TypeError(

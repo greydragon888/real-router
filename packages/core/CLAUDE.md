@@ -104,6 +104,33 @@ Core contains five invariant guards that run regardless of whether validation-pl
   - **P1 — `navigate` / `makeState` / `buildNavigationState` WARN** on the caller's RAW argument, before interceptors. Behaviour unchanged: the legacy single-bag form still works on `navigate` / `buildNavigationState` (separation moves the key one line downstream) and is pinned by a benchmark, a stress test, a property and INVARIANTS #2a — promoting it to a throw is a deliberate break with its own test migration. ⚠ A **direct `makeState`** is the exception: nothing separates upstream of it, so the key stays in `params` and never reaches the URL — there the warning reports an already-inconsistent state.
   - `undefined`-blind (the persistent-key removal marker is not a mis-channel); inherits the `/items/:id?id` carve-out from `getQueryParams`, the same registry the URL build prints from (#1556), rather than re-deriving it; short-circuits on a route with no query declarations; and **never becomes the thing that throws** — an accessor-backed bag whose read throws is left to the consumer that actually needed the value, so a diagnostic cannot move the origin of an existing failure. Predicates (`isActiveRoute` / `buildPath` / `canNavigateTo`) are deliberately NOT instrumented yet: they run on every `<Link>` render, where a per-render warning would be a log flood rather than a signal.
 
+### The mode gate — always-on, but a NORMALISER (#1575)
+
+Distinct from the guards above and worth the contrast: the channel guard
+**detects and never moves**; the mode gate **fixes and never reports**.
+
+One rule, all three `queryParamsMode` values, both directions: *a key the active
+mode does not PRINT does not enter the canonical query channel.* The URL build
+has always printed declared names only under `default` / `strict`, so keeping an
+undeclared key in `state.search` published a state whose own `path` contradicted
+it. The gate drops it instead, buying `keys(state.search) ⊆
+keys(matchPath(state.path).search)` in every mode (INVARIANTS makeState #6).
+
+- A **DROP, not a move** — the key does not fall back into `state.params`.
+  Re-channelling it there would re-create the per-entry-point ambiguity (#1553).
+- Applied **after** the default merge, so a `defaultSearch` for a key the route
+  does not declare with `?name` is dead config under `default` / `strict` — a
+  deliberate side edge, not an oversight.
+- Wired at the **three terminals** that produce a canonical query bag:
+  `pipeline/canonicalize` (the navigate path), `StateNamespace.makeState` (the
+  other intent producers), and the `matchPath` rebuild (the URL direction).
+  `loose` short-circuits at all three, so the repo default pays nothing.
+- The pipeline reads the decision through one boolean port accessor,
+  `admitsUndeclaredQuery()`, rather than learning the mode itself.
+- Silent in bare core; `validation-plugin`'s `state.reportDroppedQueryKey`
+  (called from the gate, de-duplicated per route+key) makes it visible. Same
+  always-on-fixes / opt-in-diagnoses split as the channel guard.
+
 **Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.
 
 **Param-value type validation stays opt-in (validator), NOT a core guard.** Bare core tolerantly accepts param values that cannot round-trip through a URL path — a `Symbol` path-param keeps its raw identity in `state.params` (path stringifies to `/items/Symbol(x)`, never matching back), a `BigInt` coerces lossily, and a NUL/control char percent-encodes into `state.path` (`%00`). These are exotic programmer errors, so `@real-router/validation-plugin` rejects them with actionable messages (#934/#942) rather than core paying a per-navigate value-scan on the hot path. Symmetry note: a Symbol _query_ value already throws a raw `TypeError` from `String(symbol)` in bare core; the plugin aligns the path-param case to a clear error too.

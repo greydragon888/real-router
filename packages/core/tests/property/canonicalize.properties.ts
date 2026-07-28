@@ -34,6 +34,7 @@ import type { Params, SearchParams } from "../../src/types";
 function makePort(
   defaultParams?: Params,
   defaultSearch?: SearchParams,
+  gate?: { queryNames: readonly string[]; admitsUndeclared: boolean },
 ): RouteResolver {
   return {
     resolveForward: (name, params, search) => ({ name, params, search }),
@@ -42,6 +43,10 @@ function makePort(
     buildPath: () => {
       throw new Error("buildPath must not be reached by canonicalize");
     },
+    // Default to `loose` so every pre-existing property keeps exercising the
+    // un-gated path; the mode-gate properties below pass their own.
+    queryNames: () => gate?.queryNames ?? [],
+    admitsUndeclaredQuery: () => gate?.admitsUndeclared ?? true,
   };
 }
 
@@ -193,4 +198,72 @@ describe("canonicalize (pure) — properties", () => {
     expect({ ...twice.query }).toStrictEqual({ ...once.query });
     expect(twice.name).toBe(once.name);
   });
+
+  // The mode gate (#1575). Two halves, both needed: what a non-loose mode ADMITS
+  // and what it DROPS. Stated over the merged bag, because that is the bag ⑤a
+  // prints from — a `defaultSearch` for an undeclared key is dropped with it.
+  test.prop(
+    [fc.string(), arbDefinedBag, fc.array(arbParamKey, { maxLength: 4 })],
+    {
+      numRuns: NUM_RUNS.standard,
+    },
+  )(
+    "a non-loose mode admits exactly the declared query keys",
+    (name, searchBag, declared) => {
+      const port = makePort(undefined, undefined, {
+        queryNames: declared,
+        admitsUndeclared: false,
+      });
+
+      const canonical = canonicalize(port, name, {}, searchBag);
+
+      for (const key of Object.keys(canonical.query)) {
+        expect(declared).toContain(key);
+      }
+
+      // ...and nothing declared-and-present was lost on the way — without this
+      // half the property would pass for a gate that emptied the bag.
+      for (const [key, value] of Object.entries(searchBag)) {
+        if (declared.includes(key)) {
+          expect(canonical.query[key]).toStrictEqual(value);
+        }
+      }
+    },
+  );
+
+  test.prop(
+    [fc.string(), arbDefinedBag, fc.array(arbParamKey, { maxLength: 4 })],
+    {
+      numRuns: NUM_RUNS.standard,
+    },
+  )("loose admits every key, declared or not", (name, searchBag, declared) => {
+    const port = makePort(undefined, undefined, {
+      queryNames: declared,
+      admitsUndeclared: true,
+    });
+
+    const canonical = canonicalize(port, name, {}, searchBag);
+
+    expect({ ...canonical.query }).toStrictEqual({ ...searchBag });
+  });
+
+  // A DROP, never a move: the gate must not push the rejected key into the path
+  // channel — that would re-create the per-entry-point ambiguity (#1553).
+  test.prop([fc.string(), arbDefinedBag], { numRuns: NUM_RUNS.standard })(
+    "a dropped query key never reappears in the path channel",
+    (name, searchBag) => {
+      const port = makePort(undefined, undefined, {
+        queryNames: [],
+        admitsUndeclared: false,
+      });
+
+      const canonical = canonicalize(port, name, {}, searchBag);
+
+      expect(Object.keys(canonical.query)).toStrictEqual([]);
+
+      for (const key of Object.keys(searchBag)) {
+        expect(key in canonical.path).toBe(false);
+      }
+    },
+  );
 });

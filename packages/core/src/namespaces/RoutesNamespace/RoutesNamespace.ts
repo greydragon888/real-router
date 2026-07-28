@@ -12,7 +12,7 @@ import {
   resetStore,
 } from "./routesStore";
 import { constants, EMPTY_SEARCH } from "../../constants";
-import { mergeDefined, separateChannels } from "../../helpers";
+import { admittedSearch, mergeDefined, separateChannels } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -359,10 +359,24 @@ export class RoutesNamespace<
     // equivalent no-op). `state.path` and `state.search` still can't diverge:
     // makeState re-applies the same `defaultSearch` idempotently.
     const routeParams = forwarded.params;
-    const forwardedSearch = this.#mergeDefaultSearch(
-      routeName,
-      forwarded.search,
-    );
+    const mergedSearch = this.#mergeDefaultSearch(routeName, forwarded.search);
+    // The mode gate (#1575), the URL half of the same rule the intent side
+    // applies. `default` accepts an undeclared key in the URL — that is what
+    // separates it from `strict` — but the rebuilt path below prints declared
+    // names only, so keeping the key in `state.search` published a state whose
+    // own `path` contradicts it. Dropping it here means the two are built from
+    // ONE bag. `strict` never reaches this line for such a URL (the matcher
+    // already rejected it); `loose` short-circuits and pays nothing.
+    const forwardedSearch =
+      opts.queryParamsMode === "loose"
+        ? mergedSearch
+        : admittedSearch(
+            mergedSearch,
+            this.getQueryParams(routeName),
+            (key) => {
+              this.#deps.reportDroppedQueryKey?.(routeName, key);
+            },
+          );
 
     let builtPath = path;
 

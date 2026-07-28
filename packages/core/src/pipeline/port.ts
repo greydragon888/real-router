@@ -75,4 +75,31 @@ export interface RouteResolver {
    * accepts nothing but a `Canonical`.
    */
   buildPath: (name: string, params: Params, search: SearchParams) => string;
+
+  /**
+   * The route's declared `?query` names — the ONE registry that classifies and
+   * prints (#1556), so a key enters the query channel iff the build shows it.
+   * A name that also occupies a path slot (`/items/:id?id`) is absent here by
+   * construction: it is legitimately path-owned (#843 / #1549).
+   */
+  queryNames: (name: string) => readonly string[];
+
+  /**
+   * The mode gate (#1575) — `true` exactly for `queryParamsMode: "loose"`, the
+   * one mode whose build prints undeclared query keys. Read as a boolean rather
+   * than leaking the mode itself into the pipeline: the pipeline's question is
+   * "may an undeclared key be canonical here?", not "which mode is this?".
+   */
+  admitsUndeclaredQuery: () => boolean;
+
+  /**
+   * The mode gate's opt-in diagnostic sink (#1575) — `undefined` unless
+   * `validation-plugin` is installed, so bare core drops silently and the
+   * pipeline pays nothing. Resolved per call, not captured: the plugin
+   * registers after wiring.
+   *
+   * Optional on the interface so a MOCK port (the property tests) stays a
+   * four-liner: the pipeline's contract is the drop, not the report.
+   */
+  reportDroppedQueryKey?: (routeName: string, key: string) => void;
 }

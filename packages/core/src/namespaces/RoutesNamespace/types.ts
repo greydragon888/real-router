@@ -84,6 +84,11 @@ export interface RoutesDependencies<
     params: P,
     search?: S,
   ) => SimpleState<P, S>;
+  /**
+   * The mode gate's opt-in reporter (#1575) — absent unless `validation-plugin`
+   * is installed. Resolved per call: the plugin registers after wiring.
+   */
+  reportDroppedQueryKey?: (routeName: string, key: string) => void;
 }
 
 /**

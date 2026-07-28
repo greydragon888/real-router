@@ -21,7 +21,7 @@ The `RouterValidator` interface is organized into 8 namespaces, matching core's 
 | `plugins`      | `validatePluginLimit`, `validateNoDuplicatePlugins`, `validatePluginKeys` (validates hook names: `onStart`, `onStop`, `onTransitionStart`, `onTransitionLeaveApprove`, `onTransitionSuccess`, `onTransitionError`, `onTransitionCancel`, `teardown`), `validateCountThresholds`, `validateAddInterceptorArgs` |
 | `lifecycle`    | `validateHandler`, `validateHandlerLimit`, `validateCountThresholds`                                                                                |
 | `navigation`   | `validateNavigateArgs`, `validateNavigateToDefaultArgs`, `validateNavigationOptions`, `validateParams`, `validateStartArgs`                                                   |
-| `state`        | `validateMakeStateArgs`, `validateAreStatesEqualArgs`                                                                                                                         |
+| `state`        | `validateMakeStateArgs`, `validateAreStatesEqualArgs`, `reportDroppedQueryKey` — the mode gate's opt-in diagnostic (#1575): core silently DROPS a query key the active `queryParamsMode` will not print, and this warns once per route+key so the drop (and a `defaultSearch` that is dead config because of it) is visible in development |
 | `eventBus`     | `validateListenerArgs` — validates event names: `$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`; `validateCountThresholds` — proactive `warn@20% / error@50%` on the per-event listener count for `subscribe` / `addEventListener` (#1188), mirroring the plugins / lifecycle / dependencies counters |
 
 ## Gotchas

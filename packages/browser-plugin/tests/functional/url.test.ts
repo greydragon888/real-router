@@ -89,17 +89,22 @@ describe("Browser Plugin — URL", () => {
         });
       });
 
-      it("matches URL with query params", async () => {
+      it("matches a URL with undeclared query params but keeps none of them (#1575)", async () => {
         const state = router.matchUrl(
           "https://example.com/users/list?page=1&sort=asc",
         );
 
+        // `queryParamsMode: "default"` (set on this suite's router) and
+        // `users.list` declares no `?page&sort`. The URL still MATCHES — that is
+        // what separates `default` from `strict` — but the keys do not become
+        // state: the rebuilt `path` prints declared names only, so keeping them
+        // in `search` published a state contradicting its own path (#1575).
         expect(withoutMeta(state!)).toStrictEqual({
           name: "users.list",
           params: {},
           path: "/users/list",
         });
-        expect(state!.search).toStrictEqual({ page: 1, sort: "asc" });
+        expect(state!.search).toStrictEqual({});
       });
 
       it("handles IPv6 addresses", async () => {

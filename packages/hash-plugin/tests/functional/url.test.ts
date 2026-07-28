@@ -106,7 +106,10 @@ describe("Hash Plugin — URL Operations", () => {
         expect(withoutMeta(state!)).toStrictEqual({
           name: "users.list",
           params: {},
-          path: "/users/list",
+          // `path` now SHOWS the query it carries: `?page&sort` are declared on
+          // the fixture, so both channels are built from one admitted bag and
+          // cannot disagree (#1575).
+          path: "/users/list?page=1&sort=asc",
         });
         // Query params now live in the dedicated search channel (RFC-4 M2).
         expect(state!.search).toStrictEqual({ page: 1, sort: "asc" });
@@ -244,7 +247,9 @@ describe("Hash Plugin — URL Operations", () => {
           "https://example.com/?a=1#/users/list?page=2",
         );
 
-        expect(state?.path).toBe("/users/list");
+        // `page` is declared, so it prints — the point of this test is the
+        // SHAPE of the joined path, not whether the key survives.
+        expect(state?.path).toBe("/users/list?page=2");
         expect(state?.path).not.toContain("??");
       });
     });

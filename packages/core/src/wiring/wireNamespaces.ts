@@ -155,6 +155,12 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
 
       return ctx.forwardState(name, params, search);
     },
+    reportDroppedQueryKey: (routeName, key) => {
+      getInternals(ns.router).validator?.state.reportDroppedQueryKey(
+        routeName,
+        key,
+      );
+    },
   };
 
   ns.routes.setDependencies(deps);
@@ -214,6 +220,13 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     defaultParams: (name) => store.config.defaultParams[name],
     defaultSearch: (name) => store.config.defaultSearch[name],
     buildPath: (name, params, search) => ctx.buildPath(name, params, search),
+    queryNames: (name) => ns.routes.getQueryParams(name),
+    // Read per call, not captured: `queryParamsMode` lives in the options
+    // namespace, which `setOption` can rewrite after wiring.
+    admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",
+    reportDroppedQueryKey: (routeName, key) => {
+      ctx.validator?.state.reportDroppedQueryKey(routeName, key);
+    },
   };
 }
 
@@ -370,5 +383,16 @@ function wireState<Dependencies extends DefaultDependencies>(
       return ctx.buildPath(name, params, search);
     },
     getUrlParams: (name) => ns.routes.getUrlParams(name),
+    getQueryParams: (name) => ns.routes.getQueryParams(name),
+    admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",
+    getDropReporter: () => {
+      const validator = getInternals(ns.router).validator;
+
+      return validator
+        ? (routeName, key) => {
+            validator.state.reportDroppedQueryKey(routeName, key);
+          }
+        : undefined;
+    },
   });
 }

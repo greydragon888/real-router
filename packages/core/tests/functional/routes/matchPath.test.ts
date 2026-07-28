@@ -538,7 +538,7 @@ describe("core/routes/routePath/matchPath", () => {
   });
 
   describe("query params without declaration", () => {
-    it("should include undeclared query params in default mode", () => {
+    it("should drop undeclared query params from state in default mode, still matching the URL (#1575)", () => {
       const customRouter = createTestRouter({ queryParamsMode: "default" });
 
       getRoutesApi(customRouter).add({ name: "search", path: "/search" }); // No ?q declared
@@ -547,10 +547,30 @@ describe("core/routes/routePath/matchPath", () => {
         "/search?q=test&limit=10",
       );
 
+      // Still MATCHES — accepting an undeclared key in the URL is exactly what
+      // separates `default` from `strict`. It just does not become state: the
+      // rebuilt path prints declared names only, so a key kept in `search` here
+      // would contradict the very `path` published beside it (#1575).
       expect(state?.name).toBe("search");
-      // Undeclared query params are included in default mode (search channel)
+      expect(state?.search).toStrictEqual({});
+      expect(state?.path).toBe("/search");
+    });
+
+    it("should keep undeclared query params in loose mode (#1575 discriminator)", () => {
+      const customRouter = createTestRouter({ queryParamsMode: "loose" });
+
+      getRoutesApi(customRouter).add({ name: "search", path: "/search" });
+
+      const state = getPluginApi(customRouter).matchPath(
+        "/search?q=test&limit=10",
+      );
+
+      // `loose` PRINTS undeclared keys, so admitting them keeps `search` and
+      // `path` in step. Without this arm the assertion above would pass for a
+      // gate that dropped undeclared keys unconditionally.
       expect(state?.search?.q).toBe("test");
       expect(state?.search?.limit).toBe(10);
+      expect(state?.path).toBe("/search?q=test&limit=10");
     });
 
     it("should NOT match path with undeclared query params in strict mode", async () => {
@@ -603,7 +623,7 @@ describe("core/routes/routePath/matchPath", () => {
       customRouter.stop();
     });
 
-    it("should handle mixed declared and undeclared params in default mode", () => {
+    it("should keep the declared half and drop the undeclared one in default mode (#1575)", () => {
       const customRouter = createTestRouter({ queryParamsMode: "default" });
 
       getRoutesApi(customRouter).add({
@@ -618,8 +638,10 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state?.name).toBe("search");
       expect(state?.search?.q).toBe("test");
       expect(state?.search?.page).toBe(2);
-      // Extra undeclared param also included in default mode (search channel)
-      expect(state?.search?.sort).toBe("name");
+      // The mixed URL is the discriminating shape: `sort` goes, the declared
+      // pair stays, and `path` shows exactly what survived.
+      expect(state?.search?.sort).toBeUndefined();
+      expect(state?.path).toBe("/search?q=test&page=2");
     });
   });
 

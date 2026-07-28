@@ -1,7 +1,7 @@
 // packages/core/src/pipeline/canonicalize.ts
 
 import { EMPTY_PARAMS, EMPTY_SEARCH } from "../constants";
-import { mergeWithDefault, normalizeParams } from "../helpers";
+import { admittedSearch, mergeWithDefault, normalizeParams } from "../helpers";
 
 import type { RouteResolver } from "./port";
 import type { Canonical } from "./types";
@@ -49,6 +49,12 @@ export function canonicalize(
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
   // accessor) so the merge itself allocates nothing on the zero-defaults hot
   // path — the `Canonical` literal below is the pipeline's one added allocation.
+  const query = mergeWithDefault(
+    port.defaultSearch(resolvedName),
+    forwarded.search,
+    EMPTY_SEARCH,
+  );
+
   return {
     name: resolvedName,
     path: mergeWithDefault(
@@ -56,11 +62,20 @@ export function canonicalize(
       pathBag,
       EMPTY_PARAMS,
     ),
-    query: mergeWithDefault(
-      port.defaultSearch(resolvedName),
-      forwarded.search,
-      EMPTY_SEARCH,
-    ),
+    // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
+    // for an undeclared key is dropped with it — under `default`/`strict` that
+    // config is dead by the same rule, not a back door around it. Runs on the
+    // merged bag rather than the caller's, because that is the bag ⑤a prints
+    // from, and the invariant is about those two agreeing.
+    query: port.admitsUndeclaredQuery()
+      ? query
+      : admittedSearch(
+          query as SearchParams,
+          port.queryNames(resolvedName),
+          (key) => {
+            port.reportDroppedQueryKey?.(resolvedName, key);
+          },
+        ),
     // The one and only cast to the brand in the codebase — reviewed once, here.
   } as Canonical;
 }

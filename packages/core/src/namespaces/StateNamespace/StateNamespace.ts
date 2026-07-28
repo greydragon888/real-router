@@ -2,6 +2,7 @@
 
 import { EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import {
+  admittedSearch,
   areParamValuesEqual,
   createStateObject,
   freezeStateInPlace,
@@ -138,11 +139,22 @@ export class StateNamespace {
       params,
       EMPTY_PARAMS,
     ) as P;
-    const mergedSearch = mergeWithDefault(
+    const rawSearch = mergeWithDefault(
       routeDefaultSearch,
       search,
       EMPTY_SEARCH,
     ) as S;
+    // The mode gate (#1575): under `default` / `strict` the URL build prints
+    // declared names only, so an undeclared key surviving here would sit in
+    // `state.search` while `state.path` — built from this same bag below — could
+    // never show it. Applied AFTER the default merge, so a `defaultSearch` for an
+    // undeclared key is dead config in those modes rather than a way around the
+    // rule. `loose` prints undeclared keys, so it short-circuits and pays nothing.
+    const mergedSearch = this.#deps.admitsUndeclaredQuery()
+      ? rawSearch
+      : admittedSearch(rawSearch, this.#deps.getQueryParams(name), (key) => {
+          this.#deps.getDropReporter()?.(name, key);
+        });
 
     // Query channel (RFC-4 M2 / #1548): the input is already canonical
     // (separated upstream), so declared query names live in `search`, never in
