@@ -34,18 +34,25 @@ export async function run(): Promise<void> {
     );
   }
 
-  // Explicit `search` channel under strict mode (RFC-4 M2 / #1548): the caller
-  // pre-separates the query, and the strict-reject Set still allocates per
-  // match — so this arm is the strict matcher cost on a clean two-channel call.
+  // navigate under strict mode: the caller pre-separates the query (RFC-4 M2 /
+  // #1548) and the strict-reject Set still allocates per match, so this arm is
+  // the strict matcher cost on a clean two-channel call.
   //
-  // It used to be one half of a delta pair: `navigate/strict-query` passed the
-  // same five keys in the `params` bag, and the difference isolated the
-  // channel-split cost from the strict matcher cost. That arm is GONE, not
-  // migrated — the single-bag spelling throws at the facade since the channel
-  // guard's P1 (#1572), so the delta has no second term any more, and migrating
-  // it would have produced a byte-identical duplicate of this block (same
-  // routes, same five keys, same batch). Same retirement as
-  // `navigate/search-single-bag` in default.bench.ts.
+  // ⚠ SERIES STEP at 81ad9e174 — the NAME continues, the COMPOSITION changed.
+  // `navigate/strict-query` used to pass the same five keys in the `params`
+  // bag, and this block existed beside it as `navigate/strict-query-channel`;
+  // the difference between the two isolated the channel-split cost from the
+  // strict matcher cost. The single-bag spelling throws at the facade since the
+  // channel guard's P1 (#1572), so the pair collapsed: the single-bag arm was
+  // deleted (migrating it would have produced a byte-identical duplicate of
+  // this block — same routes, same five keys, same batch) and the survivor took
+  // its name back, to keep one continuous series in the ledger rather than
+  // ending one and starting another.
+  //
+  // So numbers under this name are NOT comparable across 81ad9e174: before it
+  // they include the per-navigate channel split, after it they do not. The step
+  // is deliberate and unmeasured — a same-session A/B is impossible because the
+  // prior form no longer runs. Read the boundary as a discontinuity, not a win.
   {
     const router = createRouter(routes, { queryParamsMode: "strict" });
 
@@ -57,7 +64,7 @@ export async function run(): Promise<void> {
     let i = 0;
 
     bench.add(
-      "navigate/strict-query-channel",
+      "navigate/strict-query",
       batched(192, () => {
         void router.navigate("search", {}, searches[i++ % searches.length]);
       }),
