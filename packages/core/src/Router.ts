@@ -18,7 +18,7 @@ import {
   createTernaryInterceptable,
   getInternals,
   registerInternals,
-  warnOnMisChanneledKey,
+  throwOnMisChanneledKey,
 } from "./internals";
 import {
   EventBusNamespace,
@@ -908,7 +908,7 @@ export class Router<
       opts = options ?? EMPTY_OPTS;
     }
 
-    warnOnMisChanneledKey(ctx, "navigate", routeName, routeParams);
+    throwOnMisChanneledKey(ctx, "navigate", routeName, routeParams);
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);
     ctx.validator?.navigation.validateParams(routeParams, "navigate");

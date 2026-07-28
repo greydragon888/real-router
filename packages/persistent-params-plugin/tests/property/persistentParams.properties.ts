@@ -1,4 +1,4 @@
-import { fc, test } from "@fast-check/vitest";
+import { test } from "@fast-check/vitest";
 import { getLifecycleApi } from "@real-router/core/api";
 import { describe, expect } from "vitest";
 
@@ -26,7 +26,7 @@ describe("persistence: persistent param survives navigation to a different route
       const idA = nextId();
       const idB = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
       await router.navigate("routeB", { id: idB });
 
       expect(router.getState()?.search[paramName]).toBe(paramValue);
@@ -44,7 +44,7 @@ describe("persistence: persistent param survives navigation to a different route
       const idB = nextId();
       const idC = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
       await router.navigate("routeB", { id: idB });
       await router.navigate("routeC", { id: idC });
 
@@ -68,8 +68,16 @@ describe("override: explicitly passed param overrides the stored persistent valu
       const idA = nextId();
       const idB = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: initialValue });
-      await router.navigate("routeB", { id: idB, [paramName]: overrideValue });
+      await router.navigate(
+        "routeA",
+        { id: idA },
+        { [paramName]: initialValue },
+      );
+      await router.navigate(
+        "routeB",
+        { id: idB },
+        { [paramName]: overrideValue },
+      );
 
       expect(router.getState()?.search[paramName]).toBe(overrideValue);
 
@@ -86,8 +94,16 @@ describe("override: explicitly passed param overrides the stored persistent valu
       const idB = nextId();
       const idC = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: initialValue });
-      await router.navigate("routeB", { id: idB, [paramName]: overrideValue });
+      await router.navigate(
+        "routeA",
+        { id: idA },
+        { [paramName]: initialValue },
+      );
+      await router.navigate(
+        "routeB",
+        { id: idB },
+        { [paramName]: overrideValue },
+      );
       await router.navigate("routeC", { id: idC });
 
       expect(router.getState()?.search[paramName]).toBe(overrideValue);
@@ -110,7 +126,7 @@ describe("no-clobber: route path params are not modified by plugin injection", (
       const idA = nextId();
       const idB = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
       await router.navigate("routeB", { id: idB });
 
       expect(router.getState()?.params.id).toBe(idB);
@@ -128,7 +144,7 @@ describe("no-clobber: route path params are not modified by plugin injection", (
       const idB = nextId();
       const idC = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
       await router.navigate("routeB", { id: idB });
       await router.navigate("routeC", { id: idC });
 
@@ -154,10 +170,11 @@ describe("scope: persistent params apply ONLY to params listed in plugin config"
       const idA = nextId();
       const idB = nextId();
 
-      await router.navigate("routeA", {
-        id: idA,
-        [unconfiguredName]: paramValue,
-      });
+      await router.navigate(
+        "routeA",
+        { id: idA },
+        { [unconfiguredName]: paramValue },
+      );
       await router.navigate("routeB", { id: idB });
 
       expect(router.getState()?.params).not.toHaveProperty(unconfiguredName);
@@ -180,11 +197,14 @@ describe("scope: persistent params apply ONLY to params listed in plugin config"
       const idA = nextId();
       const idB = nextId();
 
-      await router.navigate("routeA", {
-        id: idA,
-        [configuredName]: configuredValue,
-        [unconfiguredName]: unconfiguredValue,
-      });
+      await router.navigate(
+        "routeA",
+        { id: idA },
+        {
+          [configuredName]: configuredValue,
+          [unconfiguredName]: unconfiguredValue,
+        },
+      );
       await router.navigate("routeB", { id: idB });
 
       const state = router.getState();
@@ -210,7 +230,7 @@ describe("idempotency: double merge does not duplicate persistent params", () =>
       const idA = nextId();
       const idB = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
 
       const pathExplicit = router.buildPath("routeB", {
         id: idB,
@@ -233,7 +253,7 @@ describe("idempotency: double merge does not duplicate persistent params", () =>
       const idB = nextId();
       const idC = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
       await router.navigate("routeB", { id: idB });
       await router.navigate("routeC", { id: idC });
 
@@ -261,8 +281,8 @@ describe("removal: passing undefined permanently removes a param from persistenc
       const idB = nextId();
       const idC = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
-      await router.navigate("routeB", { id: idB, [paramName]: undefined });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
+      await router.navigate("routeB", { id: idB }, { [paramName]: undefined });
       await router.navigate("routeC", { id: idC });
 
       expect(router.getState()?.params).not.toHaveProperty(paramName);
@@ -281,9 +301,13 @@ describe("removal: passing undefined permanently removes a param from persistenc
       const idC = nextId();
       const idD = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: initialValue });
-      await router.navigate("routeB", { id: idB, [paramName]: undefined });
-      await router.navigate("routeC", { id: idC, [paramName]: laterValue });
+      await router.navigate(
+        "routeA",
+        { id: idA },
+        { [paramName]: initialValue },
+      );
+      await router.navigate("routeB", { id: idB }, { [paramName]: undefined });
+      await router.navigate("routeC", { id: idC }, { [paramName]: laterValue });
       await router.navigate("routeA", { id: idD });
 
       expect(router.getState()?.params).not.toHaveProperty(paramName);
@@ -302,12 +326,12 @@ describe("removal: passing undefined permanently removes a param from persistenc
       const idC = nextId();
 
       // persist the param
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
 
       // block routeB so the removal navigation is rejected by the guard
       getLifecycleApi(router).addActivateGuard("routeB", () => () => false);
       await router
-        .navigate("routeB", { id: idB, [paramName]: undefined })
+        .navigate("routeB", { id: idB }, { [paramName]: undefined })
         .catch(() => {});
 
       // the rejected removal never committed — the param must still persist
@@ -352,10 +376,11 @@ describe("default values: object config injects defaults before any explicit set
       const idA = nextId();
       const idB = nextId();
 
-      await router.navigate("routeA", {
-        id: idA,
-        [paramName]: explicitValue,
-      });
+      await router.navigate(
+        "routeA",
+        { id: idA },
+        { [paramName]: explicitValue },
+      );
       await router.navigate("routeB", { id: idB });
 
       expect(router.getState()?.search[paramName]).toBe(explicitValue);
@@ -380,11 +405,11 @@ describe("multi-param: multiple persistent params coexist correctly", () => {
       const idA = nextId();
       const idB = nextId();
 
-      await router.navigate("routeA", {
-        id: idA,
-        [param1]: value1,
-        [param2]: value2,
-      });
+      await router.navigate(
+        "routeA",
+        { id: idA },
+        { [param1]: value1, [param2]: value2 },
+      );
       await router.navigate("routeB", { id: idB });
 
       const search = router.getState()?.search ?? {};
@@ -407,15 +432,12 @@ describe("multi-param: multiple persistent params coexist correctly", () => {
       const idB = nextId();
       const idC = nextId();
 
-      await router.navigate("routeA", {
-        id: idA,
-        [param1]: val1Initial,
-        [param2]: val2,
-      });
-      await router.navigate("routeB", {
-        id: idB,
-        [param1]: val1Override,
-      });
+      await router.navigate(
+        "routeA",
+        { id: idA },
+        { [param1]: val1Initial, [param2]: val2 },
+      );
+      await router.navigate("routeB", { id: idB }, { [param1]: val1Override });
       await router.navigate("routeC", { id: idC });
 
       const search = router.getState()?.search ?? {};
@@ -433,19 +455,22 @@ describe("multi-param: multiple persistent params coexist correctly", () => {
 // =============================================================================
 
 describe("channel: persisted values ride the query channel, never the path bag", () => {
-  test.prop([arbParamName, arbParamValue, fc.boolean()], {
+  // The `viaSearch` dimension is gone (#1572): it contrasted a params-bag write
+  // against a search-bag one, and the params-bag arm is now refused outright for
+  // a key the route declares with `?`. There is one channel left to set a
+  // declared value through, so generating a boolean would generate the same
+  // call twice.
+  test.prop([arbParamName, arbParamValue], {
     numRuns: NUM_RUNS.async,
   })(
-    "a value set through either channel is committed to state.search only",
-    async (paramName, paramValue, viaSearch) => {
+    "a value set through the query channel is committed to state.search only",
+    async (paramName, paramValue) => {
       const router = await createStartedRouter([paramName]);
 
       const idA = nextId();
       const idB = nextId();
 
-      await (viaSearch
-        ? router.navigate("routeA", { id: idA }, { [paramName]: paramValue })
-        : router.navigate("routeA", { id: idA, [paramName]: paramValue }));
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
       await router.navigate("routeB", { id: idB });
 
       const state = router.getState();
@@ -459,22 +484,24 @@ describe("channel: persisted values ride the query channel, never the path bag",
     },
   );
 
-  test.prop([arbParamName, arbParamValue, fc.boolean()], {
+  test.prop([arbParamName, arbParamValue], {
     numRuns: NUM_RUNS.async,
   })(
-    "an undefined removal marker is honored in either channel",
-    async (paramName, paramValue, viaSearch) => {
+    "an undefined removal marker is honored on the query channel",
+    async (paramName, paramValue) => {
       const router = await createStartedRouter([paramName]);
 
       const idA = nextId();
       const idB = nextId();
       const idC = nextId();
 
-      await router.navigate("routeA", { id: idA, [paramName]: paramValue });
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
 
-      const removal = await (viaSearch
-        ? router.navigate("routeB", { id: idB }, { [paramName]: undefined })
-        : router.navigate("routeB", { id: idB, [paramName]: undefined }));
+      const removal = await router.navigate(
+        "routeB",
+        { id: idB },
+        { [paramName]: undefined },
+      );
 
       // The marker must reach the URL build too — a plugin that reads removals
       // from one channel only drops the key from `search` while the built path

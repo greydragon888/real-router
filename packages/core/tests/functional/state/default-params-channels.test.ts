@@ -166,17 +166,18 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
 
       await router.start("/x");
 
-      // `page` (declared `?page`) handed in BOTH the params bag AND search:
-      // forwardState canonicalization routes the params-bag copy into the query
-      // channel, where the explicit search value wins — params drops it.
-      const state = await router.navigate(
-        "x",
-        { page: "fromParams" },
-        { page: "fromSearch" },
-      );
+      // `page` (declared `?page`) handed in BOTH bags used to be a PRECEDENCE
+      // question — the explicit search won and params dropped it. Since P1
+      // throws (#1572) the collision cannot be spelled through a producer at
+      // all: it is refused before any merge. The rule survives only where P1
+      // does not reach, i.e. the predicates.
+      expect(() =>
+        router.navigate("x", { page: "fromParams" }, { page: "fromSearch" }),
+      ).toThrow(/declares `page` as a query param/);
 
-      expect(state.params).toStrictEqual({});
-      expect(state.search).toStrictEqual({ page: "fromSearch" });
+      expect(
+        router.buildPath("x", { page: "fromParams" }, { page: "fromSearch" }),
+      ).toBe("/x?page=fromSearch");
     });
 
     it("lets a query-declared params-bag value win over defaultSearch (user > default)", async () => {
@@ -192,7 +193,7 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
       // its result BEFORE channel separation, so the default outranked the user
       // params-twin (`{ page: 2 }` wrongly committing page=1). Both channels AND
       // the URL are asserted (anti-remask — search must reconstruct from path).
-      const state = await router.navigate("x", { page: "2" });
+      const state = await router.navigate("x", {}, { page: "2" });
 
       expect(state.params).toStrictEqual({});
       expect(state.search).toStrictEqual({ page: "2" });
@@ -256,13 +257,24 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
       // here. A query-declared key handed in the params bag STAYS in params — the
       // primitive never re-routes. (Callers reconstructing a serialized split
       // state — browser-plugin popstate restore — hand each channel its own bag.)
+      expect(() =>
+        getPluginApi(router).makeState(
+          "x",
+          { page: "fromParams" },
+          { page: "fromSearch" },
+        ),
+      ).toThrow(/declares `page` as a query param/);
+
+      // The "no re-split" contract itself is unchanged and still observable —
+      // each channel keeps exactly what it was handed, once the bags are
+      // channel-correct.
       const state = getPluginApi(router).makeState(
         "x",
-        { page: "fromParams" },
+        { other: "fromParams" },
         { page: "fromSearch" },
       );
 
-      expect(state.params).toStrictEqual({ page: "fromParams" });
+      expect(state.params).toStrictEqual({ other: "fromParams" });
       expect(state.search).toStrictEqual({ page: "fromSearch" });
     });
   });

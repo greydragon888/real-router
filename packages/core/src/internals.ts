@@ -231,15 +231,27 @@ export function getInternals<D extends DefaultDependencies>(
  * the API boundary and BEFORE any interceptor runs, so what it reports is what
  * the CALLER wrote (a plugin's later injection is P2's population, not this one).
  *
- * Warns rather than throws for now: the single-bag form still WORKS today —
- * channel separation moves the key one line downstream — and it is pinned by a
- * benchmark, a stress test, a property and an INVARIANTS row. Announcing the
- * contract first makes every call site self-identify in the logs; promoting it
- * to a throw is a deliberate break with its own test migration.
+ * THROWS. The warn-first step (#1572) announced the contract so every call site
+ * could identify itself in the logs; this is the promotion it announced.
+ *
+ * A `TypeError`, synchronous, rather than a `RouterError` on a rejected promise:
+ * this is an ARGUMENT-shape defect at the API boundary, caught before any
+ * interceptor or transition exists — the same class as the `subscribe` /
+ * `navigateToNotFound` / `start` guards beside it. Rejecting instead would let a
+ * `.catch()` written for navigation failures swallow a programming error.
+ *
+ * P3 (`navigateToState`) keeps REJECTING — deliberately asymmetric, because it
+ * takes a ready-made `State` from a popstate handler, where a new synchronous
+ * throw would change an existing method's failure shape.
+ *
+ * The predicates (`buildPath` / `isActiveRoute` / `canNavigateTo`) are still NOT
+ * instrumented: they run on every `<Link>` render, an answer there is read
+ * immediately and corrupts nothing, and throwing inside a render in six adapters
+ * is not a trade this guard is worth.
  *
  * @internal
  */
-export function warnOnMisChanneledKey<D extends DefaultDependencies>(
+export function throwOnMisChanneledKey<D extends DefaultDependencies>(
   ctx: RouterInternals<D>,
   method: string,
   routeName: string,
@@ -248,7 +260,9 @@ export function warnOnMisChanneledKey<D extends DefaultDependencies>(
   const key = findMisChanneledKey(params, ctx.getQueryParams(routeName));
 
   if (key !== undefined) {
-    ctx.logger.warn(`router.${method}`, misChanneledKeyMessage(routeName, key));
+    throw new TypeError(
+      `[router.${method}] ${misChanneledKeyMessage(routeName, key)}`,
+    );
   }
 }
 

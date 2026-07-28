@@ -3,7 +3,12 @@
 
 import { getPluginApi } from "@real-router/core/api";
 
-import type { Params, PluginFactory, State } from "@real-router/core";
+import type {
+  Params,
+  SearchParams,
+  PluginFactory,
+  State,
+} from "@real-router/core";
 
 /**
  * Options for creating a tracking plugin that records hook calls
@@ -195,15 +200,24 @@ export const createPersistentParamsPlugin = (
 
     const removeInterceptor = api.addInterceptor(
       "forwardState",
-      (next, name: string, params: Params) => {
-        const result = next(name, params) as { name: string; params: Params };
-
-        const mergedParams: Params = {
-          ...persistentParamsValues,
-          ...result.params,
+      (next, name: string, params: Params, search?: SearchParams) => {
+        // Injects into the SEARCH channel and forwards the caller's `search`
+        // through — what the real `persistent-params` does since #1563. The
+        // earlier shape took two arguments, called `next(name, params)` and
+        // returned `search: {}`, which silently DESTROYED the caller's query
+        // bag; that stayed invisible only while persisted keys still rode in
+        // `params` (#1572).
+        const result = next(name, params, search) as {
+          name: string;
+          params: Params;
+          search: SearchParams;
         };
 
-        return { name: result.name, params: mergedParams, search: {} };
+        return {
+          name: result.name,
+          params: result.params,
+          search: { ...persistentParamsValues, ...result.search },
+        };
       },
     );
 

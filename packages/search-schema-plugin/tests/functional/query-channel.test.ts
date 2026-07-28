@@ -69,7 +69,7 @@ describe("Search schema plugin — the query channel is what gets validated (#15
     router.usePlugin(searchSchemaPlugin({ mode: "production" }));
     await router.start("/");
 
-    const state = await router.navigate("search", { id: "AB", q: "X" });
+    const state = await router.navigate("search", { id: "AB" }, { q: "X" });
 
     expect(seen.at(-1)).toStrictEqual({ q: "X" });
     // The path param keeps the caller's value — a query schema must not
@@ -95,7 +95,7 @@ describe("Search schema plugin — the query channel is what gets validated (#15
     router.usePlugin(searchSchemaPlugin({ mode: "production", strict: true }));
     await router.start("/");
 
-    const state = await router.navigate("search", { id: "7", q: "x" });
+    const state = await router.navigate("search", { id: "7" }, { q: "x" });
 
     expect(seen.at(-1)).toStrictEqual({ q: "x" });
     expect(state.path).toBe("/search/7?q=x");
@@ -127,7 +127,7 @@ describe("Search schema plugin — the query channel is what gets validated (#15
     router.usePlugin(searchSchemaPlugin({ mode: "production" }));
     await router.start("/");
 
-    const state = await router.navigate("search", { id: "1", q: "X" });
+    const state = await router.navigate("search", { id: "1" }, { q: "X" });
 
     expect(seen.at(-1)).toStrictEqual({ q: "X", lang: "EN" });
     expect(state.search).toStrictEqual({ q: "x", lang: "en" });
@@ -152,11 +152,11 @@ describe("Search schema plugin — the query channel is what gets validated (#15
     router.usePlugin(searchSchemaPlugin({ mode: "production", strict: true }));
     await router.start("/");
 
-    const state = await router.navigate("search", {
-      id: "7",
-      q: "x",
-      extra: "gone",
-    });
+    const state = await router.navigate(
+      "search",
+      { id: "7" },
+      { q: "x", extra: "gone" },
+    );
 
     expect(state.search).toStrictEqual({ q: "x" });
     expect(state.params).toStrictEqual({ id: "7" });
@@ -184,11 +184,11 @@ describe("Search schema plugin — the query channel is what gets validated (#15
     router.usePlugin(searchSchemaPlugin({ mode: "production", strict: true }));
     await router.start("/");
 
-    const state = await router.navigate("org.search", {
-      orgId: "acme",
-      id: "7",
-      q: "x",
-    });
+    const state = await router.navigate(
+      "org.search",
+      { orgId: "acme", id: "7" },
+      { q: "x" },
+    );
 
     expect(seen.at(-1)).toStrictEqual({ q: "x" });
     expect(state.path).toBe("/org/acme/search/7?q=x");
@@ -218,11 +218,11 @@ describe("Search schema plugin — the query channel is what gets validated (#15
 
     // `orgId` is not part of an absolute child's URL, so it is not a path slot
     // here — the schema sees it as an ordinary query key and lowercases it.
-    const state = await router.navigate("org.search", {
-      orgId: "ACME",
-      id: "AB",
-      q: "X",
-    });
+    const state = await router.navigate(
+      "org.search",
+      { orgId: "ACME", id: "AB" },
+      { q: "X" },
+    );
 
     expect(seen.at(-1)).toStrictEqual({ orgId: "ACME", q: "X" });
     expect(state.params.id).toBe("AB");
@@ -246,7 +246,7 @@ describe("Search schema plugin — the query channel is what gets validated (#15
 
     intent.usePlugin(searchSchemaPlugin({ mode: "production" }));
     await intent.start("/");
-    await intent.navigate("search", { id: "9", q: "X" });
+    await intent.navigate("search", { id: "9" }, { q: "X" });
 
     const fromIntent = seen.at(-1);
 

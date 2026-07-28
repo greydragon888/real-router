@@ -87,7 +87,7 @@ describe("Persistent params inject into the search channel (#1563)", () => {
 
     await router.start("/a");
 
-    const removed = await router.navigate("a", { lang: undefined });
+    const removed = await router.navigate("a", {}, { lang: undefined });
 
     expect(removed.search).toStrictEqual({});
     expect(removed.path).toBe("/a");
@@ -137,7 +137,7 @@ describe("Persistent params inject into the search channel (#1563)", () => {
     expect(router.buildPath("a", { lang: "fr" })).toBe("/a?lang=fr");
     expect(router.buildPath("a", {}, { lang: "de" })).toBe("/a?lang=de");
 
-    const viaParams = await router.navigate("b", { id: "1", lang: "fr" });
+    const viaParams = await router.navigate("b", { id: "1" }, { lang: "fr" });
 
     expect(viaParams.search).toStrictEqual({ lang: "fr" });
 

@@ -85,7 +85,7 @@ describe("core/state — root-declared query key channel (#1556)", () => {
 
         await router.start("/home");
 
-        const state = await router.navigate("g", { lang: "fr" });
+        const state = await router.navigate("g", {}, { lang: "fr" });
 
         expect(state.params).toStrictEqual({});
         expect(state.search).toStrictEqual({ lang: "fr" });
@@ -132,7 +132,7 @@ describe("core/state — root-declared query key channel (#1556)", () => {
 
       await router.start("/home");
 
-      const state = await router.navigate("p.c", { lang: "de" });
+      const state = await router.navigate("p.c", {}, { lang: "de" });
 
       expect(state.params).toStrictEqual({});
       expect(state.search).toStrictEqual({ lang: "de" });
@@ -149,7 +149,7 @@ describe("core/state — root-declared query key channel (#1556)", () => {
 
       await router.start("/home");
 
-      const state = await router.navigate("a", { q: "1", lang: "en" });
+      const state = await router.navigate("a", {}, { q: "1", lang: "en" });
 
       expect(state.params).toStrictEqual({});
       expect(state.search).toStrictEqual({ q: "1", lang: "en" });

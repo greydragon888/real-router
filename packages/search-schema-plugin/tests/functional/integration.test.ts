@@ -48,7 +48,7 @@ describe("Search schema plugin", () => {
 
       await router.start("/");
 
-      await router.navigate("search", { q: "test" });
+      await router.navigate("search", {}, { q: "test" });
 
       expect(consoleSpy).toHaveBeenCalledTimes(1);
 
@@ -57,7 +57,7 @@ describe("Search schema plugin", () => {
       unsubscribe();
 
       await router.navigate("home");
-      await router.navigate("search", { q: "test2" });
+      await router.navigate("search", {}, { q: "test2" });
 
       expect(consoleSpy).not.toHaveBeenCalled();
 
@@ -121,11 +121,17 @@ describe("Search schema plugin", () => {
 
       const pluginApi = getPluginApi(router);
 
-      pluginApi.addInterceptor("forwardState", (next, routeName, params) => {
-        const result = next(routeName, params);
+      pluginApi.addInterceptor(
+        "forwardState",
+        (next, routeName, params, search) => {
+          // Injects into the SEARCH channel and forwards the caller's `search`
+          // through — that is what `persistent-params` does since #1563, and a
+          // 2-arg passthrough would silently drop the caller's query bag.
+          const result = next(routeName, params, search);
 
-        return { ...result, params: { ...result.params, lang: "en" } };
-      });
+          return { ...result, search: { ...result.search, lang: "en" } };
+        },
+      );
 
       router.usePlugin(searchSchemaPlugin({ mode: "development" }));
       await router.start("/");
@@ -134,7 +140,7 @@ describe("Search schema plugin", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
       const state = router.getState();
 
@@ -168,18 +174,24 @@ describe("Search schema plugin", () => {
       const pluginApi = getPluginApi(router);
 
       // Injector registered FIRST → search-schema (registered second) is outermost.
-      pluginApi.addInterceptor("forwardState", (next, routeName, params) => {
-        const result = next(routeName, params);
+      pluginApi.addInterceptor(
+        "forwardState",
+        (next, routeName, params, search) => {
+          // Injects into the SEARCH channel and forwards the caller's `search`
+          // through — that is what `persistent-params` does since #1563, and a
+          // 2-arg passthrough would silently drop the caller's query bag.
+          const result = next(routeName, params, search);
 
-        return {
-          ...result,
-          params: { ...result.params, page: "INVALID-INJECTED" },
-        };
-      });
+          return {
+            ...result,
+            search: { ...result.search, page: "INVALID-INJECTED" },
+          };
+        },
+      );
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
       // schema (outermost) validated the injected page (a string, not a number) → stripped.
       expect(router.getState()?.search.page).toBeUndefined();
@@ -213,7 +225,7 @@ describe("Search schema plugin", () => {
       });
       await router.start("/");
 
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
       // injector (outermost) added page AFTER the schema ran → invalid value leaks into state.
       expect(router.getState()?.search.page).toBe("INVALID-INJECTED");
@@ -364,7 +376,7 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      await router.navigate("search", { q: "hello", page: "bad" });
+      await router.navigate("search", {}, { q: "hello", page: "bad" });
 
       const state = router.getState();
 
@@ -427,7 +439,7 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "development" }));
       await router.start("/");
 
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
       const state = router.getState();
 
@@ -484,7 +496,7 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      await router.navigate("clean", { page: -3 });
+      await router.navigate("clean", {}, { page: -3 });
 
       expect(router.getState()?.params).toStrictEqual({});
     });

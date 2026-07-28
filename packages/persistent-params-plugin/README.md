@@ -8,14 +8,17 @@
 > Automatically persist query parameters across all navigation transitions in [Real-Router](https://github.com/greydragon888/real-router).
 
 ```typescript
+// Query values ride the THIRD argument — the query channel (RFC-4 M2).
+// Passing a declared `?key` in the second (path) bag throws since #1572.
+
 // Without plugin:
-router.navigate("products", { lang: "en", theme: "dark" });
+router.navigate("products", {}, { lang: "en", theme: "dark" });
 router.navigate("cart");
 // URL: /cart  — lang and theme are lost
 
 // With plugin:
 router.usePlugin(persistentParamsPluginFactory(["lang", "theme"]));
-router.navigate("products", { lang: "en", theme: "dark" });
+router.navigate("products", {}, { lang: "en", theme: "dark" });
 router.navigate("cart");
 // URL: /cart?lang=en&theme=dark  — automatically preserved
 ```
@@ -56,16 +59,16 @@ router.usePlugin(persistentParamsPluginFactory({ lang: "en", theme: "light" }));
 
 ```typescript
 // Persist — saved on first navigation
-router.navigate("page1", { lang: "en" });     // saved: lang=en
+router.navigate("page1", {}, { lang: "en" });     // saved: lang=en
 
 // Carry — auto-injected into subsequent navigations
 router.navigate("page2");                      // URL: /page2?lang=en
 
 // Update — explicit values override saved ones
-router.navigate("page3", { lang: "fr" });      // URL: /page3?lang=fr, saved: lang=fr
+router.navigate("page3", {}, { lang: "fr" });      // URL: /page3?lang=fr, saved: lang=fr
 
 // Remove — pass undefined to stop persisting
-router.navigate("page4", { lang: undefined }); // lang removed permanently
+router.navigate("page4", {}, { lang: undefined }); // lang removed permanently
 ```
 
 > **Note:** Removal is permanent for the plugin lifetime — but only once the removal navigation actually commits. Once `undefined` is passed and the navigation succeeds, the param is no longer tracked, even if passed again later. If that navigation is rejected by a guard or superseded by a concurrent navigate, the param stays persisted (the removal rolls back).
@@ -77,7 +80,7 @@ router.navigate("page4", { lang: undefined }); // lang removed permanently
 ```typescript
 router.usePlugin(persistentParamsPluginFactory({ lang: "en" }));
 
-router.navigate("settings", { lang: "fr" });
+router.navigate("settings", {}, { lang: "fr" });
 router.navigate("products");   // ?lang=fr
 router.navigate("cart");        // ?lang=fr
 ```

@@ -108,12 +108,11 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
     describe("ignoreQueryParams", () => {
       it("should ignore query params by default (ignoreQueryParams=true)", async () => {
-        await router.navigate("section.query", {
-          section: "section1",
-          param1: "value1",
-          param2: "value2",
-          param3: "value3",
-        });
+        await router.navigate(
+          "section.query",
+          { section: "section1" },
+          { param1: "value1", param2: "value2", param3: "value3" },
+        );
 
         // Check with only URL param, ignoring query params
         expect(
@@ -122,12 +121,11 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should consider query params when ignoreQueryParams=false", async () => {
-        await router.navigate("section.query", {
-          section: "section1",
-          param1: "value1",
-          param2: "value2",
-          param3: "value3",
-        });
+        await router.navigate(
+          "section.query",
+          { section: "section1" },
+          { param1: "value1", param2: "value2", param3: "value3" },
+        );
 
         // With ignoreQueryParams=false, all params must match
         expect(
@@ -158,12 +156,11 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should return false when query params differ and ignoreQueryParams=false", async () => {
-        await router.navigate("section.query", {
-          section: "section1",
-          param1: "value1",
-          param2: "value2",
-          param3: "value3",
-        });
+        await router.navigate(
+          "section.query",
+          { section: "section1" },
+          { param1: "value1", param2: "value2", param3: "value3" },
+        );
 
         // Different query param value
         expect(

@@ -52,7 +52,7 @@ The two interceptors are **two phases of one synchronous window** (core's `build
 - With no explicit `search` (the v1 single-bag `router.buildPath(name, params)` an adapter `<Link>` makes), the caller's params bag **is** the query source core would read (`search ?? params`), so the plugin routes that bag's content through `search` — the caller's own query keys stay on the URL.
 - On a route that declares `defaultSearch`, core's `search` channel is defined even for a single-bag call, so it used to shadow the params-bag injection entirely and `buildPath` disagreed with what `navigate` commits. Injecting into `search` closes that gap.
 
-A tracked key the caller passes in the **path bag alone** (the legacy single-bag form, `navigate("page", { lang: "fr" })`) keeps the caller's value: the plugin stands down for that key rather than injecting a twin into `search`, which core's separation would let win. An explicit `search` value beats both.
+⚠ **The legacy single-bag form is gone (#1572).** A key the route declares with `?name` passed in the path bag now throws a `TypeError` from `navigate` / `makeState` / `buildNavigationState` — tracked values ride the `search` argument: `navigate("page", {}, { lang: "fr" })`. The plugin stands down for a key the caller supplies explicitly rather than injecting a twin. (An UNDECLARED tracked key is unaffected: the guard only fires on declared query names.)
 
 **Permanent removal happens in `onTransitionSuccess`, not in the interceptors** — keyed on the committed state, so a rejected/cancelled navigation never drops the param (#803).
 
@@ -74,9 +74,9 @@ Components can use `state.context.persistentParams` to distinguish persistent (q
 Passing `undefined` for a tracked param deletes it from `paramNamesSet` and from `#persistentParams`. It won't be re-persisted even if you pass it again later:
 
 ```typescript
-router.navigate("page", { lang: undefined });           // lang removed once this navigation commits
+router.navigate("page", {}, { lang: undefined });           // lang removed once this navigation commits
 router.navigate("page", {}, { lang: undefined });       // same, in the query channel (#1563)
-router.navigate("page", { lang: "en" });               // lang NOT re-added — Set no longer tracks it
+router.navigate("page", {}, { lang: "en" });               // lang NOT re-added — Set no longer tracks it
 ```
 
 Once removed, the param is gone for the lifetime of the plugin instance.

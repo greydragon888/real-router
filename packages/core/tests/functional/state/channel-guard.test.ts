@@ -168,43 +168,47 @@ describe("channel guard (#1572)", () => {
     });
   });
 
-  describe("P1 — producers warn on the raw argument, behaviour unchanged", () => {
-    it("warns when navigate() receives a declared query key in params", async () => {
-      const state = await router.navigate("q", { page: "2" }, undefined, {
-        reload: true,
-      });
+  describe("P1 — producers THROW on the raw argument", () => {
+    // A `TypeError`, SYNCHRONOUS even on `navigate` (which otherwise reports
+    // failure through a rejected promise): this is an argument-shape defect at
+    // the API boundary, caught before any interceptor or transition exists —
+    // the same class as the `subscribe` / `start` guards. Rejecting instead
+    // would let a `.catch()` written for navigation failures swallow it.
+    it("throws when navigate() receives a declared query key in params", () => {
+      // `expect(fn).toThrow()` only passes on a SYNCHRONOUS throw — a rejected
+      // promise would sail past it. That is the assertion carrying the "sync
+      // even on navigate" contract: a `.catch()` written for transition
+      // failures must not swallow a programming error.
+      expect(() =>
+        router.navigate("q", { page: "2" }, undefined, { reload: true }),
+      ).toThrow(TypeError);
 
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("page"));
-      expect(warnSpy.mock.calls[0]?.[0]).toContain("search");
-
-      // …and the call still behaves exactly as before — this step announces the
-      // contract, it does not break the form.
-      expect(state.params).toStrictEqual({});
-      expect(state.search).toStrictEqual({ page: "2" });
-      expect(state.path).toBe("/q?page=2");
+      expect(() =>
+        router.navigate("q", { page: "2" }, undefined, { reload: true }),
+      ).toThrow(/declares `page` as a query param/);
     });
 
-    it("warns when makeState() receives one — the only position where the form is ALREADY broken", () => {
-      const state = api.makeState("q", { page: "2" });
-
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("page"));
-
-      // Unlike `navigate` / `buildNavigationState`, a DIRECT `makeState` has no
-      // channel separation upstream of it (nothing routes through the
-      // `forwardState` seam), so the key stays in the path bag and never
-      // reaches the URL — `state.search` is empty and `/q` carries no query.
-      // The warning here is not an announcement of a future break: it reports a
-      // state that is already inconsistent with its own path.
-      expect(state.params).toStrictEqual({ page: "2" });
-      expect(state.search).toStrictEqual({});
-      expect(state.path).toBe("/q");
+    it("throws when makeState() receives one", () => {
+      expect(() => api.makeState("q", { page: "2" })).toThrow(
+        /declares `page` as a query param/,
+      );
     });
 
-    it("warns when buildNavigationState() receives one", () => {
-      const state = api.buildNavigationState("q", { page: "2" });
+    it("throws when buildNavigationState() receives one", () => {
+      expect(() => api.buildNavigationState("q", { page: "2" })).toThrow(
+        /declares `page` as a query param/,
+      );
+    });
 
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("page"));
-      expect(state?.search).toStrictEqual({ page: "2" });
+    it("names the method it was called through", () => {
+      // One message builder, one wording — but the caller still needs to know
+      // WHICH door they came through.
+      expect(() => api.makeState("q", { page: "2" })).toThrow(
+        /\[router\.makeState\]/,
+      );
+      expect(() => api.buildNavigationState("q", { page: "2" })).toThrow(
+        /\[router\.buildNavigationState\]/,
+      );
     });
 
     it("stays silent when the query value arrives in the right channel", async () => {

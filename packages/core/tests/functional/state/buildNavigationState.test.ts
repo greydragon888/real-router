@@ -201,31 +201,42 @@ describe("getPluginApi().buildNavigationState()", () => {
       expect(state?.path).toBe("/q?lang=fr");
     });
 
-    it("lets an explicit search value beat a params-bag twin", () => {
-      // Precedence parity with the other five entry points: the explicit
-      // channel wins over a declared key that rode in `params`.
-      const state = api.buildNavigationState(
-        "q",
-        { lang: "PARAM" },
-        { lang: "SEARCH" },
-      );
+    it("rejects a params-bag twin outright — the precedence question no longer arises", () => {
+      // This used to pin PRECEDENCE: an explicit `search` beating a declared key
+      // the caller rode in `params`. Since P1 throws (#1572), a producer cannot
+      // SPELL that collision at all, so there is no precedence left to assert
+      // here — the shape is refused before any merge happens.
+      //
+      // The rule itself is not gone: it still governs the PREDICATES
+      // (`buildPath` / `isActiveRoute` / `canNavigateTo`), which P1 deliberately
+      // does not instrument because they run on every `<Link>` render.
+      expect(() =>
+        api.buildNavigationState("q", { lang: "PARAM" }, { lang: "SEARCH" }),
+      ).toThrow(/declares `lang` as a query param/);
 
-      expect(state?.search).toStrictEqual({ lang: "SEARCH" });
-      expect(state?.params).toStrictEqual({});
-      expect(state?.path).toBe("/q?lang=SEARCH");
+      // The predicate keeps the precedence it always had — the control that
+      // makes this a scope change rather than a deletion.
+      expect(router.buildPath("q", { lang: "PARAM" }, { lang: "SEARCH" })).toBe(
+        "/q?lang=SEARCH",
+      );
     });
 
     it("keeps the two-argument form working — the slot is additive", () => {
       // The single-bag shape its only consumer relies on today must not move.
-      const state = api.buildNavigationState("q", { lang: "fr" });
+      const state = api.buildNavigationState("q", {}, { lang: "fr" });
 
       expect(state?.search).toStrictEqual({ lang: "fr" });
       expect(state?.path).toBe("/q?lang=fr");
     });
 
     it("treats an omitted and an explicitly undefined search alike", () => {
-      const omitted = api.buildNavigationState("q", { page: "2" });
-      const explicit = api.buildNavigationState("q", { page: "2" }, undefined);
+      // The axis is the THIRD argument's presence, not the channel: an omitted
+      // `search` and an explicitly-`undefined` one must build the same state.
+      // (It used to contrast the two-arg single-bag form against an explicit
+      // `undefined`; P1 now refuses the single bag, so the comparison is stated
+      // on the surviving shapes.)
+      const omitted = api.buildNavigationState("q", {});
+      const explicit = api.buildNavigationState("q", {}, undefined);
 
       expect(explicit?.search).toStrictEqual(omitted?.search);
       expect(explicit?.path).toBe(omitted?.path);

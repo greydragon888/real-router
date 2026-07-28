@@ -923,7 +923,7 @@ describe("Memory plugin", () => {
       router2.usePlugin(memoryPluginFactory());
       await router2.start("/");
       // Record visit with current defaults (sort=asc, page=1).
-      await router2.navigate("users", { page: "2" });
+      await router2.navigate("users", {}, { page: "2" });
 
       // sort/page are QUERY params (`/users?sort&page`) → they live in
       // `state.search` after the RFC-4 M2 split (#1548), not `state.params`.

@@ -558,26 +558,34 @@ export async function run(): Promise<void> {
     );
   }
 
-  // navigate — v1 single-bag: query rides in `params` and `splitParamsBySearch`
-  // separates it by declaration. The delta vs `navigate/search-channel` is the
-  // per-navigate split overhead a migrated-from-v1 call site still pays.
+  // navigate — the channel guard's cost on a HEALTHY call. Replaces
+  // `navigate/search-single-bag` (#1572): that arm measured the per-navigate
+  // split a migrated-from-v1 call site paid, and the form it measured now
+  // throws, which would take the whole harness process down with it.
+  //
+  // What is worth measuring instead is what EVERY caller now pays for the
+  // always-on guard: the predicate scans the route's declared query names
+  // (small, cached) rather than the caller's bag, so the arm carries the widest
+  // declaration list in this file to keep that scan honest. The route below
+  // declares five query names against a two-key bag — the shape where the guard
+  // does the most work and finds nothing.
   {
     const router = createRouter([
       { name: "home", path: "/" },
-      { name: "search", path: "/search?q&page&sort" },
+      { name: "search", path: "/search?q&page&sort&filter&limit" },
     ]);
 
     await router.start("/");
-    const bags: Params[] = [
-      { q: "a", page: "1", sort: "date" },
-      { q: "a", page: "2", sort: "date" },
+    const searches: SearchParams[] = [
+      { q: "a", page: "1" },
+      { q: "a", page: "2" },
     ];
     let i = 0;
 
     bench.add(
-      "navigate/search-single-bag",
+      "navigate/channel-guard-clean",
       batched(192, () => {
-        void router.navigate("search", bags[i++ % bags.length]);
+        void router.navigate("search", {}, searches[i++ % searches.length]);
       }),
     );
   }

@@ -1,6 +1,6 @@
 import { throwIfDisposed } from "./helpers";
 import { errorCodes } from "../constants";
-import { getInternals, warnOnMisChanneledKey } from "../internals";
+import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
@@ -33,7 +33,7 @@ export function getPluginApi<
   const ctx = getInternals(router);
   const api: PluginApi = {
     makeState: (name, params, search, path) => {
-      warnOnMisChanneledKey(ctx, "makeState", name, params);
+      throwOnMisChanneledKey(ctx, "makeState", name, params);
 
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
 
@@ -96,7 +96,7 @@ export function getPluginApi<
       return ctx.addEventListener(eventName, cb);
     },
     buildNavigationState: (name, params = {}, search) => {
-      warnOnMisChanneledKey(ctx, "buildNavigationState", name, params);
+      throwOnMisChanneledKey(ctx, "buildNavigationState", name, params);
 
       ctx.validator?.routes.validateStateBuilderArgs(
         name,

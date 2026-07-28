@@ -226,7 +226,7 @@ describe("Browser Plugin Integration", () => {
       await router.start();
 
       // Set persistent params
-      await router.navigate("home", { lang: "en", theme: "dark" });
+      await router.navigate("home", {}, { lang: "en", theme: "dark" });
 
       expect(router.getState()?.search.lang).toBe("en");
       expect(router.getState()?.search.theme).toBe("dark");
@@ -350,7 +350,7 @@ describe("Browser Plugin Integration", () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
       await router.start();
-      await router.navigate("users.view", { id: "1", sessionId: "abc" });
+      await router.navigate("users.view", { id: "1" }, { sessionId: "abc" });
 
       // Logger logged events
       expect(logs.length).toBeGreaterThan(0);
@@ -475,7 +475,7 @@ describe("Browser Plugin Integration", () => {
       for (let i = 0; i < 50; i++) {
         const route = i % 2 === 0 ? "home" : "users.list";
 
-        await router.navigate(route, { lang: "en" });
+        await router.navigate(route, {}, { lang: "en" });
       }
 
       // Final state should be correct (49 % 2 === 1, so last route is "users.list")
