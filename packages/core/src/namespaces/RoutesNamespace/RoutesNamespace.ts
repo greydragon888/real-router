@@ -1,11 +1,7 @@
 // packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts
 
 import { DEFAULT_ROUTE_NAME } from "./constants";
-import {
-  matchSourceTrailingSlash,
-  paramsMatch,
-  paramsMatchExcluding,
-} from "./helpers";
+import { matchSourceTrailingSlash, paramsMatch } from "./helpers";
 import {
   createRoutesStore,
   rebuildTreeInPlace,
@@ -776,32 +772,33 @@ export class RoutesNamespace<
       return false;
     }
 
-    const defaultParams = this.#store.config.defaultParams[name] as
-      Params | undefined;
+    // The comparison target, built by the SAME pipeline every producer uses
+    // (nav-pipeline Phase 2, step 2-5) — in the LITERAL form: this predicate asks
+    // about the route it was NAMED. `forwardTo` is resolved by the caller's
+    // second arm (`isActiveRoute`), through the NON-interceptable namespace
+    // primitive, and `{ resolveForward: false }` is what keeps it that way here:
+    // the literal form never touches the port, so a plugin's interceptor chain
+    // does not run once per `<Link>` per render.
+    //
+    // ⚠ Stage ② is genuinely gone from THIS point — unlike `matchPath` /
+    // `canNavigateTo` / `buildNavigationState`, whose ② lives in the seam they
+    // still reach through the port. This method owned its own
+    // `separateChannels` call, and dropping it is the observable change: a
+    // declared query key handed in the `params` bag is no longer moved to the
+    // query channel before comparison, so a v1 single-bag call stops matching.
+    // Channel-correctness becomes the caller's contract, exactly as it already is
+    // for `navigate` (which throws on that shape) and `buildPath` (which prints
+    // without it).
+    const canonical = canonicalize(this.#deps.port, name, params, searchArg, {
+      resolveForward: false,
+    });
 
-    // Exact match case
+    // Exact match case. Path "" skips the URL build — `areStatesEqual` compares
+    // channels and never reads the URL, which is also why `materialize` needs no
+    // port argument here (the fork milestone 1 left open, settled in step 2-3).
     if (strictEquality || activeName === name) {
-      // Build the canonical target the same way navigate / canNavigateTo do:
-      // separate the caller bag into channels by this route's `?`-declaration
-      // (a declared query key handed in `params` moves to search, explicit
-      // `searchArg` winning the collision), then hand the CLEAN channels to
-      // makeState — which merges defaults but no longer re-splits (#1548/#1549).
-      // So the comparison target can never drift from how the committed state was
-      // built. Path "" skips the URL build (areStatesEqual compares channels).
-      const { params: targetParams, search: targetSearch } = separateChannels(
-        params,
-        this.getQueryParams(name),
-        searchArg,
-      );
-      const targetState = this.#deps.makeState(
-        name,
-        targetParams,
-        targetSearch,
-        "",
-      );
-
       return this.#deps.areStatesEqual(
-        targetState,
+        materialize(canonical, { path: "" }),
         activeState,
         ignoreQueryParams,
       );
@@ -816,43 +813,27 @@ export class RoutesNamespace<
       return false;
     }
 
-    // Hierarchical check: activeState is a descendant of target (name).
-    // Recombine each state's two channels into a single bag for the subset
-    // match: the explicit query `searchArg` wins over any query key still riding
-    // in `params` (a v1 single-bag call) — RFC-4 M2 / #1548.
-    const activeParams = {
-      ...activeState.params,
-      ...activeState.search,
-    } as Params;
-
-    const combinedTarget = { ...params, ...searchArg } as Params;
-
-    if (!paramsMatch(combinedTarget, activeParams)) {
+    // Hierarchical check: activeState is a descendant of target (name). Compared
+    // CHANNEL BY CHANNEL (step 2-5) instead of over one recombined bag: the
+    // canonical target already carries the route's defaults, each merged under
+    // the caller's value in the channel the route DECLARES it in (#1549), so the
+    // separate `paramsMatchExcluding` passes over `defaultParams` /
+    // `defaultSearch` are no longer needed — a default that survived into
+    // `canonical` is exactly a default the caller did not override.
+    if (!paramsMatch(canonical.path, activeState.params)) {
       return false;
     }
 
-    // Enforce the route's defaults against the active descendant, excluding any
-    // key the caller supplied explicitly. Path defaults (`defaultParams`) always
-    // count; query defaults (`defaultSearch`) count only when `ignoreQueryParams`
-    // is false — a query-only default must not disqualify an ancestor link when
-    // query is ignored (RFC-4 M2 / #1548).
+    // The query channel obeys `ignoreQueryParams`, the same flag the exact arm
+    // hands to `areStatesEqual`. The recombined-bag form could not: it folded
+    // query into the path bag before matching, so an ancestor link compared its
+    // query even when the caller asked to ignore it — the two arms disagreed
+    // about the flag.
     if (
-      defaultParams &&
-      !paramsMatchExcluding(defaultParams, activeParams, combinedTarget)
+      !ignoreQueryParams &&
+      !paramsMatch(canonical.query as Params, activeState.search as Params)
     ) {
       return false;
-    }
-
-    if (!ignoreQueryParams) {
-      const defaultSearch = this.#store.config.defaultSearch[name] as
-        Params | undefined;
-
-      if (
-        defaultSearch &&
-        !paramsMatchExcluding(defaultSearch, activeParams, combinedTarget)
-      ) {
-        return false;
-      }
     }
 
     return true;

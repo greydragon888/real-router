@@ -108,15 +108,23 @@ describe("core/state — root-declared query key channel (#1556)", () => {
 
         await router.start("/g?lang=en");
 
-        // A <Link routeParams={{ lang }}> — the key is re-routed to the query
-        // channel at separation, so it compares against state.search.
-        expect(
-          router.isActiveRoute("g", { lang: "en" }, undefined, false, false),
-        ).toBe(true);
-        // A <Link routeSearch={{ lang }}> — already the query channel.
+        // A <Link routeSearch={{ lang }}> — the query channel, which is where a
+        // root-declared `?lang` belongs. This is the half #1556 was really about:
+        // the key must CLASSIFY as query so it compares against state.search.
         expect(
           router.isActiveRoute("g", {}, { lang: "en" }, false, false),
         ).toBe(true);
+
+        // A <Link routeParams={{ lang }}> — retired in Phase 2 step 2-5. This
+        // predicate owned its own `separateChannels` call, which re-routed the
+        // key out of the params bag before comparing; that stage is gone here, so
+        // channel-correctness is the caller's contract, as it already is for
+        // `navigate` (throws) and `buildPath` (prints without it). Note the
+        // plugin that motivated #1556 is unaffected: `persistent-params` injects
+        // into the search channel itself.
+        expect(
+          router.isActiveRoute("g", { lang: "en" }, undefined, false, false),
+        ).toBe(false);
       });
     },
   );

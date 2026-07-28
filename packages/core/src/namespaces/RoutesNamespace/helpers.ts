@@ -76,26 +76,6 @@ export function paramsMatch(source: Params, target: Params): boolean {
 }
 
 /**
- * Checks params match, skipping keys present in skipKeys.
- */
-export function paramsMatchExcluding(
-  source: Params,
-  target: Params,
-  skipKeys: Params,
-): boolean {
-  for (const key in source) {
-    if (key in skipKeys) {
-      continue;
-    }
-    if (!areParamValuesEqual(source[key], target[key])) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/**
  * Sanitizes a route by keeping only essential properties.
  */
 export function sanitizeRoute<Dependencies extends DefaultDependencies>(

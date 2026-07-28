@@ -141,8 +141,6 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
     },
     compileGuard: (handler, methodName) =>
       ns.routeLifecycle.compileGuardFactory(handler, methodName),
-    makeState: (name, params, search, path) =>
-      ns.state.makeState(name, params, search, path),
     getState: () => ns.state.get(),
     areStatesEqual: (state1, state2, ignoreQueryParams) =>
       ns.state.areStatesEqual(state1, state2, ignoreQueryParams),

@@ -63,19 +63,29 @@ describe("Persistent params — root-declared keys reach state.search (#1556)", 
     router.stop();
   });
 
-  it("matches an active link built from either spelling", async () => {
+  it("matches an active link spelled in the query channel", async () => {
     const router = makeRouter();
 
     await router.start("/a?lang=fr");
 
-    // <Link routeParams={{ lang }}> — re-routed to the query channel.
-    expect(
-      router.isActiveRoute("a", { lang: "fr" }, undefined, false, false),
-    ).toBe(true);
-    // <Link routeSearch={{ lang }}> — already the query channel.
+    // <Link routeSearch={{ lang }}> — the query channel, which is where a
+    // root-declared `?lang` belongs. This is what #1556 was about: the key must
+    // CLASSIFY as query, so it compares against state.search rather than
+    // disappearing from both sides.
     expect(router.isActiveRoute("a", {}, { lang: "fr" }, false, false)).toBe(
       true,
     );
+
+    // <Link routeParams={{ lang }}> — retired by nav-pipeline Phase 2 step 2-5.
+    // `isActiveRoute` owned its own `separateChannels` call, which re-routed the
+    // key out of the params bag before comparing; that stage is gone, so
+    // channel-correctness is the caller's contract here as it already is for
+    // `navigate` (throws) and `buildPath` (prints without it). This plugin does
+    // not depend on the retired spelling: it injects into `search` itself, in
+    // both of its interceptors (#1563).
+    expect(
+      router.isActiveRoute("a", { lang: "fr" }, undefined, false, false),
+    ).toBe(false);
 
     router.stop();
   });

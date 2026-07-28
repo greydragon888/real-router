@@ -138,7 +138,21 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
           ),
         ).toBe(false);
 
-        // All params match
+        // All params match — spelled in the channels the route declares them
+        // in. Since Phase 2 step 2-5 this predicate no longer re-routes a
+        // declared query key out of the params bag, so the query half must be
+        // handed through the query slot (the v1 single-bag spelling below is
+        // retired and answers false).
+        expect(
+          router.isActiveRoute(
+            "section.query",
+            { section: "section1" },
+            { param1: "value1", param2: "value2", param3: "value3" },
+            false,
+            false,
+          ),
+        ).toBe(true);
+
         expect(
           router.isActiveRoute(
             "section.query",
@@ -152,7 +166,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
             false,
             false,
           ),
-        ).toBe(true);
+        ).toBe(false);
       });
 
       it("should return false when query params differ and ignoreQueryParams=false", async () => {
@@ -429,10 +443,14 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       it("should handle undefined in hierarchical check (parent route)", async () => {
         await router.navigate("users.view", { id: "123" });
 
-        // Hierarchical check uses paramsMatch
-        // { id: undefined } means "id must be undefined in activeState"
-        // activeState.params.id === "123", so undefined !== "123" → false
-        expect(router.isActiveRoute("users", { id: undefined })).toBe(false);
+        // `undefined` is ABSENCE, not a value to match against (#1550 / #1551).
+        // Step 2-5 put this predicate on the same `canonicalize` every other
+        // producer uses, and its path-channel entry guard strips undefined-valued
+        // keys — so `{ id: undefined }` says nothing about `id` and the ancestor
+        // stays active. Before, this one predicate read it as "id must BE
+        // undefined", which was the last place in core where undefined meant
+        // something other than absence.
+        expect(router.isActiveRoute("users", { id: undefined })).toBe(true);
 
         // But checking with matching value works
         expect(router.isActiveRoute("users", { id: "123" })).toBe(true);
@@ -523,15 +541,16 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
           filter: "active",
         });
 
-        // Passing undefined for filter overrides the default
-        // effectiveParams = { ...{filter: "active"}, ...{filter: undefined} }
-        // = { filter: undefined }
-        // Then undefined !== "active" → false
+        // `undefined` is ABSENCE on both sides of the merge (#1550 / #1551), so
+        // it does NOT override the route default — the default keeps the slot and
+        // matches the active state. Renamed in step 2-5: the predicate now shares
+        // `canonicalize` with every other producer, where this rule has always
+        // held; it used to be the one place that read undefined as a value.
         expect(
           router.isActiveRoute("usersFiltered", {
             filter: undefined,
           }),
-        ).toBe(false);
+        ).toBe(true);
       });
 
       it("should use defaultParams when param is not provided", async () => {

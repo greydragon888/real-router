@@ -64,13 +64,9 @@ export interface RoutesDependencies<
     methodName: string,
   ) => GuardFn;
 
-  /** Create state object */
-  makeState: <P extends Params = Params, S extends SearchParams = SearchParams>(
-    name: string,
-    params?: P,
-    search?: S,
-    path?: string,
-  ) => State<P, S>;
+  // `makeState` used to live here for `matchPath` and `isActiveRoute`. Both are
+  // on the pipeline now (Phase 2, steps 2-2 and 2-5) and materialise their state
+  // from a `Canonical` instead, so the closure lost its last caller.
 
   /** Get current router state */
   getState: () => State | undefined;
