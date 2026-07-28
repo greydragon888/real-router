@@ -249,6 +249,12 @@ export function getInternals<D extends DefaultDependencies>(
  * immediately and corrupts nothing, and throwing inside a render in six adapters
  * is not a trade this guard is worth.
  *
+ * ⚠ Not instrumented ≠ blind. `canNavigateTo` answers whether `navigate` WOULD
+ * work, so it consults {@link findMisChanneledKey} directly and returns `false`
+ * for a shape this function would have thrown on (#1576) — an answer, not a
+ * throw, so the render-path trade above is untouched. `buildPath` /
+ * `isActiveRoute` ask a different question and are unchanged.
+ *
  * @internal
  */
 export function throwOnMisChanneledKey<D extends DefaultDependencies>(

@@ -1,5 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import {
@@ -455,5 +456,51 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     getLifecycleApi(fresh).addDeactivateGuard("admin", () => () => false);
 
     expect(fresh.canNavigateTo("admin")).toBe(true);
+  });
+
+  // #1576 — the predicate must mirror EVERY way `navigate` refuses the same
+  // arguments, not only the guard verdict. The channel guard (#1572) gave
+  // `navigate` a new synchronous rejection; without this the predicate promised
+  // a navigation that throws on the click.
+  it("returns false for a declared query key handed in the params bag (#1576)", async () => {
+    const fresh = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q" },
+    ]);
+
+    await fresh.start("/home");
+
+    // The verb refuses this argument shape outright — synchronously, at the
+    // facade, before any transition exists.
+    expect(() => fresh.navigate("search", { q: "a" })).toThrow(TypeError);
+
+    expect(fresh.canNavigateTo("search", { q: "a" })).toBe(false);
+
+    // Discrimination: the spelling `navigate` accepts stays navigable, so the
+    // predicate has not degenerated into a constant `false`.
+    expect(fresh.canNavigateTo("search", {}, { q: "a" })).toBe(true);
+
+    fresh.stop();
+  });
+
+  // The mirror must not OVER-reach: a name occupying both a path slot and a
+  // query declaration is legitimately path-owned (#843 / #1549), so
+  // `getQueryParams` excludes it, `navigate` does NOT throw — and the predicate
+  // must keep answering `true`.
+  it("keeps a path/query collision navigable — the carve-out `navigate` also honours (#1576)", async () => {
+    const fresh = createRouter([
+      { name: "home", path: "/" },
+      { name: "item", path: "/items/:id?id" },
+    ]);
+
+    await fresh.start("/home");
+
+    await expect(fresh.navigate("item", { id: "7" })).resolves.toMatchObject({
+      path: "/items/7",
+    });
+
+    expect(fresh.canNavigateTo("item", { id: "7" })).toBe(true);
+
+    fresh.stop();
   });
 });

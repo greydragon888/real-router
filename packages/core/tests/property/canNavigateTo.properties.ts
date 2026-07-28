@@ -180,12 +180,24 @@ describe("canNavigateTo Properties", () => {
       arbNavigableRoute,
       arbNavigableRoute,
       fc.option(arbGuard, { nil: undefined }),
+      fc.boolean(),
     ],
     { numRuns: NUM_RUNS.standard },
   )(
     "sound — canNavigateTo(to)=true implies navigate(to) resolves (ex-same-state)",
-    async (from, to, guard) => {
-      const [params, search] = navArgsForRoute(to);
+    async (from, to, guard, singleBag) => {
+      const [pathParams, queryParams] = navArgsForRoute(to);
+
+      // Both spellings of the same intent (#1576). `navArgsForRoute` returns
+      // PRE-SEPARATED channels because the channel guard's P1 throws on the
+      // legacy single-bag form — which quietly removed that half of the input
+      // domain from this property at the exact moment the form became a
+      // rejection. Soundness has to cover every shape a caller can hand BOTH
+      // entry points, or the predicate is free to out-promise the verb on the
+      // shapes the generator stopped producing.
+      const [params, search] = singleBag
+        ? [{ ...pathParams, ...queryParams }, {}]
+        : [pathParams, queryParams];
 
       // Twin instances: `a` answers the predicate, `b` actually commits.
       const a = createFixtureRouter();

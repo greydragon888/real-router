@@ -12,7 +12,12 @@ import {
   guardDependencies,
   guardRouteStructure,
 } from "./guards";
-import { createLimits, normalizeParams, separateChannels } from "./helpers";
+import {
+  createLimits,
+  findMisChanneledKey,
+  normalizeParams,
+  separateChannels,
+} from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -729,6 +734,28 @@ export class Router<
     ctx.validator?.navigation.validateParams(params, "canNavigateTo");
 
     if (!this.#routes.hasRoute(name)) {
+      return false;
+    }
+
+    // Mirror EVERY way `navigate` refuses these same arguments, not only the
+    // guard verdict (#1576). A declared query key handed in the PATH bag makes
+    // `navigate` throw synchronously at the facade (channel guard P1, #1572), so
+    // the route is unreachable with this input — exactly the situation invariant
+    // canNavigateTo #5 already answers `false` to for an unbuildable path (#725).
+    // Answering `true` here promised a navigation that throws on the click.
+    //
+    // The RAW caller bag, before `forwardState`: the same argument, the same
+    // registry and the same name P1 reads, so the predicate cannot be stricter
+    // OR laxer than the verb. The `/items/:id?id` collision is absent from
+    // `queryNames` by construction (#843 / #1549), so it stays navigable in both.
+    //
+    // A `false` rather than a rethrow: a capability predicate answers, it never
+    // throws (#725), and it runs on every `<Link>` render across six adapters —
+    // which is exactly why P1 does not instrument the predicates (#1572).
+    if (
+      findMisChanneledKey(params, this.#routes.getQueryParams(name)) !==
+      undefined
+    ) {
       return false;
     }
 
