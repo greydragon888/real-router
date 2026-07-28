@@ -12,7 +12,7 @@ import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleN
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
 import type { RouteResolver } from "../pipeline";
 import type { Router } from "../Router";
-import type { DefaultDependencies, Params, SearchParams } from "../types";
+import type { DefaultDependencies } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
 
 /**
@@ -48,6 +48,15 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   // `getDependency` closure is allocated once here, not per compile call.
   const compileFactory = createCompileFactory(ns);
 
+  // One port per router instance — allocated at wiring time, not per call.
+  // Hoisted OUT of `wireNavigation` (Phase 2, step 2-2): `navigate` is no longer
+  // its only consumer — the entry points migrating onto the pipeline live in
+  // RoutesNamespace, which is wired first. Creation order is safe because the
+  // resolver only captures `ns.router`'s internals (registered before wiring,
+  // #1331) and the routes store (assigned in the namespace's constructor); every
+  // member reads through `ns.*` at CALL time, so no wiring order is baked in.
+  const port = createRouteResolver(ns);
+
   // Shared by RouteLifecycle and Plugins — one allocation. Internals are
   // registered before wiring (#1331), so this never throws; returns null until
   // validation-plugin installs the validator.
@@ -57,9 +66,9 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   wireLimits(ns);
   wireEventBus(ns, getValidator);
   wireRouteLifecycle(ns, compileFactory, getValidator);
-  wireRoutes(ns);
+  wireRoutes(ns, port);
   wirePlugins(ns, compileFactory, getValidator);
-  wireNavigation(ns);
+  wireNavigation(ns, port);
   wireRouterLifecycle(ns);
   wireState(ns);
 }
@@ -119,9 +128,11 @@ function wireRouteLifecycle<Dependencies extends DefaultDependencies>(
 
 function wireRoutes<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
+  port: RouteResolver,
 ): void {
   const deps: RoutesDependencies<Dependencies> = {
     logger: getInternals(ns.router).logger,
+    port,
     addActivateGuard: (name, handler, precompiledFn) => {
       ns.routeLifecycle.addCanActivate(name, handler, true, precompiledFn);
     },
@@ -137,30 +148,6 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
       ns.state.areStatesEqual(state1, state2, ignoreQueryParams),
     getDependency: (name) =>
       ns.dependenciesStore.dependencies[name] as Dependencies[typeof name],
-    forwardState: <
-      P extends Params = Params,
-      S extends SearchParams = SearchParams,
-    >(
-      name: string,
-      params: P,
-      search?: S,
-    ) => {
-      const ctx = getInternals(ns.router);
-
-      ctx.validator?.routes.validateStateBuilderArgs(
-        name,
-        params,
-        "forwardState",
-      );
-
-      return ctx.forwardState(name, params, search);
-    },
-    reportDroppedQueryKey: (routeName, key) => {
-      getInternals(ns.router).validator?.state.reportDroppedQueryKey(
-        routeName,
-        key,
-      );
-    },
   };
 
   ns.routes.setDependencies(deps);
@@ -232,10 +219,8 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
 
 function wireNavigation<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
+  port: RouteResolver,
 ): void {
-  // One port per router instance — allocated at wiring time, not per navigate.
-  const port = createRouteResolver(ns);
-
   const deps: NavigationDependencies = {
     logger: getInternals(ns.router).logger,
     getOptions: () => ns.options.get(),

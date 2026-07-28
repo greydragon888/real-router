@@ -12,7 +12,8 @@ import {
   resetStore,
 } from "./routesStore";
 import { constants, EMPTY_SEARCH } from "../../constants";
-import { admittedSearch, mergeDefined, separateChannels } from "../../helpers";
+import { mergeDefined, separateChannels } from "../../helpers";
+import { canonicalize, materialize } from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -383,63 +384,42 @@ export class RoutesNamespace<
         ? this.#store.config.decoders[name]({ params, search })
         : { params, search };
 
-    // Thread the decoded channels through forwardState (RFC-4 M2 / #1548): a
-    // search-schema interceptor validates the query on the URL→State path here
-    // (the `routeSearch` argument is defined, marking this as a re-parse, not a
-    // navigate).
-    const forwarded = this.#deps.forwardState<P>(
+    // Stages ① + ③ + the mode gate, one pass through the pipeline (nav-pipeline
+    // Phase 2, step 2-2). `canonicalize` reaches the SAME `forwardState` seam
+    // this method used to call directly — `port.resolveForward` is
+    // `ctx.forwardState` — so a search-schema interceptor still validates the
+    // query on the URL→State path here (the `routeSearch` argument is defined,
+    // marking this as a re-parse, not a navigate), and the seam's channel
+    // separation still canonicalises the bags. What the pipeline replaces is the
+    // hand-rolled composition that followed: the route's own default split
+    // (#1549), the default merge, and the mode gate (#1575) now happen once,
+    // inside `canonicalize`, from the same read-model `navigate` uses.
+    // ⚠ Stage ② does NOT leave this path here, and cannot: `separateChannels`
+    // lives in the seam (`Router.ts:281-292`), which the port calls. Measured —
+    // a `forwardState` interceptor injecting a declared query key into
+    // `result.params` lands in `state.search` both before and after this change,
+    // identically to `navigate`, which has been on the pipeline since milestone 1.
+    // The channel guard's P2 position therefore stays dormant until Phase 4
+    // removes the seam's wrapper; RFC step 2-2's "② leaves the path here" was
+    // written before that was measured.
+    const canonical = canonicalize(
+      this.#deps.port,
       name,
-      decoded.params as P,
+      decoded.params,
       decoded.search,
     );
-    const routeName = forwarded.name;
+    const routeName = canonical.name;
 
-    // forwardState canonicalizes the channels at ITS boundary (#1548/#1549): the
-    // result is already path-only params + the user query — a declared `?key`
-    // that a plugin's forwardState injection (persistent-params on `start()`) or
-    // a decoder left in the params bag has already moved to the query channel.
-    // forwardState does NOT fold in the TARGET route's defaults (that would
-    // outrank a user params-twin at separation, #1549), so apply them below the
-    // user channel HERE — but only `defaultSearch`. The asymmetry is real, not
-    // the forwardState one: query defaults are URL-DEFINING (absent from a
-    // minimally-matched URL, they must be printed into the rebuilt query string),
-    // whereas path/arbitrary `defaultParams` never need merging for the URL — a
-    // path default either arrived in the matched URL or, being arbitrary, is
-    // dropped by the matcher — and `state.params` receives them from makeState
-    // downstream regardless (verified: merging defaultParams here is an
-    // equivalent no-op). `state.path` and `state.search` still can't diverge:
-    // makeState re-applies the same `defaultSearch` idempotently.
-    // The route's OWN defaults, split by its declared channel (#1549). The URL
-    // direction needs the same split as the intent direction, and it needs it
-    // HERE: the rebuild below calls the matcher's `buildPath` directly, not this
-    // namespace's, so it never passes the split done in `buildPath`. Without it
-    // `makeState` routed the default into `state.search` while the rebuilt
-    // `state.path` never showed it — the two halves of one state disagreeing
-    // (INVARIANTS makeState #6).
-    const routeDefaults = separateChannels(
-      this.#store.config.defaultParams[routeName],
-      this.getQueryParams(routeName),
-      this.#store.config.defaultSearch[routeName],
-    );
-    const routeParams = forwarded.params;
-    const mergedSearch = mergeDefined(routeDefaults.search, forwarded.search);
-    // The mode gate (#1575), the URL half of the same rule the intent side
-    // applies. `default` accepts an undeclared key in the URL — that is what
-    // separates it from `strict` — but the rebuilt path below prints declared
-    // names only, so keeping the key in `state.search` published a state whose
-    // own `path` contradicts it. Dropping it here means the two are built from
-    // ONE bag. `strict` never reaches this line for such a URL (the matcher
-    // already rejected it); `loose` short-circuits and pays nothing.
-    const forwardedSearch =
-      opts.queryParamsMode === "loose"
-        ? mergedSearch
-        : admittedSearch(
-            mergedSearch,
-            this.getQueryParams(routeName),
-            (key) => {
-              this.#deps.reportDroppedQueryKey?.(routeName, key);
-            },
-          );
+    // The canonical channels, ready for BOTH halves of the state: `canonical.path`
+    // is path-only (the seam moved any declared `?key` a plugin injection or a
+    // decoder left in the params bag over to the query channel, and stage ③
+    // layered the route's own defaults under it, split by the channel the route
+    // declares — #1549), `canonical.query` is the full canonical query with the
+    // mode gate already applied (#1575). Both are read from ONE object, so the
+    // rebuilt `state.path` and the committed `state.search` cannot derive from
+    // differently-merged bags (INVARIANTS makeState #6).
+    const routeParams = canonical.path;
+    const forwardedSearch = canonical.query;
 
     let builtPath = path;
 
@@ -488,16 +468,13 @@ export class RoutesNamespace<
       }
     }
 
-    // `routeParams` / `forwardedSearch` are already canonical (forwardState
-    // boundary), so `state.path` (the rebuild) and `state.search` (makeState)
-    // derive from the SAME separated bags by construction. makeState only merges
-    // route defaults idempotently — it no longer re-splits.
-    return this.#deps.makeState<P>(
-      routeName,
-      routeParams,
-      forwardedSearch,
-      builtPath,
-    );
+    // Stage ⑤b. `materialize` over `makeState` because the intent is ALREADY
+    // canonical: `makeState` would re-run the default merge (idempotent, but a
+    // wasted pass) and would rebuild the path when none is handed to it, which is
+    // exactly the work ⑤a above just did. The generic rides through
+    // (`matchPath<P>` → `materialize<P>` → `State<P>`), so a consumer's typed
+    // params survive the migration.
+    return materialize<P>(canonical, { path: builtPath });
   }
 
   /**

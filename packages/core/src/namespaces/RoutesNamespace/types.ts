@@ -1,5 +1,6 @@
 // packages/core/src/namespaces/RoutesNamespace/types.ts
 
+import type { RouteResolver } from "../../pipeline";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -8,7 +9,6 @@ import type {
   ParamsSearch,
   RouterLogger,
   SearchParams,
-  SimpleState,
   State,
   GuardFnFactory,
 } from "../../types";
@@ -24,6 +24,16 @@ export interface RoutesDependencies<
 > {
   /** Per-router logger instance (from `getInternals(router).logger`) */
   logger: RouterLogger;
+
+  /**
+   * The pipeline's read-model (`RouteResolver`), shared with NavigationNamespace
+   * — one instance per router, created in `wireNamespaces`. Entry points on this
+   * namespace compose their target state through `canonicalize` / `buildURL` /
+   * `materialize` and reach the router's stage ① seam and route config through
+   * this port rather than through the namespace's own dependency closures, so
+   * every producer reads ONE read-model (nav-pipeline Phase 2).
+   */
+  port: RouteResolver;
 
   /**
    * Register a canActivate handler for a route. `precompiledFn` installs an
@@ -75,20 +85,17 @@ export interface RoutesDependencies<
   /** Get a dependency by name */
   getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K];
 
-  /** Forward state through facade (allows plugin interception) */
-  forwardState: <
-    P extends Params = Params,
-    S extends SearchParams = SearchParams,
-  >(
-    name: string,
-    params: P,
-    search?: S,
-  ) => SimpleState<P, S>;
-  /**
-   * The mode gate's opt-in reporter (#1575) — absent unless `validation-plugin`
-   * is installed. Resolved per call: the plugin registers after wiring.
-   */
-  reportDroppedQueryKey?: (routeName: string, key: string) => void;
+  // `forwardState` and `reportDroppedQueryKey` used to live here for
+  // `matchPath`, its only consumer. Step 2-2 moved that entry point onto the
+  // pipeline, which reaches the SAME seam through `port.resolveForward` and the
+  // same drop reporter through `port.reportDroppedQueryKey`, leaving both
+  // closures without a caller. Note what went with them: the dep wrapper also
+  // ran `validateStateBuilderArgs` on the bags `matchPath` had just produced
+  // itself (matcher output + decoder output) — an internal intermediate, not a
+  // caller argument. The pipeline validates where the other producers do, at the
+  // ENTRY of the point (`buildNavigateState` for navigate, `validateMatchPathArgs`
+  // on the facade for this one), so removing it aligns the two rather than
+  // dropping a check on user input.
 }
 
 /**

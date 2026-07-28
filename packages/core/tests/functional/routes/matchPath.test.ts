@@ -4,8 +4,12 @@ import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Route, Router } from "@real-router/core";
+import type { Params, Route, Router, State } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
+
+interface TypedParams extends Params {
+  id: string;
+}
 
 let router: Router;
 let routesApi: RoutesApi;
@@ -1097,6 +1101,24 @@ describe("core/routes/routePath/matchPath", () => {
 
       expect(state?.path).toBe("/rt-ok?page=2.5");
       expect(state?.search.page).toBe(2.5);
+    });
+  });
+
+  describe("typed params channel", () => {
+    it("carries the caller's param type through to the returned State", () => {
+      routesApi.add({ name: "typed", path: "/typed/:id" });
+
+      // Type-level pin (nav-pipeline step 2-2). `matchPath<P>` is public and
+      // consumers instantiate it, so the chain `matchPath<P>` → `materialize<P>`
+      // → `State<P>` has to carry P. `materialize` was NOT generic when the
+      // pipeline landed, which collapsed the chain to `State<Params>`; this
+      // annotation is what fails type-check if the parameter is ever dropped
+      // again (verified discriminating: widening `materialize`'s return to
+      // `State` reddens `pnpm -F @real-router/core type-check` with TS2322 here).
+      const state: State<TypedParams> | undefined =
+        getPluginApi(router).matchPath<TypedParams>("/typed/7");
+
+      expect(state?.params.id).toBe("7");
     });
   });
 });
