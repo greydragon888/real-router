@@ -54,6 +54,7 @@
 | 4   | Determinism            | `buildPath(name, params)` returns the same string for identical arguments. URL building is a pure function.                                                                  |
 | 5   | Query params roundtrip | For routes with query parameters (e.g., `?q&page`), query values survive the build-then-match cycle intact.                                                                  |
 | 6   | Static route default   | `buildPath("home")` with no params returns `/`. Static routes with no required params work without arguments.                                                                |
+| 7   | href equals destination (#1578) | `buildPath(name, params, search) === (await navigate(name, params, search)).path` for the same intent, INCLUDING the arm where the caller names no query channel (`search` omitted). `buildPath` is the only URL producer reached without a state builder in front of it, so it is the only one that can drift: routing a route's defaults by channel (#1549) skipped them whenever the `search` argument was absent, which is the arm every adapter's `<Link>` takes — the href dropped `defaultSearch` while the click kept it, and `matchPath` immediately rewrote the emitted URL into a different one. The skip now keys on the caller's BAG (a route-declared query name actually riding in `params` — the v1 single-bag shape the matcher's `search ?? params` fallback exists to serve), not on the absence of the argument. Property-verified in `tests/property/searchPathConsistency.properties.ts` block 8; mutation-checked (either buildPath-side mutation reddens that block and no other, 1 failed / 420 passed). |
 
 ## isActiveRoute
 
@@ -578,6 +579,7 @@ Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and 
 | `tests/property/navigateToDefault.properties.ts`        | 4          | Default route navigation                                                                                |
 | `tests/property/forwarding.properties.ts`               | 4          | forwardTo chain resolution                                                                              |
 | `tests/property/queryChannelRegistry.properties.ts`     | 4          | One registry classifies and prints (#1556) + hop defaults land in the target's channel (#1570)          |
+| `tests/property/searchPathConsistency.properties.ts`    | 8          | `state.search` ↔ `state.path` consistency across every producer (#1548/#1549) + href equals destination (#1578) |
 | `tests/property/routeManagement.properties.ts`          | 14         | Route CRUD via getRoutesApi                                                                             |
 | `tests/property/guards.properties.ts`                   | 7          | Guard and navigate interaction                                                                          |
 | `tests/property/canNavigateTo.properties.ts`            | 4          | Synchronous navigation predicate                                                                        |

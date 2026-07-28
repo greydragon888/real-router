@@ -255,34 +255,42 @@ export class RoutesNamespace<
     // state builders: `buildNavigationState` and the `matchPath` rebuild ask for
     // the URL through this method BEFORE `makeState` splits, so a split done
     // only downstream would print a path that contradicts `state.search`
-    // (INVARIANTS makeState #6). The query half is handed to
-    // `#mergeDefaultSearch` below via the split, so `defaultSearch` still wins.
-    // `defaultSearch` goes in as the third argument, which `separateChannels`
-    // spreads LAST — so the explicit query slot outranks the query half of
-    // `defaultParams`, the same precedence `canonicalize` and `makeState` use.
-    // Passing it (rather than `EMPTY_SEARCH`) also keeps `undefined` flowing
-    // through when the route declares neither: the matcher's single-bag
-    // fallback (`search ?? params`) must stay reachable for a v1 caller.
-    // ⚠ Only when the caller SPELLED a query channel. A single-bag caller
-    // (`buildPath(name, { q, page })`, still legal until the entry point
-    // migrates) relies on the matcher's `search ?? params` fallback to print the
-    // query out of the one bag they passed. Splitting the defaults would make
-    // `searchWithDefault` defined, the fallback would stop firing, and the
-    // caller's own query values would vanish from the URL — measured as four
-    // red `search-schema-plugin` tests. With no explicit `search`, the defaults
-    // stay in the params bag exactly as before and the fallback prints them.
-    const routeDefaults =
-      search === undefined
-        ? {
-            params: this.#store.config.defaultParams[route] as
-              Params | undefined,
-            search: undefined,
-          }
-        : separateChannels(
-            this.#store.config.defaultParams[route],
-            this.getQueryParams(route),
-            this.#store.config.defaultSearch[route],
-          );
+    // (INVARIANTS makeState #6). `defaultSearch` goes in as the third argument,
+    // which `separateChannels` spreads LAST — so the explicit query slot
+    // outranks the query half of `defaultParams`, the same precedence
+    // `canonicalize` and `makeState` use. Passing it (rather than
+    // `EMPTY_SEARCH`) also keeps `undefined` flowing through when the route
+    // declares neither: the matcher's single-bag fallback (`search ?? params`)
+    // must stay reachable for a v1 caller.
+    // ⚠ Skipped for a v1 SINGLE-BAG caller — one who rode a route-DECLARED
+    // query key in the params bag (`buildPath(name, { q, page })`, still legal
+    // until this entry point migrates). Such a caller owns the query channel
+    // through the matcher's `search ?? params` fallback: splitting the defaults
+    // would make `searchWithDefault` defined, the fallback would stop firing,
+    // and their own query values would vanish from the URL — measured as four
+    // red `search-schema-plugin` tests.
+    // The test is the caller's BAG, not the absence of the `search` argument
+    // (#1578): keying it on `search === undefined` also skipped the defaults for
+    // a caller who named no query channel at ALL, which is the arm every
+    // adapter's `<Link to="x">` takes (`buildHref` forwards an absent search
+    // prop verbatim). That printed an href without the default while the click
+    // committed one with it — `buildPath` was left the only producer disagreeing
+    // with `navigate` / `makeState` / the `matchPath` rebuild.
+    const queryNames = this.getQueryParams(route);
+    const ridesQueryInParams =
+      search === undefined &&
+      queryNames.some((name) => params[name] !== undefined);
+
+    const routeDefaults = ridesQueryInParams
+      ? {
+          params: this.#store.config.defaultParams[route] as Params | undefined,
+          search: undefined,
+        }
+      : separateChannels(
+          this.#store.config.defaultParams[route],
+          queryNames,
+          this.#store.config.defaultSearch[route],
+        );
 
     // `undefined` is absence on both sides (#1550 / #1551) — neither an
     // explicitly-undefined caller value nor an undefined-valued default reaches
@@ -291,11 +299,12 @@ export class RoutesNamespace<
 
     // #1549 (RFC-4 M2): the route's query defaults (`defaultSearch`) join the
     // search channel so they reach the URL query string — including when the
-    // caller omits `search` (the navigate path), which keeps `state.path` in
-    // step with makeState's `state.search`. An explicitly-passed search value
-    // wins over the default. When the route has no `defaultSearch`, an omitted
-    // `search` stays `undefined` (single-bag fallback: the matcher extracts any
-    // query the caller rode in `paramsWithDefault`).
+    // caller omits `search` (the navigate path and every `<Link>`, #1578), which
+    // keeps `state.path` in step with makeState's `state.search`. An
+    // explicitly-passed search value wins over the default. When the route has
+    // no `defaultSearch`, or the caller rode the query in the params bag, an
+    // omitted `search` stays `undefined` (single-bag fallback: the matcher
+    // extracts any query the caller rode in `paramsWithDefault`).
     // Annotated, not inferred: `separateChannels` short-circuits by RETURNING
     // the `search` it was handed, so this stays `undefined` for a route with
     // neither kind of query default — which is what keeps the matcher's

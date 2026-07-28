@@ -30,8 +30,8 @@ import type { Route, Router, State } from "@real-router/core";
  * (`path: buildPath(name, mergedParams, mergedSearch)`, still used by every
  * entry point not yet migrated), in makeState's `defaultSearch` merge, or in the
  * `matchPath` URL rebuild can never again print one query while committing
- * another. (`buildPath`'s own `#mergeDefaultSearch` is NOT among them — see the
- * measured map below.)
+ * another. (`buildPath`'s own default merge joined them in #1578 — block 8; the
+ * measured map below records what each block actually kills.)
  *
  * DISCRIMINATING POWER — re-measured on the nav-pipeline milestone (five
  * independent mutations, each applied and reverted; the previous map was written
@@ -44,7 +44,8 @@ import type { Route, Router, State } from "@real-router/core";
  *  | `makeState`'s path fallback drops `mergedSearch`            | 3          |
  *  | `matchPath`'s URL rebuild prints without the query          | 4, 7       |
  *  | `makeState` stops merging `defaultSearch`                   | 3, 5       |
- *  | `buildPath` stops merging `defaultSearch`                   | none       |
+ *  | `buildPath` stops merging `defaultSearch`                   | 8          |
+ *  | `buildPath` skips its defaults when `search` is `undefined` | 8          |
  *
  *  - blocks 1, 2 AND 6 (both navigate forms) now guard ONE builder — the
  *    pipeline's ⑤a. Block 2 used to sit with block 3: before the milestone the
@@ -56,16 +57,17 @@ import type { Route, Router, State } from "@real-router/core";
  *    i.e. by the seven entry points not yet on the pipeline.
  *  - blocks 4 and 7 guard the `matchPath` URL rebuild (the exact site of the e2e
  *    divergence — raw vs recovered query).
- *  - block 5 guards makeState's `defaultSearch` merge, NOT buildPath's
- *    `#mergeDefaultSearch` as previously claimed: dropping the latter kills
- *    nothing here (measured), because makeState merges the default itself and
- *    hands it to buildPath as an explicit `search`, making buildPath's own merge
- *    redundant on this path. That claim was already wrong before the milestone —
- *    `RoutesNamespace` is untouched by it. ⚠ No mutation in this set kills block 5
- *    alone (both that reach it also reach block 3), so its unique contribution is
- *    the VALUE assertion (`state.search` equals the route default), not the
- *    consistency invariant. Five mutations are not proof of redundancy; treat it
- *    as the open end of this map.
+ *  - block 5 guards makeState's `defaultSearch` merge. Dropping buildPath's own
+ *    merge used to kill nothing here (measured), because every block reached the
+ *    URL through a state builder that merges the default itself and hands
+ *    buildPath an explicit `search`, making buildPath's merge redundant on that
+ *    path. That gap is what #1578 fell into — block 8 closes it by drawing the
+ *    arm where NO state builder stands in front of buildPath, and both buildPath
+ *    mutations above now die on it alone (measured: 1 failed / 420 passed).
+ *    ⚠ No mutation in this set kills block 5 alone (both that reach it also reach
+ *    block 3), so its unique contribution is the VALUE assertion (`state.search`
+ *    equals the route default), not the consistency invariant. Mutations are not
+ *    proof of redundancy; treat block 5 as the open end of this map.
  *
  * A `state.search`-only assertion (the masking shape the e2e exposed) survives
  * EVERY one of these mutations — this property is exactly what that shape could
@@ -316,6 +318,31 @@ describe("core/state — search ↔ path consistency (#1548/#1549)", () => {
       expect(state!.search).toStrictEqual({ tag: "d" });
 
       assertSearchMatchesPath(state!);
+    },
+  );
+
+  // 8. The href a link renders and the URL a click commits are ONE string — the
+  //    `buildPath` ↔ `navigate` agreement, drawn ACROSS the arm where the caller
+  //    names no query channel at all (`fc.option(..., { nil: undefined })`).
+  //    This is the block the map above was missing: blocks 1-7 all reach the URL
+  //    through a state builder that merges `defaultSearch` itself and hands
+  //    `buildPath` an explicit `search`, so `buildPath`'s own merge is redundant
+  //    on every one of them — hence "kills none". A directly-called `buildPath`
+  //    has no such builder in front of it, which is where #1578 lived: every
+  //    adapter's `<Link to="x">` forwards an absent search prop verbatim, so the
+  //    href dropped the route's query default while the click kept it.
+  //    Verified mutationally: restoring the `search === undefined` skip fails
+  //    this block on the `undefined` draw and no other block in the file.
+  test.prop([arbId, fc.option(arbRefSearch, { nil: undefined })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "buildPath(name, params[, search]) prints the URL navigate commits for the same intent",
+    async (id, refSearch) => {
+      const committed = await router.navigate("item", { id }, refSearch, {
+        reload: true,
+      });
+
+      expect(router.buildPath("item", { id }, refSearch)).toBe(committed.path);
     },
   );
 });
