@@ -356,10 +356,14 @@ describe("Browser Plugin — URL", () => {
       });
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      const url = router.buildUrl("search", {
-        q: "test&debug=true",
-        category: "books",
-      });
+      const url = router.buildUrl(
+        "search",
+        {},
+        {
+          q: "test&debug=true",
+          category: "books",
+        },
+      );
 
       // Ampersand in param value should be encoded
       expect(url).toContain("test%26debug%3Dtrue");

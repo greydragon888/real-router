@@ -743,7 +743,8 @@ describe("Link component", () => {
         () => (
           <Link
             routeName="items.item"
-            routeParams={{ id: "42", q: "search" }}
+            routeParams={{ id: "42" }}
+            routeSearch={{ q: "search" }}
             hash="section-2"
             data-testid="link"
           >

@@ -189,9 +189,22 @@ describe("Roundtrip Properties", () => {
       { minLength: 1, maxLength: 3 },
     );
 
-    test.prop([arbSegments, arbSplatValue], { numRuns: NUM_RUNS.standard })(
+    // ⚠ The two generators are independent, so they CAN draw the same string —
+    // and then the fixture is genuinely ambiguous rather than broken: with
+    // `tail = ["t"]` and `fallback = "t"`, `buildPath("root.all", {rest:"t"})`
+    // emits `/root/t`, which the more-specific child `leaf` (`/t`) matches by
+    // design. The property then fails on correct behaviour. Filter the PAIR (not
+    // either generator alone — a filter over a single arbitrary here has nothing
+    // to reject against) so the drawn splat value never spells the child's own
+    // path. Verified: `[["t"],"t"]` reproduces identically on `f5d3125b7`, i.e.
+    // the flake predates the pipeline work and was only ever seed-dependent.
+    const arbDistinctPair = fc
+      .tuple(arbSegments, arbSplatValue)
+      .filter(([tail, fallback]) => fallback !== tail.join("/"));
+
+    test.prop([arbDistinctPair], { numRuns: NUM_RUNS.standard })(
       "a route reached through a splat builds a URL that matches that same route",
-      (tail: string[], fallback: string) => {
+      ([tail, fallback]: [string[], string]) => {
         const matcher = createMatcher();
 
         matcher.registerTree(

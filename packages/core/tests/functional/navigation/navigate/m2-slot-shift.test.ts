@@ -132,8 +132,16 @@ describe("navigate() — RFC-4 M2 params/search slot-shift (#1548)", () => {
       );
     });
 
-    it("v1 two-arg call is unchanged (query extracted from the single bag)", () => {
-      expect(router.buildPath("search", { q: "b" })).toBe("/search?q=b");
+    it("prints the query from the query channel, not from the params bag", () => {
+      // Retired at Phase 2 step 2-1 (was: "v1 two-arg call is unchanged — query
+      // extracted from the single bag"). The matcher's `search ?? params`
+      // fallback is gone from this entry point: the URL's query comes from the
+      // query channel alone, so a declared key handed in the params bag is not
+      // printed. `navigate` refuses that same shape outright (P1, #1572); the
+      // predicate answers instead of throwing, which is why it prints a URL
+      // without the key rather than raising.
+      expect(router.buildPath("search", {}, { q: "b" })).toBe("/search?q=b");
+      expect(router.buildPath("search", { q: "b" })).toBe("/search");
     });
   });
 

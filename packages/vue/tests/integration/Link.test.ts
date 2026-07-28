@@ -168,7 +168,7 @@ describe("Link - Integration Tests", () => {
           Link,
           {
             routeName: "one-more-test",
-            routeParams: { id: "123", filter: "active" },
+            routeSearch: { id: "123", filter: "active" },
           },
           { default: () => "Test" },
         ),

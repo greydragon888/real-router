@@ -66,7 +66,15 @@ describe("query-channel registry properties (#1556)", () => {
           getPluginApi(router).forwardState("r", bag).search ?? {},
           key,
         );
-        const printedAsQuery = router.buildPath("r", bag).includes(`?${key}=V`);
+        // The build is asked through the QUERY channel (Phase 2, step 2-1):
+        // `buildPath` no longer runs the seam, so a key handed in the params bag
+        // is not re-channelled and never reaches the query string. The
+        // biconditional is about CLASSIFICATION — does the registry call this key
+        // a query name — so both sides must observe it where classification is
+        // what decides: the seam separates by it, and the build prints by it.
+        const printedAsQuery = router
+          .buildPath("r", {}, bag)
+          .includes(`?${key}=V`);
 
         expect(separatedToQuery).toBe(printedAsQuery);
       }

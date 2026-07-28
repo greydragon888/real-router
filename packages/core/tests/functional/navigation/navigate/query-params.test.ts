@@ -134,11 +134,11 @@ describe("router.navigate() / router.buildPath() — undefined params contract",
   });
 
   it("buildPath() strips undefined from produced URL", () => {
-    const url = router.buildPath("users.view", {
-      id: 42,
-      q: "search",
-      sort: undefined,
-    });
+    const url = router.buildPath(
+      "users.view",
+      { id: 42 },
+      { q: "search", sort: undefined },
+    );
 
     expect(url).toBe("/users/view/42?q=search");
   });

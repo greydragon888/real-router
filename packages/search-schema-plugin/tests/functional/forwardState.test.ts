@@ -63,11 +63,15 @@ describe("Search schema plugin", () => {
     });
 
     it("should pass valid params through unchanged on buildPath", () => {
-      const path = router.buildPath("search", {
-        q: "hello",
-        page: 2,
-        sort: "desc",
-      });
+      const path = router.buildPath(
+        "search",
+        {},
+        {
+          q: "hello",
+          page: 2,
+          sort: "desc",
+        },
+      );
 
       expect(path).toBe("/search?q=hello&page=2&sort=desc");
     });
@@ -115,12 +119,16 @@ describe("Search schema plugin", () => {
     });
 
     it("should not strip unknowns from buildPath (schema only runs on navigate)", () => {
-      const path = router.buildPath("search", {
-        q: "test",
-        page: 1,
-        sort: "asc",
-        extra: "still-here",
-      });
+      const path = router.buildPath(
+        "search",
+        {},
+        {
+          q: "test",
+          page: 1,
+          sort: "asc",
+          extra: "still-here",
+        },
+      );
 
       expect(path).toContain("q=test");
       expect(path).toContain("extra=still-here");
@@ -479,7 +487,7 @@ describe("Search schema plugin", () => {
     });
 
     it("should build path without modification for routes without schema", () => {
-      const path = router.buildPath("about", { ref: "homepage" });
+      const path = router.buildPath("about", {}, { ref: "homepage" });
 
       expect(path).toBe("/about?ref=homepage");
     });
@@ -521,7 +529,7 @@ describe("Search schema plugin", () => {
     });
 
     it("should not affect buildPath (schema only runs on navigate)", () => {
-      const path = router.buildPath("search", { q: "hello" });
+      const path = router.buildPath("search", {}, { q: "hello" });
 
       expect(path).toContain("q=hello");
       expect(path).not.toContain("page=");
@@ -943,7 +951,7 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      const path = router.buildPath("search", { q: "  HELLO  " });
+      const path = router.buildPath("search", {}, { q: "  HELLO  " });
 
       expect(path).not.toContain("q=hello");
     });

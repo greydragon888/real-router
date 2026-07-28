@@ -631,7 +631,7 @@ describe("Link - Integration Tests", () => {
       render(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "123", filter: "active" }}
+          routeSearch={{ id: "123", filter: "active" }}
           data-testid="link"
         >
           Test
@@ -649,7 +649,7 @@ describe("Link - Integration Tests", () => {
       const { rerender } = render(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "1" }}
+          routeSearch={{ id: "1" }}
           data-testid="link"
         >
           Test
@@ -664,7 +664,7 @@ describe("Link - Integration Tests", () => {
       rerender(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "2" }}
+          routeSearch={{ id: "2" }}
           data-testid="link"
         >
           Test
@@ -681,7 +681,7 @@ describe("Link - Integration Tests", () => {
       render(
         <Link
           routeName="one-more-test"
-          routeParams={{
+          routeSearch={{
             search: "test query",
             sort: "asc",
             page: "1",

@@ -6,6 +6,7 @@ import {
   mergeWithDefault,
   normalizeParams,
   separateChannels,
+  withholdFilledSlots,
 } from "../helpers";
 
 import type { RouteResolver } from "./port";
@@ -34,15 +35,40 @@ import type { Params, SearchParams } from "../types";
  * can see them. `mergeWithDefault` also copies before freezing, so the caller's
  * own bag is never frozen out from under it.
  */
+export interface CanonicalizeOptions {
+  /**
+   * Run stage ① (`forwardTo` resolution through the interceptor seam)?
+   *
+   * Defaults to `true`. `false` is the LITERAL form: the intent canonicalises
+   * against the route the caller NAMED, without following its `forwardTo` chain
+   * and without entering the seam. The entry points that ask a question about a
+   * literal route rather than producing a destination take it — `buildPath`
+   * (A.5: `buildPath("src")` stays `/src`, deliberately asymmetric with
+   * `navigate`), `isActiveRoute`'s literal arm, and `makeState`.
+   *
+   * ⚠ Skipping the seam also skips its channel separation, which is the POINT,
+   * not a side effect: a caller who rode a declared query key in the `params`
+   * bag no longer has it moved to the query channel, so the URL build prints
+   * from the query channel alone. That is what makes channel-correctness the
+   * producer's contract on these points.
+   */
+  resolveForward?: boolean;
+}
+
 export function canonicalize(
   port: RouteResolver,
   name: string,
   params: Params,
   search?: SearchParams,
+  opts?: CanonicalizeOptions,
 ): Canonical {
   // ① — forwardTo resolution + source-route default layering, through the
-  // interceptor zone (plugins inject here).
-  const forwarded = port.resolveForward(name, params, search);
+  // interceptor seam (plugins inject here). The literal form skips it entirely:
+  // no chain, no seam, no channel separation — the caller's bags stand as given.
+  const forwarded =
+    opts?.resolveForward === false
+      ? { name, params, search }
+      : port.resolveForward(name, params, search);
   const resolvedName = forwarded.name;
 
   // Path-channel entry guard: drops `undefined`-valued keys and collapses an
@@ -68,11 +94,22 @@ export function canonicalize(
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
   // accessor) so the merge itself allocates nothing on the zero-defaults hot
   // path — the `Canonical` literal below is the pipeline's one added allocation.
-  const query = mergeWithDefault(
-    routeDefaults.search,
-    forwarded.search,
-    EMPTY_SEARCH,
-  );
+  // In the LITERAL form no seam runs, so nothing has enforced #1570's rule that
+  // a default is never applied to a slot the caller already filled — in EITHER
+  // bag. Apply it here: the query default and a caller's params-twin land in
+  // DIFFERENT channels, where no merge ranks them, and the default would win by
+  // construction. `buildPath("x", { page: "9" })` on `defaultSearch { page: "5" }`
+  // would print `?page=5` — the caller's value silently replaced by the default,
+  // which is the §1.1 inversion this whole split exists to remove. Nothing is
+  // rerouted: the caller's key stays in the bag they chose (and, being in the
+  // path channel, is simply not printed — that IS the single-bag retirement),
+  // only the default is withheld.
+  const queryDefaults =
+    opts?.resolveForward === false
+      ? withholdFilledSlots(routeDefaults.search, pathBag)
+      : routeDefaults.search;
+
+  const query = mergeWithDefault(queryDefaults, forwarded.search, EMPTY_SEARCH);
 
   return {
     name: resolvedName,

@@ -136,7 +136,7 @@ describe("Link - Integration Tests", () => {
     it("should generate correct href with query params", () => {
       renderWithRouter(router, Link, {
         routeName: "one-more-test",
-        routeParams: { id: "123", filter: "active" },
+        routeSearch: { id: "123", filter: "active" },
       });
 
       const href = document.querySelector("a")!.getAttribute("href")!;

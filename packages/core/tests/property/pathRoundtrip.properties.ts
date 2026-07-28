@@ -86,7 +86,9 @@ describe("buildPath ↔ matchPath Roundtrip Properties", () => {
   test.prop([arbSearchParams], { numRuns: NUM_RUNS.standard })(
     "query params roundtrip: search route preserves q and page values",
     (params) => {
-      const path = router.buildPath("search", params);
+      // The query channel is spelled explicitly since buildPath moved onto the
+      // pipeline (Phase 2, step 2-1): the URL query is printed from it alone.
+      const path = router.buildPath("search", {}, params);
       const matched = pluginApi.matchPath(path);
 
       expect(matched).toBeDefined();

@@ -255,11 +255,15 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      const path = router.buildPath("search", {
-        q: "test",
-        page: 5,
-        sort: "desc",
-      });
+      const path = router.buildPath(
+        "search",
+        {},
+        {
+          q: "test",
+          page: 5,
+          sort: "desc",
+        },
+      );
 
       expect(path).toContain("q=test");
       expect(path).toContain("page=5");
@@ -410,7 +414,7 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      const path = router.buildPath("search", { q: "hello", page: "bad" });
+      const path = router.buildPath("search", {}, { q: "hello", page: "bad" });
 
       expect(path).toContain("q=hello");
       expect(path).toContain("page=bad");

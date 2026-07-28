@@ -250,87 +250,39 @@ export class RoutesNamespace<
       return typeof params.path === "string" ? params.path : "";
     }
 
-    // The route's OWN defaults, split by the channel the route DECLARES (#1549)
-    // — the third and last place a terminal's defaults are applied, after
-    // `canonicalize` and `makeState`. It has to happen HERE too, not only in the
-    // state builders: `buildNavigationState` and the `matchPath` rebuild ask for
-    // the URL through this method BEFORE `makeState` splits, so a split done
-    // only downstream would print a path that contradicts `state.search`
-    // (INVARIANTS makeState #6). `defaultSearch` goes in as the third argument,
-    // which `separateChannels` spreads LAST — so the explicit query slot
-    // outranks the query half of `defaultParams`, the same precedence
-    // `canonicalize` and `makeState` use. Passing it (rather than
-    // `EMPTY_SEARCH`) also keeps `undefined` flowing through when the route
-    // declares neither: the matcher's single-bag fallback (`search ?? params`)
-    // must stay reachable for a v1 caller.
-    // ⚠ Skipped for a v1 SINGLE-BAG caller — one who rode a route-DECLARED
-    // query key in the params bag (`buildPath(name, { q, page })`, still legal
-    // until this entry point migrates). Such a caller owns the query channel
-    // through the matcher's `search ?? params` fallback: splitting the defaults
-    // would make `searchWithDefault` defined, the fallback would stop firing,
-    // and their own query values would vanish from the URL — measured as four
-    // red `search-schema-plugin` tests.
-    // The test is the caller's BAG, not the absence of the `search` argument
-    // (#1578): keying it on `search === undefined` also skipped the defaults for
-    // a caller who named no query channel at ALL, which is the arm every
-    // adapter's `<Link to="x">` takes (`buildHref` forwards an absent search
-    // prop verbatim). That printed an href without the default while the click
-    // committed one with it — `buildPath` was left the only producer disagreeing
-    // with `navigate` / `makeState` / the `matchPath` rebuild.
-    const queryNames = this.getQueryParams(route);
-    const ridesQueryInParams =
-      search === undefined &&
-      queryNames.some((name) => params[name] !== undefined);
+    // Stage ③ (route defaults under the caller's value, split by the channel the
+    // route declares — #1549) plus the mode gate (#1575), one pass through the
+    // pipeline (nav-pipeline Phase 2, step 2-1). The LITERAL form: `buildPath`
+    // does not follow `forwardTo` (A.5 — `buildPath("src")` stays `/src`, a
+    // deliberate asymmetry with `navigate`), so stage ① is skipped and the seam
+    // is never entered.
+    // ⚠ Skipping the seam also skips its channel separation, and THAT is what
+    // retires the v1 single-bag form here: a caller who rode a query key in the
+    // `params` bag no longer has it moved to the query channel, and the query
+    // string is printed from `canonical.query` alone. Before this step the
+    // matcher's `search ?? params` fallback printed it out of the path bag, so
+    // `buildPath` disagreed with `navigate` on the same intent — an undeclared
+    // key in `loose` (`/t?foo=1` vs `/t`), the `/coll/:id?id` collision
+    // (`/items/V?id=V` vs `/items/V`), and a route's arbitrary `defaultParams`
+    // (`/s?theme=d` vs `/s`). All three now agree.
+    const canonical = canonicalize(this.#deps.port, route, params, search, {
+      resolveForward: false,
+    });
 
-    const routeDefaults = ridesQueryInParams
-      ? {
-          params: this.#store.config.defaultParams[route] as Params | undefined,
-          search: undefined,
-        }
-      : separateChannels(
-          this.#store.config.defaultParams[route],
-          queryNames,
-          this.#store.config.defaultSearch[route],
-        );
-
-    // `undefined` is absence on both sides (#1550 / #1551) — neither an
-    // explicitly-undefined caller value nor an undefined-valued default reaches
-    // the codec or the matcher as an own key.
-    const paramsWithDefault = mergeDefined(routeDefaults.params, params);
-
-    // #1549 (RFC-4 M2): the route's query defaults (`defaultSearch`) join the
-    // search channel so they reach the URL query string — including when the
-    // caller omits `search` (the navigate path and every `<Link>`, #1578), which
-    // keeps `state.path` in step with makeState's `state.search`. An
-    // explicitly-passed search value wins over the default. When the route has
-    // no `defaultSearch`, or the caller rode the query in the params bag, an
-    // omitted `search` stays `undefined` (single-bag fallback: the matcher
-    // extracts any query the caller rode in `paramsWithDefault`).
-    // Annotated, not inferred: `separateChannels` short-circuits by RETURNING
-    // the `search` it was handed, so this stays `undefined` for a route with
-    // neither kind of query default — which is what keeps the matcher's
-    // single-bag fallback (`search ?? params`) reachable for a v1 caller. The
-    // inferred type loses that branch and would make the `?? {}` below read as
-    // dead code.
-    const searchWithDefault: SearchParams | undefined = mergeDefined(
-      routeDefaults.search,
-      search,
-    );
-
-    // `search` (RFC-4 M2 / #1548) is the explicit query channel. The route codec
-    // (if any) now sees BOTH channels — `encodeParams({ params, search })` returns
-    // `{ params, search }` (§4) — so an encoder can shape the query as well as the
-    // path. The matcher then builds the path slots from the returned `params` and
-    // the query string from the returned `search`. With no encoder the channels
-    // pass straight through, allocating no wrapper object on the hot path.
+    // Stage ⑤a stays LOCAL to this method rather than going through `buildURL`,
+    // and this is structural, not a preference: `buildURL` prints via
+    // `port.buildPath`, which IS the interceptable `ctx.buildPath` wrapping this
+    // very method (`Router.ts:322-325`) — routing through it would recurse. The
+    // interceptor zone therefore stays exactly where it is (#1231:
+    // `persistent-params` injects here), one layer above.
+    // The route codec sees BOTH channels — `encodeParams({ params, search })` →
+    // `{ params, search }` (§4) — so an encoder can shape the query as well as
+    // the path.
     if (typeof this.#store.config.encoders[route] === "function") {
       const encoded = this.#store.config.encoders[route]({
-        // Spread so a mutating encoder can't reach the caller's original params
-        // object (the `params ?? {}` branch above aliases it) — a copy, as the
-        // v1 single-bag call (`encoders[route]({ ...paramsWithDefault })`) did.
-        params: { ...paramsWithDefault },
-
-        search: searchWithDefault ?? {},
+        // Spread so a mutating encoder cannot reach the frozen canonical bag.
+        params: { ...canonical.path },
+        search: canonical.query,
       });
 
       return this.#store.matcher.buildPath(
@@ -343,8 +295,8 @@ export class RoutesNamespace<
 
     return this.#store.matcher.buildPath(
       route,
-      paramsWithDefault,
-      searchWithDefault,
+      canonical.path,
+      canonical.query,
       this.#getBuildPathOptions(options),
     );
   }

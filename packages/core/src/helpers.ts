@@ -28,6 +28,47 @@ import type { Limits } from "./types/internal";
  * allocation) when there is nothing to route: no params, no declared query
  * names, or no declared key actually riding in the params bag (the common path).
  */
+/**
+ * Withholds every query default whose key the caller already filled in the PATH
+ * bag — the rule #1570 states for a `forwardTo` chain's defaults, applied where
+ * no seam runs to enforce it.
+ *
+ * Nothing is moved between channels: the caller's key stays in the bag the
+ * caller chose, only the default is declined. Without this the default and the
+ * caller's params-twin sit in DIFFERENT channels, where no merge ranks them, and
+ * the query default wins by default — the §1.1 priority inversion the channel
+ * split exists to remove.
+ *
+ * `undefined` is absence (#1550 / #1551), so a caller's removal marker does not
+ * count as "already filled" and the default survives it.
+ *
+ * Returns the input untouched (no allocation) when nothing is withheld — the
+ * common path, and the only one the zero-default hot path ever takes.
+ */
+export function withholdFilledSlots(
+  defaults: SearchParams | undefined,
+  params: Params,
+): SearchParams | undefined {
+  if (defaults === undefined) {
+    return defaults;
+  }
+
+  let kept: Record<string, unknown> | undefined;
+  let dropped = false;
+
+  for (const [key, value] of Object.entries(defaults)) {
+    if (params[key] !== undefined) {
+      dropped = true;
+      continue;
+    }
+
+    kept ??= {};
+    kept[key] = value;
+  }
+
+  return dropped ? (kept as SearchParams | undefined) : defaults;
+}
+
 export function separateChannels(
   params: Params | undefined,
   queryNames: readonly string[],

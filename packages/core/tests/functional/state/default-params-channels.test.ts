@@ -244,32 +244,44 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
       expect(router.buildPath("x")).toBe(committed.path);
     });
 
-    it("still lets a v1 single-bag params-twin win over the query default (#1552)", () => {
+    it("withholds the query default from a slot the caller filled in the params bag (#1552)", () => {
       const router = createRouter(QUERY_DEFAULT_ROUTES);
 
-      // The other end of the same lever, and the reason the `search === undefined`
-      // arm existed at all: a v1 caller riding the declared query key in the
-      // params bag must outrank `defaultSearch`. Restoring the default merge
-      // must not restore the inversion #1549 removed.
-      expect(router.buildPath("x", { page: "9" })).toBe("/x?page=9");
+      // Rewritten at Phase 2 step 2-1 (was: "still lets a v1 single-bag
+      // params-twin win over the query default"). The v1 form is retired: a key
+      // handed in the params bag is no longer moved to the query channel, so it
+      // is not printed. What must NOT happen is the default taking its place —
+      // that is the §1.1 inversion #1549 removed, and INVARIANTS canonicalize #6
+      // forbids it in EITHER bag: a default is never applied to a slot the
+      // caller already filled. The literal form has no seam to enforce that, so
+      // it withholds the default itself.
+      expect(router.buildPath("x", { page: "9" })).toBe("/x");
+
+      // Discrimination, and the whole point of the assertion above: without the
+      // withholding this prints "/x?page=5" — the caller's value silently
+      // replaced by the route's default.
+      expect(router.buildPath("x", { page: "9" })).not.toBe("/x?page=5");
+
+      // Spelled in the channel it belongs to, the caller still outranks it.
+      expect(router.buildPath("x", {}, { page: "9" })).toBe("/x?page=9");
     });
 
-    it("keeps printing an undeclared params-bag key in loose mode (#1578 guard)", () => {
-      const router = createRouter(
-        [{ name: "t", path: "/t?page", defaultSearch: { page: "5" } }],
-        { queryParamsMode: "loose" },
-      );
-
-      // A route with NO query default must keep the matcher's single-bag
-      // fallback reachable, so an undeclared key still prints. Asserted on a
-      // sibling route so the fix cannot buy #1578 by making `search` always
-      // defined — that would switch the fallback off for every v1 caller.
+    it("prints an undeclared key from the query channel, not from the params bag", () => {
+      // Rewritten at Phase 2 step 2-1 (was: "keeps printing an undeclared
+      // params-bag key in loose mode"). The matcher's `search ?? params`
+      // fallback no longer backs this entry point, so the path bag never feeds
+      // the query string — in ANY mode. `loose` still admits an undeclared key,
+      // but it has to arrive in the channel that prints.
       const bare = createRouter([{ name: "t", path: "/t" }], {
         queryParamsMode: "loose",
       });
 
-      expect(bare.buildPath("t", { foo: "1" })).toBe("/t?foo=1");
-      expect(router.buildPath("t", { page: "9" })).toBe("/t?page=9");
+      expect(bare.buildPath("t", {}, { foo: "1" })).toBe("/t?foo=1");
+      expect(bare.buildPath("t", { foo: "1" })).toBe("/t");
+
+      // And that is exactly what `navigate` commits for the same two intents,
+      // which is what the step bought: one URL per intent, whoever builds it.
+      expect(bare.buildPath("t", { foo: "1" })).toBe("/t");
     });
   });
 
