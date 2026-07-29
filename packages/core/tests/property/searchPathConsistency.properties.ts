@@ -276,7 +276,7 @@ describe("core/state — search ↔ path consistency (#1548/#1549)", () => {
   );
 
   // 5. defaultSearch injection — no caller query at all. The query default must
-  //    reach BOTH state.search AND state.path (the #mergeDefaultSearch / makeState
+  //    reach BOTH state.search AND state.path (the buildPath / makeState
   //    default-routing consistency). A default that lands in state.search but not
   //    in the URL fails here (and ONLY here — a search-only assert would pass).
   test.prop([fc.constant(null)], { numRuns: NUM_RUNS.fast })(

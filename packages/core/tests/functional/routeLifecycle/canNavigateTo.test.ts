@@ -554,7 +554,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     // Symmetry (#1577): the sibling render-path predicate states the same policy
     // in its own code — "a predicate answers, it never throws from inside a
     // render" (RoutesNamespace.ts:616-618) — but only wrapped the destination
-    // arm. Its literal arm walks the bag too (separateChannels), as does the
+    // arm. Its literal arm walks the bag too (canonicalize's literal form), as does the
     // descendant branch's combined-bag spread.
     expect(fresh.isActiveRoute("x", hostile as never)).toBe(false);
     expect(fresh.isActiveRoute("x", {}, hostile as never)).toBe(false);

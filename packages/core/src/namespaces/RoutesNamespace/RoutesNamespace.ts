@@ -361,8 +361,8 @@ export class RoutesNamespace<
     // this method used to call directly — `port.resolveForward` is
     // `ctx.forwardState` — so a search-schema interceptor still validates the
     // query on the URL→State path here (the `routeSearch` argument is defined,
-    // marking this as a re-parse, not a navigate), and the seam's channel
-    // separation still canonicalises the bags. What the pipeline replaces is the
+    // marking this as a re-parse, not a navigate), and the seam still checks the
+    // channels on the way through. What the pipeline replaces is the
     // hand-rolled composition that followed: the route's own default split
     // (#1549), the default merge, and the mode gate (#1575) now happen once,
     // inside `canonicalize`, from the same read-model `navigate` uses.

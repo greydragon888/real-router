@@ -146,8 +146,10 @@ describe("query-channel registry properties (#1556)", () => {
    * A forwarding hop can only spell a default in `defaultParams`, but the
    * channel belongs to the resolved TARGET. Stated over the RAW stage-① output
    * (what a `forwardState` interceptor sees via `next(...)`), because the seam's
-   * `separateChannels` moves the key one line later and would mask a producer
-   * that classifies wrongly — the very masking that kept this defect invisible.
+   * channel repair used to move the key one line later, which would mask a
+   * producer that classifies wrongly — the very masking that kept this defect
+   * invisible. The repair is gone (the seam refuses instead), and stating the
+   * property over the RAW stage-① output keeps it honest either way.
    *
    * The oracle is the FIXTURE, not the implementation: the property re-derives
    * the expected channel from the route path it just built, so it cannot agree
