@@ -32,13 +32,13 @@ await hydrateRouter(router, window.__SSR_STATE__);
 
 ## API
 
-| Function | Description |
-|----------|--------------|
-| `serializeState(data, opts?)` | XSS-safe JSON serialization for embedding in HTML `<script>` tags |
-| `serializeRouterState(state, opts?)` | XSS-safe `State` serializer — strips `transition`, keeps `context` |
-| `hydrateRouter(router, source, opts?)` | Hydrate a fresh router from server-serialized state |
-| `getStaticPaths(router, entries?)` | Enumerate leaf routes and build URLs for SSG pre-rendering |
-| `createRequestScope(request, base, deps?)` | Per-request SSR isolation via a cloned router |
+| Function                                   | Description                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| `serializeState(data, opts?)`              | XSS-safe JSON serialization for embedding in HTML `<script>` tags  |
+| `serializeRouterState(state, opts?)`       | XSS-safe `State` serializer — strips `transition`, keeps `context` |
+| `hydrateRouter(router, source, opts?)`     | Hydrate a fresh router from server-serialized state                |
+| `getStaticPaths(router, entries?)`         | Enumerate leaf routes and build URLs for SSG pre-rendering         |
+| `createRequestScope(request, base, deps?)` | Per-request SSR isolation via a cloned router                      |
 
 ### `serializeRouterState(state, options?)`
 
@@ -61,7 +61,9 @@ router.usePlugin(browserPluginFactory());
 await hydrateRouter(router, window.__SSR_STATE__);
 
 // Pair with a custom serializer
-await hydrateRouter(router, window.__SSR_STATE__, { deserialize: devalue.parse });
+await hydrateRouter(router, window.__SSR_STATE__, {
+  deserialize: devalue.parse,
+});
 ```
 
 SSR loader plugins (`@real-router/ssr-data-plugin`, `@real-router/rsc-server-plugin`)
@@ -74,11 +76,27 @@ value is already present in the hydrated state — no extra wiring needed.
 const paths = await getStaticPaths(router);
 // ["/", "/about", "/users/1", "/users/2", ...]
 
-// Provide per-route param sets for dynamic segments
+// Per-route entry sets for dynamic segments. An entry names its CHANNELS —
+// `params` for path slots, `search` for `?`-declared query names, both optional.
 const paths = await getStaticPaths(router, {
-  "users.profile": async () => [{ id: "1" }, { id: "2" }],
+  "users.profile": async () => [
+    { params: { id: "1" } },
+    { params: { id: "2" } },
+  ],
+  // `/list?sort&page` — the query channel varies the page
+  list: async () => [
+    { search: { sort: "asc", page: "1" } },
+    { search: { sort: "desc", page: "1" } },
+  ],
+  // `/doc/:id?rev` — both channels at once
+  doc: async () => [{ params: { id: "a" }, search: { rev: "1" } }],
 });
 ```
+
+A key that cannot reach the URL throws rather than silently collapsing pages: a
+name the route declares with `?` handed in `params`, or one it declares nowhere
+that the active `queryParamsMode` will not print, would make every entry
+differing only in it generate the same file (#1580).
 
 ### `createRequestScope(request, base, deps?)`
 
@@ -111,11 +129,11 @@ Full documentation: [Wiki — ssr-utils](https://github.com/greydragon888/real-r
 
 ## Related Packages
 
-| Package | Description |
-|---------|-------------|
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router |
-| [@real-router/ssr-data-plugin](https://www.npmjs.com/package/@real-router/ssr-data-plugin) | Per-route data loading — composes with the hydration scratchpad |
-| [@real-router/rsc-server-plugin](https://www.npmjs.com/package/@real-router/rsc-server-plugin) | Per-route `ReactNode` (RSC) loading — same composition |
+| Package                                                                                        | Description                                                     |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                           | Core router                                                     |
+| [@real-router/ssr-data-plugin](https://www.npmjs.com/package/@real-router/ssr-data-plugin)     | Per-route data loading — composes with the hydration scratchpad |
+| [@real-router/rsc-server-plugin](https://www.npmjs.com/package/@real-router/rsc-server-plugin) | Per-route `ReactNode` (RSC) loading — same composition          |
 
 ## Contributing
 

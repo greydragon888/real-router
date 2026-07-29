@@ -23,4 +23,4 @@ export { serializeState } from "./serializeState";
 
 export type { Serialize, SerializeStateOptions } from "./serializeState";
 
-export type { StaticPathEntries } from "./getStaticPaths";
+export type { StaticPathEntries, StaticPathEntry } from "./getStaticPaths";
