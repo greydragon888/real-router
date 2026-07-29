@@ -251,7 +251,16 @@ export class NavigationPlugin {
     // does via navOptions.hash for browser-initiated navigation.
     this.#pendingTraverseHash = extractHashFromEntryUrl(entryUrl);
 
-    return this.#router.navigate(matchedState.name, matchedState.params);
+    // Both channels, not just the path (#1586). `matchedState` came from
+    // matching the entry's URL, so its `search` is populated whenever that URL
+    // carried a query — and the browser is about to traverse to that very
+    // entry. Committing the path alone leaves the address bar and the router
+    // describing different pages.
+    return this.#router.navigate(
+      matchedState.name,
+      matchedState.params,
+      matchedState.search,
+    );
   }
 
   getPlugin(): Plugin {

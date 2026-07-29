@@ -15,7 +15,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Postcondition:**
 - `browser.getLocation()` returns a path that matches `S.path`
-- `browser.currentEntry.getState()` contains `{ name: S.name, params: S.params, path: S.path }`
+- `browser.currentEntry.getState()` contains `{ name: S.name, params: S.params, search: S.search, path: S.path }` — the entry state is two-channel since RFC-4 M2 (#1548); the recovery writer was the last one still omitting `search` (#1586)
 - If `navOptions.replace === true`, history was replaced (not pushed)
 - If `navOptions.replace === false`, history was pushed
 
@@ -277,6 +277,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 **Postcondition:**
 - Router transitions to the last `users.list` entry (index 3)
 - `router.getState().name === "users.list"`
+- **Both channels of that entry are committed (#1586)** — if its URL was `/users/list?tab=a`, then `getState().search` is `{ tab: "a" }` and `getState().path` carries the query. The browser traverses to the entry's full URL either way, so committing only `params` leaves the address bar and the router describing different pages.
 - `router.peekBack()` returns `users.view`
 - `router.peekForward()` returns `undefined`
 - `state.context.navigation` has `navigationType: "traverse"` and `direction: "back"`
@@ -792,6 +793,7 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 - `recoverFromNavigateError()` is called
 - `browser.navigate(url, { history: "replace" })` is called with URL matching current state
 - Browser URL is restored to `/`
+- **The rebuilt URL carries every channel of the surviving state (#1586)** — `buildUrl(name, params, state.search, { hash })`, and the buffered entry state carries `search`. Recovery rebuilds the state that SURVIVED the failure, so a dropped channel publishes a URL the router itself does not hold. This applies to the `RouterError` branch (`withRecovery` → `syncUrlToRouterState`) identically.
 
 **Why it matters:** Prevents URL from being stuck in an inconsistent state.
 

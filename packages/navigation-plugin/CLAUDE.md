@@ -97,6 +97,8 @@ Error: [navigation-plugin] Navigation API is not supported. Use @real-router/bro
 
 When a guard blocks navigation, `withRecovery` in `navigate-handler.ts` catches the `RouterError` and explicitly calls `syncUrlToRouterState` — `browser.navigate({ history: "replace" })` to the current router state — so URL and router state stay consistent.
 
+"Consistent" includes the query channel: the rebuilt URL passes `currentState.search` at slot 3 and the buffered entry state carries `search`. Both were missing until #1586, which made recovery the one writer producing a narrower entry than every other — a blocked back-navigation away from `?tab=a` left the user on the bare path while `state.path` still held the query.
+
 Why manual instead of relying on Navigation API's built-in rollback on intercept rejection: in practice (Chromium headless, some cross-origin setups) the rollback leaves a visible "committed-then-reverted" URL window that breaks UI tests and flashes an incorrect URL. Manual sync from the syncing branch gives a single visible state transition.
 
 `withRecovery` handles the two error classes:
@@ -170,6 +172,8 @@ Comparison is via `isSameHref(finalUrl, browser.currentEntry?.url)` (`href-utils
 ### traverseToLast Excludes Current Entry
 
 `traverseToLast(routeName)` finds the last entry matching `routeName`, but excludes the current entry to avoid `SAME_STATES`. Throws if the only matching entry is the current one.
+
+It commits **both** channels of the entry it traverses to — `navigate(matchedState.name, matchedState.params, matchedState.search)`. The query slot was empty until #1586, so a traverse onto `/list?tab=a` committed `/list` while the browser sat on the full URL, and a second back/forward round trip disagreed with what was displayed. This is the output half of the journey #449 fixed on the input side (`entryToState` keeping `url.search` before matching) — the resolved `matchedState` had been correct since then, which is why an assertion stopping at it proves nothing.
 
 ## Navigation Metadata via State Context
 

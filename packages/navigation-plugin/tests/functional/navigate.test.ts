@@ -8,6 +8,7 @@ import { PLUGIN_SYNC_INFO } from "../../src/navigation-browser";
 import { MockNavigation } from "../helpers/mockNavigation";
 import {
   createMockNavigationBrowser,
+  queryRouterConfig,
   routerConfig,
 } from "../helpers/testUtils";
 
@@ -313,6 +314,50 @@ describe("Navigation Plugin — Navigate", () => {
       // PLUGIN_SYNC_INFO keeps URL and router state consistent. No desync.
       expect(mockNav.currentUrl).toBe(urlBefore);
       expect(router.getState()?.name).toBe("index");
+    });
+
+    it("guard rejection rebuilds the URL with its query channel (#1586)", async () => {
+      // syncUrlToRouterState rebuilds the visible URL from the state that
+      // survived the rejection. It used to rebuild it from `name` + `params`
+      // alone, so a blocked back-navigation away from `?tab=a&sort=z` left the
+      // user on the bare path — a URL the router itself does not believe in
+      // (`state.path` still carries the query), and the one the address bar
+      // keeps if they copy it.
+      router.stop();
+
+      mockNav = new MockNavigation("http://localhost/");
+      browser = createMockNavigationBrowser(mockNav);
+      router = createRouter(queryRouterConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+
+      await router.start();
+      await router.navigate("users.list", {}, { tab: "a", sort: "z" });
+
+      const urlBefore = mockNav.currentUrl;
+
+      expect(urlBefore).toBe("http://localhost/users/list?tab=a&sort=z");
+
+      getLifecycleApi(router).addDeactivateGuard(
+        "users.list",
+        () => () => false,
+      );
+
+      const { finished } = mockNav.navigate("http://localhost/home");
+
+      await finished;
+
+      expect(router.getState()?.name).toBe("users.list");
+      expect(mockNav.currentUrl).toBe(urlBefore);
+      // The buffered entry state is the other half: `search` is part of the
+      // documented shape (CLAUDE.md "State in NavigationHistoryEntry"), and a
+      // reader restoring from it must not see a state the router never held.
+      expect(browser.currentEntry?.getState()).toMatchObject({
+        name: "users.list",
+        search: { tab: "a", sort: "z" },
+      });
     });
 
     it("explicit forceDeactivate: true still bypasses guards (opt-in escape hatch)", async () => {
