@@ -691,22 +691,19 @@ describe("core/routes/routePath/matchPath", () => {
       );
     });
 
-    it("routes a decoder-injected declared query key into state.path AND state.search (#1549)", () => {
-      // A decoder that injects a DECLARED `?tag` into the params bag: the key
-      // rides in `routeParams` on the matchPath rebuild — the same shape a
-      // plugin's forwardState injection produces (persistent-params on start()).
-      // The rebuild must route it into the URL query, in step with the
-      // `state.search` makeState commits — never leave state.search carrying
-      // `tag` while the rebuilt URL omits it.
+    it("takes a decoder's two channels as written, and refuses a mis-channelled one", () => {
+      // A decoder receives BOTH channels and must return both correctly — it
+      // knows its own route's declaration better than anyone. Injecting a
+      // DECLARED `?tag` into the params bag used to be silently repaired by the
+      // seam (stage ②), so a decoder shipped a bag it never wrote; it is now
+      // refused, and the message names the decoder rather than the chain the
+      // value later flows through.
       const customRouter = createTestRouter();
 
       getRoutesApi(customRouter).add({
         name: "tagged",
         path: "/tagged/:id?tag",
-        decodeParams: ({ params, search }) => ({
-          params: { ...params, tag: "dev" },
-          search,
-        }),
+        decodeParams: ({ params }) => ({ params, search: { tag: "dev" } }),
       });
 
       const state = getPluginApi(customRouter).matchPath("/tagged/1");
@@ -714,21 +711,30 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state?.params).toStrictEqual({ id: "1" });
       expect(state?.search).toStrictEqual({ tag: "dev" });
       expect(state?.path).toBe("/tagged/1?tag=dev");
+
+      getRoutesApi(customRouter).add({
+        name: "mis",
+        path: "/mis/:id?tag",
+        decodeParams: ({ params, search }) => ({
+          params: { ...params, tag: "dev" },
+          search,
+        }),
+      });
+
+      expect(() => getPluginApi(customRouter).matchPath("/mis/1")).toThrow(
+        /`decodeParams`/,
+      );
     });
 
-    it("routes a decoder-injected query key on a route WITHOUT path params (#1549)", () => {
-      // The decoder injects only a DECLARED query key and the route has no path
-      // params, so after channel separation the path bag is empty — covers the
-      // all-query rebuild branch (canonical params → EMPTY_PARAMS).
+    it("rebuilds an all-query URL from a decoder that injects only search", () => {
+      // The route has no path params, so the canonical path bag is empty —
+      // covers the all-query rebuild branch (canonical params → EMPTY_PARAMS).
       const customRouter = createTestRouter();
 
       getRoutesApi(customRouter).add({
         name: "plain",
         path: "/plain?tag",
-        decodeParams: ({ params, search }) => ({
-          params: { ...params, tag: "dev" },
-          search,
-        }),
+        decodeParams: ({ params }) => ({ params, search: { tag: "dev" } }),
       });
 
       const state = getPluginApi(customRouter).matchPath("/plain");

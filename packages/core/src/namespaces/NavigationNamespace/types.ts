@@ -3,7 +3,7 @@
 import type {
   GuardFn,
   NavigationOptions,
-  Options,
+  AnyOptions,
   Params,
   RouterLogger,
   SearchParams,
@@ -31,7 +31,11 @@ export interface NavigationDependencies {
   logger: RouterLogger;
 
   /** Get router options */
-  getOptions: () => Options;
+  // The erased view: these namespaces READ configuration (`defaultRoute`
+  // truthiness, `allowNotFound`) — they never resolve a callback, which is
+  // `resolveDefault`'s job. Taking `AnyOptions` keeps the dependency-map
+  // generic out of every namespace that has no use for it.
+  getOptions: () => AnyOptions;
 
   /** Check if route exists */
   hasRoute: (name: string) => boolean;
@@ -66,8 +70,14 @@ export interface NavigationDependencies {
     routeSearch?: SearchParams,
   ) => State | undefined;
 
-  /** Resolve defaultRoute and defaultParams options (static value or callback) */
-  resolveDefault: () => { route: string; params: Params };
+  /**
+   * Resolve the `defaultRoute` / `defaultParams` / `defaultSearch` options
+   * (each a static value or a callback). Two channels, never one bag — the
+   * default route may be chosen dynamically, so its query defaults have to
+   * travel in their own slot rather than be re-channelled downstream
+   * (RFC-4 M2 / #1548).
+   */
+  resolveDefault: () => { route: string; params: Params; search: SearchParams };
 
   /** Start transition and send NAVIGATE event to routerFSM */
   startTransition: (toState: State, fromState: State | undefined) => void;

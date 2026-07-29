@@ -62,21 +62,25 @@ describe("query-channel registry properties (#1556)", () => {
       for (const key of all) {
         const bag = { [key]: "V" };
 
-        const separatedToQuery = Object.hasOwn(
-          getPluginApi(router).forwardState("r", bag).search ?? {},
-          key,
-        );
-        // The build is asked through the QUERY channel (Phase 2, step 2-1):
-        // `buildPath` no longer runs the seam, so a key handed in the params bag
-        // is not re-channelled and never reaches the query string. The
-        // biconditional is about CLASSIFICATION — does the registry call this key
-        // a query name — so both sides must observe it where classification is
-        // what decides: the seam separates by it, and the build prints by it.
+        // ONE registry, two reactions, and the biconditional is still about
+        // CLASSIFICATION — does the registry call this key a query name. What
+        // changed is the seam's answer: it used to SEPARATE such a key out of
+        // the params bag (stage ②), and now it REFUSES the bag. Same predicate,
+        // opposite verb, so the property reads the refusal where it used to read
+        // the separation.
+        let refusedInPathBag = false;
+
+        try {
+          getPluginApi(router).forwardState("r", bag);
+        } catch {
+          refusedInPathBag = true;
+        }
+
         const printedAsQuery = router
           .buildPath("r", {}, bag)
           .includes(`?${key}=V`);
 
-        expect(separatedToQuery).toBe(printedAsQuery);
+        expect(refusedInPathBag).toBe(printedAsQuery);
       }
 
       // The control keys must be on the "neither" side of the biconditional —
@@ -156,15 +160,18 @@ describe("query-channel registry properties (#1556)", () => {
     ],
     { numRuns: NUM_RUNS.standard },
   )(
-    "a forwarding hop's default never lands in the path channel of a query-declared key",
+    "a forwarding hop's defaults keep the slot they were spelled in, and a query-declared name in the path slot is refused",
     async (rawQueryKeys, rawPathKeys) => {
       // Disjoint: a name occupying BOTH is the #843 carve-out, pinned above.
       const pathKeys = rawPathKeys.filter((k) => !rawQueryKeys.includes(k));
       const slots = pathKeys.map((k) => `/:${k}`).join("");
       const target = `/dst${slots}?${rawQueryKeys.join("&")}`;
 
-      const hopDefaults = Object.fromEntries(
-        [...rawQueryKeys, ...pathKeys].map((k) => [k, `D-${k}`]),
+      const queryDefaults = Object.fromEntries(
+        rawQueryKeys.map((k) => [k, `D-${k}`]),
+      );
+      const pathDefaults = Object.fromEntries(
+        pathKeys.map((k) => [k, `D-${k}`]),
       );
 
       const router = createRouter(
@@ -175,7 +182,12 @@ describe("query-channel registry properties (#1556)", () => {
             name: "src",
             path: "/src",
             forwardTo: "dst",
-            defaultParams: hopDefaults,
+            // Each half in the slot that names its channel. The router routes
+            // nothing by the target's declaration any more, so this is the only
+            // spelling that can work — and the refusal below proves the other
+            // one does not silently work anyway.
+            defaultParams: pathDefaults,
+            defaultSearch: queryDefaults,
           },
         ],
         { queryParams: { booleanFormat: "none" } } as never,
@@ -209,12 +221,34 @@ describe("query-channel registry properties (#1556)", () => {
       }
 
       // Path-declared hop defaults stay where they were (discrimination: the
-      // split is by declaration, not a blanket move to `search`).
+      // channel comes from the slot, not from a blanket move to `search`).
       for (const key of pathKeys) {
         expect(stageOne!.params[key]).toBe(`D-${key}`);
       }
 
       router.stop();
+
+      // The other spelling is REFUSED, not silently re-channelled. Registration
+      // cannot see it — only the resolved target declares these names — so the
+      // refusal comes from the seam, at the first navigation.
+      const misChannelled = createRouter([
+        { name: "home", path: "/home" },
+        { name: "dst", path: target },
+        {
+          name: "src",
+          path: "/src",
+          forwardTo: "dst",
+          defaultParams: { ...pathDefaults, ...queryDefaults },
+        },
+      ]);
+
+      await misChannelled.start("/home");
+
+      await expect(
+        misChannelled.navigate("src", {}, undefined, { reload: true }),
+      ).rejects.toThrow(/declares `/);
+
+      misChannelled.stop();
     },
   );
 });

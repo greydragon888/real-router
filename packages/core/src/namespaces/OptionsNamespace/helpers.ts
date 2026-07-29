@@ -1,6 +1,11 @@
 // packages/core/src/namespaces/OptionsNamespace/helpers.ts
 
-import type { Options, Params } from "../../types";
+import type {
+  DefaultDependencies,
+  Options,
+  Params,
+  SearchParams,
+} from "../../types";
 
 /**
  * Recursively freezes an object and all nested objects.
@@ -23,20 +28,28 @@ export function deepFreeze<T extends object>(obj: T): Readonly<T> {
  * If the value is a function, calls it with getDependency and returns the result.
  * Otherwise, returns the value as-is.
  */
-export function resolveOption(
-  value: Options["defaultRoute"],
+export function resolveOption<D extends DefaultDependencies>(
+  value: Options<D>["defaultRoute"],
   getDependency: (name: string) => unknown,
 ): string;
 
-export function resolveOption(
-  value: Options["defaultParams"],
+export function resolveOption<D extends DefaultDependencies>(
+  value: Options<D>["defaultParams"],
   getDependency: (name: string) => unknown,
 ): Params;
 
-export function resolveOption(
-  value: Options["defaultRoute"] | Options["defaultParams"],
+export function resolveOption<D extends DefaultDependencies>(
+  value: Options<D>["defaultSearch"],
   getDependency: (name: string) => unknown,
-): string | Params {
+): SearchParams;
+
+export function resolveOption<D extends DefaultDependencies>(
+  value:
+    | Options<D>["defaultRoute"]
+    | Options<D>["defaultParams"]
+    | Options<D>["defaultSearch"],
+  getDependency: (name: string) => unknown,
+): string | Params | SearchParams {
   if (typeof value === "function") {
     // Runtime getDependency is (name: string) => unknown, but DefaultRouteCallback<object>
     // expects <K extends keyof object>(name: K) => object[K] where keyof object = never.

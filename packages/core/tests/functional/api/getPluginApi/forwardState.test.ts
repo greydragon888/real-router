@@ -202,20 +202,21 @@ describe("forwardState", () => {
     });
   });
 
-  describe("chain defaults land in the channel the TARGET declares (#1570)", () => {
+  describe("a forwarding hop's defaults keep the channel they were spelled in", () => {
     /**
-     * A forwarding hop can only declare a default in `defaultParams` — that is
-     * the single slot it has. But the CHANNEL is decided by the resolved
-     * TARGET: if the target declares that key with `?`, the value belongs in
-     * the query channel.
+     * A hop writes `defaultParams` for the path channel and `defaultSearch` for
+     * the query channel, and the router moves neither. The channel used to be
+     * decided by the resolved TARGET's declaration (#1570), on the argument
+     * that a hop "can only spell a default in `defaultParams`" — which was
+     * already false (the fold reads `defaultSearch` too) and left a hop author
+     * unable to tell which channel their own config would land in without
+     * reading a target that a `forwardTo` CALLBACK may not determine until
+     * navigation time.
      *
      * Asserted on the RAW stage-① output, which is what a `forwardState`
-     * interceptor sees: `next(...)` returns the namespace primitive's result,
-     * before the seam's `separateChannels` runs. That is the surface the
-     * producer contract (RFC §4.3) is about — `search-schema` and friends read
-     * these bags — and the only place the classification is observable, since
-     * the seam moves the key one line later and the committed state is
-     * therefore identical either way.
+     * interceptor sees: `next(...)` returns the namespace primitive's result.
+     * That is the surface the producer contract (RFC §4.3) is about — plugins
+     * read these bags — and now also the surface the seam CHECKS.
      */
     function captureStageOne(): {
       calls: { params: Params; search: SearchParams }[];
@@ -236,26 +237,28 @@ describe("forwardState", () => {
       return { calls: captured };
     }
 
-    it("routes a chain default into `search` when the target declares it as a query param", async () => {
+    it("layers a hop's defaultSearch into the query channel", async () => {
       routesApi.add([
         { name: "q-dst", path: "/q-dst?lang" },
         {
           name: "q-src",
           path: "/q-src",
           forwardTo: "q-dst",
-          defaultParams: { lang: "fr" },
+          defaultSearch: { lang: "fr" },
         },
       ]);
 
       const stageOne = captureStageOne();
-
-      await router.navigate("q-src", {}, undefined, { reload: true });
+      const state = await router.navigate("q-src", {}, undefined, {
+        reload: true,
+      });
 
       expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "fr" });
       expect(stageOne.calls.at(-1)?.params).toStrictEqual({});
+      expect(state.path).toBe("/q-dst?lang=fr");
     });
 
-    it("keeps a chain default in `params` when the target declares it as a path slot", async () => {
+    it("keeps a hop's defaultParams in the path channel", async () => {
       routesApi.add([
         { name: "p-dst", path: "/p-dst/:lang" },
         {
@@ -267,42 +270,67 @@ describe("forwardState", () => {
       ]);
 
       const stageOne = captureStageOne();
+      const state = await router.navigate("p-src", {}, undefined, {
+        reload: true,
+      });
 
-      await router.navigate("p-src", {}, undefined, { reload: true });
-
-      // The discriminator: the split is by DECLARATION, not a blanket move.
       expect(stageOne.calls.at(-1)?.params).toStrictEqual({ lang: "es" });
       expect(stageOne.calls.at(-1)?.search).toStrictEqual({});
+      expect(state.path).toBe("/p-dst/es");
     });
 
-    it("splits an INTERMEDIATE hop's default of a multi-hop chain", async () => {
+    it("refuses a hop's defaultParams the TARGET declares as a query param", async () => {
+      // Registration cannot catch this one: the hop's own declarations are
+      // clean, and only the resolved target says `?lang`. So the check lives at
+      // the seam, where the target is finally known — and the message names
+      // both routes, because the author looked at neither in isolation.
       routesApi.add([
-        { name: "h-dst", path: "/h-dst?lang" },
+        { name: "m-dst", path: "/m-dst?lang" },
         {
-          name: "h-mid",
-          path: "/h-mid",
-          forwardTo: "h-dst",
-          defaultParams: { lang: "de" },
+          name: "m-src",
+          path: "/m-src",
+          forwardTo: "m-dst",
+          defaultParams: { lang: "fr" },
         },
-        { name: "h-src", path: "/h-src", forwardTo: "h-mid" },
+      ]);
+
+      await expect(
+        router.navigate("m-src", {}, undefined, { reload: true }),
+      ).rejects.toThrow(/"m-dst" declares `lang`[\s\S]*from "m-src"/);
+    });
+
+    it("layers an INTERMEDIATE hop's defaults across a multi-hop chain", async () => {
+      routesApi.add([
+        { name: "i3", path: "/i3?lang" },
+        {
+          name: "i2",
+          path: "/i2",
+          forwardTo: "i3",
+          defaultSearch: { lang: "fr" },
+        },
+        { name: "i1", path: "/i1", forwardTo: "i2" },
       ]);
 
       const stageOne = captureStageOne();
 
-      await router.navigate("h-src", {}, undefined, { reload: true });
+      await router.navigate("i1", {}, undefined, { reload: true });
 
-      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "de" });
+      // The hop that spelled the default is not the one entered NOR the target.
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "fr" });
       expect(stageOne.calls.at(-1)?.params).toStrictEqual({});
     });
 
-    it("splits a DYNAMIC chain's hop default", async () => {
+    it("layers a DYNAMIC chain's hop defaults", async () => {
+      // The case that decides where the check belongs: the target comes from a
+      // callback, so no registration-time pass can know it. The hop's own slot
+      // still says which channel it meant.
       routesApi.add([
         { name: "d-dst", path: "/d-dst?lang" },
         {
           name: "d-src",
           path: "/d-src",
           forwardTo: () => "d-dst",
-          defaultParams: { lang: "it" },
+          defaultSearch: { lang: "fr" },
         },
       ]);
 
@@ -310,32 +338,35 @@ describe("forwardState", () => {
 
       await router.navigate("d-src", {}, undefined, { reload: true });
 
-      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "it" });
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "fr" });
       expect(stageOne.calls.at(-1)?.params).toStrictEqual({});
     });
 
-    it("splits a MIXED static→dynamic chain's hop default", async () => {
+    it("layers a MIXED static→dynamic chain's hop defaults", async () => {
       routesApi.add([
-        { name: "mx-dst", path: "/mx-dst?lang" },
+        { name: "x3", path: "/x3?lang" },
         {
-          name: "mx-mid",
-          path: "/mx-mid",
-          forwardTo: () => "mx-dst",
-          defaultParams: { lang: "pt" },
+          name: "x2",
+          path: "/x2",
+          forwardTo: () => "x3",
+          defaultSearch: { lang: "fr" },
         },
-        { name: "mx-src", path: "/mx-src", forwardTo: "mx-mid" },
+        { name: "x1", path: "/x1", forwardTo: "x2" },
       ]);
 
       const stageOne = captureStageOne();
 
-      await router.navigate("mx-src", {}, undefined, { reload: true });
+      await router.navigate("x1", {}, undefined, { reload: true });
 
-      // The third branch: a static prefix concatenated with a dynamic walk.
-      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "pt" });
+      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "fr" });
       expect(stageOne.calls.at(-1)?.params).toStrictEqual({});
     });
 
     it("keeps a colliding name path-owned when the target declares both slots", async () => {
+      // `/c-dst/:id?id` — the name occupies a path slot, so it is path-owned
+      // (#843 / #1549 carve-out) and `getQueryParams` excludes it. The seam's
+      // check inherits that carve-out rather than re-deriving its own rule, so
+      // a `defaultParams` for it is legal.
       routesApi.add([
         { name: "c-dst", path: "/c-dst/:id?id" },
         {
@@ -350,72 +381,75 @@ describe("forwardState", () => {
 
       await router.navigate("c-src", {}, undefined, { reload: true });
 
-      // `/c-dst/:id?id` — the name occupies a path slot, so it is path-owned
-      // (#843 / #1549 carve-out) and `getQueryParams` excludes it. The split
-      // must inherit that carve-out rather than re-derive its own rule.
       expect(stageOne.calls.at(-1)?.params).toStrictEqual({ id: "X" });
       expect(stageOne.calls.at(-1)?.search).toStrictEqual({});
     });
 
-    it("lets a caller's PATH-bag value beat a chain default the target declares as query", async () => {
+    it("lets a caller's QUERY value beat a chain default", async () => {
       routesApi.add([
-        { name: "p-dst", path: "/p-dst?lang" },
+        { name: "b-dst", path: "/b-dst?lang" },
         {
-          name: "p-src",
-          path: "/p-src",
-          forwardTo: "p-dst",
-          defaultParams: { lang: "fr" },
+          name: "b-src",
+          path: "/b-src",
+          forwardTo: "b-dst",
+          defaultSearch: { lang: "fr" },
         },
       ]);
 
-      // The caller names `lang` in the PATH bag while the chain default for the
-      // same key belongs to the QUERY channel (the target declares `?lang`). The
-      // two would sit in DIFFERENT bags, where no merge ranks them — and the
-      // downstream channel separation spreads `search` last, handing the win to
-      // the default. The caller must win regardless of which bag they used.
-      const state = await router.navigate("p-src", { lang: "de" }, undefined, {
-        reload: true,
-      });
+      const state = await router.navigate(
+        "b-src",
+        {},
+        { lang: "de" },
+        {
+          reload: true,
+        },
+      );
 
       expect(state.search).toStrictEqual({ lang: "de" });
-      expect(state.path).toBe("/p-dst?lang=de");
+      expect(state.path).toBe("/b-dst?lang=de");
     });
 
-    it("lets a caller's PATH-bag value beat a MID-CHAIN default across hops", async () => {
+    it("lets a caller's QUERY value beat a MID-CHAIN default across hops", async () => {
       routesApi.add([
         { name: "j3", path: "/j3?lang" },
         {
           name: "j2",
           path: "/j2",
           forwardTo: "j3",
-          defaultParams: { lang: "fr" },
+          defaultSearch: { lang: "fr" },
         },
         { name: "j1", path: "/j1", forwardTo: "j2" },
       ]);
 
-      const state = await router.navigate("j1", { lang: "de" }, undefined, {
-        reload: true,
-      });
+      const state = await router.navigate(
+        "j1",
+        {},
+        { lang: "de" },
+        {
+          reload: true,
+        },
+      );
 
       expect(state.search).toStrictEqual({ lang: "de" });
       expect(state.path).toBe("/j3?lang=de");
     });
 
-    it("lets a caller's PATH bag beat BOTH halves of a split chain default", async () => {
+    it("lets a caller beat a hop's defaults in BOTH channels at once", async () => {
       routesApi.add([
         { name: "x-dst", path: "/x-dst/:z?lang" },
         {
           name: "x-src",
           path: "/x-src",
           forwardTo: "x-dst",
-          defaultParams: { lang: "fr", z: "5" },
+          defaultParams: { z: "5" },
+          defaultSearch: { lang: "fr" },
         },
       ]);
 
       const state = await router.navigate(
         "x-src",
-        { lang: "de", z: "9" },
-        undefined,
+        { z: "9" },
+        { lang: "de" },
         { reload: true },
       );
 
@@ -426,61 +460,29 @@ describe("forwardState", () => {
 
     it("keeps a chain default alive against an explicit `undefined` in EITHER bag", async () => {
       routesApi.add([
-        { name: "u-dst", path: "/u-dst?lang" },
+        { name: "u-dst", path: "/u-dst/:z?lang" },
         {
           name: "u-src",
           path: "/u-src",
           forwardTo: "u-dst",
-          defaultParams: { lang: "fr" },
+          defaultParams: { z: "5" },
+          defaultSearch: { lang: "fr" },
         },
       ]);
 
       // `undefined` is ABSENCE on both sides of the merge (#1550 / #1551), so it
-      // means "I said nothing" and the default keeps the slot — symmetric with a
-      // route-level `defaultSearch`, where this already held.
-      const viaSearch = await router.navigate(
+      // means "I said nothing" and the default keeps the slot — in each channel
+      // independently.
+      const state = await router.navigate(
         "u-src",
-        {},
+        { z: undefined },
         { lang: undefined },
         { reload: true },
       );
 
-      expect(viaSearch.search).toStrictEqual({ lang: "fr" });
-      expect(viaSearch.path).toBe("/u-dst?lang=fr");
-
-      const viaParams = await router.navigate(
-        "u-src",
-        { lang: undefined },
-        undefined,
-        { reload: true },
-      );
-
-      expect(viaParams.search).toStrictEqual({ lang: "fr" });
-      expect(viaParams.path).toBe("/u-dst?lang=fr");
-    });
-
-    it("lets the caller beat the layered default in BOTH channels", async () => {
-      routesApi.add([
-        { name: "w-dst", path: "/w-dst/:slot?lang" },
-        {
-          name: "w-src",
-          path: "/w-src",
-          forwardTo: "w-dst",
-          defaultParams: { lang: "fr", slot: "DEFAULT" },
-        },
-      ]);
-
-      const stageOne = captureStageOne();
-
-      await router.navigate(
-        "w-src",
-        { slot: "CALLER" },
-        { lang: "en" },
-        { reload: true },
-      );
-
-      expect(stageOne.calls.at(-1)?.search).toStrictEqual({ lang: "en" });
-      expect(stageOne.calls.at(-1)?.params).toStrictEqual({ slot: "CALLER" });
+      expect(state.params).toStrictEqual({ z: "5" });
+      expect(state.search).toStrictEqual({ lang: "fr" });
+      expect(state.path).toBe("/u-dst/5?lang=fr");
     });
   });
 
@@ -529,6 +531,34 @@ describe("forwardState", () => {
       // "literal" could be read as "no merging at all".
       expect(state.search).toStrictEqual({ page: "5" });
       expect(state.path).toBe("/x?page=5");
+    });
+
+    it("normalises a params bag an interceptor dropped to `undefined`", async () => {
+      // The seam's `?? EMPTY_PARAMS`. It used to be reached by stage ②, whose
+      // split returned an undefined path bag when every key belonged to the
+      // query channel; with the repair gone, the only remaining source is an
+      // interceptor breaking its own typed contract (`params: P`, not `P |
+      // undefined`). That is still worth surviving — a third-party interceptor
+      // spreading a partial result must not put `undefined` into `state.params`
+      // and crash every consumer downstream — so the net is pinned rather than
+      // deleted along with the mechanism that used to exercise it.
+      const router = createRouter([{ name: "a", path: "/a/:id" }], {
+        defaultRoute: "a",
+      });
+      const api = getPluginApi(router);
+
+      api.addInterceptor("forwardState", (next, name, params) => {
+        const result = next(name, params);
+
+        return { ...result, params: undefined as never };
+      });
+
+      await router.start("/a/1");
+
+      expect(router.getState()?.params).toStrictEqual({});
+      expect(router.getState()?.path).toBe("/a/1");
+
+      router.stop();
     });
   });
 });

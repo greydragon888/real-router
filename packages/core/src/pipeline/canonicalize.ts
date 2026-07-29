@@ -5,7 +5,6 @@ import {
   admittedSearch,
   mergeWithDefault,
   normalizeParams,
-  separateChannels,
   withholdFilledSlots,
 } from "../helpers";
 
@@ -128,18 +127,17 @@ export function canonicalize(
   }
 
   // The route's OWN defaults, split by the channel the route DECLARES (#1549) —
-  // the same rule #1570 applies to a forwarding hop's defaults, now applied to
-  // the terminal's. `defaultParams` is a route's only default slot in v1 configs
-  // and stays legal for a `?`-declared name, so a default spelled there for a
-  // query key belongs to the query channel; `defaultSearch` is spread last and
-  // therefore wins the collision (the explicit slot outranks the implicit one).
-  // `separateChannels` short-circuits on a route with no query declarations, so
-  // the zero-declaration hot path pays a length check.
-  const routeDefaults = separateChannels(
-    port.defaultParams(resolvedName),
-    declaredQuery,
-    port.defaultSearch(resolvedName),
-  );
+  // Each slot IS its channel — no split. `defaultParams` is the path channel,
+  // `defaultSearch` the query channel, and the router never moves a key between
+  // them: the two meet only when the URL is printed. A `defaultParams` naming a
+  // `?`-declared key is refused at REGISTRATION (`assertRouteDefaultChannels`),
+  // so nothing mis-channelled can reach this merge and there is nothing here to
+  // repair. Splitting here used to be what made a config the router itself had
+  // accepted survive its own always-on channel guard.
+  const routeDefaults = {
+    params: port.defaultParams(resolvedName),
+    search: port.defaultSearch(resolvedName),
+  };
 
   // ③ — route defaults UNDER the routed value, each channel independent. Read
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`

@@ -1,9 +1,13 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/types.ts
 
-import type { NavigationOptions, Options, Params, State } from "../../types";
+import type { AnyOptions, NavigationOptions, Params, State } from "../../types";
 
 export interface RouterLifecycleDependencies {
-  getOptions: () => Options;
+  // The erased view: these namespaces READ configuration (`defaultRoute`
+  // truthiness, `allowNotFound`) — they never resolve a callback, which is
+  // `resolveDefault`'s job. Taking `AnyOptions` keeps the dependency-map
+  // generic out of every namespace that has no use for it.
+  getOptions: () => AnyOptions;
   /**
    * Commit a fully-resolved State without re-running `forwardState`/`buildPath`.
    * `start(path)` uses this to commit `matchPath(path)` directly — the same

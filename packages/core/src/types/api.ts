@@ -17,10 +17,10 @@ import type { NavigationOptions, StateContext } from "./index";
 import type {
   DefaultDependencies,
   GuardFnFactory,
-  Options,
   Plugin,
   Route,
   RouteConfigUpdate,
+  AnyOptions,
 } from "./router";
 import type { TreeChangedEvent } from "./tree-changed";
 
@@ -166,7 +166,7 @@ export interface PluginApi {
     search?: SearchParams,
   ) => State | undefined;
 
-  getOptions: () => Options;
+  getOptions: () => AnyOptions;
 
   getTree: () => unknown;
 

@@ -1,9 +1,10 @@
 // packages/core/src/namespaces/RoutesNamespace/helpers.ts
 
-import { areParamValuesEqual } from "../../helpers";
+import { areParamValuesEqual, assertChannelCorrect } from "../../helpers";
 
+import type { RoutesStore } from "./routesStore";
 import type { RouteConfig } from "./types";
-import type { RouteDefinition } from "../../engine";
+import type { Matcher, RouteDefinition, RouteTree } from "../../engine";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -174,4 +175,146 @@ export function matchSourceTrailingSlash(
   const querySuffix = queryIndex === -1 ? "" : rewrittenPath.slice(queryIndex);
 
   return `${pathPart}/${querySuffix}`;
+}
+
+// =============================================================================
+// The query-channel registry — ONE derivation, shared by every reader (#1556)
+// =============================================================================
+
+/** Flattens the path-slot names declared across a route's matched segments. */
+export function collectUrlParamsArray(
+  segments: readonly RouteTree[],
+): string[] {
+  const params: string[] = [];
+
+  for (const segment of segments) {
+    for (const param of segment.paramMeta.urlParams) {
+      params.push(param);
+    }
+  }
+
+  return params;
+}
+
+/**
+ * The route's PATH slot names, cached per route name.
+ *
+ * Store-level rather than a namespace method so the config-time channel check
+ * reads the SAME registry the URL build prints from. A second derivation is
+ * exactly the drift #1556 removed.
+ */
+export function urlParamsFor(
+  matcher: Matcher,
+  name: string,
+  cache: Map<string, string[]>,
+): string[] {
+  const cached = cache.get(name);
+
+  // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const segments = matcher.getSegmentsByName(name);
+  const result = segments
+    ? collectUrlParamsArray(segments as readonly RouteTree[])
+    : [];
+
+  cache.set(name, result);
+
+  return result;
+}
+
+/** Store-bound {@link urlParamsFor}. */
+export function urlParamsOf<Dependencies extends DefaultDependencies>(
+  store: RoutesStore<Dependencies>,
+  name: string,
+): string[] {
+  return urlParamsFor(store.matcher, name, store.urlParamsCache);
+}
+
+/**
+ * The route's declared `?query` names minus its path slots — the registry that
+ * both classifies and PRINTS (#1556), with the `/items/:id?id` carve-out
+ * (#843 / #1549) falling out of the subtraction rather than being re-decided.
+ */
+export function queryParamsFor(
+  matcher: Matcher,
+  name: string,
+  urlCache: Map<string, string[]>,
+  queryCache: Map<string, string[]>,
+): string[] {
+  const cached = queryCache.get(name);
+
+  // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const declared = matcher.getDeclaredQueryParams(name);
+  let result: string[] = [];
+
+  if (declared) {
+    const urlParams = urlParamsFor(matcher, name, urlCache);
+
+    result = declared.filter((param: string) => !urlParams.includes(param));
+  }
+
+  queryCache.set(name, result);
+
+  return result;
+}
+
+/** Store-bound {@link queryParamsFor}. */
+export function queryParamsOf<Dependencies extends DefaultDependencies>(
+  store: RoutesStore<Dependencies>,
+  name: string,
+): string[] {
+  return queryParamsFor(
+    store.matcher,
+    name,
+    store.urlParamsCache,
+    store.queryParamsCache,
+  );
+}
+
+/**
+ * Config-time channel check: a route's `defaultParams` may not name a key the
+ * route declares with `?`.
+ *
+ * The static half of "params and search meet only in the URL". Without it the
+ * router builds a state out of its OWN config that its OWN always-on channel
+ * guard then rejects — `start()` throwing `WRONG_CHANNEL` about a bag the user
+ * never passed, which is the deferred-crash shape core's invariant guards exist
+ * to prevent. The dynamic half (a forwarding hop whose target is only known at
+ * resolution) is caught at the `forwardState` seam instead.
+ *
+ * Runs over the WHOLE config after every rebuild rather than over the routes
+ * just added: `setRootPath("?lang")` declares a name on every route at once, so
+ * a config that was legal a moment ago can stop being legal without any route
+ * changing.
+ */
+export function assertRouteDefaultChannels(
+  matcher: Matcher,
+  config: RouteConfig,
+  method: string,
+): void {
+  // Local caches, not the store's: this runs on PREPARED artifacts, before any
+  // swap. Checking after the swap would leave a rejected batch installed — the
+  // atomicity `adoptRouteArtifacts` promises, broken by the very guard meant to
+  // protect the config (caught by the entry-point test, which found the bad
+  // config still in the store on the NEXT call).
+  const urlCache = new Map<string, string[]>();
+  const queryCache = new Map<string, string[]>();
+
+  for (const [name, defaults] of Object.entries(config.defaultParams)) {
+    assertChannelCorrect(
+      method,
+      name,
+      defaults,
+      queryParamsFor(matcher, name, urlCache, queryCache),
+      "this route's `defaultParams`",
+      "Move it to `defaultSearch`",
+    );
+  }
 }

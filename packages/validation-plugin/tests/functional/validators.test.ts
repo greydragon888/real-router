@@ -763,6 +763,30 @@ describe("Phase 2 options validators", () => {
       }).toThrow('Unknown option: "unknownKey"');
     });
 
+    it("accepts defaultSearch and rejects a non-plain-object one", () => {
+      // The query-channel twin of `defaultParams` (RFC-4 M2 / #1548). Both go
+      // through the same parameterised check, so the two option channels can
+      // never drift into accepting different shapes for the same kind of value.
+      expect(() => {
+        validateOptions({ defaultSearch: { tab: "a" } }, "test");
+      }).not.toThrow();
+      expect(() => {
+        validateOptions({ defaultSearch: () => ({ tab: "a" }) }, "test");
+      }).not.toThrow();
+
+      expect(() => {
+        validateOptions({ defaultSearch: ["tab"] }, "test");
+      }).toThrow(TypeError);
+      expect(() => {
+        validateOptions({ defaultSearch: "tab=a" }, "test");
+      }).toThrow('Invalid "defaultSearch"');
+      // The message must name the option that was actually wrong — a shared
+      // helper is only safe while it stays parameterised by name.
+      expect(() => {
+        validateOptions({ defaultParams: "id=1" }, "test");
+      }).toThrow('Invalid "defaultParams"');
+    });
+
     it("throws for invalid trailingSlash (string value)", () => {
       expect(() => {
         validateOptions({ trailingSlash: "invalid" }, "test");

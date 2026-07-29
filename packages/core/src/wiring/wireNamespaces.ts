@@ -307,6 +307,12 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         (name: string) =>
           ns.dependenciesStore.dependencies[name as keyof Dependencies],
       );
+      const search = resolveOption(
+        options.defaultSearch,
+        /* v8 ignore next -- @preserve: unreachable unless defaultSearch is a callback that calls getDependency */
+        (name: string) =>
+          ns.dependenciesStore.dependencies[name as keyof Dependencies],
+      );
 
       if (typeof options.defaultRoute === "function") {
         ctx.validator?.options.validateResolvedDefaultRoute(
@@ -315,7 +321,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         );
       }
 
-      return { route, params };
+      return { route, params, search };
     },
     startTransition: (toState, fromState) => {
       ns.eventBus.sendNavigate(toState, fromState);

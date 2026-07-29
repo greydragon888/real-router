@@ -1,14 +1,15 @@
 // packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts
 
 import { DEFAULT_ROUTE_NAME } from "./constants";
-import { matchSourceTrailingSlash, paramsMatch } from "./helpers";
 import {
-  createRoutesStore,
-  rebuildTreeInPlace,
-  resetStore,
-} from "./routesStore";
+  matchSourceTrailingSlash,
+  paramsMatch,
+  queryParamsOf,
+  urlParamsOf,
+} from "./helpers";
+import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
 import { constants, EMPTY_SEARCH } from "../../constants";
-import { mergeDefined, separateChannels } from "../../helpers";
+import { assertChannelCorrect, mergeDefined } from "../../helpers";
 import { canonicalize, materialize } from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -17,7 +18,6 @@ import type { RoutesDependencies } from "./types";
 import type {
   CreateMatcherOptions,
   RouteParams,
-  RouteTree,
   RouteTreeState,
 } from "../../engine";
 import type { RouteResolver } from "../../pipeline";
@@ -25,7 +25,7 @@ import type { RouteMetaLookup } from "../../transitionPath";
 import type {
   DefaultDependencies,
   ForwardToCallback,
-  Options,
+  AnyOptions,
   Params,
   RouterLogger,
   SearchParams,
@@ -33,18 +33,6 @@ import type {
   Route,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
-
-function collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
-  const params: string[] = [];
-
-  for (const segment of segments) {
-    for (const param of segment.paramMeta.urlParams) {
-      params.push(param);
-    }
-  }
-
-  return params;
-}
 
 function createRouteState<P extends RouteParams = RouteParams>(
   matchResult: {
@@ -88,7 +76,7 @@ export class RoutesNamespace<
   #cachedBuildPathOpts: CachedBuildPathOpts | undefined;
   // Source `options` reference captured on the first #getBuildPathOptions call;
   // used only by the dev-build immutability assertion below (#957).
-  #cachedOptionsSource: Options | undefined;
+  #cachedOptionsSource: AnyOptions | undefined;
 
   get #deps(): RoutesDependencies<Dependencies> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -212,8 +200,7 @@ export class RoutesNamespace<
   // =========================================================================
 
   setRootPath(newRootPath: string): void {
-    this.#store.rootPath = newRootPath;
-    rebuildTreeInPlace(this.#store);
+    applyRootPath(this.#store, newRootPath);
   }
 
   hasRoute(name: string): boolean {
@@ -241,7 +228,7 @@ export class RoutesNamespace<
     route: string,
     params: Params,
     search?: SearchParams,
-    options?: Options,
+    options?: AnyOptions,
   ): string {
     if (route === constants.UNKNOWN_ROUTE) {
       return typeof params.path === "string" ? params.path : "";
@@ -309,7 +296,7 @@ export class RoutesNamespace<
    */
   matchPath<P extends Params = Params>(
     path: string,
-    options?: Options,
+    options?: AnyOptions,
   ): State<P> | undefined {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
     const opts = options!;
@@ -351,6 +338,20 @@ export class RoutesNamespace<
       this.#deps
         .getValidator()
         ?.routes.validateStateBuilderArgs(name, decoded.params, "matchPath");
+
+      // The channel half of the same boundary — always on, unlike the shape
+      // check above. A decoder that moves a declared `?key` into the params bag
+      // used to be repaired by the seam and shipped as if it had been written
+      // correctly; now it is refused. Checked HERE as well as at the seam so the
+      // message names the decoder rather than the chain it later flows through —
+      // same single assertion, applied where the fault was actually authored.
+      assertChannelCorrect(
+        "matchPath",
+        name,
+        decoded.params,
+        this.getQueryParams(name),
+        "the `params` returned by this route's `decodeParams`",
+      );
     } else {
       decoded = { params, search };
     }
@@ -365,14 +366,10 @@ export class RoutesNamespace<
     // hand-rolled composition that followed: the route's own default split
     // (#1549), the default merge, and the mode gate (#1575) now happen once,
     // inside `canonicalize`, from the same read-model `navigate` uses.
-    // ⚠ Stage ② does NOT leave this path here, and cannot: `separateChannels`
-    // lives in the seam (`Router.ts:281-292`), which the port calls. Measured —
-    // a `forwardState` interceptor injecting a declared query key into
-    // `result.params` lands in `state.search` both before and after this change,
-    // identically to `navigate`, which has been on the pipeline since milestone 1.
-    // The channel guard's P2 position therefore stays dormant until Phase 4
-    // removes the seam's wrapper; RFC step 2-2's "② leaves the path here" was
-    // written before that was measured.
+    // ⚠ Stage ② is GONE from this path, as it is from every other: the seam no
+    // longer repairs a mis-channelled bag, it refuses one. A `forwardState`
+    // interceptor injecting a declared query key into `result.params` used to
+    // land in `state.search` here exactly as on `navigate`; both now throw.
     const canonical = canonicalize(
       this.#deps.port,
       name,
@@ -382,11 +379,11 @@ export class RoutesNamespace<
     const routeName = canonical.name;
 
     // The canonical channels, ready for BOTH halves of the state: `canonical.path`
-    // is path-only (the seam moved any declared `?key` a plugin injection or a
-    // decoder left in the params bag over to the query channel, and stage ③
-    // layered the route's own defaults under it, split by the channel the route
-    // declares — #1549), `canonical.query` is the full canonical query with the
-    // mode gate already applied (#1575). Both are read from ONE object, so the
+    // is path-only (the seam REFUSED any declared `?key` a plugin injection or a
+    // decoder left in the params bag, and stage ③ layered the route's own
+    // defaults under it, split by the channel the route declares — #1549),
+    // `canonical.query` is the full canonical query with the mode gate already
+    // applied (#1575). Both are read from ONE object, so the
     // rebuilt `state.path` and the committed `state.search` cannot derive from
     // differently-merged bags (INVARIANTS makeState #6).
     const routeParams = canonical.path;
@@ -468,8 +465,7 @@ export class RoutesNamespace<
     // merged strictly BELOW the user channels at the terminal points only
     // (`makeState` for state, `matchPath` / `buildPath` for the URL). Folding a
     // target default into this result would ride ABOVE a user params-twin at the
-    // channel-separation boundary (the interceptable's outer `separateChannels`
-    // merges the params-twin UNDER `result.search`), inverting the priority — a
+    // terminal merge, inverting the priority — a
     // `navigate(x, { page: 2 })` on a `?page` route with `defaultSearch{page:1}`
     // would wrongly commit `page=1`. So both channels pass through as the user
     // gave them: `search` stays `resolvedSearch`, `params` stays the raw bag.
@@ -658,21 +654,7 @@ export class RoutesNamespace<
   }
 
   getUrlParams(name: string): string[] {
-    const cached = this.#store.urlParamsCache.get(name);
-
-    // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (getUrlParams is deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const segments = this.#store.matcher.getSegmentsByName(name);
-    const result = segments
-      ? collectUrlParamsArray(segments as readonly RouteTree[])
-      : [];
-
-    this.#store.urlParamsCache.set(name, result);
-
-    return result;
+    return urlParamsOf(this.#store, name);
   }
 
   /**
@@ -695,25 +677,7 @@ export class RoutesNamespace<
    * registry classifies and prints, so the two cannot drift again.
    */
   getQueryParams(name: string): string[] {
-    const cached = this.#store.queryParamsCache.get(name);
-
-    // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (getQueryParams is deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const declared = this.#store.matcher.getDeclaredQueryParams(name);
-    let result: string[] = [];
-
-    if (declared) {
-      const urlParams = this.getUrlParams(name);
-
-      result = declared.filter((param) => !urlParams.includes(param));
-    }
-
-    this.#store.queryParamsCache.set(name, result);
-
-    return result;
+    return queryParamsOf(this.#store, name);
   }
 
   getStore(): RoutesStore<Dependencies> {
@@ -739,8 +703,8 @@ export class RoutesNamespace<
    * which walks `params` key by key, and then again in the descendant branch's
    * channel-by-channel `paramsMatch` — so an accessor-backed key, a `Proxy` or a
    * framework's reactive object throws HERE, on the render path. (It used to be
-   * the exact branch's own `separateChannels` and the descendant branch's spread
-   * into one bag; step 2-5 removed both, the exposure is unchanged.) The
+   * the exact branch's own channel split and the descendant branch's spread into
+   * one bag; step 2-5 removed both, the exposure is unchanged.) The
    * predicate's stated
    * policy is that it answers and never throws from inside a render (see the
    * `forwardState` wrap below), and #1573 implemented that for the destination
@@ -806,15 +770,14 @@ export class RoutesNamespace<
     // the literal form never touches the port, so a plugin's interceptor chain
     // does not run once per `<Link>` per render.
     //
-    // ⚠ Stage ② is genuinely gone from THIS point — unlike `matchPath` /
-    // `canNavigateTo` / `buildNavigationState`, whose ② lives in the seam they
-    // still reach through the port. This method owned its own
-    // `separateChannels` call, and dropping it is the observable change: a
-    // declared query key handed in the `params` bag is no longer moved to the
-    // query channel before comparison, so a v1 single-bag call stops matching.
-    // Channel-correctness becomes the caller's contract, exactly as it already is
-    // for `navigate` (which throws on that shape) and `buildPath` (which prints
-    // without it).
+    // ⚠ Stage ② is gone from this point, and by now from everywhere: step 2-5
+    // dropped this method's OWN channel split, and the seam that the other
+    // points reach through the port stopped repairing bags too. The observable
+    // change here is unchanged by that: a declared query key handed in the
+    // `params` bag is no longer moved to the query channel before comparison,
+    // so a v1 single-bag call stops matching. Channel-correctness is the
+    // caller's contract, exactly as for `navigate` (which throws on that shape)
+    // and `buildPath` (which prints without it).
     const canonical = canonicalize(this.#deps.port, name, params, searchArg, {
       resolveForward: false,
     });
@@ -895,13 +858,14 @@ export class RoutesNamespace<
    * A hop can only write `defaultParams` — that is the single slot it has — but
    * the CHANNEL belongs to the resolved target: when the target declares the key
    * with `?`, the value is a query value that happened to be spelled in a path
-   * slot upstream. Splitting here rather than downstream keeps stage ① itself
-   * channel-correct, so the producer contract holds for core's own output and
-   * not merely for plugins (RFC nav-pipeline §4.2, decision A-3).
-   *
-   * The split reuses `separateChannels` over `getQueryParams` — the same
-   * classifier and the same printing registry the URL build uses (#1556) — so
-   * no second derivation of "which channel is this key" can drift from it.
+   * slot upstream. ⛔ **That routing is GONE.** The slot is the channel: a hop's
+   * `defaultParams` is the path channel and its `defaultSearch` the query
+   * channel, whatever the resolved target declares. The old argument — "a hop
+   * can only spell a default in `defaultParams`" — was false the moment this
+   * fold started reading `defaultSearch`, and the routing left a hop author
+   * unable to predict their own config's channel behind a dynamic `forwardTo`.
+   * A hop's `defaultParams` naming a key the TARGET declares with `?` is refused
+   * at the `forwardState` seam, where the target is finally known.
    */
   #layerChainDefaults<
     P extends Params = Params,
@@ -933,69 +897,47 @@ export class RoutesNamespace<
       );
     }
 
-    // Split the DEFAULTS ALONE by the target's channels — the caller's bags are
-    // never routed here (that is stage ②, which this design removes: channel
-    // correctness is the producer's contract, §4.3). Each half is then layered
-    // UNDER the caller in its OWN channel, below.
-    const split = separateChannels(
-      hopDefaults,
-      this.getQueryParams(target),
-      // Spread last, so a hop's explicit `defaultSearch` outranks the query half
-      // of its `defaultParams` — the same precedence the terminal's own defaults
-      // get. `EMPTY_SEARCH` keeps the `search` half defined when no hop spelled
-      // one, which the withholding loop below relies on.
-      hopSearchDefaults ?? EMPTY_SEARCH,
-    );
-
-    // A default is never applied to a key the caller already named — in EITHER
-    // bag (#1570). Without this the caller's params-twin and the query half of
-    // the defaults sit in DIFFERENT channels, where no merge ranks them, and the
-    // seam's `separateChannels` (which spreads `search` last) hands the win to
-    // the DEFAULT: `navigate("src", { lang: "de" })` on a chain default
-    // `{ lang: "fr" }` committed `?lang=fr` and lost the caller's value — the
-    // §1.1 priority inversion this whole channel split exists to remove.
-    // Nothing is moved between channels: the caller's key stays where the caller
-    // put it, we merely decline to default a slot they already filled.
-    // `separateChannels` was handed a defined `search` (the frozen empty
-    // singleton), so its `search` half is defined too — no guard needed here.
-    let chainQuery: SearchParams | undefined = split.search;
-
-    {
-      let kept: Record<string, unknown> | undefined;
-      let dropped = false;
-
-      for (const [key, value] of Object.entries(chainQuery)) {
-        // `undefined` is absence (#1550 / #1551), so a caller's removal marker
-        // does NOT count as "already named" — the default keeps the slot.
-        if (params[key] !== undefined) {
-          dropped = true;
-          continue;
-        }
-
-        kept ??= {};
-        kept[key] = value;
-      }
-
-      if (dropped) {
-        chainQuery = kept as SearchParams | undefined;
-      }
-    }
+    // Each slot IS its channel — no split, here or anywhere else. A hop's
+    // `defaultParams` is the path channel and its `defaultSearch` the query
+    // channel, whatever the resolved target declares.
+    //
+    // This used to route the fold by the TARGET's declaration, on the argument
+    // that a hop "can only spell a default in `defaultParams`". That argument
+    // was already false — the fold reads `defaultSearch` two lines above — and
+    // the routing was doing real damage: a hop author could not tell which
+    // channel their own config would end up in without reading a target that a
+    // `forwardTo` CALLBACK may not even determine until navigation time. Now
+    // they can: the slot they wrote is the channel they get.
+    //
+    // A hop whose `defaultParams` names a key the TARGET declares with `?` is
+    // still caught — not here, but at the `forwardState` seam, where the target
+    // is finally known and the check can name both routes. Registration cannot
+    // see it (a dynamic `forwardTo` has no target yet), which is exactly why
+    // that check lives at resolution rather than being guessed here.
+    // No cross-channel withholding any more, and its removal is the point.
+    // #1570 needed it because the split put a caller's params-twin and the
+    // query half of the same default in DIFFERENT bags, where no merge ranks
+    // them — so the default had to be withheld by hand or it won. Nothing is
+    // split now: a key in the caller's `params` and a key in the chain's
+    // `search` are different channels holding different names, because a caller
+    // who puts a declared query name in `params` is refused outright. Each
+    // channel merges against its own default and nothing has to look sideways.
 
     return {
       name: target,
       // The caller's params stay ABOVE the path half, and their `undefined`
       // keys are stripped exactly as before — this merge runs whether or not
       // the chain contributed anything.
-      params: mergeDefined(split.params as P | undefined, params),
+      params: mergeDefined(hopDefaults as P | undefined, params),
       // `mergeDefined`, not a spread: an explicit `undefined` from the caller is
       // ABSENCE (#1550 / #1551), so it must not delete the hop default. A spread
       // copied the `undefined` key over and killed it — asymmetric with a
       // route-level `defaultSearch`, where the rule already held.
-      search: mergeDefined(chainQuery, search) as S,
+      search: mergeDefined(hopSearchDefaults, search) as S,
     };
   }
 
-  #getBuildPathOptions(options?: Options): CachedBuildPathOpts {
+  #getBuildPathOptions(options?: AnyOptions): CachedBuildPathOpts {
     // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return rebuilds the identical buildPath options (deterministic) and re-caches them. (ConditionalExpression stays live: `→false` always rebuilds but a real consumer test pins the cached identity.)
     if (this.#cachedBuildPathOpts) {
       /* v8 ignore next 5 -- @preserve: dev assertion guarding a future caller that passes per-call varying options; the sole caller (Router.buildPath, always via this.#options.get()) passes the same immutable, deep-frozen per-instance options, so this branch is unreachable through the public API by construction (#957) */

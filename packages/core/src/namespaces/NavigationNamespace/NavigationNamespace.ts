@@ -261,9 +261,10 @@ export class NavigationNamespace {
 
     let route: string;
     let params: Params;
+    let search: SearchParams;
 
     try {
-      ({ route, params } = deps.resolveDefault());
+      ({ route, params, search } = deps.resolveDefault());
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided resolveDefault callback
       return Promise.reject(error);
@@ -277,7 +278,13 @@ export class NavigationNamespace {
       );
     }
 
-    return this.navigate(route, params, undefined, opts);
+    // Both channels, never one bag (RFC-4 M2 / #1548). The query slot took
+    // `undefined` until `defaultSearch` existed as a router option, so a
+    // query-declared name in `defaultParams` reached the URL only via the
+    // `forwardState` seam's channel re-separation — the repair the pipeline
+    // design removes. Passing the query here makes the default route's query
+    // defaults independent of that stage.
+    return this.navigate(route, params, search, opts);
   }
 
   navigateToNotFound(path: string): State {

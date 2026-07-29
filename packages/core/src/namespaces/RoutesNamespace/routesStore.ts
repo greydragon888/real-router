@@ -3,8 +3,10 @@
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
 import {
+  assertRouteDefaultChannels,
   assignConfigEntries,
   createEmptyConfig,
+  queryParamsOf,
   sanitizeRoute,
 } from "./helpers";
 import {
@@ -12,6 +14,7 @@ import {
   createRouteTree,
   routeTreeToDefinitions,
 } from "../../engine";
+import { assertChannelCorrect } from "../../helpers";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type {
@@ -113,6 +116,33 @@ export function rebuildTreeInPlace<
 
   store.tree = result.tree;
   store.matcher = result.matcher;
+  store.urlParamsCache.clear();
+  store.queryParamsCache.clear();
+}
+
+/**
+ * Prepare-then-commit root-path change.
+ *
+ * A root `?`-declaration declares the name on EVERY route at once, so a
+ * `defaultParams` that was legal a moment ago can stop being legal without any
+ * route changing — the one mutation where re-checking the WHOLE config is not
+ * redundant. Built into locals first so a rejected root path leaves the store
+ * exactly as it was, matching the atomicity `add` / `replace` promise.
+ */
+export function applyRootPath<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>, newRootPath: string): void {
+  const prepared = rebuildTree(
+    store.definitions,
+    newRootPath,
+    store.matcherOptions,
+  );
+
+  assertRouteDefaultChannels(prepared.matcher, store.config, "setRootPath");
+
+  store.rootPath = newRootPath;
+  store.tree = prepared.tree;
+  store.matcher = prepared.matcher;
   store.urlParamsCache.clear();
   store.queryParamsCache.clear();
 }
@@ -786,6 +816,12 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   const { activate: compiledActivate, deactivate: compiledDeactivate } =
     precompiled ?? compileArtifactGuards(artifacts, deps);
 
+  // Pre-swap config-time channel check, on the PREPARED artifacts: a rejected
+  // batch must leave the store exactly as it was. Same label as the sibling
+  // batch asserts so all three population entry points surface the identical
+  // bare-core error (#1351 convention).
+  assertRouteDefaultChannels(artifacts.matcher, artifacts.config, "addRoute");
+
   // Atomic swap — pure assignments, cannot throw. (`definitions` is derived
   // from `tree`, so swapping the tree IS the definitions swap.)
   Object.assign(store.config, artifacts.config);
@@ -847,6 +883,22 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   // ===== PREPARE — compute every change into LOCALS. Any throw here aborts
   // before a single store write, so the whole field set is applied
   // all-or-nothing (#951).
+
+  // Channel check on the INCOMING value, in PREPARE: `update` does not rebuild
+  // the tree (NO_TREE_REBUILD), so the route's declarations are the ones the
+  // matcher already holds. Checked before any write, so a mis-channelled
+  // `defaultParams` aborts the whole update rather than landing half-applied.
+  if (defaultParams !== undefined && defaultParams !== null) {
+    assertChannelCorrect(
+      "updateRoute",
+      name,
+      defaultParams,
+      queryParamsOf(store, name),
+      "this route's `defaultParams`",
+      "Move it to `defaultSearch`",
+    );
+  }
+
   const forwardToPlan =
     forwardTo === undefined
       ? undefined
@@ -1182,6 +1234,11 @@ export function createRoutesStore<
     pendingCanActivate: artifacts.pendingCanActivate,
     pendingCanDeactivate: artifacts.pendingCanDeactivate,
   };
+
+  // Same config-time channel check the add/replace path runs, so the
+  // constructor is not the one population entry point that accepts a config
+  // whose own state the router would then reject on `start()`.
+  assertRouteDefaultChannels(store.matcher, store.config, "addRoute");
 
   return store;
 }

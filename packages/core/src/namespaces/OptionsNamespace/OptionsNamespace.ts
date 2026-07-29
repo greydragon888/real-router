@@ -4,12 +4,14 @@ import { defaultOptions } from "./constants";
 import { deepFreeze } from "./helpers";
 import { validateOptionsIsObject } from "./validators";
 
-import type { Options } from "../../types";
+import type { DefaultDependencies, Options } from "../../types";
 
-export class OptionsNamespace {
-  readonly #options: Readonly<Options>;
+export class OptionsNamespace<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
+  readonly #options: Readonly<Options<Dependencies>>;
 
-  constructor(initialOptions: Partial<Options> = {}) {
+  constructor(initialOptions: Partial<Options<Dependencies>> = {}) {
     this.#options = deepFreeze({
       ...defaultOptions,
       ...initialOptions,
@@ -22,7 +24,7 @@ export class OptionsNamespace {
     validateOptionsIsObject(options);
   }
 
-  get(): Readonly<Options> {
+  get(): Readonly<Options<Dependencies>> {
     return this.#options;
   }
 }

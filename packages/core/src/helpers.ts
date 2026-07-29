@@ -67,67 +67,6 @@ export function withholdFilledSlots(
   return dropped ? (kept as SearchParams | undefined) : defaults;
 }
 
-/**
- * THE single point where the path / query channels are separated by
- * declaration (#1549). A DECLARED `?key` that rides in the `params` bag — a
- * plugin's `forwardState` injection (persistent-params on `start()`), a
- * decoder-injected key, a v1 single-bag `navigate(name, { q })` — moves to the
- * query channel; everything else stays a path param. An explicit `search` value
- * wins over a params-bag twin (the #843 collision precedence).
- *
- * Every State producer routes through this ONE function — `makeState` (the state
- * factory), `pipeline/canonicalize` and the `matchPath` URL rebuild — so
- * `state.path` and `state.search` can never derive from differently-split bags.
- * Returns the inputs untouched (no allocation) when there is nothing to route:
- * no params, no declared query names, or no declared key actually riding in the
- * params bag (the common path).
- */
-export function separateChannels(
-  params: Params | undefined,
-  queryNames: readonly string[],
-  search: SearchParams,
-): { params: Params | undefined; search: SearchParams };
-
-export function separateChannels(
-  params: Params | undefined,
-  queryNames: readonly string[],
-  search: SearchParams | undefined,
-): { params: Params | undefined; search: SearchParams | undefined };
-
-export function separateChannels(
-  params: Params | undefined,
-  queryNames: readonly string[],
-  search: SearchParams | undefined,
-): { params: Params | undefined; search: SearchParams | undefined } {
-  if (params === undefined || queryNames.length === 0) {
-    return { params, search };
-  }
-
-  let routedParams: Params | undefined;
-  let routedQuery: Record<string, unknown> | undefined;
-
-  for (const [key, value] of Object.entries(params)) {
-    if (queryNames.includes(key)) {
-      routedQuery ??= {};
-      routedQuery[key] = value;
-    } else {
-      routedParams ??= {};
-      routedParams[key] = value;
-    }
-  }
-
-  if (routedQuery === undefined) {
-    // No declared query name rode in the params bag — channels already canonical.
-    return { params, search };
-  }
-
-  // `search` wins over a params-bag twin via the spread order (#843).
-  return {
-    params: routedParams,
-    search: { ...routedQuery, ...search } as SearchParams,
-  };
-}
-
 // =============================================================================
 // Channel guard — detect, never normalise (#1572)
 // =============================================================================
@@ -138,9 +77,9 @@ export function separateChannels(
  * when the bag is channel-correct.
  *
  * A DETECTOR, not a normaliser — the key is never moved. Moving it is what
- * {@link separateChannels} (stage ②) does, and the nav-pipeline design removes
- * that stage precisely so channel-correctness becomes the producer's contract
- * rather than a repair the pipeline performs behind everyone's back.
+ * `separateChannels` (stage ②) used to do — a function that no longer exists.
+ * Channel-correctness is the producer's contract now, not a repair the pipeline
+ * performs behind everyone's back.
  *
  * Scans `queryNames` (a route's declared query names — small, cached) rather
  * than the bag, so there is no `Object.keys` allocation, and short-circuits on
@@ -197,12 +136,56 @@ export function findMisChanneledKey(
  *
  * @internal
  */
+/**
+ * THE centralized channel check — the single place a mis-channelled bag is
+ * refused, wherever it came from.
+ *
+ * Replaces the repair `separateChannels` (stage ②, since deleted) used to
+ * perform at the `forwardState` seam. A key the route declares with `?`, sitting in the PATH
+ * bag, is a producer's mistake — the producer named the route, so it knows the
+ * declaration — and the router now says so instead of quietly moving the field
+ * into the other object. Moving it was invisible: the caller kept believing
+ * their bag was the one that shipped, and two producers of the SAME intent
+ * could disagree about which channel a key ended up in.
+ *
+ * `source` names WHOSE bag is wrong, which is the whole diagnostic value at a
+ * seam: the caller's argument, a `forwardState` interceptor's return, or the
+ * output of a route's own `decodeParams`. It takes a THUNK as well as a string
+ * because the seam sits on the navigation hot path — a source that has to be
+ * composed (naming the route a chain forwarded from) must not build its string
+ * on every call just to discard it on the 99.99% of calls that pass.
+ *
+ * @internal
+ */
+export function assertChannelCorrect(
+  method: string,
+  routeName: string,
+  params: Params | undefined,
+  queryNames: readonly string[],
+  source?: string | (() => string),
+  remedy?: string,
+): void {
+  const key = findMisChanneledKey(params, queryNames);
+
+  if (key !== undefined) {
+    throw new TypeError(
+      `[router.${method}] ${misChanneledKeyMessage(
+        routeName,
+        key,
+        typeof source === "function" ? source() : source,
+        remedy,
+      )}`,
+    );
+  }
+}
+
 export function misChanneledKeyMessage(
   routeName: string,
   key: string,
   source = "the `params` argument",
+  remedy = "Pass it in `search` instead",
 ): string {
-  return `Route "${routeName}" declares \`${key}\` as a query param, but it was passed in ${source} — the path channel. Pass it in \`search\` instead; the two channels are separate since RFC-4 M2.`;
+  return `Route "${routeName}" declares \`${key}\` as a query param, but it was given in ${source} — the path channel. ${remedy}; the two channels are separate since RFC-4 M2 and the router never moves a key between them.`;
 }
 
 // =============================================================================
@@ -591,7 +574,7 @@ export function admittedSearch<S extends SearchParams>(
   let dropped = false;
 
   // `Object.entries` (own enumerable only) rather than `for…in` + `Object.hasOwn`
-  // — the same idiom as `separateChannels` above, and it keeps the guard branch
+  // — the same idiom the deleted `separateChannels` used, and it keeps the guard branch
   // out of the file instead of leaving one no test can reach.
   for (const [key, value] of Object.entries(search)) {
     if (queryNames.includes(key)) {

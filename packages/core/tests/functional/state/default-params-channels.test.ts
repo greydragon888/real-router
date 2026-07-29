@@ -455,60 +455,105 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
   // proves the NEW slot while the describe still promises `defaultParams`
   // routing. The form the tests stopped covering is exactly the one #1549 is
   // about — and it is not merely mis-channelled any more, it CRASHES.
-  describe("a route's OWN defaultParams naming a declared query key (#1549)", () => {
+  describe("a route's OWN defaultParams naming a declared query key", () => {
     const OWN_QUERY_DEFAULT = [
       { name: "home", path: "/home" },
       { name: "x", path: "/x?page&sort", defaultParams: { page: "5" } },
     ];
 
-    it("start() commits instead of throwing WRONG_CHANNEL on a legal config", async () => {
-      const router = createRouter(OWN_QUERY_DEFAULT);
+    it("is refused at registration, in every population entry point", () => {
+      // The static half of "params and search meet only in the URL". Core used
+      // to accept this config and re-channel the default on the way out (#1549);
+      // that split is gone, and without a config-time refusal the router would
+      // build a state out of its OWN config that its OWN always-on channel guard
+      // then rejects — `start()` throwing WRONG_CHANNEL about a bag the user
+      // never passed. Refusing here turns a deferred crash into a config error
+      // naming the slot to move it to.
+      const message =
+        /Route "x" declares `page`[\s\S]*Move it to `defaultSearch`/;
 
-      // `start` commits through `navigateToState`, where the channel guard's P3
-      // rejects a declared query key sitting in `state.params` — so core's own
-      // default made core's own guard reject core's own state.
-      await router.start("/x");
+      expect(() => createRouter(OWN_QUERY_DEFAULT)).toThrow(message);
 
-      const state = router.getState()!;
+      const viaAdd = createRouter([{ name: "home", path: "/home" }]);
 
-      expect(state.params).toStrictEqual({});
-      expect(state.search).toStrictEqual({ page: "5" });
-      expect(state.path).toBe("/x?page=5");
+      expect(() => {
+        getRoutesApi(viaAdd).add({
+          name: "x",
+          path: "/x?page&sort",
+          defaultParams: { page: "5" },
+        });
+      }).toThrow(message);
+
+      expect(() => {
+        getRoutesApi(viaAdd).replace(OWN_QUERY_DEFAULT);
+      }).toThrow(message);
+
+      getRoutesApi(viaAdd).add({ name: "y", path: "/y?page" });
+
+      expect(() => {
+        getRoutesApi(viaAdd).update("y", { defaultParams: { page: "5" } });
+      }).toThrow(/Route "y" declares `page`/);
     });
 
-    it("routes the default into state.search on the navigate path", async () => {
-      const router = createRouter(OWN_QUERY_DEFAULT);
+    it("is refused when a LATER setRootPath declares the name", () => {
+      // The one mutation that invalidates an untouched config: a root
+      // `?`-declaration declares the name on every route at once, so a
+      // `defaultParams` that was legal a moment ago stops being legal without
+      // any route changing. Nothing else re-checks the whole table.
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "g", path: "/g", defaultParams: { lang: "it" } },
+      ]);
 
-      await router.start("/home");
-
-      const state = await router.navigate("x", {});
-
-      expect(state.params).toStrictEqual({});
-      expect(state.search).toStrictEqual({ page: "5" });
-      expect(state.path).toBe("/x?page=5");
+      expect(() => {
+        getPluginApi(router).setRootPath("?lang");
+      }).toThrow(/Route "g" declares `lang`[\s\S]*Move it to `defaultSearch`/);
     });
 
-    it("keeps every producer in agreement — no channel divergence (#1554 class)", async () => {
-      const router = createRouter(OWN_QUERY_DEFAULT);
+    it("takes `defaultSearch` — the spelling that says which channel", async () => {
+      // The positive control, and the migration target. Same intent, one slot
+      // to the right, and every producer agrees without anything being moved.
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "x", path: "/x?page&sort", defaultSearch: { page: "5" } },
+      ]);
       const api = getPluginApi(router);
 
-      await router.start("/home");
+      await router.start("/x");
+
+      const started = router.getState()!;
+
+      expect(started.params).toStrictEqual({});
+      expect(started.search).toStrictEqual({ page: "5" });
+      expect(started.path).toBe("/x?page=5");
+
+      await router.navigate("home");
 
       const navigated = await router.navigate("x", {});
       const matched = api.matchPath("/x")!;
-
-      // A producer that leaves the default in `params` while another routes it
-      // to `search` makes two states for the SAME location compare unequal —
-      // the shape that renders an active link inactive.
-      expect(matched.params).toStrictEqual(navigated.params);
-      expect(matched.search).toStrictEqual(navigated.search);
-      expect(router.areStatesEqual(navigated, matched, false)).toBe(true);
-
       const built = api.buildNavigationState("x", {})!;
 
-      expect(built.params).toStrictEqual(navigated.params);
-      expect(built.search).toStrictEqual(navigated.search);
+      // A producer that leaves the default in one channel while another puts it
+      // in the other makes two states for the SAME location compare unequal —
+      // the shape that renders an active link inactive (#1554 class).
+      expect(matched.params).toStrictEqual(navigated.params);
+      expect(matched.search).toStrictEqual(navigated.search);
       expect(built.path).toBe(navigated.path);
+      expect(router.areStatesEqual(navigated, matched, false)).toBe(true);
+    });
+
+    it("leaves an UNDECLARED defaultParams key in the path channel", () => {
+      // The negative control that keeps the refusal from reading as "no
+      // app-level defaults allowed": a key the route declares nowhere is
+      // ordinary path-channel data and is untouched.
+      const router = createRouter([
+        { name: "x", path: "/x?page", defaultParams: { flag: "on" } },
+      ]);
+
+      const state = getPluginApi(router).makeState("x");
+
+      expect(state.params).toStrictEqual({ flag: "on" });
+      expect(state.search).toStrictEqual({});
     });
   });
 

@@ -162,15 +162,15 @@ export class SearchSchemaPlugin {
     const invalidKeys = getInvalidKeys(validation.issues);
     const stripped = omitKeys(channel, invalidKeys);
     const route = this.#routesApi.get(result.name);
-    // Recovery fills from the route's query-channel defaults. `defaultSearch`
-    // is the M2 home (#1549); a `defaultParams` entry still reaches the query
-    // channel for a declared query key (core merges it below the user channel
-    // and separates afterwards), so it is honoured too — minus the path slots,
-    // which are core's business, not the schema's.
-    const defaults = {
-      ...omitKeys(route?.defaultParams ?? {}, pathParams),
-      ...((route?.defaultSearch ?? {}) as Params),
-    };
+    // Recovery fills from the route's query-channel defaults, and `defaultSearch`
+    // is the ONLY place those live. This used to also mine `defaultParams` minus
+    // the path slots, on the grounds that core merged such an entry below the
+    // user channel and separated it afterwards. Core does not separate any more
+    // — a `defaultParams` naming a declared query key is refused at
+    // registration — so whatever survives that subtraction today is undeclared
+    // path-channel data, and pouring it into the query channel would be this
+    // plugin re-creating the very repair core removed.
+    const defaults = (route?.defaultSearch ?? {}) as Params;
     const restored = { ...defaults, ...stripped };
 
     return this.#writeBack(result, pathParams, restored);

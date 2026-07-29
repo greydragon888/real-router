@@ -15,8 +15,8 @@ import {
 import {
   createLimits,
   findMisChanneledKey,
+  assertChannelCorrect,
   normalizeParams,
-  separateChannels,
 } from "./helpers";
 import {
   createInterceptable,
@@ -108,7 +108,7 @@ export class Router<
   // Namespaces
   // ============================================================================
 
-  readonly #options: OptionsNamespace;
+  readonly #options: OptionsNamespace<Dependencies>;
   readonly #limits: Limits;
   readonly #dependenciesStore: DependenciesStore<Dependencies>;
   readonly #state: StateNamespace;
@@ -147,7 +147,7 @@ export class Router<
    */
   constructor(
     routes: Route<Dependencies>[] = [],
-    options: Partial<Options> = {},
+    options: Partial<Options<Dependencies>> = {},
     dependencies: Dependencies = {} as Dependencies,
   ) {
     // Extract the logger config WITHOUT mutating the caller's `options` object
@@ -260,18 +260,24 @@ export class Router<
     const interceptorsMap: RouterInternals["interceptors"] = new Map();
 
     // THE single forwardState boundary (#1548/#1549). The interceptable resolves
-    // the route (forwardTo) and runs the whole interceptor chain — persistent
-    // params injected into the params bag, a search-schema validation, etc. The
-    // outer layer then canonicalizes the channels ONCE via `separateChannels`,
-    // keyed on the RESOLVED route's `?`-declaration (`getQueryParams(forwarded
-    // .name)`): a declared query key a plugin/decoder left in the params bag
-    // moves to the query channel, everything else stays a path param. So
-    // forwardState's result is ALWAYS channel-separated by construction — every
-    // consumer (makeState, matchPath, canNavigateTo, buildNavigationState) receives
-    // path-only params + the full query and never re-splits. `as unknown as` is
-    // required: the closure is non-generic, but RouterInternals["forwardState"]
-    // is declared generic `<P, S>`, which tsc will not infer from a non-generic
-    // source (Sonar S4325 misclassifies this as a redundant cast).
+    // the route (forwardTo) and runs the whole interceptor chain — a plugin
+    // injecting params, a search-schema validation, etc. The outer layer then
+    // CHECKS the channels once, keyed on the RESOLVED route's `?`-declaration.
+    //
+    // It used to REPAIR them instead (`separateChannels`, stage ②): a declared
+    // query key left in the params bag was moved into the query channel behind
+    // the producer's back. Three things were wrong with that. The producer kept
+    // believing the bag it wrote was the one that shipped. A plugin could
+    // inject past a validation that had already run — search-schema documented
+    // exactly that leak, with a test named LEAKS. And the caller's own
+    // mis-channelled key and a chain default's query half landed in DIFFERENT
+    // channels, where no merge ranks them, so the default silently won (#1570).
+    // Refusing is the whole fix: whoever names the route knows its declaration.
+    //
+    // `as unknown as` is required: the closure is non-generic, but
+    // RouterInternals["forwardState"] is declared generic `<P, S>`, which tsc
+    // will not infer from a non-generic source (Sonar S4325 misclassifies this
+    // as a redundant cast).
     const rawForwardState = createTernaryInterceptable(
       "forwardState",
       (name: string, params: Params, search?: SearchParams) =>
@@ -285,16 +291,38 @@ export class Router<
       search?: SearchParams,
     ) => {
       const forwarded = rawForwardState(name, params, search);
-      const separated = separateChannels(
+
+      // The DECLARATION that matters is the RESOLVED route's — it owns the URL
+      // that gets printed. When a chain resolved to a different route, say so:
+      // a caller who wrote `navigate("src", { lang })` looked at `src`'s config,
+      // where `lang` is undeclared and legitimate, and needs to be told that the
+      // hop landed somewhere that spells it `?lang`. Naming only the target
+      // would read as a message about a route they never mentioned.
+      assertChannelCorrect(
+        "forwardState",
+        forwarded.name,
         forwarded.params,
         this.#routes.getQueryParams(forwarded.name),
-        forwarded.search,
+        () =>
+          forwarded.name === name
+            ? "the `params` bag leaving the forwardState chain"
+            : `the \`params\` bag leaving the forwardState chain (forwarded here from "${name}")`,
       );
 
       return {
         name: forwarded.name,
-        params: separated.params ?? EMPTY_PARAMS,
-        search: separated.search,
+        // The type says `params: P`, and across THIS boundary the type is a
+        // contract, not a guarantee: `rawForwardState` is an interceptable, so
+        // the value has passed through user code that can spread a partial
+        // result. The net used to be reached by stage ②'s split (an all-query
+        // bag left the path half undefined) and is now reached only by that
+        // contract violation — still worth surviving rather than putting
+        // `undefined` into `state.params`. Pinned by "normalises a params bag an
+        // interceptor dropped to `undefined`" in forwardState.test.ts, which
+        // fails if this is removed.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the declared type cannot model an interceptor's runtime return
+        params: forwarded.params ?? EMPTY_PARAMS,
+        search: forwarded.search,
       };
     }) as unknown as RouterInternals["forwardState"];
 
@@ -1154,8 +1182,8 @@ function throwDisposed(): never {
  * Derives CreateMatcherOptions from router Options.
  * Maps core option names to matcher option names.
  */
-function deriveMatcherOptions(
-  options: Readonly<Options>,
+function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
+  options: Readonly<Options<Dependencies>>,
 ): CreateMatcherOptions {
   return {
     strictTrailingSlash: options.trailingSlash === "strict",

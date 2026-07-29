@@ -32,7 +32,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: searchSchema(),
           },
         ],
@@ -85,7 +85,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort&extra",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: searchSchema(),
           },
         ],
@@ -143,7 +143,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort&extra",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: searchSchema(),
           },
         ],
@@ -185,7 +185,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: createMockSchema({
               validate: (value) => {
                 const params = value as Record<string, unknown>;
@@ -686,7 +686,7 @@ describe("Search schema plugin", () => {
             {
               name: "search",
               path: "/search?q&page",
-              defaultParams: { page: 1 },
+              defaultSearch: { page: 1 },
               searchSchema: failingSchema([
                 {
                   message: "page is invalid",
@@ -809,7 +809,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: failingSchema([
               { message: "page is bad", path: ["page"] },
               { message: "sort is bad", path: ["sort"] },

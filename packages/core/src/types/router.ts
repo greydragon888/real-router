@@ -86,26 +86,66 @@ export type DefaultParamsCallback<Dependencies = object> = (
 ) => Params;
 
 /**
+ * Callback function for dynamically resolving the default query params.
+ * Receives a dependency getter function to access router dependencies.
+ */
+export type DefaultSearchCallback<Dependencies = object> = (
+  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
+) => SearchParams;
+
+/**
  * Router configuration options.
  *
  * Note: For input, use `Partial<Options>` as all fields have defaults.
  * After initialization, `getOptions()` returns resolved `Options` with all fields populated.
+ *
+ * Generic over the router's dependency map so the three resolver callbacks
+ * (`defaultRoute` / `defaultParams` / `defaultSearch`) receive a TYPED
+ * `getDependency`. Code that cannot know that map — anything plugin-facing,
+ * and every consumer that reads configuration rather than resolving it —
+ * takes {@link AnyOptions} instead of infecting itself with the parameter.
  */
-export interface Options {
+export interface Options<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
   /**
    * Default route to navigate to on start.
    * Empty string means no default route.
    *
    * @default ""
    */
-  defaultRoute: string | DefaultRouteCallback;
+  defaultRoute: string | DefaultRouteCallback<Dependencies>;
 
   /**
-   * Default parameters for the default route.
+   * Default **path** parameters for the default route.
+   *
+   * Query defaults belong in {@link defaultSearch} — the two are separate
+   * channels (RFC-4 M2 / #1548), exactly as on a route's own config. Until that
+   * twin existed, a query-declared name written here reached the URL only
+   * because the `forwardState` seam still re-channelled the bag on its way
+   * through; that repair is scheduled for removal, so this slot is for path
+   * params and arbitrary app-level data, nothing else.
    *
    * @default {}
    */
-  defaultParams: Params | DefaultParamsCallback;
+  defaultParams: Params | DefaultParamsCallback<Dependencies>;
+
+  /**
+   * Default **query** parameters for the default route (RFC-4 M2 / #1548) —
+   * the query-channel twin of {@link defaultParams}, and the router-level
+   * counterpart of a route's own `defaultSearch`.
+   *
+   * Passed to `navigateToDefault()` in the query slot, so it is merged into
+   * `state.search` and, subject to `queryParamsMode`, printed into the URL
+   * query string. Like `defaultRoute` / `defaultParams`, it may be a callback,
+   * re-evaluated on every `navigateToDefault()` — the default route can itself
+   * be chosen dynamically, so its query defaults have to be able to follow.
+   * `Options` is generic over the dependency map, so the callback's
+   * `getDependency` is typed against the router's OWN dependencies.
+   *
+   * @default {}
+   */
+  defaultSearch: SearchParams | DefaultSearchCallback<Dependencies>;
 
   /**
    * How to handle trailing slashes in URLs.
@@ -197,6 +237,22 @@ export interface Options {
    */
   limits?: Partial<LimitsConfig>;
 }
+
+/**
+ * `Options` as seen by code that cannot know the router's dependency map —
+ * `PluginApi.getOptions()`, the matcher, the URL builders.
+ *
+ * `Options<never>` rather than `Options<object>`, and the difference is the
+ * whole point: `keyof never` is `PropertyKey`, so the erased `getDependency`
+ * accepts ANY key and returns `never` — a wider parameter and a narrower
+ * return, which is exactly what contravariance needs for `Options<D>` to flow
+ * in for every `D`. `Options<object>` erases `keyof` to `never` instead and
+ * therefore accepts NOTHING but itself (verified: the assignment fails).
+ *
+ * Every field stays visible; only the callbacks become uncallable, which is
+ * honest — a plugin has no dependency map to resolve them against.
+ */
+export type AnyOptions = Options<never>;
 
 export type GuardFn = (
   toState: State,
@@ -442,8 +498,15 @@ export interface Route<
   /**
    * Default **path** parameters for this route (and arbitrary app-level
    * defaults). Merged into `state.params`; missing path params are filled from
-   * here. Query defaults live in {@link defaultSearch} (RFC-4 M2 / #1548) — a
-   * query-declared name (`?name`) placed here is NOT routed to the query string.
+   * here. Query defaults belong in {@link defaultSearch} (RFC-4 M2 / #1548).
+   *
+   * ⚠ The slot does NOT decide the channel — the route's `?`-declaration does
+   * (#1549). A name the route declares with `?` written here IS routed to the
+   * query string, exactly as a `forwardTo` hop's defaults are routed by the
+   * resolved target's declaration (#1570); `defaultSearch` is layered last and
+   * so outranks it, and the caller outranks both. Prefer `defaultSearch` for
+   * query defaults anyway: it says which channel you meant, and it does not
+   * depend on the route being the one that declares the name.
    */
   defaultParams?: Params;
   /**

@@ -641,7 +641,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       router = createRouter([
         { name: "home", path: "/home" },
         { name: "d", path: "/d?z" },
-        { name: "s", path: "/s", forwardTo: "d", defaultParams: { z: "5" } },
+        { name: "s", path: "/s", forwardTo: "d", defaultSearch: { z: "5" } },
       ]);
       await router.start("/home");
 
@@ -649,8 +649,9 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       expect(state.path).toBe("/d?z=5");
       // Sharper than the path case: the arm matches only if the repeat carries
-      // the SEARCH channel too — stage ① routes the hop default there when the
-      // target declares the key with `?` (#1570).
+      // the SEARCH channel too. The hop spells the default in `defaultSearch`,
+      // the slot that says "query" — nothing is routed by the target, so the
+      // predicate and the navigation read the same two channels.
       expect(router.isActiveRoute("s", {}, {}, false, false)).toBe(true);
     });
 

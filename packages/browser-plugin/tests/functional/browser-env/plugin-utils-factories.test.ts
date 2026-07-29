@@ -29,7 +29,11 @@ describe("plugin-utils factories", () => {
         name: "archive",
         path: "/archive",
         forwardTo: "posts",
-        defaultParams: { id: "7", tab: "old", sort: "asc" },
+        // Each slot IS its channel: `id` is a path segment of the target,
+        // `tab`/`sort` are declared with `?`. The hop spells each half where it
+        // belongs — the router does not route them by the target's declaration.
+        defaultParams: { id: "7" },
+        defaultSearch: { tab: "old", sort: "asc" },
       },
       { name: "posts", path: "/posts/:id?tab&sort" },
     ]);
@@ -213,11 +217,10 @@ describe("plugin-utils factories", () => {
 
       replace("archive");
 
-      // `archive`'s single `defaultParams` bag splits across both channels of
-      // the target: `id` is a path segment, `tab` is declared with `?`. Both
-      // halves belong in the record — the path half was never in doubt, and it
-      // is what makes the query half's absence a proven asymmetry rather than a
-      // guess about where defaults live.
+      // `archive` spells its defaults in BOTH slots. Both halves belong in the
+      // record — the path half was never in doubt, and it is what makes the
+      // query half's absence a proven asymmetry rather than a guess about where
+      // defaults live.
       expect(browser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "posts",

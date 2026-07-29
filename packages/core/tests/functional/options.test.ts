@@ -696,6 +696,52 @@ describe("core/options", () => {
       customRouter.stop();
     });
 
+    it("types getDependency against the router's own dependency map", () => {
+      // `Options` is generic over `Dependencies`, so the three resolver
+      // callbacks receive a TYPED accessor. Before that they defaulted to
+      // `object`, whose `keyof` is `never` — every key was rejected and the
+      // documented `defaultParams: (getDependency) => …` example did not
+      // compile. A type-level pin because that is the only level it lives on.
+      interface Deps {
+        currentUserId: string;
+        preferredTab: string;
+      }
+
+      const typed = createRouter<Deps>(
+        [
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "view", path: "/view/:id?tab" }],
+          },
+        ],
+        {
+          defaultRoute: (getDependency) =>
+            getDependency("currentUserId") ? "users.view" : "users",
+          defaultParams: (getDependency) => ({
+            id: getDependency("currentUserId"),
+          }),
+          defaultSearch: (getDependency) => ({
+            tab: getDependency("preferredTab"),
+          }),
+        },
+        { currentUserId: "42", preferredTab: "profile" },
+      );
+
+      // The discriminating half — a key the map does not declare must still be
+      // rejected, or the parameter would be typing nothing at all.
+      createRouter<Deps>(
+        [],
+        // @ts-expect-error -- "nope" is not a key of Deps
+        { defaultParams: (getDependency) => ({ id: getDependency("nope") }) },
+        { currentUserId: "1", preferredTab: "a" },
+      );
+
+      expect(typed).toBeDefined();
+
+      typed.stop();
+    });
+
     it("should resolve callback defaultParams via navigateToDefault", async () => {
       const customRouter = createTestRouter({
         defaultRoute: "users.view",

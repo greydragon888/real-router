@@ -7,7 +7,6 @@ import {
   createStateObject,
   freezeStateInPlace,
   mergeWithDefault,
-  separateChannels,
 } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -142,11 +141,13 @@ export class StateNamespace {
     // the query channel; `defaultSearch` is spread last and wins the collision.
     // Without this the key rode `state.params` while `state.path` never showed
     // it — and the always-on P3 guard then rejected core's OWN state on `start`.
-    const routeDefaults = separateChannels(
-      routeDefaultParams,
-      this.#deps.getQueryParams(name),
-      routeDefaultSearch,
-    );
+    // Each slot IS its channel (see `pipeline/canonicalize`): the router does
+    // not move a key between them, and a `defaultParams` naming a `?`-declared
+    // key never gets registered in the first place.
+    const routeDefaults = {
+      params: routeDefaultParams,
+      search: routeDefaultSearch,
+    };
 
     const mergedParams = mergeWithDefault(
       routeDefaults.params,

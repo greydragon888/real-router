@@ -1,4 +1,4 @@
-import { findMisChanneledKey, misChanneledKeyMessage } from "./helpers";
+import { assertChannelCorrect } from "./helpers";
 
 import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";
@@ -6,6 +6,7 @@ import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { RouteResolver } from "./pipeline";
 import type { Router as RouterClass } from "./Router";
 import type {
+  AnyOptions,
   DefaultDependencies,
   EventName,
   LoggerConfig,
@@ -73,10 +74,10 @@ export interface RouterInternals<
 
   readonly matchPath: <P extends Params = Params>(
     path: string,
-    options?: Options,
+    options?: AnyOptions,
   ) => State<P> | undefined;
 
-  readonly getOptions: () => Options;
+  readonly getOptions: () => Options<D>;
 
   readonly addEventListener: <E extends EventName>(
     eventName: E,
@@ -186,7 +187,7 @@ export interface RouterInternals<
   // clone-relevant subsystem is wired in a single place instead of being spread
   // across separate methods.
   readonly getCloneState: () => {
-    options: Options;
+    options: Options<D>;
     dependencies: Record<string, unknown>;
     pluginFactories: PluginFactory<D>[];
     // Resolved logger config of the base router, so a clone can build its OWN
@@ -273,13 +274,12 @@ export function throwOnMisChanneledKey<D extends DefaultDependencies>(
   routeName: string,
   params: Params | undefined,
 ): void {
-  const key = findMisChanneledKey(params, ctx.getQueryParams(routeName));
-
-  if (key !== undefined) {
-    throw new TypeError(
-      `[router.${method}] ${misChanneledKeyMessage(routeName, key)}`,
-    );
-  }
+  assertChannelCorrect(
+    method,
+    routeName,
+    params,
+    ctx.getQueryParams(routeName),
+  );
 }
 
 export function registerInternals<D extends DefaultDependencies>(

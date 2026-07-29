@@ -42,15 +42,31 @@ describe("core/state — root-declared query key channel (#1556)", () => {
   };
 
   describe("classification agrees with printing", () => {
-    it("routes a root-declared key into the query channel on forwardState", () => {
+    it("carries a root-declared key in the query channel on forwardState", () => {
       const router = withRoot();
 
-      const forwarded = getPluginApi(router).forwardState("g", {
-        lang: "it",
-      });
+      const forwarded = getPluginApi(router).forwardState(
+        "g",
+        {},
+        {
+          lang: "it",
+        },
+      );
 
       expect(forwarded.params).toStrictEqual({});
       expect(forwarded.search).toStrictEqual({ lang: "it" });
+    });
+
+    it("refuses a root-declared key handed in the path bag", () => {
+      // `setRootPath("?lang")` declares the name on EVERY route, which is how
+      // `persistent-params` publishes its keys. The seam used to move such a key
+      // out of the params bag; it now refuses it, so a plugin cannot inject past
+      // a validation that already ran and then be told nothing happened.
+      const router = withRoot();
+
+      expect(() =>
+        getPluginApi(router).forwardState("g", { lang: "it" }),
+      ).toThrow(/"g" declares `lang` as a query param/);
     });
 
     it("keeps a path-slot twin path-owned even when the name is also declared (#843 carve-out)", () => {

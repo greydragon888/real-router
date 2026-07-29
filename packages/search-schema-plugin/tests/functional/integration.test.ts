@@ -198,7 +198,7 @@ describe("Search schema plugin", () => {
       expect(router.getState()?.search.q).toBe("hello");
     });
 
-    it("LEAKS an invalid value injected by a LATER interceptor (schema innermost — alternative)", async () => {
+    it("REFUSES an invalid value injected by a LATER interceptor (the leak is closed)", async () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -225,10 +225,20 @@ describe("Search schema plugin", () => {
       });
       await router.start("/");
 
-      await router.navigate("search", {}, { q: "hello" });
+      // The injector (outermost) adds `page` AFTER the schema ran, so the value
+      // never faced validation. It used to reach `state.search` anyway: the
+      // `forwardState` seam moved a declared `?page` out of the params bag into
+      // the query channel, laundering an unvalidated value into the very channel
+      // the schema owns — a leak this suite documented rather than fixed.
+      //
+      // The seam refuses the mis-channelled bag now, so the composition hazard
+      // is structurally gone: an interceptor that wants to write the query
+      // channel has to write `search`, where the schema can see it.
+      await expect(
+        router.navigate("search", {}, { q: "hello" }),
+      ).rejects.toThrow(/"search" declares `page` as a query param/);
 
-      // injector (outermost) added page AFTER the schema ran → invalid value leaks into state.
-      expect(router.getState()?.search.page).toBe("INVALID-INJECTED");
+      expect(router.getState()?.name).toBe("home");
     });
   });
 
@@ -240,7 +250,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: schemaWithDefaults(),
           },
         ],
@@ -328,7 +338,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: schemaWithDefaults(),
           },
         ],
@@ -359,7 +369,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: failingSchema([
               { message: "page is bad", path: ["page"] },
             ]),
@@ -399,7 +409,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: failingSchema([
               { message: "page invalid", path: ["page"] },
             ]),
@@ -433,7 +443,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q",
-            defaultParams: { q: "default" },
+            defaultSearch: { q: "default" },
             searchSchema: failingSchema([]),
           },
         ],

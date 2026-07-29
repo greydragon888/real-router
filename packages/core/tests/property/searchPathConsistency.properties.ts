@@ -111,6 +111,13 @@ const ROUTES: Route[] = [
   {
     name: "tagged",
     path: "/tagged/:id?tag",
+    decodeParams: ({ params }) => ({ params, search: { tag: "d" } }),
+  },
+  // The mirror of `tagged`: the SAME injection spelled into the path bag, which
+  // the seam used to repair and now refuses.
+  {
+    name: "mis-tagged",
+    path: "/mis-tagged/:id?tag",
     decodeParams: ({ params, search }) => ({
       params: { ...params, tag: "d" },
       search,
@@ -302,14 +309,14 @@ describe("core/state — search ↔ path consistency (#1548/#1549)", () => {
     },
   );
 
-  // 7. A declared `?key` riding in routeParams during the matchPath rebuild (here
-  //    via a query-declared defaultParam; the same shape a plugin's forwardState
-  //    injection produces — persistent-params on start()) must reach state.path,
-  //    not only state.search. The #1549 rebuild routes params-bag declared keys
-  //    into the URL query; without it state.search carries `tag` while the URL
-  //    omits it. Verified mutationally: reverting that routing fails this block.
+  // 7. A decoder owns BOTH channels of its own route and must write each into
+  //    its own slot. Spelled correctly, the injected key reaches state.search
+  //    AND state.path; spelled into the path bag it is refused rather than
+  //    repaired — the seam used to move it, which shipped a bag the decoder
+  //    never wrote. Both arms in one block so the property cannot decay into
+  //    "the happy shape works" while the refusal quietly stops firing.
   test.prop([arbId], { numRuns: NUM_RUNS.standard })(
-    "matchPath: a declared key riding in routeParams reaches state.path AND state.search",
+    "matchPath: a decoder's own channels are taken as written, a mis-channelled one is refused",
     (id) => {
       const state = pluginApi.matchPath(`/tagged/${id}`);
 
@@ -318,6 +325,10 @@ describe("core/state — search ↔ path consistency (#1548/#1549)", () => {
       expect(state!.search).toStrictEqual({ tag: "d" });
 
       assertSearchMatchesPath(state!);
+
+      expect(() => pluginApi.matchPath(`/mis-tagged/${id}`)).toThrow(
+        /`decodeParams`/,
+      );
     },
   );
 
