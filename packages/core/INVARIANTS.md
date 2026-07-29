@@ -581,6 +581,7 @@ Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and 
 | `tests/property/navigateToDefault.properties.ts`        | 4          | Default route navigation                                                                                |
 | `tests/property/forwarding.properties.ts`               | 4          | forwardTo chain resolution                                                                              |
 | `tests/property/queryChannelRegistry.properties.ts`     | 4          | One registry classifies and prints (#1556) + hop defaults land in the target's channel (#1570)          |
+| `tests/property/entryPointConvergence.properties.ts`    | 4          | Phase-2 lock: entry points of one compositional form agree on one intent (#1548) |
 | `tests/property/searchPathConsistency.properties.ts`    | 8          | `state.search` ↔ `state.path` consistency across every producer (#1548/#1549) + href equals destination (#1578) |
 | `tests/property/routeManagement.properties.ts`          | 14         | Route CRUD via getRoutesApi                                                                             |
 | `tests/property/guards.properties.ts`                   | 7          | Guard and navigate interaction                                                                          |
