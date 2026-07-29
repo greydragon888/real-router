@@ -1,5 +1,5 @@
 ---
-"@real-router/core": patch
+"@real-router/core": minor
 ---
 
 Offer an opt-in diagnostic for a param key the route declares nowhere (#1579)

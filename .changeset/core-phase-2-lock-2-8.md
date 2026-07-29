@@ -18,9 +18,12 @@ where the two must DISAGREE, so a third property asserts the divergence: without
 it the first two would both pass on a router that ignored `resolveForward`
 entirely, which is the one regression the lock exists to catch.
 
-Verified mutationally, per property: dropping the query from `buildPath`'s print
-reddens the LITERAL class and nothing else; ignoring the literal form reddens the
-divergence property and nothing else.
+Verified mutationally, per property — and the SITE of the mutation is part of the
+claim, because the two classes reach `buildPath` through different depths.
+Dropping the query at the FACADE (`Router.buildPath`, the argument surface M2's
+slot shift moved) reddens the LITERAL class and nothing else; the same drop deep
+in the namespace method reddens class ① instead, via the `matchPath` re-parse.
+Ignoring the literal form reddens the divergence property and nothing else.
 
 All four caveats from the parent RFC's §5 are carried and documented in the file,
 including the one an earlier revision lost: `canNavigateTo` returns a `boolean`,
