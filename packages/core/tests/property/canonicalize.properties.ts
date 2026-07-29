@@ -45,6 +45,7 @@ function makePort(
     },
     // Default to `loose` so every pre-existing property keeps exercising the
     // un-gated path; the mode-gate properties below pass their own.
+    pathNames: () => [],
     queryNames: () => gate?.queryNames ?? [],
     admitsUndeclaredQuery: () => gate?.admitsUndeclared ?? true,
   };

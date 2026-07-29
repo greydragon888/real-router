@@ -72,3 +72,47 @@ export function reportDroppedQueryKey(routeName: string, key: string): void {
 export function resetDroppedQueryKeyReports(): void {
   reported.clear();
 }
+
+/**
+ * The undeclared-params-bag diagnostic (#1579 — the params half of #1553).
+ *
+ * A key the route declares NOWHERE — neither as a path slot nor with `?` — has
+ * no channel to own it, so core keeps it in `state.params` as app-level data
+ * (documented: wiki `Route.md`). Correct, but it means the state does not
+ * round-trip through its own `state.path`: reopen the same link and the key is
+ * gone.
+ *
+ * Core's behaviour is deliberately UNCHANGED — dropping the key was measured
+ * and rejected. It retires a shipped capability (52 tests across 6 packages plus
+ * the wiki), and the "declared nowhere" predicate cannot separate that case from
+ * a legitimate one: `navigate("users", { id })` on a PARENT route whose child
+ * declares `:id` is indistinguishable from a typo. A diagnostic can afford that
+ * ambiguity — it says what happened and lets the developer judge; a gate cannot.
+ *
+ * De-duplicated per `route + key`, like the mode gate's: this runs on every
+ * navigation, so an un-deduped warning floods the console on a revisit.
+ */
+const undeclaredReported = new Set<string>();
+
+export function reportUndeclaredParamKey(routeName: string, key: string): void {
+  const seen = `${routeName} ${key}`;
+
+  if (undeclaredReported.has(seen)) {
+    return;
+  }
+
+  undeclaredReported.add(seen);
+
+  console.warn(
+    `[router] Param "${key}" is declared nowhere on route "${routeName}" — neither as a path ` +
+      `slot (:${key}) nor as a query param (?${key}), so it stays in state.params but never ` +
+      `reaches the URL. The state will not round-trip: matchPath(state.path) cannot recover ` +
+      `it. Declare it on the route path if it belongs in the URL, or pass it through the ` +
+      `search channel; keep it here only if it is deliberately app-level data.`,
+  );
+}
+
+/** Test seam: the de-dup cache is module-level and outlives a router. */
+export function resetUndeclaredParamKeyReports(): void {
+  undeclaredReported.clear();
+}

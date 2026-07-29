@@ -206,11 +206,15 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     defaultSearch: (name) => store.config.defaultSearch[name],
     buildPath: (name, params, search) => ctx.buildPath(name, params, search),
     queryNames: (name) => ns.routes.getQueryParams(name),
+    pathNames: (name) => ns.routes.getUrlParams(name),
     // Read per call, not captured: `queryParamsMode` lives in the options
     // namespace, which `setOption` can rewrite after wiring.
     admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",
     reportDroppedQueryKey: (routeName, key) => {
       ctx.validator?.state.reportDroppedQueryKey(routeName, key);
+    },
+    reportUndeclaredParamKey: (routeName, key) => {
+      ctx.validator?.state.reportUndeclaredParamKey(routeName, key);
     },
   };
 }
@@ -250,7 +254,15 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       // query channel inside `port.resolveForward`, so one path serves both the
       // positional and the v1 single-bag forms. A colliding name
       // (`/items/:id?id`) keeps its path slot and query twin independent.
-      const canonical = canonicalize(port, routeName, routeParams, routeSearch);
+      const canonical = canonicalize(
+        port,
+        routeName,
+        routeParams,
+        routeSearch,
+        {
+          diagnoseUndeclared: true,
+        },
+      );
       const meta = ns.routes.getMetaForState(canonical.name);
 
       if (meta === undefined) {

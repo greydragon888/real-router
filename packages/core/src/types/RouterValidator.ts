@@ -143,6 +143,9 @@ export interface RouterValidator {
      * modes, and that is the edge worth naming out loud.
      */
     reportDroppedQueryKey: (routeName: string, key: string) => void;
+
+    /** Opt-in diagnostic for a key the route declares NOWHERE (#1579). */
+    reportUndeclaredParamKey: (routeName: string, key: string) => void;
   };
 
   /**

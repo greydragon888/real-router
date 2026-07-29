@@ -53,6 +53,19 @@ export interface CanonicalizeOptions {
    * producer's contract on these points.
    */
   resolveForward?: boolean;
+
+  /**
+   * Run the opt-in undeclared-key diagnostic (#1579)? Defaults to `false`.
+   *
+   * Explicit rather than inferred from `resolveForward`, and the difference is
+   * not cosmetic: `canNavigateTo` DOES resolve `forwardTo` (so it shares the
+   * form with `navigate`) yet is a PREDICATE that runs on every `<Link>` render.
+   * Keying the diagnostic on the form warned from it — measured, not reasoned —
+   * which is exactly the per-render flood the channel guard avoids by not
+   * instrumenting predicates at all (RFC rev. 29 §5). Only the points that
+   * COMMIT or hand back a state a developer will keep opt in.
+   */
+  diagnoseUndeclared?: boolean;
 }
 
 export function canonicalize(
@@ -75,6 +88,32 @@ export function canonicalize(
   // empty bag onto the EMPTY_PARAMS singleton (#1027), so the zero-params hot
   // path allocates nothing downstream.
   const pathBag = normalizeParams(forwarded.params);
+
+  // The undeclared-key diagnostic (#1579 — the params half of #1553). A key the
+  // route declares NOWHERE stays in `state.params` as app-level data, which is
+  // correct and documented — but it never reaches the URL, so the state does not
+  // round-trip through its own `state.path`. Core does not change that; it only
+  // offers to SAY it.
+  //
+  // Three things keep this from costing anything it should not:
+  //  - gated on the sink being present, so bare core pays one `undefined` check
+  //    and never walks the bag;
+  //  - opted in EXPLICITLY by the committing producers, so every predicate stays
+  //    silent — including `canNavigateTo`, which resolves `forwardTo` and would
+  //    therefore be caught by a form-based test while still running on every
+  //    `<Link>` render (measured: it warned before the flag was made explicit);
+  //  - read from the CALLER's bag, before route defaults are merged in, so a
+  //    deliberate arbitrary `defaultParams` entry is not reported as a mistake.
+  if (port.reportUndeclaredParamKey && opts?.diagnoseUndeclared === true) {
+    const declaredQuery = port.queryNames(resolvedName);
+    const declaredPath = port.pathNames(resolvedName);
+
+    for (const key of Object.keys(pathBag)) {
+      if (!declaredQuery.includes(key) && !declaredPath.includes(key)) {
+        port.reportUndeclaredParamKey(resolvedName, key);
+      }
+    }
+  }
 
   // The route's OWN defaults, split by the channel the route DECLARES (#1549) —
   // the same rule #1570 applies to a forwarding hop's defaults, now applied to

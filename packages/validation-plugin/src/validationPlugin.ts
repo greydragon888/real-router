@@ -80,6 +80,7 @@ import {
 } from "./validators/routes";
 import {
   reportDroppedQueryKey,
+  reportUndeclaredParamKey,
   validateMakeStateArgs,
 } from "./validators/state";
 
@@ -277,6 +278,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
     state: {
       validateMakeStateArgs,
       reportDroppedQueryKey,
+      reportUndeclaredParamKey,
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {
           throw new TypeError(

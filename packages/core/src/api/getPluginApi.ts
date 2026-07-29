@@ -111,7 +111,9 @@ export function getPluginApi<
       // so the seam is still where an explicit query value wins over a declared
       // twin the caller rode in `params`, and where a `search-schema`
       // interceptor sees the query channel.
-      const canonical = canonicalize(ctx.port(), name, params, search);
+      const canonical = canonicalize(ctx.port(), name, params, search, {
+        diagnoseUndeclared: true,
+      });
 
       // Existence is checked BEFORE the URL is built, and the order is
       // load-bearing: `buildURL` prints through the matcher, which throws on an

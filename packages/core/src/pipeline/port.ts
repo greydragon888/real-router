@@ -102,4 +102,24 @@ export interface RouteResolver {
    * four-liner: the pipeline's contract is the drop, not the report.
    */
   reportDroppedQueryKey?: (routeName: string, key: string) => void;
+
+  /**
+   * The route's PATH slot names — the other half of "is this key declared?".
+   * Needed only by the undeclared-key diagnostic (#1579), which asks whether a
+   * key is declared ANYWHERE; `queryNames` alone cannot answer that.
+   */
+  pathNames: (name: string) => readonly string[];
+
+  /**
+   * Opt-in sink for a key the route declares NOWHERE (#1579 — the params half
+   * of #1553). Absent unless `validation-plugin` is installed, and the absence
+   * is what keeps the scan off the hot path: core checks one `undefined` and
+   * skips the walk entirely.
+   *
+   * A diagnostic, never a gate — core keeps the key in `state.params` as
+   * app-level data (wiki `Route.md`). Dropping it was measured and rejected: it
+   * retires a shipped capability, and "declared nowhere" cannot tell a typo from
+   * `navigate("users", { id })` on a parent whose CHILD declares `:id`.
+   */
+  reportUndeclaredParamKey?: (routeName: string, key: string) => void;
 }
