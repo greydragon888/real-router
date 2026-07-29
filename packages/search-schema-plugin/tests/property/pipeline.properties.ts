@@ -5,13 +5,13 @@ import { describe, it, expect, vi } from "vitest";
 import { searchSchemaPlugin } from "../../src/index";
 
 import type { StandardSchemaV1, StandardSchemaV1Issue } from "../../src/types";
-import type { Params } from "@real-router/core";
+import type { Params, SearchParams } from "@real-router/core";
 
 // =============================================================================
 // Schema Helpers
 // =============================================================================
 
-function createPassSchema(output: Params): StandardSchemaV1 {
+function createPassSchema(output: SearchParams): StandardSchemaV1 {
   return {
     "~standard": {
       version: 1,
@@ -106,19 +106,19 @@ const arbValidatedParams = fc.dictionary(
   fc.constantFrom(...VALIDATED_KEYS),
   arbParamValue,
   { minKeys: 1, maxKeys: VALIDATED_KEYS.length },
-) as fc.Arbitrary<Params>;
+) as fc.Arbitrary<SearchParams>;
 
 const arbExtraParams = fc.dictionary(
   fc.constantFrom(...EXTRA_KEYS),
   arbParamValue,
   { minKeys: 1, maxKeys: EXTRA_KEYS.length },
-) as fc.Arbitrary<Params>;
+) as fc.Arbitrary<SearchParams>;
 
 const arbAllParams = fc.dictionary(
   fc.constantFrom(...ALL_KEYS),
   arbParamValue,
   { minKeys: 1, maxKeys: ALL_KEYS.length },
-) as fc.Arbitrary<Params>;
+) as fc.Arbitrary<SearchParams>;
 
 // =============================================================================
 // Validation Pipeline (forwardState interceptor)
@@ -134,7 +134,10 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
           arbValidatedParams,
           arbExtraParams,
           async (validParams, extraParams) => {
-            const navigateParams: Params = { ...validParams, ...extraParams };
+            const navigateParams: SearchParams = {
+              ...validParams,
+              ...extraParams,
+            };
 
             const router = createRouter(
               [
@@ -152,7 +155,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
               searchSchemaPlugin({ mode: "production", strict: false }),
             );
             await router.start("/");
-            await router.navigate("test", navigateParams);
+            await router.navigate("test", {}, navigateParams);
 
             const state = router.getState();
 
@@ -182,7 +185,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
           arbValidatedParams,
           fc.subarray(EXTRA_KEYS, { minLength: 1 }),
           async (validParams, invalidKeys) => {
-            const allParams: Params = { ...validParams };
+            const allParams: SearchParams = { ...validParams };
 
             for (const key of invalidKeys) {
               allParams[key] = "bad-value";
@@ -207,7 +210,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
 
             router.usePlugin(searchSchemaPlugin({ mode: "production" }));
             await router.start("/");
-            await router.navigate("test", allParams);
+            await router.navigate("test", {}, allParams);
 
             const state = router.getState();
 
@@ -241,7 +244,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             maxKeys: EXTRA_KEYS.length,
           }),
           async (validParams, invalidKeys, defaults) => {
-            const allParams: Params = { ...validParams };
+            const allParams: SearchParams = { ...validParams };
 
             for (const key of invalidKeys) {
               allParams[key] = "bad-value";
@@ -267,7 +270,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
 
             router.usePlugin(searchSchemaPlugin({ mode: "production" }));
             await router.start("/");
-            await router.navigate("test", allParams);
+            await router.navigate("test", {}, allParams);
 
             const state = router.getState();
 
@@ -298,7 +301,10 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
           arbValidatedParams,
           arbExtraParams,
           async (schemaOutput, extraParams) => {
-            const navigateParams: Params = { ...schemaOutput, ...extraParams };
+            const navigateParams: SearchParams = {
+              ...schemaOutput,
+              ...extraParams,
+            };
 
             const router = createRouter(
               [
@@ -316,7 +322,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
               searchSchemaPlugin({ mode: "production", strict: true }),
             );
             await router.start("/");
-            await router.navigate("test", navigateParams);
+            await router.navigate("test", {}, navigateParams);
 
             const state = router.getState();
 
@@ -348,7 +354,10 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
           arbValidatedParams,
           arbExtraParams,
           async (validParams, extraParams) => {
-            const navigateParams: Params = { ...validParams, ...extraParams };
+            const navigateParams: SearchParams = {
+              ...validParams,
+              ...extraParams,
+            };
 
             const router = createRouter(
               [
@@ -366,7 +375,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
               searchSchemaPlugin({ mode: "production", strict: false }),
             );
             await router.start("/");
-            await router.navigate("test", navigateParams);
+            await router.navigate("test", {}, navigateParams);
 
             const state = router.getState();
 
@@ -409,7 +418,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
         router.usePlugin(searchSchemaPlugin({ mode: "production" }));
         await router.start("/");
 
-        await expect(router.navigate("test", params)).rejects.toThrow(
+        await expect(router.navigate("test", {}, params)).rejects.toThrow(
           TypeError,
         );
 
@@ -426,6 +435,8 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
 /** Route with TWO path slots and a query declaration. */
 const CHANNEL_ROUTE_PATH = "/items/:kind/:id?q&tag";
 const PATH_KEYS = ["kind", "id"] as const;
+/** The `?`-declared names — the ones the channel guard refuses in `params`. */
+const DECLARED_QUERY_KEYS = ["q", "tag"] as const;
 
 const arbPathValues = fc.dictionary(
   fc.constantFrom(...PATH_KEYS),
@@ -474,6 +485,28 @@ describe("Channel isolation (#1564)", () => {
           router.usePlugin(searchSchemaPlugin({ mode: "production", strict }));
           await router.start("/");
 
+          // The v1 single-bag spelling is RETIRED at the producer (#1572 P1):
+          // a route-declared query name handed in the `params` bag is refused
+          // on the caller's raw argument, synchronously, before any interceptor
+          // runs. So the schema is not merely kept away from the path slots —
+          // it is never consulted at all, which is channel isolation in its
+          // strongest form. (An UNdeclared key is not a mis-channel: it stays
+          // in the path bag as app-level data by core's own rule, #1553.)
+          const ridesDeclaredQueryInParams =
+            !viaSearch &&
+            DECLARED_QUERY_KEYS.some((key) => Object.hasOwn(queryValues, key));
+
+          if (ridesDeclaredQueryInParams) {
+            expect(() =>
+              router.navigate("item", { ...pathValues, ...queryValues }),
+            ).toThrow(TypeError);
+            expect(seen).toHaveLength(0);
+
+            router.stop();
+
+            return;
+          }
+
           await (viaSearch
             ? router.navigate("item", pathValues, queryValues)
             : router.navigate("item", { ...pathValues, ...queryValues }));
@@ -485,9 +518,15 @@ describe("Channel isolation (#1564)", () => {
             expect(handed).not.toHaveProperty(key);
           }
 
-          // (2) Every query value the caller supplied — in either channel — is.
-          for (const [key, value] of Object.entries(queryValues)) {
-            expect(handed[key]).toBe(value);
+          // (2) Every query value the caller supplied THROUGH THE QUERY CHANNEL
+          //     is. Scoped to that channel since the single-bag alternative was
+          //     retired above: what survives of it here is a bag of path slots
+          //     plus, possibly, an undeclared key — and an undeclared key
+          //     legitimately never reaches a query schema.
+          if (viaSearch) {
+            for (const [key, value] of Object.entries(queryValues)) {
+              expect(handed[key]).toBe(value);
+            }
           }
 
           // (3) Every path slot commits the caller's value verbatim, so the URL
