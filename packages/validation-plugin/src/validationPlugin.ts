@@ -79,8 +79,8 @@ import {
   guardNoAsyncCallbacks,
 } from "./validators/routes";
 import {
-  reportDroppedQueryKey,
-  reportUndeclaredParamKey,
+  createDroppedQueryKeyReporter,
+  createUndeclaredParamKeyReporter,
   validateMakeStateArgs,
 } from "./validators/state";
 
@@ -277,8 +277,12 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
     },
     state: {
       validateMakeStateArgs,
-      reportDroppedQueryKey,
-      reportUndeclaredParamKey,
+      // One de-dup cache per validator object, i.e. per registration, i.e. per
+      // router (#1583). Module-level `Set`s made the first router in a process
+      // silence every one after it — the SSR / SSG case where the diagnostic
+      // fired for request #1 and never again.
+      reportDroppedQueryKey: createDroppedQueryKeyReporter(),
+      reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {
           throw new TypeError(

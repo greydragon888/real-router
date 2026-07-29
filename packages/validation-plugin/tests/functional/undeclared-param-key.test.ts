@@ -1,9 +1,8 @@
 import { createRouter } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { validationPlugin } from "../../src";
-import { resetUndeclaredParamKeyReports } from "../../src/validators/state";
 
 import type { Router } from "@real-router/core";
 
@@ -48,9 +47,8 @@ function mk(): Router {
 
 describe("validation-plugin — undeclared params-bag key diagnostic (#1579)", () => {
   beforeEach(() => {
-    // Module-level de-dup cache outlives a router: a stale entry would silence
-    // the very warning under test.
-    resetUndeclaredParamKeyReports();
+    // No cache reset here (#1583): the de-dup belongs to the validator object,
+    // so each router built below starts with an empty one.
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -96,6 +94,55 @@ describe("validation-plugin — undeclared params-bag key diagnostic (#1579)", (
     // Same route + key twice → one warning. Without the de-dup a revisited
     // route floods the console.
     expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns again for a SECOND router — the cache is per router, not per process (#1583)", async () => {
+    // Same shape as the mode gate's cache (#1575), same defect: keyed per
+    // PROCESS, it silenced every router after the first. Under SSR the
+    // diagnostic fired once and then never again for the life of the process.
+    router = mk();
+    await router.start("/h");
+    await router.navigate("plain", { foo: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    const second = mk();
+
+    await second.start("/h");
+    await second.navigate("plain", { foo: "1" });
+    second.stop();
+
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+
+    const clone = cloneRouter(router);
+
+    clone.usePlugin(validationPlugin());
+    await clone.start("/h");
+    await clone.navigate("plain", { foo: "1" });
+    clone.stop();
+
+    expect(warnSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("warns again after the plugin is torn down and re-registered (#1583)", () => {
+    // Pre-start, like the mode gate's twin: the plugin refuses registration
+    // after `start()`, so this is the only shape a teardown/re-register cycle
+    // can take. `buildNavigationState` is one of the two committing producers
+    // that opt into this diagnostic, and it runs before the router starts.
+    router = createRouter(ROUTES);
+
+    const un = router.usePlugin(validationPlugin());
+
+    getPluginApi(router).buildNavigationState("plain", { foo: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    un();
+    router.usePlugin(validationPlugin());
+
+    getPluginApi(router).buildNavigationState("plain", { foo: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(2);
   });
 
   it("stays silent on every PREDICATE, including canNavigateTo", async () => {

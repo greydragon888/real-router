@@ -1,9 +1,8 @@
 import { createRouter } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { validationPlugin } from "../../src";
-import { resetDroppedQueryKeyReports } from "../../src/validators/state";
 
 import type { QueryParamsMode, Router } from "@real-router/core";
 
@@ -39,9 +38,8 @@ function mk(mode: QueryParamsMode): Router {
 
 describe("validation-plugin — dropped query key diagnostic (#1575)", () => {
   beforeEach(() => {
-    // The de-dup cache is module-level and outlives a router, so a stale entry
-    // from a previous test would silence the very warning under test.
-    resetDroppedQueryKeyReports();
+    // No cache reset here, and that is the point of #1583: the de-dup lives on
+    // the validator object, so every `mk()` starts with an empty one.
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -104,6 +102,61 @@ describe("validation-plugin — dropped query key diagnostic (#1575)", () => {
     // The gate runs on every navigation and every matchPath; without the de-dup
     // a revisited route would flood the console.
     expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns again for a SECOND router — the cache is per router, not per process (#1583)", async () => {
+    // The de-dup exists so a revisited route does not flood the console. It was
+    // keyed per PROCESS, so it silenced every router after the first: under SSR
+    // or SSG the diagnostic fired for request #1 and never again for the life of
+    // the process — the opposite of what a dev-time diagnostic should do.
+    router = mk("default");
+    await router.start("/h");
+    await router.navigate("plain", {}, { foo: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    const second = mk("default");
+
+    await second.start("/h");
+    await second.navigate("plain", {}, { foo: "1" });
+    second.stop();
+
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+
+    // …and a clone, which is what an SSR request scope actually uses.
+    const clone = cloneRouter(router);
+
+    clone.usePlugin(validationPlugin());
+    await clone.start("/h");
+    await clone.navigate("plain", {}, { foo: "1" });
+    clone.stop();
+
+    expect(warnSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("warns again after the plugin is torn down and re-registered (#1583)", () => {
+    // `teardown()` nulls `ctx.validator`; the cache used to survive it, so
+    // re-registering bought silence instead of a fresh start.
+    //
+    // Pre-start on purpose, and that is the reachable shape of this defect
+    // rather than a convenience: the plugin REFUSES registration after
+    // `start()` (`VALIDATION_PLUGIN_AFTER_START`), so a teardown/re-register
+    // cycle can only happen before the router runs. The URL direction is the
+    // producer that warns without a start.
+    router = createRouter(ROUTES, { queryParamsMode: "default" });
+
+    const un = router.usePlugin(validationPlugin());
+
+    getPluginApi(router).matchPath("/plain?foo=1");
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    un();
+    router.usePlugin(validationPlugin());
+
+    getPluginApi(router).matchPath("/plain?foo=1");
+
+    expect(warnSpy).toHaveBeenCalledTimes(2);
   });
 
   it("reports a different key on the same route separately", async () => {

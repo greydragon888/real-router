@@ -47,30 +47,43 @@ export function validateMakeStateArgs(
  * De-duplicated per `route + key`: the gate runs on every navigation and every
  * `matchPath`, so an un-deduped warning would flood a dev console the moment a
  * route is revisited.
+ *
+ * ⚠ **The cache belongs to the ROUTER, not to the module (#1583).** A `Set` at
+ * module scope is one per PROCESS: the first router to report a `route + key`
+ * silenced every router after it, so under SSR / SSG the diagnostic fired for
+ * request #1 and stayed quiet for the life of the process — precisely backwards
+ * for a dev-time signal. It also survived `teardown()`, so re-registering the
+ * plugin bought silence, and it grew without bound because nothing evicted.
+ *
+ * A factory rather than a `WeakMap<Router, Set>`: `buildValidatorObject` already
+ * runs once per registration, so closing over a fresh `Set` there gives
+ * per-router lifetime, per-router isolation and collection with the router at
+ * zero new module state — and it retires the two `reset*` test seams, which
+ * existed only to work around the module scope.
  */
-const reported = new Set<string>();
+export function createDroppedQueryKeyReporter(): (
+  routeName: string,
+  key: string,
+) => void {
+  const reported = new Set<string>();
 
-export function reportDroppedQueryKey(routeName: string, key: string): void {
-  const seen = `${routeName} ${key}`;
+  return function reportDroppedQueryKey(routeName: string, key: string): void {
+    const seen = `${routeName} ${key}`;
 
-  if (reported.has(seen)) {
-    return;
-  }
+    if (reported.has(seen)) {
+      return;
+    }
 
-  reported.add(seen);
+    reported.add(seen);
 
-  console.warn(
-    `[router] Query key "${key}" is not declared on route "${routeName}" (\`?${key}\`), so the ` +
-      `current \`queryParamsMode\` will not print it — it was dropped from \`state.search\` rather ` +
-      `than published beside a \`state.path\` that cannot show it. Declare it on the route path, ` +
-      `or use \`queryParamsMode: "loose"\` to keep undeclared keys. A \`defaultSearch\` entry for ` +
-      `"${key}" is dead config in this mode for the same reason.`,
-  );
-}
-
-/** Test seam: the de-dup cache is module-level and outlives a router. */
-export function resetDroppedQueryKeyReports(): void {
-  reported.clear();
+    console.warn(
+      `[router] Query key "${key}" is not declared on route "${routeName}" (\`?${key}\`), so the ` +
+        `current \`queryParamsMode\` will not print it — it was dropped from \`state.search\` rather ` +
+        `than published beside a \`state.path\` that cannot show it. Declare it on the route path, ` +
+        `or use \`queryParamsMode: "loose"\` to keep undeclared keys. A \`defaultSearch\` entry for ` +
+        `"${key}" is dead config in this mode for the same reason.`,
+    );
+  };
 }
 
 /**
@@ -90,29 +103,33 @@ export function resetDroppedQueryKeyReports(): void {
  * ambiguity — it says what happened and lets the developer judge; a gate cannot.
  *
  * De-duplicated per `route + key`, like the mode gate's: this runs on every
- * navigation, so an un-deduped warning floods the console on a revisit.
+ * navigation, so an un-deduped warning floods the console on a revisit — and
+ * per ROUTER, for the same reasons and by the same factory shape (#1583).
  */
-const undeclaredReported = new Set<string>();
+export function createUndeclaredParamKeyReporter(): (
+  routeName: string,
+  key: string,
+) => void {
+  const undeclaredReported = new Set<string>();
 
-export function reportUndeclaredParamKey(routeName: string, key: string): void {
-  const seen = `${routeName} ${key}`;
+  return function reportUndeclaredParamKey(
+    routeName: string,
+    key: string,
+  ): void {
+    const seen = `${routeName} ${key}`;
 
-  if (undeclaredReported.has(seen)) {
-    return;
-  }
+    if (undeclaredReported.has(seen)) {
+      return;
+    }
 
-  undeclaredReported.add(seen);
+    undeclaredReported.add(seen);
 
-  console.warn(
-    `[router] Param "${key}" is declared nowhere on route "${routeName}" — neither as a path ` +
-      `slot (:${key}) nor as a query param (?${key}), so it stays in state.params but never ` +
-      `reaches the URL. The state will not round-trip: matchPath(state.path) cannot recover ` +
-      `it. Declare it on the route path if it belongs in the URL, or pass it through the ` +
-      `search channel; keep it here only if it is deliberately app-level data.`,
-  );
-}
-
-/** Test seam: the de-dup cache is module-level and outlives a router. */
-export function resetUndeclaredParamKeyReports(): void {
-  undeclaredReported.clear();
+    console.warn(
+      `[router] Param "${key}" is declared nowhere on route "${routeName}" — neither as a path ` +
+        `slot (:${key}) nor as a query param (?${key}), so it stays in state.params but never ` +
+        `reaches the URL. The state will not round-trip: matchPath(state.path) cannot recover ` +
+        `it. Declare it on the route path if it belongs in the URL, or pass it through the ` +
+        `search channel; keep it here only if it is deliberately app-level data.`,
+    );
+  };
 }
