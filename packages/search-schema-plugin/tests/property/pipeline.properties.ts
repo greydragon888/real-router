@@ -231,7 +231,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
     }
   });
 
-  it("DefaultParams recovery", async () => {
+  it("defaultSearch recovery", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
@@ -261,7 +261,12 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                 {
                   name: "test",
                   path: ROUTE_PATH,
-                  defaultParams: defaults,
+                  // `defaultSearch`, not `defaultParams`: every key here is
+                  // `?`-declared on ROUTE_PATH, and the slot IS the channel
+                  // (#1548) — a query-declared name written in `defaultParams`
+                  // is refused at registration. This is also the only slot the
+                  // plugin's recovery reads now, for the same reason.
+                  defaultSearch: defaults,
                   searchSchema: createFailSchema(issues),
                 },
               ],
