@@ -813,7 +813,10 @@ export class Router<
       canonical = canonicalize(
         this.#routes.getPort(),
         name,
-        params ?? {},
+        // The singleton, not a fresh `{}` (#1589): this predicate runs on every
+        // `<Link>` render too, and `normalizeParams` recognises `EMPTY_PARAMS` by
+        // identity — a literal makes it walk and re-allocate instead.
+        params ?? EMPTY_PARAMS,
         search,
       );
     } catch (error) {

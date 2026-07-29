@@ -195,11 +195,19 @@ export function canonicalize(
   // ⚠ The channels are still FROZEN here (canonicalize invariant #4): `pathBag`
   // is `normalizeParams`' own fresh object, so it is frozen in place, and
   // `EMPTY_SEARCH` is the shared frozen singleton.
+  //
+  // ⚠ The query test accepts the EMPTY_SEARCH singleton as well as `undefined`,
+  // and that is not cosmetic: `isActiveRoute` and the `forwardState` seam both
+  // hand down the singleton rather than nothing, so a test for `undefined` alone
+  // left the two render-path predicates — the whole point of the exercise — on
+  // the slow path. A fresh `{}` is deliberately NOT accepted: telling an empty
+  // literal from a non-empty one costs a key walk, and the two call sites that
+  // used to mint one now pass the singleton instead.
   if (
     defaultPath === undefined &&
     defaultQuery === undefined &&
     declaredQuery.length === 0 &&
-    forwarded.search === undefined
+    (forwarded.search === undefined || forwarded.search === EMPTY_SEARCH)
   ) {
     // Annotated rather than asserted: the literal's inferred `query` type is the
     // empty singleton's `Record<string, never>`, too narrow for `Canonical` to

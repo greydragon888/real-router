@@ -9,7 +9,7 @@ import {
 } from "./helpers";
 import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
 import { assertChannelCorrect } from "../../channels";
-import { constants, EMPTY_SEARCH } from "../../constants";
+import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import { mergeDefined } from "../../helpers";
 import { canonicalize, materialize } from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
@@ -601,8 +601,16 @@ export class RoutesNamespace<
    */
   isActiveRoute(
     name: string,
-    params: Params = {},
-    searchArg: SearchParams = {},
+    // Singletons, not fresh literals (#1589). `= {}` minted TWO throwaway objects
+    // on every call — i.e. on every `<Link>` on every re-render across six
+    // adapters — and the `search` one was worse than an allocation: being a fresh
+    // `{}` it is neither `undefined` nor `EMPTY_SEARCH`, so it defeated
+    // `canonicalize`'s own empty-query fast path and this predicate ran the full
+    // merge + mode-gate tail every time. Measured: the flame graph showed
+    // `withholdFilledSlots` and the drop-sink getter live under a route with
+    // nothing to withhold and nothing to drop.
+    params: Params = EMPTY_PARAMS,
+    searchArg: SearchParams = EMPTY_SEARCH,
     strictEquality = false,
     ignoreQueryParams = true,
   ): boolean {
@@ -805,8 +813,14 @@ export class RoutesNamespace<
     // channels and never reads the URL, which is also why `materialize` needs no
     // port argument here (the fork milestone 1 left open, settled in step 2-3).
     if (strictEquality || activeName === name) {
+      // `skipFreeze` (#1589): the state exists for the length of one comparison.
+      // `areStatesEqual` reads `.name` / `.params` / `.search` and nothing else,
+      // so freezing it — and attaching the `transition` the freeze implies —
+      // buys a guarantee no one can observe. The CHANNELS are still frozen;
+      // that happens in `canonicalize`, and it is the part that matters
+      // (canonicalize invariant #4). Measured at 926 µs, ~5 % of this benchmark.
       return this.#deps.areStatesEqual(
-        materialize(canonical, { path: "" }),
+        materialize(canonical, { path: "", skipFreeze: true }),
         activeState,
         ignoreQueryParams,
       );
