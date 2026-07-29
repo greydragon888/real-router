@@ -800,6 +800,17 @@ export function compileArtifactGuards<Dependencies extends DefaultDependencies>(
  * pre-compiled guards are then installed without re-compiling (the factory ran
  * once, at the pre-compile above). `depsStore` is always set on a wired router,
  * which is the only path that reaches `add`/`replace`.
+ *
+ * ⚠ **The config-time channel check (`assertRouteDefaultChannels`) is the
+ * CALLER's PREPARE step, not this function's.** It used to run here, one line
+ * before the swap, which is early enough for `add` and too late for `replace`:
+ * `replace` erases the old definition guards BEFORE calling this, so a batch
+ * this check refused left the tree intact and the guards gone — a previously
+ * guarded route freely activatable. That is the #1193 fail-open shape verbatim,
+ * which is why the guard COMPILE was hoisted into the callers; the channel
+ * check now sits beside it, for the same reason. Keeping this function
+ * throw-free is what makes its "atomic swap" contract true rather than nearly
+ * true.
  */
 export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
@@ -815,12 +826,6 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   // definition guards (#1193); `add` has no clear step and compiles inline.
   const { activate: compiledActivate, deactivate: compiledDeactivate } =
     precompiled ?? compileArtifactGuards(artifacts, deps);
-
-  // Pre-swap config-time channel check, on the PREPARED artifacts: a rejected
-  // batch must leave the store exactly as it was. Same label as the sibling
-  // batch asserts so all three population entry points surface the identical
-  // bare-core error (#1351 convention).
-  assertRouteDefaultChannels(artifacts.matcher, artifacts.config, "addRoute");
 
   // Atomic swap — pure assignments, cannot throw. (`definitions` is derived
   // from `tree`, so swapping the tree IS the definitions swap.)

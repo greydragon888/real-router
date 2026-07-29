@@ -168,7 +168,19 @@ export class StateNamespace {
     const mergedSearch = this.#deps.admitsUndeclaredQuery()
       ? rawSearch
       : admittedSearch(rawSearch, this.#deps.getQueryParams(name), (key) => {
-          this.#deps.getDropReporter()?.(name, key);
+          // The REPORT presupposes the route exists; the DROP above does not
+          // (#1584). This is the mode gate's SECOND terminal — the one a URL
+          // plugin reaches when it rebuilds a state from a serialized history
+          // entry, where the route name may be gone or not yet registered — and
+          // #1584 landed only on the first, because it was found by sweeping
+          // `pipeline/canonicalize`'s PORT consumers and this terminal reads its
+          // own dependency bag instead. Ungated, it reported "key `q` is not
+          // declared on route `nope`" about a name that is not a route at all,
+          // and burnt the shared per-router de-dup slot, so the genuine warning
+          // stayed silent once that name became real.
+          if (this.#deps.hasRoute(name)) {
+            this.#deps.getDropReporter()?.(name, key);
+          }
         });
 
     // Query channel (RFC-4 M2 / #1548): the input is already canonical

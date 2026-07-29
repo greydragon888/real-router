@@ -752,6 +752,29 @@ describe("core/routes/routePath/buildPath", () => {
           expect(path).toBe("/user/42");
         });
 
+        it("applies a defaultSearch whose key is an Object.prototype name", () => {
+          // The withholding rule ("a default is not applied to a slot the caller
+          // already filled") read the caller's bag with a bare `params[key]`,
+          // which walks the PROTOTYPE — so on an EMPTY bag `toString` /
+          // `constructor` / `valueOf` all read as filled and the default was
+          // declined. The rule runs only in the LITERAL form, so `buildPath`
+          // withheld while `navigate` / `makeState` applied: the one producer out
+          // of agreement, printing an href its own route does not reproduce —
+          // the #1552/#1578 shape the rule exists to close, on a different key
+          // set. The sibling `findMisChanneledKey` guards the same read with
+          // `Object.hasOwn` for exactly this reason.
+          for (const key of ["toString", "constructor", "valueOf"]) {
+            const proto = createRouter([
+              { name: "p", path: `/p?${key}`, defaultSearch: { [key]: "D" } },
+            ]);
+
+            expect(proto.buildPath("p")).toBe(`/p?${key}=D`);
+            expect(getPluginApi(proto).makeState("p").path).toBe(`/p?${key}=D`);
+
+            proto.dispose();
+          }
+        });
+
         it("keeps an undeclared params-bag key out of the URL", () => {
           // Renamed from "should include all enumerable properties as query
           // params" when buildPath moved onto the pipeline (Phase 2, step 2-1).

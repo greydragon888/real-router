@@ -235,6 +235,42 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       );
     });
 
+    it("reports nothing from the makeState terminal either (#1584)", () => {
+      // The gate has TWO terminals, and #1584 landed on one. It was found by
+      // sweeping `pipeline/canonicalize`'s PORT consumers — a sweep that cannot
+      // see this one, which reads its own dependency bag. `makeState` with an
+      // explicit `path` is precisely the shape a URL plugin uses to rebuild a
+      // state from a serialized history entry, where the route name may be gone
+      // or not yet registered, so it does not even fail on its own the way the
+      // navigate arm does.
+      //
+      // The second-order cost is what makes it worth a test rather than a
+      // comment: the de-dup cache is shared by both terminals, so a bogus report
+      // from here burns the slot and silences the GENUINE warning at the
+      // terminal that WAS gated, once the name becomes real.
+      router = mk("default");
+
+      const validator = installSpyValidator(router);
+      const api = getPluginApi(router);
+
+      api.makeState("plainn", {}, { foo: "1" }, "/plainn");
+
+      expect(validator.state.reportDroppedQueryKey).not.toHaveBeenCalled();
+
+      // The DROP itself is unaffected — always-on and correct for any name.
+      expect(
+        api.makeState("plainn", {}, { foo: "1" }, "/plainn").search,
+      ).toStrictEqual({});
+
+      // Discrimination: a route that DOES exist still reports from here.
+      api.makeState("plain", {}, { foo: "1" }, "/plain");
+
+      expect(validator.state.reportDroppedQueryKey).toHaveBeenCalledWith(
+        "plain",
+        "foo",
+      );
+    });
+
     it("reports on the URL direction too", () => {
       router = mk("default");
 

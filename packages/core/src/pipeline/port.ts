@@ -98,10 +98,19 @@ export interface RouteResolver {
    * pipeline pays nothing. Resolved per call, not captured: the plugin
    * registers after wiring.
    *
+   * ⚠ Like its sibling below, the absence has to be REAL: the router implements
+   * this as a GETTER returning `undefined` while `validator === null`, not as a
+   * closure that forwards into an optional-chained validator. A closure is
+   * always truthy, so the pipeline's `?.` read as taken and bare core still paid
+   * the `pathNames` existence lookup (#1584) once per dropped key with nothing
+   * to feed. The `| undefined` in the type is what lets the getter say so under
+   * `exactOptionalPropertyTypes`.
+   *
    * Optional on the interface so a MOCK port (the property tests) stays a
    * four-liner: the pipeline's contract is the drop, not the report.
    */
-  reportDroppedQueryKey?: (routeName: string, key: string) => void;
+  reportDroppedQueryKey?:
+    ((routeName: string, key: string) => void) | undefined;
 
   /**
    * The route's PATH slot names, or `undefined` when there is NO SUCH ROUTE —

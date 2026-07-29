@@ -555,6 +555,35 @@ describe("core/state — defaultParams channel routing (#1549)", () => {
       expect(state.params).toStrictEqual({ flag: "on" });
       expect(state.search).toStrictEqual({});
     });
+
+    it("a REJECTED replace() leaves the old definition guards installed", () => {
+      // The refusal is a throwing step, and `replace()` erases the definition
+      // guards BEFORE it swaps. While the check lived inside
+      // `adoptRouteArtifacts` — one line before the swap, which is early enough
+      // for `add` — a batch it refused left the tree intact and the guards
+      // GONE: a route whose definition guard was blocking became freely
+      // activatable, with nothing in the error hinting that access control had
+      // just been dropped. Same fail-open #1046 (handler limit) and #1193 (guard
+      // compile) each hoisted their own throw out of; this is the third
+      // throwing step the path grew, and it belongs in PREPARE with them.
+      const router = createRouter([
+        { name: "guarded", path: "/guarded", canActivate: () => () => false },
+        { name: "home", path: "/home" },
+      ]);
+
+      expect(router.canNavigateTo("guarded")).toBe(false);
+
+      expect(() => {
+        getRoutesApi(router).replace([
+          { name: "guarded", path: "/guarded", canActivate: () => () => false },
+          { name: "home", path: "/home" },
+          { name: "x", path: "/x?page", defaultParams: { page: "5" } },
+        ]);
+      }).toThrow(/Route "x" declares `page`/);
+
+      expect(router.canNavigateTo("guarded")).toBe(false);
+      expect(getRoutesApi(router).has("x")).toBe(false);
+    });
   });
 
   describe("a forwarding hop's defaultSearch (#1549, second half)", () => {

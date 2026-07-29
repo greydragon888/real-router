@@ -55,7 +55,19 @@ export function withholdFilledSlots(
   let dropped = false;
 
   for (const [key, value] of Object.entries(defaults)) {
-    if (params[key] !== undefined && declaredQuery.includes(key)) {
+    // `Object.hasOwn` before the read, exactly as {@link findMisChanneledKey}
+    // does two functions up and for the same reason: a bare `params[key]` walks
+    // the PROTOTYPE, so a route declaring `?toString` / `?constructor` /
+    // `?valueOf` read as "the caller already filled this slot" on an EMPTY bag.
+    // The default was then withheld from `buildPath` and `isActiveRoute`'s
+    // literal arm while `navigate` / `makeState` still applied it — `buildPath`
+    // alone out of agreement, printing an href its own `matchPath` does not
+    // reproduce, which is the #1552/#1578 class this very rule exists to close.
+    if (
+      Object.hasOwn(params, key) &&
+      params[key] !== undefined &&
+      declaredQuery.includes(key)
+    ) {
       dropped = true;
       continue;
     }

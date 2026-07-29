@@ -176,11 +176,12 @@ function wirePlugins<Dependencies extends DefaultDependencies>(
  *
  * ⚠ Both ends are wired to the INTERCEPTABLE primitives on purpose — see the
  * port's own docs. `resolveForward` is the `forwardState` seam (interceptors +
- * the channel-separation wrapper, `Router.ts:268-292`), so stage ② lives here,
- * in the port implementation, and never inside the pipeline module. `buildPath`
- * is `ctx.buildPath`, because today's navigate path prints its URL through that
- * interceptable — reaching for the engine's matcher instead would silently drop
- * `persistent-params`' `buildPath` interceptor from the navigate path.
+ * the centralized channel CHECK that replaced stage ②'s repair), so the seam
+ * lives here, in the port implementation, and never inside the pipeline module.
+ * `buildPath` is `ctx.buildPath`, because the navigate path prints its URL
+ * through that interceptable — reaching for the engine's matcher instead would
+ * silently drop `persistent-params`' `buildPath` interceptor from the navigate
+ * path.
  */
 function createRouteResolver<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
@@ -203,6 +204,10 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     ctx.validator?.state.reportUndeclaredParamKey(routeName, key);
   };
 
+  const reportDroppedQueryKey = (routeName: string, key: string): void => {
+    ctx.validator?.state.reportDroppedQueryKey(routeName, key);
+  };
+
   return {
     resolveForward: (name, params, search) =>
       ctx.forwardState(name, params, search),
@@ -221,8 +226,12 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // Read per call, not captured: `queryParamsMode` lives in the options
     // namespace, which `setOption` can rewrite after wiring.
     admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",
-    reportDroppedQueryKey: (routeName, key) => {
-      ctx.validator?.state.reportDroppedQueryKey(routeName, key);
+    // A GETTER for the same reason as its sibling below — a plain closure is
+    // always truthy, so the pipeline's `?.` never gated anything and bare core
+    // paid #1584's `pathNames` existence lookup once per dropped key with no
+    // sink behind it. Both sinks now report their absence honestly.
+    get reportDroppedQueryKey() {
+      return ctx.validator ? reportDroppedQueryKey : undefined;
     },
     // A GETTER, not a closure — the absence is the gate (#1579). The pipeline
     // reads `port.reportUndeclaredParamKey` and skips the whole caller-bag walk
@@ -404,6 +413,9 @@ function wireState<Dependencies extends DefaultDependencies>(
     },
     getUrlParams: (name) => ns.routes.getUrlParams(name),
     getQueryParams: (name) => ns.routes.getQueryParams(name),
+    // The matcher's own existence predicate — the same one `port.pathNames`
+    // reads for the sibling terminal, so no second derivation appears (#1584).
+    hasRoute: (name) => ns.routes.hasRoute(name),
     admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",
     getDropReporter: () => {
       const validator = getInternals(ns.router).validator;

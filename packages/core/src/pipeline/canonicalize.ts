@@ -17,7 +17,7 @@ import type { Params, SearchParams } from "../types";
  * `forwardTo` chain) and stage ③ (merge each channel's route default UNDER the
  * caller's value). There is no separating stage ② — channels arrive correct by
  * the producer contract, and the port's `resolveForward` is wired to the seam
- * that still normalises them while the legacy single-bag form is alive.
+ * that REFUSES a mis-channelled bag rather than repairing one.
  *
  * Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name
  * (target defaults cannot be read before `forwardTo` resolves), so ① always
@@ -116,13 +116,20 @@ export function canonicalize(
       ? port.reportUndeclaredParamKey
       : undefined;
 
+  // The mode gate's sink, resolved ONCE and read as the gate. Bare core leaves
+  // it a plain (always-truthy) closure rather than `undefined`, so the `?.`
+  // below is not the gate the port's docs describe — hoisting the read here is
+  // what makes "bare core pays nothing" true: without it `port.pathNames` ran
+  // per dropped key with no sink to feed.
+  const dropSink = port.reportDroppedQueryKey;
+
   // BOTH diagnostics presuppose that the route EXISTS — they answer "does route
   // X declare this key?", and for a route that is not a route the honest answer
   // is that the question does not apply (#1584). `queryNames` / `pathNames`
   // answer `[]` for a real route with no declarations, so `[]` cannot say "no
   // such route"; `pathNames` carries the `undefined` arm that can. Each
-  // diagnostic reads it for itself, inside its own sink gate, so bare core never
-  // pays the lookup and neither reader depends on the other's ordering.
+  // diagnostic reads it for itself, behind its own sink check, so bare core
+  // never pays the lookup and neither reader depends on the other's ordering.
   if (reportUndeclared) {
     const declaredPath = port.pathNames(resolvedName);
 
@@ -199,8 +206,14 @@ export function canonicalize(
           // not exist blames the query for a route-name typo. Found by sweeping
           // this file's port consumers after fixing the sibling — the two
           // diagnostics read the same `[]`-means-nothing answer.
-          if (port.pathNames(resolvedName) !== undefined) {
-            port.reportDroppedQueryKey?.(resolvedName, key);
+          // The sink is checked FIRST: it is the cheap half, and it is the one
+          // that is absent in bare core, so the `pathNames` lookup stays off the
+          // path of a router with no validator installed.
+          if (
+            dropSink !== undefined &&
+            port.pathNames(resolvedName) !== undefined
+          ) {
+            dropSink(resolvedName, key);
           }
         }),
     // The one and only cast to the brand in the codebase — reviewed once, here.

@@ -16,6 +16,16 @@ export interface StateNamespaceDependencies {
   getUrlParams: (name: string) => string[];
   /** Declared `?query` names — the mode gate's admission list (#1575) */
   getQueryParams: (name: string) => readonly string[];
+  /**
+   * Does the route EXIST? The precondition of the gate's REPORT, never of its
+   * drop (#1584). `getQueryParams` answers `[]` both for a real route with no
+   * declarations and for no route at all, so it cannot carry the distinction —
+   * and without it the diagnostic blames the query for a typo in the ROUTE name
+   * and burns a de-dup slot the genuine warning would have needed. The port's
+   * `pathNames` carries the same distinction for the sibling terminal
+   * (`pipeline/canonicalize`); this is that terminal's half.
+   */
+  hasRoute: (name: string) => boolean;
   /** `true` exactly for `queryParamsMode: "loose"` — the mode gate (#1575) */
   admitsUndeclaredQuery: () => boolean;
   /**
