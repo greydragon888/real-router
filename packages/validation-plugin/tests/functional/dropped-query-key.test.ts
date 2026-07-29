@@ -104,6 +104,31 @@ describe("validation-plugin — dropped query key diagnostic (#1575)", () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("collapses DIFFERENT producers on the same route+key into one line (#1581)", async () => {
+    router = mk("default");
+    await router.start("/h");
+
+    // Split by MOMENT, not counted once at the end: a total of 1 is satisfied
+    // both by "the predicate warned and the rest de-duped" and by "the predicate
+    // was silenced and `navigate` warned instead" — the second is exactly the
+    // regression this pins against, and a final count cannot tell them apart.
+    router.buildPath("plain", {}, { foo: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    router.canNavigateTo("plain", {}, { foo: "1" });
+    await router.navigate("plain", {}, { foo: "1" });
+
+    // This is why the message names the route and the key and NOT the producer:
+    // the name would credit whichever ran first — `buildPath` here — and say
+    // nothing about the `navigate` carrying the identical defect. Naming one
+    // would assert a locality the de-dup has already destroyed; naming all of
+    // them means de-duplicating per producer, which is the console flood the
+    // de-dup exists to prevent.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).not.toContain("buildPath");
+  });
+
   it("warns again for a SECOND router — the cache is per router, not per process (#1583)", async () => {
     // The de-dup exists so a revisited route does not flood the console. It was
     // keyed per PROCESS, so it silenced every router after the first: under SSR

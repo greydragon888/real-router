@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
@@ -275,6 +275,84 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       await router.navigate("dec", {}, { a: "1" });
 
       expect(validator.state.reportDroppedQueryKey).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Every producer reports — the predicates included (#1581).
+     *
+     * The three tests above pin `navigate`, `matchPath` and `makeState`, which
+     * is exactly the set Phase 2 did NOT change. The producers it DID change —
+     * `buildPath` and `isActiveRoute`'s descendant arm, which had no gate at all
+     * before and so could not report — were pinned by nothing, so a refactor
+     * could silence them again and this file would stay green. That is the
+     * "one producer out of step" shape the phase exists to remove, and it is
+     * uniformity, not an accident: measured on `ac0ffc0e3`, `canNavigateTo` and
+     * `isActiveRoute`'s exact arm ALREADY reported (through `makeState`), so the
+     * render path was never actually silent.
+     *
+     * Asserted as one list rather than eight cases so a failure names every
+     * producer that went quiet, not just the first.
+     */
+    it("feeds the gate from EVERY producer, predicates included (#1581)", async () => {
+      const routes = [
+        { name: "h", path: "/h" },
+        { name: "x", path: "/x?a", children: [{ name: "kid", path: "/kid" }] },
+      ];
+      const search = { a: "1", zz: "9" };
+
+      async function reports(
+        startPath: string,
+        run: (r: Router) => unknown,
+      ): Promise<boolean> {
+        router.stop();
+        router = createRouter(routes, { queryParamsMode: "default" });
+
+        const spy = vi.mocked(
+          installSpyValidator(router).state.reportDroppedQueryKey,
+        );
+
+        await router.start(startPath);
+        spy.mockClear();
+        await run(router);
+
+        return spy.mock.calls.length > 0;
+      }
+
+      // `x` is active → the exact arm; `x.kid` is active → the descendant arm.
+      // Both reach the gate through the same `canonicalize` call, but only the
+      // first one did before the phase, so both are worth naming.
+      const producers: [string, string, (r: Router) => unknown][] = [
+        ["buildPath", "/h", (r) => r.buildPath("x", {}, search)],
+        ["canNavigateTo", "/h", (r) => r.canNavigateTo("x", {}, search)],
+        [
+          "isActiveRoute (exact)",
+          "/x?a=1",
+          (r) => r.isActiveRoute("x", {}, search, false, false),
+        ],
+        [
+          "isActiveRoute (descendant)",
+          "/x/kid?a=1",
+          (r) => r.isActiveRoute("x", {}, search, false, false),
+        ],
+        ["navigate", "/h", (r) => r.navigate("x", {}, search)],
+        [
+          "buildNavigationState",
+          "/h",
+          (r) => getPluginApi(r).buildNavigationState("x", {}, search),
+        ],
+        ["makeState", "/h", (r) => getPluginApi(r).makeState("x", {}, search)],
+        ["matchPath", "/h", (r) => getPluginApi(r).matchPath("/x?a=1&zz=9")],
+      ];
+
+      const silent: string[] = [];
+
+      for (const [label, startPath, run] of producers) {
+        if (!(await reports(startPath, run))) {
+          silent.push(label);
+        }
+      }
+
+      expect(silent).toStrictEqual([]);
     });
   });
 });

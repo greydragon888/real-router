@@ -128,7 +128,7 @@ Core contains five invariant guards that run regardless of whether validation-pl
 - **channel guard** (#1572) — `params ∩ queryNames(name) ≠ ∅`, i.e. a key the route declares as a **query** param supplied in the **path** bag. A **detector, never a normaliser**: the key is not moved (moving it is what channel separation does, and the nav-pipeline design removes that stage so channel-correctness becomes the producer's contract). Two positions, deliberately different reactions:
   - **P3 — `navigateToState` REJECTS** (`WRONG_CHANNEL`), mirroring the `ROUTE_NOT_FOUND` guard beside it: rejected promise + `TRANSITION_ERROR`, not a sync throw, because URL plugins call it from popstate handlers and a new sync throw would change an existing method's failure shape. It is the one producer taking a ready-made `State`, and there is no working form behind it — a pre-M2 layout commits silently corrupt (key in `state.params`, absent from `state.path`). `start()` commits through the same primitive, so the guard sits on every start including SSR hydration, at zero cost (a state produced by core is channel-correct by construction).
   - **P1 — `navigate` / `makeState` / `buildNavigationState` THROW** a `TypeError`, SYNCHRONOUSLY, on the caller's RAW argument before interceptors. Sync even on `navigate` (which otherwise reports failure through a rejected promise) because this is an ARGUMENT-SHAPE defect at the API boundary, caught before any transition exists — the same class as the `subscribe` / `start` guards; rejecting would let a `.catch()` written for navigation failures swallow a programming error. The warn-first step announced the contract so every call site could self-identify in the logs; this is the promotion it announced, shipped with its own test migration (~100 pins across core + 4 plugins, plus the `navigate/search-single-bag` benchmark arm, which measured a form that now throws).
-  - `undefined`-blind (the persistent-key removal marker is not a mis-channel); inherits the `/items/:id?id` carve-out from `getQueryParams`, the same registry the URL build prints from (#1556), rather than re-deriving it; short-circuits on a route with no query declarations; and **never becomes the thing that throws** — an accessor-backed bag whose read throws is left to the consumer that actually needed the value, so a diagnostic cannot move the origin of an existing failure. Predicates (`isActiveRoute` / `buildPath` / `canNavigateTo`) are deliberately NOT instrumented yet: they run on every `<Link>` render, where a per-render warning would be a log flood rather than a signal. **Not instrumented ≠ blind, though (#1576):** `canNavigateTo` asks whether `navigate` WOULD work, so it consults the same predicate itself and returns `false` for the shape P1 throws on — an answer, not a throw, so the render-path trade is untouched. `isActiveRoute` / `buildPath` ask a different question and are unchanged.
+  - `undefined`-blind (the persistent-key removal marker is not a mis-channel); inherits the `/items/:id?id` carve-out from `getQueryParams`, the same registry the URL build prints from (#1556), rather than re-deriving it; short-circuits on a route with no query declarations; and **never becomes the thing that throws** — an accessor-backed bag whose read throws is left to the consumer that actually needed the value, so a diagnostic cannot move the origin of an existing failure. **This guard** does not run on the predicates (`isActiveRoute` / `buildPath` / `canNavigateTo`): it is a SCAN over the caller's bag on every `<Link>` render, for a condition that is almost always absent, so correct links pay it too. The rule is the channel guard's own — **it is not core's policy on predicates, and the mode gate below makes the opposite call on purpose (#1581)**; see the render-path table at the end of this section for all three mechanisms side by side. **Not scanned ≠ blind, though (#1576):** `canNavigateTo` asks whether `navigate` WOULD work, so it consults the same predicate itself and returns `false` for the shape P1 throws on — an answer, not a throw, so the render-path trade is untouched. `isActiveRoute` / `buildPath` ask a different question and are unchanged.
 
 ### The mode gate — always-on, but a NORMALISER (#1575)
 
@@ -147,16 +147,42 @@ keys(matchPath(state.path).search)` in every mode (INVARIANTS makeState #6).
 - Applied **after** the default merge, so a `defaultSearch` for a key the route
   does not declare with `?name` is dead config under `default` / `strict` — a
   deliberate side edge, not an oversight.
-- Wired at the **three terminals** that produce a canonical query bag:
-  `pipeline/canonicalize`, `StateNamespace.makeState` and the `matchPath`
-  rebuild. `loose` short-circuits at all three, so the repo default pays nothing.
-  ⚠ Since Phase 2 the FIRST of those is reached by `buildPath` and
-  `isActiveRoute` too (both take `canonicalize`'s literal form), so under
-  `default` / `strict` those two now feed `reportDroppedQueryKey` as well —
-  `isActiveRoute` and `canNavigateTo` already did, through `makeState`;
-  `buildPath` is new. De-duplicated per route+key, so it is one line per key, not
-  a per-render flood — but it is a diagnostic emitted from a render-path
-  predicate, which is the trade the channel guard below declines to make.
+- Wired at the **two terminals** that produce a canonical query bag —
+  `pipeline/canonicalize`, which every producer but one now reaches
+  (`navigate` / `buildNavigationState` / `buildPath` / `canNavigateTo` /
+  `isActiveRoute` both arms / the `matchPath` rebuild), and
+  `StateNamespace.makeState`, the direct primitive plugins use to rebuild a
+  state from a serialized history entry. Phase 2 folded the `matchPath` rebuild
+  into the first, so this was three terminals before it and is two after.
+  `loose` short-circuits at both, so the repo default pays nothing.
+- **The diagnostic fires from every one of them, predicates included — that
+  uniformity IS the design (#1581), not a leak from it.** Measured on the phase's
+  own base commit: `canNavigateTo` and `isActiveRoute`'s exact arm ALREADY
+  reported, through `makeState`, so the render path was never silent; the two
+  cells the phase changed (`buildPath`, `isActiveRoute`'s descendant arm) were
+  silent only because they had no gate at all — the #1549 / #1578 divergence it
+  closed. The channel guard's reason for staying off predicates does not
+  transfer: that guard SCANS on every render for a condition usually absent,
+  while this one speaks only when a key was actually DROPPED — i.e. only when the
+  answer the predicate just returned is missing what the caller asked for. A
+  `buildPath` that silently omits your key is exactly the case worth one line.
+  De-duplicated per route+key, so it is one line per key, never a per-render
+  flood. ⚠ Silencing `buildPath` again would restore the "one producer out of
+  step" shape the phase exists to remove, and gating the report on
+  `canonicalize`'s literal form cannot express a coherent rule anyway — it misses
+  `canNavigateTo`, a predicate on the ① form (mutationally demonstrated: that
+  mutant silences `buildPath` and both `isActiveRoute` arms and leaves
+  `canNavigateTo` reporting). Pinned by "feeds the gate from EVERY producer" in
+  `undeclared-query-mode-gate.test.ts`, which is the only test that fails on it.
+- **The message names the route and the key, deliberately not the PRODUCER.**
+  Adding one cannot work under the de-dup that ships with it: three producers
+  hitting the same route+key raise exactly ONE warning (measured), so the name
+  would be whichever ran first and would assert a locality the de-dup has already
+  destroyed — a `<Link>` render would be blamed while the `navigate` with the
+  identical defect went unmentioned. De-duplicating per producer instead would
+  undo the anti-flood decision the diagnostic shipped with. Route + key already
+  says WHAT is wrong; only a stack trace says WHERE, and `console.warn` carries
+  one in the browser devtools this diagnostic targets.
 - The pipeline reads the decision through one boolean port accessor,
   `admitsUndeclaredQuery()`, rather than learning the mode itself.
 - **The REPORT presupposes the route exists (#1584).** The drop does not — it
@@ -171,6 +197,16 @@ keys(matchPath(state.path).search)` in every mode (INVARIANTS makeState #6).
   always-on-fixes / opt-in-diagnoses split as the channel guard.
 
 **A key declared NOWHERE keeps its params-bag home — with an opt-in diagnostic (#1579).** A key the route names neither as a path slot nor with `?` has no channel to own it, so it stays in `state.params` as app-level data (documented in the wiki: an arbitrary default is not part of the URL). The consequence is real and was the complaint behind #1553: the state does not round-trip through its own `state.path`. Core does NOT drop it — that was measured and rejected, because dropping retires a shipped capability across 52 tests in 6 packages, and the "declared nowhere" predicate cannot separate a typo from `navigate("users", { id })` on a parent route whose CHILD declares `:id`. Instead `validation-plugin` says it once per route+key, per ROUTER (#1583 — the cache used to be module-level, which silenced every router after the first) — and only for a route that EXISTS (#1584: `queryNames`/`pathNames` both answer `[]` for a missing route, so every key in the bag used to be reported as "declared nowhere", blaming the params for a route-name typo and burning a de-dup slot that silenced the genuine warning if that name later became real). The diagnostic is opted into by the COMMITTING producers (`navigate`, `buildNavigationState`) rather than inferred from the compositional form — `canNavigateTo` resolves `forwardTo` and would be caught by a form-based test while still running on every `<Link>` render, which is the same per-render flood the channel guard avoids by not instrumenting predicates.
+
+**What each mechanism does on the RENDER path.** Three of them make a call about the predicates, each in its own section above, each for its own reason — and one sentence written without naming its mechanism read as a policy for all three, which is what #1581 was (the sentence lived in the channel guard's bullets and had never described the mode gate, not even before Phase 2). Read this table before writing "predicates are not …" anywhere:
+
+| Mechanism | On predicates? | Why that answer |
+| --- | --- | --- |
+| **Channel guard** (#1572) | **No** — never runs there | A SCAN over the caller's bag on every `<Link>` render, for a condition that is almost always absent. Correct links pay it too, and its reaction is a THROW — into a render, across six adapters. `canNavigateTo` is not blind regardless (#1576): it consults the same predicate and answers `false`. |
+| **Mode gate** (#1575) | **Yes** — every producer, no exceptions | Speaks only when a key was actually DROPPED, so the cost lands on the broken call, not on the correct one. A predicate that dropped your key just returned an answer missing what you asked for. De-duplicated per route+key. |
+| **Undeclared-param diagnostic** (#1579) | **No** — committing producers only (`navigate`, `buildNavigationState`) | Nothing is lost: the key STAYS in `state.params` as app-level data. The advice is about round-tripping a state you are about to commit, so a predicate that commits nothing has no use for it. Opted into by ROLE, not inferred from the compositional form — `canNavigateTo` shares the resolving form with `navigate` and would be swept in by a form-based rule. |
+
+The discriminator is **loss**: report where information was destroyed, advise only where something will be committed, and never scan the render path for an absence.
 
 **Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.
 
