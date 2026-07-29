@@ -13,7 +13,6 @@ import {
   guardRouteStructure,
 } from "./guards";
 import {
-  createLimits,
   findMisChanneledKey,
   assertChannelCorrect,
   normalizeParams,
@@ -25,6 +24,7 @@ import {
   registerInternals,
   throwOnMisChanneledKey,
 } from "./internals";
+import { createLimits } from "./limits";
 import {
   EventBusNamespace,
   NavigationNamespace,

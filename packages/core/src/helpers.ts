@@ -1,14 +1,8 @@
 // packages/core/src/helpers.ts
 
-import {
-  DEFAULT_LIMITS,
-  DEFAULT_TRANSITION,
-  EMPTY_PARAMS,
-  EMPTY_SEARCH,
-} from "./constants";
+import { EMPTY_PARAMS, EMPTY_SEARCH } from "./constants";
 
-import type { Params, SearchParams, State, LimitsConfig } from "./types";
-import type { Limits } from "./types/internal";
+import type { Params, SearchParams, State } from "./types";
 
 // =============================================================================
 // Channel separation (RFC-4 M2 / #1548, #1549)
@@ -455,55 +449,6 @@ export function mergeWithDefault(
   const defined = mergeDefined(undefined, value);
 
   return Object.freeze(defined === value ? { ...value } : defined);
-}
-
-/**
- * THE shape of a router State. It had two producers when it was written
- * (`StateNamespace.makeState` and `pipeline/materialize`) and has ONE since
- * Phase 4 folded `makeState` onto the pipeline — kept as a named function
- * because the state SHAPE belongs beside `freezeStateInPlace` and
- * `DEFAULT_TRANSITION`, not inside ⑤b. ⚠ If a second producer never returns,
- * inlining it into `materialize` is the honest simplification. Channels arrive
- * already merged and frozen (`mergeWithDefault`); `path` arrives already built.
- *
- * `skipFreeze` governs the freeze of the STATE OBJECT only — never the channels.
- * `params` / `search` are frozen at merge time regardless, so a state handed to
- * a guard mid-pipeline (`skipFreeze: true`, the navigate path) still exposes
- * immutable bags while `completeTransition` is free to attach `transition`.
- *
- * `context` is a fresh empty object, intentionally NOT frozen — plugins publish
- * into it via `claim.write(state, value)` after creation.
- *
- * @internal
- */
-export function createStateObject<
-  P extends Params = Params,
-  S extends SearchParams = SearchParams,
->(
-  name: string,
-  params: P,
-  search: S,
-  path: string,
-  skipFreeze?: boolean,
-): State<P, S> {
-  const state = {
-    name,
-    params,
-    search,
-    path,
-    context: {},
-    ...(!skipFreeze && { transition: DEFAULT_TRANSITION }),
-  } as State<P, S>;
-
-  return skipFreeze ? state : freezeStateInPlace(state);
-}
-
-/**
- * Merges user limits with defaults.
- * Returns frozen object for immutability.
- */
-export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
-  return { ...DEFAULT_LIMITS, ...userLimits };
 }
 
 // =============================================================================
