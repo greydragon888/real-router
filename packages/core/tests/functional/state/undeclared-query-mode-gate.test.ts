@@ -110,9 +110,10 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       });
 
       it("drops from a DIRECT makeState too, silently in bare core", () => {
-        // `navigate` builds through the pipeline, so `makeState` is a separate
-        // terminal — the one plugins use to rebuild a state from a serialized
-        // history entry. Bare core (no validation-plugin) drops without a word.
+        // `makeState` is the same pipeline in its literal form (Phase 4), but a
+        // distinct ENTRY — the one plugins use to rebuild a state from a
+        // serialized history entry. Bare core (no validation-plugin) drops
+        // without a word.
         const state = getPluginApi(router).makeState("plain", {}, { foo: "1" });
 
         expect(state.search).toStrictEqual({});
@@ -236,13 +237,15 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
     });
 
     it("reports nothing from the makeState terminal either (#1584)", () => {
-      // The gate has TWO terminals, and #1584 landed on one. It was found by
-      // sweeping `pipeline/canonicalize`'s PORT consumers — a sweep that cannot
-      // see this one, which reads its own dependency bag. `makeState` with an
-      // explicit `path` is precisely the shape a URL plugin uses to rebuild a
-      // state from a serialized history entry, where the route name may be gone
-      // or not yet registered, so it does not even fail on its own the way the
-      // navigate arm does.
+      // The gate HAD two terminals, and #1584 landed on one. It was found by
+      // sweeping `pipeline/canonicalize`'s PORT consumers — a sweep that could
+      // not see the other, which read its own dependency bag. Phase 4 folded
+      // `makeState` onto `canonicalize`, so there is one implementation now and
+      // this case is guarded by it; the test stays because the ENTRY is still
+      // distinct. `makeState` with an explicit `path` is precisely the shape a
+      // URL plugin uses to rebuild a state from a serialized history entry,
+      // where the route name may be gone or not yet registered, so it does not
+      // even fail on its own the way the navigate arm does.
       //
       // The second-order cost is what makes it worth a test rather than a
       // comment: the de-dup cache is shared by both terminals, so a bogus report
@@ -289,10 +292,10 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
 
       const validator = installSpyValidator(router);
 
-      // `navigate` builds its state through the pipeline (`canonicalize`), so
-      // `makeState`'s own gate is a SEPARATE terminal: plugins reconstructing a
-      // state from a serialized history entry come through here, and it must
-      // apply — and report — the same rule.
+      // `makeState` is the literal form of the same pipeline since Phase 4, so
+      // this is no longer a second terminal — but it IS a second ENTRY, the one
+      // plugins reconstructing a state from a serialized history entry come
+      // through, and the rule must reach it identically.
       const state = getPluginApi(router).makeState("plain", {}, { foo: "1" });
 
       expect(state.search).toStrictEqual({});

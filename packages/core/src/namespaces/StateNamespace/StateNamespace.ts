@@ -1,13 +1,8 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
-import { EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
-import {
-  admittedSearch,
-  areParamValuesEqual,
-  createStateObject,
-  freezeStateInPlace,
-  mergeWithDefault,
-} from "../../helpers";
+import { EMPTY_PARAMS } from "../../constants";
+import { areParamValuesEqual, freezeStateInPlace } from "../../helpers";
+import { buildURL, canonicalize, materialize } from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
 import type { Params, SearchParams, State } from "../../types";
@@ -101,14 +96,27 @@ export class StateNamespace {
    * This keeps params-freezing invariants independent of transition-pipeline
    * mutation (e.g. `completeTransition` attaching `state.transition`).
    *
-   * Channels arrive ALREADY separated by construction (#1548/#1549): every
-   * producer routes its input through `forwardState`, whose interceptable
-   * canonicalizes the channels ONCE — a DECLARED query name (`?a&b`, colliding
-   * path names excluded) → the query channel, everything else → path — after the
-   * whole plugin chain has run. So `params` is path-only and `search` is the
-   * query channel here. makeState never re-splits; it only merges each channel's
-   * route default (`defaultParams` on path, `defaultSearch` on query) UNDER the
-   * given value (caller wins), the two channels independent.
+   * **The LITERAL form of the pipeline** (nav-pipeline Phase 4). This method
+   * used to carry its own copy of stage ③ (merge each channel's route default
+   * UNDER the caller's value) and of the mode gate — a second, parallel
+   * canonicalisation living outside `src/pipeline`. Two terminals for one rule
+   * is not a style problem: #1584's existence precondition landed on the
+   * pipeline's terminal and NOT on this one, because it was found by sweeping
+   * `canonicalize`'s PORT consumers, and this method read its own dependency
+   * bag. It now IS `canonicalize(…, { resolveForward: false })` — the same form
+   * `buildPath` and `isActiveRoute`'s literal arm take, which is exactly this
+   * method's documented contract: `forwardTo` is not resolved (`makeState("src")`
+   * stays on `"src"`) but the NAMED route's defaults are applied (forwardState
+   * invariants #7/#8).
+   *
+   * ⚠ The literal form also applies `withholdFilledSlots` (a query default is
+   * declined for a `?`-declared slot the caller filled in the PARAMS bag). That
+   * is unreachable here rather than new behaviour: the only door to this method
+   * is `PluginApi.makeState`, which runs the P1 channel guard first
+   * (`getPluginApi.ts` → `throwOnMisChanneledKey`) on the SAME predicate — own
+   * key, defined value, `?`-declared — so the bag that would trigger the
+   * withholding is refused before it arrives. Verified by a 71-cell before/after
+   * snapshot, not by reading.
    *
    * `context` is initialized as a fresh empty object — intentionally NOT frozen
    * so plugins can publish data via `claim.write(state, value)` after creation.
@@ -118,85 +126,35 @@ export class StateNamespace {
     params?: P,
     search?: S,
     path?: string,
-    skipFreeze?: boolean,
   ): State<P, S> {
-    // Optimization: O(1) lookup instead of O(depth) ancestor iteration.
-    // Defaults are pre-split by field (RFC-4 M2 / #1548): `defaultParams` owns
-    // the path channel, `defaultSearch` the query channel — no declaration
-    // inference. `config.*` maps are null-prototype, so a missing entry reads as
-    // `undefined` (never a proto value).
-    const routeDefaultParams = this.#deps.getDefaultParams()[name] as
-      Params | undefined;
-    const routeDefaultSearch = this.#deps.getDefaultSearch()[name] as
-      SearchParams | undefined;
+    // Stages ③ + the mode gate, from the ONE implementation (`canonicalize`) —
+    // this method no longer carries its own. `resolveForward: false` is the
+    // whole difference from `navigate`'s form, and it is this method's contract:
+    // the route NAMED is the route answered about.
+    const port = this.#deps.port();
+    const canonical = canonicalize(port, name, params ?? EMPTY_PARAMS, search, {
+      resolveForward: false,
+    });
 
-    // Channels are already canonical (separated upstream in forwardState) — no
-    // re-split here. Each channel merges its route default UNDER the given value
-    // (caller wins), reusing the EMPTY_PARAMS / EMPTY_SEARCH singleton (#1027)
-    // when neither a default nor a value survives.
-    // The route's OWN defaults are split by the channel the route DECLARES
-    // (#1549), mirroring what #1570 does for a forwarding hop's defaults.
-    // `defaultParams` is a v1 config's only default slot and stays legal for a
-    // `?`-declared name, so a default spelled there for a query key belongs to
-    // the query channel; `defaultSearch` is spread last and wins the collision.
-    // Without this the key rode `state.params` while `state.path` never showed
-    // it — and the always-on P3 guard then rejected core's OWN state on `start`.
-    // Each slot IS its channel (see `pipeline/canonicalize`): the router does
-    // not move a key between them, and a `defaultParams` naming a `?`-declared
-    // key never gets registered in the first place.
-    const routeDefaults = {
-      params: routeDefaultParams,
-      search: routeDefaultSearch,
-    };
-
-    const mergedParams = mergeWithDefault(
-      routeDefaults.params,
-      params,
-      EMPTY_PARAMS,
-    ) as P;
-    const rawSearch = mergeWithDefault(
-      routeDefaults.search,
-      search,
-      EMPTY_SEARCH,
-    ) as S;
-    // The mode gate (#1575): under `default` / `strict` the URL build prints
-    // declared names only, so an undeclared key surviving here would sit in
-    // `state.search` while `state.path` — built from this same bag below — could
-    // never show it. Applied AFTER the default merge, so a `defaultSearch` for an
-    // undeclared key is dead config in those modes rather than a way around the
-    // rule. `loose` prints undeclared keys, so it short-circuits and pays nothing.
-    const mergedSearch = this.#deps.admitsUndeclaredQuery()
-      ? rawSearch
-      : admittedSearch(rawSearch, this.#deps.getQueryParams(name), (key) => {
-          // The REPORT presupposes the route exists; the DROP above does not
-          // (#1584). This is the mode gate's SECOND terminal — the one a URL
-          // plugin reaches when it rebuilds a state from a serialized history
-          // entry, where the route name may be gone or not yet registered — and
-          // #1584 landed only on the first, because it was found by sweeping
-          // `pipeline/canonicalize`'s PORT consumers and this terminal reads its
-          // own dependency bag instead. Ungated, it reported "key `q` is not
-          // declared on route `nope`" about a name that is not a route at all,
-          // and burnt the shared per-router de-dup slot, so the genuine warning
-          // stayed silent once that name became real.
-          if (this.#deps.hasRoute(name)) {
-            this.#deps.getDropReporter()?.(name, key);
-          }
-        });
-
-    // Query channel (RFC-4 M2 / #1548): the input is already canonical
-    // (separated upstream), so declared query names live in `search`, never in
-    // `params`. The URL is built from the MERGED channels (not the raw args) so
-    // a state built without an explicit path — canNavigateTo, isActiveRoute —
-    // has `state.path` in step with `state.search`; buildPath re-applies the
-    // same defaults idempotently. `createStateObject` is shared with
-    // `pipeline/materialize` so both producers emit one state shape.
-    return createStateObject(
-      name,
-      mergedParams,
-      mergedSearch,
-      path ?? this.#deps.buildPath(name, mergedParams, mergedSearch),
-      skipFreeze,
-    );
+    // ⑤a only when the caller did not supply the URL. `buildURL` prints through
+    // `port.buildPath` — the interceptable `ctx.buildPath` this method already
+    // used — so the interceptor zone is unchanged, and the URL is built from the
+    // SAME canonical intent the state is materialised from, which is what keeps
+    // `state.path` in step with `state.search` for a caller that passes no path
+    // (`canNavigateTo`, `isActiveRoute`).
+    //
+    // ⚠ No `skipFreeze` arm: the parameter died when Phase 2 moved the two
+    // callers that used it (`canNavigateTo`, `isActiveRoute`) onto
+    // `materialize({ skipFreeze: true })` directly, and the old body hid the
+    // death because it forwarded `undefined` into a slot that needs no branch.
+    // The public `PluginApi.makeState` type has four parameters and both call
+    // sites pass four; unfreezing a state is the transition pipeline's business,
+    // reached through `materialize`, not through this primitive. Coverage is
+    // what surfaced it — the same way it caught `deps.makeState` and
+    // `paramsMatchExcluding` when Phase 2 migrated their last consumers.
+    return materialize<P, S>(canonical, {
+      path: path ?? buildURL(canonical, port),
+    });
   }
 
   // =========================================================================

@@ -80,7 +80,7 @@ Two wiring facts are load-bearing and were measured, not assumed — changing ei
 - **`port.resolveForward` is the `forwardState` SEAM** (`Router.ts:268-292`) — the interceptable chain _plus_ the channel-separation wrapper. Channel separation therefore lives in the port implementation, never inside the pipeline module, which is what lets the module hold its target shape while legacy single-bag callers still work.
 - **`port.buildPath` is the interceptable `ctx.buildPath`** — one `navigate()` runs BOTH the `forwardState` and the `buildPath` interceptor today (`persistent-params` registers both). Reaching for the engine's `matcher.buildPath` would silently stop running the latter on the navigate path.
 
-Stage ③ (route default UNDER the caller's value) has two callers — `canonicalize` and `StateNamespace.makeState` — and both go through the shared `mergeWithDefault` / `createStateObject` helpers in `src/helpers.ts`: one source of truth for the merge rule and one state shape. Channels are frozen at merge time, independently of `materialize`'s `skipFreeze` (which defers only the state-object freeze, for the transition pipeline).
+Stage ③ (route default UNDER the caller's value) has exactly ONE implementation — `canonicalize` — since nav-pipeline Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ and of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other; the fold was verified byte-identical across a 71-cell snapshot, because the only door to `makeState` is `PluginApi.makeState` and its P1 guard refuses exactly the bag the literal form's `withholdFilledSlots` would act on. Channels are frozen at merge time, independently of `materialize`'s `skipFreeze` (which defers only the state-object freeze, for the transition pipeline).
 
 ### Validation Pattern
 
@@ -147,14 +147,16 @@ keys(matchPath(state.path).search)` in every mode (INVARIANTS makeState #6).
 - Applied **after** the default merge, so a `defaultSearch` for a key the route
   does not declare with `?name` is dead config under `default` / `strict` — a
   deliberate side edge, not an oversight.
-- Wired at the **two terminals** that produce a canonical query bag —
-  `pipeline/canonicalize`, which every producer but one now reaches
-  (`navigate` / `buildNavigationState` / `buildPath` / `canNavigateTo` /
-  `isActiveRoute` both arms / the `matchPath` rebuild), and
-  `StateNamespace.makeState`, the direct primitive plugins use to rebuild a
-  state from a serialized history entry. Phase 2 folded the `matchPath` rebuild
-  into the first, so this was three terminals before it and is two after.
-  `loose` short-circuits at both, so the repo default pays nothing.
+- Wired at ONE terminal — `pipeline/canonicalize` — which every producer now
+  reaches: `navigate` / `buildNavigationState` / `buildPath` / `canNavigateTo` /
+  `isActiveRoute` both arms / the `matchPath` rebuild, and `makeState`, the
+  direct primitive plugins use to rebuild a state from a serialized history
+  entry. It was three terminals before Phase 2 folded the `matchPath` rebuild in,
+  two until Phase 4 folded `makeState`, and one since. That count is the whole
+  point: while it was two, #1584's existence precondition landed on the first and
+  not the second, because it was found by sweeping the PORT's consumers and
+  `makeState` read its own dependency bag. `loose` short-circuits, so the repo
+  default pays nothing.
 - **The diagnostic fires from every one of them, predicates included — that
   uniformity IS the design (#1581), not a leak from it.** Measured on the phase's
   own base commit: `canNavigateTo` and `isActiveRoute`'s exact arm ALREADY

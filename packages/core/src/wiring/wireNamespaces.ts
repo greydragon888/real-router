@@ -70,7 +70,7 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   wirePlugins(ns, compileFactory, getValidator);
   wireNavigation(ns, port);
   wireRouterLifecycle(ns);
-  wireState(ns);
+  wireState(ns, port);
 }
 
 function createCompileFactory<Dependencies extends DefaultDependencies>(
@@ -402,29 +402,15 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
 
 function wireState<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
+  port: RouteResolver,
 ): void {
   ns.state.setDependencies({
-    getDefaultParams: () => ns.routes.getStore().config.defaultParams,
-    getDefaultSearch: () => ns.routes.getStore().config.defaultSearch,
-    buildPath: (name, params, search) => {
-      const ctx = getInternals(ns.router);
-
-      return ctx.buildPath(name, params, search);
-    },
+    // `makeState` is `canonicalize`'s literal form since Phase 4, so the port is
+    // all it needs. The seven members that used to live here — both default
+    // maps, `getQueryParams`, `hasRoute`, `admitsUndeclaredQuery`,
+    // `getDropReporter`, `buildPath` — existed only to feed a second copy of
+    // stage ③ and the mode gate, and left with it.
+    port: () => port,
     getUrlParams: (name) => ns.routes.getUrlParams(name),
-    getQueryParams: (name) => ns.routes.getQueryParams(name),
-    // The matcher's own existence predicate — the same one `port.pathNames`
-    // reads for the sibling terminal, so no second derivation appears (#1584).
-    hasRoute: (name) => ns.routes.hasRoute(name),
-    admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",
-    getDropReporter: () => {
-      const validator = getInternals(ns.router).validator;
-
-      return validator
-        ? (routeName, key) => {
-            validator.state.reportDroppedQueryKey(routeName, key);
-          }
-        : undefined;
-    },
   });
 }

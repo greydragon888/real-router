@@ -151,8 +151,6 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
 
       params.own = "own-value";
 
-      // `makeState` is the door that hands a bag to the merge untouched — the
-      // navigate path rebuilds it in `normalizeParams` first (own keys only).
       expect(
         getPluginApi(router).makeState("arb", params).params,
       ).toStrictEqual({ own: "own-value" });
@@ -160,6 +158,34 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
       const navigated = await router.navigate("arb", params);
 
       expect(navigated.params).toStrictEqual({ own: "own-value" });
+    });
+
+    it("ignores an inherited key on the caller's SEARCH bag", async () => {
+      // The PATH channel is filtered twice — `normalizeParams` runs before the
+      // merge for every producer since `makeState` joined the pipeline (Phase 4),
+      // so the merge's own-key guard never sees an inherited path key any more.
+      // The QUERY channel has no such entry guard: `canonicalize` hands the
+      // caller's `search` to the merge verbatim, which makes the guard inside
+      // `mergeDefined` the ONLY thing standing between a prototype-borne key and
+      // `state.search`. Coverage pointed at that line the moment the path
+      // channel stopped reaching it.
+      //
+      // Route `x` and not `arb`: `mergeDefined` short-circuits to
+      // `stripUndefined(value)` when the route has NO default in that channel,
+      // so only a route WITH a `defaultSearch` runs the merge loop the guard
+      // lives in. Picking the wrong fixture here passes while testing nothing.
+      const router = await started();
+      const search = Object.create({ inheritedQ: "INHERITED" }) as SearchParams;
+
+      search.ownQ = "own-value";
+
+      expect(
+        getPluginApi(router).makeState("x", {}, search).search,
+      ).toStrictEqual({ page: "1", ownQ: "own-value" });
+
+      const navigated = await router.navigate("x", {}, search);
+
+      expect(navigated.search).toStrictEqual({ page: "1", ownQ: "own-value" });
     });
 
     it("ignores an inherited key on the route default", async () => {
