@@ -151,6 +151,21 @@ export const noopSuccessPlugin: PluginFactory = () => ({
   onTransitionSuccess: () => {},
 });
 
+/**
+ * Plugin observing `onTransitionStart` only — the PRE-COMMIT window.
+ *
+ * Deliberately not interchangeable with {@link noopSuccessPlugin}: only
+ * `TRANSITION_START` / `TRANSITION_LEAVE_APPROVE` count towards
+ * `hasPreCommitListeners()` (`EventBusNamespace.hasPreCommitListeners`), because
+ * only those run user code BEFORE the state is committed and can therefore
+ * supersede the navigation mid-flight. `onTransitionSuccess` fires post-commit
+ * and cannot cancel, so `plugins-N` does NOT exercise this term despite looking
+ * like it does.
+ */
+export const noopStartPlugin: PluginFactory = () => ({
+  onTransitionStart: () => {},
+});
+
 /** `count` flat sibling routes `route0 … route{count-1}` (path-matcher stress.bench). */
 export function wideRoutes(count: number): Route[] {
   return Array.from({ length: count }, (_, i) => ({
