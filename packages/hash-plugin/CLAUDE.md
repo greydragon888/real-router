@@ -82,6 +82,19 @@ router.replaceHistoryState(name, params); // URL only, no transition
 router.navigate(name, params, undefined, { replace: true }); // Full transition
 ```
 
+**Both halves of that first call come from the resolved state (#1585).**
+`replaceHistoryState` resolves the target through `buildNavigationState` and then
+uses that state VERBATIM — as the `history.state` record AND as the input to the
+plugin's `buildUrl`. Before #1585 only the record did: the URL was built from the
+caller's raw arguments, which reach the plain `buildPath` — no `forwardTo`
+resolution, no `forwardState` seam — so the pair could disagree about the very
+keys the seam contributes (a `persistent-params` injection landed in the record
+and not in the hash URL beside it; a forwarding route wrote the source name in
+the URL and the target in the record). The shared factory also stopped re-making
+the state through `api.makeState`: that rebuild was a leftover from `buildState`,
+which built no path of its own, and it cost a third pass through the `buildPath`
+interceptor chain per record.
+
 ### buildUrl vs buildPath
 
 ```typescript

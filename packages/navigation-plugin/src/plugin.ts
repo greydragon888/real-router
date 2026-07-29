@@ -160,7 +160,6 @@ export class NavigationPlugin {
         api.matchPath(urlToPath(url, options.base)) ?? undefined,
       replaceHistoryState: createReplaceHistoryState(
         api,
-        router,
         this.#browser,
         pluginBuildUrl,
       ),

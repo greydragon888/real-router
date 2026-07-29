@@ -57,7 +57,7 @@ The plugin extends the router instance with three methods via [`extendRouter()`]
 | -------------------------------------------- | -------------------- | ------------------------------------- |
 | `buildUrl(name, params?, search?)`           | `string`             | Build full URL with hash and prefix   |
 | `matchUrl(url)`                              | `State \| undefined` | Parse hash URL to router state        |
-| `replaceHistoryState(name, params?, search?)`         | `void`               | Update browser URL without navigation |
+| `replaceHistoryState(name, params?, search?)`         | `void`               | Update browser URL without navigation. The URL and the `history.state` record are both built from the RESOLVED target, so they always describe the same state — a `forwardTo` route writes its destination, and a query key injected by `persistent-params` reaches both (#1585). |
 
 ```typescript
 router.buildUrl("users", { id: "123" });

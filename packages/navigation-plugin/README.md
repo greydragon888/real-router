@@ -66,7 +66,7 @@ router.usePlugin(
 | --------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `buildUrl(name, params?, search?, options?: { hash? })`   | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. `options.hash` (decoded) is encoded and appended. |
 | `matchUrl(url)`                                           | `State \| undefined` | Parse URL to router state                                                                                                                           |
-| `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`      | Update browser URL without triggering navigation. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Tri-state `hash`: `undefined` preserves, `""` clears, value sets. |
+| `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`      | Update browser URL without triggering navigation. The URL and the `history.state` record are both built from the RESOLVED target, so they always describe the same state — a `forwardTo` route writes its destination, and a query key injected by `persistent-params` reaches both (#1585). Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Tri-state `hash`: `undefined` preserves, `""` clears, value sets. |
 
 ```typescript
 router.buildUrl("users", { id: "123" });

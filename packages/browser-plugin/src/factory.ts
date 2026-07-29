@@ -147,7 +147,6 @@ function createBrowserPlugin(
 
   const replaceHistoryStateImpl = createReplaceHistoryState(
     api,
-    router,
     browser,
     pluginBuildUrl,
   );

@@ -115,6 +115,26 @@ When guard blocks navigation but browser already changed URL — critical error 
 
 `replaceHistoryState(name, params, search?, options?)` accepts a `search` query channel (position 3, RFC-4 M2 #1548) and an optional `{ hash }` field with the same tri-state semantics as `router.navigate` (undefined preserves, `""` clears, value sets). When omitted, the current `browser.getHash()` is preserved — symmetric with `onTransitionSuccess`.
 
+**Both halves of the call come from the resolved state (#1585).** `replaceHistoryState`
+resolves the target through `buildNavigationState` and then uses that state
+VERBATIM — as the `history.state` record AND as the input to `buildUrl`. Before
+#1585 only the record did: the URL was built from the caller's raw arguments,
+which reach the plain `buildPath` — no `forwardTo` resolution, no `forwardState`
+seam — so the pair could disagree about the very keys the seam contributes.
+Measured with a `persistent-params`-style injection: the record read
+`/posts/9?tab=new&sort=date&lang=de` and the URL beside it `/posts/9?tab=new&sort=date`;
+for a forwarding route the record said `posts` and the URL `/old`. It was the only
+one of the five history writers reading the caller's bag — `onTransitionSuccess`
+(all three plugins) and `rollbackUrlToCurrentState` all build from a committed
+state, and `navigate` has always kept the pair equal.
+
+Two consequences worth knowing: the state is no longer re-made through
+`api.makeState` (that rebuild was a leftover from `buildState`, which built no
+path of its own — it produced a byte-identical state and cost a third pass
+through the `buildPath` interceptor chain per record), and
+`createReplaceHistoryState` no longer takes a `router` argument, since the
+rebuild was its only use for one.
+
 ## State in History
 
 ```typescript

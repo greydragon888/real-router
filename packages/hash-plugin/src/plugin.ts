@@ -89,7 +89,6 @@ export class HashPlugin {
 
     const replaceHistoryStateImpl = createReplaceHistoryState(
       api,
-      router,
       browser,
       pluginBuildUrl,
       false,

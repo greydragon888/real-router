@@ -120,9 +120,11 @@ describe("plugin-utils factories", () => {
     function makeReplace(preserveHash?: boolean) {
       const api = getPluginApi(router);
 
+      // No `router` argument since #1585: the factory used it only for the
+      // `buildPath` rebuild that call deleted. It still reaches `buildPath`
+      // through `buildUrlFn`, which is the caller's to supply.
       return createReplaceHistoryState(
         api,
-        router,
         browser,
         (name, params, search) =>
           createPluginBuildUrl(router, "")(name, params, search),

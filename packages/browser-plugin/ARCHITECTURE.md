@@ -203,14 +203,13 @@ const removeExtensions = api.extendRouter({
     api.matchPath(urlToPath(url, options.base)) ?? undefined,
   replaceHistoryState: createReplaceHistoryState(
     api,
-    router,
     browser,
     pluginBuildUrl,
   ),
 });
 ```
 
-`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target **and both channels** via `api.buildNavigationState` (the caller's `search` goes in, the resolved `params`/`search` come out), builds the record from that resolved pair via `api.makeState` and calls `browser.replaceState`. Taking the query from the resolved state rather than the raw argument is what keeps a `forwardTo` chain's query-channel `defaultParams` in `history.state` (#1574).
+`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target **and both channels** via `api.buildNavigationState` (the caller's `search` goes in, the resolved `params`/`search` come out), then writes that state as the record and builds the URL from it, both via `browser.replaceState`. Taking the query from the resolved state rather than the raw argument is what keeps a `forwardTo` chain's query-channel `defaultParams` in `history.state` (#1574) — and the URL is built from the same resolved triple, so the two halves of one `replaceState` call cannot describe different states (#1585). Before that they could: the URL went through `buildUrl` with the caller's RAW arguments, which reach the public `buildPath` — no `forwardTo` resolution, no `forwardState` seam — so a `persistent-params` injection landed in the record and not in the URL beside it. The record is the resolved state VERBATIM; there is no `api.makeState` re-make, which was a leftover from `buildState` (that primitive built no path, so one had to be supplied) and cost a third pass through the `buildPath` interceptor chain per record.
 
 `extendRouter()` validates that no property with the same name already exists on the router (throws `PLUGIN_CONFLICT` if it does), adds the properties, and returns an unsubscribe function that removes them.
 

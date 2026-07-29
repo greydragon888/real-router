@@ -76,7 +76,6 @@ export function createPluginBuildUrl(
 
 export function createReplaceHistoryState(
   api: PluginApi,
-  router: Router,
   browser: ReplaceStateBrowser,
   buildUrlFn: (
     name: string,
@@ -125,32 +124,28 @@ export function createReplaceHistoryState(
       );
     }
 
-    const builtState = api.makeState(
-      state.name,
-      state.params,
-      // Explicit query channel (RFC-4 M2 / #1548), taken from the RESOLVED
-      // state rather than the caller's bag: `state.search` is the caller's
-      // `search` after the seam layered the chain's query-channel defaults
-      // under it. Both channels of the record therefore come from the same
-      // canonicalization that produced `state.name`/`state.params`, so the
-      // `history.state` record agrees with the URL instead of carrying a
-      // half-resolved query (#1574). Omitted by the caller and contributed by
-      // no hop → the frozen empty search bag, as before.
-      //
-      // ⚠ Why an explicit value still outranks a hop default is #1570's rule —
-      // a default is never applied to a slot the caller already filled, in
-      // EITHER bag — NOT the spread order inside `separateChannels`. The two
-      // are easy to confuse because today they agree: the seam does spread the
-      // caller's bag last. But that is stage ②, which the nav-pipeline work
-      // removes in Phase 4, whereas the withholding rule is a property of the
-      // merge and survives it. Anchoring the guarantee on the spread order would
-      // make this comment silently false the day the seam's wrapper goes.
-      state.search,
-      router.buildPath(state.name, state.params, state.search),
-      // No meta arg: since #1548 the per-segment param-source map is read from
-      // the live matcher by `state.name` (getMetaForState), not carried onto the
-      // built State — the removed `stateMetaStore` sidecar.
-    );
+    // `state` IS the record (#1585). It used to be re-made through `makeState`
+    // with a freshly built path, which was a leftover from `buildState` — that
+    // primitive built no path at all, so one had to be supplied. Since this call
+    // site moved to `buildNavigationState` the state already carries the path
+    // that same canonicalization produced, and the rebuild was measurably
+    // byte-identical: same name, same channels, same string. It cost a whole
+    // extra trip through the `buildPath` interceptor chain — one more
+    // `persistent-params` pass per history record.
+    //
+    // What the rebuild's channels were about survives unchanged, because it is a
+    // property of `state`, not of the re-make: `state.search` is the caller's
+    // `search` after the seam layered the forwarding chain's query-channel
+    // defaults under it, so the record cannot carry a half-resolved query
+    // (#1574). Omitted by the caller and contributed by no hop → the frozen
+    // empty search bag. ⚠ An explicit value still outranks a hop default because
+    // of #1570's rule — a default is never applied to a slot the caller already
+    // filled, in EITHER bag — and that rule lives in the merge, so it held when
+    // stage ② was deleted.
+    //
+    // The extra fields `buildNavigationState` returns (`context`, `transition`)
+    // never reach the browser: only the four channels below are copied into the
+    // buffer that `replaceState` structured-clones.
 
     // Tri-state hash semantics (#532):
     //   options.hash === undefined → preserve (legacy behavior, controlled by
@@ -174,15 +169,26 @@ export function createReplaceHistoryState(
     // always called without options. For browser/navigation-plugin hashSegment
     // carries the explicit or preserved fragment; for hash-plugin it is always
     // "" (preserveHash=false), and the plugin strips { hash } before this runs
-    // (#1230), so no stray fragment is spliced into a hash-route URL. The
-    // caller's `search` (RFC-4 M2 / #1548) threads through so the query lands in
-    // the rebuilt URL, matching the built State above.
-    const url = buildUrlFn(name, params, search) + hashSegment;
+    // (#1230), so no stray fragment is spliced into a hash-route URL.
+    //
+    // Built from the RESOLVED state, not the caller's arguments (#1585). This
+    // line is the other arm of #1574: that fix stopped the RECORD from carrying
+    // a half-resolved query, and its comment here claimed the URL already
+    // matched — it did not. `buildUrlFn` reaches the public `buildPath`, which
+    // neither resolves `forwardTo` nor runs the `forwardState` seam, so the URL
+    // was missing exactly what the seam contributes. Measured: with a
+    // `persistent-params`-style injection the record said
+    // `/posts/9?tab=new&sort=date&lang=de` while the URL beside it said
+    // `/posts/9?tab=new&sort=date`, and for a forwarding route the record said
+    // `posts` while the URL said `/old`. `navigate` has always kept the two
+    // equal; this brings `replaceHistoryState` into line with it.
+    const url =
+      buildUrlFn(state.name, state.params, state.search) + hashSegment;
 
-    buffer.name = builtState.name;
-    buffer.params = builtState.params;
-    buffer.search = builtState.search;
-    buffer.path = builtState.path;
+    buffer.name = state.name;
+    buffer.params = state.params;
+    buffer.search = state.search;
+    buffer.path = state.path;
 
     browser.replaceState(buffer, url);
   };

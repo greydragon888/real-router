@@ -273,7 +273,6 @@ this.#removeExtensions = api.extendRouter({
     api.matchPath(urlToPath(url, options.base)) ?? undefined,
   replaceHistoryState: createReplaceHistoryState(
     api,
-    router,
     browser,
     pluginBuildUrl,
   ),
