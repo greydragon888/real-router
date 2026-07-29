@@ -15,29 +15,26 @@ import type { Limits } from "./types/internal";
 // =============================================================================
 
 /**
- * THE single point where the path / query channels are separated by
- * declaration (#1549). A DECLARED `?key` that rides in the `params` bag — a
- * plugin's `forwardState` injection (persistent-params on `start()`), a
- * decoder-injected key, a v1 single-bag `navigate(name, { q })` — moves to the
- * query channel; everything else stays a path param. An explicit `search` value
- * wins over a params-bag twin (the #843 collision precedence).
- *
- * Every State producer routes through this ONE function — `makeState` (the state
- * factory) and the `matchPath` URL rebuild — so `state.path` and `state.search`
- * can never derive from differently-split bags. Returns the inputs untouched (no
- * allocation) when there is nothing to route: no params, no declared query
- * names, or no declared key actually riding in the params bag (the common path).
- */
-/**
- * Withholds every query default whose key the caller already filled in the PATH
- * bag — the rule #1570 states for a `forwardTo` chain's defaults, applied where
- * no seam runs to enforce it.
+ * Withholds a query default whose key the caller already filled with the RETIRED
+ * single-bag spelling — the rule #1570 states for a `forwardTo` chain's
+ * defaults, applied where no seam runs to enforce it.
  *
  * Nothing is moved between channels: the caller's key stays in the bag the
  * caller chose, only the default is declined. Without this the default and the
  * caller's params-twin sit in DIFFERENT channels, where no merge ranks them, and
  * the query default wins by default — the §1.1 priority inversion the channel
  * split exists to remove.
+ *
+ * ⚠ Scoped to `declaredQuery` — the route's `?`-declared names — and the scope
+ * is what keeps `buildPath` in step with every other producer. Only a DECLARED
+ * query name can have a params-bag "twin" at all: that spelling is the v1
+ * single-bag form the migrated entry points retired, so withholding is the whole
+ * point. A key the route declares NOWHERE (`/u` + `defaultSearch { theme }`) or
+ * one that owns a PATH SLOT beside its query twin (`/items/:id?id`, the
+ * #843/#1549 carve-out) is not a twin — the caller's params entry and the query
+ * default describe different things, and withholding there printed an href the
+ * route's own `matchPath` immediately rewrote (the #1552/#1578 class: href ≠
+ * destination, with `buildPath` the only producer out of agreement).
  *
  * `undefined` is absence (#1550 / #1551), so a caller's removal marker does not
  * count as "already filled" and the default survives it.
@@ -48,8 +45,9 @@ import type { Limits } from "./types/internal";
 export function withholdFilledSlots(
   defaults: SearchParams | undefined,
   params: Params,
+  declaredQuery: readonly string[],
 ): SearchParams | undefined {
-  if (defaults === undefined) {
+  if (defaults === undefined || declaredQuery.length === 0) {
     return defaults;
   }
 
@@ -57,7 +55,7 @@ export function withholdFilledSlots(
   let dropped = false;
 
   for (const [key, value] of Object.entries(defaults)) {
-    if (params[key] !== undefined) {
+    if (params[key] !== undefined && declaredQuery.includes(key)) {
       dropped = true;
       continue;
     }
@@ -69,6 +67,21 @@ export function withholdFilledSlots(
   return dropped ? (kept as SearchParams | undefined) : defaults;
 }
 
+/**
+ * THE single point where the path / query channels are separated by
+ * declaration (#1549). A DECLARED `?key` that rides in the `params` bag — a
+ * plugin's `forwardState` injection (persistent-params on `start()`), a
+ * decoder-injected key, a v1 single-bag `navigate(name, { q })` — moves to the
+ * query channel; everything else stays a path param. An explicit `search` value
+ * wins over a params-bag twin (the #843 collision precedence).
+ *
+ * Every State producer routes through this ONE function — `makeState` (the state
+ * factory), `pipeline/canonicalize` and the `matchPath` URL rebuild — so
+ * `state.path` and `state.search` can never derive from differently-split bags.
+ * Returns the inputs untouched (no allocation) when there is nothing to route:
+ * no params, no declared query names, or no declared key actually riding in the
+ * params bag (the common path).
+ */
 export function separateChannels(
   params: Params | undefined,
   queryNames: readonly string[],
@@ -599,5 +612,12 @@ export function admittedSearch<S extends SearchParams>(
     return search;
   }
 
-  return (admitted ?? EMPTY_SEARCH) as S;
+  // Frozen, because this is the ONLY branch that hands back a bag the caller did
+  // not already freeze: `search` arrives frozen from `mergeWithDefault`, and the
+  // no-drop branch returns it untouched. Before nav-pipeline Phase 2 the gap was
+  // invisible — every consumer re-merged (and re-froze) downstream in
+  // `makeState`. `materialize` deliberately does not, so an unfrozen `admitted`
+  // reached `state.search` verbatim and broke "states are deeply frozen" for
+  // exactly the states the gate had touched.
+  return Object.freeze(admitted ?? EMPTY_SEARCH) as S;
 }

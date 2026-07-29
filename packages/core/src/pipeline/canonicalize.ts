@@ -89,6 +89,12 @@ export function canonicalize(
   // path allocates nothing downstream.
   const pathBag = normalizeParams(forwarded.params);
 
+  // Read ONCE. Three consumers below need the route's `?`-declared names — the
+  // diagnostic, the default split, and the mode gate — and `getQueryParams` is a
+  // cached lookup, not a free one; a local also makes it impossible for the three
+  // to disagree about which registry decided the channel (#1556).
+  const declaredQuery = port.queryNames(resolvedName);
+
   // The undeclared-key diagnostic (#1579 — the params half of #1553). A key the
   // route declares NOWHERE stays in `state.params` as app-level data, which is
   // correct and documented — but it never reaches the URL, so the state does not
@@ -97,20 +103,26 @@ export function canonicalize(
   //
   // Three things keep this from costing anything it should not:
   //  - gated on the sink being present, so bare core pays one `undefined` check
-  //    and never walks the bag;
+  //    and never walks the bag (the port member is a GETTER that returns
+  //    `undefined` until `validation-plugin` installs the validator — a plain
+  //    closure would always be truthy and the gate would be decorative);
   //  - opted in EXPLICITLY by the committing producers, so every predicate stays
   //    silent — including `canNavigateTo`, which resolves `forwardTo` and would
   //    therefore be caught by a form-based test while still running on every
   //    `<Link>` render (measured: it warned before the flag was made explicit);
   //  - read from the CALLER's bag, before route defaults are merged in, so a
   //    deliberate arbitrary `defaultParams` entry is not reported as a mistake.
-  if (port.reportUndeclaredParamKey && opts?.diagnoseUndeclared === true) {
-    const declaredQuery = port.queryNames(resolvedName);
+  const reportUndeclared =
+    opts?.diagnoseUndeclared === true
+      ? port.reportUndeclaredParamKey
+      : undefined;
+
+  if (reportUndeclared) {
     const declaredPath = port.pathNames(resolvedName);
 
     for (const key of Object.keys(pathBag)) {
       if (!declaredQuery.includes(key) && !declaredPath.includes(key)) {
-        port.reportUndeclaredParamKey(resolvedName, key);
+        reportUndeclared(resolvedName, key);
       }
     }
   }
@@ -125,7 +137,7 @@ export function canonicalize(
   // the zero-declaration hot path pays a length check.
   const routeDefaults = separateChannels(
     port.defaultParams(resolvedName),
-    port.queryNames(resolvedName),
+    declaredQuery,
     port.defaultSearch(resolvedName),
   );
 
@@ -143,9 +155,16 @@ export function canonicalize(
   // rerouted: the caller's key stays in the bag they chose (and, being in the
   // path channel, is simply not printed — that IS the single-bag retirement),
   // only the default is withheld.
+  // ⚠ Scoped to `declaredQuery`, and the scope is load-bearing: only a DECLARED
+  // query name can HAVE a params-bag twin. Withholding on a key the route
+  // declares nowhere (`/u` + `defaultSearch { theme }`), or on one that owns a
+  // path slot beside its query twin (`/items/:id?id`, the #843/#1549 carve-out),
+  // takes a default no caller was competing for — and left `buildPath` the only
+  // producer out of agreement, printing an href this very route's `matchPath`
+  // rewrote on the spot. That is the #1552/#1578 class, re-opened.
   const queryDefaults =
     opts?.resolveForward === false
-      ? withholdFilledSlots(routeDefaults.search, pathBag)
+      ? withholdFilledSlots(routeDefaults.search, pathBag, declaredQuery)
       : routeDefaults.search;
 
   const query = mergeWithDefault(queryDefaults, forwarded.search, EMPTY_SEARCH);
@@ -160,13 +179,9 @@ export function canonicalize(
     // from, and the invariant is about those two agreeing.
     query: port.admitsUndeclaredQuery()
       ? query
-      : admittedSearch(
-          query as SearchParams,
-          port.queryNames(resolvedName),
-          (key) => {
-            port.reportDroppedQueryKey?.(resolvedName, key);
-          },
-        ),
+      : admittedSearch(query as SearchParams, declaredQuery, (key) => {
+          port.reportDroppedQueryKey?.(resolvedName, key);
+        }),
     // The one and only cast to the brand in the codebase — reviewed once, here.
   } as Canonical;
 }

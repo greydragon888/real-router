@@ -277,9 +277,14 @@ export class RoutesNamespace<
     // the path.
     if (typeof this.#store.config.encoders[route] === "function") {
       const encoded = this.#store.config.encoders[route]({
-        // Spread so a mutating encoder cannot reach the frozen canonical bag.
+        // BOTH channels spread, and the symmetry is the point: `canonical.*` is
+        // frozen at merge time, so handing a channel through verbatim turns a
+        // codec that edits its argument in place — legal before this entry point
+        // joined the pipeline, and still legal for `params` — into a silent no-op
+        // (sloppy mode) or a `TypeError` (ESM). Copying `params` alone left the
+        // two halves of one documented hook behaving differently.
         params: { ...canonical.path },
-        search: canonical.query,
+        search: { ...canonical.query },
       });
 
       return this.#store.matcher.buildPath(
@@ -712,10 +717,14 @@ export class RoutesNamespace<
   /**
    * The literal arm of {@link isActiveRoute} — unchanged by #1573.
    *
-   * Safe boundary (#1577): both branches below READ the caller's bags — the
-   * exact branch splits them (`separateChannels`), the descendant branch spreads
-   * them into one — so an accessor-backed key, a `Proxy` or a framework's
-   * reactive object throws HERE, on the render path. The predicate's stated
+   * Safe boundary (#1577): both branches below READ the caller's bags — since
+   * nav-pipeline Phase 2 step 2-5 through `canonicalize` in its literal form,
+   * which walks `params` key by key, and then again in the descendant branch's
+   * channel-by-channel `paramsMatch` — so an accessor-backed key, a `Proxy` or a
+   * framework's reactive object throws HERE, on the render path. (It used to be
+   * the exact branch's own `separateChannels` and the descendant branch's spread
+   * into one bag; step 2-5 removed both, the exposure is unchanged.) The
+   * predicate's stated
    * policy is that it answers and never throws from inside a render (see the
    * `forwardState` wrap below), and #1573 implemented that for the destination
    * arm only. One boundary around the whole walk rather than a `try` per read —

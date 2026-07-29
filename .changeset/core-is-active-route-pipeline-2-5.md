@@ -22,13 +22,19 @@ their port calls, and keep it until Phase 4. `isActiveRoute` had its own
 1. A declared query key handed in the `params` bag is no longer re-routed to the
    query channel before comparison, so the v1 single-bag spelling stops matching:
    `isActiveRoute("x", { page: "2" }, undefined, false, false)` answers `false`
-   where it answered `true`. Spell it in the query slot instead. (With the default
-   `ignoreQueryParams: true` nothing changes — that path compares path slots
-   only.) `persistent-params` is unaffected: it injects into `search` itself.
+   where it answered `true`. Spell it in the query slot instead. (On the EXACT
+   arm the default `ignoreQueryParams: true` is unaffected — it compares path
+   slots only. The DESCENDANT arm is a different story; see 2 below.)
+   `persistent-params` is unaffected: it injects into `search` itself.
 2. The descendant arm now obeys `ignoreQueryParams`, the same flag the exact arm
    hands to `areStatesEqual`. It could not before: it folded query into the path
    bag before matching, so an ancestor link compared its query even when the
-   caller asked to ignore it — the two arms disagreed about the flag.
+   caller asked to ignore it — the two arms disagreed about the flag. **This one
+   lands on the DEFAULT flag**, and it is the visible half of the change: on an
+   active `/kid?tab=1`, `isActiveRoute("p", {}, { tab: "9" })` answered `false`
+   and now answers `true`, because the caller asked for query to be ignored.
+   Monotonicity (INVARIANTS isActiveRoute #6) still holds — ignoring query can
+   only make a route more active.
 3. `undefined` in the params bag is ABSENCE, not a value to match against
    (#1550 / #1551). `isActiveRoute("users", { id: undefined })` now answers
    `true` for an active `users.view`, and an `undefined` no longer "overrides" a

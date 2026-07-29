@@ -116,10 +116,18 @@ export interface RouteResolver {
    * is what keeps the scan off the hot path: core checks one `undefined` and
    * skips the walk entirely.
    *
+   * ⚠ The absence has to be REAL — the router implements this member as a
+   * GETTER returning `undefined` while `validator === null`, not as a closure
+   * that forwards into an optional-chained validator. A closure is always
+   * truthy, so the gate would read as taken and bare core would walk the
+   * caller's bag on every commit; the `| undefined` in the type is what lets
+   * the getter say so under `exactOptionalPropertyTypes`.
+   *
    * A diagnostic, never a gate — core keeps the key in `state.params` as
    * app-level data (wiki `Route.md`). Dropping it was measured and rejected: it
    * retires a shipped capability, and "declared nowhere" cannot tell a typo from
    * `navigate("users", { id })` on a parent whose CHILD declares `:id`.
    */
-  reportUndeclaredParamKey?: (routeName: string, key: string) => void;
+  reportUndeclaredParamKey?:
+    ((routeName: string, key: string) => void) | undefined;
 }

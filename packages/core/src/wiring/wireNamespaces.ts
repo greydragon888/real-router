@@ -197,6 +197,10 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
   const ctx = getInternals(ns.router);
   const store = ns.routes.getStore();
 
+  const reportUndeclaredParamKey = (routeName: string, key: string): void => {
+    ctx.validator?.state.reportUndeclaredParamKey(routeName, key);
+  };
+
   return {
     resolveForward: (name, params, search) =>
       ctx.forwardState(name, params, search),
@@ -213,8 +217,16 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     reportDroppedQueryKey: (routeName, key) => {
       ctx.validator?.state.reportDroppedQueryKey(routeName, key);
     },
-    reportUndeclaredParamKey: (routeName, key) => {
-      ctx.validator?.state.reportUndeclaredParamKey(routeName, key);
+    // A GETTER, not a closure — the absence is the gate (#1579). The pipeline
+    // reads `port.reportUndeclaredParamKey` and skips the whole caller-bag walk
+    // when it is `undefined`; a plain closure is always truthy, so bare core
+    // (`validator === null`, the repo default) walked the bag on every commit
+    // anyway and the "opt-in sink" the design bought was never wired. The
+    // validator is installed AFTER wiring, so this cannot be decided once at
+    // construction — it has to be read per call, exactly like
+    // `admitsUndeclaredQuery` above.
+    get reportUndeclaredParamKey() {
+      return ctx.validator ? reportUndeclaredParamKey : undefined;
     },
   };
 }
