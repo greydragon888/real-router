@@ -7,36 +7,42 @@ import type { Params, SearchParams } from "../types";
  * layer. The module stays pure and mock-testable; the router implements the
  * port at wiring time (`wiring/wireNamespaces.ts`).
  *
- * ⚠ **Both ends are deliberately interceptable on milestone 1.** The signatures
- * describe the pipeline's contract, not where the implementation goes:
+ * ⚠ **Both ends are deliberately interceptable, and all four phases closed
+ * without changing that.** The signatures describe the pipeline's contract, not
+ * where the implementation goes:
  *
- * - `resolveForward` is wired to the `forwardState` SEAM (`Router.ts:268-292`),
- *   i.e. the interceptable chain PLUS the channel-separation wrapper. Stage ②
- *   therefore lives inside the port implementation, never inside the pipeline —
- *   which is exactly what keeps `canonicalize` in its target shape while the
- *   ~84 legacy single-bag test pins stay green. Calling the namespace primitive
- *   directly would switch off both the interceptors and ②.
- * - `buildPath` is wired to `ctx.buildPath`, the interceptable, because today's
+ * - `resolveForward` is wired to the `forwardState` SEAM (`Router.ts:259-324`),
+ *   i.e. the interceptable chain PLUS the centralized channel ASSERTION. It
+ *   used to be a channel-SEPARATION wrapper (stage ②) that repaired a
+ *   mis-channelled bag behind the producer's back; `ba0f6b18b` deleted the
+ *   stage outright, and the seam now REFUSES such a bag instead
+ *   (`assertChannelCorrect`, `src/channels/guard.ts`). Channel-correctness is
+ *   the producer's contract, not something the port quietly restores. Calling
+ *   the namespace primitive directly would switch off both the interceptors and
+ *   that check.
+ * - `buildPath` is wired to `ctx.buildPath`, the interceptable, because the
  *   navigate path builds `state.path` through it (measured: one `navigate()`
  *   runs BOTH the `forwardState` and the `buildPath` interceptor). Reaching for
  *   the engine's `matcher.buildPath` here would silently stop running
  *   `persistent-params`' `buildPath` interceptor on the navigate path — a
- *   behaviour change, not a refactor.
+ *   behaviour change, not a refactor. Phases 2 and 4 closed without un-wiring
+ *   it: ⑤a stays on the interceptable.
  *
- * Un-wiring those (engine-level ⑤a, ② outside the port) is Phase 2/4 work, each
- * with its own commit and its own test migration.
- *
- * Accessors arrive with their consumers: the design (RFC §4.5) also lists
- * `queryNames`, `admitsUndeclaredQuery` and `encode`, which have no caller on
- * this milestone — `queryNames` comes with the channel guard (0b-0 / 0b-2),
- * `admitsUndeclaredQuery` with the mode gate (0b-4), `encode` with Phase 2. A
- * member added early would be dead weight nothing detects: knip has no issue
- * type for unused members of an interface.
+ * Accessors arrived with their consumers, as designed — `queryNames` with the
+ * channel guard, `admitsUndeclaredQuery` with the mode gate (#1575),
+ * `pathNames` and the two sinks with the diagnostics (#1579 / #1584). One
+ * member the design (RFC §4.5) listed never arrived at all: `encode`. The route
+ * codecs stayed with the entry points that own their direction (`buildPath`
+ * calls `config.encoders`, `matchPath` calls `config.decoders`), so the port
+ * never grew a stage for them — which is the case for adding a member only
+ * together with its caller, since one added early is dead weight nothing
+ * detects (knip has no issue type for unused members of an interface).
  */
 export interface RouteResolver {
   /**
-   * Stage ① — resolve the `forwardTo` chain (layering the source route's
-   * defaults) and hand back channel-correct bags. `search` flows THROUGH the
+   * Stage ① — resolve the `forwardTo` chain (layering the hops' defaults) and
+   * hand back channel-correct bags. Channel-correct by REFUSAL, not by repair:
+   * the seam asserts and throws (see the header). `search` flows THROUGH the
    * interceptor zone, not past it: `search-schema` validates the query channel
    * here on the URL→State direction.
    */

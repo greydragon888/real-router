@@ -9,26 +9,9 @@ import type { Canonical } from "./types";
 import type { Params, SearchParams } from "../types";
 
 /**
- * THE single producer of {@link Canonical}: one pass over stage ① (resolve the
- * `forwardTo` chain) and stage ③ (merge each channel's route default UNDER the
- * caller's value). There is no separating stage ② — channels arrive correct by
- * the producer contract, and the port's `resolveForward` is wired to the seam
- * that REFUSES a mis-channelled bag rather than repairing one.
- *
- * Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name
- * (target defaults cannot be read before `forwardTo` resolves), so ① always
- * precedes it.
- *
- * `undefined` is absence on both sides of the merge (`mergeWithDefault`,
- * #1550/#1551) — an explicitly-`undefined` caller value leaves the default in
- * place, and a default carrying `undefined` behaves like no entry.
- *
- * Channels are frozen here, at merge time — NOT in `materialize`. The two
- * freezes are different things: `materialize`'s `skipFreeze` governs the state
- * object (the navigate path defers it so `completeTransition` can attach
- * `transition`), while `params` / `search` must be immutable the moment a guard
- * can see them. `mergeWithDefault` also copies before freezing, so the caller's
- * own bag is never frozen out from under it.
+ * Options for {@link canonicalize}. Both flags are opt-in, and both are read as
+ * a ROLE rather than inferred from the shape of the call — the reasons differ
+ * per flag and are recorded on each.
  */
 export interface CanonicalizeOptions {
   /**
@@ -63,6 +46,28 @@ export interface CanonicalizeOptions {
   diagnoseUndeclared?: boolean;
 }
 
+/**
+ * THE single producer of {@link Canonical}: one pass over stage ① (resolve the
+ * `forwardTo` chain) and stage ③ (merge each channel's route default UNDER the
+ * caller's value). There is no separating stage ② — channels arrive correct by
+ * the producer contract, and the port's `resolveForward` is wired to the seam
+ * that REFUSES a mis-channelled bag rather than repairing one.
+ *
+ * Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name
+ * (target defaults cannot be read before `forwardTo` resolves), so ① always
+ * precedes it.
+ *
+ * `undefined` is absence on both sides of the merge (`mergeWithDefault`,
+ * #1550/#1551) — an explicitly-`undefined` caller value leaves the default in
+ * place, and a default carrying `undefined` behaves like no entry.
+ *
+ * Channels are frozen here, at merge time — NOT in `materialize`. The two
+ * freezes are different things: `materialize`'s `skipFreeze` governs the state
+ * object (the navigate path defers it so `completeTransition` can attach
+ * `transition`), while `params` / `search` must be immutable the moment a guard
+ * can see them. `mergeWithDefault` also copies before freezing, so the caller's
+ * own bag is never frozen out from under it.
+ */
 export function canonicalize(
   port: RouteResolver,
   name: string,
@@ -112,11 +117,14 @@ export function canonicalize(
       ? port.reportUndeclaredParamKey
       : undefined;
 
-  // The mode gate's sink, resolved ONCE and read as the gate. Bare core leaves
-  // it a plain (always-truthy) closure rather than `undefined`, so the `?.`
-  // below is not the gate the port's docs describe — hoisting the read here is
-  // what makes "bare core pays nothing" true: without it `port.pathNames` ran
-  // per dropped key with no sink to feed.
+  // The mode gate's sink, resolved ONCE — the read IS the gate. The router
+  // implements this member as a GETTER returning `undefined` while no validator
+  // is installed (`wiring/wireNamespaces.ts`), so in bare core `dropSink` is
+  // genuinely absent and the drop path below skips the `pathNames` existence
+  // lookup entirely. Hoisting also keeps the getter from being re-invoked per
+  // dropped key. (It used to be wired as a plain closure — always truthy — so
+  // the check read as taken and bare core paid that lookup with no sink behind
+  // it; both sinks report their absence honestly now.)
   const dropSink = port.reportDroppedQueryKey;
 
   // BOTH diagnostics presuppose that the route EXISTS — they answer "does route
@@ -144,8 +152,9 @@ export function canonicalize(
     }
   }
 
-  // The route's OWN defaults, split by the channel the route DECLARES (#1549) —
-  // Each slot IS its channel — no split. `defaultParams` is the path channel,
+  // The route's OWN defaults. Each slot IS its channel — no split (#1549 routed
+  // them by the route's declaration for one release; `ba0f6b18b` retired that
+  // along with the rest of stage ②). `defaultParams` is the path channel,
   // `defaultSearch` the query channel, and the router never moves a key between
   // them: the two meet only when the URL is printed. A `defaultParams` naming a
   // `?`-declared key is refused at REGISTRATION (`assertRouteDefaultChannels`),
@@ -160,7 +169,9 @@ export function canonicalize(
   // ③ — route defaults UNDER the routed value, each channel independent. Read
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
   // accessor) so the merge itself allocates nothing on the zero-defaults hot
-  // path — the `Canonical` literal below is the pipeline's one added allocation.
+  // path — the `Canonical` literal below is this function's only allocation.
+  // (The pipeline's second one is `materialize`'s options bag, at the call site:
+  // two object literals per navigation over the pre-pipeline form.)
   // In the LITERAL form no seam runs, so nothing has enforced #1570's rule that
   // a default is never applied to a slot the caller already filled — in EITHER
   // bag. Apply it here: the query default and a caller's params-twin land in
