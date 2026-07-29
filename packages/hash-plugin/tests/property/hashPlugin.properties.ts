@@ -350,18 +350,21 @@ describe("search-params: query params preserved through hash URL matchUrl", () =
   )(
     "search params in hash URL are parsed correctly by matchUrl",
     (hashPrefix: string, page: string, sort: string) => {
-      const router = createHashRouter(hashPrefix);
+      // `loose`: the subject here is whether a query written AFTER the hash
+      // reaches the matcher at all. `page` / `sort` are declared by no route in
+      // the fixture, so under `default` the mode gate (#1575) would drop them
+      // before `state.search` and the property would pass or fail on the gate's
+      // policy instead of on the plumbing it is named after.
+      const router = createHashRouter(hashPrefix, "", "loose");
 
-      // Build the base URL and manually append query params
-      // (queryParamsMode: "default" allows undeclared query params in matchUrl)
       const baseUrl = router.buildUrl("users.list", {});
       const urlWithParams = `https://example.com${baseUrl}?page=${page}&sort=${sort}`;
       const state = router.matchUrl(urlWithParams);
 
       expect(state).toBeDefined();
       expect(state!.name).toBe("users.list");
-      // Query params now live in the dedicated search channel (RFC-4 M2).
-      // queryParamsMode: "default" auto-converts numeric strings to numbers
+      // Query params live in the dedicated search channel (RFC-4 M2), and the
+      // URL direction parses `?page=1` into a number.
       expect(String(state!.search.page as number)).toBe(page);
       expect(state!.search.sort).toBe(sort);
 
@@ -486,7 +489,9 @@ describe("multi-key query params survive matchUrl parsing", () => {
   })(
     "arbitrary query dictionary is parsed correctly",
     (hashPrefix: string, params: Record<string, string>) => {
-      const router = createHashRouter(hashPrefix);
+      // `loose` for the same reason as above, and here it is structural: the
+      // dictionary is ARBITRARY, so no route could declare its keys.
+      const router = createHashRouter(hashPrefix, "", "loose");
       const base = router.buildUrl("users.list", {});
       const query = new URLSearchParams(params).toString();
       const state = router.matchUrl(`https://example.com${base}?${query}`);
@@ -495,13 +500,9 @@ describe("multi-key query params survive matchUrl parsing", () => {
       expect(state!.name).toBe("users.list");
 
       for (const [key, value] of Object.entries(params)) {
-        // Query params now live in the dedicated search channel (RFC-4 M2).
-        // queryParamsMode: "default" may coerce numeric strings to numbers.
-        const actual = state!.search[key];
-
-        expect(
-          actual === undefined ? "" : String(actual as string | number),
-        ).toBe(value);
+        // The search channel (RFC-4 M2); the URL direction may parse a numeric
+        // string into a number, so compare by printed form.
+        expect(String(state!.search[key] as string | number)).toBe(value);
       }
 
       router.stop();
@@ -542,17 +543,67 @@ describe("query collision: inner hash query is source of truth", () => {
   )(
     "outer ?... is ignored when hash has its own query",
     (hashPrefix: string, page: string, sort: string) => {
-      const router = createHashRouter(hashPrefix);
+      // `loose` is load-bearing for the NEGATIVE half. Under `default` the mode
+      // gate drops every undeclared key, so `outer` would be absent whatever the
+      // precedence rule did — the assertion would pass for the wrong reason and
+      // stop discriminating. In `loose` an undeclared key IS admitted, so
+      // `outer`'s absence can only mean the outer query never reached the
+      // matcher.
+      const router = createHashRouter(hashPrefix, "", "loose");
       const url = `https://example.com/?outer=1#${hashPrefix}/users/list?page=${page}&sort=${sort}`;
       const state = router.matchUrl(url);
 
       expect(state).toBeDefined();
       expect(state!.name).toBe("users.list");
-      expect(state!.path).toBe("/users/list");
-      // Query params now live in the dedicated search channel (RFC-4 M2).
+      expect(state!.path).toBe(`/users/list?page=${page}&sort=${sort}`);
+      // Query params live in the dedicated search channel (RFC-4 M2).
       expect(String(state!.search.page as number)).toBe(page);
       expect(state!.search.sort).toBe(sort);
       expect(state!.search.outer).toBeUndefined();
+
+      router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Mode gate: an undeclared key in the hash query is dropped under `default`
+// =============================================================================
+
+describe("mode gate: the hash query obeys queryParamsMode (#1575)", () => {
+  test.prop(
+    [
+      arbHashPrefix,
+      fc.constantFrom("1", "10", "42"),
+      fc.constantFrom("asc", "desc"),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "a key no route declares does not reach state.search under `default`",
+    (hashPrefix: string, page: string, sort: string) => {
+      // The counterpart of the three `loose` properties above, and the reason
+      // they had to ask for that mode. No route in the fixture declares `?page`
+      // or `?sort`, and under `default` the URL build prints declared names
+      // only — so admitting them would publish a `state.search` its own
+      // `state.path` contradicts (INVARIANTS makeState #6). The gate drops them
+      // instead, and the state round-trips through its own path.
+      const router = createHashRouter(hashPrefix);
+      const url = `https://example.com/#${hashPrefix}/users/list?page=${page}&sort=${sort}`;
+      const state = router.matchUrl(url);
+
+      expect(state).toBeDefined();
+      expect(state!.name).toBe("users.list");
+      expect(state!.search).toStrictEqual({});
+      expect(state!.path).toBe("/users/list");
+
+      // The drop is not a loss of information the URL still carries: matching
+      // the state's OWN path yields the same state.
+      const again = router.matchUrl(
+        `https://example.com/#${hashPrefix}${state!.path}`,
+      );
+
+      expect(again?.path).toBe(state!.path);
+      expect(again?.search).toStrictEqual({});
 
       router.stop();
     },

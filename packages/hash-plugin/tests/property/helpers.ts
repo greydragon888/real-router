@@ -212,10 +212,22 @@ export const arbStringParams: fc.Arbitrary<Record<string, string>> =
 // Router Factory Helpers
 // =============================================================================
 
-export function createHashRouter(hashPrefix: string, base = ""): Router {
+/**
+ * `queryParamsMode` is a parameter, not a constant, because the fixture's routes
+ * declare NO query names: under the repo default (`"default"`) the mode gate
+ * (#1575) drops every key in a hash query before it reaches `state.search`, and
+ * a property about PARSING or PRECEDENCE would then be asserting the gate rather
+ * than its own subject. Those properties ask for `"loose"`, the one mode whose
+ * contract admits an undeclared key; everything else keeps `"default"`.
+ */
+export function createHashRouter(
+  hashPrefix: string,
+  base = "",
+  queryParamsMode: "default" | "strict" | "loose" = "default",
+): Router {
   const router = createRouter(ROUTES, {
     defaultRoute: "home",
-    queryParamsMode: "default",
+    queryParamsMode,
   });
 
   const mockedBrowser = createMockedBrowser(() => undefined, hashPrefix);
