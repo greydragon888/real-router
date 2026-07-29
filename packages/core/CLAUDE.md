@@ -159,12 +159,18 @@ keys(matchPath(state.path).search)` in every mode (INVARIANTS makeState #6).
   predicate, which is the trade the channel guard below declines to make.
 - The pipeline reads the decision through one boolean port accessor,
   `admitsUndeclaredQuery()`, rather than learning the mode itself.
+- **The REPORT presupposes the route exists (#1584).** The drop does not — it
+  is always-on and correct for any name — but announcing "key `q` is not
+  declared on route `nope`" about a route that is not a route blames the query
+  for a typo in the ROUTE name. `queryNames` cannot tell the two apart (`[]`
+  for both), so both diagnostics gate on `pathNames(name) !== undefined`, the
+  one member that carries the distinction.
 - Silent in bare core; `validation-plugin`'s `state.reportDroppedQueryKey`
   (called from the gate, de-duplicated per route+key — and per ROUTER since
   #1583, so a second router or an SSR clone is not silenced) makes it visible. Same
   always-on-fixes / opt-in-diagnoses split as the channel guard.
 
-**A key declared NOWHERE keeps its params-bag home — with an opt-in diagnostic (#1579).** A key the route names neither as a path slot nor with `?` has no channel to own it, so it stays in `state.params` as app-level data (documented in the wiki: an arbitrary default is not part of the URL). The consequence is real and was the complaint behind #1553: the state does not round-trip through its own `state.path`. Core does NOT drop it — that was measured and rejected, because dropping retires a shipped capability across 52 tests in 6 packages, and the "declared nowhere" predicate cannot separate a typo from `navigate("users", { id })` on a parent route whose CHILD declares `:id`. Instead `validation-plugin` says it once per route+key, per ROUTER (#1583 — the cache used to be module-level, which silenced every router after the first). The diagnostic is opted into by the COMMITTING producers (`navigate`, `buildNavigationState`) rather than inferred from the compositional form — `canNavigateTo` resolves `forwardTo` and would be caught by a form-based test while still running on every `<Link>` render, which is the same per-render flood the channel guard avoids by not instrumenting predicates.
+**A key declared NOWHERE keeps its params-bag home — with an opt-in diagnostic (#1579).** A key the route names neither as a path slot nor with `?` has no channel to own it, so it stays in `state.params` as app-level data (documented in the wiki: an arbitrary default is not part of the URL). The consequence is real and was the complaint behind #1553: the state does not round-trip through its own `state.path`. Core does NOT drop it — that was measured and rejected, because dropping retires a shipped capability across 52 tests in 6 packages, and the "declared nowhere" predicate cannot separate a typo from `navigate("users", { id })` on a parent route whose CHILD declares `:id`. Instead `validation-plugin` says it once per route+key, per ROUTER (#1583 — the cache used to be module-level, which silenced every router after the first) — and only for a route that EXISTS (#1584: `queryNames`/`pathNames` both answer `[]` for a missing route, so every key in the bag used to be reported as "declared nowhere", blaming the params for a route-name typo and burning a de-dup slot that silenced the genuine warning if that name later became real). The diagnostic is opted into by the COMMITTING producers (`navigate`, `buildNavigationState`) rather than inferred from the compositional form — `canNavigateTo` resolves `forwardTo` and would be caught by a form-based test while still running on every `<Link>` render, which is the same per-render flood the channel guard avoids by not instrumenting predicates.
 
 **Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.
 

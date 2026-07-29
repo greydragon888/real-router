@@ -173,6 +173,41 @@ describe("nav-pipeline Phase 2 — producer agreement", () => {
       expect(typeof port.reportUndeclaredParamKey).toBe("function");
     });
 
+    it("says nothing at all when the ROUTE does not exist (#1584)", async () => {
+      // Both diagnostics answer "does route X declare this key?", and both read
+      // the declaration registries, which return `[]` for a route with no
+      // declarations AND for a route with no existence. Reporting the second
+      // blamed the caller's bag for a typo in the ROUTE NAME — the most
+      // misleading direction available — and burnt a de-dup slot per key,
+      // silencing the genuine warning if that name later became real.
+      //
+      // `pathNames` carries the `undefined` arm that tells the two apart; the
+      // committing producers still refuse the navigation on their own.
+      const validator = installSpyValidator(router);
+
+      expect(
+        getPluginApi(router).buildNavigationState("hoem", { first: "1" }),
+      ).toBeUndefined();
+
+      await expect(
+        router.navigate("hoem", { first: "1" }, { second: "2" }),
+      ).rejects.toMatchObject({ code: "ROUTE_NOT_FOUND" });
+
+      expect(validator.state.reportUndeclaredParamKey).not.toHaveBeenCalled();
+      expect(validator.state.reportDroppedQueryKey).not.toHaveBeenCalled();
+
+      // Discrimination: the same bag on a route that DOES exist still reports,
+      // so this is a precondition on existence, not the diagnostics going quiet.
+      await router.navigate("home", { first: "1" }, undefined, {
+        reload: true,
+      });
+
+      expect(validator.state.reportUndeclaredParamKey).toHaveBeenCalledWith(
+        "home",
+        "first",
+      );
+    });
+
     it("stops reporting again once the validator is removed", async () => {
       const validator = installSpyValidator(router);
 

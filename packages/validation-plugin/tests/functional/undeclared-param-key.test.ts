@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { cloneRouter, getPluginApi } from "@real-router/core/api";
+import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { validationPlugin } from "../../src";
@@ -143,6 +143,65 @@ describe("validation-plugin — undeclared params-bag key diagnostic (#1579)", (
     getPluginApi(router).buildNavigationState("plain", { foo: "1" });
 
     expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("says nothing about the params when the ROUTE does not exist (#1584)", async () => {
+    // The diagnostic asks "is this key declared anywhere on this route". For a
+    // route that does not exist the honest answer is that the question does not
+    // apply — but `queryNames` and `pathNames` both answered `[]`, which is
+    // indistinguishable from a real route that declares nothing, so EVERY key
+    // in the bag was reported as "declared nowhere on route X".
+    //
+    // Wrong in the most misleading direction: it blames the params for a typo
+    // in the ROUTE name. The return values were always right — this entry point
+    // answers `undefined`, `navigate` rejects ROUTE_NOT_FOUND — only the
+    // diagnostic lied.
+    router = mk();
+    await router.start("/h");
+
+    const built = getPluginApi(router).buildNavigationState("plainn", {
+      foo: "1",
+      bar: "2",
+    });
+
+    expect(built).toBeUndefined();
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    await expect(router.navigate("plainn", { foo: "1" })).rejects.toMatchObject(
+      {
+        code: "ROUTE_NOT_FOUND",
+      },
+    );
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    // Discrimination: the SAME key on a route that DOES exist still warns —
+    // otherwise "never warn" would pass this block.
+    await router.navigate("plain", { foo: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not burn a de-dup slot on a route that does not exist (#1584)", async () => {
+    // Second-order, and reachable within one router: each bogus report took a
+    // slot in the per-route+key cache, so the genuine warning for that pair was
+    // suppressed once the name became real.
+    router = mk();
+    await router.start("/h");
+
+    await router.navigate("later", { foo: "1" }).catch(() => undefined);
+
+    // Split by MOMENT, not by count: a bare `toHaveBeenCalledTimes(1)` at the
+    // end passes on the bug too (one bogus warning and a suppressed genuine one
+    // total the same as no bogus warning and a genuine one). The discriminating
+    // fact is that nothing is said while the route does not exist.
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    getRoutesApi(router).add({ name: "later", path: "/later" });
+    await router.navigate("later", { foo: "1" });
+
+    // …and the genuine warning still fires, i.e. no de-dup slot was burnt.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(`"later"`));
   });
 
   it("stays silent on every PREDICATE, including canNavigateTo", async () => {

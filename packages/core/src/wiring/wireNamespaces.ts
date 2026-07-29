@@ -212,7 +212,12 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     defaultSearch: (name) => store.config.defaultSearch[name],
     buildPath: (name, params, search) => ctx.buildPath(name, params, search),
     queryNames: (name) => ns.routes.getQueryParams(name),
-    pathNames: (name) => ns.routes.getUrlParams(name),
+    // `undefined` for a route that does not exist (#1584) — `getUrlParams`
+    // answers `[]` for that case and for a real route with no path slots alike,
+    // and the diagnostic downstream cannot tell those apart. `hasRoute` is the
+    // matcher's own predicate, so no second derivation of existence appears.
+    pathNames: (name) =>
+      ns.routes.hasRoute(name) ? ns.routes.getUrlParams(name) : undefined,
     // Read per call, not captured: `queryParamsMode` lives in the options
     // namespace, which `setOption` can rewrite after wiring.
     admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",

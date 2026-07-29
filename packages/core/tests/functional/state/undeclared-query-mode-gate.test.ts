@@ -204,6 +204,37 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       );
     });
 
+    it("reports nothing when the ROUTE does not exist (#1584)", async () => {
+      // The gate's DROP is always-on and unaffected — the navigation fails on
+      // its own with ROUTE_NOT_FOUND either way. What was wrong is the REPORT:
+      // the declaration registry answers `[]` for a route with no declarations
+      // AND for a route with no existence, so every query key was announced as
+      // "not declared on route X" for a route X that is not a route. That
+      // blames the query for a typo in the ROUTE name.
+      //
+      // Same precondition as the params-bag diagnostic's (#1579), found by
+      // sweeping this file's sibling rather than named in the issue.
+      router = mk("default");
+
+      const validator = installSpyValidator(router);
+
+      await router.start("/h");
+
+      await expect(
+        router.navigate("plainn", {}, { foo: "1" }),
+      ).rejects.toMatchObject({ code: "ROUTE_NOT_FOUND" });
+
+      expect(validator.state.reportDroppedQueryKey).not.toHaveBeenCalled();
+
+      // Discrimination: the same key on a route that DOES exist still reports.
+      await router.navigate("plain", {}, { foo: "1" });
+
+      expect(validator.state.reportDroppedQueryKey).toHaveBeenCalledWith(
+        "plain",
+        "foo",
+      );
+    });
+
     it("reports on the URL direction too", () => {
       router = mk("default");
 

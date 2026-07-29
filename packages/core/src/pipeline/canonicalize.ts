@@ -116,12 +116,27 @@ export function canonicalize(
       ? port.reportUndeclaredParamKey
       : undefined;
 
+  // BOTH diagnostics presuppose that the route EXISTS — they answer "does route
+  // X declare this key?", and for a route that is not a route the honest answer
+  // is that the question does not apply (#1584). `queryNames` / `pathNames`
+  // answer `[]` for a real route with no declarations, so `[]` cannot say "no
+  // such route"; `pathNames` carries the `undefined` arm that can. Each
+  // diagnostic reads it for itself, inside its own sink gate, so bare core never
+  // pays the lookup and neither reader depends on the other's ordering.
   if (reportUndeclared) {
     const declaredPath = port.pathNames(resolvedName);
 
-    for (const key of Object.keys(pathBag)) {
-      if (!declaredQuery.includes(key) && !declaredPath.includes(key)) {
-        reportUndeclared(resolvedName, key);
+    if (declaredPath !== undefined) {
+      // Reporting a nonexistent route blamed the params for a typo in the ROUTE
+      // name — the most misleading direction available — and burnt a de-dup slot
+      // per key, silencing the genuine warning if that name later became real.
+      // The committing producers still refuse the navigation on their own
+      // (`undefined` from `buildNavigationState`, `ROUTE_NOT_FOUND` from
+      // `navigate`); only the diagnostic was wrong.
+      for (const key of Object.keys(pathBag)) {
+        if (!declaredQuery.includes(key) && !declaredPath.includes(key)) {
+          reportUndeclared(resolvedName, key);
+        }
       }
     }
   }
@@ -178,7 +193,15 @@ export function canonicalize(
     query: port.admitsUndeclaredQuery()
       ? query
       : admittedSearch(query as SearchParams, declaredQuery, (key) => {
-          port.reportDroppedQueryKey?.(resolvedName, key);
+          // Same existence precondition as the params-bag diagnostic above
+          // (#1584): the DROP is always-on and correct either way, but saying
+          // "key `q` is not declared on route `nope`" about a route that does
+          // not exist blames the query for a route-name typo. Found by sweeping
+          // this file's port consumers after fixing the sibling — the two
+          // diagnostics read the same `[]`-means-nothing answer.
+          if (port.pathNames(resolvedName) !== undefined) {
+            port.reportDroppedQueryKey?.(resolvedName, key);
+          }
         }),
     // The one and only cast to the brand in the codebase — reviewed once, here.
   } as Canonical;

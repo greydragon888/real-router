@@ -170,6 +170,28 @@ describe("validation-plugin — dropped query key diagnostic (#1575)", () => {
     expect(warnSpy).toHaveBeenCalledTimes(2);
   });
 
+  it("says nothing about the query when the ROUTE does not exist (#1584)", async () => {
+    // The sibling of the params-bag diagnostic's defect, found by sweeping this
+    // file's port consumers rather than by the issue, which named only the
+    // other one: both ask "does route X declare this key?" and both read `[]`
+    // for a route that has no declarations AND for a route that has no
+    // existence. Reporting the second blames the query for a typo in the ROUTE
+    // name.
+    //
+    // The DROP itself is unaffected and always-on — only the report is gated.
+    router = mk("default");
+    await router.start("/h");
+
+    await router.navigate("plainn", {}, { foo: "1" }).catch(() => undefined);
+
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    // Discrimination: the same key on a route that DOES exist still warns.
+    await router.navigate("plain", {}, { foo: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("warns on the URL direction too", () => {
     router = mk("default");
 

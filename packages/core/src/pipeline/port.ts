@@ -104,11 +104,25 @@ export interface RouteResolver {
   reportDroppedQueryKey?: (routeName: string, key: string) => void;
 
   /**
-   * The route's PATH slot names — the other half of "is this key declared?".
-   * Needed only by the undeclared-key diagnostic (#1579), which asks whether a
-   * key is declared ANYWHERE; `queryNames` alone cannot answer that.
+   * The route's PATH slot names, or `undefined` when there is NO SUCH ROUTE —
+   * the other half of "is this key declared?". Needed only by the undeclared-key
+   * diagnostic (#1579), which asks whether a key is declared ANYWHERE;
+   * `queryNames` alone cannot answer that.
+   *
+   * ⚠ The `undefined` arm is load-bearing, not defensive (#1584). An empty array
+   * is what an EXISTING route with no path slots returns, so `[]` cannot say
+   * "no such route" — and the diagnostic, reading `[]` for both, reported every
+   * key in the caller's bag as "declared nowhere on route X" for a route X that
+   * has no declarations only because it has no existence. That blames the params
+   * for a typo in the ROUTE name, which is the most misleading direction
+   * available. The matcher already knows the difference (`getSegmentsByName`
+   * answers `undefined`); this member used to discard it.
+   *
+   * `queryNames` is deliberately NOT given the same arm: its three consumers —
+   * the diagnostic, the default merge and the mode gate — all want `[]` for a
+   * missing route, and only this one asks a question that presupposes existence.
    */
-  pathNames: (name: string) => readonly string[];
+  pathNames: (name: string) => readonly string[] | undefined;
 
   /**
    * Opt-in sink for a key the route declares NOWHERE (#1579 — the params half
