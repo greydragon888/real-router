@@ -333,10 +333,27 @@ export class RoutesNamespace<
     // through the decoder). Runs here, inside match, BEFORE any search-schema
     // plugin validation (the v1 order: engine codec → plugin). With no decoder the
     // channels pass through untouched.
-    const decoded =
-      typeof this.#store.config.decoders[name] === "function"
-        ? this.#store.config.decoders[name]({ params, search })
-        : { params, search };
+    const decoder = this.#store.config.decoders[name];
+    let decoded: { params: Params; search: SearchParams };
+
+    if (typeof decoder === "function") {
+      decoded = decoder({ params, search });
+
+      // The ONE boundary on this path where a value core is about to build a
+      // state from came out of USER code (#1582). The matcher's own output above
+      // needs no check — it is router-produced and plain by construction — but a
+      // decoder may hand back anything: an array becomes `params {"0":"a"}`, a
+      // string becomes `{"0":"o","1":"o",…}`, a `Map` or a prototyped object
+      // becomes `{}`, and every one of those commits silently. Opt-in, like every
+      // DX check: `null` in bare core, where the behaviour is unchanged either
+      // way. Labelled for THIS entry point — the pre-pipeline call sat inside a
+      // `forwardState` dep wrapper and blamed that method for a `matchPath` fault.
+      this.#deps
+        .getValidator()
+        ?.routes.validateStateBuilderArgs(name, decoded.params, "matchPath");
+    } else {
+      decoded = { params, search };
+    }
 
     // Stages ① + ③ + the mode gate, one pass through the pipeline (nav-pipeline
     // Phase 2, step 2-2). `canonicalize` reaches the SAME `forwardState` seam

@@ -12,6 +12,7 @@ import type {
   State,
   GuardFnFactory,
 } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 
 /**
  * Dependencies injected into RoutesNamespace.
@@ -24,6 +25,15 @@ export interface RoutesDependencies<
 > {
   /** Per-router logger instance (from `getInternals(router).logger`) */
   logger: RouterLogger;
+
+  /**
+   * The opt-in validator, resolved PER CALL — `null` until `validation-plugin`
+   * installs one, and `null` again after its teardown. The same shared closure
+   * EventBus / RouteLifecycle / Plugins receive; this namespace needs it for the
+   * one boundary on it where USER code hands back a value core then builds a
+   * state from (a route's `decodeParams`).
+   */
+  getValidator: () => RouterValidator | null;
 
   /**
    * The pipeline's read-model (`RouteResolver`), shared with NavigationNamespace
@@ -85,13 +95,12 @@ export interface RoutesDependencies<
   // `matchPath`, its only consumer. Step 2-2 moved that entry point onto the
   // pipeline, which reaches the SAME seam through `port.resolveForward` and the
   // same drop reporter through `port.reportDroppedQueryKey`, leaving both
-  // closures without a caller. Note what went with them: the dep wrapper also
-  // ran `validateStateBuilderArgs` on the bags `matchPath` had just produced
-  // itself (matcher output + decoder output) — an internal intermediate, not a
-  // caller argument. The pipeline validates where the other producers do, at the
-  // ENTRY of the point (`buildNavigateState` for navigate, `validateMatchPathArgs`
-  // on the facade for this one), so removing it aligns the two rather than
-  // dropping a check on user input.
+  // closures without a caller. ⚠ The `validateStateBuilderArgs` call that went
+  // with them was NOT purely an internal intermediate, which is how its removal
+  // was justified: of the two bags it saw, the matcher's output is indeed
+  // router-produced, but a route's `decodeParams` is USER code and its return
+  // value is external input. Only the matcher half was redundant — the decoder
+  // half is back, at the decoder itself (#1582).
 }
 
 /**

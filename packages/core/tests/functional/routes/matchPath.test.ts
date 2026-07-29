@@ -3,6 +3,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
+import { installSpyValidator } from "../../helpers/spyValidator";
 
 import type { Params, Route, Router, State } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
@@ -1119,6 +1120,47 @@ describe("core/routes/routePath/matchPath", () => {
         getPluginApi(router).matchPath<TypedParams>("/typed/7");
 
       expect(state?.params.id).toBe("7");
+    });
+  });
+
+  describe("a decoder's output is validated as user input (#1582)", () => {
+    // Core's half of the contract: does it consult the validator, with the right
+    // bag and the right caller label, under the right condition? Whether the bag
+    // is acceptable is the plugin's half, pinned in its own suite.
+    it("hands the DECODER's bag to the validator, labelled matchPath", () => {
+      routesApi.add({
+        name: "dec",
+        path: "/dec/:id",
+        decodeParams: ({ params }) => ({
+          params: { ...params, injected: "yes" },
+          search: {},
+        }),
+      });
+
+      const validator = installSpyValidator(router);
+
+      getPluginApi(router).matchPath("/dec/7");
+
+      expect(validator.routes.validateStateBuilderArgs).toHaveBeenCalledWith(
+        "dec",
+        // The decoder's output, not the matcher's — the matcher never produced
+        // `injected`.
+        { id: "7", injected: "yes" },
+        "matchPath",
+      );
+    });
+
+    it("does not consult it for a route with no decoder", () => {
+      routesApi.add({ name: "plain", path: "/plain/:id" });
+
+      const validator = installSpyValidator(router);
+
+      getPluginApi(router).matchPath("/plain/7");
+
+      // The matcher's own output is router-produced and plain by construction.
+      // Validating it would be the internal-intermediate check the pipeline
+      // migration was right to drop.
+      expect(validator.routes.validateStateBuilderArgs).not.toHaveBeenCalled();
     });
   });
 });

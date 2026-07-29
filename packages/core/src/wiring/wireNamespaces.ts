@@ -66,7 +66,7 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   wireLimits(ns);
   wireEventBus(ns, getValidator);
   wireRouteLifecycle(ns, compileFactory, getValidator);
-  wireRoutes(ns, port);
+  wireRoutes(ns, port, getValidator);
   wirePlugins(ns, compileFactory, getValidator);
   wireNavigation(ns, port);
   wireRouterLifecycle(ns);
@@ -129,9 +129,11 @@ function wireRouteLifecycle<Dependencies extends DefaultDependencies>(
 function wireRoutes<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
   port: RouteResolver,
+  getValidator: () => RouterValidator | null,
 ): void {
   const deps: RoutesDependencies<Dependencies> = {
     logger: getInternals(ns.router).logger,
+    getValidator,
     port,
     addActivateGuard: (name, handler, precompiledFn) => {
       ns.routeLifecycle.addCanActivate(name, handler, true, precompiledFn);
