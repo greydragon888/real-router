@@ -21,22 +21,26 @@ Router.ts (facade)
     └── RouterLifecycleNamespace — start/stop
 
 src/pipeline/ (navigation delivery — three primitives over one opaque type)
-    ├── canonicalize(port, name, params, search) → Canonical  — ① forwardTo + ③ route defaults, one pass
+    ├── canonicalize(port, name, params, search?, opts?) → Canonical  — ① forwardTo + ③ route defaults, one pass
+    │        opts.resolveForward: false → the LITERAL form (the route NAMED, no chain, no seam)
     ├── buildURL(canonical, port)                → string     — ⑤a
     ├── materialize(canonical, opts)             → State      — ⑤b
     └── RouteResolver                                          — the port the router implements at wiring time
 
-src/channels/ (channel correctness — the fifth always-on invariant guard, as a subsystem)
+src/channels/ (channel correctness — one rule, three mechanisms; only `guard` is core's fifth always-on invariant guard, `modeGate` is deliberately NOT a guard)
     ├── guard      — findMisChanneledKey · assertChannelCorrect · misChanneledKeyMessage
     ├── defaults   — assertRouteDefaultChannels (config-time half) · withholdFilledSlots
     └── modeGate   — admittedSearch
 
     A subsystem and not a namespace method because the rule has no owning module:
-    it runs from the facade, from `internals`, from the `forwardState` seam, from
-    the `decodeParams` boundary, from `updateRoute` and from four registration
-    entry points. It lived in two files both named `helpers.ts` until then —
-    which is how #1584's existence precondition landed on one half and not the
-    other. Imports nothing from the namespaces, the engine or the pipeline:
+    twelve call sites in seven modules — P1 (`internals`), the `forwardState`
+    seam and `canNavigateTo` (`Router.ts`), P3 `navigateToState` (twice), the
+    `decodeParams` boundary, `updateRoute`, and four registration entry points
+    through the adapter in `RoutesNamespace/helpers.ts`. It lived in two files
+    both named `helpers.ts` until then, one edit away from becoming two rules
+    that disagree — the same shape one layer up (two stage-③ TERMINALS) is what
+    let #1584 land on one and not the other, and what Phase 4 closed.
+    Imports nothing from the namespaces, the engine or the pipeline:
     declared query names arrive as DATA, never as a matcher, so a second
     derivation of the one registry (#1556) cannot grow here. Enforced by a
     `no-restricted-imports` boundary in `packages/core/eslint.config.mjs`.
@@ -60,7 +64,7 @@ api/ (standalone functions — tree-shakeable)
 All router events are consequences of FSM transitions (via `fsm.on(from, event, action)`), not manual calls.
 No boolean flags (`#started`, `#active`, `#navigating` removed).
 
-### Navigation pipeline (`src/pipeline/`, RFC nav-pipeline milestones 1-2)
+### Navigation pipeline (`src/pipeline/`, RFC nav-pipeline — all four phases closed)
 
 Every entry point builds its target state through the pipeline: `canonicalize` is the **sole producer** of `Canonical`, and `buildURL` / `materialize` physically accept nothing else (the brand is a `unique symbol` that is never exported, so `materialize({name, path, query})` does not compile). Phase 2 (#1548) migrated the remaining seven, one per commit, in TWO compositional forms:
 
@@ -92,7 +96,7 @@ The seam's error names the key, the route, and — when a chain resolved elsewhe
 
 Two wiring facts are load-bearing and were measured, not assumed — changing either is a behaviour change, not a refactor:
 
-- **`port.resolveForward` is the `forwardState` SEAM** (`Router.ts:268-292`) — the interceptable chain _plus_ the channel-separation wrapper. Channel separation therefore lives in the port implementation, never inside the pipeline module, which is what lets the module hold its target shape while legacy single-bag callers still work.
+- **`port.resolveForward` is the `forwardState` SEAM** (`Router.ts:259-324`) — the interceptable chain _plus_ the centralized channel ASSERTION. It was a channel-SEPARATION wrapper until `ba0f6b18b` deleted stage ②; the check, not a repair, therefore lives in the port implementation and never inside the pipeline module.
 - **`port.buildPath` is the interceptable `ctx.buildPath`** — one `navigate()` runs BOTH the `forwardState` and the `buildPath` interceptor today (`persistent-params` registers both). Reaching for the engine's `matcher.buildPath` would silently stop running the latter on the navigate path.
 
 Stage ③ (route default UNDER the caller's value) has exactly ONE implementation — `canonicalize` — since nav-pipeline Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ and of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other; the fold was verified byte-identical across a 71-cell snapshot, because the only door to `makeState` is `PluginApi.makeState` and its P1 guard refuses exactly the bag the literal form's `withholdFilledSlots` would act on. Channels are frozen at merge time, independently of `materialize`'s `skipFreeze` (which defers only the state-object freeze, for the transition pipeline).
@@ -326,7 +330,7 @@ removeExtensions();
 
 States are **deeply frozen** via `Object.freeze()`. Never mutate, always create new.
 
-**Exception — `state.context`:** the `context` object is **intentionally not frozen** (`helpers.ts:24`). Plugins write per-route data into it via `claimContextNamespace()` + `claim.write(state, value)` (or the direct `state.context.<ns> = …` escape hatch) after state creation. The `context` _slot_ on the state is frozen (cannot be reassigned — `state.context = {}` throws), but the object it points to stays mutable. So "deeply frozen" holds for `name` / `params` / `path` / `transition` (+ nested), with `context` the documented carve-out that the whole `claimContextNamespace` mechanism depends on.
+**Exception — `state.context`:** the `context` object is **intentionally not frozen** (`pipeline/materialize.ts` — the state shape moved there when `03b70236f` inlined `createStateObject`; `navigateToNotFound` builds its own in `NavigationNamespace`). Plugins write per-route data into it via `claimContextNamespace()` + `claim.write(state, value)` (or the direct `state.context.<ns> = …` escape hatch) after state creation. The `context` _slot_ on the state is frozen (cannot be reassigned — `state.context = {}` throws), but the object it points to stays mutable. So "deeply frozen" holds for `name` / `params` / `path` / `transition` (+ nested), with `context` the documented carve-out that the whole `claimContextNamespace` mechanism depends on.
 
 ### Router Lifecycle: dispose()
 
@@ -804,7 +808,7 @@ router.areStatesEqual(state1, state2, false); // Compares state.params AND state
 
 **`undefined` is absence on both sides of the default merge (#1550 / #1551).** `mergeDefined` (`src/helpers.ts`) is the single owner of "route default UNDER the value": a key survives only when its winning value is defined. So a caller's explicit `undefined` means "I said nothing" and the route default keeps the slot (`navigate("x", {}, { page: undefined })` on `defaultSearch { page: "1" }` commits `page: "1"`, symmetric with the path channel), and a default that itself carries `undefined` behaves exactly like no entry (no `undefined`-valued own key ever reaches the frozen state, a codec, or `forwardState`'s result). The rule lives in the merge rather than in a separately-ordered normalize stage — that is what makes it order-insensitive and true for every producer (`makeState`, `pipeline/canonicalize`, `matchPath`, `buildPath`, `forwardState` source-layering). `normalizeParams` stays as the path-channel entry guard (it also collapses an empty bag to the `EMPTY_PARAMS` singleton, #1027).
 
-**A route's own defaults are routed by the same registry, from both slots (#1549).** `defaultParams` and `defaultSearch` do not decide the channel — the route's `?`-declaration does, exactly as a `forwardTo` hop's defaults are routed by the _destination_'s declaration (#1570). `defaultSearch` is layered last and so outranks the query half of `defaultParams`; the caller outranks both. The split is applied wherever a route's defaults are merged — `pipeline/canonicalize`, `StateNamespace.makeState`, `RoutesNamespace.buildPath` and the `matchPath` rebuild — because the URL builders run BEFORE the state builders; splitting only in the latter publishes a `state.search` its own `state.path` contradicts. Since Phase 2 (#1548) `buildPath` applies the split through `canonicalize`'s literal form like everyone else — the v1 single-bag skip it used to carry (and the matcher's `search ?? params` fallback behind it) is retired, so the query string is printed from the canonical query channel alone. What survives from #1578 is the RULE the skip kept breaking: **`buildPath` must agree with `navigate` / `makeState` / the `matchPath` rebuild on the same intent, and the href it prints must survive its own `matchPath`.** The literal form withholds a query default only for a name the route DECLARES with `?` (there, and only there, a params-bag entry is the retired twin competing for the slot); a default for a key declared nowhere, or for the path-slot half of a `/items/:id?id` collision, is never withheld — doing so re-opened the same href-≠-destination divergence one review later. Until #1549 each slot worked in exactly one position — a hop's `defaultSearch` was read by nobody, and a terminal's `defaultParams` for a declared query name stayed in the path bag, which made the P3 guard reject core's OWN state on `start()`.
+**A route's own defaults are decided by the SLOT, and merged in exactly one place (#1549, superseded by `ba0f6b18b`).** `defaultParams` IS the path channel and `defaultSearch` IS the query channel, whatever the route declares. ⚠ For one release this paragraph said the opposite — that the `?`-declaration routed them, exactly as a hop's defaults were routed by the destination's — and that routing is gone; a `defaultParams` naming a `?`-declared key is REFUSED at registration instead, so the two slots can no longer compete for one key and there is no precedence left to state between them (the caller still outranks whichever default owns the slot). The merge itself has one implementation, `pipeline/canonicalize`, since Phase 4 folded `makeState` onto it; `RoutesNamespace.buildPath` and the `matchPath` rebuild reach that same implementation through the literal and resolving forms. One terminal is what keeps a `state.search` from contradicting its own `state.path`: the URL builders run BEFORE the state builders, so a merge living only in the latter would publish exactly that contradiction. Since Phase 2 (#1548) `buildPath` goes through the literal form like everyone else — the v1 single-bag skip it used to carry is retired, and the matcher's `search ?? params` fallback behind it is no longer reachable from any core producer (they all pass a defined query bag), so the query string is printed from the canonical query channel alone. What survives from #1578 is the RULE the skip kept breaking: **`buildPath` must agree with `navigate` / `makeState` / the `matchPath` rebuild on the same intent, and the href it prints must survive its own `matchPath`.** The literal form withholds a query default only for a name the route DECLARES with `?` (there, and only there, a params-bag entry is the retired twin competing for the slot); a default for a key declared nowhere, or for the path-slot half of a `/items/:id?id` collision, is never withheld — doing so re-opened the same href-≠-destination divergence one review later. Until #1549 each slot worked in exactly one position — a hop's `defaultSearch` was read by nobody, and a terminal's `defaultParams` for a declared query name stayed in the path bag, which made the P3 guard reject core's OWN state on `start()`.
 
 **The ROUTER-level defaults have both slots too, and that one was not cosmetic.** `RouterOptions` carried `defaultParams` with no query twin, so the default route's query defaults could be spelled only in the path bag — and reached the URL only because the `forwardState` seam re-separated channels on the way through (stage ②, since deleted). Measured by neutralising that stage before removing it: a route's own `defaultParams` and a `forwardTo` hop's both survived it (their split lived in the pipeline, #1549/#1570), but the router option did NOT — `navigateToDefault` passed `undefined` in the query slot, so the key stayed in `state.params` and never printed. Deleting stage ② would have turned that into a silent regression with no correct spelling to migrate to and no test to catch it (the existing `navigateToDefault` coverage uses only UNDECLARED keys, which legitimately stay in `params`), so `Options.defaultSearch` shipped in the same commit as the spelling: resolved by the same `resolveOption` helper, static value or dependency-resolved callback like its siblings, and passed to `navigate` in the query slot. ⚠ Unlike a ROUTE's `defaultParams`, the router option is **not** refused at registration — `defaultRoute` and both default slots may be dependency-resolved callbacks, and the route they name need not exist yet — so a query key spelled there still surfaces at `navigateToDefault` time, through the seam's channel guard.
 
@@ -1015,5 +1019,7 @@ Guards receive `signal` as optional 3rd parameter for cooperative cancellation (
 - [packages/validation-plugin/CLAUDE.md](../validation-plugin/CLAUDE.md) — Validation plugin architecture and validator namespaces
 - [src/engine/CLAUDE.md](src/engine/CLAUDE.md) — Routing engine (merged route-tree + path-matcher + search-params, #1510)
 - [src/utils/fsm/CLAUDE.md](src/utils/fsm/CLAUDE.md) — FSM engine internals (lifecycle + navigation state machine)
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System design and package structure
+- [ARCHITECTURE.md](ARCHITECTURE.md) — this package's structure, pipeline wiring, subsystem boundaries
+- [INVARIANTS.md](INVARIANTS.md) — property-based invariants per entry point
+- [root ARCHITECTURE.md](../../ARCHITECTURE.md) — System design and package structure
 - [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) — Infrastructure decisions
