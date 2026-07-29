@@ -69,6 +69,45 @@ export interface CanonicalizeOptions {
  * can see them. `mergeWithDefault` also copies before freezing, so the caller's
  * own bag is never frozen out from under it.
  */
+/**
+ * The undeclared-key diagnostic (#1579 — the params half of #1553), lifted out of
+ * {@link canonicalize} so the fast path (#1589) fits the cognitive-complexity
+ * budget beside it.
+ *
+ * BOTH diagnostics presuppose that the route EXISTS — they answer "does route X
+ * declare this key?", and for a route that is not a route the honest answer is
+ * that the question does not apply (#1584). `queryNames` / `pathNames` answer
+ * `[]` for a real route with no declarations, so `[]` cannot say "no such route";
+ * `pathNames` carries the `undefined` arm that can. Reporting a nonexistent route
+ * blamed the params for a typo in the ROUTE name — the most misleading direction
+ * available — and burnt a de-dup slot per key, silencing the genuine warning if
+ * that name later became real. The committing producers still refuse the
+ * navigation on their own (`undefined` from `buildNavigationState`,
+ * `ROUTE_NOT_FOUND` from `navigate`); only the diagnostic was wrong.
+ *
+ * Called only when the sink is present, so bare core never reaches the
+ * `pathNames` lookup or the bag walk.
+ */
+function diagnoseUndeclaredKeys(
+  port: RouteResolver,
+  resolvedName: string,
+  pathBag: Params,
+  declaredQuery: readonly string[],
+  report: (routeName: string, key: string) => void,
+): void {
+  const declaredPath = port.pathNames(resolvedName);
+
+  if (declaredPath === undefined) {
+    return;
+  }
+
+  for (const key of Object.keys(pathBag)) {
+    if (!declaredQuery.includes(key) && !declaredPath.includes(key)) {
+      report(resolvedName, key);
+    }
+  }
+}
+
 export function canonicalize(
   port: RouteResolver,
   name: string,
@@ -118,39 +157,14 @@ export function canonicalize(
       ? port.reportUndeclaredParamKey
       : undefined;
 
-  // The mode gate's sink, resolved ONCE — the read IS the gate. The router
-  // implements this member as a GETTER returning `undefined` while no validator
-  // is installed (`wiring/wireNamespaces.ts`), so in bare core `dropSink` is
-  // genuinely absent and the drop path below skips the `pathNames` existence
-  // lookup entirely. Hoisting also keeps the getter from being re-invoked per
-  // dropped key. (It used to be wired as a plain closure — always truthy — so
-  // the check read as taken and bare core paid that lookup with no sink behind
-  // it; both sinks report their absence honestly now.)
-  const dropSink = port.reportDroppedQueryKey;
-
-  // BOTH diagnostics presuppose that the route EXISTS — they answer "does route
-  // X declare this key?", and for a route that is not a route the honest answer
-  // is that the question does not apply (#1584). `queryNames` / `pathNames`
-  // answer `[]` for a real route with no declarations, so `[]` cannot say "no
-  // such route"; `pathNames` carries the `undefined` arm that can. Each
-  // diagnostic reads it for itself, behind its own sink check, so bare core
-  // never pays the lookup and neither reader depends on the other's ordering.
   if (reportUndeclared) {
-    const declaredPath = port.pathNames(resolvedName);
-
-    if (declaredPath !== undefined) {
-      // Reporting a nonexistent route blamed the params for a typo in the ROUTE
-      // name — the most misleading direction available — and burnt a de-dup slot
-      // per key, silencing the genuine warning if that name later became real.
-      // The committing producers still refuse the navigation on their own
-      // (`undefined` from `buildNavigationState`, `ROUTE_NOT_FOUND` from
-      // `navigate`); only the diagnostic was wrong.
-      for (const key of Object.keys(pathBag)) {
-        if (!declaredQuery.includes(key) && !declaredPath.includes(key)) {
-          reportUndeclared(resolvedName, key);
-        }
-      }
-    }
+    diagnoseUndeclaredKeys(
+      port,
+      resolvedName,
+      pathBag,
+      declaredQuery,
+      reportUndeclared,
+    );
   }
 
   // The route's OWN defaults. Each slot IS its channel — no split (#1549 routed
@@ -162,10 +176,42 @@ export function canonicalize(
   // so nothing mis-channelled can reach this merge and there is nothing here to
   // repair. Splitting here used to be what made a config the router itself had
   // accepted survive its own always-on channel guard.
-  const routeDefaults = {
-    params: port.defaultParams(resolvedName),
-    search: port.defaultSearch(resolvedName),
-  };
+  // Two locals, not an object literal: this used to allocate a `{ params, search }`
+  // bag on EVERY call to read two fields twice (#1589).
+  const defaultPath = port.defaultParams(resolvedName);
+  const defaultQuery = port.defaultSearch(resolvedName);
+
+  // FAST PATH (#1589): nothing to merge and nothing to gate. A route with no
+  // defaults on either slot and no `?`-declaration cannot have a default applied,
+  // cannot have a slot withheld, and cannot have a key dropped by the mode gate —
+  // whatever the mode, `admittedSearch` would keep every key of a query channel
+  // that is empty anyway. So the whole tail below is provably identity, and this
+  // returns without it.
+  //
+  // This is the `buildPath/warm-static` case, and it was the most diagnostic
+  // number in the regression: a static route — no params, no query, no defaults —
+  // paid the full pass and came out 2.6x slower than before the pipeline.
+  //
+  // ⚠ The channels are still FROZEN here (canonicalize invariant #4): `pathBag`
+  // is `normalizeParams`' own fresh object, so it is frozen in place, and
+  // `EMPTY_SEARCH` is the shared frozen singleton.
+  if (
+    defaultPath === undefined &&
+    defaultQuery === undefined &&
+    declaredQuery.length === 0 &&
+    forwarded.search === undefined
+  ) {
+    // Annotated rather than asserted: the literal's inferred `query` type is the
+    // empty singleton's `Record<string, never>`, too narrow for `Canonical` to
+    // overlap, and an inline `as SearchParams` is redundant to the receiver.
+    const fastPath: { name: string; path: Params; query: SearchParams } = {
+      name: resolvedName,
+      path: Object.freeze(pathBag),
+      query: EMPTY_SEARCH,
+    };
+
+    return fastPath as Canonical;
+  }
 
   // ③ — route defaults UNDER the routed value, each channel independent. Read
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
@@ -190,16 +236,33 @@ export function canonicalize(
   // takes a default no caller was competing for — and left `buildPath` the only
   // producer out of agreement, printing an href this very route's `matchPath`
   // rewrote on the spot. That is the #1552/#1578 class, re-opened.
+  // The mode gate's sink, resolved ONCE — the read IS the gate. The router
+  // implements this member as a GETTER returning `undefined` while no validator
+  // is installed (`wiring/wireNamespaces.ts`), so in bare core `dropSink` is
+  // genuinely absent and the drop path below skips the `pathNames` existence
+  // lookup entirely. Hoisting also keeps the getter from being re-invoked per
+  // dropped key. (It used to be wired as a plain closure — always truthy — so
+  // the check read as taken and bare core paid that lookup with no sink behind
+  // it; both sinks report their absence honestly now.)
+  //
+  // Read BELOW the fast path (#1589): a route with nothing to gate cannot drop a
+  // key, so it has no use for the sink and should not pay the getter.
+  const dropSink = port.reportDroppedQueryKey;
+
   const queryDefaults =
     opts?.resolveForward === false
-      ? withholdFilledSlots(routeDefaults.search, pathBag, declaredQuery)
-      : routeDefaults.search;
+      ? withholdFilledSlots(defaultQuery, pathBag, declaredQuery)
+      : defaultQuery;
 
   const query = mergeWithDefault(queryDefaults, forwarded.search, EMPTY_SEARCH);
 
   return {
     name: resolvedName,
-    path: mergeWithDefault(routeDefaults.params, pathBag, EMPTY_PARAMS),
+    // `valueIsOwned` (#1589): `pathBag` is `normalizeParams`' own fresh object —
+    // never its input — so the merge freezes it in place instead of copying a bag
+    // that was already copied one line above. Only the PATH channel may say this;
+    // `forwarded.search` above comes from the caller or the seam.
+    path: mergeWithDefault(defaultPath, pathBag, EMPTY_PARAMS, true),
     // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
     // for an undeclared key is dropped with it — under `default`/`strict` that
     // config is dead by the same rule, not a back door around it. Runs on the

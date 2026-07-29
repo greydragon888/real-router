@@ -224,6 +224,12 @@ export function freezeStateInPlace<T extends State>(state: T): T {
  * that carries `undefined` behaves like no entry — so the frozen state never
  * exposes an `undefined`-valued own key on either channel.
  *
+ * `valueIsOwned` says the caller minted `value` itself and nothing else holds a
+ * reference — then the defensive copy is skipped and the bag is frozen in place
+ * (#1589). Only `canonicalize`'s PATH channel may pass it, because only there is
+ * the value the fresh object `normalizeParams` just returned. Passing it for a
+ * bag that came from user code would freeze the caller's object.
+ *
  * Lives here, not in a namespace, because the rule outlived its call count:
  * stage ③ (`applyDefaults`) had TWO callers when the pipeline landed
  * (`StateNamespace.makeState` and `pipeline/canonicalize`) and has ONE since
@@ -239,6 +245,7 @@ export function mergeWithDefault(
   defaultValue: Record<string, unknown> | undefined,
   value: Record<string, unknown> | undefined,
   empty: Readonly<Record<string, never>>,
+  valueIsOwned = false,
 ): Readonly<Record<string, unknown>> {
   if (defaultValue !== undefined) {
     return Object.freeze(mergeDefined(defaultValue, value));
@@ -246,6 +253,18 @@ export function mergeWithDefault(
 
   if (value === undefined || value === empty) {
     return empty;
+  }
+
+  // OWNED value: freeze in place. The copy below exists solely so the CALLER's
+  // bag is never frozen out from under it — when the bag was minted one line
+  // earlier by `normalizeParams` (which always returns a fresh object or the
+  // frozen `empty` singleton, never its input) there is no caller to protect,
+  // and `undefined` values are already stripped, so `mergeDefined`'s walk is
+  // redundant too. Measured on #1589: without this the path channel is copied
+  // TWICE per producer call — once to normalize, once to freeze — on `navigate`,
+  // `buildPath`, `matchPath`, `isActiveRoute` and `canNavigateTo` alike.
+  if (valueIsOwned) {
+    return Object.freeze(value);
   }
 
   // `mergeDefined` returns the argument itself when there is nothing to strip,
