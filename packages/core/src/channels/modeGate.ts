@@ -63,7 +63,7 @@ export function admittedSearch<S extends SearchParams>(
   // then-separate `makeState`. `materialize` deliberately does not, so an
   // unfrozen `admitted` reached `state.search` verbatim and broke "states are
   // deeply frozen" for exactly the states the gate had touched. Phase 4 folded
-  // `makeState` into `materialize`, so there is no re-merge left anywhere: this
-  // freeze is now the only one on the drop path.
+  // `makeState` onto `canonicalize` + `materialize`, so there is no re-merge
+  // left anywhere: this freeze is now the only one on the drop path.
   return Object.freeze(admitted ?? EMPTY_SEARCH) as S;
 }

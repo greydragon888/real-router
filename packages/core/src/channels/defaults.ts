@@ -45,8 +45,8 @@ export function withholdFilledSlots(
   let dropped = false;
 
   for (const [key, value] of Object.entries(defaults)) {
-    // `Object.hasOwn` before the read, exactly as {@link findMisChanneledKey}
-    // does two functions up and for the same reason: a bare `params[key]` walks
+    // `Object.hasOwn` before the read, exactly as `findMisChanneledKey` does in
+    // `./guard` and for the same reason: a bare `params[key]` walks
     // the PROTOTYPE, so a route declaring `?toString` / `?constructor` /
     // `?valueOf` read as "the caller already filled this slot" on an EMPTY bag.
     // The default was then withheld from every LITERAL-form producer while the
@@ -95,8 +95,8 @@ export function withholdFilledSlots(
  * PREPARED artifacts before any swap, with caches local to the attempt, because
  * checking against the live store would validate a tree the rejected batch has
  * not installed. `RoutesNamespace/helpers.assertRouteDefaultChannelsFor` is that
- * caller — a five-line adapter, so the four entry points do not each rebuild the
- * closure.
+ * caller — a small adapter holding the per-attempt caches, so the four entry
+ * points do not each rebuild the closure.
  */
 export function assertRouteDefaultChannels(
   defaultParams: Readonly<Record<string, Params>>,
