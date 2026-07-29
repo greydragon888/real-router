@@ -96,7 +96,7 @@ export function getPluginApi<
 
       return ctx.addEventListener(eventName, cb);
     },
-    buildNavigationState: (name, params = {}, search) => {
+    buildNavigationState: (name, params = {}, search = {}) => {
       throwOnMisChanneledKey(ctx, "buildNavigationState", name, params);
 
       ctx.validator?.routes.validateStateBuilderArgs(
