@@ -69,9 +69,10 @@ export interface RoutesStore<
   readonly urlParamsCache: Map<string, string[]>;
   /**
    * Per-route-name cache of declared query param names (`?a&b` across the
-   * route's segments), read by `RoutesNamespace.getQueryParams` (powers the
-   * defaultParams channel routing, #1549). Same lifecycle as `urlParamsCache`:
-   * cleared on every `matcher` rebuild.
+   * route's segments), read by `RoutesNamespace.getQueryParams` — THE registry
+   * every channel mechanism classifies through and the URL build prints from
+   * (#1556). Same lifecycle as `urlParamsCache`: cleared on every `matcher`
+   * rebuild.
    */
   readonly queryParamsCache: Map<string, string[]>;
   resolvedForwardMap: Record<string, string>;

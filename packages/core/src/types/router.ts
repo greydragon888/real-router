@@ -500,13 +500,18 @@ export interface Route<
    * defaults). Merged into `state.params`; missing path params are filled from
    * here. Query defaults belong in {@link defaultSearch} (RFC-4 M2 / #1548).
    *
-   * ⚠ The slot does NOT decide the channel — the route's `?`-declaration does
-   * (#1549). A name the route declares with `?` written here IS routed to the
-   * query string, exactly as a `forwardTo` hop's defaults are routed by the
-   * resolved target's declaration (#1570); `defaultSearch` is layered last and
-   * so outranks it, and the caller outranks both. Prefer `defaultSearch` for
-   * query defaults anyway: it says which channel you meant, and it does not
-   * depend on the route being the one that declares the name.
+   * ⚠ **The slot IS the channel** — `ba0f6b18b` retired the routing #1549
+   * introduced, and this doc described it for one release. A name the route
+   * declares with `?` written here is NOT re-routed to the query string: it is
+   * REFUSED at registration, so `createRouter` / `add` / `replace` / `update` /
+   * `setRootPath` throw, naming the key and telling you to move it to
+   * {@link defaultSearch}. Without that check the router would build a state out
+   * of config it had just accepted and its own always-on channel guard would
+   * reject it on `start()`.
+   *
+   * A key the route declares NOWHERE is legitimate here and stays in
+   * `state.params` as app-level data — it never reaches the URL, which
+   * `@real-router/validation-plugin` reports once per route+key (#1579).
    */
   defaultParams?: Params;
   /**

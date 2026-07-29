@@ -24,11 +24,12 @@ export interface CanonicalizeOptions {
    * (A.5: `buildPath("src")` stays `/src`, deliberately asymmetric with
    * `navigate`), `isActiveRoute`'s literal arm, and `makeState`.
    *
-   * ⚠ Skipping the seam also skips its channel separation, which is the POINT,
-   * not a side effect: a caller who rode a declared query key in the `params`
-   * bag no longer has it moved to the query channel, so the URL build prints
-   * from the query channel alone. That is what makes channel-correctness the
-   * producer's contract on these points.
+   * ⚠ The literal form also skips the seam's channel CHECK. The seam does not
+   * SEPARATE channels — stage ② was deleted (`ba0f6b18b`), so the resolving form
+   * REFUSES a mis-channelled bag while the literal form simply does not look.
+   * Either way nothing is moved: a caller who rides a declared query key in the
+   * `params` bag keeps it there, and the URL build prints from the query channel
+   * alone. That is what makes channel-correctness the producer's contract.
    */
   resolveForward?: boolean;
 
@@ -77,7 +78,7 @@ export function canonicalize(
 ): Canonical {
   // ① — forwardTo resolution + source-route default layering, through the
   // interceptor seam (plugins inject here). The literal form skips it entirely:
-  // no chain, no seam, no channel separation — the caller's bags stand as given.
+  // no chain, no seam, no channel check — the caller's bags stand as given.
   const forwarded =
     opts?.resolveForward === false
       ? { name, params, search }

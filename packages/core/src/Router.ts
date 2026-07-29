@@ -788,11 +788,12 @@ export class Router<
 
     // Resolution runs USER code and must not escape as an exception (#1577):
     // a dynamic `forwardTo` callback, a plugin's `forwardState` interceptor, and
-    // the caller's own bag (channel separation walks it with `Object.entries`,
-    // so an accessor-backed key throws here) all sit on this one call. The
+    // the caller's own bag (the merge walks it key by key, so an accessor-backed
+    // key throws here — the channel guard itself does NOT, it catches its own
+    // read) all sit on this one call. The
     // predicate is documented TOTAL — it answers, it never throws (INVARIANTS
     // canNavigateTo #5, #725) — and its sibling `isActiveRoute` has wrapped the
-    // very same primitive since #1573 (`RoutesNamespace.ts:611-626`). Leaving
+    // very same primitive since #1573 (`RoutesNamespace.ts:631-645`). Leaving
     // this one bare made the two render-path predicates disagree about what a
     // throwing resolution means.
     //
@@ -804,7 +805,7 @@ export class Router<
     // Phase 2, step 2-3). `canonicalize` reaches the same `forwardState` seam
     // this method used to call directly (`port.resolveForward` IS
     // `ctx.forwardState`), so the resolution, the interceptor zone and the
-    // channel separation on the seam are all unchanged — what the pipeline
+    // channel CHECK on the seam are all unchanged — what the pipeline
     // replaces is the hand-rolled composition that followed.
     let canonical;
 

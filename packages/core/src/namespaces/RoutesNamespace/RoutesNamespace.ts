@@ -235,16 +235,18 @@ export class RoutesNamespace<
       return typeof params.path === "string" ? params.path : "";
     }
 
-    // Stage ③ (route defaults under the caller's value, split by the channel the
-    // route declares — #1549) plus the mode gate (#1575), one pass through the
-    // pipeline (nav-pipeline Phase 2, step 2-1). The LITERAL form: `buildPath`
-    // does not follow `forwardTo` (A.5 — `buildPath("src")` stays `/src`, a
-    // deliberate asymmetry with `navigate`), so stage ① is skipped and the seam
-    // is never entered.
-    // ⚠ Skipping the seam also skips its channel separation, and THAT is what
-    // retires the v1 single-bag form here: a caller who rode a query key in the
-    // `params` bag no longer has it moved to the query channel, and the query
-    // string is printed from `canonical.query` alone. Before this step the
+    // Stage ③ (each channel's route default under the caller's value — the slot
+    // IS the channel, #1549 as `ba0f6b18b` left it) plus the mode gate (#1575),
+    // one pass through the pipeline (nav-pipeline Phase 2, step 2-1). The LITERAL
+    // form: `buildPath` does not follow `forwardTo` (A.5 — `buildPath("src")`
+    // stays `/src`, a deliberate asymmetry with `navigate`), so stage ① is
+    // skipped and the seam is never entered.
+    // ⚠ The v1 single-bag form is retired here, and skipping the seam is not what
+    // retires it: the seam stopped MOVING a mis-channelled key when stage ② was
+    // deleted (`ba0f6b18b`) — it refuses one now, on the resolving form. A caller
+    // who rides a declared query key in the `params` bag simply keeps it there,
+    // and the query string is printed from `canonical.query` alone. Before this
+    // step the
     // matcher's `search ?? params` fallback printed it out of the path bag, so
     // `buildPath` disagreed with `navigate` on the same intent — an undeclared
     // key in `loose` (`/t?foo=1` vs `/t`), the `/coll/:id?id` collision
@@ -257,7 +259,7 @@ export class RoutesNamespace<
     // Stage ⑤a stays LOCAL to this method rather than going through `buildURL`,
     // and this is structural, not a preference: `buildURL` prints via
     // `port.buildPath`, which IS the interceptable `ctx.buildPath` wrapping this
-    // very method (`Router.ts:322-325`) — routing through it would recurse. The
+    // very method (`Router.ts:349-359`) — routing through it would recurse. The
     // interceptor zone therefore stays exactly where it is (#1231:
     // `persistent-params` injects here), one layer above.
     // The route codec sees BOTH channels — `encodeParams({ params, search })` →
@@ -382,7 +384,7 @@ export class RoutesNamespace<
     // The canonical channels, ready for BOTH halves of the state: `canonical.path`
     // is path-only (the seam REFUSED any declared `?key` a plugin injection or a
     // decoder left in the params bag, and stage ③ layered the route's own
-    // defaults under it, split by the channel the route declares — #1549),
+    // defaults under it, each slot in its own channel — #1549),
     // `canonical.query` is the full canonical query with the mode gate already
     // applied (#1575). Both are read from ONE object, so the
     // rebuilt `state.path` and the committed `state.search` cannot derive from
@@ -447,12 +449,13 @@ export class RoutesNamespace<
   }
 
   /**
-   * Applies forwardTo and returns resolved state with merged defaultParams.
+   * Applies `forwardTo` and returns the resolved name with the CHAIN's defaults
+   * layered under the caller's channels.
    *
-   * Merges params in order:
-   * 1. Source route defaultParams
-   * 2. Provided params
-   * 3. Target route defaultParams (after resolving forwardTo)
+   * Order, per channel: every forwarding HOP's defaults (the earliest hop wins),
+   * then the caller's value on top. The TARGET route's own defaults are
+   * deliberately NOT part of it — the body says why they cannot be, and the
+   * summary used to list them as step 3 while the very next comment denied it.
    */
   forwardState<
     P extends Params = Params,
@@ -463,8 +466,9 @@ export class RoutesNamespace<
     search?: S,
   ): { name: string; params: P; search: S } {
     // TARGET-route defaults are NOT applied here for EITHER channel — they are
-    // merged strictly BELOW the user channels at the terminal points only
-    // (`makeState` for state, `matchPath` / `buildPath` for the URL). Folding a
+    // merged strictly BELOW the user channels at the pipeline's single terminal
+    // (`canonicalize`, reached alike by `makeState`, `matchPath` and
+    // `buildPath`). Folding a
     // target default into this result would ride ABOVE a user params-twin at the
     // terminal merge, inverting the priority — a
     // `navigate(x, { page: 2 })` on a `?page` route with `defaultSearch{page:1}`
@@ -474,11 +478,12 @@ export class RoutesNamespace<
     // The ONE default forwardState still merges is the forwardTo CHAIN's own
     // defaults (`#layerChainDefaults` in the forward branches): when `a` forwards
     // to `b`, `a`'s `defaultParams` fill in before the redirect and flow to `b`.
-    // This canNOT move to a terminal point — `makeState`/`buildPath` see only the
-    // RESOLVED target `b` and cannot reconstruct source `a`'s defaults. A hop can
-    // only SPELL such a default in `defaultParams` (its single slot), but the
-    // CHANNEL is the target's: a key the target declares with `?` is layered
-    // under `search`, everything else under `params` (#1570). Frozen empty search
+    // This canNOT move to the terminal — `canonicalize` sees only the RESOLVED
+    // target `b` and cannot reconstruct source `a`'s defaults. Each of a hop's
+    // slots keeps its own channel (`defaultParams` the path, `defaultSearch` the
+    // query) whatever the target declares; `ba0f6b18b` retired #1570's routing by
+    // the target's declaration, and a hop default naming a key the TARGET
+    // declares with `?` is refused at the seam instead. Frozen empty search
     // singleton when absent.
     const resolvedSearch = (search ?? EMPTY_SEARCH) as S;
 
@@ -535,9 +540,17 @@ export class RoutesNamespace<
   }
 
   /**
-   * Builds a RouteTreeState from already-resolved route name and params.
-   * Called by getPluginApi().buildNavigationState after the interceptable
-   * forwardState resolved the target — so plugins can intercept forwardState.
+   * Builds a RouteTreeState from an already-resolved route name and params.
+   *
+   * ⚠ Its ONE caller — `getPluginApi().buildNavigationState` — uses it as an
+   * EXISTENCE probe and discards the object (`if (!ctx.buildStateResolved(…))
+   * return;`). Since Phase 2 that entry point materialises its state from the
+   * `Canonical`, so what this returns is built and dropped; what the caller
+   * needs is the `undefined` arm, placed BEFORE `buildURL` because the matcher
+   * throws on an unknown route while that entry point must answer `undefined`.
+   * Whether this should therefore collapse into a `hasRoute`-shaped predicate is
+   * an open question, not a settled design — the same dead-surface shape
+   * coverage surfaced for `skipFreeze` in Phase 4.
    */
   buildStateResolved(
     resolvedName: string,
@@ -553,9 +566,10 @@ export class RoutesNamespace<
     const meta = this.#store.matcher.getMetaByName(resolvedName)!;
 
     return createRouteState(
-      // forwardState already separated the channels upstream (#1548/#1549), so
-      // `resolvedParams` is path-only; this RouteTreeState carries the path
-      // channel only — the query is threaded separately by the caller (makeState).
+      // `resolvedParams` is path-only by the PRODUCER's contract, not by a repair
+      // upstream: the seam refuses a declared `?key` in the params bag rather
+      // than moving one out (stage ② is gone — `ba0f6b18b`). The `search: {}`
+      // placeholder threads nowhere; the caller discards this object.
       { segments, params: resolvedParams, search: {}, meta },
       resolvedName,
     );
@@ -571,7 +585,7 @@ export class RoutesNamespace<
    * Two arms, `literal || destination` (#1573). The literal arm is the whole
    * predicate below, unchanged. The destination arm repeats THAT SAME predicate
    * on the full output of stage ① — the resolved terminal name together with
-   * the forwarding chain's defaults layered into the TARGET's channels — so a
+   * the forwarding chain's defaults, each hop's slot in its own channel — so a
    * `<Link to="alias">` reads active on the page it actually navigates to.
    *
    * It is a FALLBACK, never a pre-resolution: resolving before comparing would
@@ -582,8 +596,8 @@ export class RoutesNamespace<
    * because the chain's `defaultParams` live on the forwarding SOURCE and are
    * layered by `forwardState` (#1566/#1570) — never by the forward map — and a
    * dynamic `forwardTo` is not in that map at all. Name substitution therefore
-   * fixes neither, and it also carries no `search`, which is where ① routes a
-   * hop default whose key the target declares with `?`.
+   * fixes neither, and it also carries no `search`, which is the channel a hop's
+   * own `defaultSearch` lands in.
    */
   isActiveRoute(
     name: string,
@@ -661,8 +675,12 @@ export class RoutesNamespace<
   /**
    * Declared query param names of a route (`?a&b` across its segments,
    * ancestors included) that are NOT also path params — the query-channel twin
-   * of {@link getUrlParams}, powering the defaultParams channel routing
-   * (#1549). A colliding name (`/items/:id?id` — legal under M2, the channels
+   * of {@link getUrlParams}. THE registry (#1556): the always-on channel guard,
+   * the literal form's default withholding and the mode gate all classify
+   * through it, and the URL build prints from it. (It powered the `defaultParams`
+   * channel ROUTING too, until `ba0f6b18b` retired that — the slot is the channel
+   * now, so nothing is routed anywhere.) A colliding name (`/items/:id?id` —
+   * legal under M2, the channels
    * coexist) is path-owned for routing purposes: excluding it here keeps the
    * path slot's value in `state.params` and the rebuild's #843 precedence
    * intact. Same cache lifecycle: cleared on every matcher rebuild.
@@ -705,11 +723,11 @@ export class RoutesNamespace<
    * channel-by-channel `paramsMatch` — so an accessor-backed key, a `Proxy` or a
    * framework's reactive object throws HERE, on the render path. (It used to be
    * the exact branch's own channel split and the descendant branch's spread into
-   * one bag; step 2-5 removed both, the exposure is unchanged.) The
-   * predicate's stated
-   * policy is that it answers and never throws from inside a render (see the
-   * `forwardState` wrap below), and #1573 implemented that for the destination
-   * arm only. One boundary around the whole walk rather than a `try` per read —
+   * one bag; step 2-5 removed both, the exposure is unchanged.) The predicate's
+   * stated policy is that it answers and never throws from inside a render (see
+   * the `forwardState` wrap below), and #1573 implemented that for the
+   * destination arm only. One boundary around the whole walk rather than a
+   * `try` per read —
    * the same shape `isParams` took for the same class of hostile input (#1052).
    */
   #matchesActiveState(
@@ -806,7 +824,7 @@ export class RoutesNamespace<
     // Hierarchical check: activeState is a descendant of target (name). Compared
     // CHANNEL BY CHANNEL (step 2-5) instead of over one recombined bag: the
     // canonical target already carries the route's defaults, each merged under
-    // the caller's value in the channel the route DECLARES it in (#1549), so the
+    // the caller's value in the channel its own SLOT names (#1549), so the
     // separate `paramsMatchExcluding` passes over `defaultParams` /
     // `defaultSearch` are no longer needed — a default that survived into
     // `canonical` is exactly a default the caller did not override.
@@ -855,18 +873,15 @@ export class RoutesNamespace<
    * so a default declared on an intermediate hop never reached the target and
    * a required slot was left empty (#1566).
    *
-   * The hops are folded ALONE, then split by the TARGET's declaration (#1570).
-   * A hop can only write `defaultParams` — that is the single slot it has — but
-   * the CHANNEL belongs to the resolved target: when the target declares the key
-   * with `?`, the value is a query value that happened to be spelled in a path
-   * slot upstream. ⛔ **That routing is GONE.** The slot is the channel: a hop's
-   * `defaultParams` is the path channel and its `defaultSearch` the query
-   * channel, whatever the resolved target declares. The old argument — "a hop
-   * can only spell a default in `defaultParams`" — was false the moment this
-   * fold started reading `defaultSearch`, and the routing left a hop author
-   * unable to predict their own config's channel behind a dynamic `forwardTo`.
-   * A hop's `defaultParams` naming a key the TARGET declares with `?` is refused
-   * at the `forwardState` seam, where the target is finally known.
+   * Each slot IS its channel: a hop's `defaultParams` is the path channel and
+   * its `defaultSearch` the query channel, whatever the resolved target
+   * declares. A hop's `defaultParams` naming a key the TARGET declares with `?`
+   * is refused at the `forwardState` seam, where the target is finally known.
+   *
+   * (#1570 routed this fold by the target's declaration for one release;
+   * `ba0f6b18b` retired that with the rest of stage ②. The body below records
+   * why — it is not repeated here, and the retired rule is not restated in the
+   * present tense above it.)
    */
   #layerChainDefaults<
     P extends Params = Params,
