@@ -392,7 +392,18 @@ export async function run(): Promise<void> {
     {
       name: "withDefaults",
       path: "/wd/:id?tab",
-      defaultParams: { tab: "overview" },
+      // `tab` is `?`-declared, so it is a QUERY default — RFC-4 M2 / #1548, where
+      // the slot became the channel. Spelling it in `defaultParams` is refused at
+      // registration now (`assertRouteDefaultChannels`), which is exactly how this
+      // suite died in CI: `createRouter` threw before a single benchmark ran, so
+      // CodSpeed reported all 122 core benchmarks as "skipped" and silently reused
+      // the master baseline.
+      // The bench NAME below (`buildPath/warm-defaultParams`) deliberately keeps
+      // its old identity: renaming archives the series on CodSpeed and starts a new
+      // one, which costs the entire history to buy nothing measurable — what the
+      // benchmark measures (a route default merged under the caller's value on the
+      // way to a URL) is unchanged.
+      defaultSearch: { tab: "overview" },
     },
     {
       name: "encoded",
@@ -714,9 +725,15 @@ export async function run(): Promise<void> {
       routes: [
         { name: "home", path: "/" },
         {
+          // Same migration as `withDefaults` above, and the reason the scan
+          // mattered: this one sits 320 lines later, so fixing only the first
+          // would have moved the crash rather than removed it. `sort` / `page`
+          // are both `?`-declared → query defaults. The measured shape is
+          // unchanged — the URL supplies `sort=desc` (caller wins) and `page`
+          // comes from the default, exactly as before.
           name: "users",
           path: "/users?sort&page",
-          defaultParams: { sort: "asc", page: "1" },
+          defaultSearch: { sort: "asc", page: "1" },
         },
       ],
       start: "/",
