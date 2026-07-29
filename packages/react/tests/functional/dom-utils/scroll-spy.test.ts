@@ -314,6 +314,58 @@ describe("createScrollSpy", () => {
     });
   });
 
+  describe("query channel (RFC-4 M2 / #1548)", () => {
+    it("preserves the committed query when it emits the hash transition", async () => {
+      // The spy re-navigates to the SAME route to move the hash. Handing only
+      // `state.params` drops the query channel, so a user merely SCROLLING a
+      // page at `/docs?tab=api` had the URL rewritten to `/docs`.
+      const router = createRouter([
+        { name: "home", path: "/" },
+        { name: "docs", path: "/docs?tab" },
+      ]);
+
+      router.usePlugin(urlContextPluginFactory);
+      await router.start("/docs?tab=api");
+
+      const [s1] = setupAnchors(["section-1", "section-2"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      flushTimersAndRaf();
+      await Promise.resolve();
+
+      expect(router.getState()?.search).toStrictEqual({ tab: "api" });
+      expect(router.getState()?.path).toBe("/docs?tab=api");
+
+      router.stop();
+    });
+
+    it("passes the query channel through the third slot, not the options slot", async () => {
+      const router = createRouter([
+        { name: "home", path: "/" },
+        { name: "docs", path: "/docs?tab" },
+      ]);
+
+      router.usePlugin(urlContextPluginFactory);
+      await router.start("/docs?tab=api");
+
+      const navigateSpy = vi.spyOn(router, "navigate");
+      const [s1] = setupAnchors(["section-1", "section-2"]);
+
+      track(createScrollSpy(router, { selector: "[id]" }));
+      ioInstances[0].trigger([buildEntry(s1, 50)]);
+      flushTimersAndRaf();
+
+      // Slot 3 is the query channel, slot 4 the options — the M2 shift.
+      expect(navigateSpy.mock.calls[0]?.[2]).toStrictEqual({ tab: "api" });
+      expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
+        hash: "section-1",
+      });
+
+      router.stop();
+    });
+  });
+
   describe("basic intersection flow", () => {
     it("emits forced same-route transition with hash/replace/force/hashChange on intersection", async () => {
       const router = await createTestRouter();
