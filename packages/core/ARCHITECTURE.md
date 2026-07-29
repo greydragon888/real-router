@@ -479,7 +479,7 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Stress Test Coverage
 
-153 stress tests across 32 `*.stress.ts` files in `tests/stress/` validate behavior under extreme conditions (file count checked against disk; the test count is the last recorded run — `pnpm -F @real-router/core test:stress` is the authority). The suite spans these categories (see `tests/stress/` for the current file set — per-category counts drift, so they are not enumerated here):
+153 stress tests across 47 files in `tests/stress/` validate behavior under extreme conditions (both numbers from a `pnpm -F @real-router/core test:stress` run, which is the authority — an earlier revision of this line said "32 `*.stress.ts` files", the count of top-level files matching that glob, which is neither what the runner loads nor what it reports). The suite spans these categories (see `tests/stress/` for the current file set — per-category counts drift, so they are not enumerated here):
 
 | Category              | What they verify                                                            |
 | --------------------- | --------------------------------------------------------------------------- |
