@@ -12,7 +12,12 @@ import {
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
-import { createMockedBrowser, routerConfig, noop } from "../helpers/testUtils";
+import {
+  createMockedBrowser,
+  queryRouterConfig,
+  routerConfig,
+  noop,
+} from "../helpers/testUtils";
 
 import type { Browser } from "../../src/browser-env";
 import type { Router, State, Unsubscribe } from "@real-router/core";
@@ -217,6 +222,62 @@ describe("Browser Plugin — Popstate", () => {
       expect(replaceSpy).toHaveBeenCalledWith(
         previousState,
         expect.stringContaining(previousState.path),
+      );
+
+      guardedRouter.stop();
+    });
+
+    it("rollback URL keeps both the query channel and the fragment (#1586)", async () => {
+      // `rollbackUrlToCurrentState` rebuilds the visible URL from the state
+      // that survived the rejection. Two channels used to go missing at once,
+      // and for one reason: the deps type still described the pre-#1548
+      // three-argument `buildUrl(name, params, options)`, while the injected
+      // `createPluginBuildUrl` is `(name, params, search, options)`. So the
+      // `{ hash }` object landed in the SEARCH slot — dropping the real query
+      // AND leaving `options` undefined, which silently defeats the very hash
+      // preservation the call site's own #532 comment promises. `{ hash }` is
+      // structurally a `SearchParams`, so nothing complained.
+      router.stop();
+
+      const guardedRouter = createRouter(queryRouterConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+
+      guardedRouter.usePlugin(
+        browserPluginFactory({ forceDeactivate: false }, mockedBrowser),
+      );
+      await guardedRouter.start();
+      await guardedRouter.navigate(
+        "users.list",
+        {},
+        { tab: "a", sort: "z" },
+        { hash: "anchor" },
+      );
+
+      const previousState = guardedRouter.getState()!;
+
+      expect(previousState.path).toBe("/users/list?tab=a&sort=z");
+
+      getLifecycleApi(guardedRouter).addDeactivateGuard(
+        "users.list",
+        () => () => false,
+      );
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: { name: "home", params: {}, search: {}, path: "/home" },
+        }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(guardedRouter.getState()).toStrictEqual(previousState);
+      expect(replaceSpy).toHaveBeenCalledWith(
+        previousState,
+        "/users/list?tab=a&sort=z#anchor",
       );
 
       guardedRouter.stop();

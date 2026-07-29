@@ -3,7 +3,12 @@ import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
 import { getRouteFromEvent } from "./popstate-utils.js";
 
 import type { Browser, SharedFactoryState } from "./types.js";
-import type { Params, Plugin, Router } from "@real-router/core";
+import type {
+  Params,
+  Plugin,
+  Router,
+  SearchParams,
+} from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
@@ -25,9 +30,20 @@ export interface PopstateHandlerDeps {
   allowNotFound: boolean;
   transitionOptions: PopstateTransitionOptions;
   loggerContext: string;
+  /**
+   * The plugin's `createPluginBuildUrl`. The `search` slot is NOT optional
+   * decoration: this type used to describe the pre-#1548 three-argument form
+   * while the injected implementation had already shifted to
+   * `(name, params, search, options)`. `{ hash }` is structurally a
+   * `SearchParams`, so the narrower type accepted the call, silently landed the
+   * fragment in the query slot and left `options` undefined — losing BOTH the
+   * query and the hash on rollback (#1586). Keep the arity in step with
+   * `createPluginBuildUrl`.
+   */
   buildUrl: (
     name: string,
     params?: Params,
+    search?: SearchParams,
     options?: { hash?: string },
   ) => string;
   /**
@@ -118,6 +134,7 @@ export function createPopstateHandler(
     const url = deps.buildUrl(
       currentState.name,
       currentState.params,
+      currentState.search,
       ctxHash ? { hash: ctxHash } : undefined,
     );
 

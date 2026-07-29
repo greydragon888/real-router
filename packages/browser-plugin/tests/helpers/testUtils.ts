@@ -18,6 +18,26 @@ export const routerConfig = [
   { name: "index", path: "/" },
 ];
 
+/**
+ * `routerConfig` with a query channel declared on `users.list` (#1586).
+ *
+ * The popstate rollback lost the query for as long as it did because no
+ * fixture in this package declared a `?` name — every rollback assertion
+ * compared a bare path against a bare path and passed on the bug.
+ */
+export const queryRouterConfig = [
+  {
+    name: "users",
+    path: "/users",
+    children: [
+      { name: "view", path: "/view/:id" },
+      { name: "list", path: "/list?tab&sort" },
+    ],
+  },
+  { name: "home", path: "/home" },
+  { name: "index", path: "/" },
+];
+
 export const withoutMeta = (
   state: State,
 ): {

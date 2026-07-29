@@ -179,6 +179,47 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       restrictedRouter.stop();
     });
 
+    it("rolls back to a URL that keeps the query channel (#1586)", async () => {
+      // Same rollback, one channel further: the shared `rollbackUrlToCurrentState`
+      // rebuilt the URL from `name` + `params` only, so a state sitting on
+      // `?page=2&sort=asc` came back as the bare route. The assertion above
+      // cannot see it — it builds its expectation with the SAME omission, which
+      // is a tautology for as long as both sides drop the same channel.
+      router.stop();
+
+      const restrictedRouter = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+        allowNotFound: false,
+      });
+
+      restrictedRouter.usePlugin(hashPluginFactory({}, mockedBrowser));
+      await restrictedRouter.start();
+      await restrictedRouter.navigate(
+        "users.list",
+        {},
+        { page: "2", sort: "asc" },
+      );
+
+      const previousState = restrictedRouter.getState()!;
+
+      expect(previousState.path).toBe("/users/list?page=2&sort=asc");
+
+      const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+      globalThis.history.replaceState({}, "", "/#/nonexistent");
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(restrictedRouter.getState()).toStrictEqual(previousState);
+      expect(replaceSpy.mock.calls.at(-1)?.[1]).toBe(
+        "#/users/list?page=2&sort=asc",
+      );
+
+      restrictedRouter.stop();
+    });
+
     it("skips transition for equal states (RouterError is silenced)", async () => {
       const subscribeSpy = vi.fn();
 
