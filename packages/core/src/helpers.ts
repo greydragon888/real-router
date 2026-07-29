@@ -59,10 +59,13 @@ export function withholdFilledSlots(
     // does two functions up and for the same reason: a bare `params[key]` walks
     // the PROTOTYPE, so a route declaring `?toString` / `?constructor` /
     // `?valueOf` read as "the caller already filled this slot" on an EMPTY bag.
-    // The default was then withheld from `buildPath` and `isActiveRoute`'s
-    // literal arm while `navigate` / `makeState` still applied it — `buildPath`
-    // alone out of agreement, printing an href its own `matchPath` does not
-    // reproduce, which is the #1552/#1578 class this very rule exists to close.
+    // The default was then withheld from every LITERAL-form producer while the
+    // resolving form still applied it — `buildPath` out of agreement with
+    // `navigate`, printing an href its own `matchPath` does not reproduce, which
+    // is the #1552/#1578 class this very rule exists to close. (`makeState`
+    // joined the literal form in Phase 4, so it withholds too; the shape stayed
+    // unreachable there because `PluginApi.makeState`'s P1 guard refuses the
+    // triggering bag on the same predicate.)
     if (
       Object.hasOwn(params, key) &&
       params[key] !== undefined &&
@@ -143,12 +146,6 @@ export function findMisChanneledKey(
 }
 
 /**
- * The guard's actionable message. One builder for every position, so the
- * wording a user sees does not depend on which door they came through.
- *
- * @internal
- */
-/**
  * THE centralized channel check — the single place a mis-channelled bag is
  * refused, wherever it came from.
  *
@@ -191,6 +188,15 @@ export function assertChannelCorrect(
   }
 }
 
+/**
+ * The guard's actionable message. One builder for every position, so the
+ * wording a user sees does not depend on which door they came through — the
+ * facade's `TypeError`, the seam's, the decoder's, and `navigateToState`'s
+ * `RouterError(WRONG_CHANNEL)`, which needs the wording WITHOUT the throw and is
+ * why this is a separate function from {@link assertChannelCorrect}.
+ *
+ * @internal
+ */
 export function misChanneledKeyMessage(
   routeName: string,
   key: string,
@@ -420,10 +426,13 @@ export function freezeStateInPlace<T extends State>(state: T): T {
  * that carries `undefined` behaves like no entry — so the frozen state never
  * exposes an `undefined`-valued own key on either channel.
  *
- * Lives here, not in a namespace, because stage ③ (`applyDefaults`) has TWO
- * callers since the pipeline landed — `StateNamespace.makeState` and
- * `pipeline/canonicalize` — and a second copy of "default under value" would be
- * a second source of truth for the rule, the same drift trap #1550/#1551 closed
+ * Lives here, not in a namespace, because the rule outlived its call count:
+ * stage ③ (`applyDefaults`) had TWO callers when the pipeline landed
+ * (`StateNamespace.makeState` and `pipeline/canonicalize`) and has ONE since
+ * Phase 4 folded the first onto the second — but the chain fold in
+ * `RoutesNamespace` still layers hop defaults through `mergeDefined` directly,
+ * so a second copy of "default under value" would be a second source of truth
+ * for the rule, the same drift trap #1550/#1551 closed
  * by collapsing the four merge sites onto `mergeDefined`.
  *
  * @internal
@@ -449,8 +458,12 @@ export function mergeWithDefault(
 }
 
 /**
- * THE shape of a router State — one constructor for both producers
- * (`StateNamespace.makeState` and `pipeline/materialize`). Channels arrive
+ * THE shape of a router State. It had two producers when it was written
+ * (`StateNamespace.makeState` and `pipeline/materialize`) and has ONE since
+ * Phase 4 folded `makeState` onto the pipeline — kept as a named function
+ * because the state SHAPE belongs beside `freezeStateInPlace` and
+ * `DEFAULT_TRANSITION`, not inside ⑤b. ⚠ If a second producer never returns,
+ * inlining it into `materialize` is the honest simplification. Channels arrive
  * already merged and frozen (`mergeWithDefault`); `path` arrives already built.
  *
  * `skipFreeze` governs the freeze of the STATE OBJECT only — never the channels.
@@ -514,9 +527,9 @@ export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
  *   engine behavior for regression detection)
  *
  * Single pass. When nothing survives (empty input, or every value `undefined`)
- * it returns the shared frozen `EMPTY_PARAMS` singleton, so `makeState`'s
- * `params === EMPTY_PARAMS` reuse branch fires and an empty-params navigation
- * allocates zero transient `{}` (#1027); a non-empty input returns a fresh
+ * it returns the shared frozen `EMPTY_PARAMS` singleton, so the merge's
+ * `value === empty` reuse branch (`mergeWithDefault`) fires and an empty-params
+ * navigation allocates zero transient `{}` (#1027); a non-empty input returns a fresh
  * object. Either way reference identity is not preserved across calls, and the
  * result MUST be treated as read-only — callers must not mutate it (the empty
  * case is a shared frozen singleton).
@@ -550,8 +563,8 @@ export function normalizeParams(
     }
   }
 
-  // Reuse the shared singleton when nothing survived so makeState's
-  // `params === EMPTY_PARAMS` reuse branch fires (#1027).
+  // Reuse the shared singleton when nothing survived so the merge's
+  // `value === empty` reuse branch fires (#1027).
   return normalized ?? EMPTY_PARAMS;
 }
 
@@ -610,9 +623,11 @@ export function admittedSearch<S extends SearchParams>(
   // Frozen, because this is the ONLY branch that hands back a bag the caller did
   // not already freeze: `search` arrives frozen from `mergeWithDefault`, and the
   // no-drop branch returns it untouched. Before nav-pipeline Phase 2 the gap was
-  // invisible — every consumer re-merged (and re-froze) downstream in
-  // `makeState`. `materialize` deliberately does not, so an unfrozen `admitted`
-  // reached `state.search` verbatim and broke "states are deeply frozen" for
-  // exactly the states the gate had touched.
+  // invisible — every consumer re-merged (and re-froze) downstream in the
+  // then-separate `makeState`. `materialize` deliberately does not, so an
+  // unfrozen `admitted` reached `state.search` verbatim and broke "states are
+  // deeply frozen" for exactly the states the gate had touched. Phase 4 folded
+  // `makeState` into `materialize`, so there is no re-merge left anywhere: this
+  // freeze is now the only one on the drop path.
   return Object.freeze(admitted ?? EMPTY_SEARCH) as S;
 }
