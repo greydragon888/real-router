@@ -21,7 +21,8 @@ core/
 │   ├── constants.ts                 — Error codes, events, limits
 │   ├── internals.ts                 — WeakMap registry for API functions
 │   ├── transitionPath.ts            — Transition path calculation (reads route param-source meta via a RouteMetaLookup callback → getMetaForState, #1548)
-│   ├── helpers.ts                   — Utility functions
+│   ├── helpers.ts                   — Merge, comparison and state-freeze semantics
+│   ├── limits.ts                    — createLimits() (per-router handler/listener caps)
 │   ├── guards.ts                    — Input guards (deps, routes) + logger-config assertion
 │   ├── routerFSM.ts                 — Router FSM config (states, events, payloads)
 │   ├── validation.ts                — @real-router/core/validation subpath (plugin's door to the engine, #1301)
@@ -29,7 +30,9 @@ core/
 │   │
 │   ├── engine/                      — Merged routing engine: route-tree + path-matcher + search-params layers (#1510)
 │   │
-│   ├── pipeline/                    — Navigation delivery: canonicalize → buildURL / materialize over the opaque `Canonical` (RFC nav-pipeline, milestone 1)
+│   ├── pipeline/                    — Navigation delivery: canonicalize → buildURL / materialize over the opaque `Canonical` (RFC nav-pipeline, all four phases closed)
+│   │
+│   ├── channels/                    — Channel correctness: the always-on guard + the registration check + the mode gate (one rule, one place)
 │   │
 │   ├── namespaces/
 │   │   ├── RoutesNamespace/         — Route tree, path operations, forwarding
@@ -199,14 +202,18 @@ fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
 "Navigation intent → committed State + URL" is owned by one module of three primitives over one opaque type, rather than re-composed at each entry point:
 
 ```ts
-canonicalize(port, name, params, search) // ① forwardTo resolution + ③ route defaults → Canonical
-buildURL(canonical, port)                // ⑤a — the URL of that intent
-materialize(canonical, opts)             // ⑤b — the State of that intent
+canonicalize(port, name, params, search?, opts?) // ① forwardTo resolution + ③ route defaults → Canonical
+buildURL(canonical, port)                        // ⑤a — the URL of that intent
+materialize(canonical, opts)                     // ⑤b — the State of that intent
 ```
+
+`opts.resolveForward: false` selects the LITERAL form — the route the caller NAMED, no chain, no seam — taken by `buildPath`, `isActiveRoute`'s literal arm and `makeState`.
 
 `Canonical` carries a `unique symbol` brand that is never exported, so it cannot be fabricated outside `canonicalize` — "build a URL or a State out of un-defaulted channels" is unrepresentable, not merely discouraged. The module reaches the routes layer through a narrow port (`RouteResolver`), implemented by the router at wiring time.
 
-**Milestone 1 wiring (deliberate, measured).** The port's `resolveForward` is the interceptable `forwardState` **seam** — so channel separation stays in the port implementation, never inside the pipeline — and its `buildPath` is the interceptable `ctx.buildPath`, because one `navigate()` runs both interceptors today. `navigate()` is the only entry point on the pipeline so far; the remaining seven migrate one per commit.
+**Port wiring (deliberate, measured — unchanged by any of the four phases).** The port's `resolveForward` is the interceptable `forwardState` **seam**, so the seam's channel CHECK stays in the port implementation and never inside the pipeline; its `buildPath` is the interceptable `ctx.buildPath`, because one `navigate()` runs both interceptors and reaching for the engine's matcher would silently drop `persistent-params`' `buildPath` interceptor.
+
+**Coverage.** Every producer of a URL or a State is on the pipeline: `navigate` (milestone 1), then `matchPath` / `canNavigateTo` / `buildNavigationState` / `buildPath` / `isActiveRoute` (Phase 2, one per commit), then `makeState` (Phase 4) — which is not a second terminal beside `canonicalize` but its literal form. The one deliberate exception is `navigateToNotFound`: it wraps a URL string rather than building a state from an intent, so it has no channels to canonicalise.
 
 ### navigate() Flow
 
@@ -435,6 +442,11 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 - `DependenciesStore` is a plain data interface — no class, no methods that call other namespaces
 - Structural guards remain in namespace folders (`OptionsNamespace`, `PluginsNamespace`). DX validators live in `@real-router/validation-plugin`, accessed via `ctx.validator?.`
 
+### Subsystem Rules (`src/channels`, `src/pipeline`)
+
+- `src/channels` **never** imports a namespace, the engine or the pipeline. Declared query names arrive as DATA (`readonly string[]`, or a `queryNamesOf` accessor), so the one registry that classifies and prints (#1556) cannot grow a second derivation. **Lint-enforced** — `eslint.config.mjs` fails the import with that reason
+- `src/pipeline` reaches the routes layer only through its `RouteResolver` port, implemented by the router at wiring time. Same inversion, same reason: the module stays pure and mock-testable
+
 ### Facade Rules
 
 - Facade **never** contains business logic — only validation + delegation
@@ -467,7 +479,7 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Stress Test Coverage
 
-115 stress tests across 34 `*.stress.ts` files in `tests/stress/` validate behavior under extreme conditions. The suite spans these categories (see `tests/stress/` for the current file set — per-category counts drift, so they are not enumerated here):
+153 stress tests across 32 `*.stress.ts` files in `tests/stress/` validate behavior under extreme conditions (file count checked against disk; the test count is the last recorded run — `pnpm -F @real-router/core test:stress` is the authority). The suite spans these categories (see `tests/stress/` for the current file set — per-category counts drift, so they are not enumerated here):
 
 | Category              | What they verify                                                            |
 | --------------------- | --------------------------------------------------------------------------- |
