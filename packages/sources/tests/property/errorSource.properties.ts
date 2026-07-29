@@ -7,6 +7,7 @@ import {
   arbDestroyCount,
   createStartedRouter,
   NUM_RUNS,
+  channelsForRoute,
   paramsForRoute,
 } from "./helpers";
 import { createErrorSource } from "../../src";
@@ -38,7 +39,9 @@ describe("createErrorSource — version monotonicity", () => {
       let previousVersion = source.getSnapshot().version;
 
       for (const route of routes) {
-        await router.navigate(route, paramsForRoute(route)).catch(() => {});
+        await router
+          .navigate(route, ...channelsForRoute(route))
+          .catch(() => {});
 
         const currentVersion = source.getSnapshot().version;
 
@@ -68,7 +71,9 @@ describe("createErrorSource — version monotonicity", () => {
       const versions: number[] = [source.getSnapshot().version];
 
       for (const route of routes) {
-        await router.navigate(route, paramsForRoute(route)).catch(() => {});
+        await router
+          .navigate(route, ...channelsForRoute(route))
+          .catch(() => {});
         versions.push(source.getSnapshot().version);
       }
 
@@ -97,12 +102,12 @@ describe("createErrorSource — error cleared on success", () => {
       const source = createErrorSource(router);
 
       await router
-        .navigate(errorRoute, paramsForRoute(errorRoute))
+        .navigate(errorRoute, ...channelsForRoute(errorRoute))
         .catch(() => {});
 
       expect(source.getSnapshot().error).not.toBeNull();
 
-      await router.navigate(successRoute, paramsForRoute(successRoute));
+      await router.navigate(successRoute, ...channelsForRoute(successRoute));
 
       expect(source.getSnapshot().error).toBeNull();
       expect(source.getSnapshot().toRoute).toBeNull();
@@ -126,12 +131,12 @@ describe("createErrorSource — error cleared on success", () => {
       const source = createErrorSource(router);
 
       await router
-        .navigate(errorRoute, paramsForRoute(errorRoute))
+        .navigate(errorRoute, ...channelsForRoute(errorRoute))
         .catch(() => {});
 
       const versionAfterError = source.getSnapshot().version;
 
-      await router.navigate(successRoute, paramsForRoute(successRoute));
+      await router.navigate(successRoute, ...channelsForRoute(successRoute));
 
       // SUCCESS clears error/toRoute/fromRoute but version is sticky.
       expect(source.getSnapshot().version).toBe(versionAfterError);
@@ -164,7 +169,7 @@ describe("createErrorSource — TRANSITION_CANCEL leaves snapshot unchanged", ()
       const cancelTarget =
         routeName === "admin.settings" ? "users.list" : "admin.settings";
 
-      const p1 = router.navigate(routeName, paramsForRoute(routeName));
+      const p1 = router.navigate(routeName, ...channelsForRoute(routeName));
 
       await Promise.resolve();
 
@@ -197,7 +202,7 @@ describe("createErrorSource — snapshot reference stability", () => {
       const source = createErrorSource(router);
 
       await router
-        .navigate(errorRoute, paramsForRoute(errorRoute))
+        .navigate(errorRoute, ...channelsForRoute(errorRoute))
         .catch(() => {});
 
       const firstSnapshot = source.getSnapshot();
@@ -244,7 +249,7 @@ describe("createErrorSource — destroy", () => {
       source.destroy();
 
       await router
-        .navigate(errorRoute, paramsForRoute(errorRoute))
+        .navigate(errorRoute, ...channelsForRoute(errorRoute))
         .catch(() => {});
 
       expect(listener).not.toHaveBeenCalled();
@@ -264,7 +269,7 @@ describe("createErrorSource — destroy", () => {
       const source = createErrorSource(router);
 
       await router
-        .navigate(errorRoute, paramsForRoute(errorRoute))
+        .navigate(errorRoute, ...channelsForRoute(errorRoute))
         .catch(() => {});
 
       const lastSnapshot = source.getSnapshot();
@@ -313,7 +318,7 @@ describe("createErrorSource — version persists across SUCCESS (audit §6 MEDIU
 
       // First error.
       await router
-        .navigate(errorRoute1, paramsForRoute(errorRoute1))
+        .navigate(errorRoute1, ...channelsForRoute(errorRoute1))
         .catch(() => {});
 
       const firstErrorVersion = source.getSnapshot().version;
@@ -323,7 +328,7 @@ describe("createErrorSource — version persists across SUCCESS (audit §6 MEDIU
 
       // Intervening SUCCESS — resets `error` to null but must NOT touch the
       // version counter. successRoute is unguarded so navigation succeeds.
-      await router.navigate(successRoute, paramsForRoute(successRoute));
+      await router.navigate(successRoute, ...channelsForRoute(successRoute));
 
       const afterSuccessVersion = source.getSnapshot().version;
 
@@ -332,7 +337,7 @@ describe("createErrorSource — version persists across SUCCESS (audit §6 MEDIU
 
       // Second error.
       await router
-        .navigate(errorRoute2, paramsForRoute(errorRoute2))
+        .navigate(errorRoute2, ...channelsForRoute(errorRoute2))
         .catch(() => {});
 
       const secondErrorVersion = source.getSnapshot().version;
@@ -362,12 +367,12 @@ describe("createErrorSource — version persists across SUCCESS (audit §6 MEDIU
       const source = createErrorSource(router);
 
       await router
-        .navigate(errorRoute, paramsForRoute(errorRoute))
+        .navigate(errorRoute, ...channelsForRoute(errorRoute))
         .catch(() => {});
       const v1 = source.getSnapshot().version;
 
       await router
-        .navigate(successRoute, paramsForRoute(successRoute))
+        .navigate(successRoute, ...channelsForRoute(successRoute))
         .catch(() => {});
 
       // SUCCESS does not change version.

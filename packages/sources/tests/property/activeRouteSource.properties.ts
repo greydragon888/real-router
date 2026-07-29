@@ -10,7 +10,9 @@ import {
   executeNavigations,
   expectedActive,
   NUM_RUNS,
+  channelsForRoute,
   paramsForRoute,
+  searchForRoute,
 } from "./helpers";
 import { createActiveRouteSource } from "../../src";
 
@@ -20,6 +22,7 @@ describe("boolean tracking", () => {
     async (routeName, options) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
+      const search = searchForRoute(routeName);
       const strict = options.strict ?? false;
       const ignoreQueryParams = options.ignoreQueryParams ?? true;
 
@@ -27,7 +30,7 @@ describe("boolean tracking", () => {
         router,
         routeName,
         params,
-        undefined,
+        search,
         options,
       );
 
@@ -36,6 +39,7 @@ describe("boolean tracking", () => {
           router,
           routeName,
           params,
+          search,
           strict,
           ignoreQueryParams,
           options.hash,
@@ -54,6 +58,7 @@ describe("boolean tracking", () => {
     async (routeName, navigations, options) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
+      const search = searchForRoute(routeName);
       const strict = options.strict ?? false;
       const ignoreQueryParams = options.ignoreQueryParams ?? true;
 
@@ -61,7 +66,7 @@ describe("boolean tracking", () => {
         router,
         routeName,
         params,
-        undefined,
+        search,
         options,
       );
 
@@ -75,6 +80,7 @@ describe("boolean tracking", () => {
           router,
           routeName,
           params,
+          search,
           strict,
           ignoreQueryParams,
           options.hash,
@@ -93,6 +99,7 @@ describe("boolean tracking", () => {
     async (routeName, navigations, options) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
+      const search = searchForRoute(routeName);
       const strict = options.strict ?? false;
       const ignoreQueryParams = options.ignoreQueryParams ?? true;
 
@@ -100,7 +107,7 @@ describe("boolean tracking", () => {
         router,
         routeName,
         params,
-        undefined,
+        search,
         options,
       );
       const listener = vi.fn();
@@ -111,11 +118,14 @@ describe("boolean tracking", () => {
       let expectedCalls = 0;
 
       for (const nav of navigations) {
-        await router.navigate(nav.name, nav.params).catch(() => undefined);
+        await router
+          .navigate(nav.name, nav.params, nav.search)
+          .catch(() => undefined);
         const newValue = expectedActive(
           router,
           routeName,
           params,
+          search,
           strict,
           ignoreQueryParams,
           options.hash,
@@ -141,8 +151,9 @@ describe("boolean tracking", () => {
     async (childRoute) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(childRoute);
+      const search = searchForRoute(childRoute);
 
-      await router.navigate(childRoute, params);
+      await router.navigate(childRoute, params, search);
 
       const source = createActiveRouteSource(
         router,
@@ -166,8 +177,9 @@ describe("boolean tracking", () => {
     async (childRoute) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(childRoute);
+      const search = searchForRoute(childRoute);
 
-      await router.navigate(childRoute, params);
+      await router.navigate(childRoute, params, search);
 
       const source = createActiveRouteSource(
         router,
@@ -191,6 +203,7 @@ describe("boolean tracking", () => {
     async (routeName, navigations, ignoreQueryParams) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
+      const search = searchForRoute(routeName);
 
       await executeNavigations(router, navigations).catch(() => undefined);
 
@@ -198,7 +211,7 @@ describe("boolean tracking", () => {
         router,
         routeName,
         params,
-        undefined,
+        search,
         {
           strict: true,
           ignoreQueryParams,
@@ -208,7 +221,7 @@ describe("boolean tracking", () => {
         router,
         routeName,
         params,
-        undefined,
+        search,
         {
           strict: false,
           ignoreQueryParams,
@@ -237,6 +250,7 @@ describe("areRoutesRelated filter", () => {
     async (routeName, navigations, options) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
+      const search = searchForRoute(routeName);
       const strict = options.strict ?? false;
       const ignoreQueryParams = options.ignoreQueryParams ?? true;
 
@@ -244,7 +258,7 @@ describe("areRoutesRelated filter", () => {
         router,
         routeName,
         params,
-        undefined,
+        search,
         options,
       );
 
@@ -252,13 +266,16 @@ describe("areRoutesRelated filter", () => {
       source.subscribe(() => {});
 
       for (const nav of navigations) {
-        await router.navigate(nav.name, nav.params).catch(() => undefined);
+        await router
+          .navigate(nav.name, nav.params, nav.search)
+          .catch(() => undefined);
 
         expect(source.getSnapshot()).toStrictEqual(
           expectedActive(
             router,
             routeName,
             params,
+            search,
             strict,
             ignoreQueryParams,
             options.hash,
@@ -283,7 +300,7 @@ describe("areRoutesRelated filter", () => {
 
       for (let i = 0; i < navCount; i++) {
         await (i % 2 === 0
-          ? router.navigate("search", { q: "test", page: "1" })
+          ? router.navigate("search", {}, { q: "test", page: "1" })
           : router.navigate("home"));
       }
 
@@ -441,7 +458,9 @@ describe("hash-aware monotonicity (#532)", () => {
       expect(source.getSnapshot()).toBe(false);
 
       for (const nav of navigations) {
-        await router.navigate(nav.name, nav.params).catch(() => undefined);
+        await router
+          .navigate(nav.name, nav.params, nav.search)
+          .catch(() => undefined);
 
         expect(source.getSnapshot()).toBe(false);
       }
@@ -503,12 +522,13 @@ describe("destroy (cached shared source — no-op)", () => {
     async (routeName, options) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
+      const search = searchForRoute(routeName);
 
       const source = createActiveRouteSource(
         router,
         routeName,
         params,
-        undefined,
+        search,
         options,
       );
 
@@ -531,12 +551,13 @@ describe("destroy (cached shared source — no-op)", () => {
     async (routeName, options) => {
       const router = await createStartedRouter();
       const params = paramsForRoute(routeName);
+      const search = searchForRoute(routeName);
 
       const source = createActiveRouteSource(
         router,
         routeName,
         params,
-        undefined,
+        search,
         options,
       );
 
@@ -614,7 +635,7 @@ describe("lazy connection (#766)", () => {
       unsub1();
 
       // Navigate to a "users.*" descendant while the source has ZERO listeners.
-      await router.navigate(childRoute, paramsForRoute(childRoute));
+      await router.navigate(childRoute, ...channelsForRoute(childRoute));
 
       // Re-subscribe: onFirstSubscribe reconciles the active boolean to the
       // current router state (true) instead of replaying the stale `false`.

@@ -89,7 +89,9 @@ describe("createActiveNameSelector — invariants", () => {
       let expectedFlips = 0;
 
       for (const nav of navigations) {
-        await router.navigate(nav.name, nav.params).catch(() => undefined);
+        await router
+          .navigate(nav.name, nav.params, nav.search)
+          .catch(() => undefined);
         const next = oracleIsActive(router, name);
 
         if (next !== prev) {
@@ -155,7 +157,9 @@ describe("createActiveNameSelector — invariants", () => {
       let flipsB = 0;
 
       for (const nav of navigations) {
-        await router.navigate(nav.name, nav.params).catch(() => undefined);
+        await router
+          .navigate(nav.name, nav.params, nav.search)
+          .catch(() => undefined);
         const nextA = oracleIsActive(router, nameA);
         const nextB = oracleIsActive(router, nameB);
 
