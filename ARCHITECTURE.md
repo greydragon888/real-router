@@ -19,7 +19,7 @@ Key technical choices:
 ```
 real-router/
 ├── packages/
-│   ├── core/                      # Router implementation (facade + namespaces); routing engine at src/engine; public types in src/types, exposed at @real-router/core/types
+│   ├── core/                      # Router implementation (facade + namespaces); routing engine at src/engine; navigation delivery at src/pipeline; channel correctness at src/channels; public types in src/types, exposed at @real-router/core/types
 │   ├── react/                     # React integration (triple entry: main for 19.2+, /legacy for 18+, /ink for Ink 7+ terminal UIs)
 │   ├── preact/                     # Preact integration (hooks, components, Suspense)
 │   ├── solid/                     # Solid.js integration (hooks, components, directives)
@@ -384,6 +384,7 @@ These are deliberately designed constraints. Violating them will break the syste
 
 - **All `State` objects are deeply frozen** (`Object.freeze`). Never mutate — always create new.
 - **`State` has two param channels** — `state.params` (path params) and `state.search` (query params) are separate and independently typed (`State<Params, Search>`), split in RFC-4 M2 (#1548). Both are always present (a frozen `{}` when empty); `navigate` / `buildPath` / `isActiveRoute` take `search` as the argument after `params`.
+- **The router never moves a key between the channels** — the slot IS the channel: `params` / `defaultParams` are the path, `search` / `defaultSearch` the query, and the two meet in exactly one place, the printed URL. Enforcement rather than convention: a key the route declares with `?` supplied in the path bag makes `navigate` / `makeState` / `buildNavigationState` throw synchronously and `navigateToState` reject, a `defaultParams` naming such a key is refused at registration, and `canNavigateTo` answers `false` for the shape the verbs refuse. There is no repair step — an earlier release moved the key silently, which let a producer believe its own bag had shipped.
 - **Router options are immutable** — deep-frozen at construction time.
 
 ### FSM & Events
@@ -426,7 +427,8 @@ These are deliberately designed constraints. Violating them will break the syste
 ├──────────────────────────────────────────────────────────────────┤
 │                core internals (bundled into core)                │
 ├──────────────────────────────────────────────────────────────────┤
-│    src/engine  ·  src/utils/{fsm, event-emitter, logger}         │
+│  src/engine · src/pipeline · src/channels                        │
+│  src/utils/{fsm, event-emitter, logger}                          │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -436,6 +438,8 @@ These are deliberately designed constraints. Violating them will break the syste
 - Consumer plugins inline the guards they need
 - Consumer packages import shared sources via git-tracked symlinks (`src/dom-utils` → `shared/dom-utils`, `src/browser-env` → `shared/browser-env`, `src/shared-ssr` → `shared/ssr`)
 - The `engine` subsystem (`core/src/engine`) is self-contained — the `route-tree` → `path-matcher` / `search-params` layering is an internal boundary within `src/engine`, enforced by core's lint
+- The `channels` subsystem (`core/src/channels`) imports **nothing** from the namespaces, the engine or the pipeline — declared query names arrive as DATA (`readonly string[]` or a `queryNamesOf` accessor), so the one registry that classifies and prints cannot grow a second derivation. Also enforced by core's lint
+- The `pipeline` subsystem (`core/src/pipeline`) reaches the routes layer only through its `RouteResolver` port, implemented by the router at wiring time — same inversion, so the module stays pure and mock-testable
 - `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)
 
 **FORBIDDEN:**

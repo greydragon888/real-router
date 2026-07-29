@@ -349,8 +349,8 @@ function App() {
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | [`@real-router/core`](packages/core)        | [![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)   | Router implementation                                                                                              |
 | `@real-router/core/api`                     |                                                                                                                                   | Tree-shakeable modular API: `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter` |
-| `@real-router/core/utils`                   |                                                                                                                                   | Utility functions: `serializeState` (XSS-safe JSON for SSR), `getStaticPaths` (static path generation for SSG)     |
-| [`@real-router/types`](packages/core-types) | [![npm](https://img.shields.io/npm/v/@real-router/types.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/types) | Shared TypeScript type definitions                                                                                 |
+| `@real-router/core/types`                   |                                                                                                                                   | Public types (`State`, `Route`, `Params`, `SearchParams`, …) and the module-augmentation site                      |
+| [`@real-router/ssr-utils`](packages/ssr-utils) | [![npm](https://img.shields.io/npm/v/@real-router/ssr-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-utils) | Router-level SSR / SSG / hydration helpers: `serializeState`, `serializeRouterState`, `hydrateRouter`, `getStaticPaths`, `createRequestScope` |
 
 ### Framework Integration
 
@@ -387,7 +387,6 @@ function App() {
 | [`@real-router/sources`](packages/sources)         | [![npm](https://img.shields.io/npm/v/@real-router/sources.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/sources)         | Reactive subscription sources for UI bindings — per-router cached `getTransitionSource` / `createDismissableError` / `createActiveNameSelector` + canonical params cache |
 | [`@real-router/rx`](packages/rx)                   | [![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)                   | Observable API: `state$`, `events$`, operators, TC39 Observable                                                                                                          |
 | [`@real-router/route-utils`](packages/route-utils) | [![npm](https://img.shields.io/npm/v/@real-router/route-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries: `getRouteUtils`, segment testers, `areRoutesRelated`                                                                                                 |
-| [`@real-router/logger`](packages/logger)           | [![npm](https://img.shields.io/npm/v/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)           | Structured logging utility                                                                                                                                               |
 
 ## Documentation
 
