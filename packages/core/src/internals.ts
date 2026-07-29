@@ -1,4 +1,4 @@
-import { assertChannelCorrect } from "./helpers";
+import { assertChannelCorrect } from "./channels";
 
 import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";

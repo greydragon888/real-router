@@ -6,17 +6,14 @@
  * All functionality is now provided by namespace classes.
  */
 
+import { assertChannelCorrect, findMisChanneledKey } from "./channels";
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import {
   assertLoggerConfig,
   guardDependencies,
   guardRouteStructure,
 } from "./guards";
-import {
-  findMisChanneledKey,
-  assertChannelCorrect,
-  normalizeParams,
-} from "./helpers";
+import { normalizeParams } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,

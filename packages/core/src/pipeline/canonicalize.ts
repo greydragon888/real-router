@@ -1,12 +1,8 @@
 // packages/core/src/pipeline/canonicalize.ts
 
+import { admittedSearch, withholdFilledSlots } from "../channels";
 import { EMPTY_PARAMS, EMPTY_SEARCH } from "../constants";
-import {
-  admittedSearch,
-  mergeWithDefault,
-  normalizeParams,
-  withholdFilledSlots,
-} from "../helpers";
+import { mergeWithDefault, normalizeParams } from "../helpers";
 
 import type { RouteResolver } from "./port";
 import type { Canonical } from "./types";

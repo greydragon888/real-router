@@ -1,6 +1,7 @@
 // packages/core/src/namespaces/RoutesNamespace/helpers.ts
 
-import { areParamValuesEqual, assertChannelCorrect } from "../../helpers";
+import { assertRouteDefaultChannels } from "../../channels";
+import { areParamValuesEqual } from "../../helpers";
 
 import type { RoutesStore } from "./routesStore";
 import type { RouteConfig } from "./types";
@@ -279,42 +280,27 @@ export function queryParamsOf<Dependencies extends DefaultDependencies>(
 }
 
 /**
- * Config-time channel check: a route's `defaultParams` may not name a key the
- * route declares with `?`.
+ * Store-layer adapter for {@link assertRouteDefaultChannels}: supplies the
+ * declared-query accessor the pure rule takes as data.
  *
- * The static half of "params and search meet only in the URL". Without it the
- * router builds a state out of its OWN config that its OWN always-on channel
- * guard then rejects — `start()` throwing `WRONG_CHANNEL` about a bag the user
- * never passed, which is the deferred-crash shape core's invariant guards exist
- * to prevent. The dynamic half (a forwarding hop whose target is only known at
- * resolution) is caught at the `forwardState` seam instead.
- *
- * Runs over the WHOLE config after every rebuild rather than over the routes
- * just added: `setRootPath("?lang")` declares a name on every route at once, so
- * a config that was legal a moment ago can stop being legal without any route
- * changing.
+ * The caches are LOCAL to the attempt, not the store's, and that is the whole
+ * reason this adapter exists rather than the four entry points each building the
+ * closure. Every caller runs on PREPARED artifacts, before any swap: validating
+ * against the store's caches would answer about a tree the rejected batch has
+ * not installed — and the guard would then be checking the wrong config while
+ * claiming to protect the right one.
  */
-export function assertRouteDefaultChannels(
+export function assertRouteDefaultChannelsFor(
   matcher: Matcher,
   config: RouteConfig,
   method: string,
 ): void {
-  // Local caches, not the store's: this runs on PREPARED artifacts, before any
-  // swap. Checking after the swap would leave a rejected batch installed — the
-  // atomicity `adoptRouteArtifacts` promises, broken by the very guard meant to
-  // protect the config (caught by the entry-point test, which found the bad
-  // config still in the store on the NEXT call).
   const urlCache = new Map<string, string[]>();
   const queryCache = new Map<string, string[]>();
 
-  for (const [name, defaults] of Object.entries(config.defaultParams)) {
-    assertChannelCorrect(
-      method,
-      name,
-      defaults,
-      queryParamsFor(matcher, name, urlCache, queryCache),
-      "this route's `defaultParams`",
-      "Move it to `defaultSearch`",
-    );
-  }
+  assertRouteDefaultChannels(
+    config.defaultParams,
+    (name) => queryParamsFor(matcher, name, urlCache, queryCache),
+    method,
+  );
 }

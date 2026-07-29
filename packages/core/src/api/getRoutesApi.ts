@@ -3,7 +3,7 @@ import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
 import {
-  assertRouteDefaultChannels,
+  assertRouteDefaultChannelsFor,
   clearConfigEntries,
   removeFromDefinitions,
 } from "../namespaces/RoutesNamespace/helpers";
@@ -426,7 +426,11 @@ function addRoutes<
   // Config-time channel check on the PREPARED artifacts, in PREPARE — the same
   // position `replace` gives it, and for the same reason (a throw must precede
   // every mutation, not merely the swap).
-  assertRouteDefaultChannels(artifacts.matcher, artifacts.config, "addRoute");
+  assertRouteDefaultChannelsFor(
+    artifacts.matcher,
+    artifacts.config,
+    "addRoute",
+  );
 
   // Pre-flight the #961 handler-limit into PREPARE so a limit-exceeding batch
   // aborts before the swap (#1046). `add` does not clear guards, so the
@@ -498,7 +502,11 @@ function replaceRoutes<
   // definition guards ERASED, so a guarded route became freely activatable. Same
   // fail-open shape #1046 and #1193 hoisted their own throws out of, now for the
   // third throwing step this path grew.
-  assertRouteDefaultChannels(artifacts.matcher, artifacts.config, "addRoute");
+  assertRouteDefaultChannelsFor(
+    artifacts.matcher,
+    artifacts.config,
+    "addRoute",
+  );
 
   // Pre-flight the #961 handler-limit BEFORE clearDefinitionGuards mutates, so a
   // limit-exceeding batch aborts with BOTH the tree and the definition guards

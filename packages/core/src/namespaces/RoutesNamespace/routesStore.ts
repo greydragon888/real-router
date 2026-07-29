@@ -3,18 +3,18 @@
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
 import {
-  assertRouteDefaultChannels,
+  assertRouteDefaultChannelsFor,
   assignConfigEntries,
   createEmptyConfig,
   queryParamsOf,
   sanitizeRoute,
 } from "./helpers";
+import { assertChannelCorrect } from "../../channels";
 import {
   createMatcher,
   createRouteTree,
   routeTreeToDefinitions,
 } from "../../engine";
-import { assertChannelCorrect } from "../../helpers";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type {
@@ -138,7 +138,7 @@ export function applyRootPath<
     store.matcherOptions,
   );
 
-  assertRouteDefaultChannels(prepared.matcher, store.config, "setRootPath");
+  assertRouteDefaultChannelsFor(prepared.matcher, store.config, "setRootPath");
 
   store.rootPath = newRootPath;
   store.tree = prepared.tree;
@@ -1243,7 +1243,7 @@ export function createRoutesStore<
   // Same config-time channel check the add/replace path runs, so the
   // constructor is not the one population entry point that accepts a config
   // whose own state the router would then reject on `start()`.
-  assertRouteDefaultChannels(store.matcher, store.config, "addRoute");
+  assertRouteDefaultChannelsFor(store.matcher, store.config, "addRoute");
 
   return store;
 }

@@ -8,8 +8,9 @@ import {
   urlParamsOf,
 } from "./helpers";
 import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
+import { assertChannelCorrect } from "../../channels";
 import { constants, EMPTY_SEARCH } from "../../constants";
-import { assertChannelCorrect, mergeDefined } from "../../helpers";
+import { mergeDefined } from "../../helpers";
 import { canonicalize, materialize } from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 

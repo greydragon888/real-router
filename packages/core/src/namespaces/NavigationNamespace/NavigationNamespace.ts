@@ -8,13 +8,13 @@ import {
 import { completeTransition } from "./transition/completeTransition";
 import { routeTransitionError } from "./transition/errorHandling";
 import { executeGuardPipeline } from "./transition/guardPhase";
+import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
 import {
   EMPTY_PARAMS,
   EMPTY_SEARCH,
   errorCodes,
   constants,
 } from "../../constants";
-import { findMisChanneledKey, misChanneledKeyMessage } from "../../helpers";
 import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 

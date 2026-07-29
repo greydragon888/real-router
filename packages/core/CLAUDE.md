@@ -26,6 +26,21 @@ src/pipeline/ (navigation delivery — three primitives over one opaque type)
     ├── materialize(canonical, opts)             → State      — ⑤b
     └── RouteResolver                                          — the port the router implements at wiring time
 
+src/channels/ (channel correctness — the fifth always-on invariant guard, as a subsystem)
+    ├── guard      — findMisChanneledKey · assertChannelCorrect · misChanneledKeyMessage
+    ├── defaults   — assertRouteDefaultChannels (config-time half) · withholdFilledSlots
+    └── modeGate   — admittedSearch
+
+    A subsystem and not a namespace method because the rule has no owning module:
+    it runs from the facade, from `internals`, from the `forwardState` seam, from
+    the `decodeParams` boundary, from `updateRoute` and from four registration
+    entry points. It lived in two files both named `helpers.ts` until then —
+    which is how #1584's existence precondition landed on one half and not the
+    other. Imports nothing from the namespaces, the engine or the pipeline:
+    declared query names arrive as DATA, never as a matcher, so a second
+    derivation of the one registry (#1556) cannot grow here. Enforced by a
+    `no-restricted-imports` boundary in `packages/core/eslint.config.mjs`.
+
 api/ (standalone functions — tree-shakeable)
     ├── getRoutesApi(router)      — route CRUD
     ├── getDependenciesApi(router) — dependency CRUD
