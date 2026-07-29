@@ -58,9 +58,22 @@ overrides:
   # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
   # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
   # the @1-selected dep could resolve up to 5.x). Bump each line when its next patch lands.
+  #
+  # ⚠ A SECOND ReDoS landed on the same package (GHSA-mh99-v99m-4gvg, High, 2026-07). Unlike the
+  # first, it was patched on ONE line only: OSV lists a single affected/fixed pair, `<= 5.0.7` →
+  # `5.0.8`. There is no patched 1.x or 2.x, so only the @5 pin below could move.
+  #
+  # ⛔ Collapsing all three onto 5.0.8 is NOT the fix, and this is measured rather than assumed:
+  # v1 and v2 both end in `module.exports = expandTop` (the function IS the export), while 5.x's
+  # CJS build emits `exports.expand = expand` — a NAMED export with no default. Every consumer of
+  # the older lines is `minimatch` (3.1.5 → @1, 5.1.9 and 9.0.9 → @2, 10.2.5 → @5) doing
+  # `require('brace-expansion')` and calling the result, so the override would hand it an object
+  # and break glob matching across the tooling. The remaining @1/@2 instances are allowlisted in
+  # `scripts/osv-scanner.toml` (+ the mirrored `allow-ghsas:` in codeql.yml) as dev-only and
+  # unpatchable; drop that entry the moment a 1.x or 2.x patch is published.
   brace-expansion@1: 1.1.16
   brace-expansion@2: 2.1.2
-  brace-expansion@5: 5.0.7
+  brace-expansion@5: 5.0.8
   # shell-quote < 1.9.0 (GHSA-395f-4hp3-45gv, High) — dev-only (concurrently → shell-quote), never
   # in a published @real-router/* package. Drop when concurrently pulls >=1.9.0 transitively.
   shell-quote: '>=1.9.0'
