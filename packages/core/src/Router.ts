@@ -807,11 +807,17 @@ export class Router<
     // `ctx.forwardState`), so the resolution, the interceptor zone and the
     // channel CHECK on the seam are all unchanged — what the pipeline
     // replaces is the hand-rolled composition that followed.
+    // Read ONCE (#1589): this predicate reached for the port twice — here and
+    // again for `buildURL` below — on every `<Link>` render. The port is one
+    // object per router, created at wiring time, so the second read could only
+    // ever return the same reference.
+    const port = this.#routes.getPort();
+
     let canonical;
 
     try {
       canonical = canonicalize(
-        this.#routes.getPort(),
+        port,
         name,
         // The singleton, not a fresh `{}` (#1589): this predicate runs on every
         // `<Link>` render too, and `normalizeParams` recognises `EMPTY_PARAMS` by
@@ -856,7 +862,7 @@ export class Router<
       // cannot drift. `skipFreeze` mirrors the navigate guard phase, where
       // guards see an unfrozen, transition-less `toState`.
       toState = materialize(canonical, {
-        path: buildURL(canonical, this.#routes.getPort()),
+        path: buildURL(canonical, port),
         skipFreeze: true,
       });
     } catch {
