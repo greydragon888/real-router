@@ -1,5 +1,85 @@
 # @real-router/validation-plugin
 
+## 0.13.0
+
+### Minor Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Report a query key the active `queryParamsMode` drops ([#1575](https://github.com/greydragon888/real-router/issues/1575))
+
+  Core's mode gate is always-on and SILENT: a query key the active
+  `queryParamsMode` will not print never enters `state.search`, so the two
+  channels of one state can no longer disagree. The drop is correct, and
+  invisible — which is exactly the always-on-fixes / opt-in-diagnoses split the
+  channel guard already follows.
+
+  New `state.reportDroppedQueryKey` hook, called by core from the drop itself (so
+  the report can never disagree with what was actually dropped) and de-duplicated
+  per route+key — the gate runs on every navigation and every `matchPath`, so an
+  un-deduped warning would flood a dev console the moment a route is revisited.
+
+  One message covers both ways to hit it, because core cannot tell them apart at
+  the drop and a guess would be worse than the plain fact:
+
+  - a caller passing a key the route never declared with `?name`;
+  - a `defaultSearch` entry for such a key — **dead config** under `default` /
+    `strict`, since the default is dropped along with the key. This is the side
+    edge worth naming out loud: nothing the caller wrote is wrong, the route
+    config simply cannot take effect.
+
+  Warn, never throw: `queryParamsMode` is a serialization option, not an error
+  policy — promoting it to one would give three behaviours for a single rule.
+
+### Patch Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Accept and validate the new `defaultSearch` router option ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  Without this the plugin rejects the option core just gained —
+  `Unknown option: "defaultSearch"` — so the two must ship together.
+
+  `validateDefaultParams` is generalised into `validateDefaultBag`, parameterised
+  by the option name and called once per channel, rather than copied: one rule for
+  both, so the two option channels cannot drift into accepting different shapes
+  for the same kind of value. The thrown message still names the option that was
+  actually wrong, which is pinned by a test.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Key the diagnostic de-dup caches per router, not per process ([#1583](https://github.com/greydragon888/real-router/issues/1583))
+
+  Both diagnostics (`reportDroppedQueryKey` [#1575](https://github.com/greydragon888/real-router/issues/1575), `reportUndeclaredParamKey`
+  [#1579](https://github.com/greydragon888/real-router/issues/1579)) de-duplicated their warnings in a module-level `Set` — one per PROCESS,
+  shared by every router in it. Every consequence pointed the wrong way for a
+  dev-time signal:
+
+  - a second router never warned for a `route + key` the first had reported,
+    including a `cloneRouter` per-request clone: under SSR/SSG the diagnostic
+    fired for request [#1](https://github.com/greydragon888/real-router/issues/1) and stayed silent for the life of the process;
+  - `teardown()` did not clear it, so re-registering the plugin bought silence;
+  - nothing evicted, so it grew without bound.
+
+  The caches now live on the validator object, which `buildValidatorObject` builds
+  once per registration — per-router lifetime, per-router isolation, collected with
+  the router, and dropped by `teardown()` along with the validator. No new module
+  state: a closure, not a `WeakMap`.
+
+  The two `resetDroppedQueryKeyReports` / `resetUndeclaredParamKeyReports` exports
+  are removed. They were internal (never re-exported from the package barrel) and
+  existed only so the tests could work around the module scope — a test seam
+  compensating for the design rather than the design being per-router.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Warn when a param key is declared nowhere on the route ([#1579](https://github.com/greydragon888/real-router/issues/1579))
+
+  `state.reportUndeclaredParamKey` implements core's new opt-in sink: a key the
+  route names neither as a path slot nor with `?` stays in `state.params` but never
+  reaches the URL, so the state cannot be rebuilt from its own `state.path`.
+
+  De-duplicated per route + key, like the mode gate's diagnostic — this runs on
+  every navigation, and an un-deduped warning would flood the console on a revisit.
+  The message names the key and the route, states what happened, and offers the
+  three ways out: declare it on the path, pass it through the `search` channel, or
+  keep it deliberately as app-level data.
+
+- Updated dependencies [[`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507)]:
+  - @real-router/core@0.82.0
+
 ## 0.12.6
 
 ### Patch Changes

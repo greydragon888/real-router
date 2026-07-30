@@ -1,5 +1,77 @@
 # @real-router/search-schema-plugin
 
+## 0.5.0
+
+### Minor Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Channel-aware `defaultSearch` recovery and dev-time validation ([#1549](https://github.com/greydragon888/real-router/issues/1549))
+
+  Follows core's `Route.defaultSearch` split. The plugin now recovers stripped
+  invalid query values from the **channel that holds the query** — `defaultSearch`,
+  and only `defaultSearch`. Before, recovery always read `defaultParams`, which
+  silently restored nothing once a route's query defaults moved to `defaultSearch`.
+
+  ⚠ The `defaultParams` arm this entry originally kept for the State→URL (navigate)
+  direction is gone, in the same release: core no longer separates channels, and a
+  `defaultParams` naming a declared query key is refused at registration, so
+  whatever a `defaultParams`-minus-path-slots subtraction still yields is undeclared
+  PATH-channel data. Pouring it into the query channel would be the plugin
+  re-creating the repair core removed.
+
+  Dev-time config validation now targets `defaultSearch`: `usePlugin()`-time and
+  `TREE_CHANGED` (`add` / `replace`, and `update` when `patch.defaultSearch`
+  changed) re-validate a route's `defaultSearch` against its `searchSchema`, with
+  a warning that names the consequence (`defaultSearch` is trusted config injected
+  by core below the interceptor seam, so an invalid default still reaches state and
+  the URL at runtime — [#802](https://github.com/greydragon888/real-router/issues/802)).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Validate the query channel on the URL→State path ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  Under the params/search split the matched query arrives on `state.search`. The
+  `forwardState` interceptor is now channel-aware: it validates `state.search` on
+  the URL→State (matchPath) path and the params bag on the navigate path, so
+  `router.start(url)` and popstate-driven URLs validate their query against the
+  schema — closing the previously-deferred gap (the un-skipped
+  "validate params from URL on router.start()" test).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Validate the query channel, not a bag picked by call shape ([#1564](https://github.com/greydragon888/real-router/issues/1564))
+
+  The `forwardState` interceptor chose what to validate from `routeSearch !== undefined`, which is a question about the CALL, not about where the query lives. It now subtracts the route's path slots — its own and its ancestors', read off the engine's `paramMeta` via `getTree()` and cached per tree identity — and validates everything else, `search` merged over the params bag.
+
+  - **A path param is never handed to the schema.** A transforming schema no longer rewrites `state.params.id`, and `strict: true` no longer deletes it — which used to abort the navigation with `[SegmentMatcher.buildPath] Missing required param 'id'` on a v1 single-bag `navigate(name, { id, q })`.
+  - **The query channel is validated on both directions.** Anything an inner interceptor injected into `search` — `@real-router/persistent-params-plugin` since [#1563](https://github.com/greydragon888/real-router/issues/1563) — is now schema-checked on `navigate` as well as on the URL→State direction. Before this, exactly one direction was covered, and which one flipped with [#1563](https://github.com/greydragon888/real-router/issues/1563).
+  - Validated values are written back to the bag they came from, so an undeclared key still rides where core puts it ([#1553](https://github.com/greydragon888/real-router/issues/1553) untouched); a key the schema invents lands in `search`.
+  - Recovery after issues fills from the route's query-channel defaults: `defaultSearch` (the M2 home) and a `defaultParams` entry for a declared query key, minus the path slots.
+
+### Patch Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - The LIFO injection leak is closed by core ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  An interceptor registered after the schema could inject a declared query key
+  into the `params` bag; core's `forwardState` seam then moved it into `search`,
+  so an unvalidated value reached the channel this plugin owns. The suite
+  documented that as a `LEAKS` test rather than a fix, because the plugin could
+  not see the injection — it happened after its own interceptor ran.
+
+  Core now refuses the mis-channelled bag instead of moving it, so an interceptor
+  that wants to write the query channel has to write `search`, where the schema
+  can see it. The test is rewritten to pin the refusal.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Move the documented examples to the query channel ([#1572](https://github.com/greydragon888/real-router/issues/1572))
+
+  Core's channel guard now throws when a key a route declares with `?name`
+  arrives in the `params` bag, so this package's README and guide examples — which
+  showed the legacy single-bag form — no longer describe working code.
+
+  Examples and tests moved to the explicit query argument:
+  `navigate("products", {}, { lang: "en" })`. No runtime change in this package.
+
+  An UNDECLARED tracked key is unaffected: the guard only fires on names the route
+  declares with `?`.
+
+- Updated dependencies [[`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507)]:
+  - @real-router/core@0.82.0
+
 ## 0.4.23
 
 ### Patch Changes
