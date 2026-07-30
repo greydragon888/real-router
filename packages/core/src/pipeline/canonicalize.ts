@@ -137,12 +137,6 @@ export function canonicalize(
   // path allocates nothing downstream.
   const pathBag = normalizeParams(forwarded.params);
 
-  // Read ONCE. Three consumers below need the route's `?`-declared names — the
-  // diagnostic, the default split, and the mode gate — and `getQueryParams` is a
-  // cached lookup, not a free one; a local also makes it impossible for the three
-  // to disagree about which registry decided the channel (#1556).
-  const declaredQuery = port.queryNames(resolvedName);
-
   // The undeclared-key diagnostic (#1579 — the params half of #1553). A key the
   // route declares NOWHERE stays in `state.params` as app-level data, which is
   // correct and documented — but it never reaches the URL, so the state does not
@@ -166,11 +160,16 @@ export function canonicalize(
       : undefined;
 
   if (reportUndeclared) {
+    // Read HERE rather than once at the top (#1589): the fast path below does not
+    // use the `?`-declared names, only the fact that there are none, and hoisting
+    // the read made every predicate pay a port hop for an array it discarded. The
+    // diagnostic is opt-in and off on every predicate, so this read is now paid
+    // only by the committing producers that asked for it.
     diagnoseUndeclaredKeys(
       port,
       resolvedName,
       pathBag,
-      declaredQuery,
+      port.queryNames(resolvedName),
       reportUndeclared,
     );
   }
@@ -184,17 +183,13 @@ export function canonicalize(
   // so nothing mis-channelled can reach this merge and there is nothing here to
   // repair. Splitting here used to be what made a config the router itself had
   // accepted survive its own always-on channel guard.
-  // Two locals, not an object literal: this used to allocate a `{ params, search }`
-  // bag on EVERY call to read two fields twice (#1589).
-  const defaultPath = port.defaultParams(resolvedName);
-  const defaultQuery = port.defaultSearch(resolvedName);
-
   // FAST PATH (#1589): nothing to merge and nothing to gate. A route with no
-  // defaults on either slot and no `?`-declaration cannot have a default applied,
-  // cannot have a slot withheld, and cannot have a key dropped by the mode gate —
-  // whatever the mode, `admittedSearch` would keep every key of a query channel
-  // that is empty anyway. So the whole tail below is provably identity, and this
-  // returns without it.
+  // defaults on either slot, called without a query bag, cannot have a default
+  // applied, cannot have a slot withheld, and cannot have a key dropped by the
+  // mode gate — whatever the mode, `admittedSearch` would keep every key of a
+  // query channel that is empty anyway. So the whole tail below is provably
+  // identity, and this returns without it. Note what is NOT in that list: how
+  // many names the route declares with `?`. See the gate's own comment.
   //
   // This is the `buildPath/warm-static` case, and it was the most diagnostic
   // number in the regression: a static route — no params, no query, no defaults —
@@ -211,11 +206,39 @@ export function canonicalize(
   // the slow path. A fresh `{}` is deliberately NOT accepted: telling an empty
   // literal from a non-empty one costs a key walk, and the two call sites that
   // used to mint one now pass the singleton instead.
+  // ⚠ TWO facts, one from each side, and between them stage ③ and the mode gate
+  // are provably identity (#1589):
+  //
+  //   1. the CALLER brought no query bag, so the mode gate has nothing to filter
+  //      and the query merge has nothing on its left;
+  //   2. the ROUTE carries no default on either slot, so neither merge has
+  //      anything on its right.
+  //
+  // The merged query bag has exactly those two sources, so both being empty is
+  // the whole condition. What is NOT in it: how many names the route declares
+  // with `?`. That term WAS in the condition until #1589 — and it was redundant
+  // against fact 1, because an empty bag has nothing to drop however many names
+  // are declared. Established, not argued: the term survives all 3808 tests, and
+  // a 33-probe × 3-mode matrix over a `?`-declaring route with no defaults is
+  // byte-identical without it. Dropping it costs one port hop less per call
+  // (`queryNames` is ~12 ns on its own — `getQueryParams` is a four-frame chain to
+  // a cached Map, not a Map read) and widens the fast path to routes that declare
+  // query params but carry no defaults.
+  //
+  // Which leaves the two defaults, and they are read ABOVE the gate on purpose:
+  // they are the gate's own route half AND the slow path's first input, so the
+  // fast path pays two hops and the slow path pays nothing extra. The alternative
+  // — one `port.mergesNothing()` predicate here, defaults re-read below — buys the
+  // fast path one more hop (measured: `isActiveRoute-exact` 101 vs 111 ns) at the
+  // cost of a FOURTH hop on the defaults path, which measured +6.5 % there. Both
+  // were built and measured; the symmetric one wins because it regresses nothing.
+  const defaultPath = port.defaultParams(resolvedName);
+  const defaultQuery = port.defaultSearch(resolvedName);
+
   if (
+    (forwarded.search === undefined || forwarded.search === EMPTY_SEARCH) &&
     defaultPath === undefined &&
-    defaultQuery === undefined &&
-    declaredQuery.length === 0 &&
-    (forwarded.search === undefined || forwarded.search === EMPTY_SEARCH)
+    defaultQuery === undefined
   ) {
     // Annotated rather than asserted: the literal's inferred `query` type is the
     // empty singleton's `Record<string, never>`, too narrow for `Canonical` to
@@ -228,6 +251,15 @@ export function canonicalize(
 
     return fastPath as Canonical;
   }
+
+  // Below the gate: the SLOW path is the only consumer of the declared names, so
+  // the read moved here from the top of the function (#1589) — hoisting it made
+  // every predicate pay a port hop for an array it discarded. The two consumers
+  // left on this side — the default split and the mode gate — share this one
+  // local, so they still cannot disagree about which registry decided the channel
+  // (#1556); the diagnostic further up reads its own, through the same accessor,
+  // so the one-registry invariant is unchanged.
+  const declaredQuery = port.queryNames(resolvedName);
 
   // ③ — route defaults UNDER the routed value, each channel independent. Read
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
