@@ -70,6 +70,14 @@ export interface RouteResolver {
    * was measured on also carried a per-call `getInternals`, and the harness's
    * own A/A spread is wider than the delta, so no percentage is attributable to
    * this accessor alone.
+   *
+   * Also the ROUTE half of the fast-path gate (#1589), which is why these two are
+   * the only reads `canonicalize` still makes before it. A dedicated
+   * `mergesNothing()` predicate answering the same question in ONE hop was built
+   * and measured: it buys the fast path a further ~10 ns but makes the DEFAULTS
+   * path re-read both values below the gate — a fourth hop, +6.5 % there. Reading
+   * the values themselves regresses nothing, because the slow path was going to
+   * need them anyway.
    */
   defaultParams: (name: string) => Params | undefined;
   defaultSearch: (name: string) => SearchParams | undefined;

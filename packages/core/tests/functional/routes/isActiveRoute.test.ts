@@ -729,4 +729,100 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       warnSpy.mockRestore();
     });
   });
+
+  // #1595 — the `forwardTo` arm is gated on a TREE-WIDE `hasAnyForward` flag, so
+  // the render path never touches the two dictionary-mode forward maps in a tree
+  // that has no forwarding route. The flag is derived state, and a stale `false`
+  // is a correctness bug wearing a performance change's clothes: the arm silently
+  // stops running and a `<Link>` to a forwarding route renders inactive again —
+  // exactly the defect #1573 shipped the arm to fix.
+  //
+  // Every route-CRUD path that can introduce the FIRST forwarding route into a
+  // tree that had none is pinned here, because that is the transition the flag
+  // must observe. Mutationally validated: pinning `hasAnyForward` to its initial
+  // value fails every case below.
+  describe("forwardTo arm survives route-CRUD (#1595)", () => {
+    /** A tree with NO forwarding route — `hasAnyForward` starts false. */
+    function plainRouter(): Router {
+      return createRouter([
+        { name: "home", path: "/home" },
+        { name: "dst", path: "/dst" },
+      ]);
+    }
+
+    it("add() introduces the first forwarding route", async () => {
+      const r = plainRouter();
+
+      getRoutesApi(r).add([{ name: "src", path: "/src", forwardTo: "dst" }]);
+      await r.start("/src");
+
+      expect(r.getState()?.name).toBe("dst");
+      expect(r.isActiveRoute("src")).toBe(true);
+    });
+
+    it("update() adds forwardTo to an existing route", async () => {
+      const r = plainRouter();
+
+      getRoutesApi(r).add([{ name: "src", path: "/src" }]);
+      getRoutesApi(r).update("src", { forwardTo: "dst" });
+      await r.start("/src");
+
+      expect(r.getState()?.name).toBe("dst");
+      expect(r.isActiveRoute("src")).toBe(true);
+    });
+
+    it("replace() swaps in a tree that forwards", async () => {
+      const r = plainRouter();
+
+      await r.start("/home");
+      getRoutesApi(r).replace([
+        { name: "home", path: "/home" },
+        { name: "dst", path: "/dst" },
+        { name: "src", path: "/src", forwardTo: "dst" },
+      ]);
+      await r.navigate("src");
+
+      expect(r.getState()?.name).toBe("dst");
+      expect(r.isActiveRoute("src")).toBe(true);
+    });
+
+    it("a dynamic forwardTo callback counts too", async () => {
+      const r = plainRouter();
+
+      getRoutesApi(r).add([
+        { name: "src", path: "/src", forwardTo: () => "dst" },
+      ]);
+      await r.start("/src");
+
+      expect(r.getState()?.name).toBe("dst");
+      expect(r.isActiveRoute("src")).toBe(true);
+    });
+
+    it("clear() + add() re-arms after the flag was reset", async () => {
+      const r = createRouter([
+        { name: "home", path: "/home" },
+        { name: "dst", path: "/dst" },
+        { name: "src", path: "/src", forwardTo: "dst" },
+      ]);
+
+      getRoutesApi(r).clear();
+      getRoutesApi(r).add([
+        { name: "dst", path: "/dst" },
+        { name: "src", path: "/src", forwardTo: "dst" },
+      ]);
+      await r.start("/src");
+
+      expect(r.getState()?.name).toBe("dst");
+      expect(r.isActiveRoute("src")).toBe(true);
+    });
+
+    it("the arm stays OFF for a tree that never forwards", async () => {
+      const r = plainRouter();
+
+      await r.start("/home");
+
+      expect(r.isActiveRoute("dst")).toBe(false);
+      expect(r.isActiveRoute("home")).toBe(true);
+    });
+  });
 });

@@ -3,6 +3,7 @@
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
 import {
+  anyForwardConfigured,
   assertRouteDefaultChannelsFor,
   assignConfigEntries,
   createEmptyConfig,
@@ -76,6 +77,26 @@ export interface RoutesStore<
    */
   readonly queryParamsCache: Map<string, string[]>;
   resolvedForwardMap: Record<string, string>;
+
+  /**
+   * Does ANY route in the tree forward? Read by `isActiveRoute` before its
+   * `forwardTo` arm's per-route gate, and worth its own field for a reason that
+   * is measurable rather than aesthetic (#1595): the two maps behind that gate
+   * are `Object.create(null)` dictionaries, which V8 keeps in dictionary mode,
+   * and two lookups on them cost ~14 ns — paid by every route in the tree for a
+   * feature only forwarding routes use, on every `<Link>` render across six
+   * adapters. A tree with no `forwardTo` at all — the common case — answers with
+   * one boolean load instead.
+   *
+   * ⚠ Maintained ONLY through {@link adoptForwardState}, together with
+   * `resolvedForwardMap`. The two are views of the same config and a stale
+   * `false` here silently switches the arm OFF, which is a correctness bug
+   * wearing a performance change's clothes: a `<Link>` to a forwarding route
+   * would render inactive again (the defect #1573 shipped the arm to fix).
+   * Pinned across every route-CRUD path by `isActiveRoute-forward-arm` in
+   * `tests/functional/routes/is-active-route.test.ts`.
+   */
+  hasAnyForward: boolean;
   routeCustomFields: Record<string, Record<string, unknown>>;
   rootPath: string;
   readonly matcherOptions: CreateMatcherOptions | undefined;
@@ -155,7 +176,7 @@ export function commitTreeChanges<
   definitions: readonly RouteDefinition[],
 ): void {
   rebuildTreeInPlace(store, definitions);
-  store.resolvedForwardMap = refreshForwardMap(store.config);
+  adoptForwardState(store, refreshForwardMap(store.config));
 }
 
 // =============================================================================
@@ -184,7 +205,7 @@ export function clearRouteData<
 >(store: RoutesStore<Dependencies>): void {
   Object.assign(store.config, createEmptyConfig());
 
-  store.resolvedForwardMap = Object.create(null) as Record<string, string>;
+  adoptForwardState(store, Object.create(null) as Record<string, string>);
   store.routeCustomFields = Object.create(null) as Record<
     string,
     Record<string, unknown>
@@ -194,6 +215,20 @@ export function clearRouteData<
 // =============================================================================
 // Forward map
 // =============================================================================
+
+/**
+ * The ONE way `resolvedForwardMap` and `hasAnyForward` move (#1595). They are two
+ * views of the same forward config, so every site that re-derives one derives the
+ * other here — a site that assigned only the map would leave a stale `false`
+ * behind, and `isActiveRoute` would stop consulting its `forwardTo` arm.
+ */
+function adoptForwardState<Dependencies extends DefaultDependencies>(
+  store: RoutesStore<Dependencies>,
+  resolved: Record<string, string>,
+): void {
+  store.resolvedForwardMap = resolved;
+  store.hasAnyForward = anyForwardConfigured(store.config);
+}
 
 export function refreshForwardMap(config: RouteConfig): Record<string, string> {
   const map = Object.create(null) as Record<string, string>;
@@ -836,7 +871,7 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store.matcher = artifacts.matcher;
   store.urlParamsCache.clear();
   store.queryParamsCache.clear();
-  store.resolvedForwardMap = artifacts.resolvedForwardMap;
+  adoptForwardState(store, artifacts.resolvedForwardMap);
 
   // Install pre-compiled guards — no re-compile, no throw.
   for (const [name, factory, fn] of compiledActivate) {
@@ -952,7 +987,7 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   if (forwardToPlan !== undefined) {
     store.config.forwardMap = forwardToPlan.forwardMap;
     store.config.forwardFnMap = forwardToPlan.forwardFnMap;
-    store.resolvedForwardMap = forwardToPlan.resolved;
+    adoptForwardState(store, forwardToPlan.resolved);
   }
 
   commitScalarConfig(store, name, {
@@ -1232,6 +1267,7 @@ export function createRoutesStore<
     urlParamsCache: new Map(),
     queryParamsCache: new Map(),
     resolvedForwardMap: artifacts.resolvedForwardMap,
+    hasAnyForward: anyForwardConfigured(artifacts.config),
     routeCustomFields: artifacts.routeCustomFields,
     rootPath: "",
     matcherOptions,

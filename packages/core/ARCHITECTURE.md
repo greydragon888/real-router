@@ -471,6 +471,8 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 | `Array.includes()` for segment cleanup      | Faster than `new Set()` for 1-5 elements                                |
 | FSM `canSend()` — O(1)                      | Cached `#currentTransitions` lookup                                     |
 | `createInterceptable()` fast path           | Empty-array check skips iteration when no interceptors                  |
+| `canonicalize` fast-path gate: 2 reads      | Was 3 — the `?`-declaration term was redundant (#1589)                  |
+| `store.hasAnyForward` — tree-wide gate      | isActiveRoute skips the forwardTo maps when nothing forwards (#1595)    |
 | Lazy event listeners                        | No allocation until first subscription                                  |
 | Cached error rejections                     | Pre-allocated `Promise.reject()` for common errors                      |
 | Async leave: no-abort on sync path          | AbortController.abort() skipped when all leave listeners are sync       |

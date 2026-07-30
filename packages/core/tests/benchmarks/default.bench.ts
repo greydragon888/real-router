@@ -262,7 +262,7 @@ export async function run(): Promise<void> {
   // param navigation: item→item on the same param route — the canonical list
   // click-through. Non-empty params hit the branches every navigate bench
   // above skips: normalizeParams' non-empty arm (the static-route benches all
-  // reuse the frozen EMPTY_PARAMS singleton, #1027), freezeStateInPlace over a
+  // reuse the frozen EMPTY_PARAMS singleton, #1027), freezeStateShell over a
   // real params object, the param-source lookup via getMetaForState (RFC-4 M2 /
   // #1548 — replaced the per-State setStateMetaParams sidecar), and the
   // param-encode inside buildNavigateState's buildPath. Two alternating ids keep

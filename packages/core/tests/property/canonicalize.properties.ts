@@ -21,6 +21,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { arbParamKey, NUM_RUNS } from "./helpers";
+import { EMPTY_SEARCH } from "../../src/constants";
 import { canonicalize } from "../../src/pipeline";
 
 import type { RouteResolver } from "../../src/pipeline";
@@ -153,31 +154,69 @@ describe("canonicalize (pure) — properties", () => {
     },
   );
 
-  // Invariant 4 — channels are frozen AT MERGE TIME,
-  // independently of the state-object freeze that `materialize`'s `skipFreeze`
-  // governs. The navigate path defers the state freeze, so a guard would
-  // otherwise observe mutable bags. The caller's own bag must never be frozen
-  // out from under it.
+  // Invariant 4 — the channels are frozen by the time they are PUBLISHED, which
+  // since #1598 is not the same as "at merge time":
+  //
+  //   - `query` is frozen on EVERY path — the fast path hands over the shared
+  //     `EMPTY_SEARCH` singleton, the slow one gets its own frozen result back
+  //     from `admittedSearch`;
+  //   - `path` is frozen at the merge on the slow path (`mergeWithDefault`) and at
+  //     `materialize` on the fast one, because the fast path's only consumers are
+  //     `buildURL` (reads, returns a string) and `materialize` (publishes, and
+  //     freezes there). No path exists where an unfrozen bag reaches user code —
+  //     the brand is unexported, so those two are the only consumers there can be,
+  //     and every state-producing entry point is pinned in
+  //     `tests/functional/error/helpers.test.ts`.
+  //
+  // What is asserted here is therefore what `canonicalize` itself owns. The
+  // published-state half lives in that functional matrix, which is where it can be
+  // stated over the producers rather than over one stage.
+  //
+  // Crosses both paths on purpose (#1599): a fresh `{...callerSearch}` is neither
+  // `undefined` nor `EMPTY_SEARCH`, so before the other two forms were added every
+  // run of this property took the SLOW path.
   test.prop([fc.string(), arbDefinedBag, arbDefinedBag, arbDefinedBag], {
     numRuns: NUM_RUNS.standard,
   })(
-    "channels are frozen; the caller's bag is not",
+    "the query channel is frozen on both paths; the caller's own bag is not",
     (name, callerParams, callerSearch, defaultBag) => {
+      const queryForms: (SearchParams | undefined)[] = [
+        { ...callerSearch },
+        undefined,
+        EMPTY_SEARCH,
+      ];
+
       for (const routeDefaults of [undefined, defaultBag]) {
-        const params = { ...callerParams };
-        const search = { ...callerSearch };
+        for (const search of queryForms) {
+          const params = { ...callerParams };
 
-        const canonical = canonicalize(
-          makePort(routeDefaults, routeDefaults),
-          name,
-          params,
-          search,
-        );
+          const canonical = canonicalize(
+            makePort(routeDefaults, routeDefaults),
+            name,
+            params,
+            search,
+          );
 
-        expect(Object.isFrozen(canonical.path)).toBe(true);
-        expect(Object.isFrozen(canonical.query)).toBe(true);
-        expect(Object.isFrozen(params)).toBe(false);
-        expect(Object.isFrozen(search)).toBe(false);
+          expect(Object.isFrozen(canonical.query)).toBe(true);
+
+          // The slow path merges into its own bag and freezes it there; the fast
+          // path defers to `materialize`. `routeDefaults` decides which one runs,
+          // together with the query form.
+          const tookFastPath =
+            routeDefaults === undefined &&
+            (search === undefined || search === EMPTY_SEARCH);
+
+          if (!tookFastPath) {
+            expect(Object.isFrozen(canonical.path)).toBe(true);
+          }
+
+          // Never frozen out from under the caller, on either path.
+          expect(Object.isFrozen(params)).toBe(false);
+
+          if (search !== undefined && search !== EMPTY_SEARCH) {
+            expect(Object.isFrozen(search)).toBe(false);
+          }
+        }
       }
     },
   );

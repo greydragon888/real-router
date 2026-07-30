@@ -1,7 +1,7 @@
 // packages/core/src/pipeline/materialize.ts
 
 import { DEFAULT_TRANSITION } from "../constants";
-import { freezeStateInPlace } from "../helpers";
+import { freezeStateShell } from "../helpers";
 
 import type { Canonical } from "./types";
 import type { Params, SearchParams, State } from "../types";
@@ -62,5 +62,19 @@ export function materialize<
     ...(!opts.skipFreeze && { transition: DEFAULT_TRANSITION }),
   } as State<P, S>;
 
-  return opts.skipFreeze ? state : freezeStateInPlace(state);
+  // The path channel is frozen HERE, at the publication boundary — `materialize`
+  // is the one place a `Canonical` becomes something user code can hold (#1598).
+  // BEFORE the `skipFreeze` branch on purpose: that flag defers the state SHELL
+  // (the navigate path attaches `transition` and lets plugins write `context`
+  // after the fact), never the channels, so guards see frozen bags either way.
+  //
+  // `params` ONLY, and that asymmetry is measured rather than stylistic:
+  // `canonical.query` is already frozen on every path — the fast path hands over
+  // the `EMPTY_SEARCH` singleton, the slow one gets it back frozen from
+  // `admittedSearch` — and re-freezing a frozen object is not free (~8 ns), so
+  // freezing both regressed `isActiveRoute-exact` by 9.8 % while freezing one
+  // wins 5-12 % on every producer that never publishes.
+  Object.freeze(state.params);
+
+  return opts.skipFreeze ? state : freezeStateShell(state);
 }
