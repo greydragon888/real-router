@@ -123,7 +123,7 @@ describe("useRouteEnter", () => {
 
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
     flushSync();
 
     expect(handler).not.toHaveBeenCalled();
@@ -140,7 +140,7 @@ describe("useRouteEnter", () => {
     flushSync();
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
     flushSync();
 
     expect(handler).toHaveBeenCalledTimes(1);

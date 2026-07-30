@@ -73,17 +73,19 @@ All hooks that subscribe to route state return `Accessor<T>` — call the access
 
 ### Typed Route Params (`useRoute<P>`)
 
-`useRoute<P>()` accepts an optional generic so `route.params` is typed without an `as` cast at the call site (the cast happens once inside the hook — no runtime overhead):
+`useRoute<P>()` accepts an optional generic so `route.params` is typed without an `as` cast at the call site (the cast happens once inside the hook — no runtime overhead). The generic types the **path** channel only — `route.search` (query channel, RFC-4 M2) keeps its own `SearchParams` shape from `@real-router/core`, always present (`{}` when there are no query params):
 
 ```tsx
 import { useRoute } from "@real-router/solid";
 import type { Params } from "@real-router/core";
 
-type SearchParams = { q: string; sort: "asc" | "desc" } & Params;
+type RouteParams = { id: string } & Params;
 
-function SearchView() {
-  const routeState = useRoute<SearchParams>();
-  return <p>Query: {routeState().route.params.q}</p>; // typed as string
+function UserView() {
+  const routeState = useRoute<RouteParams>();
+  const id = routeState().route.params.id; // typed as string (path channel)
+  const sort = routeState().route.search.sort; // query channel — not narrowed by the generic
+  return <p>User {id}, sort {sort}</p>;
 }
 ```
 
@@ -95,7 +97,7 @@ function SearchView() {
 
 ### Store-Based Hooks (Granular Reactivity)
 
-`useRouteStore()` and `useRouteNodeStore()` use `createStore` + `reconcile` for property-level reactivity. A component reading `state.route?.params.id` won't re-run when `state.route?.params.page` changes:
+`useRouteStore()` and `useRouteNodeStore()` use `createStore` + `reconcile` for property-level reactivity. A component reading `state.route?.params.id` won't re-run when `state.route?.search.page` changes (granularity holds across the path/query channels, not just within one):
 
 ```tsx
 import { useRouteStore } from "@real-router/solid";
@@ -234,6 +236,31 @@ Navigation link with automatic active state detection. Uses `classList` for acti
   View Profile
 </Link>
 ```
+
+#### `routeSearch` prop — query channel
+
+`routeSearch?: SearchParams` — the query (search) channel of the path/query split (RFC-4 M2), parallel to `routeParams`. Feeds the URL query string on click and in `href`, and — paired with `ignoreQueryParams={false}` — the active-state check.
+
+```tsx
+// Pagination link with an explicit query channel; active only on ?page=2
+<Link routeName="users" routeSearch={{ page: "2" }} ignoreQueryParams={false} />
+```
+
+A route's query still works when passed inside `routeParams` (the pre-split path); `routeSearch` is the explicit, type-clean channel.
+
+#### `to` descriptor — single-object target
+
+`<Link>` accepts two mutually-exclusive forms: the channel props above (`routeName` + `routeParams` + `routeSearch`) OR a single `to={NavigationTarget}` descriptor (`{ name, params?, search? }`). Mixing them is a compile error — TypeScript enforces the exclusion via a discriminated union (`LinkProps`), and the shared `resolveLinkTarget` helper is the runtime backstop (`to` wins, `console.warn` if channel props also leak in).
+
+```tsx
+// Channel form
+<Link routeName="users.view" routeParams={{ id: "7" }} routeSearch={{ tab: "posts" }} />
+
+// Descriptor form — equivalent, one object
+<Link to={{ name: "users.view", params: { id: "7" }, search: { tab: "posts" } }} />
+```
+
+`routeOptions` and `hash` are separate props under both forms (`hash` is not part of `NavigationTarget` — #532).
 
 #### `hash` prop — URL fragment / tab-style UIs
 

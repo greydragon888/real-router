@@ -57,7 +57,8 @@ export class ParamsToolbarComponent {
 
     void this.navigator.navigate(
       current.name,
-      { ...current.params, [key]: value },
+      current.params,
+      { ...current.search, [key]: value },
       { reload: true },
     );
   }

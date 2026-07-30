@@ -270,7 +270,7 @@ validateRoutePath(path, routeName, methodName, parentNode?)
 | Query-only          | `"?page"`, `"?q&limit"`   | Query parameter routes                                             |
 | Relative segment    | `"profile"`, `"settings"` | Normalized to a `/`-child (`/profile`), appended to parent (#1407) |
 | Parameterized       | `"/:id"`                  | Dynamic URL params                                                 |
-| Splat               | `"/*path"`                | Catch-all params                                                   |
+| Splat               | `"/*path"`                | Catch-all params — binds only as the LAST segment of the assembled path; an earlier one matches empty and `buildPath` omits it (#1568) |
 
 **Rejected:**
 

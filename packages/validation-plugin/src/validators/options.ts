@@ -25,6 +25,7 @@ const VALID_QUERY_PARAMS = {
 const KNOWN_OPTIONS = new Set<string>([
   "defaultRoute",
   "defaultParams",
+  "defaultSearch",
   "trailingSlash",
   "caseSensitive",
   "queryParamsMode",
@@ -144,26 +145,33 @@ function validateDefaultRoute(defaultRoute: unknown, methodName: string): void {
   }
 }
 
-function validateDefaultParams(
-  defaultParams: unknown,
+/**
+ * Shared by `defaultParams` and its query-channel twin `defaultSearch` — one
+ * rule, two channels (RFC-4 M2 / #1548). Parameterised by the option name
+ * rather than copied, so the two can never drift into accepting different
+ * shapes for the same kind of value.
+ */
+function validateDefaultBag(
+  value: unknown,
+  optionName: string,
   methodName: string,
 ): void {
-  if (defaultParams === undefined) {
+  if (value === undefined) {
     return;
   }
 
-  if (typeof defaultParams === "function") {
+  if (typeof value === "function") {
     return;
   }
 
   if (
-    !defaultParams ||
-    typeof defaultParams !== "object" ||
-    Array.isArray(defaultParams) ||
-    defaultParams.constructor !== Object
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    value.constructor !== Object
   ) {
     throw new TypeError(
-      `[router.${methodName}] Invalid "defaultParams": expected plain object or function, got ${typeof defaultParams}`,
+      `[router.${methodName}] Invalid "${optionName}": expected plain object or function, got ${typeof value}`,
     );
   }
 }
@@ -220,7 +228,8 @@ export function validateOptions(options: unknown, methodName: string): void {
   }
 
   validateDefaultRoute(opts.defaultRoute, methodName);
-  validateDefaultParams(opts.defaultParams, methodName);
+  validateDefaultBag(opts.defaultParams, "defaultParams", methodName);
+  validateDefaultBag(opts.defaultSearch, "defaultSearch", methodName);
   validateStringEnum(
     opts.trailingSlash,
     "trailingSlash",

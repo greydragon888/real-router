@@ -42,7 +42,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       controller.abort(new Error("pre-aborted"));
 
       await expect(
-        router.navigate("users", {}, { signal: controller.signal }),
+        router.navigate("users", {}, undefined, { signal: controller.signal }),
       ).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });
@@ -61,11 +61,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         });
       });
 
-      const promise = router.navigate(
-        "users",
-        {},
-        { signal: controller.signal },
-      );
+      const promise = router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       // Abort the signal mid-navigation
       setTimeout(() => {
@@ -307,11 +305,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         });
       });
 
-      const promise = router.navigate(
-        "users",
-        {},
-        { signal: controller.signal },
-      );
+      const promise = router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       setTimeout(() => {
         controller.abort();
@@ -364,11 +360,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         "addEventListener",
       );
 
-      const state = await router.navigate(
-        "users",
-        {},
-        { signal: controller.signal },
-      );
+      const state = await router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       expect(state.name).toBe("users");
 
@@ -382,11 +376,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       const controller = new AbortController();
 
       // Navigate successfully with signal
-      const state = await router.navigate(
-        "users",
-        {},
-        { signal: controller.signal },
-      );
+      const state = await router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       expect(state.name).toBe("users");
 
@@ -394,11 +386,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       expect(controller.signal.aborted).toBe(false);
 
       // Can still use the signal for another navigation
-      const state2 = await router.navigate(
-        "profile",
-        {},
-        { signal: controller.signal },
-      );
+      const state2 = await router.navigate("profile", {}, undefined, {
+        signal: controller.signal,
+      });
 
       expect(state2.name).toBe("profile");
     });
@@ -429,11 +419,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         controller.abort(new DOMException("Timeout", "TimeoutError"));
       }, 50);
 
-      const promise = router.navigate(
-        "users",
-        {},
-        { signal: controller.signal },
-      );
+      const promise = router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       await vi.runAllTimersAsync();
 
@@ -451,7 +439,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       controller.abort(reason);
 
       const error = await router
-        .navigate("users", {}, { signal: controller.signal })
+        .navigate("users", {}, undefined, { signal: controller.signal })
         .catch((error_: unknown) => error_);
 
       // The pre-aborted signal is caught up front; the error must carry the
@@ -476,7 +464,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       });
 
       const error = await router
-        .navigate("users", {}, { signal: controller.signal })
+        .navigate("users", {}, undefined, { signal: controller.signal })
         .catch((error_: unknown) => error_);
 
       expect(error).toMatchObject({
@@ -490,21 +478,17 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       const controller2 = new AbortController();
 
       // First navigation with controller1
-      const state1 = await router.navigate(
-        "users",
-        {},
-        { signal: controller1.signal },
-      );
+      const state1 = await router.navigate("users", {}, undefined, {
+        signal: controller1.signal,
+      });
 
       expect(state1.name).toBe("users");
       expect(controller1.signal.aborted).toBe(false);
 
       // Second navigation with controller2
-      const state2 = await router.navigate(
-        "profile",
-        {},
-        { signal: controller2.signal },
-      );
+      const state2 = await router.navigate("profile", {}, undefined, {
+        signal: controller2.signal,
+      });
 
       expect(state2.name).toBe("profile");
       expect(controller2.signal.aborted).toBe(false);
@@ -543,11 +527,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         });
       });
 
-      const promise = router.navigate(
-        "users",
-        {},
-        { signal: controller.signal },
-      );
+      const promise = router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       // Abort after guard starts but before it resolves
       setTimeout(() => {
@@ -572,7 +554,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
 
       // Navigate with already-aborted signal — should immediately reject
       await expect(
-        router.navigate("profile", {}, { signal: controller.signal }),
+        router.navigate("profile", {}, undefined, {
+          signal: controller.signal,
+        }),
       ).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });
@@ -615,11 +599,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
 
       controller.abort();
 
-      const promise2 = router.navigate(
-        "orders",
-        {},
-        { signal: controller.signal },
-      );
+      const promise2 = router.navigate("orders", {}, undefined, {
+        signal: controller.signal,
+      });
 
       promise2.catch(() => {});
 
@@ -712,7 +694,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
           }),
       );
 
-      const nav = router.navigate("users", {}, { signal: controller.signal });
+      const nav = router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 10)); // reach the guard
       controller.abort(new Error("external abort"));
@@ -754,7 +738,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
           }),
       );
 
-      const nav = router.navigate("profile", {}, { signal: controller.signal });
+      const nav = router.navigate("profile", {}, undefined, {
+        signal: controller.signal,
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 10));
       controller.abort(new Error("external abort"));
@@ -791,7 +777,9 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
           }),
       );
 
-      const nav = router.navigate("users", {}, { signal: controller.signal });
+      const nav = router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 10));
       controller.abort(new Error("external abort"));

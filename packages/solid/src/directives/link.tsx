@@ -81,6 +81,9 @@ export function link<P extends Params = Params>(
       // `resolvedRouteParams` stays for buildHref (concrete object) + navigate.
       // (#1438 — the audit-§8a hoist reintroduced the default on this path.)
       options.routeParams,
+      // Query channel (RFC-4 M2, #1548) — `use:link` has no active search
+      // channel yet; the `<Link routeSearch>` prop wires it in a follow-up.
+      undefined,
       {
         strict: options.activeStrict ?? false,
         ignoreQueryParams: options.ignoreQueryParams ?? true,
@@ -124,7 +127,14 @@ export function link<P extends Params = Params>(
     }
 
     router
-      .navigate(options.routeName, resolvedRouteParams, resolvedRouteOptions)
+      // Slot-shift (RFC-4 M2 / #1548): query channel at position 3 (unused),
+      // options at position 4.
+      .navigate(
+        options.routeName,
+        resolvedRouteParams,
+        undefined,
+        resolvedRouteOptions,
+      )
       .catch(() => {});
   }
 

@@ -29,7 +29,9 @@ describe("S1: fragment after a query never leaks into a param under a flood", ()
     for (let i = 0; i < 30_000; i++) {
       const ref = `v${i}`;
       const result = matcher.match(`/users/u${i}?ref=${ref}#frag${i}`);
-      const got = result?.params.ref;
+      // Query values live in `MatchResult.search`, path params in `.params`
+      // (RFC-4 M2 / #1548); `ref` is a declared query param.
+      const got = result?.search.ref;
 
       if (got !== ref) {
         mismatched++;
@@ -58,7 +60,7 @@ describe("S2: the fragment strip stays cheap on the hot query path", () => {
 
     for (let i = 0; i < ITER; i++) {
       const got = matcher.match(`/users/u${i % 500}?ref=v${i}#section${i}`)!
-        .params.ref as string;
+        .search.ref as string;
 
       // Result-parity guard on the hot path: each op must recover exactly the
       // declared value `v${i}` with no fragment folded in. A bare

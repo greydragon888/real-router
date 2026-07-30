@@ -183,7 +183,8 @@ Navigation link with automatic active state detection. Uses `$derived` for href 
 | Prop                | Type                        | Default     | Description                                                                                                      |
 | ------------------- | --------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- |
 | `routeName`         | `string`                    | required    | Target route name                                                                                                |
-| `routeParams`       | `Params`                    | `undefined` | Route parameters (omitted → `undefined`, shares one active-route source with `useIsActiveRoute(name)`, #776)     |
+| `routeParams`       | `Params`                    | `undefined` | Route (path) parameters (omitted → `undefined`, shares one active-route source with `useIsActiveRoute(name)`, #776) |
+| `routeSearch`       | `SearchParams`              | `undefined` | Query (search) parameters for the link's target — parallel to `routeParams` (RFC-4 M2, #1548)                    |
 | `routeOptions`      | `NavigationOptions`         | `{}`        | Navigation options (replace, etc.)                                                                               |
 | `class`             | `string`                    | `undefined` | CSS class                                                                                                        |
 | `activeClassName`   | `string`                    | `"active"`  | Class added when route is active                                                                                 |
@@ -194,6 +195,17 @@ Navigation link with automatic active state detection. Uses `$derived` for href 
 | `onclick`           | `(evt: MouseEvent) => void` | `undefined` | Custom click handler. Runs **before** the navigation logic — call `evt.preventDefault()` to suppress navigation. |
 
 All other props are spread onto the `<a>` element.
+
+#### `routeSearch` — query (search) channel
+
+```svelte
+<!-- Pagination link with an explicit query channel; active only on ?page=2 -->
+<Link routeName="users" routeSearch={{ page: "2" }} ignoreQueryParams={false}>
+  Page 2
+</Link>
+```
+
+`routeSearch?: SearchParams` is the query channel of the path/query split (RFC-4 M2, #1548) — parallel to `routeParams` (the path channel). It feeds the URL query string in `href` (forwarded to `buildUrl`/`buildPath`) and, paired with `ignoreQueryParams={false}`, the active-state check.
 
 #### `hash` — URL fragment / tab-style UIs
 
@@ -367,7 +379,7 @@ Factory function that creates a low-level action for adding navigation to any el
 
 The action automatically adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility (skipping `<a>` / `<button>` which already convey link semantics). It handles click events and Enter key navigation.
 
-> **Hash asymmetry vs `<Link hash>`:** `createLinkAction` does **not** accept a `hash` parameter; `<Link hash="x">` does (#532). Use `<Link>` when a hash-aware variant is needed (tab-style UIs, same-route different-fragment navigation through `navigateWithHash`). For pure `use:link` callers, attach a click handler that calls `router.navigate(name, params, { force: true, hash: "x" })` manually if hash control is required.
+> **Hash asymmetry vs `<Link hash>`:** `createLinkAction` does **not** accept a `hash` parameter; `<Link hash="x">` does (#532). Use `<Link>` when a hash-aware variant is needed (tab-style UIs, same-route different-fragment navigation through `navigateWithHash`). For pure `use:link` callers, attach a click handler that calls `router.navigate(name, params, undefined, { force: true, hash: "x" })` manually if hash control is required.
 
 ## Reactive Primitives
 

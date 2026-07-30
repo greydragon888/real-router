@@ -2,6 +2,42 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## Cross-router bench: per-cohort processes instead of one whole-matrix process (OOM fix)
+
+**Problem.** `cross-router-bench.yml`'s matrix step ran the entire 5-cohort matrix in
+**one** node process (`node cross-router/run-all.mjs "$RUNS"`). Over ~2.9 h that process
+accreted the residue of hundreds of `vite build()` calls (Rollup/esbuild caches, module
+graphs, heap fragmentation node never returns to the OS) up to **~10.6 GB anon-rss**. The
+runner is NOT a dedicated VPS as the comments claimed — it is a shared 11 GiB host packed
+with ~24 co-tenant production services (ispmanager: mysql/postgres/redis, apache/nginx/
+php-fpm, several Next.js apps, telegram bots, mail/DNS). On 07-21 a co-tenant
+(`test555-telegram-bot`, python) spiked, the box hit **global OOM**, and the kernel picked
+the fattest process — our bench — as the victim: `actions.runner…: Failed with result
+'oom-kill'` → runner lost its worker → "runner has received a shutdown signal" → job red at
+the **angular** finish (last cohort), 2 min short of the ~2h53m a healthy run takes (run
+29852814520). Journal since 07-10 shows exactly one OOM kill — rare, but structurally
+inevitable while the bench lives on the RAM edge of a co-tenant box.
+
+**Solution.** Drive the five cohorts as **separate processes** in a bash loop
+(`for cohort in react vue solid svelte angular; do node …run-all.mjs "$RUNS" "$cohort"; done`),
+accumulating `rc` so any cohort failure still reddens the job (completeness gate intact) while
+the rest run for a full snapshot. `run-all.mjs` already supports the single-cohort form (arg 3
+= framework); the local `bench-cross-router.sh` wrapper has always driven cohorts
+one-per-invocation, so this is a first-class path, not new code. A fresh heap per cohort caps
+peak RSS at one cohort (~2–3 GB).
+
+**Why it costs nothing methodologically.** Cohorts are **independent** comparisons — react
+pits real-router vs tanstack/react-router, svelte vs sv-router/mateo-router, etc.; their
+numbers are never cross-compared, so the cohort boundary carries no methodological weight. The
+engine INTERLEAVE that DOES matter — round-robin of a cohort's engines in one browser session
+so machine drift hits all engines equally (#1460) — lives entirely inside a single `run-all`
+invocation and is untouched. Provenance is identical across processes on the same machine
+(`commit`/`cpu`/`runner`/`dirty`/`distNewestMtime`), and `env.date` was already stamped
+per-cell (react cells at run start, angular cells ~2.5 h later) — so `deck-data` is unaffected.
+Bonus: the last cohort (angular) no longer measures under the fat process's memory-pressure
+(GC pauses / swap). Caveat: this makes OOM far less likely, not impossible — a hard co-tenant
+spike can still kill a 2–3 GB process; only more RAM / a truly dedicated runner closes it fully.
+
 ## import-x graph rules were silently inert — revived via the typescript settings trio (#1525)
 
 **Problem.** `import-x/no-cycle` sat at error level (universal `**/*.ts` block) while
@@ -3051,7 +3087,6 @@ src/
 ├── guards.ts                 — guard-related logic
 ├── validation.ts             — structural validation
 ├── typeGuards.ts             — type guard functions
-├── stateMetaStore.ts         — WeakMap<State, Params> (replaces State.meta)
 ├── helpers.ts                — internal utilities
 ├── constants.ts              — error codes, constants
 ├── types.ts                  — core type definitions
@@ -3425,6 +3460,35 @@ Module-level `WeakMap<State, Params>` inside `@real-router/core` (`stateMetaStor
 
 - `deepFreezeState()` uses `structuredClone()` → clone loses WeakMap entry. `err.redirect` intentionally has no meta (only needs name + params for redirect target).
 - `_MP` phantom generic preserved on `State<P, _MP>` for backward compatibility.
+
+### Superseded — WeakMap removed in RFC-4 M2 (#1548)
+
+The `stateMetaStore` WeakMap described above is **gone** as of the params/search
+split (RFC-4 Milestone M2). The sidecar existed only so `getTransitionPath` could
+learn a state's per-segment param-source map (`{ segment: { param: "url" | "query" } }`)
+without a public `State.meta` field. That map is **1:1 with the route name** — it is
+exactly what the live matcher already returns from `getMetaByName(name)` — so carrying
+a per-`State` copy was redundant.
+
+**Now:** `getTransitionPath(toState, fromState, getMeta)` takes a `RouteMetaLookup`
+callback (`transitionPath.ts`), wired to `RoutesNamespace.getMetaForState(name)`. Ownership
+is read from the matcher **by `state.name`** at call time, not stored per-State. Removed
+with the WeakMap: `stateMetaStore.ts` (file deleted), `getStateMetaParams` /
+`setStateMetaParams`, the `StateMetaInput` type, and the `meta` argument on the entire
+`makeState` chain (`PluginApi.makeState`, `StateNamespace.makeState`, `RouterInternals.makeState`,
+the `wiring`/`getPluginApi` wrappers). The `#1170` "carry meta onto the writable state"
+block in `NavigationNamespace` is gone too.
+
+**New failure mode it introduced (and how it's handled):** a state whose name is **no
+longer in the tree** (a `replace()`-removed route, or a survivor state after CRUD) now
+resolves `getMeta(name) === undefined`. `getTransitionPath` treats "both names gone" as
+**FAST PATH 3** (full activate/deactivate lists, no ancestor trim) — order-insensitive,
+correct because `shouldUpdateNode` reads the lists by membership. Any state whose name
+IS still in the tree (every navigate-pipeline state, popstate/start, `canNavigateTo`'s
+built target) takes the STANDARD PATH. White-box tests that used to inject meta via a
+3-arg helper `makeState` now build a **real router whose tree contains the tested route
+names** (`tests/functional/routes/shouldUpdateNode.test.ts`) so `getMetaForState` supplies
+the same ownership map the WeakMap used to.
 
 ## TRANSITION_LEAVE_APPROVE — Observable phase between guard phases
 

@@ -57,6 +57,7 @@ function makeRouter(
     navigate: (
       name: string,
       params: Params,
+      _search: unknown,
       opts?: NavigationOptions & { hash?: string; hashChange?: boolean },
     ) => {
       calls.push({ name, params, opts: opts ?? {} });
@@ -79,7 +80,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
           hash,
         });
 
-        void navigateWithHash(router, routeName, {}, hash);
+        void navigateWithHash(router, routeName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
 
@@ -108,7 +109,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, routeName, {}, newHash);
+        void navigateWithHash(router, routeName, {}, undefined, newHash);
 
         expect(calls).toHaveLength(1);
 
@@ -135,7 +136,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, targetName, {}, newHash);
+        void navigateWithHash(router, targetName, {}, undefined, newHash);
 
         expect(calls).toHaveLength(1);
 
@@ -160,7 +161,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
           hash: "",
         });
 
-        void navigateWithHash(router, targetName, {}, undefined);
+        void navigateWithHash(router, targetName, {}, undefined, undefined);
 
         expect(calls).toHaveLength(1);
         expect(calls[0].opts.hash).toBeUndefined();
@@ -178,7 +179,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
           hash: "",
         });
 
-        void navigateWithHash(router, targetName, {}, hash);
+        void navigateWithHash(router, targetName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
         expect(calls[0].opts.hash).toBe(hash);
@@ -192,7 +193,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
       (routeName, hash) => {
         const { router, calls } = makeRouter(undefined);
 
-        void navigateWithHash(router, routeName, {}, hash);
+        void navigateWithHash(router, routeName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
 
@@ -227,7 +228,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, routeName, {}, newHash, {
+        void navigateWithHash(router, routeName, {}, undefined, newHash, {
           force: false,
           hashChange: false,
         });
@@ -256,7 +257,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, targetName, {}, newHash, {
+        void navigateWithHash(router, targetName, {}, undefined, newHash, {
           force: true,
         });
 
@@ -289,7 +290,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
 
         const { router, calls } = makeRouter(undefined);
 
-        void navigateWithHash(router, routeName, {}, argHash, {
+        void navigateWithHash(router, routeName, {}, undefined, argHash, {
           hash: optsHash,
         });
 
@@ -303,7 +304,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
       (routeName, optsHash) => {
         const { router, calls } = makeRouter(undefined);
 
-        void navigateWithHash(router, routeName, {}, undefined, {
+        void navigateWithHash(router, routeName, {}, undefined, undefined, {
           hash: optsHash,
         });
 
@@ -351,7 +352,14 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
       (routeName, extra) => {
         const { router, calls } = makeRouter(undefined);
 
-        void navigateWithHash(router, routeName, {}, undefined, extra);
+        void navigateWithHash(
+          router,
+          routeName,
+          {},
+          undefined,
+          undefined,
+          extra,
+        );
 
         expect(calls).toHaveLength(1);
 
@@ -373,7 +381,7 @@ describe("navigateWithHash — Property Tests (Solid)", () => {
         hash: "",
       });
 
-      void navigateWithHash(router, "other", {}, undefined, {
+      void navigateWithHash(router, "other", {}, undefined, undefined, {
         force: true,
         myCustomKey: 42,
       } as NavigationOptions & { myCustomKey?: number });

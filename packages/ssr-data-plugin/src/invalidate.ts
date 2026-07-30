@@ -23,7 +23,12 @@ import type { Router } from "@real-router/core/types";
  *
  * // Explicit await — pair with a same-route reload
  * invalidate(router, "data");
- * await router.navigate(state.name, state.params, { reload: true });
+ * // Options at slot 4 (RFC-4 M2 / #1548) — slot 3 is the query channel, so
+ * // the pre-M2 spelling lands `{ reload: true }` in `search` and rebuilds the
+ * // URL without the page's own query.
+ * await router.navigate(state.name, state.params, state.search, {
+ *   reload: true,
+ * });
  * ```
  *
  * Cheaper than `router.navigate({ reload: true })` alone in two ways:

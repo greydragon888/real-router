@@ -74,7 +74,7 @@ are the same code.
 | 5 | **No current state → straight navigate** — `router.getState() === undefined` short-circuits the same-route logic | First-time navigation never hits the auto-bypass branch |
 | 6 | **Same route + `hash === undefined` → preserved** — `newHash = hash ?? currentHash`, no flags set | Passing `undefined` signals "don't change the fragment" |
 | 7 | **`extraOptions` pass-through** — fields from `extraOptions` (`replace`, `meta`, …) survive the hash merge | Consumers can set `{ replace: true }` alongside `hash="x"` |
-| 8 | **Same route + different params → no auto-bypass** — `shallowEqual(current.params, routeParams) === false` gates the branch | Cross-params navigation reaches the normal path |
+| 8 | **Same route + different params or search → no auto-bypass** — `shallowEqual(current.params, routeParams) === false` OR `shallowEqual(current.search, routeSearch ?? current.search) === false` gates the branch (query channel added RFC-4 M2, #1548) | Cross-params or cross-search navigation reaches the normal path |
 | 9 | **`current.context.url` absent → defensive `""` fallback** | Router started without a URL plugin (memory-only) still works correctly |
 | 10 | **Consumer `force=true` survives every branch** — last-write-wins, no downgrade | Auto-bypass cannot downgrade consumer's explicit flags |
 | 11 | **Same route + `currentHash=""` + `hash=undefined` → preserved without flags** | The "already at no-fragment, no nav-intent" path |

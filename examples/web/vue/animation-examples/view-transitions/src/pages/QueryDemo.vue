@@ -18,9 +18,11 @@ type Filter = "all" | "letter" | "number" | "color";
 // activates/deactivates — so a filter=all → filter=letter change would
 // leave `filter` frozen at "all" forever, and all buttons would look
 // like the initial active one.
-const { route } = useRoute<{ filter?: Filter }>();
+const { route } = useRoute();
 
-const filter = computed<Filter>(() => route.value?.params.filter ?? "all");
+const filter = computed<Filter>(
+  () => (route.value?.search.filter as Filter | undefined) ?? "all",
+);
 
 const visible = computed(() =>
   filter.value === "all"
@@ -46,7 +48,7 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
         v-for="value in FILTERS"
         :key="value"
         routeName="queryDemo"
-        :routeParams="{ filter: value }"
+        :routeSearch="{ filter: value }"
         :ignoreQueryParams="false"
       >
         {{ value }}

@@ -3,7 +3,12 @@
 
 import { getPluginApi } from "@real-router/core/api";
 
-import type { Params, PluginFactory, State } from "@real-router/core";
+import type {
+  Params,
+  SearchParams,
+  PluginFactory,
+  State,
+} from "@real-router/core";
 
 /**
  * Options for creating a tracking plugin that records hook calls
@@ -100,7 +105,7 @@ export const createStateModifierPlugin = (
 
         modifyState({ params: modifiedParams } as unknown as State);
 
-        return { name: result.name, params: modifiedParams };
+        return { name: result.name, params: modifiedParams, search: {} };
       },
     );
 
@@ -195,23 +200,38 @@ export const createPersistentParamsPlugin = (
 
     const removeInterceptor = api.addInterceptor(
       "forwardState",
-      (next, name: string, params: Params) => {
-        const result = next(name, params) as { name: string; params: Params };
-
-        const mergedParams: Params = {
-          ...persistentParamsValues,
-          ...result.params,
+      (next, name: string, params: Params, search?: SearchParams) => {
+        // Injects into the SEARCH channel and forwards the caller's `search`
+        // through — what the real `persistent-params` does since #1563. The
+        // earlier shape took two arguments, called `next(name, params)` and
+        // returned `search: {}`, which silently DESTROYED the caller's query
+        // bag; that stayed invisible only while persisted keys still rode in
+        // `params` (#1572).
+        const result = next(name, params, search) as {
+          name: string;
+          params: Params;
+          search: SearchParams;
         };
 
-        return { name: result.name, params: mergedParams };
+        return {
+          name: result.name,
+          params: result.params,
+          search: { ...persistentParamsValues, ...result.search },
+        };
       },
     );
 
     return {
       onTransitionSuccess: (toState: State) => {
         persistentParams.forEach((param) => {
-          if (toState.params[param] !== undefined) {
-            persistentParamsValues[param] = toState.params[param];
+          // #1549 3a: an undeclared persisted key lands in state.params (the
+          // removed splitParamsBySearch used to route it to state.search). Capture
+          // from whichever channel holds it — params for undeclared keys, search
+          // for query-declared ones — so re-injection below actually persists it.
+          const value = toState.params[param] ?? toState.search[param];
+
+          if (value !== undefined) {
+            persistentParamsValues[param] = value;
           }
         });
       },

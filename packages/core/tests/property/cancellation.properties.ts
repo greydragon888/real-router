@@ -60,7 +60,7 @@ interface Step {
 async function cancelAndAssert(router: Router, step: Step): Promise<boolean> {
   const controller = new AbortController();
   const opts = step.action === "external" ? { signal: controller.signal } : {};
-  const nav = router.navigate(step.target, {}, opts).then(
+  const nav = router.navigate(step.target, {}, undefined, opts).then(
     () => "resolved",
     () => "rejected",
   );
@@ -295,7 +295,7 @@ async function runCell(cell: Cell): Promise<void> {
   // external code cancels it after the tick below.
 
   const opts = cell.source === "external" ? { signal: controller.signal } : {};
-  const nav = router.navigate("t", {}, opts).then(
+  const nav = router.navigate("t", {}, undefined, opts).then(
     () => "resolved",
     (error: unknown) => (error as { code?: string }).code ?? "rejected",
   );

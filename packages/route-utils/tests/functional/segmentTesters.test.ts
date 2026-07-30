@@ -340,6 +340,7 @@ describe("segmentTesters", () => {
     const state: State = {
       name: "admin.users.profile.edit",
       params: { userId: "123" },
+      search: {},
       path: "/admin/users/123/profile/edit",
       transition: STUB_TRANSITION,
       context: {},

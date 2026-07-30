@@ -61,7 +61,7 @@ describe("core/observable/addEventListener", () => {
       getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, cb);
       await router.start("/");
 
-      await router.navigate("users", {}, { reload: true });
+      await router.navigate("users", {}, undefined, { reload: true });
 
       expect(cb).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users" }),

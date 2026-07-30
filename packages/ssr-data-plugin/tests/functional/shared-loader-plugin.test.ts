@@ -27,6 +27,7 @@ const buildServerState = (context: Record<string, unknown>): State =>
   ({
     name: "users",
     params: { id: "42" },
+    search: {},
     path: "/users/42",
     transition: {
       phase: "activating",

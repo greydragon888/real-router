@@ -35,8 +35,10 @@ describe("Data Loader Stress", () => {
   it("200 sequential start() calls with loader: each returns correct data", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: DataLoaderFactoryMap = {
-      "users.profile": () => (params) =>
-        Promise.resolve({ userId: params.id, ts: Date.now() }),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve({ userId: params.id, ts: Date.now() }),
     };
 
     for (let i = 0; i < 200; i++) {
@@ -56,7 +58,10 @@ describe("Data Loader Stress", () => {
   it("500 concurrent clone+start+dispose: per-request isolation preserved", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: DataLoaderFactoryMap = {
-      "users.profile": () => (params) => Promise.resolve({ id: params.id }),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve({ id: params.id }),
     };
 
     const results = await Promise.all(
@@ -82,7 +87,7 @@ describe("Data Loader Stress", () => {
     const homeLoader = vi.fn().mockResolvedValue({ page: "home" });
     const profileLoader = vi
       .fn()
-      .mockImplementation((params: { id: string }) =>
+      .mockImplementation(({ params }: { params: { id: string } }) =>
         Promise.resolve({ user: params.id }),
       );
     const aboutLoader = vi.fn().mockResolvedValue({ page: "about" });
@@ -148,7 +153,10 @@ describe("Data Loader Stress", () => {
   it("1000 clone+start+dispose cycles: no memory leak via WeakRef", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const loaders: DataLoaderFactoryMap = {
-      "users.profile": () => (params) => Promise.resolve({ id: params.id }),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve({ id: params.id }),
     };
 
     const refs: WeakRef<object>[] = [];

@@ -10,12 +10,12 @@
 ```typescript
 // Without plugin — scattered subscribe() calls with route checks:
 router.subscribe(({ route, previousRoute }) => {
-  if (route.name === "catalog") loadServices(route.params);
+  if (route.name === "catalog") loadServices(route.search);
   if (previousRoute?.name === "editor") saveEditorState();
 });
 
 // With plugin — declarative, per-route:
-{ name: "catalog", path: "/catalog?q&sort", onNavigate: () => (s) => loadServices(s.params) }
+{ name: "catalog", path: "/catalog?q&sort", onNavigate: () => (s) => loadServices(s.search) }
 { name: "editor", path: "/editor", onLeave: () => () => saveEditorState() }
 ```
 
@@ -39,7 +39,7 @@ const routes = [
     path: "/catalog?q&sort&dir",
     // Fires on entry AND on param-change — recommended default
     onNavigate: () => (toState) => {
-      loadServices(toState.params);
+      loadServices(toState.search);
     },
   },
   {
@@ -109,7 +109,7 @@ Redirecting with a **synchronous** `router.navigate()` inside a hook throws `REE
   path: "/catalog?q&sort&dir",
   onNavigate: () => (toState) => {
     // Fires on entry from another route AND on filter/sort param changes
-    loadServices(toState.params);
+    loadServices(toState.search);
   },
 }
 ```
@@ -148,7 +148,7 @@ Redirecting with a **synchronous** `router.navigate()` inside a hook throws `REE
   name: "search",
   path: "/search?q",
   onStay: () => (toState) => {
-    searchStore.setQuery(toState.params.q);
+    searchStore.setQuery(toState.search.q);
   },
 }
 ```

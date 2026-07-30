@@ -386,7 +386,7 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
 
       const unsubLeave = router.subscribeLeave(leaveListener);
 
-      await router.navigate("users", {}, { forceDeactivate: true });
+      await router.navigate("users", {}, undefined, { forceDeactivate: true });
 
       expect(deactivateGuard).not.toHaveBeenCalled();
       expect(leaveListener).toHaveBeenCalledTimes(1);

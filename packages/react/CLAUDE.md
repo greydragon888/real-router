@@ -229,20 +229,20 @@ dist/
 | `children`           | `ReactNode`                        | —           | Subtree that consumes router context (required — provider would be useless without descendants)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `announceNavigation` | `boolean \| RouteAnnouncerOptions` | `false`     | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region. `true` = defaults; pass `{ prefix?, getAnnouncementText? }` to customize the announced text (falls back to the default h1 → title → route-name chain when the callback returns empty or throws)                                                                                                                                                                                                                                                                                                       |
 | `scrollRestoration`  | `ScrollRestorationOptions`         | `undefined` | Opt into scroll capture + restoration. `undefined` = off. See [Scroll Restoration](../../real-router.wiki/Scroll-Restoration.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Tracks the topmost visible anchor inside the configured scroll container and emits `router.navigate(name, params, { hash, replace: true, force: true, hashChange: true })`. Required: `{ selector: string }` (CSS selector for anchors). Optional `rootMargin`, `scrollContainer`. `undefined` / empty `selector` = off. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) |
+| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Tracks the topmost visible anchor inside the configured scroll container and emits `router.navigate(name, params, undefined, { hash, replace: true, force: true, hashChange: true })` (query channel unused — opts at position 4, RFC-4 M2 / #1548). Required: `{ selector: string }` (CSS selector for anchors). Optional `rootMargin`, `scrollContainer`. `undefined` / empty `selector` = off. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) |
 | `viewTransitions`    | `boolean`                          | `false`     | Opt into View Transitions API integration via `createViewTransitions` utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## Hooks
 
-| Hook                               | Purpose                                                                                                                                                                | Re-renders                     |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `useRouter()`                      | Get router instance                                                                                                                                                    | Never                          |
-| `useNavigator()`                   | Get Navigator (stable ref) — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more                                                                    | Never                          |
-| `useRoute()`                       | Get route state                                                                                                                                                        | Every navigation               |
-| `useRouteNode(name)`               | Subscribe to specific node                                                                                                                                             | Only when node active/inactive |
-| `useRouteUtils()`                  | Get RouteUtils instance                                                                                                                                                | Never                          |
-| `useRouterTransition()`            | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`                                                                                | On transition start/end        |
-| `useRouteExit(handler, options?)`  | Wrap `router.subscribeLeave` with reentrant abort pre-check, same-route skip, latest-handler ref. Handler can return `Promise` — router blocks on it. Returns `void`.  | Never                          |
+| Hook                               | Purpose                                                                                                                                                                                                                                                                                                                                   | Re-renders                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `useRouter()`                      | Get router instance                                                                                                                                                                                                                                                                                                                       | Never                          |
+| `useNavigator()`                   | Get Navigator (stable ref) — exposes navigate, subscribe, subscribeLeave, isLeaveApproved, and more                                                                                                                                                                                                                                       | Never                          |
+| `useRoute()`                       | Get route state                                                                                                                                                                                                                                                                                                                           | Every navigation               |
+| `useRouteNode(name)`               | Subscribe to specific node                                                                                                                                                                                                                                                                                                                | Only when node active/inactive |
+| `useRouteUtils()`                  | Get RouteUtils instance                                                                                                                                                                                                                                                                                                                   | Never                          |
+| `useRouterTransition()`            | Track transition lifecycle — `{ isTransitioning, isLeaveApproved, toRoute, fromRoute }`                                                                                                                                                                                                                                                   | On transition start/end        |
+| `useRouteExit(handler, options?)`  | Wrap `router.subscribeLeave` with reentrant abort pre-check, same-route skip, latest-handler ref. Handler can return `Promise` — router blocks on it. Returns `void`.                                                                                                                                                                     | Never                          |
 | `useRouteEnter(handler, options?)` | Fire `handler` once on nav-driven mount with `{ route, previousRoute }`. Skip-initial / skip-same-route / StrictMode-immune — guards delegated to the shared `createRouteEnterGate` (`@real-router/sources`, #1435); the gate is held via `useState`'s lazy initializer so its dedupe survives StrictMode effect re-runs. Returns `void`. | Never                          |
 
 > **`/legacy` entry exports 6 hooks** (omits `useRouteExit` and `useRouteEnter`) — those depend on React 19 concurrent-mode scheduling. Use `router.subscribeLeave()` / `useEffect` directly on React 18.
@@ -252,7 +252,7 @@ dist/
 Link uses fire-and-forget navigation:
 
 ```typescript
-void router.navigate(routeName, stableParams, stableOptions);
+void router.navigate(routeName, stableParams, stableSearch, stableOptions);
 ```
 
 For per-navigation result handling, call `router.navigate()` in an `onClick` handler:
@@ -391,7 +391,7 @@ useRouteEnter(({ route, previousRoute }) => {
 
 `useRouteExit`'s handler can return a `Promise` — the router awaits it before committing the new state. Returning a long-running animation Promise gives router-coordinated exit timing. `useRouteEnter` is fire-and-forget (`void`) and fires after the new component mounts. Both default to `skipSameRoute: true` so query-only navigations (sort/filter) don't trigger.
 
-**No synchronous `navigate()` from a `useRouteExit` handler.** The handler runs inside the transition's leave-dispatch window, so a synchronous `router.navigate(...)` (or `navigateToDefault` / `navigateToState` / `navigateToNotFound`) in the handler body throws `REENTRANT_NAVIGATION` — core bans reentrant navigation from a transition listener (RFC navigation-cancellation-unification §4). To redirect on exit, defer past the sync dispatch: `await` the exit work first, or `queueMicrotask(() => router.navigate(...))`; a navigate issued after the handler's first `await` runs once the transition settles and is allowed. Reach for a `canDeactivate` guard, not `useRouteExit`, when the goal is to *block* or gate the departure.
+**No synchronous `navigate()` from a `useRouteExit` handler.** The handler runs inside the transition's leave-dispatch window, so a synchronous `router.navigate(...)` (or `navigateToDefault` / `navigateToState` / `navigateToNotFound`) in the handler body throws `REENTRANT_NAVIGATION` — core bans reentrant navigation from a transition listener (RFC navigation-cancellation-unification §4). To redirect on exit, defer past the sync dispatch: `await` the exit work first, or `queueMicrotask(() => router.navigate(...))`; a navigate issued after the handler's first `await` runs once the transition settles and is allowed. Reach for a `canDeactivate` guard, not `useRouteExit`, when the goal is to _block_ or gate the departure.
 
 ### useRoute throws when route is undefined
 
@@ -419,15 +419,15 @@ legitimate business state, not lifecycle misuse.
 
 ### Typed route params via generic
 
-`useRoute<P>()` accepts an optional generic to type `route.params` without `as` casts at the call site. The generic is erased at compile time — no runtime change. The cast moves from user code into the hook body, in one place.
+`useRoute<P>()` accepts an optional generic to type `route.params` — the path channel (RFC-4 M2 / #1548) — without `as` casts at the call site. The generic is erased at compile time — no runtime change. The cast moves from user code into the hook body, in one place. The generic types `route.params` only; `route.search` (the query channel) has no dedicated generic slot on this hook today and stays typed as the base `SearchParams`.
 
 ```typescript
-type SearchParams = { q: string; sort: string } & Params;
+type RouteParams = { id: string; tab: string } & Params;
 
-const { route } = useRoute<SearchParams>();
+const { route } = useRoute<RouteParams>();
 
-route.params.q; // typed as string
-route.params.sort; // typed as string
+route.params.id; // typed as string
+route.params.tab; // typed as string
 ```
 
 `RouteContext<P>` also accepts a generic, so consumers can propagate typed params across helpers.
@@ -473,7 +473,7 @@ const params = useMemo(() => ({ filters: [1, 2] }), [...]);
 
 The comparator covers all explicit `LinkProps` (`routeName`, `className`, `activeClassName`,
 `activeStrict`, `ignoreQueryParams`, `hash`, `onClick`, `target`, `style`, `children`) plus
-`routeParams`/`routeOptions` via `shallowEqual`. Anchor-spread props (`data-*`, `aria-*`, `id`,
+`routeParams`/`routeSearch`/`routeOptions` via `shallowEqual`. Anchor-spread props (`data-*`, `aria-*`, `id`,
 etc.) are NOT compared — they don't affect Link's hooks.
 
 ### `<Link hash>` Prop (#532)
@@ -505,6 +505,44 @@ Active state is hash-aware: when `hash` is set, the Link is active iff route mat
 // For pagination links:
 <Link routeName="users" ignoreQueryParams={false} />
 ```
+
+### `routeSearch` Prop (#1548)
+
+`routeSearch?: SearchParams` — the query (search) channel of the path/query split
+(RFC-4 M2), parallel to `routeParams`. Feeds the URL query string on click and in
+`href` (passed to `buildUrl` / `buildPath` at position 3), and — paired with
+`ignoreQueryParams={false}` — the active-state check.
+
+```tsx
+// Pagination link with an explicit query channel; active only on ?page=2
+<Link routeName="users" routeSearch={{ page: "2" }} ignoreQueryParams={false} />
+```
+
+A route's query still works when passed inside `routeParams` (the pre-split path);
+`routeSearch` is the explicit, type-clean channel. `InkLink` accepts the same prop.
+
+### `to` Descriptor Prop (#1548)
+
+`<Link>` accepts two **mutually-exclusive** forms — the channel props above
+(`routeName` + `routeParams` + `routeSearch`) OR a single `to={NavigationTarget}`
+descriptor (`{ name, params?, search? }`). `LinkProps` is a discriminated union
+(`to?: never` in the channel branch, `routeName?: never` in the descriptor
+branch), so mixing them is a **compile error**. At runtime the shared
+`resolveLinkTarget` helper is the backstop — `to` wins and a `console.warn` fires
+if channel props leak in via a JS consumer or a spread.
+
+```tsx
+// Channel form
+<Link routeName="users.view" routeParams={{ id: "7" }} routeSearch={{ tab: "posts" }} />
+
+// Descriptor form — equivalent, one object
+<Link to={{ name: "users.view", params: { id: "7" }, search: { tab: "posts" } }} />
+```
+
+`routeOptions` / `hash` are separate props under BOTH forms (hash is not part of
+`NavigationTarget` — #532). `InkLink` stays channel-only. react/preact/solid
+enforce the exclusion in the type; svelte/vue/angular enforce it at runtime only
+(their prop systems preclude a strict never-union).
 
 ### fallback and keepAlive Together
 

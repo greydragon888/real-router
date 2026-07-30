@@ -52,10 +52,19 @@ describe("trailingSlash: preserve — matchPath re-attaches the source slash", (
   });
 
   it("re-attaches the trailing slash BEFORE the query string", () => {
-    expect(match(usersRoute, "/users/?q=1")?.path).toBe("/users/?q=1");
+    // RFC-4 M2 (#1548): `state.path` is the FULL URL (query included) — the
+    // trailing slash is re-attached to the path part, BEFORE the query string —
+    // and `q` also round-trips through the `.search` channel.
+    const m = match(usersRoute, "/users/?q=1");
+
+    expect(m?.path).toBe("/users/?q=1");
+    expect(m?.search).toStrictEqual({ q: 1 });
   });
 
   it("leaves the query path unchanged when the source had no trailing slash", () => {
-    expect(match(usersRoute, "/users?q=1")?.path).toBe("/users?q=1");
+    const m = match(usersRoute, "/users?q=1");
+
+    expect(m?.path).toBe("/users?q=1");
+    expect(m?.search).toStrictEqual({ q: 1 });
   });
 });

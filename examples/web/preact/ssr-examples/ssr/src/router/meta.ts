@@ -40,6 +40,7 @@ const DEFAULTS: PageMeta = {
 export function getMetaForState(state: {
   name: string;
   params: Record<string, unknown>;
+  search: Record<string, unknown>;
 }): PageMeta {
   switch (state.name) {
     case "home": {
@@ -52,7 +53,7 @@ export function getMetaForState(state: {
       };
     }
     case "users": {
-      const sort = state.params.sort === "desc" ? "desc" : "asc";
+      const sort = state.search.sort === "desc" ? "desc" : "asc";
 
       return {
         title: `All Users (sorted ${sort}) — Real-Router Preact SSR`,

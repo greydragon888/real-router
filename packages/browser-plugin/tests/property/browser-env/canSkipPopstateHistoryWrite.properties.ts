@@ -155,7 +155,17 @@ describe("canSkipPopstateHistoryWrite Properties", () => {
           const committed = live as State;
 
           expect(committed.path).toBe(toState.path);
-          expect(areStatesEqual(toState, committed, false)).toBe(true);
+
+          // `canSkipPopstateHistoryWrite` backfills an empty query bag for a
+          // search-less (pre-M2, #1548) live entry before comparing; mirror that
+          // here so this independent invariant re-check compares the same
+          // normalized shape instead of throwing on the missing `search` channel.
+          const normalized: State =
+            (committed as Partial<State>).search === undefined
+              ? { ...committed, search: {} }
+              : committed;
+
+          expect(areStatesEqual(toState, normalized, false)).toBe(true);
         }
       },
     );

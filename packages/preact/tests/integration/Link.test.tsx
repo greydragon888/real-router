@@ -426,14 +426,73 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
-      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined);
+      expect(buildUrlSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        undefined,
+      );
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/custom-url");
+    });
+
+    it("should decompose a `to` descriptor into name/params/search (#1548)", () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        <Link
+          to={{
+            name: "one-more-test",
+            params: { id: "7" },
+            search: { tab: "posts" },
+          }}
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"));
+
+      expect(navigateSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        { id: "7" },
+        { tab: "posts" },
+        expect.anything(),
+      );
+    });
+
+    it("should warn when `to` and channel props are both supplied (#1548)", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      render(
+        // @ts-expect-error — the union rejects mixing `to` with channel props;
+        // this exercises the runtime backstop for JS consumers / spreads.
+        <Link
+          to={{ name: "one-more-test" }}
+          routeName="users"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("received both `to` and channel props"),
+      );
+
+      warnSpy.mockRestore();
     });
 
     it("should pass hash option to buildUrl when hash prop is set (#532)", () => {
       const buildUrlSpy = vi.fn(
-        (_name: string, _params?: object, opts?: { hash?: string }): string =>
-          opts?.hash ? `/url#${opts.hash}` : "/url",
+        (
+          _name: string,
+          _params?: object,
+          _search?: object,
+          opts?: { hash?: string },
+        ): string => (opts?.hash ? `/url#${opts.hash}` : "/url"),
       );
 
       router.buildUrl = buildUrlSpy;
@@ -445,13 +504,9 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
-      expect(buildUrlSpy).toHaveBeenCalledWith(
-        "one-more-test",
-        {},
-        {
-          hash: "anchor",
-        },
-      );
+      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined, {
+        hash: "anchor",
+      });
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#anchor");
     });
 
@@ -472,7 +527,7 @@ describe("Link - Integration Tests", () => {
       render(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "123", filter: "active" }}
+          routeSearch={{ id: "123", filter: "active" }}
           data-testid="link"
         >
           Test
@@ -490,7 +545,7 @@ describe("Link - Integration Tests", () => {
       const { rerender } = render(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "1" }}
+          routeSearch={{ id: "1" }}
           data-testid="link"
         >
           Test
@@ -505,7 +560,7 @@ describe("Link - Integration Tests", () => {
       rerender(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "2" }}
+          routeSearch={{ id: "2" }}
           data-testid="link"
         >
           Test
@@ -522,7 +577,7 @@ describe("Link - Integration Tests", () => {
       render(
         <Link
           routeName="one-more-test"
-          routeParams={{
+          routeSearch={{
             search: "test query",
             sort: "asc",
             page: "1",

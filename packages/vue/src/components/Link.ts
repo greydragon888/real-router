@@ -8,10 +8,16 @@ import {
   buildHref,
   buildActiveClassName,
   navigateWithHash,
+  resolveLinkTarget,
   shallowEqual,
 } from "../dom-utils";
 
-import type { Params, NavigationOptions } from "@real-router/core";
+import type {
+  Params,
+  NavigationOptions,
+  NavigationTarget,
+  SearchParams,
+} from "@real-router/core";
 import type { PropType } from "vue";
 
 type OnClickHandler = (evt: MouseEvent) => void;
@@ -80,9 +86,17 @@ export const Link = defineComponent({
   // attrs.onClick manually inside handleClick to preserve preventDefault.
   inheritAttrs: false,
   props: {
+    // Optional (was required) since the descriptor form (`to`) omits it — the
+    // two forms are mutually exclusive, enforced at runtime by resolveLinkTarget.
     routeName: {
       type: String,
-      required: true,
+      default: undefined,
+    },
+    // Descriptor form (RFC-4 M2 B2, #1548): `to={{ name, params?, search? }}`,
+    // mutually exclusive with the routeName/routeParams/routeSearch channels.
+    to: {
+      type: Object as PropType<NavigationTarget>,
+      default: undefined,
     },
     // Default `undefined` (NOT EMPTY_PARAMS): an omitted `routeParams` must reach
     // `createActiveRouteSource` as `undefined` so it keys the active source as ""
@@ -93,6 +107,11 @@ export const Link = defineComponent({
     // object is required.
     routeParams: {
       type: Object as PropType<Params>,
+      default: undefined,
+    },
+    // Query (search) channel (RFC-4 M2, #1548) — parallel to routeParams.
+    routeSearch: {
+      type: Object as PropType<SearchParams>,
       default: undefined,
     },
     routeOptions: {
@@ -174,21 +193,41 @@ export const Link = defineComponent({
         [
           props.routeName,
           stableParams.value,
+          props.routeSearch,
+          props.to,
           props.activeStrict,
           props.ignoreQueryParams,
           props.hash,
         ] as const,
       (
-        [routeName, routeParams, activeStrict, ignoreQueryParams, hash],
+        [
+          routeName,
+          routeParams,
+          routeSearch,
+          to,
+          activeStrict,
+          ignoreQueryParams,
+          hash,
+        ],
         _prev,
         onCleanup,
       ) => {
+        // Resolve the two prop forms (RFC-4 M2 B2, #1548): `to` supersedes the
+        // channel props (dev-warn on conflict).
+        const resolved = resolveLinkTarget(
+          to,
+          routeName ?? "",
+          routeParams,
+          routeSearch,
+        );
+
         // Hash-aware active (#532): pass hash through so tab links with the
         // same routeName but different `hash` props don't all light up.
         const source = createActiveSource(
           router,
-          routeName,
-          routeParams,
+          resolved.name,
+          resolved.params,
+          resolved.search,
           activeStrict,
           ignoreQueryParams,
           hash,
@@ -205,14 +244,22 @@ export const Link = defineComponent({
       { immediate: true, flush: "sync" },
     );
 
-    const href = computed(() =>
-      buildHref(
+    const href = computed(() => {
+      const resolved = resolveLinkTarget(
+        props.to,
+        props.routeName ?? "",
+        stableParams.value,
+        props.routeSearch,
+      );
+
+      return buildHref(
         router,
-        props.routeName,
-        stableParams.value ?? EMPTY_PARAMS,
+        resolved.name,
+        resolved.params ?? EMPTY_PARAMS,
+        resolved.search,
         props.hash,
-      ),
-    );
+      );
+    });
 
     const finalClassName = computed(() =>
       buildActiveClassName(isActive.value, props.activeClassName, props.class),
@@ -236,10 +283,19 @@ export const Link = defineComponent({
       }
 
       evt.preventDefault();
+
+      const resolved = resolveLinkTarget(
+        props.to,
+        props.routeName ?? "",
+        props.routeParams,
+        props.routeSearch,
+      );
+
       navigateWithHash(
         router,
-        props.routeName,
-        props.routeParams ?? EMPTY_PARAMS,
+        resolved.name,
+        resolved.params ?? EMPTY_PARAMS,
+        resolved.search,
         props.hash,
         props.routeOptions,
       ).catch(() => {});

@@ -88,7 +88,7 @@ describe("Rapid Hash Navigation", () => {
     for (let i = 0; i < 200; i++) {
       const name = i % 2 === 0 ? "home" : "users.list";
 
-      await router.navigate(name, {}, { replace: true }).catch(noop);
+      await router.navigate(name, {}, undefined, { replace: true }).catch(noop);
     }
 
     expect(replaceStateSpy).toHaveBeenCalledTimes(200);

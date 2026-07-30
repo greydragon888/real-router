@@ -1,6 +1,8 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
+import { getPluginApi } from "@real-router/core/api";
+
 import { arbState, createFixtureRouter, NUM_RUNS } from "./helpers";
 import { DEFAULT_TRANSITION } from "../helpers";
 
@@ -23,6 +25,7 @@ describe("areStatesEqual Properties", () => {
     return {
       name: "users.view",
       params,
+      search: {},
       path: "/users/x",
       transition: DEFAULT_TRANSITION,
       context: {},
@@ -107,6 +110,57 @@ describe("areStatesEqual Properties", () => {
 
       expect(same).toBe(true);
       expect(diff).toBe(false);
+    },
+  );
+
+  // ── #1554: equality must not depend on where the values came from ──────────
+  //
+  // The class-guard for the whole provenance defect: for ANY round-trippable bag,
+  // a state built from an intent must compare equal to the state the SAME path
+  // matches back to. The URL direction parses (`?page=2` → `2`, `?q=1&q=2` →
+  // `[1, 2]`), the intent direction keeps the caller's values — a `===`-based
+  // comparison fails this for every numeric-looking value.
+  const arbQueryScalar = fc.oneof(
+    fc.stringMatching(/^[a-z0-9]{1,6}$/),
+    fc.integer({ min: -9999, max: 9999 }),
+    fc.boolean(),
+    fc.constant(null),
+  );
+
+  test.prop(
+    [arbQueryScalar, fc.array(arbQueryScalar, { minLength: 1, maxLength: 3 })],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "provenance independence: makeState(intent) === matchPath(its own path)",
+    (q, page) => {
+      const provenanceRouter = createFixtureRouter();
+      const api = getPluginApi(provenanceRouter);
+
+      // `search` (path `/search?q&page`) declares both query names, so every
+      // generated value travels the query channel in BOTH directions.
+      const fromIntent = api.makeState("search", {}, { q, page });
+      const fromUrl = api.matchPath(fromIntent.path);
+
+      expect(fromUrl).toBeDefined();
+      expect(provenanceRouter.areStatesEqual(fromIntent, fromUrl, false)).toBe(
+        true,
+      );
+    },
+  );
+
+  test.prop([fc.integer({ min: 0, max: 99_999 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "provenance independence: a numeric path param matches its decoded string",
+    (id) => {
+      const provenanceRouter = createFixtureRouter();
+
+      expect(
+        provenanceRouter.areStatesEqual(
+          viewState({ id }),
+          viewState({ id: String(id) }),
+        ),
+      ).toBe(true);
     },
   );
 

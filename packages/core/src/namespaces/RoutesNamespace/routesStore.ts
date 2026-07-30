@@ -3,10 +3,13 @@
 import { DEFAULT_ROUTE_NAME, STANDARD_ROUTE_KEYS } from "./constants";
 import { resolveForwardChain } from "./forwardChain";
 import {
+  assertRouteDefaultChannelsFor,
   assignConfigEntries,
   createEmptyConfig,
+  queryParamsOf,
   sanitizeRoute,
 } from "./helpers";
+import { assertChannelCorrect } from "../../channels";
 import {
   createMatcher,
   createRouteTree,
@@ -25,6 +28,8 @@ import type {
   ForwardToCallback,
   GuardFn,
   Params,
+  ParamsSearch,
+  SearchParams,
   RouteConfigUpdate,
   RouterLogger,
   GuardFnFactory,
@@ -62,6 +67,14 @@ export interface RoutesStore<
    * stay frozen to a route's pre-mutation param shape (#723).
    */
   readonly urlParamsCache: Map<string, string[]>;
+  /**
+   * Per-route-name cache of declared query param names (`?a&b` across the
+   * route's segments), read by `RoutesNamespace.getQueryParams` — THE registry
+   * every channel mechanism classifies through and the URL build prints from
+   * (#1556). Same lifecycle as `urlParamsCache`: cleared on every `matcher`
+   * rebuild.
+   */
+  readonly queryParamsCache: Map<string, string[]>;
   resolvedForwardMap: Record<string, string>;
   routeCustomFields: Record<string, Record<string, unknown>>;
   rootPath: string;
@@ -105,6 +118,34 @@ export function rebuildTreeInPlace<
   store.tree = result.tree;
   store.matcher = result.matcher;
   store.urlParamsCache.clear();
+  store.queryParamsCache.clear();
+}
+
+/**
+ * Prepare-then-commit root-path change.
+ *
+ * A root `?`-declaration declares the name on EVERY route at once, so a
+ * `defaultParams` that was legal a moment ago can stop being legal without any
+ * route changing — the one mutation where re-checking the WHOLE config is not
+ * redundant. Built into locals first so a rejected root path leaves the store
+ * exactly as it was, matching the atomicity `add` / `replace` promise.
+ */
+export function applyRootPath<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>, newRootPath: string): void {
+  const prepared = rebuildTree(
+    store.definitions,
+    newRootPath,
+    store.matcherOptions,
+  );
+
+  assertRouteDefaultChannelsFor(prepared.matcher, store.config, "setRootPath");
+
+  store.rootPath = newRootPath;
+  store.tree = prepared.tree;
+  store.matcher = prepared.matcher;
+  store.urlParamsCache.clear();
+  store.queryParamsCache.clear();
 }
 
 export function commitTreeChanges<
@@ -276,17 +317,27 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   }
 
   if (route.decodeParams) {
-    config.decoders[fullName] = (params: Params): Params =>
-      route.decodeParams?.(params) ?? params;
+    const decode = route.decodeParams;
+
+    config.decoders[fullName] = (channels: ParamsSearch): ParamsSearch =>
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if a user-provided decoder violates its `{ params, search }` return type
+      decode(channels) ?? channels;
   }
 
   if (route.encodeParams) {
-    config.encoders[fullName] = (params: Params): Params =>
-      route.encodeParams?.(params) ?? params;
+    const encode = route.encodeParams;
+
+    config.encoders[fullName] = (channels: ParamsSearch): ParamsSearch =>
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if a user-provided encoder violates its `{ params, search }` return type
+      encode(channels) ?? channels;
   }
 
   if (route.defaultParams) {
     config.defaultParams[fullName] = route.defaultParams;
+  }
+
+  if (route.defaultSearch) {
+    config.defaultSearch[fullName] = route.defaultSearch;
   }
 }
 
@@ -750,6 +801,17 @@ export function compileArtifactGuards<Dependencies extends DefaultDependencies>(
  * pre-compiled guards are then installed without re-compiling (the factory ran
  * once, at the pre-compile above). `depsStore` is always set on a wired router,
  * which is the only path that reaches `add`/`replace`.
+ *
+ * ⚠ **The config-time channel check (`assertRouteDefaultChannels`) is the
+ * CALLER's PREPARE step, not this function's.** It used to run here, one line
+ * before the swap, which is early enough for `add` and too late for `replace`:
+ * `replace` erases the old definition guards BEFORE calling this, so a batch
+ * this check refused left the tree intact and the guards gone — a previously
+ * guarded route freely activatable. That is the #1193 fail-open shape verbatim,
+ * which is why the guard COMPILE was hoisted into the callers; the channel
+ * check now sits beside it, for the same reason. Keeping this function
+ * throw-free is what makes its "atomic swap" contract true rather than nearly
+ * true.
  */
 export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
@@ -773,6 +835,7 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
   store.tree = artifacts.tree;
   store.matcher = artifacts.matcher;
   store.urlParamsCache.clear();
+  store.queryParamsCache.clear();
   store.resolvedForwardMap = artifacts.resolvedForwardMap;
 
   // Install pre-compiled guards — no re-compile, no throw.
@@ -809,12 +872,14 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
 ): {
   forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
   defaultParams?: Params | null | undefined;
-  decodeParams?: ((params: Params) => Params) | null | undefined;
-  encodeParams?: ((params: Params) => Params) | null | undefined;
+  defaultSearch?: SearchParams | null | undefined;
+  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+  encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 } {
   const {
     forwardTo,
     defaultParams,
+    defaultSearch,
     decodeParams,
     encodeParams,
     canActivate,
@@ -824,6 +889,22 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   // ===== PREPARE — compute every change into LOCALS. Any throw here aborts
   // before a single store write, so the whole field set is applied
   // all-or-nothing (#951).
+
+  // Channel check on the INCOMING value, in PREPARE: `update` does not rebuild
+  // the tree (NO_TREE_REBUILD), so the route's declarations are the ones the
+  // matcher already holds. Checked before any write, so a mis-channelled
+  // `defaultParams` aborts the whole update rather than landing half-applied.
+  if (defaultParams !== undefined && defaultParams !== null) {
+    assertChannelCorrect(
+      "updateRoute",
+      name,
+      defaultParams,
+      queryParamsOf(store, name),
+      "this route's `defaultParams`",
+      "Move it to `defaultSearch`",
+    );
+  }
+
   const forwardToPlan =
     forwardTo === undefined
       ? undefined
@@ -876,6 +957,7 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
 
   commitScalarConfig(store, name, {
     defaultParams,
+    defaultSearch,
     decodeParams,
     encodeParams,
   });
@@ -885,7 +967,13 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   commitGuardUpdate(lifecycle, "activate", name, canActivate, activateFn);
   commitGuardUpdate(lifecycle, "deactivate", name, canDeactivate, deactivateFn);
 
-  return { forwardTo, defaultParams, decodeParams, encodeParams };
+  return {
+    forwardTo,
+    defaultParams,
+    defaultSearch,
+    decodeParams,
+    encodeParams,
+  };
 }
 
 /**
@@ -1003,8 +1091,29 @@ function prepareCustomFields<
 }
 
 /**
+ * Applies one nullable scalar-config update in place: `undefined` is a no-op
+ * (field not in the patch), `null` deletes the entry, any other value sets it.
+ */
+function commitScalarField<T>(
+  map: Record<string, T>,
+  name: string,
+  value: T | null | undefined,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (value === null) {
+    delete map[name];
+  } else {
+    map[name] = value;
+  }
+}
+
+/**
  * COMMIT step for the scalar config fields of an update (#951): writes
- * `defaultParams` / `decodeParams` / `encodeParams` in place. These assignments
+ * `defaultParams` / `defaultSearch` / `decodeParams` / `encodeParams` in place.
+ * These assignments
  * are pure and never throw, so they run in the COMMIT phase after every throwing
  * field has been validated in PREPARE. `forwardTo` is handled separately — it
  * has its own throwing prepare step ({@link prepareForwardTo}).
@@ -1016,17 +1125,15 @@ function commitScalarConfig<
   name: string,
   updates: {
     defaultParams?: Params | null | undefined;
-    decodeParams?: ((params: Params) => Params) | null | undefined;
-    encodeParams?: ((params: Params) => Params) | null | undefined;
+    defaultSearch?: SearchParams | null | undefined;
+    decodeParams?:
+      ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+    encodeParams?:
+      ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
   },
 ): void {
-  if (updates.defaultParams !== undefined) {
-    if (updates.defaultParams === null) {
-      delete store.config.defaultParams[name];
-    } else {
-      store.config.defaultParams[name] = updates.defaultParams;
-    }
-  }
+  commitScalarField(store.config.defaultParams, name, updates.defaultParams);
+  commitScalarField(store.config.defaultSearch, name, updates.defaultSearch);
 
   if (updates.decodeParams !== undefined) {
     if (updates.decodeParams === null) {
@@ -1034,9 +1141,9 @@ function commitScalarConfig<
     } else {
       const decoder = updates.decodeParams;
 
-      store.config.decoders[name] = (params: Params): Params =>
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided decoder violates its return type
-        decoder(params) ?? params;
+      store.config.decoders[name] = (channels: ParamsSearch): ParamsSearch =>
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided decoder violates its `{ params, search }` return type
+        decoder(channels) ?? channels;
     }
   }
 
@@ -1046,9 +1153,9 @@ function commitScalarConfig<
     } else {
       const encoder = updates.encodeParams;
 
-      store.config.encoders[name] = (params: Params): Params =>
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided encoder violates its return type
-        encoder(params) ?? params;
+      store.config.encoders[name] = (channels: ParamsSearch): ParamsSearch =>
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided encoder violates its `{ params, search }` return type
+        encoder(channels) ?? channels;
     }
   }
 }
@@ -1123,6 +1230,7 @@ export function createRoutesStore<
     tree: artifacts.tree,
     matcher: artifacts.matcher,
     urlParamsCache: new Map(),
+    queryParamsCache: new Map(),
     resolvedForwardMap: artifacts.resolvedForwardMap,
     routeCustomFields: artifacts.routeCustomFields,
     rootPath: "",
@@ -1132,6 +1240,11 @@ export function createRoutesStore<
     pendingCanActivate: artifacts.pendingCanActivate,
     pendingCanDeactivate: artifacts.pendingCanDeactivate,
   };
+
+  // Same config-time channel check the add/replace path runs, so the
+  // constructor is not the one population entry point that accepts a config
+  // whose own state the router would then reject on `start()`.
+  assertRouteDefaultChannelsFor(store.matcher, store.config, "addRoute");
 
   return store;
 }

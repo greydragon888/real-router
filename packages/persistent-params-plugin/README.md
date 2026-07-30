@@ -8,14 +8,17 @@
 > Automatically persist query parameters across all navigation transitions in [Real-Router](https://github.com/greydragon888/real-router).
 
 ```typescript
+// Query values ride the THIRD argument — the query channel (RFC-4 M2).
+// Passing a declared `?key` in the second (path) bag throws since #1572.
+
 // Without plugin:
-router.navigate("products", { lang: "en", theme: "dark" });
+router.navigate("products", {}, { lang: "en", theme: "dark" });
 router.navigate("cart");
 // URL: /cart  — lang and theme are lost
 
 // With plugin:
 router.usePlugin(persistentParamsPluginFactory(["lang", "theme"]));
-router.navigate("products", { lang: "en", theme: "dark" });
+router.navigate("products", {}, { lang: "en", theme: "dark" });
 router.navigate("cart");
 // URL: /cart?lang=en&theme=dark  — automatically preserved
 ```
@@ -56,16 +59,16 @@ router.usePlugin(persistentParamsPluginFactory({ lang: "en", theme: "light" }));
 
 ```typescript
 // Persist — saved on first navigation
-router.navigate("page1", { lang: "en" });     // saved: lang=en
+router.navigate("page1", {}, { lang: "en" });     // saved: lang=en
 
 // Carry — auto-injected into subsequent navigations
 router.navigate("page2");                      // URL: /page2?lang=en
 
 // Update — explicit values override saved ones
-router.navigate("page3", { lang: "fr" });      // URL: /page3?lang=fr, saved: lang=fr
+router.navigate("page3", {}, { lang: "fr" });      // URL: /page3?lang=fr, saved: lang=fr
 
 // Remove — pass undefined to stop persisting
-router.navigate("page4", { lang: undefined }); // lang removed permanently
+router.navigate("page4", {}, { lang: undefined }); // lang removed permanently
 ```
 
 > **Note:** Removal is permanent for the plugin lifetime — but only once the removal navigation actually commits. Once `undefined` is passed and the navigation succeeds, the param is no longer tracked, even if passed again later. If that navigation is rejected by a guard or superseded by a concurrent navigate, the param stays persisted (the removal rolls back).
@@ -77,7 +80,7 @@ router.navigate("page4", { lang: undefined }); // lang removed permanently
 ```typescript
 router.usePlugin(persistentParamsPluginFactory({ lang: "en" }));
 
-router.navigate("settings", { lang: "fr" });
+router.navigate("settings", {}, { lang: "fr" });
 router.navigate("products");   // ?lang=fr
 router.navigate("cart");        // ?lang=fr
 ```
@@ -105,7 +108,7 @@ unsubscribe();
 
 ## State Context: `state.context.persistentParams`
 
-The plugin publishes a snapshot of the current persistent params to `state.context.persistentParams` after each successful transition. This lets components distinguish persistent params from route-specific params.
+The plugin publishes a snapshot of the current persistent params to `state.context.persistentParams` after each successful transition. This lets components read persistent (query) params independent of which channel they currently ride in.
 
 ```typescript
 import { createRouter } from "@real-router/core";
@@ -115,13 +118,19 @@ const router = createRouter(routes);
 router.usePlugin(persistentParamsPluginFactory({ lang: "en", theme: "light" }));
 
 router.subscribe(({ route, previousRoute }) => {
-  const { params, context } = route;
+  const { params, search, context } = route;
 
-  // params contains BOTH route-specific and persistent params merged together
-  console.log(params);              // { id: "42", lang: "en", theme: "light" }
+  // params contains ONLY route-specific (path) params — RFC-4 M2 (#1548)
+  console.log(params);                    // { id: "42" }
 
-  // context.persistentParams contains ONLY the persistent params
-  console.log(context.persistentParams); // { lang: "en", theme: "light" }
+  // search contains ONLY query params — the channel persistent params are
+  // injected into (#1563); a hand-built state committed via navigateToState is
+  // the one case where they can ride in `params` instead
+  console.log(search);                    // { lang: "en", theme: "light" }
+
+  // context.persistentParams is a channel-independent view of ONLY the
+  // persistent params, regardless of which channel currently carries them
+  console.log(context.persistentParams);  // { lang: "en", theme: "light" }
 });
 ```
 
@@ -146,7 +155,7 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Register this plugin **before** `search-schema-plugin` to have persistent params validated (the safer default); after it only when they must deliberately skip validation.
 
-> **Caveat:** the recommended order validates `state.params`, not `state.path`. This plugin also registers a **`buildPath`** interceptor, which `search-schema-plugin` does not wrap — so an invalid persisted value is stripped from `state.params` but still reaches `state.path` (persistent, reload-stable). Give persisted keys a `defaultParams` on schema'd routes to close it (core's merge overrides the injected value). Also: the alternative-order leak only affects keys **without** a route default — stored params fill *under* incoming ones, so a key with a default is supplied by core and never leaks. (#1231)
+> **Caveat:** `search-schema-plugin` validates the injected values on **both** directions since #1564 (it validates the route's query channel, not a bag picked by call shape) — but `state.path` remains out of its reach: this plugin also registers a **`buildPath`** interceptor, which `search-schema-plugin` does not wrap. A route default is not a workaround — every route default merges *under* the injected value. (#1231, #1563, #1564)
 
 ## Documentation
 

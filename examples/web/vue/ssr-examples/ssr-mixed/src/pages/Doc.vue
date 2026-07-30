@@ -23,7 +23,7 @@ onMounted(() => {
   handle = setTimeout(() => {
     clientData.value = {
       id: String(route.value.params.id),
-      format: String(route.value.params.format),
+      format: String(route.value.search.format),
       body: `(client) PDF placeholder for ${String(route.value.params.id)}`,
     };
   }, 50);

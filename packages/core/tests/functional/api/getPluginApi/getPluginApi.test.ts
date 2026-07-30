@@ -25,7 +25,6 @@ describe("getPluginApi()", () => {
 
   it("should return an object with all expected methods", () => {
     expect(typeof api.makeState).toBe("function");
-    expect(typeof api.buildState).toBe("function");
     expect(typeof api.forwardState).toBe("function");
     expect(typeof api.matchPath).toBe("function");
     expect(typeof api.setRootPath).toBe("function");
@@ -57,17 +56,10 @@ describe("getPluginApi()", () => {
   });
 
   it("makeState should delegate to router.makeState", () => {
-    const state = api.makeState("home", {}, "/home");
+    const state = api.makeState("home", {}, undefined, "/home");
 
     expect(state.name).toBe("home");
     expect(state.path).toBe("/home");
-  });
-
-  it("buildState should delegate to router.buildState", () => {
-    const result = api.buildState("home", {});
-
-    expect(result).toBeDefined();
-    expect(result!.name).toBe("home");
   });
 
   it("forwardState should delegate to router.forwardState", () => {
@@ -82,6 +74,7 @@ describe("getPluginApi()", () => {
       (_next, _name, params) => ({
         name: "users",
         params,
+        search: {},
       }),
     );
 
@@ -133,12 +126,6 @@ describe("getPluginApi()", () => {
 
     expect(tree).toBeDefined();
     expect(tree.children.size).toBeGreaterThan(0);
-  });
-
-  it("buildState should return undefined for non-existent route", () => {
-    const result = api.buildState("nonexistent", {});
-
-    expect(result).toBeUndefined();
   });
 
   it("matchPath should return undefined for non-matching path", () => {

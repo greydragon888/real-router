@@ -108,9 +108,9 @@ describe("core/routes/replaceRoutes", () => {
 
   describe("configuration cleanup and registration", () => {
     it("should clear decoders of old routes after replace", () => {
-      const decodeParams = vi.fn((params) => ({
-        ...params,
-        decoded: true,
+      const decodeParams = vi.fn(({ params, search }) => ({
+        params: { ...params, decoded: true },
+        search,
       }));
 
       routesApi.add({
@@ -137,10 +137,13 @@ describe("core/routes/replaceRoutes", () => {
     });
 
     it("should register decoders/encoders of new routes after replace", () => {
-      const decode = vi.fn((params) => ({ ...params, id: Number(params.id) }));
-      const encode = vi.fn((params) => ({
-        ...params,
-        id: String(params.id),
+      const decode = vi.fn(({ params, search }) => ({
+        params: { ...params, id: Number(params.id) },
+        search,
+      }));
+      const encode = vi.fn(({ params, search }) => ({
+        params: { ...params, id: String(params.id) },
+        search,
       }));
 
       routesApi.replace([

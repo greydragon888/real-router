@@ -145,7 +145,7 @@ router.start(url)
         │           (registry-backed promises that settle as
         │           `<script>__rrDefer__(...)</script>` lands)
         │
-        ├── data = await entry.loader(state.params)
+        ├── data = await entry.loader({ params: state.params, search: state.search })
         │
         ├── isDeferred(data)?
         │     yes: dataClaim.write(state, data.critical)
@@ -182,7 +182,7 @@ router.navigate(...) (any CSR navigation)
         │
         ├── client-only / no-loader entry → return (flag preserved)
         │
-        ├── data = await loader(nextRoute.params)
+        ├── data = await loader({ params: nextRoute.params, search: nextRoute.search })
         │
         ├── signal.aborted? yes → return (flag preserved for the new nav)
         │
@@ -325,7 +325,7 @@ Loader factories follow the same DI pattern as `GuardFnFactory` and `LifecycleHo
 
 ```typescript
 const loaders: DataLoaderFactoryMap = {
-  "users.profile": (router, getDependency) => async (params) => {
+  "users.profile": (router, getDependency) => async ({ params }) => {
     const db = getDependency("db");
     return db.query("SELECT * FROM users WHERE id = ?", params.id);
   },

@@ -23,7 +23,7 @@ describe("snapshot tracking", () => {
 
       const router = await createStartedRouter();
 
-      await router.navigate(nav.name, nav.params);
+      await router.navigate(nav.name, nav.params, nav.search);
 
       const source = createRouteSource(router);
 
@@ -45,7 +45,7 @@ describe("snapshot tracking", () => {
       const source = createRouteSource(router);
       const unsub = source.subscribe(vi.fn());
 
-      await router.navigate(nav.name, nav.params);
+      await router.navigate(nav.name, nav.params, nav.search);
 
       expect(source.getSnapshot().route?.name).toBe(nav.name);
 
@@ -63,8 +63,8 @@ describe("snapshot tracking", () => {
       const source = createRouteSource(router);
       const unsub = source.subscribe(vi.fn());
 
-      await router.navigate(navA.name, navA.params);
-      await router.navigate(navB.name, navB.params);
+      await router.navigate(navA.name, navA.params, navA.search);
+      await router.navigate(navB.name, navB.params, navB.search);
 
       expect(source.getSnapshot().previousRoute?.name).toBe(navA.name);
 
@@ -88,9 +88,9 @@ describe("snapshot tracking", () => {
       const source = createRouteSource(router);
       const unsub = source.subscribe(vi.fn());
 
-      await router.navigate(navA.name, navA.params);
-      await router.navigate(navB.name, navB.params);
-      await router.navigate(navC.name, navC.params);
+      await router.navigate(navA.name, navA.params, navA.search);
+      await router.navigate(navB.name, navB.params, navB.search);
+      await router.navigate(navC.name, navC.params, navC.search);
 
       const snapshot = source.getSnapshot();
 
@@ -113,7 +113,7 @@ describe("snapshot tracking", () => {
       const source = createRouteSource(router);
       const unsub = source.subscribe(vi.fn());
 
-      await router.navigate(nav.name, nav.params);
+      await router.navigate(nav.name, nav.params, nav.search);
 
       const first = source.getSnapshot();
 
@@ -160,7 +160,7 @@ describe("snapshot tracking", () => {
       const listener = vi.fn();
       const unsub = subscribe(listener);
 
-      await router.navigate(nav.name, nav.params);
+      await router.navigate(nav.name, nav.params, nav.search);
 
       expect(getSnapshot().route?.name).toBe(nav.name);
 
@@ -181,7 +181,7 @@ describe("lazy-connection", () => {
 
       const router = await createStartedRouter();
 
-      await router.navigate(nav.name, nav.params);
+      await router.navigate(nav.name, nav.params, nav.search);
 
       const spy = vi.spyOn(router, "subscribe");
 
@@ -374,7 +374,7 @@ describe("subscribe order (listener added before onFirstSubscribe)", () => {
 
       const unsub1 = source.subscribe(vi.fn());
 
-      await router.navigate(nav.name, nav.params);
+      await router.navigate(nav.name, nav.params, nav.search);
 
       unsub1();
 
@@ -414,7 +414,7 @@ describe("reconnect reconcile (#765)", () => {
 
       // Navigation while the source has ZERO subscribers — the disconnected
       // source never sees it (BUG #765: stale snapshot survives reconnect).
-      await router.navigate(nav.name, nav.params);
+      await router.navigate(nav.name, nav.params, nav.search);
 
       // Re-subscribe (Activity show / RouteView remount). onFirstSubscribe must
       // reconcile the snapshot with the current router state, not replay the
@@ -450,9 +450,9 @@ describe("destroy", () => {
 
       source.subscribe(listener);
 
-      await router.navigate(navA.name, navA.params);
+      await router.navigate(navA.name, navA.params, navA.search);
       source.destroy();
-      await router.navigate(navB.name, navB.params);
+      await router.navigate(navB.name, navB.params, navB.search);
 
       expect(listener).toHaveBeenCalledTimes(1);
 
@@ -474,7 +474,11 @@ describe("destroy", () => {
       source.subscribe(listener);
 
       // Single pre-destroy navigation — exactly one listener call.
-      await router.navigate(preDestroyNav.name, preDestroyNav.params);
+      await router.navigate(
+        preDestroyNav.name,
+        preDestroyNav.params,
+        preDestroyNav.search,
+      );
 
       expect(listener).toHaveBeenCalledTimes(1);
 
@@ -485,7 +489,7 @@ describe("destroy", () => {
 
       for (let i = 0; i < postDestroyCount; i++) {
         await router
-          .navigate(targets[i % targets.length], { q: "x", page: "1" })
+          .navigate(targets[i % targets.length], {}, { q: "x", page: "1" })
           .catch(() => {});
       }
 
@@ -506,7 +510,7 @@ describe("destroy", () => {
 
       source.subscribe(listener);
 
-      await router.navigate(nav.name, nav.params);
+      await router.navigate(nav.name, nav.params, nav.search);
 
       for (let i = 0; i < n; i++) {
         source.destroy();
@@ -563,7 +567,11 @@ describe("destroy", () => {
       const unsub = source.subscribe(listener);
 
       await router
-        .navigate(postDestroyNav.name, postDestroyNav.params)
+        .navigate(
+          postDestroyNav.name,
+          postDestroyNav.params,
+          postDestroyNav.search,
+        )
         .catch(() => {});
 
       expect(listener).not.toHaveBeenCalled();

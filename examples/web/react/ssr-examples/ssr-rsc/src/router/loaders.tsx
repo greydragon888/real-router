@@ -9,15 +9,15 @@ import type { RscLoaderFactoryMap } from "@real-router/rsc-server-plugin";
 
 export const loaders: RscLoaderFactoryMap<AppDependencies> = {
   home: () => () => <HomePage />,
-  "users.list": () => (params) => {
+  "users.list": () => ({ search }) => {
     const role =
-      params.role === "admin" || params.role === "user"
-        ? params.role
+      search.role === "admin" || search.role === "user"
+        ? search.role
         : undefined;
 
     return <UsersList roleFilter={role} />;
   },
-  "users.profile": (_router, getDep) => async (params) => {
+  "users.profile": (_router, getDep) => async ({ params }) => {
     const database = getDep("db");
     const id = params.id as string;
     const user = await database.users.findById(id);

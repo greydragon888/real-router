@@ -16,16 +16,17 @@ const { route } = useRoute();
 const navigator = useNavigator();
 
 const lang = computed(
-  () => (route.value.params.lang as string | undefined) ?? "en",
+  () => (route.value.search.lang as string | undefined) ?? "en",
 );
 const theme = computed(
-  () => (route.value.params.theme as string | undefined) ?? "light",
+  () => (route.value.search.theme as string | undefined) ?? "light",
 );
 
-function navigate(newParams: Record<string, string>) {
+function navigate(newSearch: Record<string, string>) {
   void navigator.navigate(
     route.value.name,
-    { ...route.value.params, ...newParams },
+    { ...route.value.params },
+    { ...route.value.search, ...newSearch },
     { reload: true },
   );
 }

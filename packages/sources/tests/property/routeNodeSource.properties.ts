@@ -10,7 +10,7 @@ import {
   arbNavigation,
   arbDestroyCount,
   NAVIGABLE_ROUTE_NAMES,
-  paramsForRoute,
+  channelsForRoute,
 } from "./helpers";
 import { createRouteNodeSource } from "../../src";
 
@@ -51,7 +51,7 @@ describe("node scoping", () => {
       const source = createRouteNodeSource(router, nodeName);
 
       source.subscribe(() => {});
-      await router.navigate(nodeName, paramsForRoute(nodeName));
+      await router.navigate(nodeName, ...channelsForRoute(nodeName));
 
       const snapshot = source.getSnapshot();
 
@@ -70,7 +70,7 @@ describe("node scoping", () => {
       const source = createRouteNodeSource(router, nodeName);
 
       source.subscribe(() => {});
-      await router.navigate(nav.name, nav.params).catch(() => {});
+      await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
 
       const snapshot = source.getSnapshot();
 
@@ -95,7 +95,7 @@ describe("node scoping", () => {
       const source = createRouteNodeSource(router, nodeName);
 
       source.subscribe(() => {});
-      await router.navigate(nav.name, nav.params).catch(() => {});
+      await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
 
       expect(source.getSnapshot().route).toBeUndefined();
 
@@ -111,7 +111,7 @@ describe("node scoping", () => {
       const source = createRouteNodeSource(router, "");
 
       source.subscribe(() => {});
-      await router.navigate(nav.name, nav.params).catch(() => {});
+      await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
 
       expect(source.getSnapshot().route).toBe(router.getState());
 
@@ -134,7 +134,7 @@ describe("node scoping", () => {
       const listener = vi.fn();
 
       source.subscribe(listener);
-      await router.navigate(nav.name, nav.params).catch(() => {});
+      await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
 
       expect(listener).not.toHaveBeenCalled();
 
@@ -158,7 +158,7 @@ describe("node scoping", () => {
       source.subscribe(() => {});
       const snapshotBefore = source.getSnapshot();
 
-      await router.navigate(nav.name, nav.params).catch(() => {});
+      await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
 
       expect(source.getSnapshot()).toBe(snapshotBefore);
 
@@ -176,7 +176,7 @@ describe("node scoping", () => {
 
       nodeSource.subscribe(() => {});
       rootSource.subscribe(() => {});
-      await router.navigate(nav.name, nav.params).catch(() => {});
+      await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
       if (nodeSource.getSnapshot().route !== undefined) {
         expect(rootSource.getSnapshot().route).not.toBeUndefined();
       }
@@ -195,8 +195,8 @@ describe("node scoping", () => {
       const source = createRouteNodeSource(router, "users");
 
       source.subscribe(() => {});
-      await router.navigate(nameA, paramsForRoute(nameA));
-      await router.navigate(nameB, paramsForRoute(nameB));
+      await router.navigate(nameA, ...channelsForRoute(nameA));
+      await router.navigate(nameB, ...channelsForRoute(nameB));
 
       const snapshot = source.getSnapshot();
 
@@ -222,9 +222,9 @@ describe("node scoping", () => {
       const source = createRouteNodeSource(router, "users");
 
       source.subscribe(() => {});
-      await router.navigate(nameA, paramsForRoute(nameA));
-      await router.navigate(nameB, paramsForRoute(nameB));
-      await router.navigate(nameC, paramsForRoute(nameC));
+      await router.navigate(nameA, ...channelsForRoute(nameA));
+      await router.navigate(nameB, ...channelsForRoute(nameB));
+      await router.navigate(nameC, ...channelsForRoute(nameC));
 
       const snapshot = source.getSnapshot();
 
@@ -245,9 +245,9 @@ describe("node scoping", () => {
       const source = createRouteNodeSource(router, "users");
 
       source.subscribe(() => {});
-      await router.navigate(nameA, paramsForRoute(nameA));
-      await router.navigate(nameB, paramsForRoute(nameB));
-      await router.navigate(nameC, paramsForRoute(nameC));
+      await router.navigate(nameA, ...channelsForRoute(nameA));
+      await router.navigate(nameB, ...channelsForRoute(nameB));
+      await router.navigate(nameC, ...channelsForRoute(nameC));
 
       const snapshot = source.getSnapshot();
 
@@ -324,7 +324,7 @@ describe("lazy-connection and reconnection", () => {
       const unsub = source.subscribe(() => {});
 
       unsub();
-      await router.navigate(nav.name, nav.params).catch(() => {});
+      await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
       source.subscribe(() => {});
       const currentRoute = router.getState();
       const expectedRoute = isNodeActive(currentRoute?.name, nodeName)
@@ -348,7 +348,7 @@ describe("lazy-connection and reconnection", () => {
 
         unsub();
         try {
-          await router.navigate(nav.name, nav.params);
+          await router.navigate(nav.name, nav.params, nav.search);
         } catch {
           // SAME_STATES expected when navigating to current route
         }
@@ -454,7 +454,7 @@ describe("cache identity (per-router × per-nodeName)", () => {
       const unsubA = sourceA.subscribe(() => {});
       const unsubB = sourceB.subscribe(listenerB);
 
-      await routerA.navigate(nav.name, nav.params).catch(() => {});
+      await routerA.navigate(nav.name, nav.params, nav.search).catch(() => {});
 
       expect(listenerB).not.toHaveBeenCalled();
 
@@ -511,7 +511,7 @@ describe("destroy (cached shared source — no-op)", () => {
       const source = createRouteNodeSource(router, nodeName);
 
       source.subscribe(() => {});
-      await router.navigate(nav.name, nav.params).catch(() => {});
+      await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
       const lastSnapshot = source.getSnapshot();
 
       source.destroy();

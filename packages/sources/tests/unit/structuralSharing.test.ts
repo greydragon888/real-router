@@ -63,8 +63,8 @@ describe("structural sharing", () => {
 
     it("same path, different meta.id → snapshot === prevSnapshot", () => {
       const api = getPluginApi(router);
-      const state1 = api.makeState("home", {}, "/");
-      const state2 = api.makeState("home", {}, "/");
+      const state1 = api.makeState("home", {}, undefined, "/");
+      const state2 = api.makeState("home", {}, undefined, "/");
 
       const prevSnapshot = { route: state1, previousRoute: undefined };
 

@@ -19,6 +19,28 @@ export const routerConfig = [
   { name: "index", path: "/" },
 ];
 
+/**
+ * `routerConfig` with a query channel declared on `users.list` (#1586).
+ *
+ * Kept beside the default rather than folded into it: every query-less test in
+ * the package leans on `routerConfig` printing bare paths, and the whole reason
+ * the dropped-query bugs shipped silently is that no fixture in this package
+ * declared a `?` name. A separate fixture makes the channel explicit at the
+ * call site instead of implicit in a shared default.
+ */
+export const queryRouterConfig = [
+  {
+    name: "users",
+    path: "/users",
+    children: [
+      { name: "view", path: "/view/:id" },
+      { name: "list", path: "/list?tab&sort" },
+    ],
+  },
+  { name: "home", path: "/home" },
+  { name: "index", path: "/" },
+];
+
 export function createMockNavigationBrowser(
   mock: MockNavigation,
 ): NavigationBrowser {

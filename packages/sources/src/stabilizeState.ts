@@ -13,8 +13,8 @@ import type { State } from "@real-router/core";
  * new state.
  *
  * `transition.reload === true` is the user's explicit signal for a
- * non-idempotent navigation — `router.navigate(name, params, { reload:
- * true })` is the canonical pairing for `invalidate(router, namespace)`
+ * non-idempotent navigation — `router.navigate(name, params, search, {
+ * reload: true })` is the canonical pairing for `invalidate(router, namespace)`
  * and any cache-bust pattern. Bypassing stabilization for reloads makes
  * `useRoute()` consumers see fresh `state.context.<namespace>` values
  * written by the SSR loader plugin's `subscribeLeave` handler.

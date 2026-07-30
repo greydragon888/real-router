@@ -69,7 +69,9 @@ function sleep(ms: number): Promise<void> {
  * announcer element so callers can keep observing it.
  */
 async function consumeInitialNav(router: Router): Promise<Element> {
-  await router.navigate("route0", {}, { force: true }).catch(() => {});
+  await router
+    .navigate("route0", {}, undefined, { force: true })
+    .catch(() => {});
   await flushAnnouncerPipeline();
 
   const announcer = document.querySelector(ANNOUNCER_SELECTOR);
@@ -162,7 +164,9 @@ describe("§7.2 #14 — announceNavigation rapid navigations (Vue)", () => {
     // no <h1> → resolveText returns the same text → dedupe keeps the
     // announcer content stable.
     for (let i = 0; i < 10; i++) {
-      await router.navigate("route1", {}, { force: true }).catch(() => {});
+      await router
+        .navigate("route1", {}, undefined, { force: true })
+        .catch(() => {});
       await flushAnnouncerPipeline();
     }
 

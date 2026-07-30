@@ -90,3 +90,17 @@ reason = "quick-xml < 0.41.0 uses an O(N^2) duplicate-attribute check → CPU-ex
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0195"  # quick-xml unbounded namespace-declaration memory DoS
 reason = "quick-xml < 0.41.0 NsReader allocates unbounded memory for namespace declarations → memory-exhaustion DoS. Same chain and rationale as RUSTSEC-2026-0194 (Tauri 2.x -> plist -> quick-xml ^0.39.2, desktop examples only, unreachable vector, bump-blocked by plist ^0.39.2)."
+
+# brace-expansion ReDoS #2 (GHSA-mh99-v99m-4gvg, High). Patched on ONE line only —
+# OSV lists a single pair, `<= 5.0.7` → `5.0.8`, with no 1.x or 2.x release to move
+# to. The @5 override in pnpm-workspace.yaml is bumped to 5.0.8; the 1.1.16 and
+# 2.1.2 instances stay, and collapsing them onto 5.x is not available: v1/v2 end in
+# `module.exports = expandTop` while 5.x's CJS emits a NAMED `exports.expand`, so
+# every dependent (all four are `minimatch`, doing `require()` and calling the
+# result) would break. Dev/tooling transitive only — brace-expansion is in no
+# published @real-router/* package, and the ReDoS needs an attacker-supplied glob,
+# which nothing in this repo's tooling accepts. Remove this entry the moment a
+# patched 1.x or 2.x is published (then the per-line pins do the whole job again).
+[[IgnoredVulns]]
+id = "GHSA-mh99-v99m-4gvg"
+reason = "brace-expansion ReDoS, patched only in 5.0.8 (no 1.x/2.x fix exists). @5 is bumped to 5.0.8; the surviving 1.1.16 / 2.1.2 instances are dev/tooling-only (minimatch 3.1.5 / 5.1.9 / 9.0.9), never in a published package, and cannot be overridden to 5.x — v1/v2 export the function itself, 5.x exports a named `expand`, so the consumers' `require()`-and-call would break."

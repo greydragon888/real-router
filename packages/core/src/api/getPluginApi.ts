@@ -1,6 +1,7 @@
+import { buildURL, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed } from "./helpers";
 import { errorCodes } from "../constants";
-import { getInternals } from "../internals";
+import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
@@ -9,6 +10,7 @@ import type {
   DefaultDependencies,
   Params,
   Router,
+  SearchParams,
   State,
 } from "../types";
 
@@ -31,31 +33,26 @@ export function getPluginApi<
 
   const ctx = getInternals(router);
   const api: PluginApi = {
-    makeState: (name, params, path, meta) => {
+    makeState: (name, params, search, path) => {
+      throwOnMisChanneledKey(ctx, "makeState", name, params);
+
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
 
-      return ctx.makeState(
-        name,
-        params,
-        path,
-        meta?.params as
-          Record<string, Record<string, "url" | "query">> | undefined,
-      );
+      // Public PluginApi.makeState carries the query channel (RFC-4 M2 / #1548)
+      // so plugins (e.g. browser-plugin popstate restore) can reconstruct a
+      // split state from a serialized history entry. The former `meta` argument
+      // (per-segment param-source map) was dropped when the `stateMetaStore`
+      // WeakMap was removed — ownership is now read from the live matcher by
+      // `state.name`, so a caller-supplied meta had no effect and is gone.
+      return ctx.makeState(name, params, search, path);
     },
-    buildState: (routeName, routeParams) => {
-      ctx.validator?.routes.validateStateBuilderArgs(
-        routeName,
-        routeParams,
-        "buildState",
-      );
-
-      const { name, params } = ctx.forwardState(routeName, routeParams);
-
-      return ctx.buildStateResolved(name, params);
-    },
-    forwardState: <P extends Params = Params>(
+    forwardState: <
+      P extends Params = Params,
+      S extends SearchParams = SearchParams,
+    >(
       routeName: string,
       routeParams: P,
+      routeSearch?: S,
     ) => {
       ctx.validator?.routes.validateStateBuilderArgs(
         routeName,
@@ -63,7 +60,7 @@ export function getPluginApi<
         "forwardState",
       );
 
-      return ctx.forwardState(routeName, routeParams);
+      return ctx.forwardState<P, S>(routeName, routeParams, routeSearch);
     },
     matchPath: (path) => {
       ctx.validator?.routes.validateMatchPathArgs(path);
@@ -99,29 +96,42 @@ export function getPluginApi<
 
       return ctx.addEventListener(eventName, cb);
     },
-    buildNavigationState: (name, params = {}) => {
+    buildNavigationState: (name, params = {}, search = {}) => {
+      throwOnMisChanneledKey(ctx, "buildNavigationState", name, params);
+
       ctx.validator?.routes.validateStateBuilderArgs(
         name,
         params,
         "buildNavigationState",
       );
 
-      const { name: resolvedName, params: resolvedParams } = ctx.forwardState(
-        name,
-        params,
-      );
-      const routeInfo = ctx.buildStateResolved(resolvedName, resolvedParams);
+      // Stages ① + ③ + the mode gate, one pass through the pipeline
+      // (nav-pipeline Phase 2, step 2-4). `search` flows THROUGH the forwardState
+      // seam, not past it (#1571) — `port.resolveForward` IS `ctx.forwardState`,
+      // so the seam is still where an explicit query value wins over a declared
+      // twin the caller rode in `params`, and where a `search-schema`
+      // interceptor sees the query channel.
+      const canonical = canonicalize(ctx.port(), name, params, search, {
+        diagnoseUndeclared: true,
+      });
 
-      if (!routeInfo) {
+      // Existence is checked BEFORE the URL is built, and the order is
+      // load-bearing: `buildURL` prints through the matcher, which throws on an
+      // unknown route, whereas this entry point answers `undefined` for one —
+      // including when a `forwardTo` chain resolves to a target that does not
+      // exist. (`canonicalize` itself is total here: a missing route simply has
+      // no defaults and no declared query names.)
+      if (!ctx.buildStateResolved(canonical.name, canonical.path)) {
         return;
       }
 
-      return ctx.makeState(
-        routeInfo.name,
-        routeInfo.params,
-        ctx.buildPath(routeInfo.name, routeInfo.params),
-        routeInfo.meta,
-      );
+      // ⑤a then ⑤b from ONE canonical intent, so `state.search` and `state.path`
+      // cannot derive from differently-merged bags. `buildURL` is usable here for
+      // the same reason it is in `canNavigateTo`: this point is not the one the
+      // port prints through, so there is no recursion (contrast `buildPath`).
+      return materialize(canonical, {
+        path: buildURL(canonical, ctx.port()),
+      });
     },
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,

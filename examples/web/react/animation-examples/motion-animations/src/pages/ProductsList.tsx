@@ -26,8 +26,8 @@ type SortDirection = "asc" | "desc";
 // FLIP on sort changes; motion.span `layoutId` pairs the thumbnail with
 // the cover on ProductDetail for the library-coordinated hero morph.
 export function ProductsList(): JSX.Element {
-  const { route } = useRoute<{ sort?: SortDirection }>();
-  const sort: SortDirection = route.params.sort === "desc" ? "desc" : "asc";
+  const { route } = useRoute();
+  const sort: SortDirection = route.search.sort === "desc" ? "desc" : "asc";
 
   const items = useMemo(() => {
     const sorted = PRODUCTS.toSorted((left, right) =>
@@ -51,7 +51,7 @@ export function ProductsList(): JSX.Element {
         <span>Sort:</span>
         <Link
           routeName="products"
-          routeParams={{ sort: "asc" }}
+          routeSearch={{ sort: "asc" }}
           ignoreQueryParams={false}
         >
           A → Z
@@ -59,7 +59,7 @@ export function ProductsList(): JSX.Element {
         {" · "}
         <Link
           routeName="products"
-          routeParams={{ sort: "desc" }}
+          routeSearch={{ sort: "desc" }}
           ignoreQueryParams={false}
         >
           Z → A

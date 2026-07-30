@@ -234,11 +234,15 @@ describe("createRouteNodeSources", () => {
     source.subscribe(() => {});
 
     await router.navigate("users.view", { id: "42" });
-    await router.navigate("users.view", { id: "42" }, { reload: true });
+    await router.navigate("users.view", { id: "42" }, undefined, {
+      reload: true,
+    });
 
     const snapshotAfterFirstReload = source.getSnapshot();
 
-    await router.navigate("users.view", { id: "42" }, { reload: true });
+    await router.navigate("users.view", { id: "42" }, undefined, {
+      reload: true,
+    });
 
     // Reload is the user's explicit non-idempotent signal — every reload
     // emits a fresh snapshot so observers can see refreshed
@@ -255,23 +259,15 @@ describe("createRouteNodeSources", () => {
     source.subscribe(() => {});
 
     await router.navigate("users.view", { id: "42" });
-    await router.navigate(
-      "users.view",
-      { id: "42" },
-      {
-        force: true,
-      },
-    );
+    await router.navigate("users.view", { id: "42" }, undefined, {
+      force: true,
+    });
 
     const snapshotAfterFirstForce = source.getSnapshot();
 
-    await router.navigate(
-      "users.view",
-      { id: "42" },
-      {
-        force: true,
-      },
-    );
+    await router.navigate("users.view", { id: "42" }, undefined, {
+      force: true,
+    });
 
     // `force: true` bypasses SAME_STATES so the navigation pipeline runs,
     // but `transition.reload` is unset → stabilization keeps prev refs →

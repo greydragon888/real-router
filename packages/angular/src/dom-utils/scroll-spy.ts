@@ -720,7 +720,13 @@ export function createScrollSpy(
     // changes microtask schedule and breaks "spy continues after rejection".
     selfEmitting = true;
     router
-      .navigate(state.name, state.params, opts)
+      // Both channels of the CURRENT state, not just the path bag (RFC-4 M2 /
+      // #1548): this is a same-route re-navigation to move the hash, so
+      // whatever query the user is already looking at has to survive it.
+      // Passing `undefined` in slot 3 dropped it — scrolling a page at
+      // `/docs?tab=api` silently rewrote the URL to `/docs`. Options stay at
+      // slot 4.
+      .navigate(state.name, state.params, state.search, opts)
       .catch(() => {
         // Fire-and-forget — suppress expected rejections (concurrent
         // navigate, router stopped, etc.) consistent with `<Link>` adapter

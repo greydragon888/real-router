@@ -214,7 +214,8 @@ h(
   Link,
   {
     routeName: "users.profile",
-    routeParams: { id: "123" },
+    routeParams: { id: "123" }, // path channel
+    routeSearch: { tab: "posts" }, // query channel (RFC-4 M2) — parallel to routeParams
     activeClassName: "active", // default: "active"
     activeStrict: false, // default: false (ancestor match)
     ignoreQueryParams: true, // default: true
@@ -230,6 +231,7 @@ In a template:
 <Link
   routeName="users.profile"
   :routeParams="{ id: '123' }"
+  :routeSearch="{ tab: 'posts' }"
   activeClassName="active"
   :activeStrict="false"
   :ignoreQueryParams="true"
@@ -238,6 +240,14 @@ In a template:
   View Profile
 </Link>
 ```
+
+`routeSearch` is the query (search) channel of the path/query split — parallel
+to `routeParams`, the path channel. A route's query still works when passed
+inside `routeParams` (the pre-split form); `routeSearch` is the explicit,
+type-clean channel. `<Link>` also accepts a single `to={{ name, params?, search?
+}}` descriptor as an alternative to the `routeName`/`routeParams`/`routeSearch`
+channel props — see [CLAUDE.md](./CLAUDE.md) → "`routeSearch` Prop" / "`to`
+Descriptor Prop" for the full breakdown.
 
 #### `hash` prop — URL fragment / tab-style UIs
 

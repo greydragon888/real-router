@@ -8,7 +8,8 @@
 | ------------------------ | -------- | ------------------------------------------------------------ |
 | `preloadPluginFactory`   | function | Plugin factory — pass to `router.usePlugin()`                |
 | `PreloadPluginOptions`   | type     | Configuration options (`delay`, `networkAware`)              |
-| `PreloadFn`              | type     | Compiled preload signature: `(params) => Promise<unknown>`   |
+| `PreloadFn`              | type     | Compiled preload signature: `({ params, search }) => Promise<unknown>` (RFC-4 M2 / #1548) |
+| `PreloadTarget`          | type     | `{ params, search }` — the two destination channels handed to a preload fn |
 | `PreloadFnFactory`       | type     | Factory signature: `(router, getDependency) => PreloadFn`    |
 
 ## How It Works
@@ -18,7 +19,7 @@
 3. On `touchstart`: finds the anchor, starts a `TOUCH_PRELOAD_DELAY` (100ms) timer
 4. On `touchmove`: cancels the touch timer if vertical scroll > `TOUCH_SCROLL_THRESHOLD` (10px)
 5. On timer fire: calls `router.matchUrl?.(anchor.href)` → `api.getRouteConfig(name)?.preload`
-6. Calls `preload(params)` as fire-and-forget; errors silently caught (async rejection, synchronous throw, or non-Promise return)
+6. Calls `preload({ params, search })` as fire-and-forget; errors silently caught (async rejection, synchronous throw, or non-Promise return)
 
 Ghost mouse event suppression: touch devices fire a synthetic `mouseover` after `touchstart`. The plugin records the last touch target/timestamp and suppresses any `mouseover` from the same target within 2500ms.
 
@@ -55,7 +56,7 @@ Cache cleared on `onStop` and `teardown` (via `#cleanup`), and also on **any str
 
 ### Fire-and-forget
 
-`preload(params)` is called without awaiting, through `#runPreload`. Return values and errors are discarded — and "errors" means all three escape modes: a rejected promise, a **synchronous throw** before the promise is created, and a **non-Promise return** (`#runPreload` guards the sync call with `try/catch` and normalizes the return via `Promise.resolve` before `.catch`). Without this, a misbehaving user `preload` fn would surface as an `uncaughtException` from the `setTimeout` callback with no user code in the stack (#806). The plugin is a transport layer only — it does not cache, deduplicate, or track preload status.
+`preload({ params, search })` is called without awaiting, through `#runPreload`. Return values and errors are discarded — and "errors" means all three escape modes: a rejected promise, a **synchronous throw** before the promise is created, and a **non-Promise return** (`#runPreload` guards the sync call with `try/catch` and normalizes the return via `Promise.resolve` before `.catch`). Without this, a misbehaving user `preload` fn would surface as an `uncaughtException` from the `setTimeout` callback with no user code in the stack (#806). The plugin is a transport layer only — it does not cache, deduplicate, or track preload status.
 
 ### Event delegation
 

@@ -29,6 +29,11 @@ export const EMPTY_PARAMS: Readonly<Record<string, unknown>> = Object.freeze(
   {},
 );
 
+/** Frozen empty query bag for precomputed query-less cached results (RFC-4 M2). */
+export const EMPTY_SEARCH: Readonly<Record<string, unknown>> = Object.freeze(
+  {},
+);
+
 // Shared frozen sentinel for a route whose every segment has an empty
 // paramTypeMap (all-static chain): `buildMeta` returns this instead of a fresh
 // per-route `{ [fullName]: {} }` record — with N distinct route names those
@@ -46,4 +51,9 @@ export interface RegistrationState {
   readonly routesByName: Map<string, CompiledRoute>;
   readonly staticCache: Map<string, CompiledRoute>;
   readonly rootQueryParams: readonly string[];
+  // The root node is deliberately absent from `matchSegments` (see SegmentMatcher
+  // `registerTree`), so anything derived from a segment walk is root-blind. Its
+  // QUERY declarations already had to be threaded separately (#1556); its PATH
+  // slots need the same treatment for the build side (#1567).
+  readonly rootUrlParams: readonly string[];
 }

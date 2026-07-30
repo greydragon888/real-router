@@ -92,7 +92,7 @@ describe("injectRouteExit", () => {
     await router.navigate("users.view", { id: "1" });
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
 
     expect(handler).not.toHaveBeenCalled();
   });
@@ -105,7 +105,7 @@ describe("injectRouteExit", () => {
     await router.navigate("users.view", { id: "1" });
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
 
     expect(handler).toHaveBeenCalledTimes(1);
   });

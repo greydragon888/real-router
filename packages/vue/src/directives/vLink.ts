@@ -119,7 +119,7 @@ function createClickHandler(
 
     evt.preventDefault();
     router
-      .navigate(value.name, value.params ?? {}, value.options ?? {})
+      .navigate(value.name, value.params ?? {}, undefined, value.options ?? {})
       .catch(() => {});
   };
 }
@@ -132,7 +132,12 @@ function createKeydownHandler(
   return (evt: KeyboardEvent) => {
     if (evt.key === "Enter" && !(element instanceof HTMLButtonElement)) {
       router
-        .navigate(value.name, value.params ?? {}, value.options ?? {})
+        .navigate(
+          value.name,
+          value.params ?? {},
+          undefined,
+          value.options ?? {},
+        )
         .catch(() => {});
     }
   };

@@ -3,7 +3,7 @@ import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
 import type { RouterTransitionSnapshot } from "../../src/types.js";
-import type { Route, Router, Params } from "@real-router/core";
+import type { Route, Router, Params, SearchParams } from "@real-router/core";
 
 // =============================================================================
 // Fixed Route Fixture
@@ -67,10 +67,10 @@ export const arbNodeName = fc.constantFrom(
   ...(NODE_NAMES as unknown as [string, ...string[]]),
 );
 
-// Stateless params builder: the optional `seed` parameter lets callers thread
-// a unique value through `users.view` / `users.edit` ids, avoiding SAME_STATES
-// on consecutive identical-route navigations without relying on a hidden
-// module-level counter. Single-shot tests can omit the seed (default 1).
+// Stateless PATH-channel builder: the optional `seed` parameter lets callers
+// thread a unique value through `users.view` / `users.edit` ids, avoiding
+// SAME_STATES on consecutive identical-route navigations without relying on a
+// hidden module-level counter. Single-shot tests can omit the seed (default 1).
 export function paramsForRoute(name: string, seed = 1): Params {
   switch (name) {
     case "users.view":
@@ -79,24 +79,44 @@ export function paramsForRoute(name: string, seed = 1): Params {
 
       return { id: `u${String(safeSeed)}` };
     }
-    case "search": {
-      return { q: "test", page: "1" };
-    }
     default: {
       return {};
     }
   }
 }
 
+// QUERY-channel builder. `search` is the ONE route in the fixture that declares
+// query names (`/search?q&page`), and they belong here rather than in the path
+// bag: the channel guard refuses a `?`-declared name handed in `params`, and
+// every source under test reads the two channels separately anyway.
+export function searchForRoute(name: string): SearchParams {
+  return name === "search" ? { q: "test", page: "1" } : {};
+}
+
+/**
+ * Both channels as a positional pair, for the call sites that just forward them
+ * into `navigate(name, params, search)`. Spreading one call keeps ~70 fixtures
+ * from having to name a variable each — and keeps the two halves impossible to
+ * mix up, which is the mistake the split exists to make unrepresentable.
+ */
+export function channelsForRoute(
+  name: string,
+  seed = 1,
+): [Params, SearchParams] {
+  return [paramsForRoute(name, seed), searchForRoute(name)];
+}
+
 export interface NavigationAction {
   name: string;
   params: Params;
+  search: SearchParams;
 }
 
 export const arbNavigation: fc.Arbitrary<NavigationAction> = arbRouteName.map(
   (name) => ({
     name,
     params: paramsForRoute(name),
+    search: searchForRoute(name),
   }),
 );
 
@@ -114,6 +134,7 @@ export const arbNavigationSeq: fc.Arbitrary<NavigationAction[]> = fc
     pairs.map(([name, seed], index): NavigationAction => ({
       name,
       params: paramsForRoute(name, seed * 32 + index + 1),
+      search: searchForRoute(name),
     })),
   );
 
@@ -191,7 +212,7 @@ export async function executeNavigations(
   navigations: NavigationAction[],
 ): Promise<void> {
   for (const nav of navigations) {
-    await router.navigate(nav.name, nav.params);
+    await router.navigate(nav.name, nav.params, nav.search);
   }
 }
 
@@ -210,11 +231,14 @@ export function expectedActive(
   router: Router,
   routeName: string,
   params: Params | undefined,
+  search: SearchParams | undefined,
   strict: boolean,
   ignoreQueryParams: boolean,
   hash: string | undefined,
 ): boolean {
-  if (!router.isActiveRoute(routeName, params, strict, ignoreQueryParams)) {
+  if (
+    !router.isActiveRoute(routeName, params, search, strict, ignoreQueryParams)
+  ) {
     return false;
   }
   if (hash === undefined) {

@@ -174,7 +174,7 @@ All caches live inside `@real-router/sources` — no local WeakMaps in this adap
 | `useRouteNodeStore(name)` | `createRouteNodeSource(router, nodeName)`              | `(router, nodeName)`                                             |
 | `useRouterTransition()`   | `getTransitionSource(router)`                          | `(router)`                                                       |
 | `RouterErrorBoundary`     | `createDismissableError(router)`                       | `(router)` — integrated dismissal state                          |
-| Link (slow path)          | `createActiveRouteSource(router, name, params, opts)`  | `(router, name, canonicalJson(params), strict, ignoreQueryParams)` — key-order-insensitive |
+| Link (slow path)          | `createActiveRouteSource(router, name, params, search, opts)`  | `(router, name, canonicalJson(params), canonicalJson(search), strict, ignoreQueryParams)` — key-order-insensitive |
 
 Routers are WeakMap keys, so per-router state is released automatically when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes; upon re-subscription, they reconcile their snapshot so signals never observe stale values (enforced by `createSignalFromSource` re-reading `getSnapshot()` after subscribe).
 
@@ -234,17 +234,17 @@ The main performance primitive is `createSignalFromSource`: it creates a signal 
 
 `RouterProvider` creates a `createSelector` based on the current route name with prefix-based matching. `Link` components use this shared selector instead of per-link subscriptions. On navigation, `createSelector` notifies only the previously-active and newly-active links (2 updates instead of n).
 
-Links with `activeStrict: true`, custom `routeParams`, or `ignoreQueryParams: false` fall back to per-link `createActiveRouteSource` subscriptions since the selector only handles the default case (non-strict prefix matching, no params comparison).
+Links with `activeStrict: true`, custom `routeParams`, a `routeSearch` value, a `to` descriptor, or `ignoreQueryParams: false` fall back to per-link `createActiveRouteSource` subscriptions since the selector only handles the default case (non-strict prefix matching, no params/search comparison).
 
 ### Store-Based Granular Route State
 
-`useRouteStore()` and `useRouteNodeStore()` use `createStore` + `reconcile` from `solid-js/store` instead of `createSignal`. This enables property-level reactivity — a component reading `state.route?.params.id` won't re-run when `state.route?.params.page` changes.
+`useRouteStore()` and `useRouteNodeStore()` use `createStore` + `reconcile` from `solid-js/store` instead of `createSignal`. This enables property-level reactivity — a component reading `state.route?.params.id` won't re-run when `state.route?.search.page` changes (granularity holds across the path/query channels, not just within one).
 
 ```tsx
 const state = useRouteStore();
 
 createEffect(() => {
-  // Only re-runs when params.id changes, ignores params.page/route.name/etc.
+  // Only re-runs when params.id changes, ignores search.page/route.name/etc.
   console.log(state.route?.params.id);
 });
 ```

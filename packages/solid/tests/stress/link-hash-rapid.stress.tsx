@@ -128,11 +128,11 @@ describe("LH1 — Link hash rapid changes (§7.3 #20, #532)", () => {
     for (let i = 0; i < 150; i++) {
       const hash = HASHES[i % HASHES.length];
 
-      await router.navigate(
-        "route0",
-        {},
-        { hash, force: true, hashChange: true },
-      );
+      await router.navigate("route0", {}, undefined, {
+        hash,
+        force: true,
+        hashChange: true,
+      });
     }
 
     // Final hash = last in sequence.

@@ -126,10 +126,27 @@ describe("format strategies (through parseQuery/build)", () => {
       expect(num("12345")).toBe(12_345);
     });
 
-    it("decodes decimals", () => {
+    it("decodes decimals that print back to their exact text", () => {
       expect(num("12.5")).toBe(12.5);
       expect(num("0.99")).toBe(0.99);
-      expect(num("100.0")).toBe(100);
+      expect(num("-5.25")).toBe(-5.25);
+    });
+
+    it("keeps decimals String() cannot reproduce as strings (#1565)", () => {
+      // Trailing zeros: Number() drops them, so the rebuilt URL would differ
+      // from the one that was matched.
+      expect(num("2.0")).toBe("2.0");
+      expect(num("2.10")).toBe("2.10");
+      expect(num("0.50")).toBe("0.50");
+      expect(num("100.0")).toBe("100.0");
+      expect(num("100.00")).toBe("100.00");
+      expect(num("0.0")).toBe("0.0");
+      expect(num("-2.0")).toBe("-2.0");
+      // Precision loss: the safe-integer guard deliberately exempts decimals,
+      // so these reached Number() unguarded and came back as a different value.
+      expect(num("1.0000000000000000001")).toBe("1.0000000000000000001");
+      expect(num("9007199254740993.5")).toBe("9007199254740993.5");
+      expect(num("12345678901234567890.5")).toBe("12345678901234567890.5");
     });
 
     it("keeps non-numeric / malformed-decimal forms as strings", () => {

@@ -26,7 +26,7 @@ const { route } = useRoute();
 const navigator = useNavigator();
 
 const lang = computed(
-  () => (route.value.params.lang as string | undefined) ?? "en",
+  () => (route.value.search.lang as string | undefined) ?? "en",
 );
 </script>
 
@@ -50,7 +50,8 @@ const lang = computed(
         @click="
           navigator.navigate(
             route.name,
-            { ...route.params, lang: lang === 'en' ? 'ru' : 'en' },
+            { ...route.params },
+            { ...route.search, lang: lang === 'en' ? 'ru' : 'en' },
             { reload: true },
           )
         "

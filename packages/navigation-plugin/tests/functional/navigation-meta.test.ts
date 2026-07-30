@@ -50,7 +50,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
     it('state.context.navigation returns meta with navigationType "replace" for replace navigation', async () => {
       await router.start();
 
-      const state = await router.navigate("users.list", {}, { replace: true });
+      const state = await router.navigate("users.list", {}, undefined, {
+        replace: true,
+      });
 
       expect(state.context.navigation).toStrictEqual({
         navigationType: "replace",
@@ -64,7 +66,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
       await router.start();
       await router.navigate("users.list");
 
-      const state = await router.navigate("users.list", {}, { reload: true });
+      const state = await router.navigate("users.list", {}, undefined, {
+        reload: true,
+      });
 
       expect(state.context.navigation).toStrictEqual({
         navigationType: "reload",
@@ -333,7 +337,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
       await router.start();
       await router.navigate("users.list");
 
-      const state = await router.navigate("users.list", {}, { reload: true });
+      const state = await router.navigate("users.list", {}, undefined, {
+        reload: true,
+      });
 
       expect(state.context.navigation?.navigationType).toBe("reload");
     });
@@ -341,7 +347,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
     it('maps replace option to "replace"', async () => {
       await router.start();
 
-      const state = await router.navigate("users.list", {}, { replace: true });
+      const state = await router.navigate("users.list", {}, undefined, {
+        replace: true,
+      });
 
       expect(state.context.navigation?.navigationType).toBe("replace");
     });
@@ -373,7 +381,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
     it('direction is "unknown" for replace navigation', async () => {
       await router.start();
 
-      const state = await router.navigate("users.list", {}, { replace: true });
+      const state = await router.navigate("users.list", {}, undefined, {
+        replace: true,
+      });
 
       expect(state.context.navigation?.direction).toBe("unknown");
     });
@@ -382,7 +392,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
       await router.start();
       await router.navigate("users.list");
 
-      const state = await router.navigate("users.list", {}, { reload: true });
+      const state = await router.navigate("users.list", {}, undefined, {
+        reload: true,
+      });
 
       expect(state.context.navigation?.direction).toBe("unknown");
     });

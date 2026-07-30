@@ -148,6 +148,7 @@ export function stateWith(
   return {
     name: "users.profile",
     params: { id: "42" },
+    search: {},
     path: "/users/42",
     transition: {
       phase: "activating",

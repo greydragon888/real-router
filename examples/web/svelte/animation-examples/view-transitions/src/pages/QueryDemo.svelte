@@ -17,9 +17,11 @@
   // activates/deactivates — so a filter=all → filter=letter change would
   // leave `filter` frozen at "all" forever, and all buttons would look
   // like the initial active one.
-  const { route } = useRoute<{ filter?: Filter }>();
+  const { route } = useRoute();
 
-  const filter: Filter = $derived(route.current.params.filter ?? "all");
+  const filter: Filter = $derived(
+    (route.current.search.filter as Filter | undefined) ?? "all",
+  );
 
   const visible = $derived(
     filter === "all"
@@ -43,7 +45,7 @@
     {#each FILTERS as value}
       <Link
         routeName="queryDemo"
-        routeParams={{ filter: value }}
+        routeSearch={{ filter: value }}
         ignoreQueryParams={false}
       >
         {value}

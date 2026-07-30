@@ -156,7 +156,7 @@ describe("Same-URL guard + info-sentinel — stress (#580)", () => {
       const expectedType = isSameUrl ? "reload" : "push";
 
       if (isSameUrl) {
-        await router.navigate(currentRoute, {}, { reload: true });
+        await router.navigate(currentRoute, {}, undefined, { reload: true });
         updateBranchCount++;
       } else {
         const nextRoute: "home" | "users.list" =

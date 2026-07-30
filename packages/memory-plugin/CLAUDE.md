@@ -78,7 +78,7 @@ When `back(-1)` or `forward(+1)` would land on a history entry whose `path` equa
 
 ### `replace` option replaces current entry
 
-When `router.navigate(name, params, { replace: true })` succeeds, the current history entry is overwritten instead of pushing a new one. If `#index` is `-1` (empty history), replace falls through to normal push.
+When `router.navigate(name, params, undefined, { replace: true })` succeeds, the current history entry is overwritten instead of pushing a new one. If `#index` is `-1` (empty history), replace falls through to normal push.
 
 ### `onStop` clears history, `teardown` clears history AND removes extensions
 

@@ -3,11 +3,12 @@ import { useMemo, useSyncExternalStore } from "react";
 
 import { useRouter } from "./useRouter";
 
-import type { Params } from "@real-router/core";
+import type { Params, SearchParams } from "@real-router/core";
 
 export function useIsActiveRoute(
   routeName: string,
   params?: Params,
+  search?: SearchParams,
   strict = false,
   ignoreQueryParams = true,
   hash?: string,
@@ -27,11 +28,12 @@ export function useIsActiveRoute(
         router,
         routeName,
         params,
+        search,
         strict,
         ignoreQueryParams,
         hash,
       ),
-    [router, routeName, params, strict, ignoreQueryParams, hash],
+    [router, routeName, params, search, strict, ignoreQueryParams, hash],
   );
 
   return useSyncExternalStore(

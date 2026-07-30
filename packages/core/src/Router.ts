@@ -6,19 +6,22 @@
  * All functionality is now provided by namespace classes.
  */
 
+import { assertChannelCorrect, findMisChanneledKey } from "./channels";
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import {
   assertLoggerConfig,
   guardDependencies,
   guardRouteStructure,
 } from "./guards";
-import { createLimits, normalizeParams } from "./helpers";
+import { normalizeParams } from "./helpers";
 import {
-  createBinaryInterceptable,
   createInterceptable,
+  createTernaryInterceptable,
   getInternals,
   registerInternals,
+  throwOnMisChanneledKey,
 } from "./internals";
+import { createLimits } from "./limits";
 import {
   EventBusNamespace,
   NavigationNamespace,
@@ -31,6 +34,7 @@ import {
   createDependenciesStore,
 } from "./namespaces";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
+import { buildURL, canonicalize, materialize } from "./pipeline";
 import { RouterError } from "./RouterError";
 import { createRouterFSM } from "./routerFSM";
 import { getTransitionPath } from "./transitionPath";
@@ -45,9 +49,11 @@ import type {
   DefaultDependencies,
   LeaveFn,
   NavigationOptions,
+  NavigationTarget,
   Options,
   Params,
   Router as RouterInterface,
+  SearchParams,
   State,
   SubscribeFn,
   Unsubscribe,
@@ -99,7 +105,7 @@ export class Router<
   // Namespaces
   // ============================================================================
 
-  readonly #options: OptionsNamespace;
+  readonly #options: OptionsNamespace<Dependencies>;
   readonly #limits: Limits;
   readonly #dependenciesStore: DependenciesStore<Dependencies>;
   readonly #state: StateNamespace;
@@ -138,7 +144,7 @@ export class Router<
    */
   constructor(
     routes: Route<Dependencies>[] = [],
-    options: Partial<Options> = {},
+    options: Partial<Options<Dependencies>> = {},
     dependencies: Dependencies = {} as Dependencies,
   ) {
     // Extract the logger config WITHOUT mutating the caller's `options` object
@@ -250,23 +256,83 @@ export class Router<
 
     const interceptorsMap: RouterInternals["interceptors"] = new Map();
 
+    // THE single forwardState boundary (#1548/#1549). The interceptable resolves
+    // the route (forwardTo) and runs the whole interceptor chain — a plugin
+    // injecting params, a search-schema validation, etc. The outer layer then
+    // CHECKS the channels once, keyed on the RESOLVED route's `?`-declaration.
+    //
+    // It used to REPAIR them instead (`separateChannels`, stage ②): a declared
+    // query key left in the params bag was moved into the query channel behind
+    // the producer's back. Three things were wrong with that. The producer kept
+    // believing the bag it wrote was the one that shipped. A plugin could
+    // inject past a validation that had already run — search-schema documented
+    // exactly that leak, with a test named LEAKS. And the caller's own
+    // mis-channelled key and a chain default's query half landed in DIFFERENT
+    // channels, where no merge ranks them, so the default silently won (#1570).
+    // Refusing is the whole fix: whoever names the route knows its declaration.
+    //
+    // `as unknown as` is required: the closure is non-generic, but
+    // RouterInternals["forwardState"] is declared generic `<P, S>`, which tsc
+    // will not infer from a non-generic source (Sonar S4325 misclassifies this
+    // as a redundant cast).
+    const rawForwardState = createTernaryInterceptable(
+      "forwardState",
+      (name: string, params: Params, search?: SearchParams) =>
+        this.#routes.forwardState(name, params, search),
+      interceptorsMap,
+    );
+
+    const forwardState = ((
+      name: string,
+      params: Params,
+      search?: SearchParams,
+    ) => {
+      const forwarded = rawForwardState(name, params, search);
+
+      // The DECLARATION that matters is the RESOLVED route's — it owns the URL
+      // that gets printed. When a chain resolved to a different route, say so:
+      // a caller who wrote `navigate("src", { lang })` looked at `src`'s config,
+      // where `lang` is undeclared and legitimate, and needs to be told that the
+      // hop landed somewhere that spells it `?lang`. Naming only the target
+      // would read as a message about a route they never mentioned.
+      assertChannelCorrect(
+        "forwardState",
+        forwarded.name,
+        forwarded.params,
+        this.#routes.getQueryParams(forwarded.name),
+        () =>
+          forwarded.name === name
+            ? "the `params` bag leaving the forwardState chain"
+            : `the \`params\` bag leaving the forwardState chain (forwarded here from "${name}")`,
+      );
+
+      return {
+        name: forwarded.name,
+        // The type says `params: P`, and across THIS boundary the type is a
+        // contract, not a guarantee: `rawForwardState` is an interceptable, so
+        // the value has passed through user code that can spread a partial
+        // result. The net used to be reached by stage ②'s split (an all-query
+        // bag left the path half undefined) and is now reached only by that
+        // contract violation — still worth surviving rather than putting
+        // `undefined` into `state.params`. Pinned by "normalises a params bag an
+        // interceptor dropped to `undefined`" in forwardState.test.ts, which
+        // fails if this is removed.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the declared type cannot model an interceptor's runtime return
+        params: forwarded.params ?? EMPTY_PARAMS,
+        search: forwarded.search,
+      };
+    }) as unknown as RouterInternals["forwardState"];
+
     registerInternals(this, {
       logger,
-      makeState: (name, params, path, meta) =>
-        this.#state.makeState(name, params, path, meta),
-      // `as unknown as` is required: createBinaryInterceptable returns a
-      // non-generic `(a: A, b: B) => R`, but RouterInternals["forwardState"]
-      // is declared with a generic parameter `<P extends Params = Params>`,
-      // which tsc will not infer from the non-generic source. Sonar S4325
-      // misclassifies this as a redundant cast.
-      forwardState: createBinaryInterceptable(
-        "forwardState",
-        (name: string, params: Params) =>
-          this.#routes.forwardState(name, params),
-        interceptorsMap,
-      ) as unknown as RouterInternals["forwardState"],
+      makeState: (name, params, search, path) =>
+        this.#state.makeState(name, params, search, path),
+      getMetaForState: (name) => this.#routes.getMetaForState(name),
+      getQueryParams: (name) => this.#routes.getQueryParams(name),
+      forwardState,
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
+      port: () => this.#routes.getPort(),
       matchPath: (path, matchOptions) =>
         this.#routes.matchPath(path, matchOptions),
       getOptions: () => this.#options.get(),
@@ -280,12 +346,13 @@ export class Router<
         listenerCount: () => this.#eventBus.treeChangedListenerCount(),
         isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
       },
-      buildPath: createBinaryInterceptable(
+      buildPath: createTernaryInterceptable(
         "buildPath",
-        (route: string, params?: Params) =>
+        (route: string, params?: Params, search?: SearchParams) =>
           this.#routes.buildPath(
             route,
             params ?? EMPTY_PARAMS,
+            search,
             this.#options.get(),
           ),
         interceptorsMap,
@@ -455,6 +522,7 @@ export class Router<
   isActiveRoute(
     name: string,
     params?: Params,
+    search?: SearchParams,
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ): boolean {
@@ -480,21 +548,27 @@ export class Router<
       return false;
     }
 
+    // Slot-shift (RFC-4 M2 / #1548): `search` is the explicit query channel at
+    // position 3; `strictEquality` / `ignoreQueryParams` shift to 4 / 5.
     return this.#routes.isActiveRoute(
       name,
       params,
+      search,
       strictEquality,
       ignoreQueryParams,
     );
   }
 
-  buildPath(route: string, params?: Params): string {
+  buildPath(route: string, params?: Params, search?: SearchParams): string {
     const ctx = getInternals(this);
 
     ctx.validator?.routes.validateBuildPathArgs(route);
     ctx.validator?.navigation.validateParams(params, "buildPath");
 
-    return ctx.buildPath(route, normalizeParams(params));
+    // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
+    // builds the query string from it and the path from `params`, resolving a
+    // colliding name (`/items/:id?id`). Omitted → the v1 single-bag path.
+    return ctx.buildPath(route, normalizeParams(params), search);
   }
 
   // ============================================================================
@@ -528,7 +602,9 @@ export class Router<
   ): (toState: State, fromState?: State) => boolean {
     getInternals(this).validator?.routes.validateShouldUpdateNodeArgs(nodeName);
 
-    return RoutesNamespace.shouldUpdateNode(nodeName);
+    return RoutesNamespace.shouldUpdateNode(nodeName, (name) =>
+      this.#routes.getMetaForState(name),
+    );
   }
 
   // ============================================================================
@@ -678,7 +754,7 @@ export class Router<
   // Route Lifecycle (Guards)
   // ============================================================================
 
-  canNavigateTo(name: string, params?: Params): boolean {
+  canNavigateTo(name: string, params?: Params, search?: SearchParams): boolean {
     const ctx = getInternals(this);
 
     ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
@@ -688,10 +764,76 @@ export class Router<
       return false;
     }
 
-    const { name: resolvedName, params: resolvedParams } = ctx.forwardState(
-      name,
-      params ?? {},
-    );
+    // Mirror EVERY way `navigate` refuses these same arguments, not only the
+    // guard verdict (#1576). A declared query key handed in the PATH bag makes
+    // `navigate` throw synchronously at the facade (channel guard P1, #1572), so
+    // the route is unreachable with this input — exactly the situation invariant
+    // canNavigateTo #5 already answers `false` to for an unbuildable path (#725).
+    // Answering `true` here promised a navigation that throws on the click.
+    //
+    // The RAW caller bag, before `forwardState`: the same argument, the same
+    // registry and the same name P1 reads, so the predicate cannot be stricter
+    // OR laxer than the verb. The `/items/:id?id` collision is absent from
+    // `queryNames` by construction (#843 / #1549), so it stays navigable in both.
+    //
+    // A `false` rather than a rethrow: a capability predicate answers, it never
+    // throws (#725), and it runs on every `<Link>` render across six adapters —
+    // which is exactly why P1 does not instrument the predicates (#1572).
+    if (
+      findMisChanneledKey(params, this.#routes.getQueryParams(name)) !==
+      undefined
+    ) {
+      return false;
+    }
+
+    // Resolution runs USER code and must not escape as an exception (#1577):
+    // a dynamic `forwardTo` callback, a plugin's `forwardState` interceptor, and
+    // the caller's own bag (the merge walks it key by key, so an accessor-backed
+    // key throws here — the channel guard itself does NOT, it catches its own
+    // read) all sit on this one call. The
+    // predicate is documented TOTAL — it answers, it never throws (INVARIANTS
+    // canNavigateTo #5, #725) — and its sibling `isActiveRoute` has wrapped the
+    // very same primitive since #1573 (`RoutesNamespace.ts:631-645`). Leaving
+    // this one bare made the two render-path predicates disagree about what a
+    // throwing resolution means.
+    //
+    // A separate `try` rather than widening the one below: that one is SILENT by
+    // design (an unbuildable path is a normal "unreachable with this input"
+    // answer, #725), while user code crashing is an operational fault that must
+    // never vanish — the same split #959 draws for a throwing guard.
+    // Stages ① + ③ + the mode gate, one pass through the pipeline (nav-pipeline
+    // Phase 2, step 2-3). `canonicalize` reaches the same `forwardState` seam
+    // this method used to call directly (`port.resolveForward` IS
+    // `ctx.forwardState`), so the resolution, the interceptor zone and the
+    // channel CHECK on the seam are all unchanged — what the pipeline
+    // replaces is the hand-rolled composition that followed.
+    // Read ONCE (#1589): this predicate reached for the port twice — here and
+    // again for `buildURL` below — on every `<Link>` render. The port is one
+    // object per router, created at wiring time, so the second read could only
+    // ever return the same reference.
+    const port = this.#routes.getPort();
+
+    let canonical;
+
+    try {
+      canonical = canonicalize(
+        port,
+        name,
+        // The singleton, not a fresh `{}` (#1589): this predicate runs on every
+        // `<Link>` render too, and `normalizeParams` recognises `EMPTY_PARAMS` by
+        // identity — a literal makes it walk and re-allocate instead.
+        params ?? EMPTY_PARAMS,
+        search,
+      );
+    } catch (error) {
+      ctx.logger.warn(
+        "router.canNavigateTo",
+        `Resolving route "${name}" threw while answering the predicate; treating the route as unreachable.`,
+        error,
+      );
+
+      return false;
+    }
 
     // Build `toState` exactly as `buildNavigateState` does — WITH route-meta and
     // normalized params — so `getTransitionPath` takes its STANDARD PATH and
@@ -712,24 +854,28 @@ export class Router<
     let toState: State;
 
     try {
-      const normalizedParams = normalizeParams(resolvedParams);
-      const meta = this.#routes.getMetaForState(resolvedName);
-      const path = ctx.buildPath(resolvedName, normalizedParams);
-
-      toState = this.#state.makeState(
-        resolvedName,
-        normalizedParams,
-        path,
-        meta,
-        true,
-      );
+      // ⑤a then ⑤b. `buildURL` is usable HERE (unlike in `buildPath` itself,
+      // where it would recurse through the interceptable `ctx.buildPath` that
+      // wraps that very method): this point is not the one the port prints
+      // through, so the URL is built by the pipeline and the state materialised
+      // from the SAME canonical intent — `toState.search` and `toState.path`
+      // cannot drift. `skipFreeze` mirrors the navigate guard phase, where
+      // guards see an unfrozen, transition-less `toState`.
+      toState = materialize(canonical, {
+        path: buildURL(canonical, port),
+        skipFreeze: true,
+      });
     } catch {
       return false;
     }
 
     const fromState = this.#state.get();
 
-    const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
+    const { toDeactivate, toActivate } = getTransitionPath(
+      toState,
+      fromState,
+      (routeName) => this.#routes.getMetaForState(routeName),
+    );
 
     return this.#routeLifecycle.canNavigateTo(
       toDeactivate,
@@ -807,24 +953,61 @@ export class Router<
   // ============================================================================
 
   navigate(
+    target: NavigationTarget,
+    options?: NavigationOptions,
+  ): Promise<State>;
+  navigate(
     routeName: string,
     routeParams?: Params,
+    routeSearch?: SearchParams,
+    options?: NavigationOptions,
+  ): Promise<State>;
+  navigate(
+    nameOrTarget: string | NavigationTarget,
+    paramsOrOptions?: Params | NavigationOptions,
+    routeSearch?: SearchParams,
     options?: NavigationOptions,
   ): Promise<State> {
     this.#assertNotReentrant();
 
     const ctx = getInternals(this);
 
+    // Two equal-standing forms (RFC-4 M2 / #1548): the descriptor
+    // `navigate(target, opts)` (opts at position 2) and the positional
+    // `navigate(name, params, search, opts)` (opts at position 4). The v1
+    // `navigate(name, params, opts)` form is gone — its position-3 opts is now
+    // the `search` slot; unpack whichever form the caller used into one path.
+    let routeName: string;
+    let routeParams: Params | undefined;
+    let search: SearchParams | undefined;
+    let opts: NavigationOptions;
+
+    // The static type excludes null, but `navigate(null)` is a real runtime
+    // misuse that must stay graceful (ROUTE_NOT_FOUND, not a crash on
+    // `null.name`) — the null check routes it to the positional branch.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime null guard for navigate(null)
+    if (typeof nameOrTarget === "object" && nameOrTarget !== null) {
+      routeName = nameOrTarget.name;
+      routeParams = nameOrTarget.params;
+      search = nameOrTarget.search;
+      opts = (paramsOrOptions as NavigationOptions | undefined) ?? EMPTY_OPTS;
+    } else {
+      routeName = nameOrTarget;
+      routeParams = paramsOrOptions as Params | undefined;
+      search = routeSearch;
+      opts = options ?? EMPTY_OPTS;
+    }
+
+    throwOnMisChanneledKey(ctx, "navigate", routeName, routeParams);
+
     ctx.validator?.navigation.validateNavigateArgs(routeName);
     ctx.validator?.navigation.validateParams(routeParams, "navigate");
-
-    const opts = options ?? EMPTY_OPTS;
-
     ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
 
     const promiseState = this.#navigation.navigate(
       routeName,
       routeParams ?? EMPTY_PARAMS,
+      search,
       opts,
     );
 
@@ -1006,8 +1189,8 @@ function throwDisposed(): never {
  * Derives CreateMatcherOptions from router Options.
  * Maps core option names to matcher option names.
  */
-function deriveMatcherOptions(
-  options: Readonly<Options>,
+function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
+  options: Readonly<Options<Dependencies>>,
 ): CreateMatcherOptions {
   return {
     strictTrailingSlash: options.trailingSlash === "strict",

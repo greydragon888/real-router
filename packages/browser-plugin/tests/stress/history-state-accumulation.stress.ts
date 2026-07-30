@@ -73,7 +73,7 @@ describe("B2 — History State Accumulation", () => {
       const name = i % 2 === 0 ? "home" : "users.list";
 
       await router
-        .navigate(name, {}, { replace: true })
+        .navigate(name, {}, undefined, { replace: true })
         .catch(expectedStressError);
     }
 
@@ -98,7 +98,7 @@ describe("B2 — History State Accumulation", () => {
       const name = i % 2 === 0 ? "home" : "users.list";
 
       await router
-        .navigate(name, {}, i % 2 === 0 ? { replace: true } : {})
+        .navigate(name, {}, undefined, i % 2 === 0 ? { replace: true } : {})
         .catch(expectedStressError);
     }
 
@@ -121,7 +121,7 @@ describe("B2 — History State Accumulation", () => {
 
     for (let i = 0; i < 500; i++) {
       await router
-        .navigate("home", {}, { reload: true })
+        .navigate("home", {}, undefined, { reload: true })
         .catch(expectedStressError);
     }
 

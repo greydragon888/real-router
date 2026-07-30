@@ -72,6 +72,27 @@ export async function run(): Promise<void> {
     );
   }
 
+  // routeSearch active-recompute (RFC-4 M2 / #1548): query-only swap between two
+  // `?tab=` values on the SAME route. Distinct from `navigate-param-swap` — the
+  // active route name and params are unchanged, only the query flips, so the
+  // RouteView subtree and param subscribers stay put while the five
+  // `routeSearch` <Link>s recompute active (the `ignoreQueryParams: false`
+  // slow-path `createActiveRouteSource`, not the name-only fast selector).
+  {
+    const app = await mountTestApp(newContainer(), "/search?tab=t0");
+    const tabs = ["t1", "t0"] as const;
+    let i = 0;
+
+    bench.add(
+      "react/navigate-search-active-swap",
+      batched(2, () => {
+        app.commitNavigate("search", undefined, {
+          tab: tabs[i++ % tabs.length],
+        });
+      }),
+    );
+  }
+
   await settleHeap();
   await bench.run();
   console.table(bench.table());

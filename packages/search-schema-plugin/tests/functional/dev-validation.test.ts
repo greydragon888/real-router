@@ -20,8 +20,8 @@ describe("Search schema plugin", () => {
     router.stop();
   });
 
-  describe("Dev-time defaultParams validation", () => {
-    it("should console.warn when defaultParams fail schema at usePlugin() time", () => {
+  describe("Dev-time defaultSearch validation", () => {
+    it("should console.warn when defaultSearch fails schema at usePlugin() time", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -30,7 +30,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: "not-a-number" },
+            defaultSearch: { page: "not-a-number" },
             searchSchema: createMockSchema({
               validate: (value) => {
                 const params = value as Record<string, unknown>;
@@ -61,14 +61,14 @@ describe("Search schema plugin", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("defaultParams do not pass searchSchema"),
+        expect.stringContaining("defaultSearch does not pass searchSchema"),
         expect.anything(),
       );
 
       consoleSpy.mockRestore();
     });
 
-    it("should not warn when defaultParams pass schema", () => {
+    it("should not warn when defaultSearch passes schema", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -77,7 +77,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: passThroughSchema(),
           },
         ],
@@ -93,7 +93,7 @@ describe("Search schema plugin", () => {
       consoleSpy.mockRestore();
     });
 
-    it("should not warn for routes without defaultParams", () => {
+    it("should not warn for routes without defaultSearch", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -126,7 +126,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q",
-            defaultParams: { q: "test" },
+            defaultSearch: { q: "test" },
           },
         ],
         {
@@ -150,7 +150,7 @@ describe("Search schema plugin", () => {
      *
      * See forwardState.test.ts "Async schema rejection" for the runtime counterpart.
      */
-    it("should silently skip async schema during defaultParams validation", () => {
+    it("should silently skip async schema during defaultSearch validation", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -159,7 +159,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q",
-            defaultParams: { q: "test" },
+            defaultSearch: { q: "test" },
             searchSchema: asyncSchema(),
           },
         ],
@@ -179,7 +179,7 @@ describe("Search schema plugin", () => {
   });
 
   describe("Dev-time validation skipped in production mode", () => {
-    it("should not console.warn in production mode even with bad defaultParams", () => {
+    it("should not console.warn in production mode even with bad defaultSearch", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -188,7 +188,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: "not-a-number" },
+            defaultSearch: { page: "not-a-number" },
             searchSchema: failingSchema([
               { message: "page must be number", path: ["page"] },
             ]),
@@ -208,7 +208,7 @@ describe("Search schema plugin", () => {
   });
 
   describe("Dynamic routes (add interceptor)", () => {
-    it("should validate defaultParams for dynamically added routes in dev mode", () => {
+    it("should validate defaultSearch for dynamically added routes in dev mode", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter([{ name: "home", path: "/" }], {
@@ -223,7 +223,7 @@ describe("Search schema plugin", () => {
         {
           name: "dynamic",
           path: "/dynamic?q",
-          defaultParams: { q: "invalid" },
+          defaultSearch: { q: "invalid" },
           searchSchema: failingSchema([
             { message: "q is invalid", path: ["q"] },
           ]),
@@ -236,7 +236,7 @@ describe("Search schema plugin", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("defaultParams do not pass searchSchema"),
+        expect.stringContaining("defaultSearch does not pass searchSchema"),
         expect.anything(),
       );
 
@@ -258,7 +258,7 @@ describe("Search schema plugin", () => {
         {
           name: "dynamic",
           path: "/dynamic?q",
-          defaultParams: { q: "invalid" },
+          defaultSearch: { q: "invalid" },
           searchSchema: failingSchema([
             { message: "q is invalid", path: ["q"] },
           ]),
@@ -289,7 +289,7 @@ describe("Search schema plugin", () => {
             {
               name: "child",
               path: "/child?q",
-              defaultParams: { q: "bad" },
+              defaultSearch: { q: "bad" },
               searchSchema: failingSchema([
                 { message: "q is invalid", path: ["q"] },
               ]),
@@ -307,8 +307,8 @@ describe("Search schema plugin", () => {
     });
   });
 
-  describe("Nested route tree defaultParams validation", () => {
-    it("should validate defaultParams for nested routes in the tree", () => {
+  describe("Nested route tree defaultSearch validation", () => {
+    it("should validate defaultSearch for nested routes in the tree", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -321,7 +321,7 @@ describe("Search schema plugin", () => {
               {
                 name: "child",
                 path: "/child?q",
-                defaultParams: { q: "bad" },
+                defaultSearch: { q: "bad" },
                 searchSchema: failingSchema([
                   { message: "q is invalid", path: ["q"] },
                 ]),
@@ -346,7 +346,7 @@ describe("Search schema plugin", () => {
   });
 
   describe("Dynamic route with { parent } option", () => {
-    it("should validate defaultParams using full dotted name", () => {
+    it("should validate defaultSearch using full dotted name", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -366,7 +366,7 @@ describe("Search schema plugin", () => {
           {
             name: "settings",
             path: "/settings?theme",
-            defaultParams: { theme: 123 },
+            defaultSearch: { theme: 123 },
             searchSchema: failingSchema([
               { message: "theme must be string", path: ["theme"] },
             ]),
@@ -385,7 +385,7 @@ describe("Search schema plugin", () => {
   });
 
   describe("Runtime mutations via TREE_CHANGED (update / replace / remove / clear)", () => {
-    it("validates defaultParams when update() changes them (dev mode)", () => {
+    it("validates defaultSearch when update() changes them (dev mode)", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -404,7 +404,7 @@ describe("Search schema plugin", () => {
 
       router.usePlugin(searchSchemaPlugin({ mode: "development" }));
 
-      getRoutesApi(router).update("search", { defaultParams: { q: "bad" } });
+      getRoutesApi(router).update("search", { defaultSearch: { q: "bad" } });
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Route "search"'),
@@ -414,7 +414,7 @@ describe("Search schema plugin", () => {
       consoleSpy.mockRestore();
     });
 
-    it("does not validate on a non-defaultParams update (dev mode)", () => {
+    it("does not validate on a non-defaultSearch update (dev mode)", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       router = createRouter(
@@ -455,7 +455,7 @@ describe("Search schema plugin", () => {
         {
           name: "results",
           path: "/results?q",
-          defaultParams: { q: "bad" },
+          defaultSearch: { q: "bad" },
           searchSchema: failingSchema([
             { message: "q is invalid", path: ["q"] },
           ]),
@@ -485,7 +485,7 @@ describe("Search schema plugin", () => {
         {
           name: "results",
           path: "/results?q",
-          defaultParams: { q: "bad" },
+          defaultSearch: { q: "bad" },
           searchSchema: failingSchema([
             { message: "q is invalid", path: ["q"] },
           ]),

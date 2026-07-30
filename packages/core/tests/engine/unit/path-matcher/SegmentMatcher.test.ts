@@ -83,11 +83,13 @@ describe("type compilation", () => {
     const result: MatchResult = {
       segments: [],
       params: {},
+      search: {},
       meta: {},
     };
 
     expect(result.segments).toStrictEqual([]);
     expect(result.params).toStrictEqual({});
+    expect(result.search).toStrictEqual({});
   });
 
   it("should compile SegmentMatcherOptions interface", () => {
@@ -777,10 +779,15 @@ describe("SegmentMatcher", () => {
       ).toThrow(/Optional params are not supported/u);
     });
 
-    it("throws on a path-param / query-param name collision (§5.3)", () => {
-      expect(() => createMatcher([{ name: "r", path: "/a/:tab?tab" }])).toThrow(
-        /Name collision/,
-      );
+    it("accepts a path-param / query-param name collision (RFC-4 M2 / #1548)", () => {
+      // `tab` as BOTH a path and a query param is legal under M2 — separate
+      // channels. registerTree no longer rejects it, and the two round-trip
+      // independently through `params` and `search`.
+      const matcher = createMatcher([{ name: "r", path: "/a/:tab?tab" }]);
+      const result = matcher.match("/a/x?tab=y");
+
+      expect(result?.params).toStrictEqual({ tab: "x" });
+      expect(result?.search).toStrictEqual({ tab: "y" });
     });
 
     it("throws on a query-param name carrying '<'/'>' (backstop survivor, §5.1)", () => {
@@ -888,7 +895,8 @@ describe("SegmentMatcher", () => {
         const url = m.buildPath("r", { id: "x?tab=1" });
 
         expect(url).toBe("/users/x?tab=1");
-        expect(m.match(url)?.params).toStrictEqual({ id: "x", tab: "1" });
+        expect(m.match(url)?.params).toStrictEqual({ id: "x" });
+        expect(m.match(url)?.search).toStrictEqual({ tab: "1" });
       },
     );
 
@@ -1094,8 +1102,8 @@ describe("SegmentMatcher", () => {
       expect(withHash).toBeDefined();
       // Without the fix, `key` would capture "value#section" (the fragment
       // folded into the query value). Result must equal the no-fragment match.
-      expect(withHash!.params).toStrictEqual(plain!.params);
-      expect(withHash!.params).toStrictEqual({ key: "value" });
+      expect(withHash!.search).toStrictEqual(plain!.search);
+      expect(withHash!.search).toStrictEqual({ key: "value" });
     });
 
     it("should treat a fragment right after the query separator as empty query (#842)", () => {
@@ -1137,10 +1145,11 @@ describe("SegmentMatcher", () => {
 
       expect(result).toBeDefined();
       // `tab` must be "x", not "x#frag".
-      expect(result!.params).toStrictEqual({ id: "v", tab: "x" });
+      expect(result!.params).toStrictEqual({ id: "v" });
+      expect(result!.search).toStrictEqual({ tab: "x" });
     });
 
-    it("should let a query key override a same-named path param (documented, #843)", () => {
+    it("should keep a same-named path param and query key in separate channels (documented, #843)", () => {
       const matcher = createTestMatcher();
       const idNode = createInputNode({
         name: "id",
@@ -1165,13 +1174,15 @@ describe("SegmentMatcher", () => {
         }),
       );
 
-      // INVARIANTS Matching #25: query params merge into the same object as path
-      // params (query last), so a same-named query key overwrites the path value.
+      // INVARIANTS Matching #25: path params live in `.params`, query params in
+      // `.search` (separate channels), so a same-named query key no longer overwrites
+      // the path value — both coexist under their own channel.
       // `buildPath` never emits this shape — roundtrip is unaffected.
       const result = matcher.match("/u/5?id=9");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "9" });
+      expect(result!.params).toStrictEqual({ id: "5" });
+      expect(result!.search).toStrictEqual({ id: "9" });
     });
 
     it("should return correct meta", () => {
@@ -1993,7 +2004,8 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/users/123?foo=bar");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123", foo: "bar" });
+      expect(result!.params).toStrictEqual({ id: "123" });
+      expect(result!.search).toStrictEqual({ foo: "bar" });
     });
 
     it("should return correct meta for param routes", () => {
@@ -2898,7 +2910,8 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/files/a/b?dl=true");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ path: "a/b", dl: "true" });
+      expect(result!.params).toStrictEqual({ path: "a/b" });
+      expect(result!.search).toStrictEqual({ dl: "true" });
     });
 
     it("should strip hash before splat matching", () => {
@@ -3179,9 +3192,9 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("home", {}, { trailingSlash: "always" })).toBe(
-        "/home/",
-      );
+      expect(
+        matcher.buildPath("home", {}, undefined, { trailingSlash: "always" }),
+      ).toBe("/home/");
     });
 
     it("should not double trailing slash when already present", () => {
@@ -3203,9 +3216,9 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("home", {}, { trailingSlash: "always" })).toBe(
-        "/home/",
-      );
+      expect(
+        matcher.buildPath("home", {}, undefined, { trailingSlash: "always" }),
+      ).toBe("/home/");
     });
 
     it("should remove trailing slash when mode is 'never'", () => {
@@ -3227,9 +3240,9 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("home", {}, { trailingSlash: "never" })).toBe(
-        "/home",
-      );
+      expect(
+        matcher.buildPath("home", {}, undefined, { trailingSlash: "never" }),
+      ).toBe("/home");
     });
 
     it("should not remove slash from root path '/'", () => {
@@ -3251,9 +3264,9 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("index", {}, { trailingSlash: "never" })).toBe(
-        "/",
-      );
+      expect(
+        matcher.buildPath("index", {}, undefined, { trailingSlash: "never" }),
+      ).toBe("/");
     });
 
     it("should not modify path without trailingSlash option", () => {
@@ -3401,6 +3414,7 @@ describe("SegmentMatcher", () => {
         matcher.buildPath(
           "users",
           { id: "42", extra: "value", another: "one" },
+          undefined,
           { queryParamsMode: "loose" },
         ),
       ).toBe("/users/42?extra=value&another=one");
@@ -3450,11 +3464,9 @@ describe("SegmentMatcher", () => {
       matcher.registerTree(rootNode);
 
       expect(
-        matcher.buildPath(
-          "search",
-          { q: "test", extra: "val" },
-          { queryParamsMode: "loose" },
-        ),
+        matcher.buildPath("search", { q: "test", extra: "val" }, undefined, {
+          queryParamsMode: "loose",
+        }),
       ).toBe("/search?q=test&extra=val");
     });
 
@@ -3478,7 +3490,9 @@ describe("SegmentMatcher", () => {
       matcher.registerTree(rootNode);
 
       expect(
-        matcher.buildPath("search", { q: "test" }, { trailingSlash: "always" }),
+        matcher.buildPath("search", { q: "test" }, undefined, {
+          trailingSlash: "always",
+        }),
       ).toBe("/search/?q=test");
     });
 
@@ -3914,7 +3928,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/search?query=hello&page=2");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ query: "hello", page: "2" });
+      expect(result!.search).toStrictEqual({ query: "hello", page: "2" });
     });
 
     it("should pass undeclared query params in loose mode", () => {
@@ -3923,7 +3937,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/search?query=hello&extra=yes");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({
+      expect(result!.search).toStrictEqual({
         query: "hello",
         extra: "yes",
       });
@@ -3943,7 +3957,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/search?query=hello&page=2");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ query: "hello", page: "2" });
+      expect(result!.search).toStrictEqual({ query: "hello", page: "2" });
     });
 
     it("should return empty params when no query string", () => {
@@ -3991,9 +4005,9 @@ describe("SegmentMatcher", () => {
 
       const result = matcher.match("/search?__proto__=zzz");
 
-      expect(Object.hasOwn(result!.params, "__proto__")).toBe(true);
+      expect(Object.hasOwn(result!.search, "__proto__")).toBe(true);
       expect(
-        Object.getOwnPropertyDescriptor(result!.params, "__proto__")?.value,
+        Object.getOwnPropertyDescriptor(result!.search, "__proto__")?.value,
       ).toBe("zzz");
     });
 
@@ -4055,7 +4069,8 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/users/123?tab=settings");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123", tab: "settings" });
+      expect(result!.params).toStrictEqual({ id: "123" });
+      expect(result!.search).toStrictEqual({ tab: "settings" });
     });
 
     it("should use injected parseQueryString function", () => {
@@ -4083,7 +4098,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/?custom=format");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ raw: "custom=format" });
+      expect(result!.search).toStrictEqual({ raw: "custom=format" });
     });
 
     it("should handle query string with keys only (no values)", () => {
@@ -4092,7 +4107,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/search?query");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ query: null });
+      expect(result!.search).toStrictEqual({ query: null });
     });
 
     it("should handle strict mode with no query params on URL", () => {
@@ -4118,7 +4133,7 @@ describe("SegmentMatcher", () => {
       const result = matcher.match("/search?query=hello");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ query: "hello" });
+      expect(result!.search).toStrictEqual({ query: "hello" });
     });
   });
 
@@ -4397,11 +4412,9 @@ describe("mutation guards (observable-behavior kills)", () => {
 
     expect(matcher.buildPath("r", { id: "5", extra: "x" })).toBe("/5");
     expect(
-      matcher.buildPath(
-        "r",
-        { id: "5", extra: "x" },
-        { queryParamsMode: "loose" },
-      ),
+      matcher.buildPath("r", { id: "5", extra: "x" }, undefined, {
+        queryParamsMode: "loose",
+      }),
     ).toBe("/5?extra=x");
   });
 

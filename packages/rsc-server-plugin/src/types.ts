@@ -1,6 +1,7 @@
 import type {
   SsrLoaderFn,
   SsrLoaderFnFactory,
+  SsrLoaderTarget,
   SsrMode,
   SsrRouteEntry,
 } from "./shared-ssr";
@@ -28,6 +29,9 @@ export type RscSsrMode = Exclude<SsrMode, "data-only">;
  * would be ceremonial.
  */
 export type RscLoaderFn = SsrLoaderFn<ReactNode>;
+
+/** Destination channels handed to an RSC loader — `{ params, search }` (RFC-4 M2 / #1548). */
+export type RscLoaderTarget = SsrLoaderTarget;
 
 /**
  * Factory function for creating RSC loaders.

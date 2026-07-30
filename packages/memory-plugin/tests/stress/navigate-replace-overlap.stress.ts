@@ -55,7 +55,7 @@ describe("S12: navigate() in flight + replace navigate() overlap", () => {
       await Promise.resolve();
 
       const p2 = router
-        .navigate("settings", {}, { replace: true })
+        .navigate("settings", {}, undefined, { replace: true })
         .catch((error: unknown) => {
           if ((error as { code?: string }).code !== "TRANSITION_CANCELLED") {
             throw error;
@@ -105,7 +105,7 @@ describe("S12: navigate() in flight + replace navigate() overlap", () => {
                   }
                 })
             : router
-                .navigate("settings", {}, { replace: true })
+                .navigate("settings", {}, undefined, { replace: true })
                 .catch((error: unknown) => {
                   if (
                     (error as { code?: string }).code !== "TRANSITION_CANCELLED"

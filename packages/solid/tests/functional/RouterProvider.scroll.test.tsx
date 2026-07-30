@@ -61,10 +61,43 @@ function setScrollY(y: number): void {
   });
 }
 
+// `sessionStorage` here is a plain-object mock, not jsdom's Storage. On Node >= 26
+// Node ships Web Storage as unflagged globals and vitest keeps the pre-existing Node
+// global (only `Storage` comes from jsdom), so `vi.spyOn(Storage.prototype, …)` patches
+// a class nothing calls. Spying the live object fails on every Node too — Web Storage
+// is a Proxy whose named-property setter swallows the spy as a stored *item*. The mock
+// is spyable AND controllable (make `setItem`/`getItem` throw for the failure paths).
+// Why, in full: IMPLEMENTATION_NOTES.md § "Adapter scroll tests mock `sessionStorage`".
+function createMockStorage(): Storage {
+  const store = new Map<string, string>();
+
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+  };
+}
+
 describe("RouterProvider — scrollRestoration", () => {
   let router: Router;
 
   beforeEach(async () => {
+    vi.stubGlobal("sessionStorage", createMockStorage());
     sessionStorage.clear();
     history.scrollRestoration = "auto";
     vi.stubGlobal(
@@ -239,7 +272,7 @@ describe("RouterProvider — scrollRestoration", () => {
       </RouterProvider>
     ));
 
-    await router.navigate("about", {}, { replace: true });
+    await router.navigate("about", {}, undefined, { replace: true });
 
     // Capture still runs, but the restore arm is skipped for a genuine replace.
     expect(scrollTo).not.toHaveBeenCalled();
@@ -261,7 +294,7 @@ describe("RouterProvider — scrollRestoration", () => {
     scrollTo.mockClear();
     setScrollY(180); // user scrolled within "about"
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     // reload → capture about@180, then restore about@180.
     expect(scrollTo).toHaveBeenCalledWith({
@@ -286,7 +319,7 @@ describe("RouterProvider — scrollRestoration", () => {
       </RouterProvider>
     ));
 
-    await router.navigate("about", {}, { hash: "section-2" });
+    await router.navigate("about", {}, undefined, { hash: "section-2" });
 
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "auto" });
 
@@ -344,7 +377,7 @@ describe("RouterProvider — scrollRestoration", () => {
     containerScrollTo.mockClear();
     top = 220;
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     // reload → capture about@220, then restorePos through the container; the
     // reflected write makes the instant early-stop fire on the first frame.
@@ -379,7 +412,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     scrollTo.mockClear();
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     // Container getter returns null → restorePos falls back to window across the
     // retry budget (harmless clamp) — window scrollTo is invoked.
@@ -409,7 +442,7 @@ describe("RouterProvider — scrollRestoration", () => {
       </RouterProvider>
     ));
 
-    await router.navigate("about", {}, { hash: "section-3" });
+    await router.navigate("about", {}, undefined, { hash: "section-3" });
 
     expect(scrollIntoView).not.toHaveBeenCalled();
     expect(scrollTo).toHaveBeenCalledWith({
@@ -548,7 +581,7 @@ describe("RouterProvider — scrollRestoration", () => {
     // Back to "test", still at scroll 75.
     await router.navigate("test");
 
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const setItem = vi.spyOn(sessionStorage, "setItem");
 
     setScrollY(75);
 
@@ -560,7 +593,7 @@ describe("RouterProvider — scrollRestoration", () => {
   });
 
   it("tolerates a sessionStorage read failure (loadStore falls back to {})", async () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    vi.spyOn(sessionStorage, "getItem").mockImplementation(() => {
       throw new Error("storage blocked");
     });
     setScrollY(50);
@@ -670,7 +703,7 @@ describe("RouterProvider — scrollRestoration", () => {
       str: "x",
     });
 
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const setItem = vi.spyOn(sessionStorage, "setItem");
 
     setScrollY(140);
 
@@ -788,7 +821,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     // reload → restorePos; smooth never early-stops, so it re-applies every
     // frame across the retry budget.
-    await router.navigate("test", {}, { reload: true });
+    await router.navigate("test", {}, undefined, { reload: true });
 
     expect(containerScrollTo.mock.calls.length).toBeGreaterThan(1);
 
@@ -837,11 +870,9 @@ describe("RouterProvider — scrollRestoration", () => {
     scrollTo.mockClear();
 
     // reload → restore arm → safeKeyOf(route) is null → restorePos(0).
-    await plain.navigate(
-      "about",
-      { big: 1n as unknown as string },
-      { reload: true },
-    );
+    await plain.navigate("about", { big: 1n as unknown as string }, undefined, {
+      reload: true,
+    });
 
     expect(scrollTo).toHaveBeenCalledWith({
       top: 0,
@@ -869,7 +900,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     // reload-navigate to a never-visited route → loadStore()[key] is undefined
     // → the `?? 0` fallback restores to top.
-    await router.navigate("home", {}, { reload: true });
+    await router.navigate("home", {}, undefined, { reload: true });
 
     expect(scrollTo).toHaveBeenCalledWith({
       top: 0,
@@ -922,7 +953,7 @@ describe("RouterProvider — scrollRestoration", () => {
 
     await plain.navigate("about", { big: 1n as unknown as string });
 
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const setItem = vi.spyOn(sessionStorage, "setItem");
 
     globalThis.dispatchEvent(new Event("pagehide"));
 
@@ -940,7 +971,7 @@ describe("RouterProvider — scrollRestoration", () => {
     ));
 
     router.stop(); // getState() now returns undefined
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const setItem = vi.spyOn(sessionStorage, "setItem");
 
     globalThis.dispatchEvent(new Event("pagehide"));
 
@@ -954,6 +985,7 @@ describe("RouterProvider — scrollRestoration (destroyed guard)", () => {
   let router: Router;
 
   beforeEach(async () => {
+    vi.stubGlobal("sessionStorage", createMockStorage());
     sessionStorage.clear();
     history.scrollRestoration = "auto";
     vi.useFakeTimers();
@@ -1017,7 +1049,7 @@ describe("RouterProvider — scrollRestoration (destroyed guard)", () => {
     // restore rAF is still pending under the deferred shim).
     await router.navigate("about");
 
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const setItem = vi.spyOn(sessionStorage, "setItem");
 
     // Second navigation lands in the same unsettled window → capture is skipped
     // so it cannot store a foreign position under "about"'s key.

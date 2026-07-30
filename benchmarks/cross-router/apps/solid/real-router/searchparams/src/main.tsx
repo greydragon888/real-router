@@ -1,6 +1,6 @@
 // real-router (Solid) search-param-scaling variant — routes with N query params
-// (/sN?k1=v1&...&kN=vN). Query declared in the path pattern (`?k1&...`), merged into
-// route params, parsed eagerly. The leaf reads EVERY value (readSearch, once via
+// (/sN?k1=v1&...&kN=vN). Query declared in the path pattern (`?k1&...`), lives in
+// route.search, parsed eagerly. The leaf reads EVERY value (readSearch, once via
 // createMemo).
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
@@ -34,7 +34,7 @@ await router.start();
 
 function SearchLeaf(): JSX.Element {
   const state = useRoute();
-  const info = createMemo(() => readSearch(Object.entries(state().route.params)));
+  const info = createMemo(() => readSearch(Object.entries(state().route.search)));
   return (
     <main data-testid="page-search" data-count={info().count}>
       {info().count} search · Σ{info().checksum}
@@ -50,7 +50,7 @@ function App(): JSX.Element {
           {(n) => (
             <Link
               routeName={`s${n}`}
-              routeParams={searchValues(n)}
+              routeSearch={searchValues(n)}
               data-testid={`link-search-${n}`}
             >
               {n}

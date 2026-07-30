@@ -4,7 +4,7 @@ import { computed } from "vue";
 
 const { route } = useRoute();
 const lang = computed(
-  () => (route.value.params.lang as string | undefined) ?? "en",
+  () => (route.value.search.lang as string | undefined) ?? "en",
 );
 </script>
 

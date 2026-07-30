@@ -65,7 +65,7 @@ describe("B7.2 — replaceHistoryState vs navigate race", () => {
           router.replaceHistoryState("home");
         } catch {
           // Allowed only when the router transitioned mid-call to a state
-          // where buildState fails — extremely rare; do not let it kill
+          // where buildNavigationState fails — extremely rare; do not let it kill
           // the test.
         }
       }

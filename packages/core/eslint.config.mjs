@@ -80,6 +80,49 @@ export default [
     },
   },
 
+  // ── Channel-correctness subsystem boundary ────────────────────────────────
+  //    `src/channels/` owns the fifth always-on invariant guard (params is the
+  //    path channel, search the query channel, the router moves nothing between
+  //    them). It is a SUBSYSTEM, not a namespace method, because the rule has no
+  //    owning module — it runs from the facade, from `internals`, from the
+  //    `forwardState` seam, from the `decodeParams` boundary, from `updateRoute`
+  //    and from four registration entry points. The rule used to live in two
+  //    files both named `helpers.ts`, which is how #1584's existence
+  //    precondition landed on one half and not the other.
+  //
+  //    The boundary that keeps it one place: declared query names arrive as
+  //    DATA (`readonly string[]`, or a `queryNamesOf` accessor), never as a
+  //    matcher — the same inversion `src/pipeline` makes with its
+  //    `RouteResolver` port. Reaching into a namespace or the engine from here
+  //    would grow a SECOND derivation of the one registry that both classifies
+  //    and prints (#1556), which is the drift this subsystem exists to end.
+  {
+    files: ["src/channels/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/namespaces",
+                "**/namespaces/**",
+                "**/engine",
+                "**/engine/**",
+                "**/pipeline",
+                "**/pipeline/**",
+                "**/internals",
+                "**/Router",
+              ],
+              message:
+                "Subsystem boundary: src/channels/ takes declared query names as DATA, never as a matcher/store. Importing a namespace, the engine or the pipeline here re-creates the second derivation of the one query registry (#1556) — pass `readonly string[]` or a `queryNamesOf` accessor from the caller instead (see `RoutesNamespace/helpers.assertRouteDefaultChannelsFor`).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // ── Engine layer-boundary + white-box tiers (ported from the former
   //    packages/engine/eslint.config.mjs when the routing engine folded into
   //    core/src/engine, #1510). Globs re-scoped: src/ → src/engine/, tests/ →

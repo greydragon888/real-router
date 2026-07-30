@@ -32,8 +32,8 @@ const SLOW_LOADER_TIMEOUT_MS = 250;
 const SLOW_FETCH_URL = "http://localhost:3013/__bench/slow-fetch";
 
 export const loaders: DataLoaderFactoryMap = {
-  users: () => (params) => {
-    const sort: "asc" | "desc" = params.sort === "desc" ? "desc" : "asc";
+  users: () => ({ search }) => {
+    const sort: "asc" | "desc" = search.sort === "desc" ? "desc" : "asc";
 
     return Promise.resolve<UsersListData>({
       users: database.users.list(sort),
@@ -41,7 +41,7 @@ export const loaders: DataLoaderFactoryMap = {
     });
   },
 
-  "users.profile": () => (params) =>
+  "users.profile": () => ({ params }) =>
     withTimeout("users.profile", PROFILE_TIMEOUT_MS, () => {
       const id = params.id as string;
       const user = database.users.findById(id);
@@ -53,7 +53,7 @@ export const loaders: DataLoaderFactoryMap = {
       return Promise.resolve<UserProfileData>({ user });
     }),
 
-  "users.profile.posts": () => (params) => {
+  "users.profile.posts": () => ({ params }) => {
     const id = params.id as string;
     const user = database.users.findById(id);
 
@@ -67,7 +67,7 @@ export const loaders: DataLoaderFactoryMap = {
     });
   },
 
-  legacyUser: () => (params) => {
+  legacyUser: () => ({ params }) => {
     const id = params.id as string;
 
     throw new LoaderRedirect(`/users/${id}`, 301);

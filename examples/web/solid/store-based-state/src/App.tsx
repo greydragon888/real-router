@@ -20,10 +20,18 @@ export function App(): JSX.Element {
           <Link routeName="users.profile" routeParams={{ id: "42" }}>
             /users/42
           </Link>
-          <Link routeName="users.profile" routeParams={{ id: "42", page: "1" }}>
+          <Link
+            routeName="users.profile"
+            routeParams={{ id: "42" }}
+            routeSearch={{ page: "1" }}
+          >
             /users/42?page=1
           </Link>
-          <Link routeName="users.profile" routeParams={{ id: "42", page: "2" }}>
+          <Link
+            routeName="users.profile"
+            routeParams={{ id: "42" }}
+            routeSearch={{ page: "2" }}
+          >
             /users/42?page=2
           </Link>
           <Link routeName="users.profile" routeParams={{ id: "99" }}>

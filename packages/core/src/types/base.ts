@@ -19,9 +19,18 @@ import type { StateContext } from "./index";
  */
 export type Unsubscribe = () => void;
 
-export interface SimpleState<P extends Params = Params> {
+export interface SimpleState<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+> {
   name: string;
   params: P;
+  /**
+   * Query channel — see {@link SearchParams}. Split out of the former single
+   * `params` bag (RFC-4 M2 / #1548). Always present: a frozen empty object when
+   * there are no query params.
+   */
+  search: S;
 }
 
 export type TransitionPhase = "deactivating" | "activating";
@@ -43,9 +52,18 @@ export interface TransitionMeta {
   };
 }
 
-export interface State<P extends Params = Params> {
+export interface State<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+> {
   name: string;
   params: P;
+  /**
+   * Query channel — see {@link SearchParams}. Holds ONLY query-string params;
+   * path params live in {@link State.params} (RFC-4 M2 / #1548). Always present:
+   * a frozen empty object when there are no query params.
+   */
+  search: S;
   path: string;
   transition: TransitionMeta;
   /**
@@ -71,8 +89,43 @@ export interface State<P extends Params = Params> {
   context: StateContext & Record<string, unknown>;
 }
 
-export interface StateMetaInput<P extends Params = Params> {
+/**
+ * Descriptor form of a navigation target (RFC-4 M2 / #1548). The two-channel
+ * counterpart to the positional `navigate(name, params, search, opts)` form:
+ * `params` is the path channel, `search` the query channel. Passed as the first
+ * argument to `router.navigate(target, opts?)` / `router.buildPath(target)` /
+ * `router.isActiveRoute(target)` and as the `to` prop of framework `<Link>`s,
+ * so a target can be threaded as one value instead of positional arguments.
+ */
+export interface NavigationTarget<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+> {
+  name: string;
+  params?: P;
+  search?: S;
+}
+
+/**
+ * The two navigation channels a per-route codec operates on (RFC-4 M2 / #1548):
+ * `params` is the path channel, `search` the query channel. Used as **both** the
+ * input and the output of {@link Route.encodeParams} / {@link Route.decodeParams}
+ * — a codec transforms whichever channel(s) it owns and returns the other channel
+ * unchanged (it must be passed through explicitly).
+ *
+ * @remarks
+ * v1 ran the whole (path + query) bag through both callbacks, so a query value
+ * reached `decodeParams`. This two-channel shape preserves that reach: the query
+ * arrives in `search` rather than merged into `params`. Value semantics are
+ * unchanged — only the storage location differs (M2 keeps query parsing/printing
+ * exactly as v1).
+ */
+export interface ParamsSearch<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+> {
   params: P;
+  search: S;
 }
 
 /**
@@ -121,3 +174,25 @@ export interface Params {
     | null
     | undefined;
 }
+
+/**
+ * Query-parameter primitive values. Mirrors the engine's `QueryParamPrimitive`
+ * (`engine/search-params/types.ts`) — the value form is identical to v1's query
+ * half (the union produced across `queryParamsMode` formats).
+ */
+export type SearchParamPrimitive = string | number | boolean | null;
+
+/**
+ * A single query-parameter value — a primitive or an array of primitives.
+ */
+export type SearchParamValue = SearchParamPrimitive | SearchParamPrimitive[];
+
+/**
+ * Query-parameter bag carried by {@link State.search} — the query channel,
+ * split out of the former single `params` bag in M2 (RFC-4 M2 / #1548). Only
+ * the storage location changes vs v1; value semantics (modes, `queryParamsMode`,
+ * ternary arrays) are unchanged. Structurally matches the engine's internal
+ * `SearchParams` (`engine/search-params/types.ts`), so match results flow into
+ * `State.search` without conversion.
+ */
+export type SearchParams = Record<string, SearchParamValue | undefined>;

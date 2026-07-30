@@ -87,7 +87,7 @@ describe("router.navigate() - route not found", () => {
       const options = { replace: true, force: true };
 
       await expect(
-        router.navigate("invalid.route", {}, options),
+        router.navigate("invalid.route", {}, undefined, options),
       ).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,
       });
@@ -101,7 +101,7 @@ describe("router.navigate() - route not found", () => {
         onError,
       );
 
-      await router.navigate("users", {}, {});
+      await router.navigate("users", {}, undefined, {});
 
       onError.mockClear();
 

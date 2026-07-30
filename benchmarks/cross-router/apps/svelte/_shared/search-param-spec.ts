@@ -13,7 +13,7 @@ export function searchKeys(n: number): string[] {
   return Array.from({ length: n }, (_, i) => `k${i + 1}`);
 }
 
-// { k1: "v1", ..., kN: "vN" } — for real-router routeParams (mapped to query).
+// { k1: "v1", ..., kN: "vN" } — for real-router routeSearch (the query channel).
 export function searchValues(n: number): Record<string, string> {
   return Object.fromEntries(searchKeys(n).map((k, i) => [k, `v${i + 1}`]));
 }

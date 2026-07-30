@@ -103,17 +103,17 @@ export class UsersLayoutComponent {}
 
 All inject functions must be called within an injection context (constructor, field initializer, or `runInInjectionContext`). Route state functions return `RouteSignals` — an object with a `routeState` signal and a stable `navigator` reference.
 
-| Function                                    | Returns                                                                    | Reactive?                                                                                                                                                      |
-| ------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `injectRouter()`                            | `Router`                                                                   | Never                                                                                                                                                          |
-| `injectNavigator()`                         | `Navigator`                                                                | Never                                                                                                                                                          |
-| `injectRoute()`                             | `RouteSignals`                                                             | `routeState` on every navigation                                                                                                                               |
-| `injectRouteNode(name)`                     | `RouteSignals`                                                             | When the node subtree is entered, left, or changes between descendants (uses `shouldUpdateNode` — sibling-leaf transitions within the same subtree still fire) |
-| `injectRouteUtils()`                        | `RouteUtils`                                                               | Never                                                                                                                                                          |
-| `injectRouterTransition()`                  | `Signal<RouterTransitionSnapshot>`                                         | On transition start/end                                                                                                                                        |
-| `injectIsActiveRoute(name, params?, opts?)` | `Signal<boolean>`                                                          | On active state change                                                                                                                                         |
-| `injectRouteExit(handler, options?)`        | `void` — wraps `subscribeLeave` with abort + same-route guards             | Never (handler captured at injection time)                                                                                                                     |
-| `injectRouteEnter(handler, options?)`       | `void` — fires once on nav-driven mount via `effect()` + `transition.from` | Never (handler captured at injection time)                                                                                                                     |
+| Function                                                | Returns                                                                    | Reactive?                                                                                                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `injectRouter()`                                        | `Router`                                                                   | Never                                                                                                                                                          |
+| `injectNavigator()`                                     | `Navigator`                                                                | Never                                                                                                                                                          |
+| `injectRoute()`                                         | `RouteSignals`                                                             | `routeState` on every navigation                                                                                                                               |
+| `injectRouteNode(name)`                                 | `RouteSignals`                                                             | When the node subtree is entered, left, or changes between descendants (uses `shouldUpdateNode` — sibling-leaf transitions within the same subtree still fire) |
+| `injectRouteUtils()`                                    | `RouteUtils`                                                               | Never                                                                                                                                                          |
+| `injectRouterTransition()`                              | `Signal<RouterTransitionSnapshot>`                                         | On transition start/end                                                                                                                                        |
+| `injectIsActiveRoute(name, params?, search?, options?)` | `Signal<boolean>`                                                          | On active state change                                                                                                                                         |
+| `injectRouteExit(handler, options?)`                    | `void` — wraps `subscribeLeave` with abort + same-route guards             | Never (handler captured at injection time)                                                                                                                     |
+| `injectRouteEnter(handler, options?)`                   | `void` — fires once on nav-driven mount via `effect()` + `transition.from` | Never (handler captured at injection time)                                                                                                                     |
 
 `RouteSignals` shape:
 
@@ -404,6 +404,7 @@ Navigation directive for `<a>` elements. Handles click events, sets `href`, and 
   realLink
   routeName="users.profile"
   [routeParams]="{ id: '123' }"
+  [routeSearch]="{ tab: 'posts' }"
   activeClassName="is-active"
   [activeStrict]="false"
   [ignoreQueryParams]="true"
@@ -413,15 +414,16 @@ Navigation directive for `<a>` elements. Handles click events, sets `href`, and 
 </a>
 ```
 
-| Input               | Type                | Default     | Description                                                                                                     |
-| ------------------- | ------------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
-| `routeName`         | `string`            | `""`        | Target route name                                                                                               |
-| `routeParams`       | `Params`            | `undefined` | Route parameters (omitted → `undefined`, shares one active-route source with `injectIsActiveRoute(name)`, #776) |
-| `routeOptions`      | `NavigationOptions` | `{}`        | Navigation options (replace, etc.)                                                                              |
-| `activeClassName`   | `string`            | `"active"`  | CSS class applied when route is active                                                                          |
-| `activeStrict`      | `boolean`           | `false`     | Exact match only (no ancestor match)                                                                            |
-| `ignoreQueryParams` | `boolean`           | `true`      | Query params don't affect active state                                                                          |
-| `hash`              | `string`            | `undefined` | URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532)                         |
+| Input               | Type                | Default     | Description                                                                                                                          |
+| ------------------- | ------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `routeName`         | `string`            | `""`        | Target route name                                                                                                                    |
+| `routeParams`       | `Params`            | `undefined` | Route (path) parameters (omitted → `undefined`, shares one active-route source with `injectIsActiveRoute(name)`, #776)               |
+| `routeSearch`       | `SearchParams`      | `undefined` | Query (search) params for the link's target (RFC-4 M2, #1548) — parallel to `routeParams`, the path/query split's view-layer channel |
+| `routeOptions`      | `NavigationOptions` | `{}`        | Navigation options (replace, etc.)                                                                                                   |
+| `activeClassName`   | `string`            | `"active"`  | CSS class applied when route is active                                                                                               |
+| `activeStrict`      | `boolean`           | `false`     | Exact match only (no ancestor match)                                                                                                 |
+| `ignoreQueryParams` | `boolean`           | `true`      | Query params don't affect active state                                                                                               |
+| `hash`              | `string`            | `undefined` | URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532)                                              |
 
 #### `hash` input — URL fragment / tab-style UIs
 
@@ -445,6 +447,8 @@ Caveat: nested object/array param **values** are compared by reference, not deep
 readonly params = computed(() => ({ filters: [1, 2] }));
 // <a realLink routeName="search" [routeParams]="params()" />
 ```
+
+`routeSearch` is **not** content-stabilized the same way (#1548) — an inline `[routeSearch]="{ tab: 'x' }"` literal re-creates the active-route source and re-runs `buildHref` on every change detection, even when the query content is unchanged. Bind a stable reference (a component field or signal) if churn matters for your use case.
 
 ### `[realLinkActive]`
 
@@ -738,7 +742,7 @@ The adapter is signal-first and does not depend on Zone.js. It works with `provi
 
 ### Reactive Source Setup via `effect()` (#630)
 
-`RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources inside `effect(...)` blocks scheduled from the **constructor** (not `ngOnInit`). Reading signal inputs inside `effect()` makes the source-creation REACTIVE — when `[realLink]`, `[routeParams]`, `[hash]`, `[realLinkActive]`, or `[routeNode]` change in AOT, the effect tears down the previous source via `onCleanup` and creates a new one with the current input values. The legacy `ngOnInit` setup captured inputs once at mount and produced a real AOT bug (#630). Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef`.
+`RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources inside `effect(...)` blocks scheduled from the **constructor** (not `ngOnInit`). Reading signal inputs inside `effect()` makes the source-creation REACTIVE — when `[realLink]`, `[routeParams]`, `[routeSearch]`, `[hash]`, `[realLinkActive]`, or `[routeNode]` change in AOT, the effect tears down the previous source via `onCleanup` and creates a new one with the current input values. The legacy `ngOnInit` setup captured inputs once at mount and produced a real AOT bug (#630). Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef`.
 
 In `RealLink` / `RealLinkActive`, `[routeParams]` is routed through `shallowEqual` content-stabilization before the effect reads it, so an inline-literal binding re-allocated on every change detection only re-creates the source on real content change (see [Object `routeParams`](#object-routeparams--content-stabilized), #988).
 

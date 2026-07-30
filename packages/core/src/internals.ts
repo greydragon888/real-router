@@ -1,8 +1,12 @@
+import { assertChannelCorrect } from "./channels";
+
 import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
+import type { RouteResolver } from "./pipeline";
 import type { Router as RouterClass } from "./Router";
 import type {
+  AnyOptions,
   DefaultDependencies,
   EventName,
   LoggerConfig,
@@ -13,6 +17,7 @@ import type {
   Router as RouterInterface,
   RouterLogger,
   RouteTreeState,
+  SearchParams,
   SerializedRouterState,
   SimpleState,
   State,
@@ -26,17 +31,41 @@ import type { RouterValidator } from "./types/RouterValidator";
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,
 > {
-  readonly makeState: <P extends Params = Params>(
+  readonly makeState: <
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
     name: string,
     params?: P,
+    search?: S,
     path?: string,
-    meta?: Record<string, Record<string, "url" | "query">>,
-  ) => State<P>;
+  ) => State<P, S>;
 
-  readonly forwardState: <P extends Params = Params>(
+  /**
+   * Per-segment param-source map for a route name (`{ segment: { param: "url" |
+   * "query" } }`), read from the live matcher — the ownership channel for
+   * `getTransitionPath` (RFC-4 M2 / #1548, replaced the removed per-State
+   * `stateMetaStore` WeakMap). `undefined` when the name is not in the tree.
+   */
+  readonly getMetaForState: (
+    name: string,
+  ) => Record<string, Record<string, "url" | "query">> | undefined;
+
+  /**
+   * The route's DECLARED query-param names — the same registry the URL build
+   * prints from (#1556), minus path slots. Feeds the always-on channel guard
+   * (#1572); read here rather than re-derived, so classification cannot drift.
+   */
+  readonly getQueryParams: (name: string) => readonly string[];
+
+  readonly forwardState: <
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
     routeName: string,
     routeParams: P,
-  ) => SimpleState<P>;
+    routeSearch?: S,
+  ) => SimpleState<P, S>;
 
   readonly buildStateResolved: (
     resolvedName: string,
@@ -45,10 +74,10 @@ export interface RouterInternals<
 
   readonly matchPath: <P extends Params = Params>(
     path: string,
-    options?: Options,
+    options?: AnyOptions,
   ) => State<P> | undefined;
 
-  readonly getOptions: () => Options;
+  readonly getOptions: () => Options<D>;
 
   readonly addEventListener: <E extends EventName>(
     eventName: E,
@@ -75,7 +104,20 @@ export interface RouterInternals<
     readonly isEmitting: () => boolean;
   };
 
-  readonly buildPath: (route: string, params?: Params) => string;
+  readonly buildPath: (
+    route: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => string;
+
+  /**
+   * The navigation pipeline's read-model, for entry points that live on this
+   * plugin-facing surface rather than in a namespace. Resolved LAZILY: the port
+   * is created during wiring, and `registerInternals` runs before that, so the
+   * accessor is a closure rather than a value — the same shape the interceptable
+   * methods above already use.
+   */
+  readonly port: () => RouteResolver;
 
   readonly emitTransitionError: (error: Error) => void;
 
@@ -145,7 +187,7 @@ export interface RouterInternals<
   // clone-relevant subsystem is wired in a single place instead of being spread
   // across separate methods.
   readonly getCloneState: () => {
-    options: Options;
+    options: Options<D>;
     dependencies: Record<string, unknown>;
     pluginFactories: PluginFactory<D>[];
     // Resolved logger config of the base router, so a clone can build its OWN
@@ -195,6 +237,51 @@ export function getInternals<D extends DefaultDependencies>(
   return ctx as RouterInternals<D>;
 }
 
+/**
+ * Channel guard, position P1 (#1572) — the caller's RAW `params` argument, at
+ * the API boundary and BEFORE any interceptor runs, so what it reports is what
+ * the CALLER wrote (a plugin's later injection is P2's population, not this one).
+ *
+ * THROWS. The warn-first step (#1572) announced the contract so every call site
+ * could identify itself in the logs; this is the promotion it announced.
+ *
+ * A `TypeError`, synchronous, rather than a `RouterError` on a rejected promise:
+ * this is an ARGUMENT-shape defect at the API boundary, caught before any
+ * interceptor or transition exists — the same class as the `subscribe` /
+ * `navigateToNotFound` / `start` guards beside it. Rejecting instead would let a
+ * `.catch()` written for navigation failures swallow a programming error.
+ *
+ * P3 (`navigateToState`) keeps REJECTING — deliberately asymmetric, because it
+ * takes a ready-made `State` from a popstate handler, where a new synchronous
+ * throw would change an existing method's failure shape.
+ *
+ * The predicates (`buildPath` / `isActiveRoute` / `canNavigateTo`) are still NOT
+ * instrumented: they run on every `<Link>` render, an answer there is read
+ * immediately and corrupts nothing, and throwing inside a render in six adapters
+ * is not a trade this guard is worth.
+ *
+ * ⚠ Not instrumented ≠ blind. `canNavigateTo` answers whether `navigate` WOULD
+ * work, so it consults {@link findMisChanneledKey} directly and returns `false`
+ * for a shape this function would have thrown on (#1576) — an answer, not a
+ * throw, so the render-path trade above is untouched. `buildPath` /
+ * `isActiveRoute` ask a different question and are unchanged.
+ *
+ * @internal
+ */
+export function throwOnMisChanneledKey<D extends DefaultDependencies>(
+  ctx: RouterInternals<D>,
+  method: string,
+  routeName: string,
+  params: Params | undefined,
+): void {
+  assertChannelCorrect(
+    method,
+    routeName,
+    params,
+    ctx.getQueryParams(routeName),
+  );
+}
+
 export function registerInternals<D extends DefaultDependencies>(
   router: RouterClass<D>,
   ctx: RouterInternals<D>,
@@ -221,9 +308,10 @@ function executeInterceptorChain<T>(
 
 /**
  * Variadic interceptor wrapper — wraps a function of any arity, returning the
- * same callable type `T`. Use {@link createBinaryInterceptable} instead when the
- * wrapped method takes exactly two args and the caller needs the precise
- * `(a, b) => r` signature preserved (the variadic form widens args to `any[]`).
+ * same callable type `T`. Use {@link createTernaryInterceptable} instead when
+ * the wrapped method takes exactly three args and the caller needs the precise
+ * `(a, b, c) => r` signature preserved (the variadic form widens args to
+ * `any[]`).
  */
 export function createInterceptable<T extends (...args: any[]) => any>(
   name: string,
@@ -245,27 +333,31 @@ export function createInterceptable<T extends (...args: any[]) => any>(
 }
 
 /**
- * Two-argument interceptor wrapper — preserves the exact `(a: A, b: B) => R`
- * signature, which the variadic {@link createInterceptable} cannot express
- * (it widens args to `any[]`). Used for the binary interceptable methods
- * `forwardState(routeName, routeParams)` and `buildPath(route, params)`.
+ * Three-argument interceptor wrapper — preserves the exact
+ * `(a: A, b: B, c: C) => R` signature that the variadic
+ * {@link createInterceptable} widens to `any[]`. Backs both search-aware
+ * interceptables — `buildPath(route, params, search)` and
+ * `forwardState(name, params, search)` (RFC-4 M2 / #1548). Every first-party
+ * plugin registers the full three-argument form; a shorter-arity interceptor
+ * from a third party remains type-valid (TS allows fewer params, and `next(a,
+ * b)` leaves the third arg `undefined`).
  */
-export function createBinaryInterceptable<A, B, R>(
+export function createTernaryInterceptable<A, B, C, R>(
   name: string,
-  original: (a: A, b: B) => R,
+  original: (a: A, b: B, c: C) => R,
   interceptors: Map<
     string,
     ((next: (...args: any[]) => any, ...args: any[]) => any)[]
   >,
-): (a: A, b: B) => R {
-  return (arg1: A, arg2: B) => {
+): (a: A, b: B, c: C) => R {
+  return (arg1: A, arg2: B, arg3: C) => {
     const chain = interceptors.get(name);
 
     if (!chain || chain.length === 0) {
-      return original(arg1, arg2);
+      return original(arg1, arg2, arg3);
     }
 
-    return executeInterceptorChain(chain, original, [arg1, arg2]);
+    return executeInterceptorChain(chain, original, [arg1, arg2, arg3]);
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */

@@ -100,11 +100,13 @@ describe("loader arguments: loader receives correct route params", () => {
       let receivedParams: Record<string, unknown> = {};
 
       const { router } = createSsrDataRouter({
-        "users.profile": () => async (params) => {
-          receivedParams = { ...params };
+        "users.profile":
+          () =>
+          async ({ params }) => {
+            receivedParams = { ...params };
 
-          return null;
-        },
+            return null;
+          },
       });
 
       await router.start(`/users/${id}`);
@@ -257,7 +259,9 @@ describe("isolation: cloned routers have independent data", () => {
     async (id1, id2) => {
       const base = createRouter(ROUTES, { defaultRoute: "home" });
       const loaders: DataLoaderFactoryMap = {
-        "users.profile": () => async (params) => ({ userId: params.id }),
+        "users.profile":
+          () =>
+          async ({ params }) => ({ userId: params.id }),
       };
 
       const clone1 = cloneRouter(base);
@@ -871,6 +875,7 @@ describe("getSsrDataMode: pure read-side guard", () => {
   const stateWith = (ssrDataMode: unknown): State => ({
     name: "any",
     params: {},
+    search: {},
     path: "/",
     transition: {
       phase: "activating",
@@ -1000,12 +1005,12 @@ describe("invalidate: per-router isolation across cloneRouter() boundaries", () 
 
       // childB navigation reloads — its own stale flag is clean,
       // so the leave handler must no-op.
-      await childB.navigate("home", {}, { reload: true });
+      await childB.navigate("home", {}, undefined, { reload: true });
 
       expect(bCalls).toBe(1);
 
       // childA navigation reloads — flag is set, leave handler runs.
-      await childA.navigate("home", {}, { reload: true });
+      await childA.navigate("home", {}, undefined, { reload: true });
 
       expect(aCalls).toBe(2);
 

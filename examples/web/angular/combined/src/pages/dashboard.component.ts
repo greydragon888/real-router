@@ -32,14 +32,14 @@ import type { User } from "../../../../../shared/api";
 export class DashboardComponent {
   readonly logout = output();
 
-  private readonly state = injectRoute<{ lang?: string }>();
+  private readonly state = injectRoute();
   private readonly navigator = injectNavigator();
 
   readonly user = signal<User | null>(store.get("user") as User | null);
 
   readonly lang = computed<string>(() => {
-    const params = this.state.routeState().route.params;
-    const value = params?.lang;
+    const search = this.state.routeState().route.search;
+    const value = search?.lang;
 
     return typeof value === "string" ? value : "en";
   });
@@ -65,8 +65,9 @@ export class DashboardComponent {
 
     void this.navigator.navigate(
       current.name,
+      current.params,
       {
-        ...current.params,
+        ...current.search,
         lang: this.lang() === "en" ? "ru" : "en",
       },
       { reload: true },

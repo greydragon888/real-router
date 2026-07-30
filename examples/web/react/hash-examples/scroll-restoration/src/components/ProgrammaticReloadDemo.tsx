@@ -3,9 +3,10 @@ import { useNavigator, useRoute } from "@real-router/react";
 import type { JSX } from "react";
 
 /**
- * Scenario 7c — Programmatic reload. navigate(name, params, { reload: true })
- * with same path triggers `deriveNavigationType → "reload"`, which makes the
- * utility's rAF callback take the restore branch and writePos from store.
+ * Scenario 7c — Programmatic reload.
+ * navigate(name, params, undefined, { reload: true }) with same path triggers
+ * `deriveNavigationType → "reload"`, which makes the utility's rAF callback
+ * take the restore branch and writePos from store.
  */
 export function ProgrammaticReloadDemo(): JSX.Element {
   const navigator = useNavigator();
@@ -13,7 +14,9 @@ export function ProgrammaticReloadDemo(): JSX.Element {
 
   const onClick = (): void => {
     navigator
-      .navigate("articles.article", { id: route.params.id }, { reload: true })
+      .navigate("articles.article", { id: route.params.id }, undefined, {
+        reload: true,
+      })
       .catch(() => {
         /* noop */
       });

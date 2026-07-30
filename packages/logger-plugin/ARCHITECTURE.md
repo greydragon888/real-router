@@ -133,7 +133,9 @@ onTransitionStart(toState, fromState?)
     ├── perf.mark("router:transition-start:{label}")
     └── if logTransition:
             ├── console.log("[ctx] Transition: {from} → {to}", { from, to })
-            └── if shouldLogParams && sameRoute → logParamsDiff
+            └── if shouldLogParams && sameRoute:
+                    ├── diff state.params → log "params …" line if changed
+                    └── diff state.search → log "search …" line if changed
 
 onTransitionLeaveApprove(toState, fromState?)
     ├── perf.mark("router:leave-approved:{label}")
@@ -218,7 +220,9 @@ getParamsDiff(fromParams, toParams)
     └── return { changed, added, removed } | null
 ```
 
-Only triggered for **same-route navigation** (`toState.name === fromState.name`).
+Channel-agnostic — called once for `state.params` (path) and once for `state.search`
+(query), each diffed and logged independently under a `params`/`search`-labelled line
+(RFC-4 M2 / #1548). Only triggered for **same-route navigation** (`toState.name === fromState.name`).
 
 ### console-groups.ts — Group Manager
 
@@ -258,7 +262,8 @@ All marks/measures are visible in browser DevTools Performance tab.
 | `onTransitionSuccess` | `console.log`   | `logTransition`   | `[ctx] Transition success (Xms)`        |
 | `onTransitionCancel`  | `console.warn`  | `logWarning`      | `[ctx] Transition cancelled (Xms)`      |
 | `onTransitionError`   | `console.error` | `logError`        | `[ctx] Transition error: {code} (Xms)`  |
-| params diff           | `console.log`   | `shouldLogParams` | `[ctx]  Changed: { ... }, Added: {...}` |
+| params diff (`state.params`) | `console.log` | `shouldLogParams` | `[ctx]  params Changed: { ... }` |
+| search diff (`state.search`) | `console.log` | `shouldLogParams` | `[ctx]  search Changed: { ... }` |
 
 ## Environment Detection
 

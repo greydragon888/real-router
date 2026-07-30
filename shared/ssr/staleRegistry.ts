@@ -17,7 +17,12 @@ const staleByRouter = new WeakMap<Router, Set<string>>();
  * compose with the existing core API:
  * ```ts
  * markStale(router, "data");
- * await router.navigate(state.name, state.params, { reload: true });
+ * // Options at slot 4 (RFC-4 M2 / #1548) — slot 3 is the query channel, so
+ * // the pre-M2 spelling lands `{ reload: true }` in `search` and rebuilds the
+ * // URL without the page's own query.
+ * await router.navigate(state.name, state.params, state.search, {
+ *   reload: true,
+ * });
  * ```
  */
 export function markStale(router: Router, namespace: string): void {

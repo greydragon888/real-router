@@ -15,6 +15,7 @@ describe("serializeRouterState", () => {
     const state: State = {
       name: "users.view",
       params: { id: "1" },
+      search: {},
       path: "/users/1",
       context: {},
       transition: baseTransition,
@@ -26,17 +27,19 @@ describe("serializeRouterState", () => {
     expect(parsed).toStrictEqual({
       name: "users.view",
       params: { id: "1" },
+      search: {},
       path: "/users/1",
       context: {},
     });
     expect(parsed.transition).toBeUndefined();
   });
 
-  it("keeps name, params, path, context", () => {
+  it("keeps name, params, search, path, context", () => {
     const state: State = {
       name: "home",
       params: { foo: "bar" },
-      path: "/home?foo=bar",
+      search: { q: "term" },
+      path: "/home?foo=bar&q=term",
       context: { data: { hello: "world" } },
       transition: baseTransition,
     };
@@ -46,7 +49,8 @@ describe("serializeRouterState", () => {
 
     expect(parsed.name).toBe("home");
     expect(parsed.params).toStrictEqual({ foo: "bar" });
-    expect(parsed.path).toBe("/home?foo=bar");
+    expect(parsed.search).toStrictEqual({ q: "term" });
+    expect(parsed.path).toBe("/home?foo=bar&q=term");
     expect(parsed.context).toStrictEqual({ data: { hello: "world" } });
   });
 
@@ -54,6 +58,7 @@ describe("serializeRouterState", () => {
     const state: State = {
       name: "page",
       params: { html: "</script>" },
+      search: {},
       path: "/<>&",
       context: {},
       transition: baseTransition,
@@ -69,11 +74,12 @@ describe("serializeRouterState", () => {
     expect(json).toContain(String.raw`\u0026`);
   });
 
-  it("roundtrip: serialize then parse preserves name/params/path/context (only transition stripped)", () => {
+  it("roundtrip: serialize then parse preserves name/params/search/path/context (only transition stripped)", () => {
     const state: State = {
       name: "users.list",
       params: {},
-      path: "/users/list",
+      search: { page: 2 },
+      path: "/users/list?page=2",
       context: { data: { count: 42 } },
       transition: baseTransition,
     };
@@ -83,6 +89,7 @@ describe("serializeRouterState", () => {
 
     expect(parsed.name).toBe(state.name);
     expect(parsed.params).toStrictEqual(state.params);
+    expect(parsed.search).toStrictEqual(state.search);
     expect(parsed.path).toBe(state.path);
     expect(parsed.context).toStrictEqual(state.context);
     expect("transition" in parsed).toBe(false);
@@ -93,6 +100,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {
           data: { a: 1 },
@@ -112,6 +120,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {
           data: { x: 1 },
@@ -145,6 +154,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context,
         transition: baseTransition,
@@ -164,6 +174,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: { data: { x: 1 } },
         transition: baseTransition,
@@ -179,6 +190,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: { data: { x: 1 } },
         transition: baseTransition,
@@ -194,6 +206,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {
           data: { a: 1 },
@@ -223,6 +236,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: { data: { when: date } },
         transition: baseTransition,
@@ -263,6 +277,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {
           data: { a: 1 },
@@ -293,6 +308,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: {},
         transition: baseTransition,
@@ -313,6 +329,7 @@ describe("serializeRouterState", () => {
       const state: State = {
         name: "page",
         params: {},
+        search: {},
         path: "/page",
         context: { data: { a: 1 } },
         transition: baseTransition,

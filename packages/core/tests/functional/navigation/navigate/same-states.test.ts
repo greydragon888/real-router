@@ -41,15 +41,18 @@ describe("router.navigate() - same states", () => {
       });
 
       it("should handle same states with different parameter values", async () => {
-        // Navigate to profile with param
-        const state1 = await router.navigate("profile", { userId: "123" });
+        // `userId` is the declared PATH param of `profile.user` (`/profile/:userId`),
+        // so it routes to state.params and differentiates the URL (RFC-4 M2 /
+        // #1548). An undeclared key on bare `profile` would land in params but
+        // never reach the path, making every value the same state.
+        const state1 = await router.navigate("profile.user", { userId: "123" });
 
-        expect(state1?.name).toBe("profile");
+        expect(state1?.name).toBe("profile.user");
         expect(state1?.params).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with same param - should fail
         await expect(
-          router.navigate("profile", { userId: "123" }),
+          router.navigate("profile.user", { userId: "123" }),
         ).rejects.toMatchObject({
           code: errorCodes.SAME_STATES,
         });
@@ -57,15 +60,15 @@ describe("router.navigate() - same states", () => {
 
       it("should allow navigation to same route with different parameters", async () => {
         // Navigate to profile with param
-        const state1 = await router.navigate("profile", { userId: "123" });
+        const state1 = await router.navigate("profile.user", { userId: "123" });
 
-        expect(state1?.name).toBe("profile");
+        expect(state1?.name).toBe("profile.user");
         expect(state1?.params).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with different param - should succeed
-        const state2 = await router.navigate("profile", { userId: "456" });
+        const state2 = await router.navigate("profile.user", { userId: "456" });
 
-        expect(state2?.name).toBe("profile");
+        expect(state2?.name).toBe("profile.user");
         expect(state2?.params).toStrictEqual({ userId: "456" });
       });
     });
@@ -80,7 +83,9 @@ describe("router.navigate() - same states", () => {
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation with reload - should succeed
-        await router.navigate("orders.pending", {}, { reload: true });
+        await router.navigate("orders.pending", {}, undefined, {
+          reload: true,
+        });
 
         const state2 = router.getState();
 
@@ -108,11 +113,9 @@ describe("router.navigate() - same states", () => {
 
         // Second navigation with reload - should succeed (no SAME_STATES error)
         // Guards are not re-run because same-state reload has empty transition path
-        const state = await router.navigate(
-          "orders.pending",
-          {},
-          { reload: true },
-        );
+        const state = await router.navigate("orders.pending", {}, undefined, {
+          reload: true,
+        });
 
         expect(state?.name).toBe("orders.pending");
         expect(canDeactivateGuard).toHaveBeenCalledTimes(0);
@@ -130,7 +133,7 @@ describe("router.navigate() - same states", () => {
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation with force - should succeed
-        await router.navigate("orders.pending", {}, { force: true });
+        await router.navigate("orders.pending", {}, undefined, { force: true });
 
         const state2 = router.getState();
 
@@ -147,7 +150,7 @@ describe("router.navigate() - same states", () => {
         canDeactivateSpy.mockClear();
 
         // Second navigation with force - should bypass guard
-        await router.navigate("orders.pending", {}, { force: true });
+        await router.navigate("orders.pending", {}, undefined, { force: true });
 
         // Guard should not be called with force
         expect(canDeactivateSpy).not.toHaveBeenCalled();
@@ -161,11 +164,10 @@ describe("router.navigate() - same states", () => {
         expect(state1?.name).toBe("orders.pending");
 
         // Both force and reload
-        await router.navigate(
-          "orders.pending",
-          {},
-          { force: true, reload: true },
-        );
+        await router.navigate("orders.pending", {}, undefined, {
+          force: true,
+          reload: true,
+        });
 
         const state2 = router.getState();
 
@@ -175,22 +177,22 @@ describe("router.navigate() - same states", () => {
 
     describe("force navigation with non-string param types", () => {
       it("should handle numeric query params in transition path calculation", async () => {
-        await router.navigate("section.query", {
-          section: "section1",
-          param1: "a",
-          param2: "b",
-          param3: "c",
-        });
+        await router.navigate(
+          "section.query",
+          { section: "section1" },
+          { param1: "a", param2: "b", param3: "c" },
+        );
 
         const state = await router.navigate(
           "section.query",
-          { section: "section1", param1: 42, param2: "b", param3: "c" },
+          { section: "section1" },
+          { param1: 42, param2: "b", param3: "c" },
           { force: true },
         );
 
         expect(state.name).toBe("section.query");
-        expect(state.params).toStrictEqual({
-          section: "section1",
+        expect(state.params).toStrictEqual({ section: "section1" });
+        expect(state.search).toStrictEqual({
           param1: 42,
           param2: "b",
           param3: "c",
@@ -198,27 +200,22 @@ describe("router.navigate() - same states", () => {
       });
 
       it("should skip array query params in transition path comparison", async () => {
-        await router.navigate("section.query", {
-          section: "section1",
-          param1: "a",
-          param2: "b",
-          param3: "c",
-        });
+        await router.navigate(
+          "section.query",
+          { section: "section1" },
+          { param1: "a", param2: "b", param3: "c" },
+        );
 
         const state = await router.navigate(
           "section.query",
-          {
-            section: "section1",
-            param1: ["x", "y"],
-            param2: "b",
-            param3: "c",
-          },
+          { section: "section1" },
+          { param1: ["x", "y"], param2: "b", param3: "c" },
           { force: true },
         );
 
         expect(state.name).toBe("section.query");
-        expect(state.params).toStrictEqual({
-          section: "section1",
+        expect(state.params).toStrictEqual({ section: "section1" });
+        expect(state.search).toStrictEqual({
           param1: ["x", "y"],
           param2: "b",
           param3: "c",
@@ -238,12 +235,12 @@ describe("router.navigate() - same states", () => {
 
       it("should compare states including meta information", async () => {
         // First navigate with options
-        await router.navigate("profile", {}, { replace: true });
+        await router.navigate("profile", {}, undefined, { replace: true });
 
         // Second navigate with different options but same route.
         // Should still be considered same state (options don't affect state comparison)
         await expect(
-          router.navigate("profile", {}, { replace: false }),
+          router.navigate("profile", {}, undefined, { replace: false }),
         ).rejects.toMatchObject({
           code: errorCodes.SAME_STATES,
         });

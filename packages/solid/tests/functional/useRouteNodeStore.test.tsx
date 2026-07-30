@@ -215,7 +215,7 @@ describe("useRouteNodeStore hook", () => {
 
     await router.navigate("users.list");
 
-    await router.navigate("users.list", {}, { reload: true });
+    await router.navigate("users.list", {}, undefined, { reload: true });
 
     // reload keeps the active route unchanged
     expect(result.route?.name).toBe("users.list");

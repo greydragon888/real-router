@@ -12,12 +12,14 @@ import type {
   PreloadFn,
   PreloadFnFactory,
   PreloadPluginOptions,
+  PreloadTarget,
 } from "./types";
 import type {
   Params,
   Plugin,
   PluginFactory,
   Router,
+  SearchParams,
   State,
   TreeChangedEvent,
 } from "@real-router/core";
@@ -244,14 +246,21 @@ export class PreloadPlugin {
   // code in the stack. `Promise.resolve` then normalizes a non-Promise return
   // (a JS consumer ignoring `() => Promise`) so `.catch` can swallow a rejection
   // without a `.catch of undefined` TypeError. (#806)
-  #runPreload(preload: { fn: PreloadFn; params: Params }): void {
+  #runPreload(preload: {
+    fn: PreloadFn;
+    params: Params;
+    search: SearchParams;
+  }): void {
     let result: unknown;
 
     try {
       // The declared `() => Promise<unknown>` is the happy-path contract; a JS
       // consumer can ignore it (the whole reason for this guard), so the result
       // is treated as `unknown` and normalized below rather than assumed thenable.
-      result = (preload.fn as (params: Params) => unknown)(preload.params);
+      result = (preload.fn as (target: PreloadTarget) => unknown)({
+        params: preload.params,
+        search: preload.search,
+      });
     } catch {
       // sync-throw from a user fn — same fire-and-forget contract
       return;
@@ -268,7 +277,7 @@ export class PreloadPlugin {
 
   #resolveAnchorPreload(
     anchor: HTMLAnchorElement | null | undefined,
-  ): { fn: PreloadFn; params: Params } | undefined {
+  ): { fn: PreloadFn; params: Params; search: SearchParams } | undefined {
     if (!anchor) {
       return undefined;
     }
@@ -286,7 +295,7 @@ export class PreloadPlugin {
 
   #resolvePreload(
     anchor: HTMLAnchorElement,
-  ): { fn: PreloadFn; params: Params } | undefined {
+  ): { fn: PreloadFn; params: Params; search: SearchParams } | undefined {
     const state = this.#router.matchUrl?.(anchor.href);
 
     if (!state) {
@@ -310,7 +319,7 @@ export class PreloadPlugin {
     const cached = this.#compiledPreloads.get(state.name);
 
     if (cached?.factory === factory) {
-      return { fn: cached.fn, params: state.params };
+      return { fn: cached.fn, params: state.params, search: state.search };
     }
 
     let fn: PreloadFn;
@@ -323,7 +332,7 @@ export class PreloadPlugin {
 
     this.#compiledPreloads.set(state.name, { fn, factory });
 
-    return { fn, params: state.params };
+    return { fn, params: state.params, search: state.search };
   }
 
   #cacheState(href: string, state: State): void {

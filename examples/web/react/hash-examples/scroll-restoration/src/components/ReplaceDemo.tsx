@@ -18,7 +18,9 @@ export function ReplaceDemo(): JSX.Element {
 
   const onClick = (): void => {
     navigator
-      .navigate("articles.article", { id: nextId }, { replace: true })
+      .navigate("articles.article", { id: nextId }, undefined, {
+        replace: true,
+      })
       .catch(() => {
         /* noop — UI handles error via RouterErrorBoundary if needed */
       });

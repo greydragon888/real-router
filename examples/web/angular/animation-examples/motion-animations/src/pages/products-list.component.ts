@@ -37,7 +37,7 @@ type SortDirection = "asc" | "desc";
       <a
         realLink
         routeName="products"
-        [routeParams]="{ sort: 'asc' }"
+        [routeSearch]="{ sort: 'asc' }"
         [ignoreQueryParams]="false"
       >
         A → Z
@@ -46,7 +46,7 @@ type SortDirection = "asc" | "desc";
       <a
         realLink
         routeName="products"
-        [routeParams]="{ sort: 'desc' }"
+        [routeSearch]="{ sort: 'desc' }"
         [ignoreQueryParams]="false"
       >
         Z → A
@@ -76,12 +76,12 @@ type SortDirection = "asc" | "desc";
   `,
 })
 export class ProductsListComponent {
-  private readonly state = injectRoute<{ sort?: SortDirection }>();
+  private readonly state = injectRoute();
 
   readonly sortDirection = computed<SortDirection>(() => {
-    const params = this.state.routeState().route.params;
+    const search = this.state.routeState().route.search;
 
-    return params?.sort === "desc" ? "desc" : "asc";
+    return search?.sort === "desc" ? "desc" : "asc";
   });
 
   readonly items = computed(() => {

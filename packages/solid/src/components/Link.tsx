@@ -9,6 +9,7 @@ import {
   buildHref,
   buildActiveClassName,
   navigateWithHash,
+  resolveLinkTarget,
 } from "../dom-utils";
 
 import type { LinkProps } from "../types";
@@ -32,6 +33,8 @@ export function Link<P extends Params = Params>(
   const [local, rest] = splitProps(merged, [
     "routeName",
     "routeParams",
+    "routeSearch",
+    "to",
     "routeOptions",
     "activeClassName",
     "activeStrict",
@@ -63,10 +66,14 @@ export function Link<P extends Params = Params>(
     // light up before `router.start()`. Route it to the slow path instead, which
     // reads `router.isActiveRoute("") === false` in every router state (#1427).
     local.routeName !== "" &&
+    local.to === undefined &&
     local.hash === undefined &&
     !local.activeStrict &&
     local.ignoreQueryParams &&
-    props.routeParams === undefined;
+    props.routeParams === undefined &&
+    // A `routeSearch` (or a `to` descriptor) link forces the slow path (RFC-4 M2,
+    // #1548) — the name-only routeSelector is query-blind, exactly like `hash`.
+    props.routeSearch === undefined;
 
   const buildActiveOptions = () => {
     const base = {
@@ -81,29 +88,52 @@ export function Link<P extends Params = Params>(
     return { ...base, hash: local.hash };
   };
 
+  // Resolve the slow-path active source's channels once at init (RFC-4 M2 B2,
+  // #1548) — solid captures slow-path Link props at init (CLAUDE "Link Props Are
+  // Captured at Init"). A `to` descriptor supersedes the channel props. Uses the
+  // RAW `props.routeParams`/`props.routeSearch` (NOT the mergeProps EMPTY_PARAMS
+  // default) so an omitted-params Link keys the active source "" — sharing ONE
+  // cached source with a manual `createActiveRouteSource(router, name, undefined,
+  // …)` rather than splitting on "{}" (#776). `local.routeParams` (concrete
+  // EMPTY_PARAMS) stays for nav/href below.
+  const activeTarget = resolveLinkTarget(
+    local.to,
+    local.routeName ?? "",
+    props.routeParams,
+    props.routeSearch,
+  );
+
   const isActive = useFastPath
-    ? () => ctx.routeSelector(local.routeName)
+    ? () => ctx.routeSelector(local.routeName ?? "")
     : createSignalFromSource(
         createActiveRouteSource(
           router,
-          local.routeName,
-          // Pass `props.routeParams` (NOT `local.routeParams`) into the active
-          // source. When the consumer omits params, `local.routeParams` is the
-          // mergeProps default EMPTY_PARAMS ({}), which `createActiveRouteSource`
-          // keys as "{}" — splitting an omitted-params slow-path Link from the
-          // canonical undefined key "" used by a manual
-          // createActiveRouteSource(router, name, undefined, opts) and opening a
-          // second eager subscription for the same question (#776). The raw
-          // `props.routeParams` is `undefined` here, so both share one source.
-          // `local.routeParams` (concrete EMPTY_PARAMS) stays for nav/href below.
-          props.routeParams,
+          activeTarget.name,
+          activeTarget.params,
+          activeTarget.search,
           buildActiveOptions(),
         ),
       );
 
-  const href = createMemo(() =>
-    buildHref(router, local.routeName, local.routeParams, local.hash),
-  );
+  const href = createMemo(() => {
+    // Reactive channel resolution for href (RFC-4 M2 B2, #1548): `to` supersedes
+    // the channel props. `local.routeParams` is the mergeProps EMPTY_PARAMS
+    // default (concrete) for the channel form; a `to` descriptor may omit params.
+    const resolved = resolveLinkTarget(
+      local.to,
+      local.routeName ?? "",
+      local.routeParams,
+      local.routeSearch,
+    );
+
+    return buildHref(
+      router,
+      resolved.name,
+      resolved.params ?? EMPTY_PARAMS,
+      resolved.search,
+      local.hash,
+    );
+  });
 
   const handleClick = (evt: MouseEvent) => {
     if (local.onClick) {
@@ -131,10 +161,19 @@ export function Link<P extends Params = Params>(
     }
 
     evt.preventDefault();
+
+    const resolved = resolveLinkTarget(
+      local.to,
+      local.routeName ?? "",
+      local.routeParams,
+      local.routeSearch,
+    );
+
     navigateWithHash(
       router,
-      local.routeName,
-      local.routeParams,
+      resolved.name,
+      resolved.params ?? EMPTY_PARAMS,
+      resolved.search,
       local.hash,
       local.routeOptions,
     ).catch(() => {});

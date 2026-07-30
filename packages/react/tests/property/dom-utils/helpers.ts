@@ -86,6 +86,7 @@ export function createMockRouter(): {
       const route: State = {
         name: routeName,
         params: {},
+        search: {},
         path: `/${routeName}`,
         transition: STUB_TRANSITION,
         context: {},

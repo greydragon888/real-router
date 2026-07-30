@@ -147,7 +147,9 @@ describe("S31: never-settling canActivate guard does not wedge the pipeline", ()
 
     for (let i = 0; i < N; i++) {
       const controller = new AbortController();
-      const nav = router.navigate("users", {}, { signal: controller.signal });
+      const nav = router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
 
       // Let the navigation park in its never-settling activation guard
       // (FSM in LEAVE_APPROVED) before the external abort lands.

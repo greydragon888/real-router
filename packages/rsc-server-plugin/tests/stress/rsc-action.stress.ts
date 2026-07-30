@@ -76,8 +76,10 @@ describe("RSC Action Stress", () => {
   it("500 concurrent rscAction + rscServer composition: both namespaces populate independently", async () => {
     const base = createRouter(routes, { defaultRoute: "home" });
     const rscLoaders: RscLoaderFactoryMap = {
-      "users.profile": () => (params) =>
-        Promise.resolve(node("Profile", { userId: params.id })),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve(node("Profile", { userId: params.id })),
     };
 
     const results = await Promise.all(
@@ -199,14 +201,18 @@ describe("RSC Action Stress", () => {
     const base = createRouter(routes, { defaultRoute: "home" });
 
     const rscLoaders: RscLoaderFactoryMap = {
-      "users.profile": () => (params) =>
-        Promise.resolve(node("Profile", { userId: params.id })),
+      "users.profile":
+        () =>
+        ({ params }) =>
+          Promise.resolve(node("Profile", { userId: params.id })),
     };
     const dataLoaders: DataLoaderFactoryMap = {
-      "users.profile": () => async (params) => ({
-        prefsId: params.id,
-        marker: "ssr-data",
-      }),
+      "users.profile":
+        () =>
+        async ({ params }) => ({
+          prefsId: params.id,
+          marker: "ssr-data",
+        }),
     };
 
     const results = await Promise.all(

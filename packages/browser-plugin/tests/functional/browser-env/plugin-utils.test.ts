@@ -18,6 +18,7 @@ function makeState(path: string): State {
   return {
     name: "test",
     params: {},
+    search: {},
     path,
     transition: STUB_TRANSITION,
     context: {},

@@ -129,7 +129,7 @@ describe("useRouteEnter", () => {
 
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
     await flushPromises();
 
     expect(handler).not.toHaveBeenCalled();
@@ -144,7 +144,7 @@ describe("useRouteEnter", () => {
     await flushPromises();
     handler.mockClear();
 
-    await router.navigate("users.view", { id: "1", q: "x" });
+    await router.navigate("users.view", { id: "1" }, { q: "x" });
     await flushPromises();
 
     expect(handler).toHaveBeenCalledTimes(1);

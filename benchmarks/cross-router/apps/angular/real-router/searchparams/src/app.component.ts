@@ -3,19 +3,19 @@ import { injectRoute, RealLink } from "@real-router/angular";
 
 import { SEARCH_COUNTS, searchValues, readSearch } from "./routes";
 
-// Precompute stable nav-link descriptors (stable `params` object per link so
+// Precompute stable nav-link descriptors (stable `search` object per link so
 // RealLink's active-route source key does not churn).
 const SEARCH_LINKS = SEARCH_COUNTS.map((n) => ({
   n,
   routeName: `s${n}`,
   testid: `link-search-${n}`,
-  params: searchValues(n),
+  search: searchValues(n),
 }));
 
-// real-router declares query params in the route path (`?k1&k2&…`) and merges them
-// into `route.params`, parsed EAGERLY by the matcher (search-params). The leaf reads
-// EVERY value (readSearch → checksum) reactively per navigation via the route signal
-// — a single constant-size line, not N DOM nodes.
+// real-router declares query params in the route path (`?k1&k2&…`); they live in
+// `route.search` (RFC-4 M2, #1548), parsed EAGERLY by the matcher (search-params).
+// The leaf reads EVERY value (readSearch → checksum) reactively per navigation via
+// the route signal — a single constant-size line, not N DOM nodes.
 @Component({
   selector: "search-content",
   template: `
@@ -33,7 +33,7 @@ export class SearchContentComponent {
   readonly name = computed(() => this.route.routeState().route.name);
   readonly isSearch = computed(() => /^s\d+$/.test(this.name()));
   private readonly result = computed(() =>
-    readSearch(Object.entries(this.route.routeState().route.params)),
+    readSearch(Object.entries(this.route.routeState().route.search)),
   );
   readonly count = computed(() => this.result().count);
   readonly checksum = computed(() => this.result().checksum);
@@ -48,7 +48,7 @@ export class SearchContentComponent {
         <a
           realLink
           [routeName]="l.routeName"
-          [routeParams]="l.params"
+          [routeSearch]="l.search"
           [attr.data-testid]="l.testid"
           >{{ l.n }}</a
         >

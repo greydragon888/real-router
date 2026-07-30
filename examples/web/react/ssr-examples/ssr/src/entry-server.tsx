@@ -127,6 +127,7 @@ export async function render(
     const meta = getMetaForState({
       name: state.name,
       params: state.params as Record<string, unknown>,
+      search: state.search as Record<string, unknown>,
     });
 
     // Hydration payload (#563): full server-resolved State (incl.

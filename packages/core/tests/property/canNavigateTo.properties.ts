@@ -10,21 +10,10 @@ import {
   FIXTURE_ROUTE_NAMES,
   ROUTE_PATHS,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
 
-import type { Router } from "@real-router/core";
-
-function getParamsForRoute(name: string): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id: "abc" };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
-}
+import type { Params, Router } from "@real-router/core";
 
 /** Register a single sync guard (last-add-wins) on a router. */
 function applyGuard(
@@ -46,6 +35,53 @@ const arbGuard = fc.record({
   kind: fc.constantFrom("activate", "deactivate"),
   val: fc.boolean(),
 });
+
+/**
+ * A params bag that fights back (#1577). Built here rather than drawn as a
+ * fast-check value on purpose: the reporter stringifies counterexamples, and a
+ * throwing accessor would then blow up inside the reporter instead of inside
+ * the predicate. The labels cover the three surfaces a bag can weaponise —
+ * a value getter, a `[[Get]]` trap, and an `ownKeys` trap (which is what
+ * `Object.entries` reaches first).
+ */
+function makeHostileBag(kind: string): Params {
+  if (kind === "throwing-getter") {
+    const bag = {};
+
+    Object.defineProperty(bag, "id", {
+      get() {
+        throw new Error("hostile getter");
+      },
+      enumerable: true,
+    });
+
+    return bag;
+  }
+
+  if (kind === "proxy-throws-get") {
+    return new Proxy(
+      { id: "1" },
+      {
+        get() {
+          throw new Error("hostile [[Get]]");
+        },
+      },
+    );
+  }
+
+  if (kind === "proxy-throws-ownKeys") {
+    return new Proxy(
+      {},
+      {
+        ownKeys() {
+          throw new Error("hostile ownKeys");
+        },
+      },
+    );
+  }
+
+  return {};
+}
 
 describe("canNavigateTo Properties", () => {
   test.prop([arbSegmentName], { numRuns: NUM_RUNS.standard })(
@@ -74,7 +110,7 @@ describe("canNavigateTo Properties", () => {
 
       await router.start("/");
 
-      expect(router.canNavigateTo(route, getParamsForRoute(route))).toBe(true);
+      expect(router.canNavigateTo(route, ...navArgsForRoute(route))).toBe(true);
 
       router.stop();
     },
@@ -92,7 +128,7 @@ describe("canNavigateTo Properties", () => {
 
       await router.start("/");
 
-      expect(router.canNavigateTo(route, getParamsForRoute(route))).toBe(true);
+      expect(router.canNavigateTo(route, ...navArgsForRoute(route))).toBe(true);
 
       router.stop();
     },
@@ -110,18 +146,38 @@ describe("canNavigateTo Properties", () => {
 
       await router.start("/");
 
-      expect(router.canNavigateTo(route, getParamsForRoute(route))).toBe(false);
+      expect(router.canNavigateTo(route, ...navArgsForRoute(route))).toBe(
+        false,
+      );
 
       router.stop();
     },
   );
 
-  // #725 — the predicate must answer, never throw, on incomplete input. Routes
-  // with required path params (e.g. users.view "/users/:id") used to throw a
-  // raw buildPath Error when called with empty params; they now resolve to false.
-  test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.fast })(
-    "missing required params resolve to false instead of throwing",
-    async (route) => {
+  // TOTALITY (#725, widened by #1577) — the predicate ANSWERS, it never throws,
+  // for ANY bag. Routes with required path params (e.g. users.view "/users/:id")
+  // used to throw a raw buildPath Error on empty params; #1577 closed the other
+  // half, where user code running during resolution (a dynamic `forwardTo`, a
+  // `forwardState` interceptor, or the bag's own accessor read by channel
+  // separation) escaped as an exception.
+  //
+  // The bag is chosen by LABEL and built inside the body, never drawn as a
+  // value: fast-check stringifies counterexamples, and a hostile getter would
+  // throw inside the reporter rather than inside the code under test.
+  test.prop(
+    [
+      arbNavigableRoute,
+      fc.constantFrom(
+        "empty",
+        "throwing-getter",
+        "proxy-throws-get",
+        "proxy-throws-ownKeys",
+      ),
+    ],
+    { numRuns: NUM_RUNS.fast },
+  )(
+    "answers for any params bag — hostile accessors included, never throws",
+    async (route, bagKind) => {
       const router = createFixtureRouter();
 
       await router.start("/");
@@ -129,7 +185,7 @@ describe("canNavigateTo Properties", () => {
       let result: boolean | undefined;
 
       expect(() => {
-        result = router.canNavigateTo(route, {});
+        result = router.canNavigateTo(route, makeHostileBag(bagKind));
       }).not.toThrow();
       expect(typeof result).toBe("boolean");
 
@@ -148,7 +204,7 @@ describe("canNavigateTo Properties", () => {
 
       const before = router.getState();
 
-      router.canNavigateTo(route, getParamsForRoute(route));
+      router.canNavigateTo(route, ...navArgsForRoute(route));
 
       expect(router.getState()).toBe(before);
 
@@ -164,11 +220,11 @@ describe("canNavigateTo Properties", () => {
 
       await router.start("/");
 
-      const params = getParamsForRoute(route);
-      const first = router.canNavigateTo(route, params);
+      const [params, search] = navArgsForRoute(route);
+      const first = router.canNavigateTo(route, params, search);
 
-      expect(router.canNavigateTo(route, params)).toBe(first);
-      expect(router.canNavigateTo(route, params)).toBe(first);
+      expect(router.canNavigateTo(route, params, search)).toBe(first);
+      expect(router.canNavigateTo(route, params, search)).toBe(first);
 
       router.stop();
     },
@@ -189,12 +245,24 @@ describe("canNavigateTo Properties", () => {
       arbNavigableRoute,
       arbNavigableRoute,
       fc.option(arbGuard, { nil: undefined }),
+      fc.boolean(),
     ],
     { numRuns: NUM_RUNS.standard },
   )(
     "sound — canNavigateTo(to)=true implies navigate(to) resolves (ex-same-state)",
-    async (from, to, guard) => {
-      const params = getParamsForRoute(to);
+    async (from, to, guard, singleBag) => {
+      const [pathParams, queryParams] = navArgsForRoute(to);
+
+      // Both spellings of the same intent (#1576). `navArgsForRoute` returns
+      // PRE-SEPARATED channels because the channel guard's P1 throws on the
+      // legacy single-bag form — which quietly removed that half of the input
+      // domain from this property at the exact moment the form became a
+      // rejection. Soundness has to cover every shape a caller can hand BOTH
+      // entry points, or the predicate is free to out-promise the verb on the
+      // shapes the generator stopped producing.
+      const [params, search] = singleBag
+        ? [{ ...pathParams, ...queryParams }, {}]
+        : [pathParams, queryParams];
 
       // Twin instances: `a` answers the predicate, `b` actually commits.
       const a = createFixtureRouter();
@@ -213,11 +281,11 @@ describe("canNavigateTo Properties", () => {
       // route): canNavigateTo returns true by design while navigate rejects
       // SAME_STATES — an intentional divergence, not unsoundness. Every distinct
       // fixture route has a distinct path, so from≠to is never a same-state.
-      if (from !== to && a.canNavigateTo(to, params)) {
+      if (from !== to && a.canNavigateTo(to, params, search)) {
         let resolved: boolean;
 
         try {
-          await b.navigate(to, params);
+          await b.navigate(to, params, search);
           resolved = true;
         } catch {
           resolved = false;
@@ -249,7 +317,7 @@ describe("canNavigateTo Properties", () => {
   )(
     "complete — navigate(to) resolving implies canNavigateTo(to)=true (ex-same-state)",
     async (from, to, guard) => {
-      const params = getParamsForRoute(to);
+      const [params, search] = navArgsForRoute(to);
 
       // Twin instances: `a` answers the predicate, `b` actually commits.
       const a = createFixtureRouter();
@@ -270,14 +338,14 @@ describe("canNavigateTo Properties", () => {
         let resolved: boolean;
 
         try {
-          await b.navigate(to, params);
+          await b.navigate(to, params, search);
           resolved = true;
         } catch {
           resolved = false;
         }
 
         if (resolved) {
-          expect(a.canNavigateTo(to, params)).toBe(true);
+          expect(a.canNavigateTo(to, params, search)).toBe(true);
         }
       }
 

@@ -385,10 +385,11 @@ function makeFakeRouter(
     | ((
         name: string,
         params: object,
+        search?: object,
         options?: { hash?: string },
       ) => string | undefined)
     | undefined,
-  buildPath: (name: string, params: object) => string,
+  buildPath: (name: string, params: object, search?: object) => string,
 ): Router {
   return { buildUrl, buildPath } as unknown as Router;
 }
@@ -457,7 +458,7 @@ describe("buildHref — Property Tests", () => {
       numRuns: NUM_RUNS.thorough,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
       const router = makeFakeRouter(undefined, () => path);
-      const href = buildHref(router, "any", {}, rawHash);
+      const href = buildHref(router, "any", {}, undefined, rawHash);
 
       const stripped = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
 
@@ -496,8 +497,8 @@ describe("buildHref — Property Tests", () => {
 
       const router = makeFakeRouter(undefined, () => path);
 
-      const withHash = buildHref(router, "any", {}, `#${rawHash}`);
-      const withoutHash = buildHref(router, "any", {}, rawHash);
+      const withHash = buildHref(router, "any", {}, undefined, `#${rawHash}`);
+      const withoutHash = buildHref(router, "any", {}, undefined, rawHash);
 
       expect(withHash).toBe(withoutHash);
     });
@@ -513,7 +514,7 @@ describe("buildHref — Property Tests", () => {
     })("no-hash call → buildUrl receives options=undefined", (name) => {
       const calls: { options: unknown }[] = [];
       const router = makeFakeRouter(
-        (_n, _p, options) => {
+        (_n, _p, _search, options) => {
           calls.push({ options });
 
           return "/url";
@@ -538,7 +539,7 @@ describe("buildHref — Property Tests", () => {
       (name, rawHash) => {
         const calls: { options: unknown }[] = [];
         const router = makeFakeRouter(
-          (_n, _p, options) => {
+          (_n, _p, _search, options) => {
             calls.push({ options });
 
             return "/url";
@@ -546,7 +547,7 @@ describe("buildHref — Property Tests", () => {
           () => "/path",
         );
 
-        buildHref(router, name, {}, rawHash);
+        buildHref(router, name, {}, undefined, rawHash);
 
         expect(calls).toHaveLength(1);
 
@@ -575,7 +576,7 @@ describe("buildHref — Property Tests", () => {
       "no literal `#` appears in the rendered fragment portion of href",
       (rawHash, path) => {
         const router = makeFakeRouter(undefined, () => path);
-        const href = buildHref(router, "any", {}, rawHash);
+        const href = buildHref(router, "any", {}, undefined, rawHash);
 
         const stripped = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
 
@@ -634,7 +635,7 @@ describe("buildHref — Property Tests", () => {
           () => path,
         );
 
-        const href = buildHref(router, "any", {}, hash);
+        const href = buildHref(router, "any", {}, undefined, hash);
 
         if (stripped.length === 0) {
           expect(href).toBe(path);

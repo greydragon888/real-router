@@ -1,11 +1,17 @@
 // packages/core/src/namespaces/RoutesNamespace/helpers.ts
 
+import { assertRouteDefaultChannels } from "../../channels";
+import { areParamValuesEqual } from "../../helpers";
+
+import type { RoutesStore } from "./routesStore";
 import type { RouteConfig } from "./types";
-import type { RouteDefinition } from "../../engine";
+import type { Matcher, RouteDefinition, RouteTree } from "../../engine";
 import type {
   DefaultDependencies,
   ForwardToCallback,
   Params,
+  ParamsSearch,
+  SearchParams,
   Route,
 } from "../../types";
 
@@ -14,9 +20,16 @@ import type {
  */
 export function createEmptyConfig(): RouteConfig {
   return {
-    decoders: Object.create(null) as Record<string, (params: Params) => Params>,
-    encoders: Object.create(null) as Record<string, (params: Params) => Params>,
+    decoders: Object.create(null) as Record<
+      string,
+      (channels: ParamsSearch) => ParamsSearch
+    >,
+    encoders: Object.create(null) as Record<
+      string,
+      (channels: ParamsSearch) => ParamsSearch
+    >,
     defaultParams: Object.create(null) as Record<string, Params>,
+    defaultSearch: Object.create(null) as Record<string, SearchParams>,
     forwardMap: Object.create(null) as Record<string, string>,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     forwardFnMap: Object.create(null) as Record<string, ForwardToCallback<any>>,
@@ -51,74 +64,17 @@ export function assignConfigEntries(
  */
 export function paramsMatch(source: Params, target: Params): boolean {
   for (const key in source) {
-    if (source[key] !== target[key]) {
+    // Provenance-tolerant per value (#1554) — the hierarchical isActiveRoute
+    // branch compares a caller bag against the COMMITTED state, whose values
+    // may have come from the URL parser (`?tab=2` → `2`) while the caller wrote
+    // strings. Same predicate as the exact branch (`areStatesEqual`), so both
+    // branches answer identically for one location.
+    if (!areParamValuesEqual(source[key], target[key])) {
       return false;
     }
   }
 
   return true;
-}
-
-/**
- * Checks params match, skipping keys present in skipKeys.
- */
-export function paramsMatchExcluding(
-  source: Params,
-  target: Params,
-  skipKeys: Params,
-): boolean {
-  for (const key in source) {
-    if (key in skipKeys) {
-      continue;
-    }
-    if (source[key] !== target[key]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/**
- * Returns a copy of `defaultParams` with query-typed keys removed, based on
- * `ownMeta` (the per-route paramTypeMap from the matcher). When no query keys
- * are present, returns the input by reference (zero-allocation fast path).
- *
- * `ownMeta` may be `undefined` for non-registered route names — this is the
- * caller's escape hatch (e.g. `getMetaByName(name)?.[name]`); a missing meta
- * means no query type information is available, so defaults pass through
- * unchanged.
- */
-export function stripQueryDefaults(
-  defaultParams: Params,
-  ownMeta: Record<string, "url" | "query"> | undefined,
-): Params {
-  if (!ownMeta || !hasQueryDefault(defaultParams, ownMeta)) {
-    return defaultParams;
-  }
-
-  const filtered: Params = {};
-
-  for (const key in defaultParams) {
-    if (ownMeta[key] !== "query") {
-      filtered[key] = defaultParams[key];
-    }
-  }
-
-  return filtered;
-}
-
-function hasQueryDefault(
-  defaultParams: Params,
-  ownMeta: Record<string, "url" | "query">,
-): boolean {
-  for (const key in defaultParams) {
-    if (ownMeta[key] === "query") {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 /**
@@ -220,4 +176,131 @@ export function matchSourceTrailingSlash(
   const querySuffix = queryIndex === -1 ? "" : rewrittenPath.slice(queryIndex);
 
   return `${pathPart}/${querySuffix}`;
+}
+
+// =============================================================================
+// The query-channel registry — ONE derivation, shared by every reader (#1556)
+// =============================================================================
+
+/** Flattens the path-slot names declared across a route's matched segments. */
+export function collectUrlParamsArray(
+  segments: readonly RouteTree[],
+): string[] {
+  const params: string[] = [];
+
+  for (const segment of segments) {
+    for (const param of segment.paramMeta.urlParams) {
+      params.push(param);
+    }
+  }
+
+  return params;
+}
+
+/**
+ * The route's PATH slot names, cached per route name.
+ *
+ * Store-level rather than a namespace method so the config-time channel check
+ * reads the SAME registry the URL build prints from. A second derivation is
+ * exactly the drift #1556 removed.
+ */
+export function urlParamsFor(
+  matcher: Matcher,
+  name: string,
+  cache: Map<string, string[]>,
+): string[] {
+  const cached = cache.get(name);
+
+  // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const segments = matcher.getSegmentsByName(name);
+  const result = segments
+    ? collectUrlParamsArray(segments as readonly RouteTree[])
+    : [];
+
+  cache.set(name, result);
+
+  return result;
+}
+
+/** Store-bound {@link urlParamsFor}. */
+export function urlParamsOf<Dependencies extends DefaultDependencies>(
+  store: RoutesStore<Dependencies>,
+  name: string,
+): string[] {
+  return urlParamsFor(store.matcher, name, store.urlParamsCache);
+}
+
+/**
+ * The route's declared `?query` names minus its path slots — the registry that
+ * both classifies and PRINTS (#1556), with the `/items/:id?id` carve-out
+ * (#843 / #1549) falling out of the subtraction rather than being re-decided.
+ */
+export function queryParamsFor(
+  matcher: Matcher,
+  name: string,
+  urlCache: Map<string, string[]>,
+  queryCache: Map<string, string[]>,
+): string[] {
+  const cached = queryCache.get(name);
+
+  // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const declared = matcher.getDeclaredQueryParams(name);
+  let result: string[] = [];
+
+  if (declared) {
+    const urlParams = urlParamsFor(matcher, name, urlCache);
+
+    result = declared.filter((param: string) => !urlParams.includes(param));
+  }
+
+  queryCache.set(name, result);
+
+  return result;
+}
+
+/** Store-bound {@link queryParamsFor}. */
+export function queryParamsOf<Dependencies extends DefaultDependencies>(
+  store: RoutesStore<Dependencies>,
+  name: string,
+): string[] {
+  return queryParamsFor(
+    store.matcher,
+    name,
+    store.urlParamsCache,
+    store.queryParamsCache,
+  );
+}
+
+/**
+ * Store-layer adapter for {@link assertRouteDefaultChannels}: supplies the
+ * declared-query accessor the pure rule takes as data.
+ *
+ * The caches are LOCAL to the attempt, not the store's, and that is the whole
+ * reason this adapter exists rather than the four entry points each building the
+ * closure. Every caller runs on PREPARED artifacts, before any swap: validating
+ * against the store's caches would answer about a tree the rejected batch has
+ * not installed — and the guard would then be checking the wrong config while
+ * claiming to protect the right one.
+ */
+export function assertRouteDefaultChannelsFor(
+  matcher: Matcher,
+  config: RouteConfig,
+  method: string,
+): void {
+  const urlCache = new Map<string, string[]>();
+  const queryCache = new Map<string, string[]>();
+
+  assertRouteDefaultChannels(
+    config.defaultParams,
+    (name) => queryParamsFor(matcher, name, urlCache, queryCache),
+    method,
+  );
 }

@@ -3,9 +3,14 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
+import { installSpyValidator } from "../../helpers/spyValidator";
 
-import type { Route, Router } from "@real-router/core";
+import type { Params, Route, Router, State } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
+
+interface TypedParams extends Params {
+  id: string;
+}
 
 let router: Router;
 let routesApi: RoutesApi;
@@ -64,7 +69,7 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(router).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
+      expect(state?.search?.q).toBe("test");
     });
 
     it("should match first query param correctly (regression test)", () => {
@@ -74,8 +79,22 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(router).matchPath("/search?first=1&second=2");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.first).toBe(1);
-      expect(state?.params.second).toBe(2);
+      expect(state?.search?.first).toBe(1);
+      expect(state?.search?.second).toBe(2);
+    });
+
+    it("splits a path/query name collision into both channels (RFC-4 M2 / #1548)", () => {
+      // The motivating case: `id` is BOTH a path param and a query param. The
+      // former collision gate rejected this; under M2 the two coexist as
+      // separate channels, and the query does NOT overwrite the path (#843 is
+      // gone), so the rebuilt path keeps the path value.
+      routesApi.add({ name: "collide", path: "/coll/:id?id" });
+      const state = getPluginApi(router).matchPath("/coll/5?id=7");
+
+      expect(state?.name).toBe("collide");
+      expect(state?.params).toStrictEqual({ id: "5" });
+      expect(state?.search).toStrictEqual({ id: 7 });
+      expect(state?.path.startsWith("/coll/5")).toBe(true);
     });
   });
 
@@ -524,7 +543,7 @@ describe("core/routes/routePath/matchPath", () => {
   });
 
   describe("query params without declaration", () => {
-    it("should include undeclared query params in default mode", () => {
+    it("should drop undeclared query params from state in default mode, still matching the URL (#1575)", () => {
       const customRouter = createTestRouter({ queryParamsMode: "default" });
 
       getRoutesApi(customRouter).add({ name: "search", path: "/search" }); // No ?q declared
@@ -533,10 +552,30 @@ describe("core/routes/routePath/matchPath", () => {
         "/search?q=test&limit=10",
       );
 
+      // Still MATCHES — accepting an undeclared key in the URL is exactly what
+      // separates `default` from `strict`. It just does not become state: the
+      // rebuilt path prints declared names only, so a key kept in `search` here
+      // would contradict the very `path` published beside it (#1575).
       expect(state?.name).toBe("search");
-      // Undeclared query params are included in default mode
-      expect(state?.params.q).toBe("test");
-      expect(state?.params.limit).toBe(10);
+      expect(state?.search).toStrictEqual({});
+      expect(state?.path).toBe("/search");
+    });
+
+    it("should keep undeclared query params in loose mode (#1575 discriminator)", () => {
+      const customRouter = createTestRouter({ queryParamsMode: "loose" });
+
+      getRoutesApi(customRouter).add({ name: "search", path: "/search" });
+
+      const state = getPluginApi(customRouter).matchPath(
+        "/search?q=test&limit=10",
+      );
+
+      // `loose` PRINTS undeclared keys, so admitting them keeps `search` and
+      // `path` in step. Without this arm the assertion above would pass for a
+      // gate that dropped undeclared keys unconditionally.
+      expect(state?.search?.q).toBe("test");
+      expect(state?.search?.limit).toBe(10);
+      expect(state?.path).toBe("/search?q=test&limit=10");
     });
 
     it("should NOT match path with undeclared query params in strict mode", async () => {
@@ -572,7 +611,7 @@ describe("core/routes/routePath/matchPath", () => {
       const state = getPluginApi(customRouter).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
+      expect(state?.search?.q).toBe("test");
     });
 
     it("should NOT match with extra undeclared params in strict mode", async () => {
@@ -589,7 +628,7 @@ describe("core/routes/routePath/matchPath", () => {
       customRouter.stop();
     });
 
-    it("should handle mixed declared and undeclared params in default mode", () => {
+    it("should keep the declared half and drop the undeclared one in default mode (#1575)", () => {
       const customRouter = createTestRouter({ queryParamsMode: "default" });
 
       getRoutesApi(customRouter).add({
@@ -602,10 +641,12 @@ describe("core/routes/routePath/matchPath", () => {
       );
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
-      expect(state?.params.page).toBe(2);
-      // Extra undeclared param also included in default mode
-      expect(state?.params.sort).toBe("name");
+      expect(state?.search?.q).toBe("test");
+      expect(state?.search?.page).toBe(2);
+      // The mixed URL is the discriminating shape: `sort` goes, the declared
+      // pair stays, and `path` shows exactly what survived.
+      expect(state?.search?.sort).toBeUndefined();
+      expect(state?.path).toBe("/search?q=test&page=2");
     });
   });
 
@@ -616,9 +657,12 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "user",
         path: "/user/:id",
-        decodeParams: (params) => ({
-          id: Number.parseInt(params.id as string, 10),
-          originalId: params.id,
+        decodeParams: ({ params, search }) => ({
+          params: {
+            id: Number.parseInt(params.id as string, 10),
+            originalId: params.id,
+          },
+          search,
         }),
       });
 
@@ -646,6 +690,59 @@ describe("core/routes/routePath/matchPath", () => {
         "Decoder intentionally failed",
       );
     });
+
+    it("takes a decoder's two channels as written, and refuses a mis-channelled one", () => {
+      // A decoder receives BOTH channels and must return both correctly — it
+      // knows its own route's declaration better than anyone. Injecting a
+      // DECLARED `?tag` into the params bag used to be silently repaired by the
+      // seam (stage ②), so a decoder shipped a bag it never wrote; it is now
+      // refused, and the message names the decoder rather than the chain the
+      // value later flows through.
+      const customRouter = createTestRouter();
+
+      getRoutesApi(customRouter).add({
+        name: "tagged",
+        path: "/tagged/:id?tag",
+        decodeParams: ({ params }) => ({ params, search: { tag: "dev" } }),
+      });
+
+      const state = getPluginApi(customRouter).matchPath("/tagged/1");
+
+      expect(state?.params).toStrictEqual({ id: "1" });
+      expect(state?.search).toStrictEqual({ tag: "dev" });
+      expect(state?.path).toBe("/tagged/1?tag=dev");
+
+      getRoutesApi(customRouter).add({
+        name: "mis",
+        path: "/mis/:id?tag",
+        decodeParams: ({ params, search }) => ({
+          params: { ...params, tag: "dev" },
+          search,
+        }),
+      });
+
+      expect(() => getPluginApi(customRouter).matchPath("/mis/1")).toThrow(
+        /`decodeParams`/,
+      );
+    });
+
+    it("rebuilds an all-query URL from a decoder that injects only search", () => {
+      // The route has no path params, so the canonical path bag is empty —
+      // covers the all-query rebuild branch (canonical params → EMPTY_PARAMS).
+      const customRouter = createTestRouter();
+
+      getRoutesApi(customRouter).add({
+        name: "plain",
+        path: "/plain?tag",
+        decodeParams: ({ params }) => ({ params, search: { tag: "dev" } }),
+      });
+
+      const state = getPluginApi(customRouter).matchPath("/plain");
+
+      expect(state?.params).toStrictEqual({});
+      expect(state?.search).toStrictEqual({ tag: "dev" });
+      expect(state?.path).toBe("/plain?tag=dev");
+    });
   });
 
   // =========================================================================
@@ -671,15 +768,22 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "page",
         path: "/page?sort",
-        defaultParams: { sort: "name", limit: "10" },
+        // The query-declared default (`sort`) lives in defaultSearch; the
+        // arbitrary `limit` stays in defaultParams (RFC-4 M2 / #1548, rule 1).
+        defaultParams: { limit: "10" },
+        defaultSearch: { sort: "name" },
       });
 
       const state = getPluginApi(customRouter).matchPath("/page");
 
       expect(state?.name).toBe("page");
-      // defaultParams are merged into state.params
-      expect(state?.params.sort).toBe("name");
+      // defaultSearch → state.search (query channel); defaultParams → state.params.
+      expect(state?.search.sort).toBe("name");
       expect(state?.params.limit).toBe("10");
+      expect(state?.params.sort).toBeUndefined();
+      // Anti-masking (rule 6): the query default also lands in the rebuilt URL,
+      // so state.search and state.path stay in step on the matchPath channel.
+      expect(state?.path).toContain("sort=name");
     });
 
     it("should rebuild path with defaultParams query params when rewritePathOnMatch is true", () => {
@@ -688,14 +792,18 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "search",
         path: "/search?q&sort",
-        defaultParams: { sort: "date" },
+        // `sort` is query-declared → defaultSearch (RFC-4 M2 / #1548, rule 1).
+        defaultSearch: { sort: "date" },
       });
 
       const state = getPluginApi(customRouter).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("test");
-      expect(state?.params.sort).toBe("date");
+      expect(state?.search?.q).toBe("test");
+      // `sort` is absent from the URL, so it comes from defaultParams — routed
+      // into `.search` as a query-declared default (#1549).
+      expect(state?.search?.sort).toBe("date");
+      expect(state?.params.sort).toBeUndefined();
       // rewritePathOnMatch rebuilds path including defaultParams
       expect(state?.path).toContain("sort=date");
     });
@@ -709,10 +817,10 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "enc",
         path: "/enc/:id",
-        encodeParams: (params) => {
+        encodeParams: ({ params, search }) => {
           encoderCalled = true;
 
-          return params;
+          return { params, search };
         },
       });
 
@@ -732,10 +840,10 @@ describe("core/routes/routePath/matchPath", () => {
       getRoutesApi(customRouter).add({
         name: "enc",
         path: "/enc/:id",
-        encodeParams: (params) => {
+        encodeParams: ({ params, search }) => {
           encoderCalled = true;
 
-          return params;
+          return { params, search };
         },
       });
 
@@ -782,17 +890,20 @@ describe("core/routes/routePath/matchPath", () => {
         name: "enc",
         path: "/enc?q",
         // deliberately out-of-domain: hands buildPath an unserialisable query
-        // value so the codec throws during the rewrite
-        encodeParams: (params) => ({
-          ...params,
-          q: [undefined] as unknown as string[],
+        // value so the codec throws during the rewrite. Placed in the SEARCH
+        // channel — the declared-query rebuild resolves `q` search-first
+        // (#1549), so a params-channel plant would be shadowed by the matched
+        // query value and never reach the serializer.
+        encodeParams: ({ params, search }) => ({
+          params,
+          search: { ...search, q: [undefined] as unknown as string[] },
         }),
       });
 
       const state = getPluginApi(customRouter).matchPath("/enc?q=1");
 
       expect(state?.name).toBe("enc");
-      expect(state?.params.q).toBe(1);
+      expect(state?.search?.q).toBe(1);
       // path kept un-rewritten (source), match preserved
       expect(state?.path).toBe("/enc?q=1");
     });
@@ -889,8 +1000,9 @@ describe("core/routes/routePath/matchPath", () => {
         {
           name: "old-item",
           path: "/old-item/:id",
-          decodeParams: (p) => ({
-            id: Number(p.id),
+          decodeParams: ({ params, search }) => ({
+            params: { id: Number(params.id) },
+            search,
           }),
           forwardTo: "new-item",
         },
@@ -964,6 +1076,97 @@ describe("core/routes/routePath/matchPath", () => {
 
       expect(state?.name).toBe("match-target");
       expect(state?.path).toBe("/match-target");
+    });
+  });
+
+  describe("query-value round-trip under numberFormat auto (#1565)", () => {
+    // `matchPath` rebuilds `state.path` from the parsed channels, so a value the
+    // number strategy coerces lossily comes back as a DIFFERENT URL than the one
+    // that was matched — under a URL plugin that string reaches the address bar.
+    it.each([
+      "2.0",
+      "2.10",
+      "0.50",
+      "100.00",
+      "0.0",
+      "-2.0",
+      "1.0000000000000000001",
+      "9007199254740993.5",
+    ])("should keep the query value %s byte-identical in state.path", (raw) => {
+      routesApi.add({ name: "rt", path: "/rt?page" });
+
+      const state = getPluginApi(router).matchPath(`/rt?page=${raw}`);
+
+      expect(state?.path).toBe(`/rt?page=${raw}`);
+      expect(state?.search.page).toBe(raw);
+    });
+
+    it("still coerces values whose text survives the round-trip", () => {
+      routesApi.add({ name: "rt-ok", path: "/rt-ok?page" });
+
+      const state = getPluginApi(router).matchPath("/rt-ok?page=2.5");
+
+      expect(state?.path).toBe("/rt-ok?page=2.5");
+      expect(state?.search.page).toBe(2.5);
+    });
+  });
+
+  describe("typed params channel", () => {
+    it("carries the caller's param type through to the returned State", () => {
+      routesApi.add({ name: "typed", path: "/typed/:id" });
+
+      // Type-level pin (nav-pipeline step 2-2). `matchPath<P>` is public and
+      // consumers instantiate it, so the chain `matchPath<P>` → `materialize<P>`
+      // → `State<P>` has to carry P. `materialize` was NOT generic when the
+      // pipeline landed, which collapsed the chain to `State<Params>`; this
+      // annotation is what fails type-check if the parameter is ever dropped
+      // again (verified discriminating: widening `materialize`'s return to
+      // `State` reddens `pnpm -F @real-router/core type-check` with TS2322 here).
+      const state: State<TypedParams> | undefined =
+        getPluginApi(router).matchPath<TypedParams>("/typed/7");
+
+      expect(state?.params.id).toBe("7");
+    });
+  });
+
+  describe("a decoder's output is validated as user input (#1582)", () => {
+    // Core's half of the contract: does it consult the validator, with the right
+    // bag and the right caller label, under the right condition? Whether the bag
+    // is acceptable is the plugin's half, pinned in its own suite.
+    it("hands the DECODER's bag to the validator, labelled matchPath", () => {
+      routesApi.add({
+        name: "dec",
+        path: "/dec/:id",
+        decodeParams: ({ params }) => ({
+          params: { ...params, injected: "yes" },
+          search: {},
+        }),
+      });
+
+      const validator = installSpyValidator(router);
+
+      getPluginApi(router).matchPath("/dec/7");
+
+      expect(validator.routes.validateStateBuilderArgs).toHaveBeenCalledWith(
+        "dec",
+        // The decoder's output, not the matcher's — the matcher never produced
+        // `injected`.
+        { id: "7", injected: "yes" },
+        "matchPath",
+      );
+    });
+
+    it("does not consult it for a route with no decoder", () => {
+      routesApi.add({ name: "plain", path: "/plain/:id" });
+
+      const validator = installSpyValidator(router);
+
+      getPluginApi(router).matchPath("/plain/7");
+
+      // The matcher's own output is router-produced and plain by construction.
+      // Validating it would be the internal-intermediate check the pipeline
+      // migration was right to drop.
+      expect(validator.routes.validateStateBuilderArgs).not.toHaveBeenCalled();
     });
   });
 });

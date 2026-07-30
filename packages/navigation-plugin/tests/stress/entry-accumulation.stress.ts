@@ -46,7 +46,7 @@ describe("N2 — Entry Accumulation", () => {
     for (let i = 0; i < 500; i++) {
       const name = i % 2 === 0 ? "home" : "users.list";
 
-      await router.navigate(name, {}, { replace: true }).catch(noop);
+      await router.navigate(name, {}, undefined, { replace: true }).catch(noop);
     }
 
     expect(mockNav.entries()).toHaveLength(1);
@@ -66,7 +66,7 @@ describe("N2 — Entry Accumulation", () => {
       const name = i % 2 === 0 ? "home" : "users.list";
 
       await router
-        .navigate(name, {}, i % 2 === 0 ? { replace: true } : {})
+        .navigate(name, {}, undefined, i % 2 === 0 ? { replace: true } : {})
         .catch(noop);
     }
 
@@ -86,7 +86,9 @@ describe("N2 — Entry Accumulation", () => {
     await router.start();
 
     for (let i = 0; i < 500; i++) {
-      await router.navigate("home", {}, { reload: true }).catch(noop);
+      await router
+        .navigate("home", {}, undefined, { reload: true })
+        .catch(noop);
     }
 
     const entries = mockNav.entries();

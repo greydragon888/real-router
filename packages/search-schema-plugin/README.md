@@ -10,12 +10,12 @@
 ```typescript
 // Without plugin — tampered URL params reach your app unvalidated:
 // User visits: /products?page=-1&limit=99999
-router.getState().params; // { page: -1, limit: 99999 } — crashes pagination
+router.getState().search; // { page: -1, limit: 99999 } — crashes pagination
 
 // With plugin — invalid params stripped, route defaults restored automatically:
 router.usePlugin(searchSchemaPlugin());
 // User visits: /products?page=-1&limit=99999
-router.getState().params; // { page: 1, limit: 20 } — safe defaults from defaultParams
+router.getState().search; // { page: 1, limit: 20 } — safe defaults from defaultParams
 ```
 
 ## Installation
@@ -111,7 +111,7 @@ In `mode: "development"`, a `console.error` is emitted with the route name and v
 
 ### `defaultParams` must satisfy the schema (contract)
 
-The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming_ param (from the URL or a `navigate()` call) never reaches `state`. It does **not** validate `defaultParams` at runtime — those are **trusted developer config**, injected by the router core _below_ the layer this plugin intercepts. So a `defaultParams` value that violates its own `searchSchema` **will reach `state.params` and the URL** (`state.path`), on every navigation, in **every** `mode` — including `mode: "production"`:
+The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming_ param (from the URL or a `navigate()` call) never reaches `state`. It does **not** validate `defaultParams` at runtime — those are **trusted developer config**, injected by the router core _below_ the layer this plugin intercepts. So a `defaultParams` value that violates its own `searchSchema` **will reach `state.search` and the URL** (`state.path`), on every navigation, in **every** `mode` — including `mode: "production"` (a query-declared default lands in `state.search` since core routes defaults by channel, #1549):
 
 ```typescript
 {
@@ -121,7 +121,7 @@ The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming
   searchSchema: z.object({ page: z.number().positive() }),
 }
 await router.navigate("products");          // no input supplied by the caller
-router.getState().params;                   // { page: -5 }  ← invalid default reaches state
+router.getState().search;                   // { page: -5 }  ← invalid default reaches state
 router.getState().path;                     // "/products?page=-5"  ← and the URL
 ```
 
@@ -157,7 +157,9 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Prefer the recommended order (schema outermost) so `state` is validated as a whole. Reach for the alternative only when persistent/infra params must deliberately skip the schema. Swapping the two `usePlugin` lines silently flips the guarantee.
 
-> **Caveat:** the recommended order validates `state.params`, not `state.path`. `persistent-params-plugin` also registers a **`buildPath`** interceptor, which this plugin does not wrap — so an invalid persisted value is stripped from `state.params` but still reaches `state.path` (persistent, reload-stable). Give persisted keys a `defaultParams` on schema'd routes to close it (core's merge overrides the injected value). Also: the alternative-order leak only affects keys **without** a route default — stored params fill *under* incoming ones, so a key with a default is supplied by core and never leaks. (#1231)
+> **What gets validated:** the route's **query channel** — the explicit `search` argument, a v1 single-bag caller's query riding in the params bag, and anything an inner interceptor injected there (e.g. `persistent-params-plugin`) — on **both** directions (`navigate` and URL→State). The route's **path slots** are never shown to the schema, so a query schema cannot rewrite or (under `strict`) delete them. (#1564)
+>
+> **Caveat:** `state.path` is still out of reach — `persistent-params-plugin` also registers a **`buildPath`** interceptor, which this plugin does not wrap, so an invalid persisted value can still reach the URL. A route default is not a workaround: every route default merges *under* the injected value. (#1231, #1563)
 
 ## Use Cases
 

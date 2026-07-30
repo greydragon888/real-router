@@ -101,8 +101,8 @@ describe("createMatcher", () => {
     const result = matcher.match("/search?q=hello&active=true");
 
     expect(result).toBeDefined();
-    expect(result?.params.q).toBe("hello");
-    expect(result?.params.active).toBe(true); // booleanFormat: "auto" parses "true" → true
+    expect(result?.search.q).toBe("hello");
+    expect(result?.search.active).toBe(true); // booleanFormat: "auto" parses "true" → true
   });
 
   it("should inject buildQueryString from search-params", () => {
@@ -154,6 +154,7 @@ describe("createMatcher", () => {
         q: "hello",
         active: true,
       },
+      undefined,
       { queryParamsMode: "loose" },
     );
 
@@ -207,8 +208,8 @@ describe("createMatcher", () => {
     const result = matcher.match("/search?page=3&limit=20");
 
     expect(result).toBeDefined();
-    expect(result?.params.page).toBe(3); // numberFormat: "auto" parses "3" → 3
-    expect(result?.params.limit).toBe(20);
+    expect(result?.search.page).toBe(3); // numberFormat: "auto" parses "3" → 3
+    expect(result?.search.limit).toBe(20);
   });
 });
 
@@ -221,9 +222,9 @@ describe("createMatcher — legal '?' inside a query value (#1292)", () => {
 
     // "?" is legal inside a query value per RFC 3986; SegmentMatcher already split
     // the URL at the first "?", so the DI parser must not split again (#1292).
-    expect(matcher.match("/r?x=a?b")?.params).toStrictEqual({ x: "a?b" });
+    expect(matcher.match("/r?x=a?b")?.search).toStrictEqual({ x: "a?b" });
     // control — no inner "?"
-    expect(matcher.match("/r?x=ab")?.params).toStrictEqual({ x: "ab" });
+    expect(matcher.match("/r?x=ab")?.search).toStrictEqual({ x: "ab" });
   });
 
   it("does not unmatch a legal '?'-in-value URL under strictQueryParams (#1292)", () => {
@@ -234,9 +235,9 @@ describe("createMatcher — legal '?' inside a query value (#1292)", () => {
 
     // the second split spawned a phantom undeclared key → strict rejected the whole
     // URL; the declared "q" must carry the full "a?b" value.
-    expect(matcher.match("/s?q=a?b")?.params).toStrictEqual({ q: "a?b" });
+    expect(matcher.match("/s?q=a?b")?.search).toStrictEqual({ q: "a?b" });
     // control
-    expect(matcher.match("/s?q=ab")?.params).toStrictEqual({ q: "ab" });
+    expect(matcher.match("/s?q=ab")?.search).toStrictEqual({ q: "ab" });
   });
 });
 
@@ -253,6 +254,78 @@ describe("createMatcher — a literal '__proto__' query key survives (#1293)", (
     const result = matcher.match("/r?__proto__=zzz");
 
     expect(result).toBeDefined();
-    expect(Object.hasOwn(result!.params, "__proto__")).toBe(true);
+    expect(Object.hasOwn(result!.search, "__proto__")).toBe(true);
+  });
+});
+
+describe("build agrees with a splat that has a more-specific child (#1568)", () => {
+  // INVARIANTS Matching #24: when a splat node has a child route, a remainder
+  // that matches the child resolves to the CHILD — the splat captures nothing.
+  // buildPath must therefore emit no value for it, or it prints a URL that
+  // falls back to the wildcard (or matches nothing at all).
+  const tree = createRouteTree("", "", [
+    {
+      name: "n",
+      path: "/n",
+      children: [
+        {
+          name: "all",
+          path: "/*rest",
+          children: [{ name: "edit", path: "/edit" }],
+        },
+      ],
+    },
+  ]);
+
+  const build = (): Matcher => {
+    const matcher = createMatcher();
+
+    matcher.registerTree(tree);
+
+    return matcher;
+  };
+
+  it("builds the child without demanding the splat it can never bind", () => {
+    expect(build().buildPath("n.all.edit", {})).toBe("/n/edit");
+  });
+
+  it("round-trips the child back to itself", () => {
+    const matcher = build();
+    const path = matcher.buildPath("n.all.edit", {});
+
+    expect(matcher.match(path)?.segments.at(-1)?.fullName).toBe("n.all.edit");
+  });
+
+  it("still binds the splat where it IS the last segment", () => {
+    const matcher = build();
+    const path = matcher.buildPath("n.all", { rest: "x/y" });
+
+    expect(path).toBe("/n/x/y");
+    expect(matcher.match(path)?.segments.at(-1)?.fullName).toBe("n.all");
+    expect(matcher.match(path)?.params.rest).toBe("x/y");
+  });
+
+  it("builds a route whose own path continues past a splat", () => {
+    const own = createRouteTree("", "", [{ name: "x", path: "/a/*rest/b" }]);
+    const matcher = createMatcher();
+
+    matcher.registerTree(own);
+
+    const path = matcher.buildPath("x", {});
+
+    expect(path).toBe("/a/b");
+    expect(matcher.match(path)?.segments.at(-1)?.fullName).toBe("x");
+  });
+
+  it("binds only the LAST splat when a path carries two", () => {
+    const two = createRouteTree("", "", [{ name: "t", path: "/a/*x/*y" }]);
+    const matcher = createMatcher();
+
+    matcher.registerTree(two);
+
+    const path = matcher.buildPath("t", { y: "1/2" });
+
+    expect(path).toBe("/a/1/2");
+    expect(matcher.match(path)?.params).toStrictEqual({ y: "1/2" });
   });
 });

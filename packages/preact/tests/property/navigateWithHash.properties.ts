@@ -56,6 +56,7 @@ function makeRouter(
     navigate: (
       name: string,
       params: Params,
+      _search: unknown,
       opts?: NavigationOptions & { hash?: string; hashChange?: boolean },
     ) => {
       calls.push({ name, params, opts: opts ?? {} });
@@ -78,7 +79,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash,
         });
 
-        void navigateWithHash(router, routeName, {}, hash);
+        void navigateWithHash(router, routeName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
 
@@ -107,7 +108,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, routeName, {}, newHash);
+        void navigateWithHash(router, routeName, {}, undefined, newHash);
 
         expect(calls).toHaveLength(1);
 
@@ -134,7 +135,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, targetName, {}, newHash);
+        void navigateWithHash(router, targetName, {}, undefined, newHash);
 
         expect(calls).toHaveLength(1);
 
@@ -159,7 +160,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: "",
         });
 
-        void navigateWithHash(router, targetName, {}, undefined);
+        void navigateWithHash(router, targetName, {}, undefined, undefined);
 
         expect(calls).toHaveLength(1);
         expect(calls[0].opts.hash).toBeUndefined();
@@ -177,7 +178,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: "",
         });
 
-        void navigateWithHash(router, targetName, {}, hash);
+        void navigateWithHash(router, targetName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
         expect(calls[0].opts.hash).toBe(hash);
@@ -200,7 +201,7 @@ describe("navigateWithHash — Property Tests", () => {
           hash: currentHash,
         });
 
-        void navigateWithHash(router, routeName, {}, undefined);
+        void navigateWithHash(router, routeName, {}, undefined, undefined);
 
         expect(calls).toHaveLength(1);
 
@@ -220,7 +221,7 @@ describe("navigateWithHash — Property Tests", () => {
       (routeName, hash) => {
         const { router, calls } = makeRouter(undefined);
 
-        void navigateWithHash(router, routeName, {}, hash);
+        void navigateWithHash(router, routeName, {}, undefined, hash);
 
         expect(calls).toHaveLength(1);
 

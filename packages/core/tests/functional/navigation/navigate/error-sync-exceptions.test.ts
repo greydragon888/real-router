@@ -40,7 +40,7 @@ describe("router.navigate() - error sync exceptions", () => {
         );
 
         // Navigate to initial state
-        await router.navigate("orders.pending", {}, {});
+        await router.navigate("orders.pending", {}, undefined, {});
 
         errorDeactivateGuard.mockClear();
 
@@ -67,7 +67,7 @@ describe("router.navigate() - error sync exceptions", () => {
         lifecycle.addDeactivateGuard("orders.pending", () => nextGuard); // Called first
         lifecycle.addDeactivateGuard("orders", () => errorGuard); // Called second, throws error
 
-        await router.navigate("orders.pending", {}, {});
+        await router.navigate("orders.pending", {}, undefined, {});
 
         errorGuard.mockClear();
         nextGuard.mockClear();

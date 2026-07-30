@@ -50,7 +50,7 @@ Symbols: ✓ built-in, ⚠ partial / via composition, ✗ not provided / out of 
 | **In-flight dedup** | ✗ not provided by core or `ssr-data-plugin`; compose with `lifecycle-plugin.onNavigate` + a CSR fetcher | ✗ |
 | **TTL / SWR cache** | ✗ not provided; per-route `Cache-Control` is the HTTP-side knob | ✗ |
 | **Cross-navigation cache reuse** | Application-level | ✗ |
-| **Manual invalidation** | `router.navigate(name, params, { reload: true })`; CSR refetch via `lifecycle-plugin.onNavigate` | ✗ |
+| **Manual invalidation** | `router.navigate(name, params, search, { reload: true })`; CSR refetch via `lifecycle-plugin.onNavigate` | ✗ |
 | **Suspense integration** | Svelte 5 `{#await}` blocks for promise-driven content; `<svelte:boundary>` for reactive errors | n/a |
 | **Out-of-order streaming** | ✗ framework-side limit (Svelte 5 stable) | ✗ |
 | **Backpressure / abort on stream** | n/a (no progressive flush); per-request `AbortController` covers HTTP-level cancellation in `ssr/` | n/a |

@@ -47,7 +47,7 @@
 
 | #   | Invariant                                         | Description                                                                                                                                                                               |
 | --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Preload errors never propagate                    | Every `preload.fn(params)` call is followed by `.catch(() => {})`. Rejected promises are silently swallowed and never surface as unhandled rejections.                                     |
+| 1   | Preload errors never propagate                    | Every `preload.fn({ params, search })` call is followed by `.catch(() => {})`. Rejected promises are silently swallowed and never surface as unhandled rejections.                                     |
 | 2   | Preload return values are discarded               | The `Promise` returned by `preload.fn()` is not `await`ed or stored. The plugin does not inspect, cache, or act upon the resolved value.                                                  |
 
 ## DOM Traversal — #findAnchor

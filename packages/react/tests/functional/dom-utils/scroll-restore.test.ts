@@ -22,6 +22,7 @@ function makeState(
   return {
     name,
     params: params as State["params"],
+    search: {},
     path: "/",
     context: context,
     transition: transition as State["transition"],
@@ -65,8 +66,37 @@ function track<T extends { destroy: () => void }>(instance: T): T {
   return instance;
 }
 
+// Plain-object `sessionStorage` mock — the real global is not spyable under
+// vitest+jsdom, so a `Storage.prototype` spy silently observes nothing. Why, in
+// full: IMPLEMENTATION_NOTES.md § "Adapter scroll tests mock `sessionStorage`".
+function createMockStorage(): Storage {
+  const store = new Map<string, string>();
+
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+  };
+}
+
 describe("createScrollRestoration", () => {
   beforeEach(() => {
+    vi.stubGlobal("sessionStorage", createMockStorage());
     sessionStorage.clear();
     history.scrollRestoration = "auto";
     document.body.innerHTML = "";
@@ -1289,7 +1319,7 @@ describe("createScrollRestoration", () => {
 
   it("sessionStorage setItem throws → write is swallowed, no exception propagates", () => {
     const setItemSpy = vi
-      .spyOn(Storage.prototype, "setItem")
+      .spyOn(sessionStorage, "setItem")
       .mockImplementation(() => {
         throw new Error("QuotaExceededError");
       });

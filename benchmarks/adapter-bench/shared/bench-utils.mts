@@ -54,10 +54,16 @@ export async function settleHeap(): Promise<void> {
 
 /** Adapter-app contract: framework-specific commit mechanics live in the app. */
 export interface MountedApp {
-  /** navigate + framework-synchronous render commit (Vue: settles async). */
+  /**
+   * navigate + framework-synchronous render commit (Vue: settles async).
+   * `search` is the query channel (RFC-4 M2 / #1548) — passed to
+   * `router.navigate(name, params, search)`; a query-only swap drives the
+   * `routeSearch` <Link> active-recompute path.
+   */
   commitNavigate: (
     name: string,
     params?: Record<string, string>,
+    search?: Record<string, string>,
   ) => void | Promise<void>;
   /** memory-plugin back()/forward() + the same commit mechanics. */
   commitHistory: (dir: "back" | "forward") => void | Promise<void>;

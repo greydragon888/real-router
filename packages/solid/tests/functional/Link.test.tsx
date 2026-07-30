@@ -46,6 +46,39 @@ describe("Link component", () => {
     expect(link).toHaveAttribute("href", "/test");
   });
 
+  it("should decompose a `to` descriptor into href + navigation (#1548)", async () => {
+    const navigateSpy = vi.spyOn(router, "navigate");
+
+    render(
+      () => (
+        <Link
+          to={{ name: "one-more-test", search: { tab: "x" } }}
+          data-testid="link"
+        >
+          Test
+        </Link>
+      ),
+      { wrapper },
+    );
+
+    const link = screen.getByTestId("link");
+
+    // href resolves from the descriptor: route "one-more-test" → "/test", and
+    // the descriptor's `search` rides into the query string (proof it decomposed).
+    expect(link).toHaveAttribute("href", "/test?tab=x");
+
+    fireEvent.click(link);
+
+    // navigate(name, params, search, opts) — the descriptor's search channel
+    // lands at position 3.
+    expect(navigateSpy).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      { tab: "x" },
+      expect.anything(),
+    );
+  });
+
   it("should render component with passed class name", () => {
     const testClass = "test-class";
 
@@ -514,7 +547,12 @@ describe("Link component", () => {
     fireEvent.click(link, { bubbles: true, cancelable: true });
 
     // audit-2026-05-17 §1 MEDIUM #4 — pin exact arg shape, not just any-Object
-    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      undefined,
+      {},
+    );
   });
 
   it("should render without href and log error for invalid routeName", () => {
@@ -705,7 +743,8 @@ describe("Link component", () => {
         () => (
           <Link
             routeName="items.item"
-            routeParams={{ id: "42", q: "search" }}
+            routeParams={{ id: "42" }}
+            routeSearch={{ q: "search" }}
             hash="section-2"
             data-testid="link"
           >
@@ -783,9 +822,9 @@ describe("Link component", () => {
 
         // opts must be defined — Link always forwards a third argument so the
         // routing layer sees an explicit options object (no implicit defaults).
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         // Undefined hash MUST stay undefined — no `hash` key in opts.
         expect("hash" in opts).toBe(false);
@@ -808,9 +847,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         expect(opts.hash).toBe("");
         // Cross-route navigation → no force/hashChange auto-bypass.
@@ -834,9 +873,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         expect(opts.hash).toBe("section");
         // Cross-route — same-route hash logic must NOT fire.
@@ -849,7 +888,7 @@ describe("Link component", () => {
         // is populated. Then click a Link targeting the same route + same
         // params but with hash B — navigateWithHash must auto-bypass core's
         // SAME_STATES rejection by setting `force: true, hashChange: true`.
-        await router.navigate("about", {}, { hash: "first" });
+        await router.navigate("about", {}, undefined, { hash: "first" });
 
         const spy = vi.spyOn(router, "navigate");
 
@@ -866,9 +905,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         expect(opts.hash).toBe("second");
         expect((opts as { force?: boolean }).force).toBe(true);
@@ -880,7 +919,7 @@ describe("Link component", () => {
         // the current hash, navigateWithHash must NOT add force/hashChange.
         // Adding them would force a redundant transition where SAME_STATES
         // correctly rejects.
-        await router.navigate("about", {}, { hash: "same" });
+        await router.navigate("about", {}, undefined, { hash: "same" });
 
         const spy = vi.spyOn(router, "navigate");
 
@@ -900,9 +939,9 @@ describe("Link component", () => {
 
         expect(spy).toHaveBeenCalledTimes(1);
 
-        expect(spy.mock.calls[0][2]).toBeDefined();
+        expect(spy.mock.calls[0][3]).toBeDefined();
 
-        const opts = spy.mock.calls[0][2]!;
+        const opts = spy.mock.calls[0][3]!;
 
         expect(opts.hash).toBe("same");
         expect((opts as { force?: boolean }).force).toBeUndefined();
@@ -1088,7 +1127,7 @@ describe("Link component", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "users", undefined, {
+      createActiveRouteSource(router, "users", undefined, undefined, {
         strict: true,
         ignoreQueryParams: true,
       });

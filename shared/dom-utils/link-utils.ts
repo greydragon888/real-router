@@ -1,9 +1,62 @@
 import type {
   NavigationOptions,
+  NavigationTarget,
   Params,
   Router,
+  SearchParams,
   State,
 } from "@real-router/core";
+
+/**
+ * Resolved navigation channels for a `<Link>` — the single `{ name, params,
+ * search }` shape every adapter feeds into `buildHref` / `navigateWithHash` /
+ * the active-route source, regardless of which prop form the consumer used.
+ */
+export interface ResolvedLinkTarget {
+  name: string;
+  params: Params | undefined;
+  search: SearchParams | undefined;
+}
+
+/**
+ * Collapses a `<Link>`'s two prop forms (RFC-4 M2 B2, #1548) into one channel
+ * triple:
+ *
+ * - **Descriptor** — `to={{ name, params?, search? }}` (a `NavigationTarget`).
+ * - **Channel props** — `routeName` + `routeParams?` + `routeSearch?`.
+ *
+ * The forms are mutually exclusive: the TS union on each adapter's `LinkProps`
+ * rejects mixing them at compile time, and this helper is the runtime backstop —
+ * when `to` is present it **wins**, and a `dev`-visible `console.warn` fires if
+ * channel props were also supplied (a JS consumer, an object spread, or an
+ * adapter without a strict union can still slip both through). `routeOptions` /
+ * `hash` are separate props under BOTH forms (hash is not part of
+ * `NavigationTarget` — #532), so they are resolved by the caller, not here.
+ */
+export function resolveLinkTarget(
+  to: NavigationTarget | undefined,
+  routeName: string,
+  routeParams: Params | undefined,
+  routeSearch: SearchParams | undefined,
+): ResolvedLinkTarget {
+  if (to !== undefined) {
+    if (
+      routeName !== "" ||
+      routeParams !== undefined ||
+      routeSearch !== undefined
+    ) {
+      console.warn(
+        "[real-router] <Link> received both `to` and channel props " +
+          "(routeName / routeParams / routeSearch). `to` wins; the channel " +
+          "props are ignored. Use one form or the other.",
+      );
+    }
+
+    return { name: to.name, params: to.params, search: to.search };
+  }
+
+  return { name: routeName, params: routeParams, search: routeSearch };
+}
 
 export function shouldNavigate(evt: MouseEvent): boolean {
   return (
@@ -39,6 +92,7 @@ function encodeFragmentInline(decoded: string): string {
 type BuildUrlFn = (
   name: string,
   params: Params,
+  search?: SearchParams,
   options?: { hash?: string },
 ) => string | undefined;
 
@@ -59,6 +113,7 @@ export function buildHref(
   router: Router,
   routeName: string,
   routeParams: Params,
+  routeSearch?: SearchParams,
   hash?: string,
 ): string | undefined {
   try {
@@ -74,6 +129,10 @@ export function buildHref(
       const url = buildUrl(
         routeName,
         routeParams,
+        // Query channel at position 3 (RFC-4 M2 / #1548) — from the `routeSearch`
+        // prop; hash options at position 4. `undefined` when the link has no
+        // `routeSearch` (its query, if any, still rides in routeParams).
+        routeSearch,
         normHash === undefined ? undefined : { hash: normHash },
       );
 
@@ -89,7 +148,7 @@ export function buildHref(
       }
     }
 
-    const path = router.buildPath(routeName, routeParams);
+    const path = router.buildPath(routeName, routeParams, routeSearch);
 
     // Symmetric to the buildUrl guard above (#S1 audit, Invariant 12).
     // `router.buildPath` is typed `string`, but defends against:
@@ -145,6 +204,7 @@ export function navigateWithHash(
   router: Router,
   routeName: string,
   routeParams: Params,
+  routeSearch: SearchParams | undefined,
   hash: string | undefined,
   extraOptions?: NavigationOptions,
 ): Promise<State> {
@@ -158,7 +218,12 @@ export function navigateWithHash(
 
   if (
     current?.name === routeName &&
-    shallowEqual(current.params, routeParams)
+    shallowEqual(current.params, routeParams) &&
+    // Same-route hash bypass must also match the query channel (RFC-4 M2 /
+    // #1548): a `routeSearch`-less link ignores it (compare current.search to
+    // itself), so hash-only navigation on an unchanged query still bypasses
+    // SAME_STATES.
+    shallowEqual(current.search, routeSearch ?? current.search)
   ) {
     const currentHash =
       (current.context as { url?: { hash?: string } } | undefined)?.url?.hash ??
@@ -171,7 +236,9 @@ export function navigateWithHash(
     }
   }
 
-  return router.navigate(routeName, routeParams, opts);
+  // Query channel at position 3 (RFC-4 M2 / #1548) — from the `routeSearch`
+  // prop; opts at position 4. `undefined` when the link has no `routeSearch`.
+  return router.navigate(routeName, routeParams, routeSearch, opts);
 }
 
 // Match-any-whitespace regex shared across calls. RegExp literals at

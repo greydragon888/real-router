@@ -460,7 +460,7 @@ test.describe("Preact SSR — smoke", () => {
     request,
   }) => {
     // ?sort declared in route path "/users?sort"; ssr-data-plugin
-    // forwards params.sort to loader; loader returns sorted users.
+    // forwards search.sort to loader; loader returns sorted users.
     // meta.ts interpolates the sort value into the title.
     const ascHtml = await (await request.get("/users?sort=asc")).text();
     const descHtml = await (await request.get("/users?sort=desc")).text();

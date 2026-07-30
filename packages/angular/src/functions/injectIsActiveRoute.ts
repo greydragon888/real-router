@@ -5,11 +5,12 @@ import { sourceToSignal } from "../sourceToSignal";
 import { injectRouter } from "./injectRouter";
 
 import type { Signal } from "@angular/core";
-import type { Params } from "@real-router/core";
+import type { Params, SearchParams } from "@real-router/core";
 
 export function injectIsActiveRoute(
   routeName: string,
   params?: Params,
+  search?: SearchParams,
   options?: { strict?: boolean; ignoreQueryParams?: boolean; hash?: string },
 ): Signal<boolean> {
   assertInInjectionContext(injectIsActiveRoute);
@@ -24,6 +25,7 @@ export function injectIsActiveRoute(
     router,
     routeName,
     params,
+    search,
     options?.strict ?? false,
     options?.ignoreQueryParams ?? true,
     options?.hash,

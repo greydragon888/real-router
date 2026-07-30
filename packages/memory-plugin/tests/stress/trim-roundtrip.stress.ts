@@ -39,7 +39,7 @@ describe("S5: roundtrip navigate → replace → back → forward at cap", () =>
 
     for (let i = 0; i < 100; i++) {
       await router.navigate("user", { id: String(i) });
-      await router.navigate("settings", {}, { replace: true });
+      await router.navigate("settings", {}, undefined, { replace: true });
 
       router.back();
       await settle();
@@ -67,7 +67,7 @@ describe("S5: roundtrip navigate → replace → back → forward at cap", () =>
     for (let i = 0; i < 200; i++) {
       await (i % 2 === 0
         ? router.navigate("user", { id: String(i) })
-        : router.navigate("settings", {}, { replace: true }));
+        : router.navigate("settings", {}, undefined, { replace: true }));
 
       const index = getHistoryIndex(router) ?? -1;
 

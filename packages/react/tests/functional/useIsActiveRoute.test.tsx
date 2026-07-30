@@ -57,7 +57,7 @@ describe("useIsActiveRoute", () => {
 
     const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "users", undefined, {
+    createActiveRouteSource(router, "users", undefined, undefined, {
       strict: false,
       ignoreQueryParams: true,
     });
@@ -83,17 +83,23 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should handle non-strict mode", () => {
-    const { result } = renderHook(() => useIsActiveRoute("users", {}, false), {
-      wrapper: (props) => wrapper({ ...props, router }),
-    });
+    const { result } = renderHook(
+      () => useIsActiveRoute("users", {}, undefined, false),
+      {
+        wrapper: (props) => wrapper({ ...props, router }),
+      },
+    );
 
     expect(result.current).toBe(true); // "users.view" is child of "users"
   });
 
   it("should handle strict mode", () => {
-    const { result } = renderHook(() => useIsActiveRoute("users", {}, true), {
-      wrapper: (props) => wrapper({ ...props, router }),
-    });
+    const { result } = renderHook(
+      () => useIsActiveRoute("users", {}, undefined, true),
+      {
+        wrapper: (props) => wrapper({ ...props, router }),
+      },
+    );
 
     expect(result.current).toBe(false); // Exact match required
   });
@@ -124,7 +130,7 @@ describe("useIsActiveRoute", () => {
     it("should update when activeStrict changes and router navigates", async () => {
       const { result, rerender } = renderHook(
         ({ strict }: { strict: boolean }) =>
-          useIsActiveRoute("users", {}, strict),
+          useIsActiveRoute("users", {}, undefined, strict),
         {
           wrapper: (props) => wrapper({ ...props, router }),
           initialProps: { strict: false },
@@ -166,10 +172,20 @@ describe("useIsActiveRoute", () => {
         filter: "active",
         sort: "date",
         page: 1,
-        nested: { a: 1, b: 2 },
+        // A primitive array is a valid route-param value (SearchParamValue) and
+        // compares by CONTENT (areParamValuesEqual). A nested object is NOT a
+        // valid param value (M2 params are primitives / primitive arrays) and
+        // would compare by reference — fragile across adapters.
+        tags: [1, 2],
       };
 
-      await act(() => router.navigate("complex", complexParams));
+      // `/complex` has no path params and these keys are undeclared, so they
+      // don't render to the URL — both navigations build the same path. `reload`
+      // allows the same-URL re-navigation; isActiveRoute still compares the
+      // params bag (path/arbitrary channel), which is what this test exercises.
+      await act(() =>
+        router.navigate("complex", complexParams, undefined, { reload: true }),
+      );
 
       const { result } = renderHook(
         () => useIsActiveRoute("complex", complexParams),
@@ -180,16 +196,14 @@ describe("useIsActiveRoute", () => {
 
       // Navigate to route with different params
       await act(() =>
-        router.navigate("complex", { ...complexParams, page: 2 }),
+        router.navigate("complex", { ...complexParams, page: 2 }, undefined, {
+          reload: true,
+        }),
       );
 
       // Now check with the different params - should be active
       const { result: result2 } = renderHook(
-        () =>
-          useIsActiveRoute("complex", {
-            ...complexParams,
-            page: 2,
-          }),
+        () => useIsActiveRoute("complex", { ...complexParams, page: 2 }),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -476,7 +490,7 @@ describe("useIsActiveRoute", () => {
 
       // Non-strict: settings is parent of settings.profile.edit
       const { result: nonStrict } = renderHook(
-        () => useIsActiveRoute("settings", {}, false),
+        () => useIsActiveRoute("settings", {}, undefined, false),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -484,7 +498,7 @@ describe("useIsActiveRoute", () => {
 
       // Strict: exact match required
       const { result: strict } = renderHook(
-        () => useIsActiveRoute("settings", {}, true),
+        () => useIsActiveRoute("settings", {}, undefined, true),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -492,7 +506,7 @@ describe("useIsActiveRoute", () => {
 
       // Check intermediate level
       const { result: intermediate } = renderHook(
-        () => useIsActiveRoute("settings.profile", {}, false),
+        () => useIsActiveRoute("settings.profile", {}, undefined, false),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 

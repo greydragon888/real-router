@@ -238,7 +238,7 @@ Opt-in via `provideRealRouter(router, { viewTransitions: true })`. Same wiring p
 
 ```
 RealLink (@Directive, selector: a[realLink])
-├── routeName, routeParams, routeOptions, activeClassName, activeStrict, ignoreQueryParams, hash = input()
+├── routeName, routeParams, routeSearch, routeOptions, activeClassName, activeStrict, ignoreQueryParams, hash = input()
 ├── isActive = signal(false)                               # local active state
 ├── stableParams = createStableParams(routeParams)         # shallowEqual content-stabilization (#988)
 ├── href = computed(() => buildHref(..., stableParams()))  # primitive-string output; Object.is dedup

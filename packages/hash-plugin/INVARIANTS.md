@@ -113,7 +113,7 @@
 
 | #   | Invariant                                                        | Description                                                                                                                                                                                                                   |
 | --- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Arbitrary query dictionary is parsed correctly by `matchUrl`     | An arbitrary `Record<string, string>` appended to the built URL survives `matchUrl`, exposing all keys in `state.params`. Verifies that query parsing handles multiple keys, not just the canonical `id` path parameter. |
+| 1   | Arbitrary query dictionary is parsed correctly by `matchUrl`     | An arbitrary `Record<string, string>` appended to the built URL survives `matchUrl`, exposing all keys in `state.search`. Verifies that query parsing handles multiple keys, not just the canonical `id` path parameter. |
 
 ## Test Files
 

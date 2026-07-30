@@ -71,7 +71,9 @@ describe(
         ProfiledHook.snapshot();
 
         await act(async () => {
-          await router.navigate("users.view", { id: "1" }, { reload: true });
+          await router.navigate("users.view", { id: "1" }, undefined, {
+            reload: true,
+          });
         });
 
         const reloadedRoute = result.current.route;

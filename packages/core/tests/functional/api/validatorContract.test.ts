@@ -324,16 +324,6 @@ describe("core/validator call-site contract", () => {
       plugin = getPluginApi(router);
     });
 
-    it("buildState: validates state-builder args with caller 'buildState'", () => {
-      plugin.buildState("home", {});
-
-      expect(validator.routes.validateStateBuilderArgs).toHaveBeenCalledWith(
-        "home",
-        {},
-        "buildState",
-      );
-    });
-
     it("forwardState: validates state-builder args with caller 'forwardState'", () => {
       plugin.forwardState("home", {});
 
@@ -355,7 +345,7 @@ describe("core/validator call-site contract", () => {
     });
 
     it("navigateToState: validates options ('navigateToState') ONLY when options provided", () => {
-      const state = plugin.makeState("home", {}, "/home");
+      const state = plugin.makeState("home", {}, undefined, "/home");
 
       plugin.navigateToState(state).catch(() => {});
 

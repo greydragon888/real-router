@@ -13,7 +13,7 @@ import type { Params } from "@real-router/core";
  * - **`forwardState` interceptors → applied.** `matchPath` calls
  *   `this.#deps.forwardState(...)` (`RoutesNamespace.matchPath`), which is
  *   wired through `ctx.forwardState` (`wireNamespaces.ts`), which goes through
- *   `createBinaryInterceptable("forwardState", …)` in the Router constructor's
+ *   `createTernaryInterceptable("forwardState", …)` in the Router constructor's
  *   `registerInternals` block.
  *
  * - **`buildPath` interceptors → NOT applied.** `matchPath` calls
@@ -59,6 +59,7 @@ describe("matchPath: interceptor application audit (#525, Q1)", () => {
       return {
         name: result.name,
         params: { ...result.params, intercepted: "yes" },
+        search: {},
       };
     });
 

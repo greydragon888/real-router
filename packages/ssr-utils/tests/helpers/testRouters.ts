@@ -95,13 +95,13 @@ const routes: Route[] = [
   {
     name: "withEncoder",
     path: "/encoded/:param1/:param2",
-    encodeParams: ({ one, two }) => ({
-      param1: one,
-      param2: two,
+    encodeParams: ({ params: { one, two }, search }) => ({
+      params: { param1: one, param2: two },
+      search,
     }),
-    decodeParams: ({ param1, param2 }) => ({
-      one: param1,
-      two: param2,
+    decodeParams: ({ params: { param1, param2 }, search }) => ({
+      params: { one: param1, two: param2 },
+      search,
     }),
   },
 ];

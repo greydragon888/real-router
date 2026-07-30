@@ -91,7 +91,7 @@ describe("router.navigate() - base cases", () => {
   });
 
   it("should be able to call navigate with 3 args without callback", async () => {
-    await router.navigate("orders.pending", {}, { force: true });
+    await router.navigate("orders.pending", {}, undefined, { force: true });
 
     expect(router.getState()?.name).toBe("orders.pending");
   });

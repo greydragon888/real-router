@@ -144,7 +144,7 @@ describe("router.navigate() - unknown route", () => {
 
       onTransitionSuccess.mockClear();
 
-      await freshRouter.navigate("profile", {}, {});
+      await freshRouter.navigate("profile", {}, undefined, {});
 
       expect(onTransitionSuccess).toHaveBeenCalledWith(
         expect.anything(),

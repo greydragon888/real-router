@@ -7,14 +7,22 @@
     buildHref,
     buildActiveClassName,
     navigateWithHash,
+    resolveLinkTarget,
   } from "../dom-utils";
 
-  import type { NavigationOptions, Params } from "@real-router/core";
+  import type {
+    NavigationOptions,
+    NavigationTarget,
+    Params,
+    SearchParams,
+  } from "@real-router/core";
   import type { Snippet } from "svelte";
 
   let {
     routeName,
     routeParams,
+    routeSearch,
+    to,
     routeOptions = EMPTY_OPTIONS,
     class: className = undefined,
     activeClassName = "active",
@@ -26,8 +34,10 @@
     onclick: userOnClick = undefined,
     ...restProps
   }: {
-    routeName: string;
+    routeName?: string;
     routeParams?: Params;
+    routeSearch?: SearchParams;
+    to?: NavigationTarget;
     routeOptions?: NavigationOptions;
     class?: string;
     activeClassName?: string;
@@ -56,25 +66,35 @@
   //
   // Hash-aware active (#532): tab links sharing routeName but differing in
   // hash should only light up the matching variant.
+  // Resolve the two prop forms into one channel triple (RFC-4 M2 B2, #1548): a
+  // `to` descriptor supersedes the channel props (dev-warn on conflict). Captured
+  // at mount for the active source (mirrors the routeName/params capture above).
+  // svelte-ignore state_referenced_locally
+  const mountTarget = resolveLinkTarget(
+    to,
+    routeName ?? "",
+    routeParams,
+    routeSearch,
+  );
+
   // svelte-ignore state_referenced_locally
   // Active-route state is captured at mount; href remains reactive separately.
   const activeState = useIsActiveRoute(
-    routeName,
-    routeParams,
+    mountTarget.name,
+    mountTarget.params,
+    mountTarget.search,
     activeStrict,
     ignoreQueryParams,
     hash,
   );
 
   // Navigation/href building need a concrete params object — default here only.
-  const href = $derived(
-    buildHref(
-      router,
-      routeName,
-      routeParams ?? EMPTY_PARAMS,
-      hash,
-    ),
-  );
+  // `search` stays raw (`undefined` when unset). Reactive resolve for href.
+  const href = $derived.by(() => {
+    const resolved = resolveLinkTarget(to, routeName ?? "", routeParams, routeSearch);
+
+    return buildHref(router, resolved.name, resolved.params ?? EMPTY_PARAMS, resolved.search, hash);
+  });
 
   const finalClassName = $derived(
     buildActiveClassName(activeState.current, activeClassName, className),
@@ -106,10 +126,14 @@
     }
 
     evt.preventDefault();
+
+    const resolved = resolveLinkTarget(to, routeName ?? "", routeParams, routeSearch);
+
     navigateWithHash(
       router,
-      routeName,
-      routeParams ?? EMPTY_PARAMS,
+      resolved.name,
+      resolved.params ?? EMPTY_PARAMS,
+      resolved.search,
       hash,
       routeOptions,
     ).catch(NOOP);

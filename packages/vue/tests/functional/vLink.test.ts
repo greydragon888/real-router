@@ -367,7 +367,12 @@ describe("v-link directive", () => {
 
       element.dispatchEvent(clickEvent);
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it("should not navigate on right click", async () => {
@@ -405,7 +410,12 @@ describe("v-link directive", () => {
 
       element.dispatchEvent(keyEvent);
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it("should not navigate on Enter key for button elements (lifecycle)", async () => {
@@ -446,6 +456,7 @@ describe("v-link directive", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "test-route",
         { id: "1" },
+        undefined,
         {},
       );
     });
@@ -492,7 +503,12 @@ describe("v-link directive", () => {
 
       element.dispatchEvent(clickEvent);
 
-      expect(router.navigate).toHaveBeenCalledWith("test-route", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "test-route",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it("should handle click on button element", async () => {
@@ -513,7 +529,12 @@ describe("v-link directive", () => {
 
       element.dispatchEvent(clickEvent);
 
-      expect(router.navigate).toHaveBeenCalledWith("test-route", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "test-route",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it("should preserve existing role attribute", () => {
@@ -657,7 +678,12 @@ describe("v-link directive", () => {
 
       element.dispatchEvent(clickEvent1);
 
-      expect(router.navigate).toHaveBeenCalledWith("route-one", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "route-one",
+        {},
+        undefined,
+        {},
+      );
 
       vi.clearAllMocks();
 
@@ -676,6 +702,7 @@ describe("v-link directive", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "route-two",
         { id: "42" },
+        undefined,
         {},
       );
     });

@@ -97,7 +97,12 @@ describe("Link - Integration Tests", () => {
         routeName: "one-more-test",
       });
 
-      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined);
+      expect(buildUrlSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        undefined,
+      );
       expect(document.querySelector("a")!.getAttribute("href")).toBe(
         "/custom-url",
       );
@@ -105,8 +110,12 @@ describe("Link - Integration Tests", () => {
 
     it("should pass hash option to buildUrl when hash prop is set (#532)", () => {
       const buildUrlSpy = vi.fn(
-        (_name: string, _params?: object, opts?: { hash?: string }): string =>
-          opts?.hash ? `/url#${opts.hash}` : "/url",
+        (
+          _name: string,
+          _params?: object,
+          _search?: object,
+          opts?: { hash?: string },
+        ): string => (opts?.hash ? `/url#${opts.hash}` : "/url"),
       );
 
       router.buildUrl = buildUrlSpy;
@@ -116,13 +125,9 @@ describe("Link - Integration Tests", () => {
         hash: "anchor",
       });
 
-      expect(buildUrlSpy).toHaveBeenCalledWith(
-        "one-more-test",
-        {},
-        {
-          hash: "anchor",
-        },
-      );
+      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined, {
+        hash: "anchor",
+      });
       expect(document.querySelector("a")!.getAttribute("href")).toBe(
         "/url#anchor",
       );
@@ -131,7 +136,7 @@ describe("Link - Integration Tests", () => {
     it("should generate correct href with query params", () => {
       renderWithRouter(router, Link, {
         routeName: "one-more-test",
-        routeParams: { id: "123", filter: "active" },
+        routeSearch: { id: "123", filter: "active" },
       });
 
       const href = document.querySelector("a")!.getAttribute("href")!;
@@ -161,7 +166,7 @@ describe("Link - Integration Tests", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
-      const opts = navigateSpy.mock.calls[0][2] as
+      const opts = navigateSpy.mock.calls[0][3] as
         { hash?: string } | undefined;
 
       // Critical: the `hash` key must be ABSENT (not `undefined`) so plugins
@@ -184,7 +189,7 @@ describe("Link - Integration Tests", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
-      const opts = navigateSpy.mock.calls[0][2] as { hash?: string };
+      const opts = navigateSpy.mock.calls[0][3] as { hash?: string };
 
       // Explicit empty hash: present in opts with empty-string value.
       expect(Object.prototype.hasOwnProperty.call(opts, "hash")).toBe(true);
@@ -205,7 +210,7 @@ describe("Link - Integration Tests", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
-      const opts = navigateSpy.mock.calls[0][2] as { hash?: string };
+      const opts = navigateSpy.mock.calls[0][3] as { hash?: string };
 
       expect(opts.hash).toBe("section");
     });
@@ -230,7 +235,7 @@ describe("Link - Integration Tests", () => {
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
 
-      const opts = navigateSpy.mock.calls[0][2] as {
+      const opts = navigateSpy.mock.calls[0][3] as {
         force?: boolean;
         hashChange?: boolean;
         hash?: string;

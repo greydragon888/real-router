@@ -45,10 +45,10 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
   });
 
   it("different strict flag produces different instance", () => {
-    const a = createActiveRouteSource(router, "users", undefined, {
+    const a = createActiveRouteSource(router, "users", undefined, undefined, {
       strict: false,
     });
-    const b = createActiveRouteSource(router, "users", undefined, {
+    const b = createActiveRouteSource(router, "users", undefined, undefined, {
       strict: true,
     });
 
@@ -56,10 +56,10 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
   });
 
   it("different ignoreQueryParams flag produces different instance", () => {
-    const a = createActiveRouteSource(router, "users", undefined, {
+    const a = createActiveRouteSource(router, "users", undefined, undefined, {
       ignoreQueryParams: true,
     });
-    const b = createActiveRouteSource(router, "users", undefined, {
+    const b = createActiveRouteSource(router, "users", undefined, undefined, {
       ignoreQueryParams: false,
     });
 
@@ -68,8 +68,14 @@ describe("createActiveRouteSource (per-router + canonical-args cache)", () => {
 
   it("default options produces same instance as undefined options", () => {
     const a = createActiveRouteSource(router, "users");
-    const b = createActiveRouteSource(router, "users", undefined, {});
-    const c = createActiveRouteSource(router, "users", undefined, {
+    const b = createActiveRouteSource(
+      router,
+      "users",
+      undefined,
+      undefined,
+      {},
+    );
+    const c = createActiveRouteSource(router, "users", undefined, undefined, {
       strict: false,
       ignoreQueryParams: true,
     });

@@ -50,45 +50,25 @@ describe("plugin API validation — with validationPlugin", () => {
     it("throws TypeError for non-string path", () => {
       const api = getPluginApi(router);
       const raw = api as unknown as {
-        makeState: (n: unknown, p?: unknown, path?: unknown) => unknown;
+        makeState: (
+          n: unknown,
+          p?: unknown,
+          search?: unknown,
+          path?: unknown,
+        ) => unknown;
       };
 
-      expect(() => raw.makeState("home", {}, 123)).toThrow(TypeError);
+      expect(() => raw.makeState("home", {}, undefined, 123)).toThrow(
+        TypeError,
+      );
     });
 
     it("accepts valid arguments", () => {
       const api = getPluginApi(router);
 
       expect(() =>
-        api.makeState("home", { foo: "bar" }, "/home"),
+        api.makeState("home", { foo: "bar" }, undefined, "/home"),
       ).not.toThrow();
-    });
-  });
-
-  describe("buildState validation", () => {
-    it("throws TypeError for non-string routeName", () => {
-      const api = getPluginApi(router);
-      const raw = api as unknown as {
-        buildState: (n: unknown, p?: unknown) => unknown;
-      };
-
-      expect(() => raw.buildState(123)).toThrow(TypeError);
-      expect(() => raw.buildState(null)).toThrow(TypeError);
-    });
-
-    it("throws TypeError for invalid routeParams", () => {
-      const api = getPluginApi(router);
-      const raw = api as unknown as {
-        buildState: (n: unknown, p?: unknown) => unknown;
-      };
-
-      expect(() => raw.buildState("home", "not-object")).toThrow(TypeError);
-    });
-
-    it("accepts valid arguments", () => {
-      const api = getPluginApi(router);
-
-      expect(() => api.buildState("home", {})).not.toThrow();
     });
   });
 

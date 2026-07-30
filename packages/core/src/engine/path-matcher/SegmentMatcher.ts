@@ -33,27 +33,8 @@ function stringifyParamValue(value: unknown): string {
   return String(value);
 }
 
-/** Folds a parsed query param into the accumulator as an own DATA property. A
- *  plain `params[name] = value` invokes the inherited `__proto__` accessor for the
- *  literal key `"__proto__"` — so the param silently vanishes (string value) or
- *  swaps the local prototype (object value), annulling search-params' #855 own-key
- *  hardening one layer up. `defineProperty` writes a genuine own entry. (#1293) */
-function assignQueryParam(
-  params: Record<string, unknown>,
-  name: string,
-  value: unknown,
-): void {
-  if (name === "__proto__") {
-    Object.defineProperty(params, name, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true,
-    });
-  } else {
-    params[name] = value;
-  }
-}
+/** Shared frozen empty query object reused for every query-less match. */
+const EMPTY_SEARCH: Readonly<Record<string, unknown>> = Object.freeze({});
 
 // =============================================================================
 // SegmentMatcher Class
@@ -113,6 +94,7 @@ export class SegmentMatcher {
         routesByName: this.#routesByName,
         staticCache: this.#staticCache,
         rootQueryParams: this.#rootQueryParams,
+        rootUrlParams: node.paramMeta.urlParams,
       },
       node,
       "",
@@ -177,6 +159,7 @@ export class SegmentMatcher {
   buildPath(
     name: string,
     params?: Record<string, unknown>,
+    search?: Record<string, unknown>,
     options?: BuildPathOptions,
   ): string {
     const route = this.#routesByName.get(name);
@@ -187,9 +170,15 @@ export class SegmentMatcher {
 
     const path = this.#buildUrlPath(route, params);
     const finalPath = this.#applyTrailingSlash(path, options?.trailingSlash);
+    // Search-aware (RFC-4 M2 / #1548): when an explicit `search` bag is passed,
+    // the query string is built from it; the path comes from `params`. So a
+    // colliding name (`/items/:id?id` with `buildPath("items", {id:5}, {id:7})`)
+    // emits `/items/5?id=7` — path wins its slot, query wins its own (the killed
+    // #843 precedence). A v1 caller passes no `search`, so `search ?? params`
+    // falls back to extracting the query half from the single bag, unchanged.
     const queryString = this.#buildQueryStringForBuild(
       route,
-      params,
+      search ?? params,
       options?.queryParamsMode,
     );
 
@@ -207,6 +196,22 @@ export class SegmentMatcher {
     name: string,
   ): Readonly<Record<string, Record<string, "url" | "query">>> | undefined {
     return this.#routesByName.get(name)?.meta;
+  }
+
+  /**
+   * The route's declared query-param names — the SAME registry the query-string
+   * build reads (`#buildQueryStringForBuild`), so a consumer classifying keys
+   * into channels cannot drift from what this matcher actually prints (#1556).
+   *
+   * Unlike a walk over {@link getSegmentsByName}, this includes the ROOT node's
+   * `?`-declarations (`setRootPath("?a&b")` — how persistent-params declares its
+   * keys): the root is captured in `#rootQueryParams` at `registerTree` and is
+   * deliberately NOT part of `matchSegments`, so a segment walk silently misses
+   * it. Path-slot collisions (`/items/:id?id`) are NOT filtered here — the
+   * caller owns that policy (core subtracts its `urlParams`, #843 / #1549).
+   */
+  getDeclaredQueryParams(name: string): readonly string[] | undefined {
+    return this.#routesByName.get(name)?.declaredQueryParams;
   }
 
   hasRoute(name: string): boolean {
@@ -410,65 +415,64 @@ export class SegmentMatcher {
     params: Record<string, unknown>,
     queryString: string | undefined,
   ): MatchResult | undefined {
-    if (
-      queryString !== undefined &&
-      !this.#mergeQueryParams(route, params, queryString)
-    ) {
-      return undefined;
+    let search: Readonly<Record<string, unknown>> = EMPTY_SEARCH;
+
+    if (queryString !== undefined) {
+      const parsed = this.#parseSearch(route, queryString);
+
+      if (parsed === undefined) {
+        return undefined;
+      }
+
+      // Query goes ONLY into its own channel now (RFC-4 M2 / #1548). `params`
+      // stays path-only — the A2 back-compat fold into `params`, and with it
+      // the query-overwrites-path precedence (#843), are gone.
+      search = parsed;
     }
 
     return {
       segments: route.matchSegments,
       params,
+      search,
       meta: route.meta,
     };
   }
 
-  // Parses the query string and folds it into `params`. Returns false (→ match
-  // yields undefined) when the URL is unmatchable: the injected parser threw, or
-  // strict mode saw an undeclared key.
-  //
-  // Precedence (#843, INVARIANTS Matching #25): query params are merged into the
-  // SAME object that already holds the path params, so a query key equal to a
-  // path-param name OVERWRITES the path value (`match("/u/5?id=9")` → `{id:"9"}`).
-  // Intentional and documented: `buildPath` never emits a path param as a query
-  // key, so the build→match roundtrip is unaffected; the collision only arises
-  // for hand-crafted/adversarial URLs where a query shadows a path segment.
-  #mergeQueryParams(
+  // Parses the query string into its OWN object — the query channel (RFC-4 M2 /
+  // #1548). Returns undefined (→ match yields undefined) when the URL is
+  // unmatchable: the injected parser threw, or strict mode saw an undeclared
+  // key. The injected parser (searchParams.ts) already hardens `__proto__` as an
+  // own key (#855/#1293), so the parsed object is returned directly — no per-key
+  // re-hardening (that folding, and `assignQueryParam`, live on only for the A3
+  // back-compat merge into `params`).
+  #parseSearch(
     route: CompiledRoute,
-    params: Record<string, unknown>,
     queryString: string,
-  ): boolean {
-    let queryParams: Record<string, unknown>;
+  ): Record<string, unknown> | undefined {
+    let search: Record<string, unknown>;
 
     try {
-      queryParams = this.#options.parseQueryString(queryString);
+      search = this.#options.parseQueryString(queryString);
     } catch {
       // The injected query parser decodes percent-encoding too, so the same
       // valid-hex/invalid-UTF-8 sequence that breaks path params (e.g.
       // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw —
       // treat the whole URL as unmatched so the router resolves to
       // UNKNOWN_ROUTE instead of crashing on start() (#737).
-      return false;
+      return undefined;
     }
 
     if (this.#options.strictQueryParams) {
       const declared = route.declaredQueryParamsSet;
 
-      for (const key in queryParams) {
+      for (const key in search) {
         if (!declared.has(key)) {
-          return false;
+          return undefined;
         }
-
-        assignQueryParam(params, key, queryParams[key]);
-      }
-    } else {
-      for (const key in queryParams) {
-        assignQueryParam(params, key, queryParams[key]);
       }
     }
 
-    return true;
+    return search;
   }
 
   #checkTrailingSlash(cleanPath: string, route: CompiledRoute): boolean {

@@ -16,6 +16,7 @@ function makeState(
   return {
     name,
     params: params as State["params"],
+    search: {},
     path: "/",
     context: context,
     transition: {} as State["transition"],
@@ -64,8 +65,41 @@ function track<T extends { destroy: () => void }>(instance: T): T {
   return instance;
 }
 
+// `sessionStorage` here is a plain-object mock, not jsdom's Storage. On Node >= 26
+// Node ships Web Storage as unflagged globals and vitest keeps the pre-existing Node
+// global (only `Storage` comes from jsdom), so `vi.spyOn(Storage.prototype, …)` patches
+// a class nothing calls. Spying the live object fails on every Node too — Web Storage
+// is a Proxy whose named-property setter swallows the spy as a stored *item*. The mock
+// is spyable AND controllable (make `setItem`/`getItem` throw for the failure paths).
+// Why, in full: IMPLEMENTATION_NOTES.md § "Adapter scroll tests mock `sessionStorage`".
+function createMockStorage(): Storage {
+  const store = new Map<string, string>();
+
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+  };
+}
+
 describe("createScrollRestoration (Angular dom-utils copy)", () => {
   beforeEach(() => {
+    vi.stubGlobal("sessionStorage", createMockStorage());
     sessionStorage.clear();
     history.scrollRestoration = "auto";
     document.body.innerHTML = "";
@@ -608,7 +642,7 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
   // (catch at line 106-108). Verify subscriber path doesn't propagate.
   it("sessionStorage.setItem throws (quota) → silently ignored, no exception escapes", () => {
     const setItemSpy = vi
-      .spyOn(Storage.prototype, "setItem")
+      .spyOn(sessionStorage, "setItem")
       .mockImplementation(() => {
         throw new DOMException("Quota exceeded", "QuotaExceededError");
       });
@@ -639,7 +673,7 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
   // graceful fallback to empty store (catch at line 84-86).
   it("sessionStorage.getItem throws (SecurityError) → fallback to empty store", () => {
     const getItemSpy = vi
-      .spyOn(Storage.prototype, "getItem")
+      .spyOn(sessionStorage, "getItem")
       .mockImplementation(() => {
         throw new DOMException("Storage disabled", "SecurityError");
       });
@@ -1241,7 +1275,7 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
         makeState("home"),
       );
 
-      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+      const setItemSpy = vi.spyOn(sessionStorage, "setItem");
 
       // Second capture of home at the SAME 100 → cached value matches → putPos
       // returns early without re-serializing/writing.

@@ -12,6 +12,7 @@ import {
   schemaWithDefaults,
 } from "./test-utils";
 
+import type { StandardSchemaV1Issue } from "./test-utils";
 import type { Router } from "@real-router/core";
 
 let router: Router;
@@ -47,7 +48,7 @@ describe("Search schema plugin", () => {
 
       await router.start("/");
 
-      await router.navigate("search", { q: "test" });
+      await router.navigate("search", {}, { q: "test" });
 
       expect(consoleSpy).toHaveBeenCalledTimes(1);
 
@@ -56,7 +57,7 @@ describe("Search schema plugin", () => {
       unsubscribe();
 
       await router.navigate("home");
-      await router.navigate("search", { q: "test2" });
+      await router.navigate("search", {}, { q: "test2" });
 
       expect(consoleSpy).not.toHaveBeenCalled();
 
@@ -120,11 +121,17 @@ describe("Search schema plugin", () => {
 
       const pluginApi = getPluginApi(router);
 
-      pluginApi.addInterceptor("forwardState", (next, routeName, params) => {
-        const result = next(routeName, params);
+      pluginApi.addInterceptor(
+        "forwardState",
+        (next, routeName, params, search) => {
+          // Injects into the SEARCH channel and forwards the caller's `search`
+          // through — that is what `persistent-params` does since #1563, and a
+          // 2-arg passthrough would silently drop the caller's query bag.
+          const result = next(routeName, params, search);
 
-        return { ...result, params: { ...result.params, lang: "en" } };
-      });
+          return { ...result, search: { ...result.search, lang: "en" } };
+        },
+      );
 
       router.usePlugin(searchSchemaPlugin({ mode: "development" }));
       await router.start("/");
@@ -133,11 +140,11 @@ describe("Search schema plugin", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
       const state = router.getState();
 
-      expect(state?.params).toMatchObject({ q: "hello", lang: "en" });
+      expect(state?.search).toMatchObject({ q: "hello", lang: "en" });
 
       expect(consoleSpy).not.toHaveBeenCalled();
 
@@ -167,25 +174,31 @@ describe("Search schema plugin", () => {
       const pluginApi = getPluginApi(router);
 
       // Injector registered FIRST → search-schema (registered second) is outermost.
-      pluginApi.addInterceptor("forwardState", (next, routeName, params) => {
-        const result = next(routeName, params);
+      pluginApi.addInterceptor(
+        "forwardState",
+        (next, routeName, params, search) => {
+          // Injects into the SEARCH channel and forwards the caller's `search`
+          // through — that is what `persistent-params` does since #1563, and a
+          // 2-arg passthrough would silently drop the caller's query bag.
+          const result = next(routeName, params, search);
 
-        return {
-          ...result,
-          params: { ...result.params, page: "INVALID-INJECTED" },
-        };
-      });
+          return {
+            ...result,
+            search: { ...result.search, page: "INVALID-INJECTED" },
+          };
+        },
+      );
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
       // schema (outermost) validated the injected page (a string, not a number) → stripped.
-      expect(router.getState()?.params.page).toBeUndefined();
-      expect(router.getState()?.params.q).toBe("hello");
+      expect(router.getState()?.search.page).toBeUndefined();
+      expect(router.getState()?.search.q).toBe("hello");
     });
 
-    it("LEAKS an invalid value injected by a LATER interceptor (schema innermost — alternative)", async () => {
+    it("REFUSES an invalid value injected by a LATER interceptor (the leak is closed)", async () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -212,10 +225,20 @@ describe("Search schema plugin", () => {
       });
       await router.start("/");
 
-      await router.navigate("search", { q: "hello" });
+      // The injector (outermost) adds `page` AFTER the schema ran, so the value
+      // never faced validation. It used to reach `state.search` anyway: the
+      // `forwardState` seam moved a declared `?page` out of the params bag into
+      // the query channel, laundering an unvalidated value into the very channel
+      // the schema owns — a leak this suite documented rather than fixed.
+      //
+      // The seam refuses the mis-channelled bag now, so the composition hazard
+      // is structurally gone: an interceptor that wants to write the query
+      // channel has to write `search`, where the schema can see it.
+      await expect(
+        router.navigate("search", {}, { q: "hello" }),
+      ).rejects.toThrow(/"search" declares `page` as a query param/);
 
-      // injector (outermost) added page AFTER the schema ran → invalid value leaks into state.
-      expect(router.getState()?.params.page).toBe("INVALID-INJECTED");
+      expect(router.getState()?.name).toBe("home");
     });
   });
 
@@ -227,7 +250,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: schemaWithDefaults(),
           },
         ],
@@ -242,11 +265,15 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      const path = router.buildPath("search", {
-        q: "test",
-        page: 5,
-        sort: "desc",
-      });
+      const path = router.buildPath(
+        "search",
+        {},
+        {
+          q: "test",
+          page: 5,
+          sort: "desc",
+        },
+      );
 
       expect(path).toContain("q=test");
       expect(path).toContain("page=5");
@@ -255,6 +282,11 @@ describe("Search schema plugin", () => {
   });
 
   describe("URL → State direction", () => {
+    // RFC-4 M2 (#1548): under the params/search split the matched query arrives
+    // on `state.search`, validated through the forwardState(+search) contract
+    // (§2.3, B1.5) — matchPath threads `matchResult.search` through forwardState,
+    // marking the URL→State path, so this plugin's interceptor validates the
+    // query channel there (not just on the navigate→State path).
     it("should validate params from URL on router.start()", async () => {
       const consoleSpy = vi
         .spyOn(console, "error")
@@ -266,7 +298,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: searchSchema(),
           },
         ],
@@ -282,8 +314,11 @@ describe("Search schema plugin", () => {
       const state = router.getState();
 
       expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("hello");
-      expect(state?.params.page).toBe(1);
+      expect(state?.search.q).toBe("hello");
+      expect(state?.search.page).toBe(1);
+      // Anti-masking: the recovered query default must also surface in the URL,
+      // so the search and path channels agree (RFC-4 M2 / #1548).
+      expect(state?.path).toBe("/search?q=hello&page=1");
       expect(consoleSpy).toHaveBeenCalled();
 
       consoleSpy.mockRestore();
@@ -303,7 +338,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: schemaWithDefaults(),
           },
         ],
@@ -321,7 +356,8 @@ describe("Search schema plugin", () => {
       const state = router.getState();
 
       expect(state?.name).toBe("search");
-      expect(state?.params.page).toBe(1);
+      // The query-declared default lands in the search channel (#1549).
+      expect(state?.search.page).toBe(1);
     });
   });
 
@@ -333,7 +369,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: failingSchema([
               { message: "page is bad", path: ["page"] },
             ]),
@@ -354,12 +390,12 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      await router.navigate("search", { q: "hello", page: "bad" });
+      await router.navigate("search", {}, { q: "hello", page: "bad" });
 
       const state = router.getState();
 
-      expect(state?.params.q).toBe("hello");
-      expect(state?.params.page).toBe(1);
+      expect(state?.search.q).toBe("hello");
+      expect(state?.search.page).toBe(1);
 
       consoleSpy.mockRestore();
     });
@@ -373,7 +409,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page",
-            defaultParams: { page: 1 },
+            defaultSearch: { page: 1 },
             searchSchema: failingSchema([
               { message: "page invalid", path: ["page"] },
             ]),
@@ -388,7 +424,7 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      const path = router.buildPath("search", { q: "hello", page: "bad" });
+      const path = router.buildPath("search", {}, { q: "hello", page: "bad" });
 
       expect(path).toContain("q=hello");
       expect(path).toContain("page=bad");
@@ -407,7 +443,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q",
-            defaultParams: { q: "default" },
+            defaultSearch: { q: "default" },
             searchSchema: failingSchema([]),
           },
         ],
@@ -417,11 +453,11 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "development" }));
       await router.start("/");
 
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
       const state = router.getState();
 
-      expect(state?.params.q).toBe("hello");
+      expect(state?.search.q).toBe("hello");
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('[search-schema-plugin] Route "search"'),
         expect.anything(),
@@ -432,13 +468,13 @@ describe("Search schema plugin", () => {
   });
 
   // Documented contract boundary for #802. The plugin gates invalid user INPUT
-  // (see the stripping tests above); `defaultParams` are trusted config injected
+  // (see the stripping tests above); `defaultSearch` is trusted config injected
   // by core BELOW the interceptor seam the plugin hooks, so an invalid default
   // reaches state and the URL at runtime. These tests PIN that documented
   // limitation deliberately — a tripwire: if core ever starts stripping invalid
   // defaults (e.g. a single-merge-point refactor), they fail and flag that the
   // README / wiki / CLAUDE contract must be revisited.
-  describe("Documented limitation: invalid defaultParams reach state (#802)", () => {
+  describe("Documented limitation: invalid defaultSearch reaches state (#802)", () => {
     /** `page` must be a positive number when present; no defaults, no coercion. */
     function positivePageSchema() {
       return createMockSchema({
@@ -474,19 +510,19 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      await router.navigate("clean", { page: -3 });
+      await router.navigate("clean", {}, { page: -3 });
 
       expect(router.getState()?.params).toStrictEqual({});
     });
 
-    it("limitation: an invalid defaultParams value reaches state.params AND state.path (mode: production)", async () => {
+    it("limitation: an invalid defaultSearch value reaches state.search AND state.path (mode: production)", async () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
           {
             name: "bad",
             path: "/bad?page",
-            defaultParams: { page: -5 },
+            defaultSearch: { page: -5 },
             searchSchema: positivePageSchema(),
           },
         ],
@@ -495,13 +531,77 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      // No input supplied by the caller — the invalid default is injected by core.
+      // No input supplied by the caller — the invalid default is injected by
+      // core. Since #1549 the query-declared default lands in state.search
+      // (previously state.params); it still bypasses schema validation.
       await router.navigate("bad");
 
       const state = router.getState();
 
-      expect(state?.params).toStrictEqual({ page: -5 });
+      expect(state?.search).toStrictEqual({ page: -5 });
+      expect(state?.params).toStrictEqual({});
       expect(state?.path).toBe("/bad?page=-5");
+    });
+  });
+
+  // The regression the whole `defaultSearch` work chased. On the URL→State path
+  // (`start(url)` / matchPath) invalid query is stripped and RECOVERED from
+  // `defaultSearch` — and the committed `state.path` MUST show the RECOVERED
+  // value, not the raw invalid one. The bug: `state.search` was recovered while
+  // `state.path` was rebuilt from the RAW matched query → the two channels
+  // diverged. Recovery unit tests asserting ONLY `state.search` could not see
+  // it; the e2e (which asserts the URL) did. This locks BOTH channels together
+  // on the recovery path — an anti-remask tripwire. (Reverting the matchPath
+  // rebuild to feed the raw query fails this on `state.path`, not `state.search`.)
+  describe("URL→State recovery keeps state.path in step with recovered state.search (#1548)", () => {
+    function guardSchema() {
+      return createMockSchema({
+        validate: (value) => {
+          const p = value as Record<string, unknown>;
+          const issues: StandardSchemaV1Issue[] = [];
+
+          if ("page" in p && !(typeof p.page === "number" && p.page > 0)) {
+            issues.push({ message: "page must be positive", path: ["page"] });
+          }
+
+          if ("sort" in p && p.sort !== "name" && p.sort !== "date") {
+            issues.push({ message: "sort invalid", path: ["sort"] });
+          }
+
+          return issues.length > 0 ? { issues } : { value: p };
+        },
+      });
+    }
+
+    it("start(url) with invalid query: state.search AND state.path show the recovered defaults", async () => {
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "products",
+            path: "/products?page&sort",
+            defaultSearch: { page: 1, sort: "name" },
+            searchSchema: guardSchema(),
+          },
+        ],
+        { defaultRoute: "home", queryParams: { numberFormat: "auto" } },
+      );
+      router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+
+      // URL→State: both query values are invalid → stripped → recovered from
+      // defaultSearch. `page=-1` parses to the number -1 (numberFormat auto),
+      // failing `> 0`; `sort=invalid` is not in the allowed set.
+      await router.start("/products?page=-1&sort=invalid");
+
+      const state = router.getState();
+
+      expect(state?.name).toBe("products");
+      // Recovered query channel.
+      expect(state?.search).toStrictEqual({ page: 1, sort: "name" });
+      expect(state?.params).toStrictEqual({});
+      // ANTI-REMASK: the committed URL shows the RECOVERED values, never the raw
+      // `page=-1&sort=invalid` — the assertion the masked recovery tests lacked.
+      expect(state?.path).toBe("/products?page=1&sort=name");
     });
   });
 });

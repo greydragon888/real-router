@@ -275,7 +275,7 @@ describe("RouterProvider — scrollSpy", () => {
     vi.runAllTimers();
 
     expect(navigateSpy).toHaveBeenCalledTimes(1);
-    expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({
+    expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({
       hash: "section-1",
       replace: true,
       force: true,
@@ -294,7 +294,7 @@ describe("RouterProvider — scrollSpy", () => {
       ?.trigger([buildEntry(s1, 200), buildEntry(s2, 50), buildEntry(s3, 400)]);
     vi.runAllTimers();
 
-    expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({ hash: "section-2" });
+    expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({ hash: "section-2" });
   });
 
   it("picks anchor closest to rootBounds.top (rootMargin-aware, centered zone)", () => {
@@ -316,7 +316,7 @@ describe("RouterProvider — scrollSpy", () => {
     vi.runAllTimers();
 
     expect(navigateSpy).toHaveBeenCalledTimes(1);
-    expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({ hash: "section-2" });
+    expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({ hash: "section-2" });
   });
 
   it("prefers smallest non-negative distance to zoneTop over least-negative", () => {
@@ -336,7 +336,7 @@ describe("RouterProvider — scrollSpy", () => {
       ]);
     vi.runAllTimers();
 
-    expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({ hash: "section-2" });
+    expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({ hash: "section-2" });
   });
 
   it("falls back to last-above-zone when no entry has top >= 0", () => {
@@ -348,7 +348,7 @@ describe("RouterProvider — scrollSpy", () => {
     ioInstances.at(-1)?.trigger([buildEntry(s1, -300), buildEntry(s2, -100)]);
     vi.runAllTimers();
 
-    expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({ hash: "section-2" });
+    expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({ hash: "section-2" });
   });
 
   it("keeps the least-negative anchor when a more-negative one follows", () => {
@@ -362,7 +362,7 @@ describe("RouterProvider — scrollSpy", () => {
     ioInstances.at(-1)?.trigger([buildEntry(s1, -100), buildEntry(s2, -300)]);
     vi.runAllTimers();
 
-    expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({ hash: "section-1" });
+    expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({ hash: "section-1" });
   });
 
   it("skips emit when no entries are intersecting", () => {
@@ -380,11 +380,11 @@ describe("RouterProvider — scrollSpy", () => {
   it("skips emit when the resolved hash equals the current hash", async () => {
     // No `act` wrapper: navigate resolves on microtasks, and there is no vue
     // reactivity to flush before the spy reads state.context.url.hash.
-    await router.navigate(
-      "test",
-      {},
-      { hash: "section-1", force: true, hashChange: true },
-    );
+    await router.navigate("test", {}, undefined, {
+      hash: "section-1",
+      force: true,
+      hashChange: true,
+    });
 
     const [s1] = setupAnchors(["section-1"]);
     const navigateSpy = vi.spyOn(router, "navigate");
@@ -450,11 +450,11 @@ describe("RouterProvider — scrollSpy", () => {
 
     // A user-driven Link click updates the hash — the spy's subscribe callback
     // must set coolingDown so the ensuing scroll IO events don't fight it.
-    await router.navigate(
-      "test",
-      {},
-      { hash: "section-2", force: true, hashChange: true },
-    );
+    await router.navigate("test", {}, undefined, {
+      hash: "section-2",
+      force: true,
+      hashChange: true,
+    });
 
     const navigateSpy = vi.spyOn(router, "navigate");
 
@@ -469,11 +469,11 @@ describe("RouterProvider — scrollSpy", () => {
 
     mountSpy({ scrollSpy: { selector: "[id]" } });
 
-    await router.navigate(
-      "test",
-      {},
-      { hash: "section-2", force: true, hashChange: true },
-    );
+    await router.navigate("test", {}, undefined, {
+      hash: "section-2",
+      force: true,
+      hashChange: true,
+    });
 
     const navigateSpy = vi.spyOn(router, "navigate");
 
@@ -482,7 +482,7 @@ describe("RouterProvider — scrollSpy", () => {
     vi.runAllTimers();
 
     expect(navigateSpy).toHaveBeenCalledTimes(1);
-    expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({ hash: "section-1" });
+    expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({ hash: "section-1" });
   });
 
   it("spy's own emit does NOT set cooldown (selfEmitting guard)", async () => {
@@ -507,8 +507,8 @@ describe("RouterProvider — scrollSpy", () => {
     // Both emits land — a broken selfEmitting guard would cooldown-suppress the
     // second.
     expect(navigateSpy).toHaveBeenCalledTimes(2);
-    expect(navigateSpy.mock.calls[0]?.[2]).toMatchObject({ hash: "section-1" });
-    expect(navigateSpy.mock.calls[1]?.[2]).toMatchObject({ hash: "section-2" });
+    expect(navigateSpy.mock.calls[0]?.[3]).toMatchObject({ hash: "section-1" });
+    expect(navigateSpy.mock.calls[1]?.[3]).toMatchObject({ hash: "section-2" });
   });
 
   // ── debounce coalescing ───────────────────────────────────────────────────

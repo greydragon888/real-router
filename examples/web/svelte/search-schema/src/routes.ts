@@ -13,7 +13,7 @@ export const routes: Route[] = [
   {
     name: "products",
     path: "/products?q&page&sort",
-    defaultParams: { page: 1, sort: "name" },
+    defaultSearch: { page: 1, sort: "name" },
     searchSchema: productsSearchSchema,
   },
 ];

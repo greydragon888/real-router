@@ -8,9 +8,14 @@ import {
 import { completeTransition } from "./transition/completeTransition";
 import { routeTransitionError } from "./transition/errorHandling";
 import { executeGuardPipeline } from "./transition/guardPhase";
-import { EMPTY_PARAMS, errorCodes, constants } from "../../constants";
+import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
+import {
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+  errorCodes,
+  constants,
+} from "../../constants";
 import { RouterError } from "../../RouterError";
-import { getStateMetaParams, setStateMetaParams } from "../../stateMetaStore";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
 import type { NavigationContext, NavigationDependencies } from "./types";
@@ -19,6 +24,7 @@ import type {
   GuardFn,
   NavigationOptions,
   Params,
+  SearchParams,
   State,
   TransitionMeta,
 } from "../../types";
@@ -82,6 +88,7 @@ export class NavigationNamespace {
   navigate(
     name: string,
     params: Params,
+    search: SearchParams | undefined,
     opts: NavigationOptions,
   ): Promise<State> {
     this.lastSyncResolved = false;
@@ -99,7 +106,7 @@ export class NavigationNamespace {
     let toState: State | undefined;
 
     try {
-      toState = deps.buildNavigateState(name, params);
+      toState = deps.buildNavigateState(name, params, search);
     } catch (error) {
       /* v8 ignore next 3 -- @preserve: reachable only via validator-driven
          throws from buildNavigateState (validateStateBuilderArgs) — covered
@@ -170,6 +177,42 @@ export class NavigationNamespace {
       return Promise.reject(err);
     }
 
+    // Channel guard, position P3 (#1572). `navigateToState` is the ONE producer
+    // that takes a ready-made `State` instead of a `params` argument, so the
+    // predicate reads `state.params ∩ queryNames(state.name)`. What it commits
+    // becomes `getState()`, so a pre-M2 layout would be silent corruption: the
+    // key sits in `state.params` and never reaches `state.path`.
+    //
+    // Costs nothing on healthy flows — a state produced by core (`matchPath`,
+    // `makeState`) is channel-correct by construction, so the predicate is
+    // empty on every popstate / memory-restore / SSR-hydration commit. `start()`
+    // commits THROUGH here (`RouterLifecycleNamespace`), which is why the guard
+    // lives in the namespace rather than on the plugin-API door.
+    //
+    // Rejects rather than throwing, mirroring the ROUTE_NOT_FOUND guard above:
+    // this method returns `Promise<State>` and its URL-plugin callers invoke it
+    // from popstate handlers, where a new synchronous throw would be a change
+    // of failure shape rather than a new failure.
+    const misChanneled = findMisChanneledKey(
+      state.params,
+      deps.getQueryParams(state.name),
+    );
+
+    if (misChanneled !== undefined) {
+      const err = new RouterError(errorCodes.WRONG_CHANNEL, {
+        routeName: state.name,
+        message: `[router.navigateToState] ${misChanneledKeyMessage(
+          state.name,
+          misChanneled,
+          "`state.params`",
+        )}`,
+      });
+
+      deps.emitTransitionError(undefined, deps.getState(), err);
+
+      return Promise.reject(err);
+    }
+
     // States from `matchPath` are deeply frozen (`freezeStateInPlace`).
     // `completeTransition` mutates `toState.transition` and `context` is
     // intentionally extensible for plugin claim writes, so we hand the
@@ -179,22 +222,20 @@ export class NavigationNamespace {
     const writableState = {
       name: state.name,
       params: state.params,
+      // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
+      // without this, start()'s navigateToState(matchPath(...)) would drop the
+      // matched query from the committed state.
+      search: state.search,
       path: state.path,
       context: { ...state.context },
     } as State;
 
-    // Carry the route-meta binding (#1170). `matchPath` / `makeState` attach it
-    // to the frozen source `state` via a WeakMap keyed by object reference, so
-    // the fresh writable shell would otherwise be meta-less. Without it, two
-    // consecutive popstate navigations make both `toState` AND `fromState`
-    // meta-less, dropping `getTransitionPath` to FAST PATH 3 (full chains):
-    // ancestor guards re-run and browser-back can block where `navigate()`
-    // succeeds.
-    const meta = getStateMetaParams(state);
-
-    if (meta !== undefined) {
-      setStateMetaParams(writableState, meta);
-    }
+    // No route-meta to carry any more (RFC-4 M2 / #1548): ownership is read from
+    // the live matcher by `state.name` (`getTransitionPath`'s `getMeta`), not
+    // from a per-State WeakMap. The former #1170 carry — which existed only so a
+    // matchPath-derived writable shell stayed non-meta-less across consecutive
+    // popstate navs — is obsolete: any state whose name is in the tree takes the
+    // STANDARD PATH regardless of object identity.
 
     return this.#executeNavigation(writableState, opts);
   }
@@ -220,9 +261,10 @@ export class NavigationNamespace {
 
     let route: string;
     let params: Params;
+    let search: SearchParams;
 
     try {
-      ({ route, params } = deps.resolveDefault());
+      ({ route, params, search } = deps.resolveDefault());
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided resolveDefault callback
       return Promise.reject(error);
@@ -236,7 +278,13 @@ export class NavigationNamespace {
       );
     }
 
-    return this.navigate(route, params, opts);
+    // Both channels, never one bag (RFC-4 M2 / #1548). The query slot took
+    // `undefined` until `defaultSearch` existed as a router option, so a
+    // query-declared name in `defaultParams` reached the URL only via the
+    // `forwardState` seam's channel re-separation — the repair the pipeline
+    // design removes. Passing the query here makes the default route's query
+    // defaults independent of that stage.
+    return this.navigate(route, params, search, opts);
   }
 
   navigateToNotFound(path: string): State {
@@ -285,6 +333,7 @@ export class NavigationNamespace {
     const state: State = {
       name: constants.UNKNOWN_ROUTE,
       params: EMPTY_PARAMS,
+      search: EMPTY_SEARCH,
       path,
       transition: transitionMeta,
       context: {},
@@ -366,7 +415,9 @@ export class NavigationNamespace {
         deps.getLifecycleFunctions();
       const isUnknownRoute = toState.name === constants.UNKNOWN_ROUTE;
 
-      const transitionPath = getTransitionPath(toState, fromState);
+      const transitionPath = getTransitionPath(toState, fromState, (name) =>
+        deps.getMetaForState(name),
+      );
       const { toDeactivate, toActivate, intersection } = transitionPath;
 
       const shouldDeactivate =

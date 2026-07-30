@@ -83,9 +83,9 @@ describe("core/getNavigator", () => {
 
     expect(navigator.isActiveRoute("users.view", { id: "123" })).toBe(true);
     expect(navigator.isActiveRoute("home")).toBe(false);
-    expect(navigator.isActiveRoute("users.view", { id: "456" }, true)).toBe(
-      false,
-    );
+    expect(
+      navigator.isActiveRoute("users.view", { id: "456" }, undefined, true),
+    ).toBe(false);
   });
 
   it("subscribe works", async () => {

@@ -3,7 +3,7 @@ import { createActiveSource } from "@real-router/sources";
 import { useRefFromSource } from "../useRefFromSource";
 import { useRouter } from "./useRouter";
 
-import type { Params } from "@real-router/core";
+import type { Params, SearchParams } from "@real-router/core";
 import type { ShallowRef } from "vue";
 
 /**
@@ -48,6 +48,7 @@ export interface UseIsActiveRouteOptions {
 export function useIsActiveRoute(
   routeName: string,
   params?: Params,
+  search?: SearchParams,
   options?: UseIsActiveRouteOptions,
 ): ShallowRef<boolean> {
   const router = useRouter();
@@ -57,6 +58,7 @@ export function useIsActiveRoute(
       router,
       routeName,
       params,
+      search,
       options?.strict ?? false,
       options?.ignoreQueryParams ?? true,
       options?.hash,

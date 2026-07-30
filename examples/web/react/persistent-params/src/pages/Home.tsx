@@ -4,8 +4,8 @@ import type { JSX } from "react";
 
 export function Home(): JSX.Element {
   const { route } = useRoute();
-  const lang = (route.params.lang as string | undefined) ?? "en";
-  const theme = (route.params.theme as string | undefined) ?? "light";
+  const lang = (route.search.lang as string | undefined) ?? "en";
+  const theme = (route.search.theme as string | undefined) ?? "light";
 
   return (
     <div>

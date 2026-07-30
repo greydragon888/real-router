@@ -6,7 +6,15 @@
  * within this single file to resolve circular dependencies.
  */
 
-import type { State, Params, RouterError, Unsubscribe } from "./base";
+import type {
+  State,
+  Params,
+  NavigationTarget,
+  ParamsSearch,
+  SearchParams,
+  RouterError,
+  Unsubscribe,
+} from "./base";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
 // type-only cycle with the barrel is deliberate — see the note in ./index.
 import type { NavigationOptions } from "./index";
@@ -78,26 +86,66 @@ export type DefaultParamsCallback<Dependencies = object> = (
 ) => Params;
 
 /**
+ * Callback function for dynamically resolving the default query params.
+ * Receives a dependency getter function to access router dependencies.
+ */
+export type DefaultSearchCallback<Dependencies = object> = (
+  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
+) => SearchParams;
+
+/**
  * Router configuration options.
  *
  * Note: For input, use `Partial<Options>` as all fields have defaults.
  * After initialization, `getOptions()` returns resolved `Options` with all fields populated.
+ *
+ * Generic over the router's dependency map so the three resolver callbacks
+ * (`defaultRoute` / `defaultParams` / `defaultSearch`) receive a TYPED
+ * `getDependency`. Code that cannot know that map — anything plugin-facing,
+ * and every consumer that reads configuration rather than resolving it —
+ * takes {@link AnyOptions} instead of infecting itself with the parameter.
  */
-export interface Options {
+export interface Options<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
   /**
    * Default route to navigate to on start.
    * Empty string means no default route.
    *
    * @default ""
    */
-  defaultRoute: string | DefaultRouteCallback;
+  defaultRoute: string | DefaultRouteCallback<Dependencies>;
 
   /**
-   * Default parameters for the default route.
+   * Default **path** parameters for the default route.
+   *
+   * Query defaults belong in {@link defaultSearch} — the two are separate
+   * channels (RFC-4 M2 / #1548), exactly as on a route's own config. Until that
+   * twin existed, a query-declared name written here reached the URL only
+   * because the `forwardState` seam still re-channelled the bag on its way
+   * through; that repair is scheduled for removal, so this slot is for path
+   * params and arbitrary app-level data, nothing else.
    *
    * @default {}
    */
-  defaultParams: Params | DefaultParamsCallback;
+  defaultParams: Params | DefaultParamsCallback<Dependencies>;
+
+  /**
+   * Default **query** parameters for the default route (RFC-4 M2 / #1548) —
+   * the query-channel twin of {@link defaultParams}, and the router-level
+   * counterpart of a route's own `defaultSearch`.
+   *
+   * Passed to `navigateToDefault()` in the query slot, so it is merged into
+   * `state.search` and, subject to `queryParamsMode`, printed into the URL
+   * query string. Like `defaultRoute` / `defaultParams`, it may be a callback,
+   * re-evaluated on every `navigateToDefault()` — the default route can itself
+   * be chosen dynamically, so its query defaults have to be able to follow.
+   * `Options` is generic over the dependency map, so the callback's
+   * `getDependency` is typed against the router's OWN dependencies.
+   *
+   * @default {}
+   */
+  defaultSearch: SearchParams | DefaultSearchCallback<Dependencies>;
 
   /**
    * How to handle trailing slashes in URLs.
@@ -190,6 +238,22 @@ export interface Options {
   limits?: Partial<LimitsConfig>;
 }
 
+/**
+ * `Options` as seen by code that cannot know the router's dependency map —
+ * `PluginApi.getOptions()`, the matcher, the URL builders.
+ *
+ * `Options<never>` rather than `Options<object>`, and the difference is the
+ * whole point: `keyof never` is `PropertyKey`, so the erased `getDependency`
+ * accepts ANY key and returns `never` — a wider parameter and a narrower
+ * return, which is exactly what contravariance needs for `Options<D>` to flow
+ * in for every `D`. `Options<object>` erases `keyof` to `never` instead and
+ * therefore accepts NOTHING but itself (verified: the assignment fails).
+ *
+ * Every field stays visible; only the callbacks become uncallable, which is
+ * honest — a plugin has no dependency map to resolve them against.
+ */
+export type AnyOptions = Options<never>;
+
 export type GuardFn = (
   toState: State,
   fromState: State | undefined,
@@ -253,19 +317,30 @@ export interface Subscription {
  * For full router access, use the Router interface directly or the useRouter() hook.
  */
 export interface Navigator {
-  navigate: (
-    routeName: string,
-    routeParams?: Params,
-    options?: NavigationOptions,
-  ) => Promise<State>;
+  // Two forms (RFC-4 M2 / #1548): descriptor `navigate(target, opts)` and
+  // positional `navigate(name, params, search, opts)`.
+  navigate: {
+    (target: NavigationTarget, options?: NavigationOptions): Promise<State>;
+    (
+      routeName: string,
+      routeParams?: Params,
+      routeSearch?: SearchParams,
+      options?: NavigationOptions,
+    ): Promise<State>;
+  };
   getState: () => State | undefined;
   isActiveRoute: (
     name: string,
     params?: Params,
+    search?: SearchParams,
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ) => boolean;
-  canNavigateTo: (name: string, params?: Params) => boolean;
+  canNavigateTo: (
+    name: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => boolean;
   subscribe: (listener: SubscribeFn) => Unsubscribe;
   subscribeLeave: (listener: LeaveFn) => Unsubscribe;
   isLeaveApproved: () => boolean;
@@ -286,11 +361,12 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
   isActiveRoute: (
     name: string,
     params?: Params,
+    search?: SearchParams,
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ) => boolean;
 
-  buildPath: (route: string, params?: Params) => string;
+  buildPath: (route: string, params?: Params, search?: SearchParams) => string;
 
   getState: <P extends Params = Params>() => State<P> | undefined;
 
@@ -314,7 +390,11 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
 
   dispose: () => void;
 
-  canNavigateTo: (name: string, params?: Params) => boolean;
+  canNavigateTo: (
+    name: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => boolean;
 
   usePlugin: (
     ...plugins: (PluginFactory<D> | false | null | undefined)[]
@@ -326,11 +406,17 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
 
   isLeaveApproved: () => boolean;
 
-  navigate: (
-    routeName: string,
-    routeParams?: Params,
-    options?: NavigationOptions,
-  ) => Promise<State>;
+  // Two forms (RFC-4 M2 / #1548): descriptor `navigate(target, opts)` and
+  // positional `navigate(name, params, search, opts)`.
+  navigate: {
+    (target: NavigationTarget, options?: NavigationOptions): Promise<State>;
+    (
+      routeName: string,
+      routeParams?: Params,
+      routeSearch?: SearchParams,
+      options?: NavigationOptions,
+    ): Promise<State>;
+  };
 
   navigateToDefault: (options?: NavigationOptions) => Promise<State>;
 
@@ -394,17 +480,49 @@ export interface Route<
   forwardTo?: string | ForwardToCallback<Dependencies>;
   /** Nested child routes. */
   children?: Route<Dependencies>[];
-  /** Encodes state params to URL params. */
-  encodeParams?: (stateParams: Params) => Params;
-  /** Decodes URL params to state params. */
-  decodeParams?: (pathParams: Params) => Params;
   /**
-   * Default parameters for this route.
+   * Encodes the state channels to URL channels before path building (RFC-4 M2 /
+   * #1548). Receives `{ params, search }` and returns `{ params, search }` —
+   * transform whichever channel you own and pass the other through. The path
+   * slots are built from the returned `params`, the query string from the
+   * returned `search`.
+   */
+  encodeParams?: (channels: ParamsSearch) => ParamsSearch;
+  /**
+   * Decodes the matched URL channels to state channels (RFC-4 M2 / #1548).
+   * Receives `{ params, search }` (path params + parsed query) and returns
+   * `{ params, search }`. Runs inside `matchPath`, **before** any search-schema
+   * plugin validation — the v1 transformation order (engine codec → plugin).
+   */
+  decodeParams?: (channels: ParamsSearch) => ParamsSearch;
+  /**
+   * Default **path** parameters for this route (and arbitrary app-level
+   * defaults). Merged into `state.params`; missing path params are filled from
+   * here. Query defaults belong in {@link defaultSearch} (RFC-4 M2 / #1548).
    *
-   * These values are merged into state.params when creating route states.
-   * Missing URL params are filled from defaultParams.
+   * ⚠ **The slot IS the channel** — `ba0f6b18b` retired the routing #1549
+   * introduced, and this doc described it for one release. A name the route
+   * declares with `?` written here is NOT re-routed to the query string: it is
+   * REFUSED at registration, so `createRouter` / `add` / `replace` / `update` /
+   * `setRootPath` throw, naming the key and telling you to move it to
+   * {@link defaultSearch}. Without that check the router would build a state out
+   * of config it had just accepted and its own always-on channel guard would
+   * reject it on `start()`.
+   *
+   * A key the route declares NOWHERE is legitimate here and stays in
+   * `state.params` as app-level data — it never reaches the URL, which
+   * `@real-router/validation-plugin` reports once per route+key (#1579).
    */
   defaultParams?: Params;
+  /**
+   * Default **query** (search) parameters for this route (RFC-4 M2 / #1548) —
+   * the query-channel twin of {@link defaultParams}. Merged into `state.search`
+   * and, subject to `queryParamsMode`, printed into the URL query string. A key
+   * the route does not declare as a query param (`?name`) follows the same
+   * `queryParamsMode` rules as a runtime `search` value (loose prints,
+   * default/strict drops).
+   */
+  defaultSearch?: SearchParams;
 }
 
 /**
@@ -439,10 +557,12 @@ export interface RouteConfigUpdate<
   forwardTo?: string | ForwardToCallback<Dependencies> | null;
   /** Set to null to remove defaultParams */
   defaultParams?: Params | null;
+  /** Set to null to remove defaultSearch (RFC-4 M2 / #1548) */
+  defaultSearch?: SearchParams | null;
   /** Set to null to remove decoder */
-  decodeParams?: ((params: Params) => Params) | null;
+  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null;
   /** Set to null to remove encoder */
-  encodeParams?: ((params: Params) => Params) | null;
+  encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null;
   /** Set to null to remove canActivate */
   canActivate?: GuardFnFactory<Dependencies> | null;
   /** Set to null to remove canDeactivate */

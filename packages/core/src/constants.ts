@@ -39,6 +39,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   CONTEXT_NAMESPACE_ALREADY_CLAIMED: "CONTEXT_NAMESPACE_ALREADY_CLAIMED", // Plugin tried to claim a context namespace already owned by another plugin
   REENTRANT_NAVIGATION: "REENTRANT_NAVIGATION", // navigate() called synchronously from inside a transition-event listener (banned — use await/async listener)
   REENTRANT_TREE_MUTATION: "REENTRANT_TREE_MUTATION", // route-CRUD called synchronously from inside a subscribeChanges handler (banned — use await/async/queueMicrotask)
+  WRONG_CHANNEL: "WRONG_CHANNEL", // a declared query key was supplied in the path channel (`params`) instead of `search` (#1572)
 });
 
 /**
@@ -88,6 +89,14 @@ export const DEFAULT_LIMITS = {
 } as const;
 
 export const EMPTY_PARAMS: Readonly<Record<string, never>> = Object.freeze({});
+
+/**
+ * Shared frozen empty query bag reused for `State.search` when a navigation
+ * carries no query params — the search-channel twin of {@link EMPTY_PARAMS}
+ * (RFC-4 M2 / #1548). Lets `makeState` reuse one frozen `{}` (zero transient
+ * allocation, #1027) instead of minting an object per query-less state.
+ */
+export const EMPTY_SEARCH: Readonly<Record<string, never>> = Object.freeze({});
 
 const FROZEN_EMPTY_SEGMENTS = Object.freeze({
   deactivated: Object.freeze([]) as unknown as string[],

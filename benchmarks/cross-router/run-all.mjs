@@ -36,10 +36,11 @@ const fwArg = process.argv[3];
 const frameworks = fwArg ? [fwArg] : Object.keys(COHORT_ENGINES);
 const multiCohort = frameworks.length > 1;
 
-// Cohort separator banner. CI runs the whole matrix in ONE process (run-all.mjs "$RUNS"),
-// so run-all prints its own cohort banners + timings; bench-cross-router.sh does this
-// locally instead, driving cohorts one-per-invocation — so run-all only banners when a
-// single invocation actually spans multiple cohorts, else the wrapper's banner would double.
+// Cohort separator banner. Both CI (per-cohort processes, see cross-router-bench.yml) and
+// bench-cross-router.sh locally drive cohorts one-per-invocation; a whole-matrix single
+// process (run-all.mjs "$RUNS" with no framework arg) is still supported and self-banners —
+// so run-all only banners when a single invocation actually spans multiple cohorts, else the
+// per-cohort caller's own banner would double.
 function banner(text) {
   const bar = "═".repeat(50);
   console.error(`\n╔${bar}╗\n║ ${text.padEnd(48)} ║\n╚${bar}╝`);

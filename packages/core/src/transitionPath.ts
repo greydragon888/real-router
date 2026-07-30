@@ -1,8 +1,17 @@
 // packages/core/src/transitionPath.ts
 
-import { getStateMetaParams } from "./stateMetaStore";
-
 import type { State } from "./types";
+
+/**
+ * Per-segment param-source map for a route name — `{ segment: { param: "url" |
+ * "query" } }`. Resolved from the live matcher via `RoutesNamespace.getMetaForState`
+ * (RFC-4 M2 / #1548: this replaced the removed `stateMetaStore` WeakMap — ownership
+ * is now read by `state.name`, not carried per-State object). `undefined` when the
+ * name is not in the tree (a CRUD-removed route → FAST PATH 3 fallback).
+ */
+export type RouteMetaLookup = (
+  name: string,
+) => Record<string, Record<string, "url" | "query">> | undefined;
 
 /**
  * Parameters extracted from a route segment.
@@ -326,7 +335,8 @@ let cached2Result: TransitionPath | null = null;
 
 function computeTransitionPath(
   toState: State,
-  fromState?: State,
+  fromState: State | undefined,
+  getMeta: RouteMetaLookup,
 ): TransitionPath {
   // ===== FAST PATH 1: Initial navigation (no fromState) =====
   // This is the best performing case in benchmarks (5M ops/sec)
@@ -338,27 +348,23 @@ function computeTransitionPath(
     };
   }
 
-  // ===== FAST PATH 3: Missing meta requires full reload =====
-  // Single WeakMap lookup per state, reused in pointOfDifference/segmentParamsEqual
-  const toMetaParams = getStateMetaParams(toState);
-  const fromMetaParams = getStateMetaParams(fromState);
+  // ===== FAST PATH 3: Route name not in tree → full reload =====
+  // Ownership is read from the live matcher by `state.name` (RFC-4 M2 / #1548 —
+  // the per-State `stateMetaStore` WeakMap was removed). `getMeta` returns
+  // `undefined` only when the name is not in the tree — a CRUD-removed route.
+  const toMetaParams = getMeta(toState.name);
+  const fromMetaParams = getMeta(fromState.name);
 
   if (!toMetaParams && !fromMetaParams) {
-    // FAST PATH 3 (both states meta-less). Consumers that land here read the
-    // result order-INSENSITIVELY, so the from-chain is returned as-is
-    // (root→leaf, no reverse needed):
-    //   • `shouldUpdateNode` reads `toDeactivate` by MEMBERSHIP (`.includes`).
-    //   • Externally-supplied meta-less states (e.g. a plugin passing a raw
-    //     `{name, params, path}` to `navigateToState`) land here. Since #1170,
-    //     `navigateToState` carries the source's WeakMap meta across its writable
-    //     shell, so start()/popstate states are NOT meta-less. A `replace()`
-    //     survivor stays meta-less but is benign: the next transition's `toState`
-    //     always carries meta (buildNavigateState), so this both-meta-less path
-    //     is not reached from it.
-    // (`canNavigateTo` no longer reaches this path — since #970 it builds its
-    // toState WITH meta, mirroring buildNavigateState.)
-    // The navigate pipeline always carries meta (buildNavigateState) → STANDARD
-    // PATH below, which trims the shared ancestor and reverses correctly.
+    // FAST PATH 3 (both names gone from the tree — e.g. `replace()`d away, or a
+    // survivor state whose route was removed). Consumers read the result
+    // order-INSENSITIVELY, so the from-chain is returned as-is (root→leaf, no
+    // reverse needed): `shouldUpdateNode` reads `toDeactivate` by MEMBERSHIP
+    // (`.includes`). Any state whose name IS still in the tree — every navigate
+    // pipeline state, popstate/start, and `canNavigateTo`'s built toState — takes
+    // the STANDARD PATH below, which trims the shared ancestor and reverses
+    // correctly. (Pre-#1548 this branch keyed on a missing per-State WeakMap
+    // entry; it now keys on tree membership by name.)
     return {
       intersection: EMPTY_INTERSECTION,
       toActivate: nameToIDs(toState.name),
@@ -413,8 +419,13 @@ function computeTransitionPath(
 
 export function getTransitionPath(
   toState: State,
-  fromState?: State,
+  fromState: State | undefined,
+  getMeta: RouteMetaLookup,
 ): TransitionPath {
+  // Cache keys on (toState, fromState) identity only — `getMeta` is deterministic
+  // per route name and per-router (states are unique per router), so the same
+  // state pair always resolves the same meta, and the cache stays correct
+  // without keying on the callback (RFC-4 M2 / #1548).
   // Stryker disable BlockStatement: equivalent — both cache short-circuits below; emptying either early-return recomputes the identical TransitionPath (computeTransitionPath is deterministic for the same to/from states) and re-caches it. Restored right after.
   if (
     cached1Result !== null &&
@@ -433,7 +444,7 @@ export function getTransitionPath(
   }
   // Stryker restore BlockStatement
 
-  const result = computeTransitionPath(toState, fromState);
+  const result = computeTransitionPath(toState, fromState, getMeta);
 
   cached2To = cached1To;
   cached2From = cached1From;

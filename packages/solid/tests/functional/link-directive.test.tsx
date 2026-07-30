@@ -627,10 +627,16 @@ describe("link directive", () => {
       // subscribed cached source — NO new router.subscribe. If the directive feeds
       // the EMPTY_PARAMS ({}) default instead, it keys "{}" ≠ "" → a SECOND cached
       // source + a second router.subscribe (the #1438 regression).
-      const sibling = createActiveRouteSource(router, "home", undefined, {
-        strict: false,
-        ignoreQueryParams: true,
-      });
+      const sibling = createActiveRouteSource(
+        router,
+        "home",
+        undefined,
+        undefined,
+        {
+          strict: false,
+          ignoreQueryParams: true,
+        },
+      );
       const unsubscribe = sibling.subscribe(() => {});
       const delta = subscribeSpy.mock.calls.length - before;
 
@@ -661,11 +667,9 @@ describe("link directive", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "one-more-test",
-        {},
-        { replace: true },
-      );
+      expect(navigateSpy).toHaveBeenCalledWith("one-more-test", {}, undefined, {
+        replace: true,
+      });
     });
   });
 
@@ -693,7 +697,12 @@ describe("link directive", () => {
 
       // The directive still navigates to the INITIAL value ("one-more-test"),
       // not the updated value ("about"), because accessor() is called once
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
       expect(router.navigate).not.toHaveBeenCalledWith("about", {}, {});
     });
 
@@ -745,7 +754,12 @@ describe("link directive", () => {
       // Click still targets the initial route, not the updated signal value.
       await user.click(screen.getByTestId("link"));
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
       expect(router.navigate).not.toHaveBeenCalledWith("about", {}, {});
     });
 
@@ -832,7 +846,12 @@ describe("link directive", () => {
       expect(consumerSpy).toHaveBeenCalledTimes(1);
       expect(consumerSpy).toHaveBeenCalledWith(expect.any(MouseEvent));
       expect(navigateSpy).toHaveBeenCalledTimes(1);
-      expect(navigateSpy).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(navigateSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it("after unmount, JSX onClick remains on element while directive listener is removed", async () => {

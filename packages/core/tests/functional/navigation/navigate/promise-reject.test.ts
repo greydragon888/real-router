@@ -185,7 +185,7 @@ describe("router.navigate() - promise reject", () => {
         let err: any;
 
         try {
-          await router.navigate("profile", {}, {});
+          await router.navigate("profile", {}, undefined, {});
         } catch (error: any) {
           err = error;
         }
@@ -204,7 +204,12 @@ describe("router.navigate() - promise reject", () => {
 
         router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
-        const state = await router.navigate("orders.pending", {}, {});
+        const state = await router.navigate(
+          "orders.pending",
+          {},
+          undefined,
+          {},
+        );
 
         expect(state).toBeDefined();
         expect(state.name).toBe("orders.pending");
@@ -227,7 +232,7 @@ describe("router.navigate() - promise reject", () => {
         let err: any;
 
         try {
-          await router.navigate("profile", {}, {});
+          await router.navigate("profile", {}, undefined, {});
         } catch (error: any) {
           err = error;
         }
@@ -257,7 +262,7 @@ describe("router.navigate() - promise reject", () => {
         let err: any;
 
         try {
-          await router.navigate("profile", {}, {});
+          await router.navigate("profile", {}, undefined, {});
         } catch (error: any) {
           err = error;
         }
@@ -284,7 +289,7 @@ describe("router.navigate() - promise reject", () => {
         let err: any;
 
         try {
-          await router.navigate("profile", {}, {});
+          await router.navigate("profile", {}, undefined, {});
         } catch (error: any) {
           err = error;
         }
@@ -309,7 +314,7 @@ describe("router.navigate() - promise reject", () => {
         let err: any;
 
         try {
-          await router.navigate("profile", {}, {});
+          await router.navigate("profile", {}, undefined, {});
         } catch (error: any) {
           err = error;
         }
@@ -334,7 +339,7 @@ describe("router.navigate() - promise reject", () => {
         let err: any;
 
         try {
-          await router.navigate("profile", {}, {});
+          await router.navigate("profile", {}, undefined, {});
         } catch (error: any) {
           err = error;
         }
@@ -357,7 +362,7 @@ describe("router.navigate() - promise reject", () => {
         let err: any;
 
         try {
-          await router.navigate("profile", {}, {});
+          await router.navigate("profile", {}, undefined, {});
         } catch (error: any) {
           err = error;
         }
@@ -379,7 +384,7 @@ describe("router.navigate() - promise reject", () => {
         let err: any;
 
         try {
-          await router.navigate("profile", {}, {});
+          await router.navigate("profile", {}, undefined, {});
         } catch (error: any) {
           err = error;
         }
@@ -401,7 +406,12 @@ describe("router.navigate() - promise reject", () => {
 
         router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
-        const state = await router.navigate("orders.pending", {}, {});
+        const state = await router.navigate(
+          "orders.pending",
+          {},
+          undefined,
+          {},
+        );
 
         expect(state).toBeDefined();
         expect(state.name).toBe("orders.pending");
@@ -414,7 +424,7 @@ describe("router.navigate() - promise reject", () => {
 
         router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
-        const state = await router.navigate("profile", {}, {});
+        const state = await router.navigate("profile", {}, undefined, {});
 
         expect(state).toBeDefined();
         expect(state.name).toBe("profile");
@@ -427,7 +437,7 @@ describe("router.navigate() - promise reject", () => {
 
         router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
-        const state = await router.navigate("settings", {}, {});
+        const state = await router.navigate("settings", {}, undefined, {});
 
         expect(state).toBeDefined();
         expect(state.name).toBe("settings");
@@ -442,7 +452,7 @@ describe("router.navigate() - promise reject", () => {
         router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware1 }));
         router.usePlugin(() => ({ onTransitionSuccess: nextMiddleware }));
 
-        const state = await router.navigate("orders", {}, {});
+        const state = await router.navigate("orders", {}, undefined, {});
 
         expect(state).toBeDefined();
         expect(state.name).toBe("orders");
@@ -460,7 +470,7 @@ describe("router.navigate() - promise reject", () => {
 
         router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
-        const state = await router.navigate("profile", {}, {});
+        const state = await router.navigate("profile", {}, undefined, {});
 
         expect(state).toBeDefined();
         expect(state.name).toBe("profile");

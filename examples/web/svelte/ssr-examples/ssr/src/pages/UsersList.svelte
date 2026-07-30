@@ -41,7 +41,7 @@
   <p data-testid="selection-count">Selected: {selected.size}</p>
   <Link
     routeName="users"
-    routeParams={{ sort: otherSort }}
+    routeSearch={{ sort: otherSort }}
     data-testid="toggle-sort"
   >
     Toggle to {otherSort}

@@ -6,6 +6,7 @@ import {
   buildHref,
   buildActiveClassName,
   navigateWithHash,
+  resolveLinkTarget,
   shallowEqual,
 } from "../dom-utils";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
@@ -48,6 +49,8 @@ function areLinkPropsEqual(
     prev.children === next.children &&
     prev.hash === next.hash &&
     shallowEqual(prev.routeParams, next.routeParams) &&
+    shallowEqual(prev.routeSearch, next.routeSearch) &&
+    shallowEqual(prev.to, next.to) &&
     shallowEqual(prev.routeOptions, next.routeOptions)
   );
 }
@@ -56,6 +59,8 @@ export const Link: FunctionComponent<LinkProps> = memo(
   ({
     routeName,
     routeParams,
+    routeSearch,
+    to,
     routeOptions = EMPTY_OPTIONS,
     className,
     activeClassName = "active",
@@ -68,6 +73,15 @@ export const Link: FunctionComponent<LinkProps> = memo(
     ...props
   }) => {
     const router = useRouter();
+
+    // Resolve the two prop forms into one channel triple (RFC-4 M2 B2, #1548):
+    // a `to` descriptor supersedes the channel props (dev-warn on conflict).
+    const { name, params, search } = resolveLinkTarget(
+      to,
+      routeName ?? "",
+      routeParams,
+      routeSearch,
+    );
 
     // memo + areLinkPropsEqual guarantees that on bail-out the component does
     // not render; on render, routeParams/routeOptions changed reference (true
@@ -84,22 +98,24 @@ export const Link: FunctionComponent<LinkProps> = memo(
     //
     // Hash-aware active (#532) — see useIsActiveRoute for the contract.
     const isActive = useIsActiveRoute(
-      routeName,
-      routeParams,
+      name,
+      params,
+      search,
       activeStrict,
       ignoreQueryParams,
       hash,
     );
 
     // Navigation/href building need a concrete params object — default here only.
-    const paramsForNav = routeParams ?? EMPTY_PARAMS;
+    // `search` stays raw (`undefined` when unset).
+    const paramsForNav = params ?? EMPTY_PARAMS;
 
     // `buildHref` is a cheap synchronous call (route-tree lookup + string
     // concat). Wrapping it in `useMemo` allocates a deps array on every
     // render that does not bail out — and on bail-out the function body
     // doesn't execute, so the cache never pays off. Same logic for
     // `buildActiveClassName` and `handleClick` below.
-    const href = buildHref(router, routeName, paramsForNav, hash);
+    const href = buildHref(router, name, paramsForNav, search, hash);
 
     const handleClick = (evt: TargetedMouseEvent<HTMLAnchorElement>): void => {
       if (onClick) {
@@ -129,8 +145,9 @@ export const Link: FunctionComponent<LinkProps> = memo(
       evt.preventDefault();
       navigateWithHash(
         router,
-        routeName,
+        name,
         paramsForNav,
+        search,
         hash,
         routeOptions,
       ).catch(() => {});

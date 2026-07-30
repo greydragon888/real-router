@@ -1,8 +1,17 @@
 import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  expectTypeOf,
+  vi,
+  beforeEach,
+  afterEach,
+} from "vitest";
 
 import {
+  createPluginBuildUrl,
   createPopstateHandler,
   createPopstateLifecycle,
   createHashSyncLifecycle,
@@ -68,6 +77,32 @@ describe("popstate handler", () => {
   afterEach(() => {
     router.stop();
     vi.restoreAllMocks();
+  });
+
+  // Class-guard for #1586. The rollback lost the query AND the fragment for one
+  // structural reason: `PopstateHandlerDeps.buildUrl` still described the
+  // pre-#1548 three-argument form while the injected `createPluginBuildUrl` had
+  // already grown a `search` slot. Nothing failed — a 4-arg function is
+  // assignable to a 3-arg type, and `{ hash }` is structurally a `SearchParams`
+  // — so the fragment quietly travelled in the query slot for two releases.
+  //
+  // Assignability cannot express this (it holds in both directions for
+  // mismatched arities); type EQUALITY can. Whoever changes one signature now
+  // gets a compile error instead of a silently reslotted argument.
+  it("keeps the deps signature in step with the injected builder (#1586)", () => {
+    expectTypeOf<PopstateHandlerDeps["buildUrl"]>().toEqualTypeOf<
+      ReturnType<typeof createPluginBuildUrl>
+    >();
+
+    // The runtime half — what those slots MEAN. Slot 3 prints into the query
+    // string, slot 4 into the fragment; a `{ hash }` handed to slot 3 is a
+    // query key named "hash" and no fragment at all, which is precisely the
+    // URL the rollback used to produce.
+    const build = createPluginBuildUrl(router, "");
+
+    expect(build("home", {}, { tab: "a" }, { hash: "anchor" })).toBe(
+      "/?tab=a#anchor",
+    );
   });
 
   function makeDeps(overrides: Partial<PopstateHandlerDeps> = {}): Omit<
@@ -265,15 +300,22 @@ describe("popstate handler", () => {
       expect(deps.api.emitTransitionError).toHaveBeenCalledWith(
         expect.objectContaining({ code: errorCodes.ROUTE_NOT_FOUND }),
       );
-      // Rollback: current state has no url context → buildUrl without options.
-      expect(deps.buildUrl).toHaveBeenCalledWith("home", {}, undefined);
+      // Rollback: current state has no url context → buildUrl with the state's
+      // (empty) query channel at slot 3 and no hash options at slot 4.
+      expect(deps.buildUrl).toHaveBeenCalledWith("home", {}, {}, undefined);
       expect(deps.browser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "home" }),
         "/built/home",
       );
     });
 
-    it("rollback preserves the context url hash when present (#532)", async () => {
+    it("rollback passes the hash in the OPTIONS slot, not the query slot (#532, #1586)", async () => {
+      // This assertion used to read `buildUrl("home", {}, { hash: "kept" })`
+      // and pinned the defect rather than the contract: the deps type still
+      // described the pre-#1548 three-argument form, so the fragment travelled
+      // in the query slot — where the real `createPluginBuildUrl` reads
+      // `search`, leaving its `opts` undefined and appending no fragment at
+      // all. A mocked `buildUrl` cannot notice; only the arity can.
       router.stop();
       router = createRouter([{ name: "home", path: "/" }]);
       router.usePlugin((r) => {
@@ -295,7 +337,36 @@ describe("popstate handler", () => {
       handler(makePopStateEvent(null));
       await flushAsync();
 
-      expect(deps.buildUrl).toHaveBeenCalledWith("home", {}, { hash: "kept" });
+      expect(deps.buildUrl).toHaveBeenCalledWith(
+        "home",
+        {},
+        {},
+        { hash: "kept" },
+      );
+    });
+
+    it("rollback carries the current state's query channel (#1586)", async () => {
+      // The discriminating half of the pair above: with a route that actually
+      // declares a query, slot 3 must hold its values — not `undefined`, and
+      // not the hash object.
+      router.stop();
+      router = createRouter([{ name: "home", path: "/?tab" }]);
+      await router.start("/?tab=a");
+
+      const deps = makeDeps();
+
+      deps.browser.getLocation = () => "/nope";
+      const handler = createPopstateHandler(deps);
+
+      handler(makePopStateEvent(null));
+      await flushAsync();
+
+      expect(deps.buildUrl).toHaveBeenCalledWith(
+        "home",
+        {},
+        { tab: "a" },
+        undefined,
+      );
     });
 
     it("RouterError from the navigation is swallowed after a URL rollback", async () => {

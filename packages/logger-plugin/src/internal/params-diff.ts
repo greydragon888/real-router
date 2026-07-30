@@ -1,7 +1,5 @@
 // packages/logger-plugin/src/internal/params-diff.ts
 
-import type { Params } from "@real-router/core";
-
 export interface ParamsDiff {
   changed: Record<string, { from: unknown; to: unknown }>;
   added: Record<string, unknown>;
@@ -10,15 +8,16 @@ export interface ParamsDiff {
 
 /**
  * Calculates differences between two parameter objects.
- * Performs only shallow comparison.
+ * Performs only shallow comparison. Channel-agnostic — reused for both the path
+ * (`state.params`) and the query (`state.search`) channels (RFC-4 M2 / #1548).
  *
  * @param fromParams - Previous parameters
  * @param toParams - New parameters
  * @returns Object with differences or null if there are no changes
  */
 export const getParamsDiff = (
-  fromParams: Params,
-  toParams: Params,
+  fromParams: Record<string, unknown>,
+  toParams: Record<string, unknown>,
 ): ParamsDiff | null => {
   const changed: ParamsDiff["changed"] = {};
   const added: ParamsDiff["added"] = {};
@@ -64,8 +63,14 @@ export const getParamsDiff = (
  *
  * @param diff - Object with differences
  * @param context - Context for console
+ * @param channel - Channel label (`params` / `search`) prefixed to the line so
+ *   the two-channel split is visible in the output (RFC-4 M2 / #1548)
  */
-export const logParamsDiff = (diff: ParamsDiff, context: string): void => {
+export const logParamsDiff = (
+  diff: ParamsDiff,
+  context: string,
+  channel: string,
+): void => {
   const parts: string[] = [];
 
   // Cache entries to avoid double iteration
@@ -89,5 +94,5 @@ export const logParamsDiff = (diff: ParamsDiff, context: string): void => {
     parts.push(`Removed: ${JSON.stringify(diff.removed)}`);
   }
 
-  console.log(`[${context}]  ${parts.join(", ")}`);
+  console.log(`[${context}]  ${channel} ${parts.join(", ")}`);
 };

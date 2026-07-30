@@ -15,8 +15,8 @@ const ITEMS = [
 type Filter = "all" | "letter" | "number" | "color";
 
 export function QueryDemo(): JSX.Element {
-  const { route } = useRoute<{ filter?: Filter }>();
-  const filter = route.params.filter ?? "all";
+  const { route } = useRoute();
+  const filter = route.search.filter ?? "all";
 
   const visible = useMemo(() => {
     return filter === "all"
@@ -42,7 +42,7 @@ export function QueryDemo(): JSX.Element {
           <Link
             key={value}
             routeName="queryDemo"
-            routeParams={{ filter: value }}
+            routeSearch={{ filter: value }}
             ignoreQueryParams={false}
           >
             {value}

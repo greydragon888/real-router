@@ -234,10 +234,17 @@ export class LoggerPlugin {
       return;
     }
 
-    const diff = getParamsDiff(fromState.params, toState.params);
+    // Diff both channels (RFC-4 M2 / #1548): path params and query search are
+    // separate now, so a query-only change (pagination) shows under `search`.
+    const paramsDiff = getParamsDiff(fromState.params, toState.params);
+    const searchDiff = getParamsDiff(fromState.search, toState.search);
 
-    if (diff) {
-      logParamsDiff(diff, this.#context);
+    if (paramsDiff) {
+      logParamsDiff(paramsDiff, this.#context, "params");
+    }
+
+    if (searchDiff) {
+      logParamsDiff(searchDiff, this.#context, "search");
     }
   }
 

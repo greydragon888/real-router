@@ -448,7 +448,7 @@ describe("S11.6: stabilizeState reload-bypass storm", () => {
     const iterations = 10_000;
 
     for (let i = 0; i < iterations; i++) {
-      await router.navigate("admin.dashboard", {}, { reload: true });
+      await router.navigate("admin.dashboard", {}, undefined, { reload: true });
     }
 
     // Every reload navigation must surface as a fresh snapshot — no dedup.

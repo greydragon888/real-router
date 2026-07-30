@@ -22,7 +22,7 @@ This is a single pipeline:
 ```
 write side:
   <Link hash="x"> click ──┐
-                          ├─► router.navigate(name, params, { hash, force, hashChange })
+                          ├─► router.navigate(name, params, search, { hash, force, hashChange })
   scroll-spy IO ──────────┤   │
                           │   ▼
                           │   URL plugin onTransitionSuccess: state.context.url.{hash, hashChanged}

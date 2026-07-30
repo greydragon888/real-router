@@ -359,7 +359,7 @@ describe("State.context", () => {
   describe("required field", () => {
     it("is present as empty object on every state from makeState", () => {
       const api = getPluginApi(stateRouter);
-      const state = api.makeState("home", {}, "/home");
+      const state = api.makeState("home", {}, undefined, "/home");
 
       expect(state.context).toStrictEqual({});
     });

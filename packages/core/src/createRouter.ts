@@ -24,7 +24,7 @@ export const createRouter = <
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   routes: Route<Dependencies>[] = [],
-  options: Partial<Options> = {},
+  options: Partial<Options<Dependencies>> = {},
   dependencies: Dependencies = {} as Dependencies,
 ): Router<Dependencies> => {
   return new Router<Dependencies>(routes, options, dependencies);

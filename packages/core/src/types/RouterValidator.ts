@@ -131,6 +131,21 @@ export interface RouterValidator {
       s2: unknown,
       ignoreQP: unknown,
     ) => void;
+    /**
+     * The mode gate's opt-in diagnostic (#1575). Core DROPS a query key the
+     * active `queryParamsMode` will not print — silently, by the same
+     * always-on-fixes / opt-in-diagnoses split the channel guard follows. This
+     * hook is what makes the drop visible in development.
+     *
+     * Called once per dropped key, from the gate itself, so the report cannot
+     * disagree with what was actually dropped. A `defaultSearch` declared for
+     * such a key surfaces through the same call — it is dead config in these
+     * modes, and that is the edge worth naming out loud.
+     */
+    reportDroppedQueryKey: (routeName: string, key: string) => void;
+
+    /** Opt-in diagnostic for a key the route declares NOWHERE (#1579). */
+    reportUndeclaredParamKey: (routeName: string, key: string) => void;
   };
 
   /**

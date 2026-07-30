@@ -55,14 +55,17 @@ const createMockedBrowser = (): Browser => {
 
 const routerConfig = [
   {
+    // Persistent params are QUERY params — declared as `?…` so they route to
+    // state.search (and the URL query). Children inherit the parent's query
+    // segment. Since #1549 3a, an UNdeclared key would stay in state.params.
     name: "users",
-    path: "/users",
+    path: "/users?lang&theme&sessionId",
     children: [
       { name: "view", path: "/view/:id" },
       { name: "list", path: "/list" },
     ],
   },
-  { name: "home", path: "/home" },
+  { name: "home", path: "/home?lang&theme&sessionId" },
   { name: "index", path: "/" },
 ];
 
@@ -206,6 +209,8 @@ describe("Browser Plugin Integration", () => {
       // At minimum two forwardState calls: initial start → "home"
       // (defaultRoute) and navigate → "users.view". Core may call it
       // additionally for internal resolutions — asserting lower-bound 2.
+      // #1549 3a: an undeclared caller/plugin-written key stays in state.params
+      // (was routed to state.search by the removed splitParamsBySearch).
       expect(currentHistoryState?.params.modified).toBe(true);
       expect(modifiedStates.length).toBeGreaterThanOrEqual(2);
       // Last recorded state must reflect the navigation target.
@@ -221,20 +226,21 @@ describe("Browser Plugin Integration", () => {
       await router.start();
 
       // Set persistent params
-      await router.navigate("home", { lang: "en", theme: "dark" });
+      await router.navigate("home", {}, { lang: "en", theme: "dark" });
 
-      expect(router.getState()?.params.lang).toBe("en");
-      expect(router.getState()?.params.theme).toBe("dark");
+      expect(router.getState()?.search.lang).toBe("en");
+      expect(router.getState()?.search.theme).toBe("dark");
 
       // Navigate to different route - params should persist
       await router.navigate("users.list");
 
-      expect(router.getState()?.params.lang).toBe("en");
-      expect(router.getState()?.params.theme).toBe("dark");
+      expect(router.getState()?.search.lang).toBe("en");
+      expect(router.getState()?.search.theme).toBe("dark");
 
-      // Browser history should include persistent params
-      expect(currentHistoryState?.params.lang).toBe("en");
-      expect(currentHistoryState?.params.theme).toBe("dark");
+      // Browser history includes the persistent (query) params — they live in
+      // state.search (the routes declare `?lang&theme`).
+      expect(currentHistoryState?.search.lang).toBe("en");
+      expect(currentHistoryState?.search.theme).toBe("dark");
     });
   });
 
@@ -344,7 +350,7 @@ describe("Browser Plugin Integration", () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
       await router.start();
-      await router.navigate("users.view", { id: "1", sessionId: "abc" });
+      await router.navigate("users.view", { id: "1" }, { sessionId: "abc" });
 
       // Logger logged events
       expect(logs.length).toBeGreaterThan(0);
@@ -357,7 +363,8 @@ describe("Browser Plugin Integration", () => {
       // Persistent params worked
       await router.navigate("home");
 
-      expect(router.getState()?.params.sessionId).toBe("abc");
+      // Persistent (query) param lives in state.search (route declares `?sessionId`).
+      expect(router.getState()?.search.sessionId).toBe("abc");
 
       // Browser plugin updated history
       expect(currentHistoryState?.name).toBe("home");
@@ -447,6 +454,7 @@ describe("Browser Plugin Integration", () => {
       await router.navigate("users.list");
 
       // Browser plugin should handle complex params
+      // #1549 3a: undeclared plugin-written keys stay in state.params.
       expect(currentHistoryState?.params.nested).toStrictEqual({
         deep: { value: 42 },
       });
@@ -467,13 +475,13 @@ describe("Browser Plugin Integration", () => {
       for (let i = 0; i < 50; i++) {
         const route = i % 2 === 0 ? "home" : "users.list";
 
-        await router.navigate(route, { lang: "en" });
+        await router.navigate(route, {}, { lang: "en" });
       }
 
       // Final state should be correct (49 % 2 === 1, so last route is "users.list")
       expect(router.getState()?.name).toBe("users.list");
       expect(currentHistoryState?.name).toBe("users.list");
-      expect(router.getState()?.params.lang).toBe("en");
+      expect(router.getState()?.search.lang).toBe("en");
     });
   });
 });

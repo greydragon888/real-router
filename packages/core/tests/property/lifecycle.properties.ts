@@ -147,6 +147,7 @@ describe("start / stop / dispose Lifecycle Properties", () => {
       const serverState: State = {
         name: "home",
         params: {},
+        search: {},
         path,
         context: { data: { hydrated: true } },
         transition: {

@@ -7,7 +7,7 @@ Demonstrates `persistentParamsPluginFactory` for multilingual apps with theme su
 - `persistentParamsPluginFactory({ lang: "en", theme: "light" })` — default values
 - Params auto-injected into every navigation (no manual forwarding)
 - Language switcher and theme toggle update params in URL
-- Pages render content based on `route.params.lang`
+- Pages render content based on `route.search.lang`
 
 ## Run
 

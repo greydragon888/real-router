@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -101,7 +101,15 @@ describe("getRoutesApi()", () => {
     routesApi.update("home", { defaultParams: { page: "1" } });
 
     expect(routesApi.has("home")).toBe(true);
-    expect(router.buildPath("home")).toBe("/home?page=1");
+    // `page` is declared by neither a path slot nor `?` on "/home", so it is an
+    // ARBITRARY default: app-level data that lives in `state.params` and never
+    // reaches the URL (Phase 2 step 2-1 aligned buildPath with navigate here).
+    // The assertion still proves `update` took effect — via the state, which is
+    // where an arbitrary default is observable.
+    expect(router.buildPath("home")).toBe("/home");
+    expect(getPluginApi(router).makeState("home").params).toStrictEqual({
+      page: "1",
+    });
   });
 
   it("update should set canActivate guard", () => {

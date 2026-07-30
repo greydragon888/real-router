@@ -9,6 +9,7 @@ import {
   createFixtureRouter,
   createStartedRouter,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
 
 import type { Route, Router, State } from "@real-router/core";
@@ -30,18 +31,6 @@ interface LeavePayload {
   route: State;
   nextRoute: State;
   signal: AbortSignal;
-}
-
-function getParamsForRoute(name: string): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id: "abc" };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
 }
 
 describe("subscribeLeave() properties", () => {
@@ -149,7 +138,7 @@ describe("subscribeLeave() properties", () => {
 
         router.subscribeLeave(listener);
 
-        await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+        await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
         expect(listener).toHaveBeenCalledTimes(1);
 
@@ -180,7 +169,7 @@ describe("subscribeLeave() properties", () => {
           captured = signal;
         });
 
-        await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+        await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
         expect(captured).toBeInstanceOf(AbortSignal);
         expect(captured?.aborted).toBe(false);
@@ -285,7 +274,7 @@ describe("subscribeLeave() properties", () => {
 
         const controller = new AbortController();
         const opts = action === "external" ? { signal: controller.signal } : {};
-        const parked = router.navigate("b", {}, opts);
+        const parked = router.navigate("b", {}, undefined, opts);
 
         parked.catch(() => {});
         await Promise.resolve();

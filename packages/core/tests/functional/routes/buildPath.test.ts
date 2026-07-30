@@ -1,5 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
@@ -55,14 +56,14 @@ describe("core/routes/routePath/buildPath", () => {
   describe("buildPath with query params", () => {
     it("should build path with query params", () => {
       routesApi.add({ name: "search", path: "/search?q" });
-      const path = router.buildPath("search", { q: "test" });
+      const path = router.buildPath("search", {}, { q: "test" });
 
       expect(path).toBe("/search?q=test");
     });
 
     it("should build path with multiple query params", () => {
       routesApi.add({ name: "search", path: "/search?q&page" });
-      const path = router.buildPath("search", { q: "test", page: "1" });
+      const path = router.buildPath("search", {}, { q: "test", page: "1" });
 
       expect(path).toBe("/search?q=test&page=1");
     });
@@ -74,6 +75,54 @@ describe("core/routes/routePath/buildPath", () => {
       const path = router.buildPath("home");
 
       expect(path).toBe("/base/home");
+    });
+
+    describe("a param declared on the root path (#1567)", () => {
+      it("should substitute the root slot instead of emitting it literally", () => {
+        getPluginApi(router).setRootPath("/app/:tenant");
+
+        expect(router.buildPath("home", { tenant: "t1" })).toBe("/app/t1/home");
+      });
+
+      it("should not leak the value into the query string", () => {
+        getPluginApi(router).setRootPath("/app/:tenant");
+
+        expect(router.buildPath("home", { tenant: "t1" })).not.toContain("?");
+      });
+
+      it("should reject a missing value like any other required param", () => {
+        getPluginApi(router).setRootPath("/app/:tenant");
+
+        expect(() => router.buildPath("home", {})).toThrow(
+          "Missing required param 'tenant'",
+        );
+      });
+
+      it("should round-trip through match", () => {
+        getPluginApi(router).setRootPath("/app/:tenant");
+
+        const built = router.buildPath("home", { tenant: "t1" });
+        const matched = getPluginApi(router).matchPath(built);
+
+        expect(matched?.name).toBe("home");
+        expect(matched?.params).toStrictEqual({ tenant: "t1" });
+        expect(matched?.path).toBe(built);
+      });
+
+      it("should collapse a root SPLAT, which can never bind (#1568)", () => {
+        // A route path always follows the root, so a root splat is never the
+        // final segment and always matches empty — the built URL must omit it,
+        // and it now round-trips. (No index route: one under a splat parent is
+        // rejected at registerTree.)
+        const splatRouter = createRouter([{ name: "home", path: "/home" }]);
+
+        getPluginApi(splatRouter).setRootPath("/app/*rest");
+
+        const built = splatRouter.buildPath("home", {});
+
+        expect(built).toBe("/app/home");
+        expect(getPluginApi(splatRouter).matchPath(built)?.name).toBe("home");
+      });
     });
   });
 
@@ -92,9 +141,9 @@ describe("core/routes/routePath/buildPath", () => {
       routesApi.add({
         name: "user",
         path: "/user/:id",
-        encodeParams: (params) => ({
-          ...params,
-          id: `encoded-${params.id as string}`,
+        encodeParams: ({ params, search }) => ({
+          params: { ...params, id: `encoded-${params.id as string}` },
+          search,
         }),
       });
 
@@ -110,13 +159,13 @@ describe("core/routes/routePath/buildPath", () => {
       routesApi.add({
         name: "user",
         path: "/user/:id",
-        encodeParams: (params) => {
+        encodeParams: ({ params, search }) => {
           receivedParams = params;
 
           // Encoder can mutate its copy without affecting original
           params.id = `encoded-${params.id as string}`;
 
-          return params;
+          return { params, search };
         },
       });
 
@@ -134,9 +183,9 @@ describe("core/routes/routePath/buildPath", () => {
       routesApi.add({
         name: "user",
         path: "/user/:id",
-        encodeParams: (params) => ({
-          ...params,
-          id: `encoded-${params.id as string}`,
+        encodeParams: ({ params, search }) => ({
+          params: { ...params, id: `encoded-${params.id as string}` },
+          search,
         }),
       });
 
@@ -301,7 +350,7 @@ describe("core/routes/routePath/buildPath", () => {
       it("should handle array in query params", () => {
         routesApi.add({ name: "filter", path: "/filter?tags" });
 
-        const path = router.buildPath("filter", { tags: ["a", "b"] });
+        const path = router.buildPath("filter", {}, { tags: ["a", "b"] });
 
         // Query params with arrays produce multiple key=value pairs
         expect(path).toMatch(/tags=/);
@@ -324,9 +373,9 @@ describe("core/routes/routePath/buildPath", () => {
           name: "user",
           path: "/user/:id",
           defaultParams: { id: "0" },
-          encodeParams: (params) => ({
-            ...params,
-            id: `encoded-${params.id as string}`,
+          encodeParams: ({ params, search }) => ({
+            params: { ...params, id: `encoded-${params.id as string}` },
+            search,
           }),
         });
 
@@ -341,9 +390,9 @@ describe("core/routes/routePath/buildPath", () => {
           name: "user",
           path: "/user/:id",
           defaultParams: { id: "default" },
-          encodeParams: (params) => ({
-            ...params,
-            id: `encoded-${params.id as string}`,
+          encodeParams: ({ params, search }) => ({
+            params: { ...params, id: `encoded-${params.id as string}` },
+            search,
           }),
         });
 
@@ -357,11 +406,11 @@ describe("core/routes/routePath/buildPath", () => {
           name: "user",
           path: "/user/:id",
           defaultParams: { id: "0" },
-          encodeParams: (params) => {
+          encodeParams: ({ params, search }) => {
             // Increment the id
             const numId = Number(params.id);
 
-            return { ...params, id: String(numId + 1) };
+            return { params: { ...params, id: String(numId + 1) }, search };
           },
         });
 
@@ -395,7 +444,7 @@ describe("core/routes/routePath/buildPath", () => {
         it("should URL-encode spaces in query params", () => {
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", { q: "hello world" });
+          const path = router.buildPath("search", {}, { q: "hello world" });
 
           expect(path).toBe("/search?q=hello%20world");
         });
@@ -403,7 +452,7 @@ describe("core/routes/routePath/buildPath", () => {
         it("should URL-encode ampersand and equals in query params", () => {
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", { q: "a&b=c" });
+          const path = router.buildPath("search", {}, { q: "a&b=c" });
 
           expect(path).toBe("/search?q=a%26b%3Dc");
         });
@@ -411,7 +460,7 @@ describe("core/routes/routePath/buildPath", () => {
         it("should URL-encode forward slash in query params", () => {
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", { q: "path/to/file" });
+          const path = router.buildPath("search", {}, { q: "path/to/file" });
 
           expect(path).toBe("/search?q=path%2Fto%2Ffile");
         });
@@ -419,7 +468,7 @@ describe("core/routes/routePath/buildPath", () => {
         it("should URL-encode question mark in query params", () => {
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", { q: "what?" });
+          const path = router.buildPath("search", {}, { q: "what?" });
 
           expect(path).toBe("/search?q=what%3F");
         });
@@ -427,7 +476,7 @@ describe("core/routes/routePath/buildPath", () => {
         it("should URL-encode hash in query params", () => {
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", { q: "section#1" });
+          const path = router.buildPath("search", {}, { q: "section#1" });
 
           expect(path).toBe("/search?q=section%231");
         });
@@ -437,7 +486,7 @@ describe("core/routes/routePath/buildPath", () => {
         it("should URL-encode Cyrillic characters", () => {
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", { q: "привет" });
+          const path = router.buildPath("search", {}, { q: "привет" });
 
           expect(path).toBe("/search?q=%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82");
         });
@@ -445,7 +494,7 @@ describe("core/routes/routePath/buildPath", () => {
         it("should URL-encode emoji characters", () => {
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", { q: "🎉" });
+          const path = router.buildPath("search", {}, { q: "🎉" });
 
           expect(path).toBe("/search?q=%F0%9F%8E%89");
         });
@@ -453,7 +502,7 @@ describe("core/routes/routePath/buildPath", () => {
         it("should URL-encode Chinese characters", () => {
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", { q: "你好" });
+          const path = router.buildPath("search", {}, { q: "你好" });
 
           expect(path).toBe("/search?q=%E4%BD%A0%E5%A5%BD");
         });
@@ -491,7 +540,7 @@ describe("core/routes/routePath/buildPath", () => {
 
           // Sub-delimiters: ! $ & ' ( ) * + , ; =
           // But & and = are query-specific, so they get encoded
-          const path = router.buildPath("search", { q: "test!value" });
+          const path = router.buildPath("search", {}, { q: "test!value" });
 
           expect(path).toBe("/search?q=test!value");
         });
@@ -635,7 +684,7 @@ describe("core/routes/routePath/buildPath", () => {
 
           routesApi.add({ name: "search", path: "/search?q" });
 
-          const path = router.buildPath("search", nullProtoParams);
+          const path = router.buildPath("search", {}, nullProtoParams);
 
           expect(path).toBe("/search?q=search");
         });
@@ -703,8 +752,38 @@ describe("core/routes/routePath/buildPath", () => {
           expect(path).toBe("/user/42");
         });
 
-        it("should include all enumerable properties as query params", () => {
-          // Non-route params become query params
+        it("applies a defaultSearch whose key is an Object.prototype name", () => {
+          // The withholding rule ("a default is not applied to a slot the caller
+          // already filled") read the caller's bag with a bare `params[key]`,
+          // which walks the PROTOTYPE — so on an EMPTY bag `toString` /
+          // `constructor` / `valueOf` all read as filled and the default was
+          // declined. The rule runs only in the LITERAL form, so `buildPath`
+          // withheld while `navigate` / `makeState` applied: the one producer out
+          // of agreement, printing an href its own route does not reproduce —
+          // the #1552/#1578 shape the rule exists to close, on a different key
+          // set. The sibling `findMisChanneledKey` guards the same read with
+          // `Object.hasOwn` for exactly this reason.
+          for (const key of ["toString", "constructor", "valueOf"]) {
+            const proto = createRouter([
+              { name: "p", path: `/p?${key}`, defaultSearch: { [key]: "D" } },
+            ]);
+
+            expect(proto.buildPath("p")).toBe(`/p?${key}=D`);
+            expect(getPluginApi(proto).makeState("p").path).toBe(`/p?${key}=D`);
+
+            proto.dispose();
+          }
+        });
+
+        it("keeps an undeclared params-bag key out of the URL", () => {
+          // Renamed from "should include all enumerable properties as query
+          // params" when buildPath moved onto the pipeline (Phase 2, step 2-1).
+          // A key the route declares neither as a path slot nor with `?` is
+          // app-level data, not part of the URL — which is what `navigate` has
+          // always committed for the same intent (`params: { extra }`, `path:
+          // "/user/42"`). Until this step the matcher's `search ?? params`
+          // fallback printed it out of the path bag, so buildPath alone
+          // disagreed with every other producer.
           const params = {
             id: "42",
             extra: "value",
@@ -712,10 +791,11 @@ describe("core/routes/routePath/buildPath", () => {
 
           routesApi.add({ name: "userX", path: "/user/:id" });
 
-          const path = router.buildPath("userX", params);
+          expect(router.buildPath("userX", params)).toBe("/user/42");
 
-          // Extra params are appended as query params
-          expect(path).toBe("/user/42?extra=value");
+          // Discrimination: the path slot still prints, so the assertion above
+          // is about the undeclared key and not about an empty build.
+          expect(router.buildPath("userX", { id: "7" })).toBe("/user/7");
         });
 
         it("should not call toString/valueOf methods on params object", () => {

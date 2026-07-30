@@ -101,7 +101,7 @@ describe("Link component", () => {
     // change on the same route.
     it("ignoreQueryParams defaults to true — same route + different query params still active", async () => {
       // Navigate first so the link's params match the active state.
-      await router.navigate("items.item", { id: "6", page: "1" });
+      await router.navigate("items.item", { id: "6" }, { page: "1" });
       flushSync();
 
       renderWithRouter(router, Link, {
@@ -117,7 +117,7 @@ describe("Link component", () => {
 
       // Same route name + same path params, ONLY the query param differs.
       // Default behavior must keep the link active.
-      await router.navigate("items.item", { id: "6", page: "2" });
+      await router.navigate("items.item", { id: "6" }, { page: "2" });
       flushSync();
 
       expect(link.classList.contains("active")).toBe(true);
@@ -128,12 +128,13 @@ describe("Link component", () => {
     // change. Catches a hypothetical regression that ignored the prop value
     // entirely and always treated query params as "ignore".
     it("ignoreQueryParams={false} — same route + different query params drops active", async () => {
-      await router.navigate("items.item", { id: "6", page: "1" });
+      await router.navigate("items.item", { id: "6" }, { page: "1" });
       flushSync();
 
       renderWithRouter(router, Link, {
         routeName: "items.item",
-        routeParams: { id: "6", page: "1" },
+        routeParams: { id: "6" },
+        routeSearch: { page: "1" },
         activeStrict: true,
         ignoreQueryParams: false,
         activeClassName: "active",
@@ -143,7 +144,7 @@ describe("Link component", () => {
 
       expect(link.classList.contains("active")).toBe(true);
 
-      await router.navigate("items.item", { id: "6", page: "2" });
+      await router.navigate("items.item", { id: "6" }, { page: "2" });
       flushSync();
 
       // ignoreQueryParams=false → different query params → NOT active.
@@ -202,7 +203,12 @@ describe("Link component", () => {
 
       link.dispatchEvent(event);
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it("still navigates (isolated) when the onclick handler throws (#1436)", () => {
@@ -233,7 +239,12 @@ describe("Link component", () => {
         /* pre-fix: unisolated throw */
       }
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining("[real-router]"),
         expect.any(Error),
@@ -320,7 +331,7 @@ describe("Link component", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "users", undefined, {
+      createActiveRouteSource(router, "users", undefined, undefined, {
         strict: false,
         ignoreQueryParams: true,
       });
@@ -344,7 +355,7 @@ describe("Link component", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "users", undefined, {
+      createActiveRouteSource(router, "users", undefined, undefined, {
         strict: true,
         ignoreQueryParams: true,
       });

@@ -28,6 +28,7 @@ function makeServerJson(name: string, path: string, params: object): string {
   const serverState: State = {
     name,
     params: params as State["params"],
+    search: {},
     path,
     context: {
       data: { fetchedAt: path, payload: "x".repeat(256) },
@@ -244,6 +245,7 @@ describe("S15: start()/hydrateRouter cycles", () => {
     const serverState: State = {
       name: "users",
       params: {},
+      search: {},
       path: "/users",
       context,
       transition: {

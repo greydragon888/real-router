@@ -11,10 +11,10 @@ interface HashControlsProps {
  * Programmatic tri-state demo. Three buttons exercise the three states of
  * `opts.hash` documented in #532:
  *
- * - **Set**: `router.navigate("settings", {}, { hash: "billing" })` —
- *   non-empty value sets the fragment.
- * - **Clear**: `router.navigate("settings", {}, { hash: "" })` — empty string
- *   explicitly clears the fragment.
+ * - **Set**: `router.navigate("settings", {}, undefined, { hash: "billing" })`
+ *   — non-empty value sets the fragment.
+ * - **Clear**: `router.navigate("settings", {}, undefined, { hash: "" })` —
+ *   empty string explicitly clears the fragment.
  * - **Preserve**: `router.navigate("settings")` — `opts.hash` omitted; the
  *   plugin reads the current browser hash and keeps it.
  *
@@ -40,11 +40,11 @@ export function HashControls({
         data-testid="action-set-billing"
         onClick={() => {
           navigator
-            .navigate(
-              "settings",
-              {},
-              { hash: "billing", force: true, hashChange: true },
-            )
+            .navigate("settings", {}, undefined, {
+              hash: "billing",
+              force: true,
+              hashChange: true,
+            })
             .catch(() => {});
         }}
       >
@@ -55,11 +55,11 @@ export function HashControls({
         data-testid="action-clear"
         onClick={() => {
           navigator
-            .navigate(
-              "settings",
-              {},
-              { hash: "", force: true, hashChange: true },
-            )
+            .navigate("settings", {}, undefined, {
+              hash: "",
+              force: true,
+              hashChange: true,
+            })
             .catch(() => {});
         }}
       >

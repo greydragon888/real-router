@@ -1,5 +1,5 @@
 // FEATURE DEMO — typed/validated search (real-router). A zod `searchSchema` on
-// the route validates/types the query: ?n=5 → route.params.n is a number 5
+// the route validates/types the query: ?n=5 → route.search.n is a number 5
 // (not the raw string "5"). react-router/wouter have no schema API (N/A).
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
@@ -33,7 +33,7 @@ await router.start();
 
 function SearchPage(): JSX.Element {
   const { route } = useRoute();
-  const n = route.params.n as number;
+  const n = route.search.n as number;
   return (
     <main>
       <span data-testid="validated-n">{String(n)}</span>

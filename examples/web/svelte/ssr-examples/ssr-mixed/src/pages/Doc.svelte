@@ -19,10 +19,11 @@
     if (mode !== "client-only" || ssrData !== undefined) return;
 
     const params = route.current.params;
+    const search = route.current.search;
     handle = setTimeout(() => {
       clientData = {
         id: String(params.id),
-        format: String(params.format),
+        format: String(search.format),
         body: `(client) PDF placeholder for ${String(params.id)}`,
       };
     }, 50);

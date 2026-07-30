@@ -119,7 +119,7 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       vi.spyOn(browser, "navigate");
 
-      await router.navigate("users.list", {}, { replace: true });
+      await router.navigate("users.list", {}, undefined, { replace: true });
 
       expect(browser.navigate).toHaveBeenCalledWith(
         "/users/list",
@@ -260,7 +260,7 @@ describe("Navigation Plugin — Lifecycle", () => {
       vi.spyOn(browser, "navigate");
       vi.spyOn(browser, "updateCurrentEntry");
 
-      await router.navigate("index", {}, { reload: true });
+      await router.navigate("index", {}, undefined, { reload: true });
 
       // Same-URL reload: the URL `/` stays unchanged so the plugin writes
       // state via updateCurrentEntry rather than re-issuing a same-URL
@@ -308,7 +308,7 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       router.subscribe(subscribeSpy);
 
-      await router.navigate("index", {}, { reload: true });
+      await router.navigate("index", {}, undefined, { reload: true });
 
       // Limitation: no navigate event fires for the same-URL reload.
       expect(navigateEventSpy).not.toHaveBeenCalled();
@@ -362,7 +362,9 @@ describe("Navigation Plugin — Lifecycle", () => {
       // would surface here, not in the partition PBT.
       vi.spyOn(browser, "navigate");
 
-      const state = await router.navigate("users.list", {}, { replace: false });
+      const state = await router.navigate("users.list", {}, undefined, {
+        replace: false,
+      });
 
       expect(state.context.navigation?.navigationType).toBe("push");
       expect(browser.navigate).toHaveBeenCalledWith(
@@ -392,7 +394,7 @@ describe("Navigation Plugin — Lifecycle", () => {
     });
 
     it("supports navigate callback (Promise resolves with State)", async () => {
-      const state = await router.navigate("users.list", {}, {});
+      const state = await router.navigate("users.list", {}, undefined, {});
 
       expect(state.name).toBe("users.list");
       expect(state.path).toBe("/users/list");
@@ -412,11 +414,11 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
 
-      await expect(router.navigate("users.list", {}, {})).rejects.toMatchObject(
-        {
-          code: errorCodes.CANNOT_DEACTIVATE,
-        },
-      );
+      await expect(
+        router.navigate("users.list", {}, undefined, {}),
+      ).rejects.toMatchObject({
+        code: errorCodes.CANNOT_DEACTIVATE,
+      });
 
       expect(router.getState()?.name).toBe("index");
     });
@@ -505,12 +507,14 @@ describe("Navigation Plugin — Lifecycle", () => {
       const state = mockNav.currentEntry?.getState() as {
         name: string;
         params: Record<string, unknown>;
+        search: Record<string, unknown>;
         path: string;
       };
 
       expect(state).toStrictEqual({
         name: "users.view",
         params: { id: "123" },
+        search: {},
         path: "/users/view/123",
       });
       expect(mockNav.currentUrl).toBe("http://localhost/users/view/123");
@@ -522,17 +526,19 @@ describe("Navigation Plugin — Lifecycle", () => {
       const state = mockNav.currentEntry?.getState() as {
         name: string;
         params: Record<string, unknown>;
+        search: Record<string, unknown>;
         path: string;
       };
 
       expect(state).toStrictEqual({
         name: "home",
         params: {},
+        search: {},
         path: "/home",
       });
     });
 
-    it("throws if buildState returns undefined", () => {
+    it("throws if the route cannot be resolved (buildNavigationState returns undefined)", () => {
       expect(() => {
         router.replaceHistoryState("definitely.nonexistent.route");
       }).toThrow("[real-router] Cannot replace state");
@@ -558,7 +564,7 @@ describe("Navigation Plugin — Lifecycle", () => {
       mockNav.navigate("http://localhost/home#section", { history: "replace" });
       await router.start();
 
-      await router.navigate("home", {}, { reload: true });
+      await router.navigate("home", {}, undefined, { reload: true });
 
       expect(mockNav.currentUrl).toContain("#section");
     });
@@ -580,7 +586,7 @@ describe("Navigation Plugin — Lifecycle", () => {
       mockNav.navigate("http://localhost/home#section", { history: "replace" });
       await router.start();
 
-      await router.navigate("users.list", {}, { hash: "" });
+      await router.navigate("users.list", {}, undefined, { hash: "" });
 
       expect(mockNav.currentUrl).toBe("http://localhost/users/list");
     });
@@ -589,7 +595,7 @@ describe("Navigation Plugin — Lifecycle", () => {
       mockNav.navigate("http://localhost/home#section", { history: "replace" });
       await router.start();
 
-      await router.navigate("users.list", {}, { hash: "footer" });
+      await router.navigate("users.list", {}, undefined, { hash: "footer" });
 
       expect(mockNav.currentUrl).toContain("#footer");
       expect(mockNav.currentUrl).not.toContain("#section");
@@ -604,7 +610,7 @@ describe("Navigation Plugin — Lifecycle", () => {
       await router.start();
 
       // No `hash` key in the options object — must preserve.
-      await router.navigate("users.list", {}, {});
+      await router.navigate("users.list", {}, undefined, {});
 
       expect(mockNav.currentUrl).toContain("#kept");
     });
@@ -615,7 +621,7 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       // Programmatic same-hash explicit — hashChanged must be false because
       // hash equals fromState.context.url.hash.
-      await router.navigate("users.list", {}, { hash: "x" });
+      await router.navigate("users.list", {}, undefined, { hash: "x" });
 
       const url = (
         router.getState()!.context as {
@@ -694,11 +700,11 @@ describe("Navigation Plugin — Lifecycle", () => {
 
       // Pass hashChange:true even though hash didn't change — subscriber
       // sees the explicit signal regardless of computed value.
-      await router.navigate(
-        "home",
-        {},
-        { hash: "x", hashChange: true, force: true },
-      );
+      await router.navigate("home", {}, undefined, {
+        hash: "x",
+        hashChange: true,
+        force: true,
+      });
 
       const state = router.getState();
       const url = (state!.context as { url?: { hashChanged: boolean } }).url;
@@ -714,25 +720,29 @@ describe("Navigation Plugin — Lifecycle", () => {
 
     it("router.buildUrl(name, params, { hash }) appends fragment", () => {
       expect(
-        router.buildUrl("users.view", { id: "1" }, { hash: "anchor" }),
+        router.buildUrl("users.view", { id: "1" }, undefined, {
+          hash: "anchor",
+        }),
       ).toBe("/users/view/1#anchor");
     });
 
     it("router.buildUrl encodes RFC-3986 unsafe chars but preserves sub-delims", () => {
       // space → %20, & preserved, # escaped to %23
-      expect(router.buildUrl("home", {}, { hash: "a b&c#d" })).toBe(
+      expect(router.buildUrl("home", {}, undefined, { hash: "a b&c#d" })).toBe(
         "/home#a%20b&c%23d",
       );
     });
 
     it("router.buildUrl strips leading # defensively", () => {
-      expect(router.buildUrl("home", {}, { hash: "#section" })).toBe(
+      expect(router.buildUrl("home", {}, undefined, { hash: "#section" })).toBe(
         "/home#section",
       );
     });
 
     it("router.buildUrl returns base URL when hash is empty string", () => {
-      expect(router.buildUrl("home", {}, { hash: "" })).toBe("/home");
+      expect(router.buildUrl("home", {}, undefined, { hash: "" })).toBe(
+        "/home",
+      );
     });
 
     it("router.buildUrl ignores hash option when it is undefined", () => {

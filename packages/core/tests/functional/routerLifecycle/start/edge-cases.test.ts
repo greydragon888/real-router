@@ -23,12 +23,15 @@ describe("router.start() - edge cases", () => {
 
   // Bare core does NOT validate param VALUES — value validation is opt-in via
   // @real-router/validation-plugin (#934/#942). A function / class instance /
-  // plain object is ACCEPTED: it round-trips into the query string and is kept
-  // BY REFERENCE in state.params (no structuredClone). These pin the documented
-  // carve-out. (The previous tests here CLAIMED bare core rejects these values —
-  // via a self-catching `try { … expect.fail() } catch { expect(e).toBeDefined() }`
-  // that swallowed its own AssertionError on a FALSE premise; bare core accepts
-  // them, so the assertions never ran. See #1189.)
+  // plain object is ACCEPTED and kept BY REFERENCE (no structuredClone). Because
+  // these keys are undeclared (not path `:param` slots on users.list, and not a
+  // `?query` declaration), an undeclared key in the params bag routes to
+  // state.params — NOT state.search / the URL query (RFC-4 M2 / #1548, decision
+  // 3a). These pin the documented carve-out. (The previous tests here CLAIMED
+  // bare core rejects these values — via a self-catching
+  // `try { … expect.fail() } catch { expect(e).toBeDefined() }` that swallowed its
+  // own AssertionError on a FALSE premise; bare core accepts them, so the
+  // assertions never ran. See #1189.)
   describe("param-value acceptance (validation is opt-in, #934/#942)", () => {
     beforeEach(async () => {
       await router.start("/home");
@@ -41,7 +44,7 @@ describe("router.start() - edge cases", () => {
       const state = await router.navigate("users.list", { extra: fn });
 
       expect(state.name).toBe("users.list");
-      expect(state.params.extra).toBe(fn); // same reference, not cloned/coerced
+      expect(state.params?.extra).toBe(fn); // same reference, not cloned/coerced
     });
 
     it("accepts a class-instance param value — resolves, kept by reference", async () => {
@@ -54,7 +57,7 @@ describe("router.start() - edge cases", () => {
       const state = await router.navigate("users.list", { extra: instance });
 
       expect(state.name).toBe("users.list");
-      expect(state.params.extra).toBe(instance);
+      expect(state.params?.extra).toBe(instance);
     });
 
     it("accepts a plain-object param value — resolves, kept by reference", async () => {
@@ -63,7 +66,7 @@ describe("router.start() - edge cases", () => {
       const state = await router.navigate("users.list", { extra: obj });
 
       expect(state.name).toBe("users.list");
-      expect(state.params.extra).toBe(obj);
+      expect(state.params?.extra).toBe(obj);
     });
   });
 

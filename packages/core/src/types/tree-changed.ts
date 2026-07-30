@@ -24,7 +24,11 @@ export type TreeStructuralPatch<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > = Pick<
   RouteConfigUpdate<Dependencies>,
-  "forwardTo" | "defaultParams" | "encodeParams" | "decodeParams"
+  | "forwardTo"
+  | "defaultParams"
+  | "defaultSearch"
+  | "encodeParams"
+  | "decodeParams"
 >;
 
 export interface TreeChangedAdd<

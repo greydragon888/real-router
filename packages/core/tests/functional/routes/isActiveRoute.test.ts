@@ -34,7 +34,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     it("should respect strictEquality", async () => {
       await router.navigate("sign-in");
 
-      expect(router.isActiveRoute("home", {}, true)).toBe(false);
+      expect(router.isActiveRoute("home", {}, undefined, true)).toBe(false);
     });
 
     it("should return false if router was not started", async () => {
@@ -62,7 +62,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       it("should return false for parent with strictEquality=true when child is active", async () => {
         await router.navigate("users.view", { id: "123" });
 
-        expect(router.isActiveRoute("users", {}, true)).toBe(false);
+        expect(router.isActiveRoute("users", {}, undefined, true)).toBe(false);
       });
 
       it("should return false for sibling route when another sibling is active", async () => {
@@ -108,12 +108,11 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
     describe("ignoreQueryParams", () => {
       it("should ignore query params by default (ignoreQueryParams=true)", async () => {
-        await router.navigate("section.query", {
-          section: "section1",
-          param1: "value1",
-          param2: "value2",
-          param3: "value3",
-        });
+        await router.navigate(
+          "section.query",
+          { section: "section1" },
+          { param1: "value1", param2: "value2", param3: "value3" },
+        );
 
         // Check with only URL param, ignoring query params
         expect(
@@ -122,24 +121,38 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should consider query params when ignoreQueryParams=false", async () => {
-        await router.navigate("section.query", {
-          section: "section1",
-          param1: "value1",
-          param2: "value2",
-          param3: "value3",
-        });
+        await router.navigate(
+          "section.query",
+          { section: "section1" },
+          { param1: "value1", param2: "value2", param3: "value3" },
+        );
 
         // With ignoreQueryParams=false, all params must match
         expect(
           router.isActiveRoute(
             "section.query",
             { section: "section1" },
+            undefined,
             false,
             false,
           ),
         ).toBe(false);
 
-        // All params match
+        // All params match — spelled in the channels the route declares them
+        // in. Since Phase 2 step 2-5 this predicate no longer re-routes a
+        // declared query key out of the params bag, so the query half must be
+        // handed through the query slot (the v1 single-bag spelling below is
+        // retired and answers false).
+        expect(
+          router.isActiveRoute(
+            "section.query",
+            { section: "section1" },
+            { param1: "value1", param2: "value2", param3: "value3" },
+            false,
+            false,
+          ),
+        ).toBe(true);
+
         expect(
           router.isActiveRoute(
             "section.query",
@@ -149,19 +162,19 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
               param2: "value2",
               param3: "value3",
             },
+            undefined,
             false,
             false,
           ),
-        ).toBe(true);
+        ).toBe(false);
       });
 
       it("should return false when query params differ and ignoreQueryParams=false", async () => {
-        await router.navigate("section.query", {
-          section: "section1",
-          param1: "value1",
-          param2: "value2",
-          param3: "value3",
-        });
+        await router.navigate(
+          "section.query",
+          { section: "section1" },
+          { param1: "value1", param2: "value2", param3: "value3" },
+        );
 
         // Different query param value
         expect(
@@ -173,6 +186,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
               param2: "value2",
               param3: "value3",
             },
+            undefined,
             false,
             false,
           ),
@@ -195,7 +209,9 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         expect(router.isActiveRoute("withDefaultParam", {})).toBe(true);
 
         // With strictEquality, should still work
-        expect(router.isActiveRoute("withDefaultParam", {}, true)).toBe(true);
+        expect(
+          router.isActiveRoute("withDefaultParam", {}, undefined, true),
+        ).toBe(true);
       });
     });
 
@@ -256,7 +272,8 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         routesApi.add({
           name: "products",
           path: "/products?sort",
-          defaultParams: { sort: "asc" },
+          // `sort` is query-declared → defaultSearch (RFC-4 M2 / #1548, rule 1).
+          defaultSearch: { sort: "asc" },
           children: [{ name: "detail", path: "/:id" }],
         });
       });
@@ -268,13 +285,17 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         // Parent has defaultParams.sort = "asc"; with ignoreQueryParams=true
         // the query-typed default must be stripped before comparison so the
         // ancestor link still highlights as active.
-        expect(router.isActiveRoute("products", {}, false, true)).toBe(true);
+        expect(
+          router.isActiveRoute("products", {}, undefined, false, true),
+        ).toBe(true);
       });
 
       it("still enforces query default when ignoreQueryParams=false", async () => {
         await router.navigate("products.detail", { id: "6" });
 
-        expect(router.isActiveRoute("products", {}, false, false)).toBe(false);
+        expect(
+          router.isActiveRoute("products", {}, undefined, false, false),
+        ).toBe(false);
       });
 
       it("treats descendant link as inactive when current state is the parent", async () => {
@@ -287,42 +308,50 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("preserves URL-typed defaults during the strip (URL key first)", async () => {
-        // URL key first in iteration order — the stripper sees the URL key
-        // BEFORE allocating `filtered`, so the URL key never enters the
-        // append branch. It still survives because the final return uses
-        // the original `defaultParams` reference when no query was found —
-        // here `q` IS query, so `filtered` is allocated when q is reached
-        // and contains the slot prefix from the inner break loop.
+        // Mixed defaults split by channel (RFC-4 M2 / #1548, rule 1): the
+        // path-typed `slot` stays in defaultParams (always enforced), the
+        // query-declared `q` moves to defaultSearch (stripped when
+        // ignoreQueryParams=true). The parent link stays active iff `slot` matches.
         routesApi.add({
           name: "mixedA",
           path: "/mixedA/:slot?q",
-          defaultParams: { slot: "a", q: "x" },
+          defaultParams: { slot: "a" },
+          defaultSearch: { q: "x" },
           children: [{ name: "leaf", path: "/leaf" }],
         });
 
         await router.navigate("mixedA.leaf", { slot: "b" });
 
-        expect(router.isActiveRoute("mixedA", {}, false, true)).toBe(false);
+        expect(router.isActiveRoute("mixedA", {}, undefined, false, true)).toBe(
+          false,
+        );
 
         await router.navigate("mixedA.leaf", { slot: "a" });
 
-        expect(router.isActiveRoute("mixedA", {}, false, true)).toBe(true);
+        expect(router.isActiveRoute("mixedA", {}, undefined, false, true)).toBe(
+          true,
+        );
       });
 
       it("strips multiple consecutive query defaults", async () => {
-        // Two query defaults in a row — exercises the `filtered !== null`
-        // branch on the second query key (no re-allocation).
+        // Two query-declared defaults (`a`, `b`) move to defaultSearch; the
+        // non-query `slot` stays in defaultParams (RFC-4 M2 / #1548, rule 1).
+        // With ignoreQueryParams=true both query defaults are stripped, leaving
+        // only the path-channel `slot` to be enforced.
         routesApi.add({
           name: "twoQ",
           path: "/twoQ?a&b&:slot",
-          defaultParams: { a: "1", b: "2", slot: "x" },
+          defaultParams: { slot: "x" },
+          defaultSearch: { a: "1", b: "2" },
           children: [{ name: "leaf", path: "/leaf" }],
         });
 
         await router.navigate("twoQ.leaf", { slot: "x" });
 
         // Both `a` and `b` are query defaults → stripped; URL slot enforced.
-        expect(router.isActiveRoute("twoQ", {}, false, true)).toBe(true);
+        expect(router.isActiveRoute("twoQ", {}, undefined, false, true)).toBe(
+          true,
+        );
       });
 
       it("keeps defaults untouched when none are query-typed (url-only meta)", async () => {
@@ -338,27 +367,34 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
         await router.navigate("urlOnly.leaf", { slot: "a" });
 
-        expect(router.isActiveRoute("urlOnly", {}, false, true)).toBe(true);
+        expect(
+          router.isActiveRoute("urlOnly", {}, undefined, false, true),
+        ).toBe(true);
       });
 
       it("preserves URL-typed defaults during the strip (query key first)", async () => {
-        // Query key first in iteration order — `filtered` is allocated on
-        // the first iteration and the subsequent URL key flows into the
-        // `filtered[key] = defaultParams[key]` append branch.
+        // Same split as mixedA, query key declared first (RFC-4 M2 / #1548,
+        // rule 1): query-declared `q` → defaultSearch, path-typed `slot` →
+        // defaultParams. The parent link stays active iff `slot` matches.
         routesApi.add({
           name: "mixedB",
           path: "/mixedB/:slot?q",
-          defaultParams: { q: "x", slot: "a" },
+          defaultParams: { slot: "a" },
+          defaultSearch: { q: "x" },
           children: [{ name: "leaf", path: "/leaf" }],
         });
 
         await router.navigate("mixedB.leaf", { slot: "a" });
 
-        expect(router.isActiveRoute("mixedB", {}, false, true)).toBe(true);
+        expect(router.isActiveRoute("mixedB", {}, undefined, false, true)).toBe(
+          true,
+        );
 
         await router.navigate("mixedB.leaf", { slot: "b" });
 
-        expect(router.isActiveRoute("mixedB", {}, false, true)).toBe(false);
+        expect(router.isActiveRoute("mixedB", {}, undefined, false, true)).toBe(
+          false,
+        );
       });
     });
 
@@ -384,11 +420,17 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         expect(router.isActiveRoute("users", {})).toBe(true);
       });
 
-      it("should use strict equality for param comparison (number !== string)", async () => {
+      it("should match a number against the same value as a string (#1554)", async () => {
         await router.navigate("users.view", { id: "123" });
 
-        // 123 !== "123" with strict equality
-        expect(router.isActiveRoute("users.view", { id: 123 })).toBe(false);
+        // Provenance tolerance (#1554): `123` and `"123"` build the same path
+        // (`/users/123`), so the comparison must not depend on which side wrote
+        // a string — the URL decode always does, a caller often does not. This
+        // replaced the former strict-`===` pin (`number !== string`).
+        expect(router.isActiveRoute("users.view", { id: 123 })).toBe(true);
+
+        // Still discriminating: a value that prints differently stays unequal.
+        expect(router.isActiveRoute("users.view", { id: 124 })).toBe(false);
       });
 
       it("should not match null against string param", async () => {
@@ -401,10 +443,14 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       it("should handle undefined in hierarchical check (parent route)", async () => {
         await router.navigate("users.view", { id: "123" });
 
-        // Hierarchical check uses paramsMatch
-        // { id: undefined } means "id must be undefined in activeState"
-        // activeState.params.id === "123", so undefined !== "123" → false
-        expect(router.isActiveRoute("users", { id: undefined })).toBe(false);
+        // `undefined` is ABSENCE, not a value to match against (#1550 / #1551).
+        // Step 2-5 put this predicate on the same `canonicalize` every other
+        // producer uses, and its path-channel entry guard strips undefined-valued
+        // keys — so `{ id: undefined }` says nothing about `id` and the ancestor
+        // stays active. Before, this one predicate read it as "id must BE
+        // undefined", which was the last place in core where undefined meant
+        // something other than absence.
+        expect(router.isActiveRoute("users", { id: undefined })).toBe(true);
 
         // But checking with matching value works
         expect(router.isActiveRoute("users", { id: "123" })).toBe(true);
@@ -437,14 +483,26 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         await router.navigate("users.view", { id: "123" });
 
         // Explicit boolean values work correctly
-        expect(router.isActiveRoute("users", {}, false)).toBe(true); // hierarchical
-        expect(router.isActiveRoute("users", {}, true)).toBe(false); // strict
+        expect(router.isActiveRoute("users", {}, undefined, false)).toBe(true); // hierarchical
+        expect(router.isActiveRoute("users", {}, undefined, true)).toBe(false); // strict
 
         expect(
-          router.isActiveRoute("users.view", { id: "123" }, false, true),
+          router.isActiveRoute(
+            "users.view",
+            { id: "123" },
+            undefined,
+            false,
+            true,
+          ),
         ).toBe(true);
         expect(
-          router.isActiveRoute("users.view", { id: "123" }, false, false),
+          router.isActiveRoute(
+            "users.view",
+            { id: "123" },
+            undefined,
+            false,
+            false,
+          ),
         ).toBe(true);
       });
     });
@@ -483,15 +541,16 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
           filter: "active",
         });
 
-        // Passing undefined for filter overrides the default
-        // effectiveParams = { ...{filter: "active"}, ...{filter: undefined} }
-        // = { filter: undefined }
-        // Then undefined !== "active" → false
+        // `undefined` is ABSENCE on both sides of the merge (#1550 / #1551), so
+        // it does NOT override the route default — the default keeps the slot and
+        // matches the active state. Renamed in step 2-5: the predicate now shares
+        // `canonicalize` with every other producer, where this rule has always
+        // held; it used to be the one place that read undefined as a value.
         expect(
           router.isActiveRoute("usersFiltered", {
             filter: undefined,
           }),
-        ).toBe(false);
+        ).toBe(true);
       });
 
       it("should use defaultParams when param is not provided", async () => {
@@ -519,6 +578,155 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
           router.isActiveRoute("usersFiltered", { filter: "active" }),
         ).toBe(false);
       });
+    });
+  });
+
+  describe("defaultSearch hierarchical (#1549)", () => {
+    it("parent defaultSearch must match the active descendant when query is not ignored", async () => {
+      routesApi.add({
+        name: "tagged",
+        path: "/tagged?tag",
+        defaultSearch: { tag: "on" },
+        children: [{ name: "view", path: "/view/:id" }],
+      });
+
+      // Active descendant carries the parent's query default (tag=on): with query
+      // considered (ignoreQueryParams=false), the parent's defaultSearch matches
+      // the active descendant → the parent is active.
+      await router.navigate("tagged.view", { id: "1" }, { tag: "on" });
+
+      expect(router.isActiveRoute("tagged", {}, {}, false, false)).toBe(true);
+
+      // Descendant carries a DIFFERENT query value → the parent's defaultSearch no
+      // longer matches → the parent is not active (query-sensitive).
+      await router.navigate("tagged.view", { id: "2" }, { tag: "off" });
+
+      expect(router.isActiveRoute("tagged", {}, {}, false, false)).toBe(false);
+    });
+  });
+
+  describe("forwardTo destination arm (#1573)", () => {
+    /**
+     * `isActiveRoute` compared the given name against the committed state and
+     * never resolved `forwardTo`, so a `<Link to="alias">` was dark on the very
+     * page it navigates to.
+     *
+     * The arm is a FALLBACK — `literal || destination` — and the destination is
+     * a repeat of the SAME predicate on the full output of stage ①, i.e. the
+     * resolved name together with the chain's defaults layered into the
+     * target's channels. Substituting only the name does not work: the default
+     * lives on the SOURCE route and is layered by `forwardState`, never by the
+     * forward map, and a dynamic `forwardTo` is not in that map at all.
+     */
+    afterEach(() => {
+      router.stop();
+    });
+
+    it("highlights an alias whose chain default is layered into a PATH slot", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "d2", path: "/d2/:z" },
+        { name: "s2", path: "/s2", forwardTo: "d2", defaultParams: { z: "5" } },
+      ]);
+      await router.start("/home");
+
+      const state = await router.navigate("s2", {});
+
+      expect(state.path).toBe("/d2/5");
+      // The link the user clicked lands exactly here, so it must read active.
+      expect(router.isActiveRoute("s2", {})).toBe(true);
+    });
+
+    it("highlights an alias whose chain default is layered into the QUERY channel", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "d", path: "/d?z" },
+        { name: "s", path: "/s", forwardTo: "d", defaultSearch: { z: "5" } },
+      ]);
+      await router.start("/home");
+
+      const state = await router.navigate("s", {});
+
+      expect(state.path).toBe("/d?z=5");
+      // Sharper than the path case: the arm matches only if the repeat carries
+      // the SEARCH channel too. The hop spells the default in `defaultSearch`,
+      // the slot that says "query" — nothing is routed by the target, so the
+      // predicate and the navigation read the same two channels.
+      expect(router.isActiveRoute("s", {}, {}, false, false)).toBe(true);
+    });
+
+    it("highlights an alias whose forwardTo is DYNAMIC", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "d3", path: "/d3" },
+        { name: "dyn", path: "/dyn", forwardTo: () => "d3" },
+      ]);
+      await router.start("/home");
+      await router.navigate("dyn", {});
+
+      // A function target is absent from the static forward map entirely.
+      expect(router.isActiveRoute("dyn", {})).toBe(true);
+    });
+
+    it("keeps a section link lit when a SIBLING descendant is active", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "users",
+          path: "/users",
+          forwardTo: "users.list",
+          children: [
+            { name: "list", path: "/list" },
+            { name: "profile", path: "/profile/:id" },
+          ],
+        },
+      ]);
+      await router.start("/home");
+      await router.navigate("users.profile", { id: "7" });
+
+      // The literal arm answers this one. Resolving BEFORE comparing (instead
+      // of falling back) would send `users` to `users.list` and darken the
+      // section link — which is why the arm is a fallback, not a replacement.
+      expect(router.isActiveRoute("users")).toBe(true);
+    });
+
+    it("stays false when the alias lands on a DIFFERENT page", async () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "other", path: "/other" },
+        { name: "alias", path: "/alias", forwardTo: "other" },
+        { name: "elsewhere", path: "/elsewhere" },
+      ]);
+      await router.start("/home");
+      await router.navigate("elsewhere", {});
+
+      // Discrimination: the arm must not turn the predicate into a tautology.
+      expect(router.isActiveRoute("alias")).toBe(false);
+      expect(router.isActiveRoute("other")).toBe(false);
+    });
+
+    it("answers false, not throws, when a dynamic forwardTo callback throws", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "boom",
+          path: "/boom",
+          forwardTo: () => {
+            throw new Error("dynamic forward exploded");
+          },
+        },
+      ]);
+      await router.start("/home");
+
+      // A predicate on the render path must never throw — six adapters call it
+      // for every `<Link>`.
+      expect(() => router.isActiveRoute("boom")).not.toThrow();
+      expect(router.isActiveRoute("boom")).toBe(false);
+      expect(warnSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
     });
   });
 });

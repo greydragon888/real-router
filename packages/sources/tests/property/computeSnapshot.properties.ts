@@ -9,7 +9,7 @@ import {
   createStartedRouter,
   executeNavigations,
   NUM_RUNS,
-  paramsForRoute,
+  channelsForRoute,
 } from "./helpers";
 import { computeSnapshot } from "../../src/computeSnapshot.js";
 
@@ -44,9 +44,11 @@ describe("computeSnapshot — invariants", () => {
     async (nodeName, routeName) => {
       const router = await createStartedRouter();
 
-      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
-        // ignore
-      });
+      await router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {
+          // ignore
+        });
 
       const route = router.getState();
 
@@ -89,9 +91,11 @@ describe("computeSnapshot — invariants", () => {
 
       const router = await createStartedRouter();
 
-      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
-        // ignore
-      });
+      await router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {
+          // ignore
+        });
 
       const snap = computeSnapshot(INITIAL_SNAPSHOT, router, routeName);
 
@@ -109,9 +113,11 @@ describe("computeSnapshot — invariants", () => {
 
       const router = await createStartedRouter();
 
-      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
-        // ignore
-      });
+      await router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {
+          // ignore
+        });
 
       const snap = computeSnapshot(INITIAL_SNAPSHOT, router, "users");
 
@@ -132,9 +138,11 @@ describe("computeSnapshot — invariants", () => {
 
       const router = await createStartedRouter();
 
-      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
-        // SAME_STATES is expected when targeting the boot route ("home")
-      });
+      await router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {
+          // SAME_STATES is expected when targeting the boot route ("home")
+        });
 
       const snap = computeSnapshot(INITIAL_SNAPSHOT, router, nodeName);
 
@@ -160,9 +168,11 @@ describe("computeSnapshot — nodeName containment monotonicity", () => {
 
       const router = await createStartedRouter();
 
-      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
-        // ignore
-      });
+      await router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {
+          // ignore
+        });
 
       const leafName = routeName;
       const ancestorName = leafName.slice(0, leafName.lastIndexOf("."));
@@ -191,9 +201,11 @@ describe("computeSnapshot — nodeName containment monotonicity", () => {
 
       const router = await createStartedRouter();
 
-      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
-        // ignore
-      });
+      await router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {
+          // ignore
+        });
 
       const rootSnap = computeSnapshot(INITIAL_SNAPSHOT, router, "");
       const nodeSnap = computeSnapshot(INITIAL_SNAPSHOT, router, routeName);
@@ -310,7 +322,7 @@ describe("computeSnapshot — boundary cases (audit §6.2)", () => {
   test("nodeName='users' + currentRoute='search' → no false positive (route is undefined)", async () => {
     const router = await createStartedRouter();
 
-    await router.navigate("search", { q: "x", page: "1" });
+    await router.navigate("search", {}, { q: "x", page: "1" });
 
     const snap = computeSnapshot(INITIAL_SNAPSHOT, router, "users");
 
@@ -374,9 +386,11 @@ describe("computeSnapshot — hash-flip propagation through stabilizeState (audi
     async (routeName) => {
       const router = await createStartedRouter();
 
-      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
-        // ignore SAME_STATES on `home`
-      });
+      await router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {
+          // ignore SAME_STATES on `home`
+        });
 
       const baseRoute = router.getState();
 
@@ -411,9 +425,11 @@ describe("computeSnapshot — hash-flip propagation through stabilizeState (audi
     async (routeName) => {
       const router = await createStartedRouter();
 
-      await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {
-        // ignore
-      });
+      await router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {
+          // ignore
+        });
 
       const baseRoute = router.getState();
 

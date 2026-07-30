@@ -23,8 +23,8 @@ export function QueryDemo(): JSX.Element {
 
   useRouteAnimation(ref, { entryClass: "fade-in", exitClass: "fade-out" });
 
-  const { route } = useRoute<{ filter?: Filter }>();
-  const filter = route.params.filter ?? "all";
+  const { route } = useRoute();
+  const filter = route.search.filter ?? "all";
 
   const visible = useMemo(() => {
     return filter === "all"
@@ -53,7 +53,7 @@ export function QueryDemo(): JSX.Element {
           <Link
             key={value}
             routeName="queryDemo"
-            routeParams={{ filter: value }}
+            routeSearch={{ filter: value }}
             ignoreQueryParams={false}
           >
             {value}

@@ -3,6 +3,7 @@ import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
 import {
+  assertRouteDefaultChannelsFor,
   clearConfigEntries,
   removeFromDefinitions,
 } from "../namespaces/RoutesNamespace/helpers";
@@ -36,6 +37,8 @@ import type {
   ForwardToCallback,
   NavigationOptions,
   Params,
+  ParamsSearch,
+  SearchParams,
   Router,
   RouterLogger,
   State,
@@ -78,6 +81,7 @@ function clearRouteConfigurations<
   clearConfigEntries(config.decoders, shouldClear);
   clearConfigEntries(config.encoders, shouldClear);
   clearConfigEntries(config.defaultParams, shouldClear);
+  clearConfigEntries(config.defaultSearch, shouldClear);
   clearConfigEntries(config.forwardMap, shouldClear);
   clearConfigEntries(config.forwardFnMap, shouldClear);
   clearConfigEntries(routeCustomFields, shouldClear);
@@ -136,6 +140,10 @@ function assignRouteConfig<
 
   if (lookupName in config.defaultParams) {
     route.defaultParams = config.defaultParams[lookupName];
+  }
+
+  if (lookupName in config.defaultSearch) {
+    route.defaultSearch = config.defaultSearch[lookupName];
   }
 
   if (lookupName in config.decoders) {
@@ -362,8 +370,9 @@ function buildStructuralPatch<
 >(fields: {
   forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
   defaultParams?: Params | null | undefined;
-  decodeParams?: ((params: Params) => Params) | null | undefined;
-  encodeParams?: ((params: Params) => Params) | null | undefined;
+  defaultSearch?: SearchParams | null | undefined;
+  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+  encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 }): Readonly<TreeStructuralPatch<Dependencies>> {
   const patch: TreeStructuralPatch<Dependencies> = {};
 
@@ -373,6 +382,10 @@ function buildStructuralPatch<
 
   if (fields.defaultParams !== undefined) {
     patch.defaultParams = fields.defaultParams;
+  }
+
+  if (fields.defaultSearch !== undefined) {
+    patch.defaultSearch = fields.defaultSearch;
   }
 
   if (fields.encodeParams !== undefined) {
@@ -409,6 +422,15 @@ function addRoutes<
   assertAddable(store, routes, parentName);
 
   const artifacts = buildAddArtifacts(store, routes, parentName, logger);
+
+  // Config-time channel check on the PREPARED artifacts, in PREPARE — the same
+  // position `replace` gives it, and for the same reason (a throw must precede
+  // every mutation, not merely the swap).
+  assertRouteDefaultChannelsFor(
+    artifacts.matcher,
+    artifacts.config,
+    "addRoute",
+  );
 
   // Pre-flight the #961 handler-limit into PREPARE so a limit-exceeding batch
   // aborts before the swap (#1046). `add` does not clear guards, so the
@@ -472,6 +494,18 @@ function replaceRoutes<
     store.rootPath,
     store.matcherOptions,
     ctx.logger,
+  );
+
+  // Config-time channel check BEFORE clearDefinitionGuards mutates. It used to
+  // live inside `adoptRouteArtifacts`, one line before the swap — early enough
+  // for `add`, too late here: a refused batch left the tree intact and the old
+  // definition guards ERASED, so a guarded route became freely activatable. Same
+  // fail-open shape #1046 and #1193 hoisted their own throws out of, now for the
+  // third throwing step this path grew.
+  assertRouteDefaultChannelsFor(
+    artifacts.matcher,
+    artifacts.config,
+    "addRoute",
   );
 
   // Pre-flight the #961 handler-limit BEFORE clearDefinitionGuards mutates, so a
@@ -543,6 +577,7 @@ function replaceRoutes<
         const { toDeactivate, toActivate } = getTransitionPath(
           revalidated,
           currentState,
+          ctx.getMetaForState,
         );
 
         const allowed =

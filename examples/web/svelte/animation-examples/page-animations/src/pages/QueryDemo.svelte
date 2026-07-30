@@ -21,10 +21,10 @@
   useRouteAnimation(() => ref, { entryClass: "fade-in", exitClass: "fade-out" });
   useListFlip(() => listRef);
 
-  const { route } = useRoute<{ filter?: Filter }>();
+  const { route } = useRoute();
 
   const filter: Filter = $derived(
-    (route.current.params.filter as Filter | undefined) ?? "all",
+    (route.current.search.filter as Filter | undefined) ?? "all",
   );
 
   const visible = $derived.by(() =>
@@ -54,7 +54,7 @@
     {#each FILTERS as value}
       <Link
         routeName="queryDemo"
-        routeParams={{ filter: value }}
+        routeSearch={{ filter: value }}
         ignoreQueryParams={false}
       >
         {value}

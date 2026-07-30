@@ -14,6 +14,7 @@ import type {
   Router,
   GuardFnFactory,
   Params,
+  ParamsSearch,
   RouteConfigUpdate,
   RouterError,
   RoutesApi,
@@ -285,10 +286,12 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("decodeParams", () => {
     it("should add decodeParams", () => {
-      const decoder = vi.fn((params: Params): Params => ({
-        ...params,
-        id: Number(params.id),
-      }));
+      const decoder = vi.fn(
+        ({ params, search }: ParamsSearch): ParamsSearch => ({
+          params: { ...params, id: Number(params.id) },
+          search,
+        }),
+      );
 
       routesApi.add({ name: "ur-items", path: "/ur-items/:id" });
       routesApi.update("ur-items", { decodeParams: decoder });
@@ -301,11 +304,18 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should update existing decodeParams", () => {
-      const decoder1 = vi.fn((params: Params): Params => params);
-      const decoder2 = vi.fn((params: Params): Params => ({
-        ...params,
-        id: Number(params.id),
-      }));
+      const decoder1 = vi.fn(
+        ({ params, search }: ParamsSearch): ParamsSearch => ({
+          params,
+          search,
+        }),
+      );
+      const decoder2 = vi.fn(
+        ({ params, search }: ParamsSearch): ParamsSearch => ({
+          params: { ...params, id: Number(params.id) },
+          search,
+        }),
+      );
 
       routesApi.add({
         name: "ur-products",
@@ -322,10 +332,12 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should remove decodeParams when null", () => {
-      const decoder = vi.fn((params: Params): Params => ({
-        ...params,
-        decoded: true,
-      }));
+      const decoder = vi.fn(
+        ({ params, search }: ParamsSearch): ParamsSearch => ({
+          params: { ...params, decoded: true },
+          search,
+        }),
+      );
 
       routesApi.add({
         name: "ur-assets",
@@ -355,7 +367,10 @@ describe("core/routes/routeTree/updateRoute", () => {
         path: "/ur-decode-test/:id",
       });
       routesApi.update("ur-decode-test", {
-        decodeParams: (params) => ({ ...params, id: Number(params.id) }),
+        decodeParams: ({ params, search }) => ({
+          params: { ...params, id: Number(params.id) },
+          search,
+        }),
       });
 
       const state = getPluginApi(router).matchPath("/ur-decode-test/123");
@@ -371,7 +386,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
       routesApi.update("ur-decode-undef", {
         // Decoder that returns undefined (bad user code)
-        decodeParams: () => undefined as unknown as Params,
+        decodeParams: () => undefined as unknown as ParamsSearch,
       });
 
       // Should fallback to original params
@@ -383,10 +398,12 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("encodeParams", () => {
     it("should add encodeParams", () => {
-      const encoder = vi.fn((params: Params): Params => ({
-        ...params,
-        id: String(params.id as string | number),
-      }));
+      const encoder = vi.fn(
+        ({ params, search }: ParamsSearch): ParamsSearch => ({
+          params: { ...params, id: String(params.id as string | number) },
+          search,
+        }),
+      );
 
       routesApi.add({ name: "ur-goods", path: "/ur-goods/:id" });
       routesApi.update("ur-goods", { encodeParams: encoder });
@@ -394,15 +411,22 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Verify via buildPath
       router.buildPath("ur-goods", { id: 123 });
 
-      expect(encoder).toHaveBeenCalledWith({ id: 123 });
+      expect(encoder).toHaveBeenCalledWith({ params: { id: 123 }, search: {} });
     });
 
     it("should update existing encodeParams", () => {
-      const encoder1 = vi.fn((params: Params): Params => params);
-      const encoder2 = vi.fn((params: Params): Params => ({
-        ...params,
-        id: String(params.id as string | number),
-      }));
+      const encoder1 = vi.fn(
+        ({ params, search }: ParamsSearch): ParamsSearch => ({
+          params,
+          search,
+        }),
+      );
+      const encoder2 = vi.fn(
+        ({ params, search }: ParamsSearch): ParamsSearch => ({
+          params: { ...params, id: String(params.id as string | number) },
+          search,
+        }),
+      );
 
       routesApi.add({
         name: "ur-things",
@@ -418,7 +442,12 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should remove encodeParams when null", () => {
-      const encoder = vi.fn((params: Params): Params => params);
+      const encoder = vi.fn(
+        ({ params, search }: ParamsSearch): ParamsSearch => ({
+          params,
+          search,
+        }),
+      );
 
       routesApi.add({
         name: "ur-stuff",
@@ -447,10 +476,10 @@ describe("core/routes/routeTree/updateRoute", () => {
         path: "/ur-encode-test/:id",
       });
       routesApi.update("ur-encode-test", {
-        encodeParams: (params) => {
+        encodeParams: ({ params, search }) => {
           const idValue = params.id as string;
 
-          return { ...params, id: `user-${idValue}` };
+          return { params: { ...params, id: `user-${idValue}` }, search };
         },
       });
 
@@ -466,7 +495,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
       routesApi.update("ur-encode-undef", {
         // Encoder that returns undefined (bad user code)
-        encodeParams: () => undefined as unknown as Params,
+        encodeParams: () => undefined as unknown as ParamsSearch,
       });
 
       // Should fallback to original params
@@ -916,7 +945,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Valid function for decodeParams
       expect(() => {
         routesApi.update("ur-valid-test", {
-          decodeParams: (params) => params,
+          decodeParams: ({ params, search }) => ({ params, search }),
         });
       }).not.toThrow();
 
@@ -928,7 +957,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Valid function for encodeParams
       expect(() => {
         routesApi.update("ur-valid-test", {
-          encodeParams: (params) => params,
+          encodeParams: ({ params, search }) => ({ params, search }),
         });
       }).not.toThrow();
 
@@ -953,7 +982,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("multiple updates", () => {
     it("should update multiple properties at once", async () => {
-      const decoder = (params: Params): Params => params;
+      const decoder = ({ params, search }: ParamsSearch): ParamsSearch => ({
+        params,
+        search,
+      });
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: GuardFnFactory = () => guard;
 
@@ -1222,9 +1254,12 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         const decoder = {
           prefix: "decoded_",
-          decode(params: Params): Params {
-            // eslint-disable-next-line unicorn/no-this-outside-of-class -- intentional: this test verifies an object method using `this` works as decodeParams
-            return { ...params, tag: this.prefix + (params.id as string) };
+          decode({ params, search }: ParamsSearch): ParamsSearch {
+            return {
+              // eslint-disable-next-line unicorn/no-this-outside-of-class -- object-method decoder deliberately reads its own `prefix` via `this` (the test binds it)
+              params: { ...params, tag: this.prefix + (params.id as string) },
+              search,
+            };
           },
         };
 
@@ -1241,9 +1276,9 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.add({ name: "ur-arrow", path: "/ur-arrow/:id" });
 
         routesApi.update("ur-arrow", {
-          encodeParams: (params) => ({
-            ...params,
-            id: (params.id as string).toUpperCase(),
+          encodeParams: ({ params, search }) => ({
+            params: { ...params, id: (params.id as string).toUpperCase() },
+            search,
           }),
         });
 
@@ -1319,7 +1354,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         routesApi.update("ur-indep", { defaultParams: { page: 1 } });
         routesApi.update("ur-indep", {
-          decodeParams: (p) => ({ ...p, decoded: true }),
+          decodeParams: ({ params, search }) => ({
+            params: { ...params, decoded: true },
+            search,
+          }),
         });
 
         // defaultParams should still be set
@@ -1537,7 +1575,10 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(router.getState()?.path).toBe("/items/abc");
 
       routesApi.update("items", {
-        encodeParams: (params) => ({ id: `X-${params.id as string}` }),
+        encodeParams: ({ params, search }) => ({
+          params: { id: `X-${params.id as string}` },
+          search,
+        }),
       });
 
       // update() does not revalidate the active state (by-design: no tree

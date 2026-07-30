@@ -238,16 +238,12 @@ const arbNonAsciiStaticPath = fc
  * `:b?<abc>` reverse-typo form is now caught as an optional, removed, before the
  * query check.)
  */
-const arbMalformedQueryDeclarationPath = fc.oneof(
-  // §5.1: a '<' in the query name (never round-trips)
-  fc
-    .tuple(arbSafeSegment, arbSafeSegment, arbSafeSegment)
-    .map(([seg, qname, body]) => `/${seg}?${qname}<${body}`),
-  // §5.3: query name collides with a path-param name
-  fc
-    .tuple(arbSafeSegment, arbSafeSegment)
-    .map(([seg, name]) => `/${seg}/:${name}?${name}`),
-);
+// §5.1: a '<' in the query name (never round-trips). (§5.3 path/query name
+// collisions like `/a/:tab?tab` are LEGAL under M2 / #1548 — the two live in
+// separate `params`/`search` channels — so they are no longer generated here.)
+const arbMalformedQueryDeclarationPath = fc
+  .tuple(arbSafeSegment, arbSafeSegment, arbSafeSegment)
+  .map(([seg, qname, body]) => `/${seg}?${qname}<${body}`);
 
 /**
  * A `<...>` constraint filling a STATIC segment — no `:`/`*` marker (`/foo<abc>`,
@@ -496,9 +492,9 @@ describe("Route Path Validation", () => {
     );
   });
 
-  describe("14: malformed query-param declaration rejection — '<>' in a query name or a path/query name collision throws (high)", () => {
+  describe("14: malformed query-param declaration rejection — '<>' in a query name throws (high)", () => {
     test.prop([arbMalformedQueryDeclarationPath], { numRuns: NUM_RUNS.fast })(
-      "a query name carrying '<>' or colliding with a path param throws (gate-level, consistent with path-matcher #1242)",
+      "a query name carrying '<>' throws (gate-level, consistent with path-matcher #1242 §5.1)",
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");

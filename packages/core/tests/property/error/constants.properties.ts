@@ -175,8 +175,9 @@ describe("RouterError Constants Properties", () => {
   describe("errorCodes backward compatibility", () => {
     it("errorCodes contains exact number of codes", () => {
       // If this number changes, it may break backward compatibility.
-      // 14 since REENTRANT_TREE_MUTATION was added (reentrant route-CRUD ban, #1032).
-      const expectedCount = 14;
+      // 15 since WRONG_CHANNEL was added (always-on channel guard, #1572);
+      // 14 was the count from REENTRANT_TREE_MUTATION (reentrant route-CRUD ban, #1032).
+      const expectedCount = 15;
       const actualCount = Object.keys(errorCodes).length;
 
       expect(actualCount).toBe(expectedCount);
@@ -197,6 +198,7 @@ describe("RouterError Constants Properties", () => {
         ROUTER_DISPOSED: "DISPOSED",
         PLUGIN_CONFLICT: "PLUGIN_CONFLICT",
         CONTEXT_NAMESPACE_ALREADY_CLAIMED: "CONTEXT_NAMESPACE_ALREADY_CLAIMED",
+        WRONG_CHANNEL: "WRONG_CHANNEL",
       };
 
       for (const [key, expectedValue] of Object.entries(expectedMapping)) {

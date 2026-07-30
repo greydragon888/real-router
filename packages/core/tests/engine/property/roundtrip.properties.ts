@@ -1,6 +1,6 @@
 // packages/route-tree/tests/property/roundtrip.properties.ts
 
-import { test } from "@fast-check/vitest";
+import { fc, test } from "@fast-check/vitest";
 
 import {
   arbArrayFormat,
@@ -69,8 +69,8 @@ describe("Roundtrip Properties", () => {
         const result = matcher.match(path);
 
         expect(result).toBeDefined();
-        expect(result!.params.q).toBe(q);
-        expect(result!.params.page).toBe(page);
+        expect(result!.search.q).toBe(q);
+        expect(result!.search.page).toBe(page);
       },
     );
   });
@@ -85,7 +85,7 @@ describe("Roundtrip Properties", () => {
 
         expect(result).toBeDefined();
 
-        const decoded = result!.params.tags as string | string[];
+        const decoded = result!.search.tags as string | string[];
 
         if (
           format === "brackets" ||
@@ -173,7 +173,69 @@ describe("Roundtrip Properties", () => {
         expect(paramsMeta.category).toBe("url");
         expect(paramsMeta.q).toBe("query");
         expect(result!.params.category).toBe(category);
-        expect(result!.params.q).toBe(q);
+        expect(result!.search.q).toBe(q);
+      },
+    );
+  });
+
+  describe("splat with a more-specific child (INVARIANTS Matching #24)", () => {
+    // A splat node's children match at the splat's OWN position, so the splat
+    // captures nothing for them. buildPath used to emit a value there anyway,
+    // printing a URL that fell back to the wildcard or matched nothing (#1568).
+    // The guard is a NAME roundtrip, not "matches something": the broken build
+    // did match — it just resolved to the parent.
+    const arbSegments = fc.array(
+      fc.stringMatching(/^[a-z][a-z0-9]{0,6}$/).filter((s) => s !== "index"),
+      { minLength: 1, maxLength: 3 },
+    );
+
+    // ⚠ The two generators are independent, so they CAN draw the same string —
+    // and then the fixture is genuinely ambiguous rather than broken: with
+    // `tail = ["t"]` and `fallback = "t"`, `buildPath("root.all", {rest:"t"})`
+    // emits `/root/t`, which the more-specific child `leaf` (`/t`) matches by
+    // design. The property then fails on correct behaviour. Filter the PAIR (not
+    // either generator alone — a filter over a single arbitrary here has nothing
+    // to reject against) so the drawn splat value never spells the child's own
+    // path. Verified: `[["t"],"t"]` reproduces identically on `f5d3125b7`, i.e.
+    // the flake predates the pipeline work and was only ever seed-dependent.
+    const arbDistinctPair = fc
+      .tuple(arbSegments, arbSplatValue)
+      .filter(([tail, fallback]) => fallback !== tail.join("/"));
+
+    test.prop([arbDistinctPair], { numRuns: NUM_RUNS.standard })(
+      "a route reached through a splat builds a URL that matches that same route",
+      ([tail, fallback]: [string[], string]) => {
+        const matcher = createMatcher();
+
+        matcher.registerTree(
+          createRouteTree("", "", [
+            {
+              name: "root",
+              path: "/root",
+              children: [
+                {
+                  name: "all",
+                  path: "/*rest",
+                  children: [{ name: "leaf", path: `/${tail.join("/")}` }],
+                },
+              ],
+            },
+          ]),
+        );
+
+        const childPath = matcher.buildPath("root.all.leaf", {});
+
+        expect(matcher.match(childPath)?.segments.at(-1)?.fullName).toBe(
+          "root.all.leaf",
+        );
+
+        // The splat still binds where it IS terminal — the collapse must not
+        // swallow the fallback route's own capture.
+        const splatPath = matcher.buildPath("root.all", { rest: fallback });
+        const splatResult = matcher.match(splatPath);
+
+        expect(splatResult?.segments.at(-1)?.fullName).toBe("root.all");
+        expect(splatResult?.params.rest).toBe(fallback);
       },
     );
   });

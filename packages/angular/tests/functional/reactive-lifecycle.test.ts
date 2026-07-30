@@ -125,6 +125,7 @@ describe("reactive lifecycle (#778)", () => {
           router,
           "users.view",
           params(),
+          undefined,
           {},
         );
         const unsubscribe = source.subscribe(() => {});

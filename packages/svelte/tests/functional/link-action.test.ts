@@ -62,7 +62,7 @@ describe("createLinkAction", () => {
       new MouseEvent("click", { bubbles: true, cancelable: true }),
     );
 
-    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, undefined, {});
   });
 
   it("delegated click with no registered link ancestor is ignored (#1253)", () => {
@@ -132,7 +132,12 @@ describe("createLinkAction", () => {
 
     await userEvent.click(button);
 
-    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      undefined,
+      {},
+    );
   });
 
   it.each([
@@ -220,7 +225,12 @@ describe("createLinkAction", () => {
 
     await userEvent.click(anchor);
 
-    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      undefined,
+      {},
+    );
   });
 
   it("should not set a11y attributes on button elements", () => {
@@ -255,7 +265,12 @@ describe("createLinkAction", () => {
 
     div.dispatchEvent(event);
 
-    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      undefined,
+      {},
+    );
   });
 
   it("should not navigate on Enter key for button elements", () => {
@@ -301,7 +316,12 @@ describe("createLinkAction", () => {
 
     div.dispatchEvent(event);
 
-    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      undefined,
+      {},
+    );
   });
 
   // Documents WAI-ARIA semantics: role="link" activates on Enter only,
@@ -363,6 +383,7 @@ describe("createLinkAction", () => {
     expect(router.navigate).toHaveBeenCalledWith(
       "items.item",
       { id: "456" },
+      undefined,
       {},
     );
   });
@@ -385,6 +406,7 @@ describe("createLinkAction", () => {
     expect(router.navigate).toHaveBeenCalledWith(
       "one-more-test",
       {},
+      undefined,
       { replace: true },
     );
   });
@@ -404,7 +426,12 @@ describe("createLinkAction", () => {
 
     await userEvent.click(button);
 
-    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      undefined,
+      {},
+    );
 
     vi.clearAllMocks();
 
@@ -412,7 +439,12 @@ describe("createLinkAction", () => {
 
     await userEvent.click(button);
 
-    expect(router.navigate).toHaveBeenCalledWith("items", { id: "123" }, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "items",
+      { id: "123" },
+      undefined,
+      {},
+    );
   });
 
   it("should throw error when used outside RouterProvider", () => {
@@ -480,13 +512,13 @@ describe("createLinkAction", () => {
 
     await userEvent.click(button1);
 
-    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, undefined, {});
 
     vi.clearAllMocks();
 
     await userEvent.click(button2);
 
-    expect(router.navigate).toHaveBeenCalledWith("about", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith("about", {}, undefined, {});
   });
 
   it("should not navigate when anchor has target=_blank", async () => {
@@ -536,7 +568,7 @@ describe("createLinkAction", () => {
     await userEvent.click(button);
 
     // <button target="_blank"> is not an anchor → instanceof check fails → navigate fires.
-    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, undefined, {});
   });
 
   it("div with target='_blank' attribute → still navigates", async () => {
@@ -557,7 +589,7 @@ describe("createLinkAction", () => {
     element.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
-    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, undefined, {});
   });
 
   // Closes review §5.11 row 12: mount → destroy → mount again must work.
@@ -593,7 +625,12 @@ describe("createLinkAction", () => {
     await userEvent.click(secondButton);
 
     expect(router.navigate).toHaveBeenCalledTimes(2);
-    expect(router.navigate).toHaveBeenLastCalledWith("about", {}, {});
+    expect(router.navigate).toHaveBeenLastCalledWith(
+      "about",
+      {},
+      undefined,
+      {},
+    );
   });
 
   // Closes review §5.11 row 15: `currentParams` is captured by closure and
@@ -617,7 +654,7 @@ describe("createLinkAction", () => {
     await userEvent.click(button);
 
     expect(navigateSpy).toHaveBeenCalledTimes(1);
-    expect(navigateSpy).toHaveBeenLastCalledWith("home", {}, {});
+    expect(navigateSpy).toHaveBeenLastCalledWith("home", {}, undefined, {});
 
     // Now update params. Since router.navigate was already called with the
     // OLD params, the in-flight call is unaffected. Pin: NO second call.
@@ -629,7 +666,7 @@ describe("createLinkAction", () => {
     await userEvent.click(button);
 
     expect(navigateSpy).toHaveBeenCalledTimes(2);
-    expect(navigateSpy).toHaveBeenLastCalledWith("about", {}, {});
+    expect(navigateSpy).toHaveBeenLastCalledWith("about", {}, undefined, {});
   });
 
   // #1253 — with event delegation the listeners live on `document`, not on the
@@ -690,7 +727,7 @@ describe("createLinkAction", () => {
     // The hash is NOT in the call arguments — confirms action uses
     // navigate directly, not navigateWithHash, and the unknown `hash`
     // field is ignored.
-    expect(router.navigate).toHaveBeenCalledWith("home", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith("home", {}, undefined, {});
     expect(router.navigate).not.toHaveBeenCalledWith(
       "home",
       expect.anything(),
@@ -715,6 +752,11 @@ describe("createLinkAction", () => {
     anchor.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
-    expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+    expect(router.navigate).toHaveBeenCalledWith(
+      "one-more-test",
+      {},
+      undefined,
+      {},
+    );
   });
 });

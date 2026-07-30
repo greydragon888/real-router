@@ -45,6 +45,11 @@ export class HomeComponent {
     const current = this.route.routeState().route;
 
     invalidate(this.router, "data");
-    void this.router.navigate(current.name, current.params, { reload: true });
+    void this.router.navigate(
+      current.name,
+      current.params,
+      undefined,
+      { reload: true },
+    );
   }
 }

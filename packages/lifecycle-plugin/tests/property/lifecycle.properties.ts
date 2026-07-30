@@ -12,6 +12,7 @@ import {
   NUM_RUNS,
 } from "./helpers";
 import { lifecyclePluginFactory } from "../../src";
+import { captureAsyncRethrows } from "../helpers";
 
 import type { LifecycleHookFactory } from "../../src";
 import type { Route } from "@real-router/core";
@@ -521,29 +522,19 @@ describe("onNavigate orthogonality survives a throwing onEnter (#798)", () => {
 
       // The isolated hook error is re-thrown asynchronously (queueMicrotask);
       // capture it so it does not fail the run, then restore listeners.
-      const rethrown: unknown[] = [];
-      const previousListeners = [...process.listeners("uncaughtException")];
-
-      process.removeAllListeners("uncaughtException");
-      const captureHandler = (error: unknown): void => {
-        rethrown.push(error);
-      };
-
-      process.on("uncaughtException", captureHandler);
+      const rethrown = captureAsyncRethrows();
 
       try {
         await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
         // Drain the start transition's re-throw, then isolate the navigation.
-        await Promise.resolve();
-        await Promise.resolve();
+        await rethrown.flush();
         onNavigate.mockClear();
-        rethrown.length = 0;
+        rethrown.errors.length = 0;
 
         await router.navigate(toRoute);
 
         // Drain the navigation's queueMicrotask-scheduled re-throw.
-        await Promise.resolve();
-        await Promise.resolve();
+        await rethrown.flush();
 
         // onEnter threw, yet onNavigate still fired for the target route —
         // the orthogonality invariant holds under a throwing sibling hook.
@@ -553,12 +544,9 @@ describe("onNavigate orthogonality survives a throwing onEnter (#798)", () => {
 
         expect(callsForTarget).toHaveLength(1);
         // The developer signal survived, surfaced asynchronously.
-        expect(rethrown).toStrictEqual([boom]);
+        expect(rethrown.errors).toStrictEqual([boom]);
       } finally {
-        process.removeListener("uncaughtException", captureHandler);
-        for (const listener of previousListeners) {
-          process.on("uncaughtException", listener);
-        }
+        rethrown.restore();
 
         router.stop();
       }
@@ -591,27 +579,17 @@ describe("onNavigate orthogonality survives a throwing onEnter FACTORY (#1222)",
 
       // The compile (factory) throw is isolated one seam earlier than the #798
       // body throw and re-thrown asynchronously — capture it, restore listeners.
-      const rethrown: unknown[] = [];
-      const previousListeners = [...process.listeners("uncaughtException")];
-
-      process.removeAllListeners("uncaughtException");
-      const captureHandler = (error: unknown): void => {
-        rethrown.push(error);
-      };
-
-      process.on("uncaughtException", captureHandler);
+      const rethrown = captureAsyncRethrows();
 
       try {
         await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
-        await Promise.resolve();
-        await Promise.resolve();
+        await rethrown.flush();
         onNavigate.mockClear();
-        rethrown.length = 0;
+        rethrown.errors.length = 0;
 
         await router.navigate(toRoute);
 
-        await Promise.resolve();
-        await Promise.resolve();
+        await rethrown.flush();
 
         const callsForTarget = onNavigate.mock.calls.filter(
           ([toState]) => toState.name === toRoute,
@@ -620,12 +598,9 @@ describe("onNavigate orthogonality survives a throwing onEnter FACTORY (#1222)",
         // onEnter FACTORY threw, yet onNavigate still fired — the orthogonality
         // invariant holds under a throwing factory, not just a throwing body.
         expect(callsForTarget).toHaveLength(1);
-        expect(rethrown).toStrictEqual([boom]);
+        expect(rethrown.errors).toStrictEqual([boom]);
       } finally {
-        process.removeListener("uncaughtException", captureHandler);
-        for (const listener of previousListeners) {
-          process.on("uncaughtException", listener);
-        }
+        rethrown.restore();
 
         router.stop();
       }

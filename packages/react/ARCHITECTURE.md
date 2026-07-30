@@ -111,12 +111,12 @@ src/
 The `dom-utils/` directory is a symlink to `shared/dom-utils/` — identical helpers used by all framework adapters:
 
 - **`shouldNavigate(evt)`** — click filtering (button 0, no modifier keys)
-- **`buildHref(router, routeName, routeParams)`** — URL generation with buildUrl/buildPath fallback
+- **`buildHref(router, routeName, routeParams, routeSearch?, hash?)`** — URL generation with buildUrl/buildPath fallback; query channel at position 4, hash fragment at position 5 (RFC-4 M2 / #1548)
 - **`buildActiveClassName(isActive, activeClassName, baseClassName)`** — class string composition
 - **`applyLinkA11y(element)`** — adds `role="link"` + `tabindex="0"` to non-interactive elements. Not used by React's `<Link>` (always renders `<a>`), but used by Svelte/Solid/Vue/Angular directive-based navigation. Exported for consumers building custom navigation components on non-anchor elements.
 - **`createRouteAnnouncer(router, options?)`** — WCAG screen reader announcements via `aria-live` region
 - **`createScrollRestoration(router, options?)`** — opt-in scroll capture on transition, restore on back/pagehide. DOM-concern isolated from router-core. Lifecycle: `useEffect` on `RouterProvider` creates the utility when `scrollRestoration` prop is set; cleanup destroys it. Primitive-field deps (`mode`, `anchorScrolling`) guard against inline-object thrash; `scrollContainer` is read lazily, excluded from deps.
-- **`createScrollSpy(router, options)`** — opt-in `IntersectionObserver`-driven URL hash spy (#575). Picks the topmost visible anchor inside `options.scrollContainer` (or window) and emits `router.navigate(name, params, { hash, replace: true, force: true, hashChange: true })` so the URL bar tracks scroll. Anti-flicker via `getTransitionSource(router).isTransitioning` gate + `coolingDown` gate set on user-driven `<Link hash>` clicks (cleared on `scrollend` or 500 ms fallback) + `selfEmitting` guard around the spy's own emit so the cooldown setup doesn't self-rate-limit. Lifecycle: `useEffect` on `RouterProvider` creates the utility when `scrollSpy` prop has a non-empty `selector`; cleanup destroys it. Primitive-field deps (`selector`, `rootMargin`); `scrollContainer` lazy. Requires a URL plugin (browser-plugin / navigation-plugin) for `state.context.url` claim — degrades to NOOP otherwise.
+- **`createScrollSpy(router, options)`** — opt-in `IntersectionObserver`-driven URL hash spy (#575). Picks the topmost visible anchor inside `options.scrollContainer` (or window) and emits `router.navigate(name, params, undefined, { hash, replace: true, force: true, hashChange: true })` (query channel unused — opts at position 4, RFC-4 M2 / #1548) so the URL bar tracks scroll. Anti-flicker via `getTransitionSource(router).isTransitioning` gate + `coolingDown` gate set on user-driven `<Link hash>` clicks (cleared on `scrollend` or 500 ms fallback) + `selfEmitting` guard around the spy's own emit so the cooldown setup doesn't self-rate-limit. Lifecycle: `useEffect` on `RouterProvider` creates the utility when `scrollSpy` prop has a non-empty `selector`; cleanup destroys it. Primitive-field deps (`selector`, `rootMargin`); `scrollContainer` lazy. Requires a URL plugin (browser-plugin / navigation-plugin) for `state.context.url` claim — degrades to NOOP otherwise.
 - **`createViewTransitions(router)`** — opt-in View Transitions API integration. Wires `subscribeLeave` (open VT snapshot of old DOM, returns immediately so router isn't blocked) + `subscribe` (resolve deferred → `requestAnimationFrame` → VT snapshots new DOM → animates). No-op when `document.startViewTransition` is unavailable (SSR, Firefox as of 2026-04). Lifecycle: `useEffect` on `RouterProvider` creates the utility when `viewTransitions` prop is truthy; cleanup calls `destroy()` which skips any in-flight VT via `skipTransition()`.
 
 ## Context Architecture
@@ -158,7 +158,7 @@ These three hooks use `useContext()` — works in both React 18 and 19. (`use()`
 ```
 useRouteNode(name)              — createRouteNodeSource(router, name)
 useRouterTransition()           — getTransitionSource(router)
-useIsActiveRoute(name, params)  — createActiveRouteSource(router, name, params, opts)  [internal]
+useIsActiveRoute(name, params, search)  — createActiveRouteSource(router, name, params, search, opts)  [internal]
 RouterErrorBoundary             — createDismissableError(router) with integrated resetError
 RouterProvider                  — createRouteSource(router)
 ```
@@ -183,7 +183,7 @@ RouterErrorBoundary
 └── Renders: children + fallback(error, resetError) via Fragment
 ```
 
-**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `shallowEqual` (`Object.is` per key, order-insensitive) for `routeParams` and `routeOptions`, strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `style`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`. Nested objects in params aren't deep-compared — consumers stabilize with `useMemo` if needed.
+**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `shallowEqual` (`Object.is` per key, order-insensitive) for `routeParams`, `routeSearch` (query channel, RFC-4 M2 / #1548), and `routeOptions`, strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `style`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`. Nested objects in params aren't deep-compared — consumers stabilize with `useMemo` if needed.
 
 **RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary with that fallback. Use this with `React.lazy()` to code-split route components. Works seamlessly with `keepAlive` — the `<Activity>` wrapper preserves the entire `<Suspense>` boundary including the fallback state.
 
@@ -194,7 +194,7 @@ RouterErrorBoundary
 | Optimization                      | Location                | Mechanism                                                                                          |
 | --------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------- |
 | Node-scoped subscriptions         | `useRouteNode`          | Cached `createRouteNodeSource(router, nodeName)` — N consumers share one router subscription       |
-| Canonical params cache            | `useIsActiveRoute`      | `createActiveRouteSource` hashes params via `canonicalJson` — `{a:1,b:2}` ≡ `{b:2,a:1}`             |
+| Canonical params cache            | `useIsActiveRoute`      | `createActiveRouteSource` hashes params AND search via `canonicalJson` — `{a:1,b:2}` ≡ `{b:2,a:1}`             |
 | Shared transition/error sources   | `useRouterTransition`, `RouterErrorBoundary` | `getTransitionSource` / `createDismissableError` — one eager router subscription per router |
 | Custom memo comparator            | `Link`                  | `areLinkPropsEqual`: `shallowEqual` (Object.is per key) for params/options, `===` for primitives   |
 | Frozen singletons                 | `constants.ts`          | `EMPTY_PARAMS`, `EMPTY_OPTIONS` avoid allocation for default props                                 |

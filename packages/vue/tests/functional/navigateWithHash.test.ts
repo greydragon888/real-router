@@ -69,7 +69,14 @@ function makeFakeRouter(current: FakeCurrent | undefined): {
         context,
       } as unknown as State;
     },
-    navigate: (name: string, params: Params, opts?: HashAwareOpts) => {
+    navigate: (
+      name: string,
+      params: Params,
+      _search: unknown,
+      opts?: HashAwareOpts,
+    ) => {
+      // Slot-shift (RFC-4 M2 / #1548): navigateWithHash passes the query channel
+      // at position 3 (unused here) and opts at position 4.
       calls.push({ name, params, opts: opts ?? {} });
 
       return Promise.resolve({ name, params } as unknown as State);
@@ -91,7 +98,7 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       hash: "profile",
     });
 
-    await navigateWithHash(router, "settings", {}, "account");
+    await navigateWithHash(router, "settings", {}, undefined, "account");
 
     expect(calls).toHaveLength(1);
     expect(calls[0].opts.hash).toBe("account");
@@ -108,7 +115,7 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       hash: "profile",
     });
 
-    await navigateWithHash(router, "settings", {}, "profile");
+    await navigateWithHash(router, "settings", {}, undefined, "profile");
 
     expect(calls).toHaveLength(1);
     expect(calls[0].opts.hash).toBe("profile");
@@ -125,7 +132,7 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       hash: "profile",
     });
 
-    await navigateWithHash(router, "users", {}, "section");
+    await navigateWithHash(router, "users", {}, undefined, "section");
 
     expect(calls).toHaveLength(1);
     expect(calls[0].name).toBe("users");
@@ -147,7 +154,7 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
     });
 
     // Requested hash "section" != "" → trigger bypass.
-    await navigateWithHash(router, "settings", {}, "section");
+    await navigateWithHash(router, "settings", {}, undefined, "section");
 
     expect(calls).toHaveLength(1);
     expect(calls[0].opts.force).toBe(true);
@@ -162,7 +169,7 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       contextHasNoUrl: true,
     });
 
-    await navigateWithHash(router, "settings", {}, "");
+    await navigateWithHash(router, "settings", {}, undefined, "");
 
     expect(calls).toHaveLength(1);
     // hash="" is still set on opts (the helper records every defined hash).
@@ -182,7 +189,7 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       contextHasNoUrl: false,
     });
 
-    await navigateWithHash(router, "settings", {}, "section");
+    await navigateWithHash(router, "settings", {}, undefined, "section");
 
     expect(calls).toHaveLength(1);
     expect(calls[0].opts.force).toBe(true);
@@ -192,7 +199,7 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
   it("getState() returns undefined (router not started) → straight passthrough, no bypass logic, hash forwarded", async () => {
     const { router, calls } = makeFakeRouter(undefined);
 
-    await navigateWithHash(router, "settings", {}, "section");
+    await navigateWithHash(router, "settings", {}, undefined, "section");
 
     expect(calls).toHaveLength(1);
     expect(calls[0].opts.hash).toBe("section");
@@ -211,7 +218,7 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       hash: "profile",
     });
 
-    await navigateWithHash(router, "settings", {}, undefined);
+    await navigateWithHash(router, "settings", {}, undefined, undefined);
 
     expect(calls).toHaveLength(1);
     expect("hash" in calls[0].opts).toBe(false);
@@ -230,7 +237,14 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
     });
     const extraOptions: NavigationOptions = { replace: true };
 
-    await navigateWithHash(router, "settings", {}, "account", extraOptions);
+    await navigateWithHash(
+      router,
+      "settings",
+      {},
+      undefined,
+      "account",
+      extraOptions,
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].opts.replace).toBe(true);
@@ -254,7 +268,14 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       });
       const extraOptions = { hash: "from-extra" } as NavigationOptions;
 
-      await navigateWithHash(router, "settings", {}, "from-arg", extraOptions);
+      await navigateWithHash(
+        router,
+        "settings",
+        {},
+        undefined,
+        "from-arg",
+        extraOptions,
+      );
 
       expect(calls).toHaveLength(1);
       // Positional `hash` arg ("from-arg") overwrites `extraOptions.hash`.
@@ -270,7 +291,14 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       // Caller explicitly opts out of force; helper still flips it back to true.
       const extraOptions = { force: false } as NavigationOptions;
 
-      await navigateWithHash(router, "settings", {}, "account", extraOptions);
+      await navigateWithHash(
+        router,
+        "settings",
+        {},
+        undefined,
+        "account",
+        extraOptions,
+      );
 
       expect(calls).toHaveLength(1);
       // Helper's auto-bypass takes precedence over the caller's `force: false`.
@@ -286,7 +314,14 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       });
       const extraOptions = { hashChange: false } as HashAwareOpts;
 
-      await navigateWithHash(router, "settings", {}, "account", extraOptions);
+      await navigateWithHash(
+        router,
+        "settings",
+        {},
+        undefined,
+        "account",
+        extraOptions,
+      );
 
       expect(calls).toHaveLength(1);
       // Same overwrite contract — caller's `hashChange: false` is silently flipped.
@@ -305,7 +340,14 @@ describe("navigateWithHash — feature #532 auto-bypass", () => {
       const extraOptions = { force: false } as NavigationOptions;
 
       // Same hash → no bypass → no overwrite of `force`.
-      await navigateWithHash(router, "settings", {}, "profile", extraOptions);
+      await navigateWithHash(
+        router,
+        "settings",
+        {},
+        undefined,
+        "profile",
+        extraOptions,
+      );
 
       expect(calls).toHaveLength(1);
       expect(calls[0].opts.force).toBe(false);

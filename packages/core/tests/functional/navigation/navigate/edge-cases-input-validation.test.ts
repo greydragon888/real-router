@@ -24,13 +24,16 @@ describe("router.navigate() - edge cases input validation", () => {
   describe("Issue #60: navigate() options validation", () => {
     it("should accept valid NavigationOptions", () => {
       expect(() => {
-        void router.navigate("users", {}, { replace: true, reload: false });
+        void router.navigate("users", {}, undefined, {
+          replace: true,
+          reload: false,
+        });
       }).not.toThrow();
     });
 
     it("should accept empty options object", () => {
       expect(() => {
-        void router.navigate("users", {}, {});
+        void router.navigate("users", {}, undefined, {});
       }).not.toThrow();
     });
 
@@ -89,16 +92,24 @@ describe("router.navigate() - edge cases input validation", () => {
 
   describe("boundary inputs (#17)", () => {
     it("accepts params with unicode (non-ASCII) keys", async () => {
-      const state = await router.navigate("items", {
-        "ключ-тест": "значение",
-        id: "1",
-      });
+      // Path-param `id` in the params bag; the unicode query key in the SEARCH
+      // arg (RFC-4 M2 / #1548) — an undeclared key must ride the search channel
+      // to reach the URL query (an undeclared params-bag key routes to
+      // state.params and never serializes, decision 3a).
+      const state = await router.navigate(
+        "items",
+        { id: "1" },
+        { "ключ-тест": "значение" },
+      );
 
-      // Unicode key survives untouched in params; the path-param `id` matched
-      // the route segment, the extra key is serialized as a (URL-encoded) query.
+      // Path-param `id` matched the route segment and stays in params; the
+      // undeclared unicode key is a query param (RFC-4 M2 search channel) and
+      // survives untouched there, then serializes as a (URL-encoded) query.
       expect(state.name).toBe("items");
       expect(state.params).toMatchObject({
         id: "1",
+      });
+      expect(state.search).toMatchObject({
         "ключ-тест": "значение",
       });
       expect(state.path).toContain("/items/1");
@@ -142,22 +153,22 @@ describe("router.navigate() - edge cases input validation", () => {
       expect(negInf.path).toBe("/items/-Infinity");
     });
 
-    it("rejects a Symbol param VALUE with a TypeError (Symbol→string is illegal)", async () => {
-      // CORE-WITHOUT-PLUGIN behavior: a Symbol-valued, non-path param is NOT
-      // caught by a RouterError validation path — it reaches URL/query
-      // serialization (String(symbol)) and throws a raw `TypeError: Cannot
-      // convert a Symbol value to a string`. The rejection carries NO `code`; it
-      // is a native TypeError. (@real-router/validation-plugin rejects it earlier
-      // with an actionable message, #934 — this pins the bare-core asymmetry.)
+    it("rejects a Symbol query VALUE with a TypeError (Symbol→string is illegal)", async () => {
+      // CORE-WITHOUT-PLUGIN behavior: a Symbol-valued query param (passed in the
+      // SEARCH arg, RFC-4 M2 / #1548) is NOT caught by a RouterError validation
+      // path — it reaches URL/query serialization (String(symbol)) and throws a
+      // raw `TypeError: Cannot convert a Symbol value to a string`. The rejection
+      // carries NO `code`; it is a native TypeError. (@real-router/validation-plugin
+      // rejects it earlier with an actionable message, #934 — this pins the
+      // bare-core asymmetry.) NB: a Symbol in the PARAMS bag no longer reaches
+      // query serialization — as an undeclared key it routes to state.params
+      // untouched (decision 3a) and does NOT throw.
       const sym = Symbol("boundary");
 
       let error: unknown;
 
       try {
-        await router.navigate("items", {
-          id: "1",
-          weird: sym as any,
-        });
+        await router.navigate("items", { id: "1" }, { weird: sym as any });
       } catch (error_: unknown) {
         error = error_;
       }
@@ -222,7 +233,7 @@ describe("router.navigate() - edge cases input validation", () => {
         value: true,
       });
 
-      const state = await r.navigate("users", {}, opts);
+      const state = await r.navigate("users", {}, undefined, opts);
 
       expect(state.transition?.replace).toBe(true);
       expect(onTransitionSuccess).toHaveBeenCalledWith(

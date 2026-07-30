@@ -109,11 +109,13 @@ describe("loader arguments: loader receives correct route params", () => {
       let receivedParams: Record<string, unknown> = {};
 
       const { router } = createRscRouter({
-        "users.profile": () => async (params) => {
-          receivedParams = { ...params };
+        "users.profile":
+          () =>
+          async ({ params }) => {
+            receivedParams = { ...params };
 
-          return null;
-        },
+            return null;
+          },
       });
 
       await router.start(`/users/${id}`);
@@ -265,8 +267,10 @@ describe("isolation: cloned routers have independent rsc payloads", () => {
     async (id1, id2) => {
       const base = createRouter(ROUTES, { defaultRoute: "home" });
       const loaders: RscLoaderFactoryMap = {
-        "users.profile": () => async (params) =>
-          node("Profile", { userId: params.id }),
+        "users.profile":
+          () =>
+          async ({ params }) =>
+            node("Profile", { userId: params.id }),
       };
 
       const clone1 = cloneRouter(base);
@@ -437,14 +441,18 @@ describe("composition: rsc-server-plugin + ssr-data-plugin coexist", () => {
       const router = cloneRouter(base);
 
       const rscLoaders: RscLoaderFactoryMap = {
-        "users.profile": () => async (params) =>
-          node("Profile", { userId: params.id }),
+        "users.profile":
+          () =>
+          async ({ params }) =>
+            node("Profile", { userId: params.id }),
       };
       const dataLoaders: DataLoaderFactoryMap = {
-        "users.profile": () => async (params) => ({
-          jsonId: params.id,
-          source: "ssr-data",
-        }),
+        "users.profile":
+          () =>
+          async ({ params }) => ({
+            jsonId: params.id,
+            source: "ssr-data",
+          }),
       };
 
       const unsubRsc = router.usePlugin(rscServerPluginFactory(rscLoaders));
@@ -471,11 +479,15 @@ describe("composition: rsc-server-plugin + ssr-data-plugin coexist", () => {
       const router = cloneRouter(base);
 
       const rscLoaders: RscLoaderFactoryMap = {
-        "users.profile": () => async (params) =>
-          node("Profile", { userId: params.id }),
+        "users.profile":
+          () =>
+          async ({ params }) =>
+            node("Profile", { userId: params.id }),
       };
       const dataLoaders: DataLoaderFactoryMap = {
-        "users.profile": () => async (params) => ({ jsonId: params.id }),
+        "users.profile":
+          () =>
+          async ({ params }) => ({ jsonId: params.id }),
       };
 
       const unsubRsc = router.usePlugin(rscServerPluginFactory(rscLoaders));
@@ -599,11 +611,9 @@ describe("invalidate: per-namespace orthogonality", () => {
         nav += 1;
         // Reload to the same route — guarantees the leave handler fires
         // (a same-state guard would otherwise short-circuit).
-        await router.navigate(
-          "users.profile",
-          { id: `n${nav}` },
-          { reload: true },
-        );
+        await router.navigate("users.profile", { id: `n${nav}` }, undefined, {
+          reload: true,
+        });
       }
 
       expect(rscCalls - rscBaseline).toBe(expectedRscDelta);

@@ -14,10 +14,10 @@ const ITEMS = [
 type Filter = "all" | "letter" | "number" | "color";
 const FILTERS: Filter[] = ["all", "letter", "number", "color"];
 
-const { route } = useRoute<{ filter?: Filter }>();
+const { route } = useRoute();
 
 const filter = computed<Filter>(
-  () => (route.value?.params.filter as Filter | undefined) ?? "all",
+  () => (route.value?.search.filter as Filter | undefined) ?? "all",
 );
 
 const visible = computed(() =>
@@ -51,7 +51,7 @@ const visible = computed(() =>
         v-for="value in FILTERS"
         :key="value"
         routeName="queryDemo"
-        :routeParams="{ filter: value }"
+        :routeSearch="{ filter: value }"
         :ignoreQueryParams="false"
       >
         {{ value }}

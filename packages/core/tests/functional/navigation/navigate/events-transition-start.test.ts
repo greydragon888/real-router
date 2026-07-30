@@ -36,7 +36,7 @@ describe("router.navigate() - events transition start", () => {
       );
 
       // Navigate to initial state to establish fromState
-      await router.navigate("users", {}, {});
+      await router.navigate("users", {}, undefined, {});
 
       onStart.mockClear();
 
@@ -230,12 +230,12 @@ describe("router.navigate() - events transition start", () => {
       );
 
       // Navigate to parent route first
-      await router.navigate("orders", {}, {});
+      await router.navigate("orders", {}, undefined, {});
 
       onStart.mockClear();
 
       // Navigate to nested route
-      await router.navigate("orders.pending", {}, {});
+      await router.navigate("orders.pending", {}, undefined, {});
 
       expect(onStart).toHaveBeenCalledTimes(1);
       expect(onStart).toHaveBeenCalledWith(
@@ -262,7 +262,7 @@ describe("router.navigate() - events transition start", () => {
 
       const navigationOptions = { replace: true, reload: true };
 
-      await router.navigate("profile", {}, navigationOptions);
+      await router.navigate("profile", {}, undefined, navigationOptions);
 
       expect(onStart).toHaveBeenCalledTimes(1);
 
@@ -281,7 +281,7 @@ describe("router.navigate() - events transition start", () => {
       const onStart = vi.fn();
 
       // Navigate to route first
-      await router.navigate("profile", {}, {});
+      await router.navigate("profile", {}, undefined, {});
 
       const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
@@ -289,7 +289,7 @@ describe("router.navigate() - events transition start", () => {
       );
 
       // Navigate to same route with force
-      await router.navigate("profile", {}, { force: true });
+      await router.navigate("profile", {}, undefined, { force: true });
 
       expect(onStart).toHaveBeenCalledTimes(1);
       expect(onStart).toHaveBeenCalledWith(
@@ -308,7 +308,7 @@ describe("router.navigate() - events transition start", () => {
       const onStart = vi.fn();
 
       // Navigate to route first
-      await router.navigate("orders", {}, {});
+      await router.navigate("orders", {}, undefined, {});
 
       const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
@@ -317,7 +317,7 @@ describe("router.navigate() - events transition start", () => {
 
       // Try to navigate to same route without force/reload
       try {
-        await router.navigate("orders", {}, {});
+        await router.navigate("orders", {}, undefined, {});
 
         expect.fail("Should have thrown error");
       } catch (error) {

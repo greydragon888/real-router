@@ -40,6 +40,35 @@ import type { Router } from "@real-router/core";
 
 const STORAGE_KEY = "real-router:scroll";
 
+// Plain-object `sessionStorage` mock — the real global is not spyable under
+// vitest+jsdom, so a `Storage.prototype` spy silently observes nothing and the
+// quota failure below would never be injected at all. Why, in full:
+// IMPLEMENTATION_NOTES.md § "Adapter scroll tests mock `sessionStorage`".
+function createMockStorage(): Storage {
+  const store = new Map<string, string>();
+
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+  };
+}
+
 function withQuotaExceeded(
   setItemImpl: (key: string, value: string) => void = () => {
     throw new DOMException("QuotaExceededError", "QuotaExceededError");
@@ -49,7 +78,7 @@ function withQuotaExceeded(
   setItemSpy: ReturnType<typeof vi.spyOn>;
 } {
   const setItemSpy = vi
-    .spyOn(Storage.prototype, "setItem")
+    .spyOn(sessionStorage, "setItem")
     .mockImplementation(setItemImpl);
 
   return {
@@ -64,6 +93,7 @@ describe("preact stress — scrollRestoration sessionStorage quota overflow", ()
   let router: Router;
 
   beforeEach(async () => {
+    vi.stubGlobal("sessionStorage", createMockStorage());
     sessionStorage.clear();
     history.scrollRestoration = "auto";
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -188,7 +218,7 @@ describe("preact stress — scrollRestoration sessionStorage quota overflow", ()
 
   it("getItem throws (corrupted storage) → loadStore falls back to empty map, no crash", async () => {
     const getItemSpy = vi
-      .spyOn(Storage.prototype, "getItem")
+      .spyOn(sessionStorage, "getItem")
       .mockImplementation(() => {
         throw new DOMException("SecurityError", "SecurityError");
       });

@@ -5,23 +5,22 @@
 
 import type {
   Params,
+  SearchParams,
   State,
   SimpleState,
-  StateMetaInput,
   Unsubscribe,
 } from "./base";
 import type { EventMethodMap, EventName } from "./constants";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
 // type-only cycle with the barrel is deliberate — see the note in ./index.
 import type { NavigationOptions, StateContext } from "./index";
-import type { RouteTreeState } from "./route-node-types";
 import type {
   DefaultDependencies,
   GuardFnFactory,
-  Options,
   Plugin,
   Route,
   RouteConfigUpdate,
+  AnyOptions,
 } from "./router";
 import type { TreeChangedEvent } from "./tree-changed";
 
@@ -31,14 +30,18 @@ import type { TreeChangedEvent } from "./tree-changed";
  *
  * To add a new interceptable method:
  * 1. Add its signature here
- * 2. Wrap it with `createInterceptable()` / `createBinaryInterceptable()` in
+ * 2. Wrap it with `createInterceptable()` / `createTernaryInterceptable()` in
  *    the `registerInternals` block of the Router constructor
  *    (`packages/core/src/Router.ts`)
  */
 export interface InterceptableMethodMap {
   start: (path?: string) => Promise<State>;
-  buildPath: (route: string, params?: Params) => string;
-  forwardState: (routeName: string, routeParams: Params) => SimpleState;
+  buildPath: (route: string, params?: Params, search?: SearchParams) => string;
+  forwardState: (
+    routeName: string,
+    routeParams: Params,
+    routeSearch?: SearchParams,
+  ) => SimpleState;
 }
 
 /**
@@ -95,22 +98,21 @@ export interface ContextNamespaceClaim<T = unknown> {
  * Hides plugin-internal methods from public autocomplete.
  */
 export interface PluginApi {
-  makeState: <P extends Params = Params>(
+  makeState: <P extends Params = Params, S extends SearchParams = SearchParams>(
     name: string,
     params?: P,
+    search?: S,
     path?: string,
-    meta?: StateMetaInput,
-  ) => State<P>;
+  ) => State<P, S>;
 
-  buildState: (
-    routeName: string,
-    routeParams: Params,
-  ) => RouteTreeState | undefined;
-
-  forwardState: <P extends Params = Params>(
+  forwardState: <
+    P extends Params = Params,
+    S extends SearchParams = SearchParams,
+  >(
     routeName: string,
     routeParams: P,
-  ) => SimpleState<P>;
+    routeSearch?: S,
+  ) => SimpleState<P, S>;
 
   matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;
 
@@ -147,9 +149,24 @@ export interface PluginApi {
     cb: Plugin[EventMethodMap[E]],
   ) => Unsubscribe;
 
-  buildNavigationState: (name: string, params?: Params) => State | undefined;
+  /**
+   * Builds the State `navigate` would commit, without committing it: resolves
+   * `forwardTo`, checks existence (`undefined` = unknown route) and merges the
+   * route defaults.
+   *
+   * `search` is the query channel (#1571). It was the ONE pipeline entry point
+   * without the slot — `navigate` / `buildPath` / `canNavigateTo` /
+   * `isActiveRoute` / `makeState` all take one — so a query intent could only
+   * be spelled by riding declared keys in the `params` bag. An explicit value
+   * beats such a twin, matching the other five.
+   */
+  buildNavigationState: (
+    name: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => State | undefined;
 
-  getOptions: () => Options;
+  getOptions: () => AnyOptions;
 
   getTree: () => unknown;
 

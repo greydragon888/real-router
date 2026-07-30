@@ -1,4 +1,9 @@
-import type { DefaultDependencies, Params, State } from "@real-router/core";
+import type {
+  DefaultDependencies,
+  Params,
+  SearchParams,
+  State,
+} from "@real-router/core";
 import type { Router } from "@real-router/core/types";
 
 export type SsrMode = "full" | "data-only" | "client-only";
@@ -46,8 +51,20 @@ export interface SsrLoaderContext {
   signal: AbortSignal;
 }
 
+/**
+ * Destination channels handed to an SSR loader (RFC-4 M2 / #1548): `params` is
+ * the path channel, `search` the query channel. The single-dictionary shape
+ * shared across all user callbacks (`NavigationTarget`, `PreloadFn`,
+ * encode/decode) — a loader reading a query param does `target.search.q`, a
+ * path param `target.params.id`.
+ */
+export interface SsrLoaderTarget {
+  params: Params;
+  search: SearchParams;
+}
+
 export type SsrLoaderFn<T> = (
-  params: Params,
+  target: SsrLoaderTarget,
   context?: SsrLoaderContext,
 ) => Promise<T> | T;
 

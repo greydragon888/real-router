@@ -21,51 +21,60 @@ describe("navigation validation — with validationPlugin", () => {
   describe("navigate() options validation", () => {
     it("should throw TypeError for invalid options type (string)", () => {
       const raw = router as unknown as {
-        navigate: (n: string, p: object, o: unknown) => unknown;
+        navigate: (n: string, p: object, s: unknown, o: unknown) => unknown;
       };
 
-      expect(() => raw.navigate("users", {}, "invalid")).toThrow(TypeError);
-      expect(() => raw.navigate("users", {}, "invalid")).toThrow(
+      expect(() => raw.navigate("users", {}, undefined, "invalid")).toThrow(
+        TypeError,
+      );
+      expect(() => raw.navigate("users", {}, undefined, "invalid")).toThrow(
         /Invalid options/,
       );
     });
 
     it("should throw TypeError for invalid options type (number)", () => {
       const raw = router as unknown as {
-        navigate: (n: string, p: object, o: unknown) => unknown;
+        navigate: (n: string, p: object, s: unknown, o: unknown) => unknown;
       };
 
-      expect(() => raw.navigate("users", {}, 123)).toThrow(TypeError);
+      expect(() => raw.navigate("users", {}, undefined, 123)).toThrow(
+        TypeError,
+      );
     });
 
     it("should throw TypeError for invalid options type (array)", () => {
       const raw = router as unknown as {
-        navigate: (n: string, p: object, o: unknown) => unknown;
+        navigate: (n: string, p: object, s: unknown, o: unknown) => unknown;
       };
 
-      expect(() => raw.navigate("users", {}, [])).toThrow(TypeError);
+      expect(() => raw.navigate("users", {}, undefined, [])).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid option field types", () => {
       const raw = router as unknown as {
-        navigate: (n: string, p: object, o: unknown) => unknown;
+        navigate: (n: string, p: object, s: unknown, o: unknown) => unknown;
       };
 
-      expect(() => raw.navigate("users", {}, { replace: "true" })).toThrow(
+      expect(() =>
+        raw.navigate("users", {}, undefined, { replace: "true" }),
+      ).toThrow(TypeError);
+      expect(() => raw.navigate("users", {}, undefined, { reload: 1 })).toThrow(
         TypeError,
       );
-      expect(() => raw.navigate("users", {}, { reload: 1 })).toThrow(TypeError);
     });
 
     it("should accept valid NavigationOptions", () => {
       expect(() => {
-        void router.navigate("users", {}, { replace: true, reload: false });
+        void router.navigate("users", {}, undefined, {
+          replace: true,
+          reload: false,
+        });
       }).not.toThrow();
     });
 
     it("should accept empty options object", () => {
       expect(() => {
-        void router.navigate("users", {}, {});
+        void router.navigate("users", {}, undefined, {});
       }).not.toThrow();
     });
 
@@ -77,9 +86,10 @@ describe("navigation validation — with validationPlugin", () => {
 
     it("should include method name in error message", () => {
       const raw = router as unknown as {
-        navigate: (n: string, p: object, o: unknown) => unknown;
+        navigate: (n: string, p: object, s: unknown, o: unknown) => unknown;
       };
-      const action = () => raw.navigate("users", {}, { replace: "invalid" });
+      const action = () =>
+        raw.navigate("users", {}, undefined, { replace: "invalid" });
 
       expect(action).toThrow(TypeError);
       expect(action).toThrow(/\[router\.navigate\]/);

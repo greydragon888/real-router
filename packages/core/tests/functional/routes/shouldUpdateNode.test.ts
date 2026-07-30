@@ -1,15 +1,108 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { makeState, createTestRouter } from "../../helpers";
+import { createRouter } from "@real-router/core";
 
-import type { Router } from "@real-router/core";
+import { makeState } from "../../helpers";
+
+import type { Route, Router } from "@real-router/core";
 
 let router: Router;
 
+// Synthetic route tree whose param-source map (via `getMetaForState`) reproduces
+// the meta these white-box tests formerly injected per-State through the removed
+// `stateMetaStore` WeakMap (RFC-4 M2 / #1548). Every route NAME a hand-built
+// state uses must live here so `shouldUpdateNode`'s `getTransitionPath` reads the
+// live matcher's ownership map (params p1@a.b, p2@a.b.c, p3@a.b.c.d, p4@a.b.c.e)
+// and takes the STANDARD PATH — not the FAST-PATH-3 "both names gone" fallback,
+// which skips the ancestor-trim the deep-nesting assertions depend on.
+const shouldUpdateNodeRoutes: Route[] = [
+  {
+    name: "a",
+    path: "/a",
+    children: [
+      {
+        name: "b",
+        path: "/b/:p1",
+        children: [
+          {
+            name: "c",
+            path: "/c/:p2",
+            children: [
+              {
+                name: "d",
+                path: "/d/:p3",
+                children: [
+                  {
+                    name: "e",
+                    path: "/e",
+                    children: [{ name: "f", path: "/f" }],
+                  },
+                ],
+              },
+              { name: "e", path: "/e/:p4" },
+              {
+                name: "x",
+                path: "/x",
+                children: [
+                  {
+                    name: "y",
+                    path: "/y",
+                    children: [{ name: "z", path: "/z" }],
+                  },
+                ],
+              },
+            ],
+          },
+          { name: "x", path: "/x2" },
+          { name: "d", path: "/d2" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "x",
+    path: "/xroot",
+    children: [
+      {
+        name: "y",
+        path: "/yroot",
+        children: [{ name: "z", path: "/zroot/:id" }],
+      },
+    ],
+  },
+  {
+    name: "app",
+    path: "/app",
+    children: [
+      { name: "dashboard", path: "/dashboard" },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "list", path: "/list" }],
+      },
+      {
+        name: "settings",
+        path: "/settings",
+        children: [{ name: "profile", path: "/profile" }],
+      },
+    ],
+  },
+  {
+    name: "users",
+    path: "/u",
+    children: [{ name: "list", path: "/list" }],
+  },
+  {
+    name: "products",
+    path: "/products",
+    children: [{ name: "view", path: "/view/:id" }],
+  },
+];
+
 describe("core/routes", () => {
   beforeEach(async () => {
-    router = createTestRouter();
-    await router.start("/home");
+    router = createRouter(shouldUpdateNodeRoutes);
+    await router.start("/app/dashboard");
   });
 
   afterEach(() => {
@@ -17,17 +110,6 @@ describe("core/routes", () => {
   });
 
   describe("shouldUpdateNode", () => {
-    const meta = {
-      id: 0,
-      params: {
-        a: {},
-        "a.b": { p1: "url" },
-        "a.b.c": { p2: "url" },
-        "a.b.c.d": { p3: "url" },
-        "a.b.c.e": { p4: "url" },
-      },
-    };
-
     describe("input validation", () => {
       describe("nodeName validation", () => {
         it("should accept empty string as valid nodeName (root node)", () => {
@@ -150,8 +232,8 @@ describe("core/routes", () => {
 
     it("should tell intersection node to update", () => {
       const shouldUpdate = router.shouldUpdateNode("a")(
-        makeState("a.b.c.d", { p1: 0, p2: 2, p3: 3 }, meta.params),
-        makeState("a.b.c.d", { p1: 1, p2: 2, p3: 3 }, meta.params),
+        makeState("a.b.c.d", { p1: 0, p2: 2, p3: 3 }),
+        makeState("a.b.c.d", { p1: 1, p2: 2, p3: 3 }),
       );
 
       expect(shouldUpdate).toStrictEqual(true);
@@ -161,24 +243,16 @@ describe("core/routes", () => {
       // Root node "" has no route-level identity; it must see every transition.
       // See RoutesNamespace.shouldUpdateNode comment for rationale.
       const shouldUpdate = router.shouldUpdateNode("")(
-        makeState("a.b.c.d", { p1: 0, p2: 2, p3: 3 }, meta.params),
-        makeState("a.b.c.d", { p1: 1, p2: 2, p3: 3 }, meta.params),
+        makeState("a.b.c.d", { p1: 0, p2: 2, p3: 3 }),
+        makeState("a.b.c.d", { p1: 1, p2: 2, p3: 3 }),
       );
 
       expect(shouldUpdate).toStrictEqual(true);
     });
 
     it("should update nodes when they become active, inactive, or change internally", () => {
-      const fromState = makeState(
-        "a.b.c.d",
-        { p1: 0, p2: 2, p3: 3 },
-        meta.params,
-      );
-      const toState = makeState(
-        "a.b.c.e",
-        { p1: 1, p2: 2, p4: 3 },
-        meta.params,
-      );
+      const fromState = makeState("a.b.c.d", { p1: 0, p2: 2, p3: 3 });
+      const toState = makeState("a.b.c.e", { p1: 1, p2: 2, p4: 3 });
 
       // These nodes are reactivated (were active, became inactive due to p1 change, active again)
       expect(router.shouldUpdateNode("a.b")(toState, fromState)).toStrictEqual(
@@ -201,7 +275,7 @@ describe("core/routes", () => {
 
     it("should always update node if reload option is set", () => {
       const toState = {
-        ...makeState("a.b.c", { p1: 1, p2: 2 }, meta.params),
+        ...makeState("a.b.c", { p1: 1, p2: 2 }),
         transition: {
           reload: true as const,
           phase: "activating" as const,
@@ -216,7 +290,7 @@ describe("core/routes", () => {
     });
 
     it("should update nodes that become active on initial transition", () => {
-      const toState = makeState("a.b.c", { p1: 1, p2: 2 }, meta.params);
+      const toState = makeState("a.b.c", { p1: 1, p2: 2 });
 
       // These nodes become active - components should be notified
       expect(router.shouldUpdateNode("a")(toState)).toBe(true);
@@ -231,37 +305,29 @@ describe("core/routes", () => {
     });
 
     it("should not update node if it is not in toActivate", () => {
-      const fromState = makeState(
-        "a.b.c.d",
-        { p1: 1, p2: 2, p3: 3 },
-        meta.params,
-      );
-      const toState = makeState(
-        "a.b.c.e",
-        { p1: 1, p2: 2, p4: 4 },
-        meta.params,
-      );
+      const fromState = makeState("a.b.c.d", { p1: 1, p2: 2, p3: 3 });
+      const toState = makeState("a.b.c.e", { p1: 1, p2: 2, p4: 4 });
 
       expect(router.shouldUpdateNode("x.y")(toState, fromState)).toBe(false);
     });
 
     it("should update node even if no params changed, when node is the intersection", () => {
-      const fromState = makeState("a.b.c", { p1: 1 }, meta.params);
-      const toState = makeState("a.b.c", { p1: 1 }, meta.params);
+      const fromState = makeState("a.b.c", { p1: 1 });
+      const toState = makeState("a.b.c", { p1: 1 });
 
       expect(router.shouldUpdateNode("a.b.c")(toState, fromState)).toBe(true);
     });
 
     it("should not update node if both toState and fromState are root ('')", () => {
-      const state = makeState("", {}, meta.params);
+      const state = makeState("", {});
 
       expect(router.shouldUpdateNode("")(state, state)).toBe(true); // intersection
       expect(router.shouldUpdateNode("a")(state, state)).toBe(false);
     });
 
     it("should not update node in toActivate if all segments match but nodeName never matches any", () => {
-      const fromState = makeState("a.b.c", { p1: 1, p2: 2 }, meta.params);
-      const toState = makeState("a.b.c", { p1: 2, p2: 3 }, meta.params);
+      const fromState = makeState("a.b.c", { p1: 1, p2: 2 });
+      const toState = makeState("a.b.c", { p1: 2, p2: 3 });
 
       expect(router.shouldUpdateNode("a.b.c.d")(toState, fromState)).toBe(
         false,
@@ -269,16 +335,16 @@ describe("core/routes", () => {
     });
 
     it("should update node when deactivating but remaining in tree", () => {
-      const fromState = makeState("a.b.c.d", { p1: 1 }, meta.params);
-      const toState = makeState("a.b.x", { p1: 2 }, meta.params);
+      const fromState = makeState("a.b.c.d", { p1: 1 });
+      const toState = makeState("a.b.x", { p1: 2 });
 
       // "a.b" is deactivated (was a.b.c.d) but remains in the tree (became a.b.x)
       expect(router.shouldUpdateNode("a.b")(toState, fromState)).toBe(true);
     });
 
     it("should update node when deactivating (leaving the tree)", () => {
-      const fromState = makeState("a.b.c.d", {}, meta.params);
-      const toState = makeState("x.y.z", {}, meta.params);
+      const fromState = makeState("a.b.c.d", {});
+      const toState = makeState("x.y.z", {});
 
       // "a.b.c.d" deactivates - component should be notified
       expect(router.shouldUpdateNode("a.b.c.d")(toState, fromState)).toBe(true);
@@ -300,8 +366,8 @@ describe("core/routes", () => {
     });
 
     it("should update intersection node when only params change", () => {
-      const fromState = makeState("a.b.c", { id: "1" }, meta.params);
-      const toState = makeState("a.b.c", { id: "2" }, meta.params);
+      const fromState = makeState("a.b.c", { id: "1" });
+      const toState = makeState("a.b.c", { id: "2" });
 
       // intersection = "a.b.c"
       expect(router.shouldUpdateNode("a.b.c")(toState, fromState)).toBe(true);
@@ -310,8 +376,8 @@ describe("core/routes", () => {
     });
 
     it("should handle complex branch switching", () => {
-      const fromState = makeState("app.users.list", {}, meta.params);
-      const toState = makeState("app.settings.profile", {}, meta.params);
+      const fromState = makeState("app.users.list", {});
+      const toState = makeState("app.settings.profile", {});
 
       // "app" - intersection, remains active
       expect(router.shouldUpdateNode("app")(toState, fromState)).toBe(true);
@@ -341,16 +407,8 @@ describe("core/routes", () => {
     });
 
     it("should update all nodes in transition path including unrelated checks", () => {
-      const fromState = makeState(
-        "a.b.c.d",
-        { p1: 0, p2: 2, p3: 3 },
-        meta.params,
-      );
-      const toState = makeState(
-        "a.b.c.e",
-        { p1: 1, p2: 2, p4: 3 },
-        meta.params,
-      );
+      const fromState = makeState("a.b.c.d", { p1: 0, p2: 2, p3: 3 });
+      const toState = makeState("a.b.c.e", { p1: 1, p2: 2, p4: 3 });
 
       // All these nodes are affected by the transition - should update
       expect(router.shouldUpdateNode("a")(toState, fromState)).toBe(true);
@@ -364,7 +422,7 @@ describe("core/routes", () => {
     });
 
     it("should update active nodes on initial transition", () => {
-      const toState = makeState("a.b.c", { p1: 1, p2: 2 }, meta.params);
+      const toState = makeState("a.b.c", { p1: 1, p2: 2 });
 
       // All activating nodes should update on initial navigation
       expect(router.shouldUpdateNode("a")(toState)).toBe(true);
@@ -400,7 +458,7 @@ describe("core/routes", () => {
     });
 
     it("should handle reload option correctly", () => {
-      const state = makeState("a.b.c", {}, meta.params);
+      const state = makeState("a.b.c", {});
       const reloadState = {
         ...state,
         transition: {
@@ -421,19 +479,8 @@ describe("core/routes", () => {
 
     describe("shouldUpdateNode edge cases", () => {
       it("should handle deep nesting with many matching segments", () => {
-        const meta = {
-          params: {
-            a: {},
-            "a.b": {},
-            "a.b.c": {},
-            "a.b.c.d": {},
-            "a.b.c.d.e": {},
-            "a.b.c.d.e.f": {},
-          },
-        };
-
-        const fromState = makeState("a.b.c.d.e.f", {}, meta.params);
-        const toState = makeState("a.b.c.x.y.z", {}, meta.params);
+        const fromState = makeState("a.b.c.d.e.f", {});
+        const toState = makeState("a.b.c.x.y.z", {});
 
         // intersection - remains active
         expect(router.shouldUpdateNode("a.b.c")(toState, fromState)).toBe(true);

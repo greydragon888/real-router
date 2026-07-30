@@ -210,7 +210,7 @@ describe("Memory plugin", () => {
     await router.start("/");
 
     await router.navigate("users");
-    await router.navigate("settings", {}, { replace: true });
+    await router.navigate("settings", {}, undefined, { replace: true });
 
     expect(router.getState()?.name).toBe("settings");
 
@@ -400,7 +400,7 @@ describe("Memory plugin", () => {
     await router.start("/");
 
     await router.navigate("users");
-    await router.navigate("home", {}, { replace: true });
+    await router.navigate("home", {}, undefined, { replace: true });
 
     // History: [home, home], index=1. Both entries have path "/".
     const stateBefore = router.getState()!;
@@ -436,7 +436,7 @@ describe("Memory plugin", () => {
     await router.start("/");
 
     await router.navigate("users");
-    await router.navigate("home", {}, { replace: true });
+    await router.navigate("home", {}, undefined, { replace: true });
 
     // History: [home, home], index=1. Both entries have path "/".
     const stateBefore = router.getState()!;
@@ -626,7 +626,7 @@ describe("Memory plugin", () => {
       router.usePlugin(memoryPluginFactory());
       await router.start("/");
 
-      await router.navigate("users", {}, { replace: true });
+      await router.navigate("users", {}, undefined, { replace: true });
 
       // "home" replaced with "users": [users], index=0
       expect(router.getState()?.name).toBe("users");
@@ -904,14 +904,17 @@ describe("Memory plugin", () => {
   // deterministic time-travel even when interceptors / route config /
   // dependency-driven dynamic state change between record and replay.
   describe("Snapshot semantics (#561)", () => {
-    it("commits stored entry verbatim when defaultParams change between record and replay", async () => {
+    it("commits stored entry verbatim when defaultSearch changes between record and replay", async () => {
       const router2 = createRouter(
         [
           { name: "home", path: "/" },
           {
             name: "users",
             path: "/users?sort&page",
-            defaultParams: { sort: "asc", page: "1" },
+            // sort/page are QUERY-declared (`?sort&page`) → their defaults live
+            // in `defaultSearch` (the query channel) since #1549; keeping them
+            // in `defaultParams` would also (redundantly) pollute state.params.
+            defaultSearch: { sort: "asc", page: "1" },
           },
         ],
         { defaultRoute: "home", queryParamsMode: "loose" },
@@ -920,13 +923,15 @@ describe("Memory plugin", () => {
       router2.usePlugin(memoryPluginFactory());
       await router2.start("/");
       // Record visit with current defaults (sort=asc, page=1).
-      await router2.navigate("users", { page: "2" });
+      await router2.navigate("users", {}, { page: "2" });
 
-      const recordedParams = { ...router2.getState()?.params };
+      // sort/page are QUERY params (`/users?sort&page`) → they live in
+      // `state.search` after the RFC-4 M2 split (#1548), not `state.params`.
+      const recordedSearch = { ...router2.getState()?.search };
 
-      expect(recordedParams).toMatchObject({ sort: "asc", page: "2" });
+      expect(recordedSearch).toMatchObject({ sort: "asc", page: "2" });
 
-      // Mutate defaultParams between record and replay. A re-resolve flow
+      // Mutate defaultSearch between record and replay. A re-resolve flow
       // would observe the new defaults; a snapshot flow does not.
       router2.stop();
       router2.dispose();

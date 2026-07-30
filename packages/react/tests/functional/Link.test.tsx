@@ -147,8 +147,7 @@ describe("Link component", () => {
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
       await act(() =>
-        router.navigate(linkRouteName, {
-          ...linkRouteParams,
+        router.navigate(linkRouteName, linkRouteParams, {
           a: "b",
           c: "d",
         }),
@@ -169,8 +168,7 @@ describe("Link component", () => {
       );
 
       await act(() =>
-        router.navigate(linkRouteName, {
-          ...linkRouteParams,
+        router.navigate(linkRouteName, linkRouteParams, {
           e: "f",
           g: "h",
         }),
@@ -665,6 +663,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         {},
+        undefined,
         { replace: true },
       );
 
@@ -685,6 +684,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         {},
+        undefined,
         { reload: true },
       );
     });
@@ -812,7 +812,12 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(router.navigate).toHaveBeenCalledWith("one-more-test", {}, {});
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        {},
+      );
     });
 
     it('hash="" calls navigate with hash: "" (clears hash)', async () => {
@@ -830,6 +835,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         {},
+        undefined,
         {
           hash: "",
         },
@@ -849,15 +855,11 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(router.navigate).toHaveBeenCalledWith(
-        "test",
-        {},
-        {
-          hash: "section",
-          force: true,
-          hashChange: true,
-        },
-      );
+      expect(router.navigate).toHaveBeenCalledWith("test", {}, undefined, {
+        hash: "section",
+        force: true,
+        hashChange: true,
+      });
     });
   });
 
@@ -891,7 +893,7 @@ describe("Link component", () => {
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
       // Exactly what `useIsActiveRoute("users", undefined, false, false)` builds.
-      createActiveRouteSource(router, "users", undefined, {
+      createActiveRouteSource(router, "users", undefined, undefined, {
         strict: false,
         ignoreQueryParams: false,
       });

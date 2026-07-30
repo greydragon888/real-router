@@ -52,11 +52,11 @@ router.usePlugin(
 
 The plugin extends the router instance with three methods via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/plugin-architecture):
 
-| Method                                                | Returns              | Description                                                                                          |
-| ----------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
-| `buildUrl(name, params?, options?: { hash? })`        | `string`             | Build full URL with base path. `options.hash` (decoded) is encoded and appended.                     |
-| `matchUrl(url)`                                       | `State \| undefined` | Parse URL to router state                                                                            |
-| `replaceHistoryState(name, params?, options?: { hash? })` | `void`           | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets. |
+| Method                                                    | Returns              | Description                                                                                                                                         |
+| --------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `buildUrl(name, params?, search?, options?: { hash? })`   | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. `options.hash` (decoded) is encoded and appended. |
+| `matchUrl(url)`                                           | `State \| undefined` | Parse URL to router state                                                                                                                           |
+| `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. The URL and the `history.state` record are both built from the RESOLVED target, so they always describe the same state — a `forwardTo` route writes its destination, and a query key injected by `persistent-params` reaches both (#1585). Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                 |
 
 ```typescript
 router.buildUrl("users", { id: "123" });
@@ -76,26 +76,26 @@ router.buildPath("users", { id: 1 }); // "/users/1"       — core, no base
 router.buildUrl("users", { id: 1 }); // "/app/users/1"   — plugin, with base
 ```
 
-### `replaceHistoryState` vs `navigate({ replace: true })`
+### `replaceHistoryState` vs `navigate(..., { replace: true })`
 
 ```typescript
 router.replaceHistoryState(name, params); // URL only, no transition
-router.navigate(name, params, { replace: true }); // Full transition + URL update
+router.navigate(name, params, undefined, { replace: true }); // Full transition + URL update
 ```
 
 ## URL Fragment ("hash") Support
 
-`browser-plugin` ships first-class URL-fragment support: `<Link hash>` from any framework adapter, programmatic `router.navigate(name, params, { hash })`, and a `state.context.url = { hash, hashChanged }` namespace populated on every transition.
+`browser-plugin` ships first-class URL-fragment support: `<Link hash>` from any framework adapter, programmatic `router.navigate(name, params, search?, { hash })` (options at position 4 since RFC-4 M2, #1548), and a `state.context.url = { hash, hashChanged }` namespace populated on every transition.
 
 ```typescript
-// Programmatic — tri-state opts.hash
-router.navigate("settings", {}, { hash: "profile" }); // set
-router.navigate("settings", {}, { hash: "" });        // clear
-router.navigate("settings");                          // preserve current
+// Programmatic — tri-state opts.hash (options at position 4 since RFC-4 M2)
+router.navigate("settings", {}, undefined, { hash: "profile" }); // set
+router.navigate("settings", {}, undefined, { hash: "" }); // clear
+router.navigate("settings"); // preserve current
 
 // In subscribers
 router.subscribe(({ route }) => {
-  console.log(route.context.url?.hash);        // "profile"
+  console.log(route.context.url?.hash); // "profile"
   console.log(route.context.url?.hashChanged); // true on hash-only nav
 });
 ```
@@ -118,10 +118,10 @@ router.subscribe(({ route }) => {
 
 Both values are frozen singletons, so object-identity comparison is safe and zero-allocation.
 
-| Value       | Meaning                                                       |
-| ----------- | ------------------------------------------------------------- |
+| Value        | Meaning                                                                        |
+| ------------ | ------------------------------------------------------------------------------ |
 | `"navigate"` | Triggered by `router.navigate()`, `router.start()`, or `replaceHistoryState()` |
-| `"popstate"` | Triggered by browser back/forward buttons (popstate event)   |
+| `"popstate"` | Triggered by browser back/forward buttons (popstate event)                     |
 
 ## Form Protection
 
@@ -149,9 +149,9 @@ The plugin is SSR-safe — `createSafeBrowser` detects the absence of `window`/`
 // Server-side — no crashes, History API calls become no-ops
 router.usePlugin(browserPluginFactory({ base: "/app" }));
 
-router.buildUrl("home");           // "/app/home" — base is still applied
+router.buildUrl("home"); // "/app/home" — base is still applied
 router.matchUrl("/app/users/123"); // { name: "users", params: { id: "123" }, path: "/users/123" }
-await router.start("/app/home");   // transitions normally; no popstate subscription
+await router.start("/app/home"); // transitions normally; no popstate subscription
 ```
 
 The first call to any History API method emits a one-time console warning so accidental SSR usage is visible without spamming logs.

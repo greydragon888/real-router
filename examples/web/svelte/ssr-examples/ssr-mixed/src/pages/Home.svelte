@@ -19,7 +19,7 @@
     const current = route.current;
 
     invalidate(router, "data");
-    void router.navigate(current.name, current.params, { reload: true });
+    void router.navigate(current.name, current.params, current.search, { reload: true });
   }
 </script>
 

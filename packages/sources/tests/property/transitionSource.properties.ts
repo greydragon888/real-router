@@ -9,6 +9,7 @@ import {
   createStartedRouter,
   IDLE_TRANSITION,
   NUM_RUNS,
+  channelsForRoute,
   paramsForRoute,
 } from "./helpers";
 import { createTransitionSource } from "../../src";
@@ -20,7 +21,7 @@ describe("createTransitionSource — state machine", () => {
       const router = await createStartedRouter();
 
       for (const nav of navSeq) {
-        await router.navigate(nav.name, nav.params).catch(() => {});
+        await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
       }
 
       const source = createTransitionSource(router);
@@ -50,7 +51,10 @@ describe("createTransitionSource — state machine", () => {
       const source = createTransitionSource(router);
 
       // TRANSITION_START fires synchronously within navigate().
-      const navPromise = router.navigate(routeName, paramsForRoute(routeName));
+      const navPromise = router.navigate(
+        routeName,
+        ...channelsForRoute(routeName),
+      );
 
       const snapshot = source.getSnapshot();
 
@@ -72,7 +76,7 @@ describe("createTransitionSource — state machine", () => {
       const source = createTransitionSource(router);
 
       for (const nav of navSeq) {
-        await router.navigate(nav.name, nav.params).catch(() => {});
+        await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
 
         expect(source.getSnapshot()).toStrictEqual({
           isTransitioning: false,
@@ -100,7 +104,7 @@ describe("createTransitionSource — state machine", () => {
       const source = createTransitionSource(router);
 
       await router
-        .navigate(routeName, paramsForRoute(routeName))
+        .navigate(routeName, ...channelsForRoute(routeName))
         .catch(() => {});
 
       expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
@@ -130,7 +134,7 @@ describe("createTransitionSource — state machine", () => {
       const cancelTarget =
         routeName === "admin.settings" ? "users.list" : "admin.settings";
 
-      const p1 = router.navigate(routeName, paramsForRoute(routeName));
+      const p1 = router.navigate(routeName, ...channelsForRoute(routeName));
       const p2 = router.navigate(cancelTarget);
 
       resolveGuard(true);
@@ -152,7 +156,7 @@ describe("createTransitionSource — state machine", () => {
 
       const router = await createStartedRouter();
 
-      await router.navigate(firstRoute, paramsForRoute(firstRoute));
+      await router.navigate(firstRoute, ...channelsForRoute(firstRoute));
 
       const lifecycle = getLifecycleApi(router);
       let resolveGuard!: (value: boolean) => void;
@@ -189,7 +193,7 @@ describe("createTransitionSource — state machine", () => {
       const initialIdle = source.getSnapshot();
 
       for (const nav of navSeq) {
-        await router.navigate(nav.name, nav.params).catch(() => {});
+        await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
 
         expect(source.getSnapshot()).toBe(initialIdle);
       }
@@ -219,7 +223,10 @@ describe("createTransitionSource — state machine", () => {
 
       source.subscribe(listener);
 
-      const navPromise = router.navigate(routeName, paramsForRoute(routeName));
+      const navPromise = router.navigate(
+        routeName,
+        ...channelsForRoute(routeName),
+      );
 
       // Async-guarded nav: TRANSITION_START + TRANSITION_LEAVE_APPROVE fire
       // synchronously within navigate(), before the activate guard is awaited
@@ -256,7 +263,10 @@ describe("createTransitionSource — isLeaveApproved monotonicity", () => {
 
       const source = createTransitionSource(router);
 
-      const navPromise = router.navigate(routeName, paramsForRoute(routeName));
+      const navPromise = router.navigate(
+        routeName,
+        ...channelsForRoute(routeName),
+      );
 
       // LEAVE_APPROVE fires synchronously within navigate() (deactivate guards
       // passed) → the flag is true.
@@ -286,7 +296,7 @@ describe("createTransitionSource — isLeaveApproved monotonicity", () => {
       const source = createTransitionSource(router);
 
       await router
-        .navigate(routeName, paramsForRoute(routeName))
+        .navigate(routeName, ...channelsForRoute(routeName))
         .catch(() => {});
 
       expect(source.getSnapshot().isLeaveApproved).toBe(false);
@@ -316,7 +326,7 @@ describe("createTransitionSource — isLeaveApproved monotonicity", () => {
       const cancelTarget =
         routeName === "admin.settings" ? "users.list" : "admin.settings";
 
-      const p1 = router.navigate(routeName, paramsForRoute(routeName));
+      const p1 = router.navigate(routeName, ...channelsForRoute(routeName));
 
       // LEAVE_APPROVE fires synchronously within navigate(), so flag is true.
       expect(source.getSnapshot().isLeaveApproved).toBe(true);
@@ -367,7 +377,7 @@ describe("createTransitionSource — concurrent navigation", () => {
       const cancelTarget =
         routeName === "admin.settings" ? "users.list" : "admin.settings";
 
-      const p1 = router.navigate(routeName, paramsForRoute(routeName));
+      const p1 = router.navigate(routeName, ...channelsForRoute(routeName));
 
       // TRANSITION_START fires synchronously within navigate().
       expect(source.getSnapshot().toRoute?.name).toStrictEqual(routeName);
@@ -391,7 +401,7 @@ describe("createTransitionSource — concurrent navigation", () => {
       const source = createTransitionSource(router);
 
       const promises = navSeq.map((nav) =>
-        router.navigate(nav.name, nav.params).catch(() => {}),
+        router.navigate(nav.name, nav.params, nav.search).catch(() => {}),
       );
 
       await Promise.all(promises);
@@ -438,12 +448,12 @@ describe("createTransitionSource — concurrent navigation", () => {
 
       const source = createTransitionSource(router);
 
-      const p1 = router.navigate(first, paramsForRoute(first));
-      const p2 = router.navigate(second, paramsForRoute(second));
+      const p1 = router.navigate(first, ...channelsForRoute(first));
+      const p2 = router.navigate(second, ...channelsForRoute(second));
 
       // `finisher` is unguarded, so it resolves promptly and cancels both
       // pending guards via the router's abort signal.
-      const p3 = router.navigate(finisher, paramsForRoute(finisher));
+      const p3 = router.navigate(finisher, ...channelsForRoute(finisher));
 
       await p3.catch(() => {});
       await Promise.all([p1, p2].map((p) => p.catch(() => {})));
@@ -482,7 +492,7 @@ describe("createTransitionSource — concurrent navigation", () => {
 
       const source = createTransitionSource(router);
 
-      const p1 = router.navigate(routeName, paramsForRoute(routeName));
+      const p1 = router.navigate(routeName, ...channelsForRoute(routeName));
 
       // TRANSITION_START fires synchronously within navigate().
       const snapshot = source.getSnapshot();
@@ -517,7 +527,7 @@ describe("createTransitionSource — destroy", () => {
       source.destroy();
 
       for (const nav of navSeq) {
-        await router.navigate(nav.name, nav.params).catch(() => {});
+        await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
       }
 
       expect(listener).not.toHaveBeenCalled();
@@ -550,7 +560,7 @@ describe("createTransitionSource — destroy", () => {
       const source = createTransitionSource(router);
 
       for (const nav of navSeq) {
-        await router.navigate(nav.name, nav.params).catch(() => {});
+        await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
       }
 
       const lastSnapshot = source.getSnapshot();
@@ -572,7 +582,7 @@ describe("createTransitionSource — destroy", () => {
       source.destroy();
 
       for (const nav of navSeq) {
-        await router.navigate(nav.name, nav.params).catch(() => {});
+        await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
       }
 
       expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
@@ -593,7 +603,7 @@ describe("createTransitionSource — destroy", () => {
       const unsub = source.subscribe(listener);
 
       for (const nav of navSeq) {
-        await router.navigate(nav.name, nav.params).catch(() => {});
+        await router.navigate(nav.name, nav.params, nav.search).catch(() => {});
       }
 
       expect(listener).not.toHaveBeenCalled();

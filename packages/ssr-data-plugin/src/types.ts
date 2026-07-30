@@ -1,12 +1,16 @@
 import type {
   SsrLoaderFn,
   SsrLoaderFnFactory,
+  SsrLoaderTarget,
   SsrMode,
   SsrRouteEntry,
 } from "./shared-ssr";
 import type { DefaultDependencies } from "@real-router/core";
 
 export type DataLoaderFn = SsrLoaderFn<unknown>;
+
+/** Destination channels handed to a data loader — `{ params, search }` (RFC-4 M2 / #1548). */
+export type DataLoaderTarget = SsrLoaderTarget;
 
 /**
  * Factory function for creating data loaders.

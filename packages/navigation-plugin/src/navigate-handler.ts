@@ -236,6 +236,11 @@ function syncUrlToRouterState(
       const url = router.buildUrl(
         currentState.name,
         currentState.params,
+        // Query channel at position 3 (RFC-4 M2 / #1548), hash opts at 4. The
+        // slot took `undefined` until #1586: recovery rebuilds the URL of the
+        // state that SURVIVED the rejection, so dropping its query left the
+        // user on a URL the router itself does not hold.
+        currentState.search,
         ctxHash ? { hash: ctxHash } : undefined,
       );
 
@@ -246,6 +251,12 @@ function syncUrlToRouterState(
         state: {
           name: currentState.name,
           params: currentState.params,
+          // The buffered entry state is two-channel since RFC-4 M2 (#1548) —
+          // see the shape documented in CLAUDE.md. Omitting `search` here made
+          // the recovery path the one writer producing a narrower entry than
+          // every other, so a reader restoring from it saw a state the router
+          // never held (#1586).
+          search: currentState.search,
           path: currentState.path,
         },
         history: "replace",

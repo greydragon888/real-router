@@ -37,7 +37,7 @@ describe("serializeRouterState properties", () => {
   );
 
   test.prop([arbState], { numRuns: NUM_RUNS.standard })(
-    "name/params/path/context are preserved verbatim",
+    "name/params/search/path/context are preserved verbatim",
     (state) => {
       const parsed = JSON.parse(serializeRouterState(state)) as State;
 
@@ -48,6 +48,7 @@ describe("serializeRouterState properties", () => {
       // toStrictEqual sees identical prototypes — the JSON-equivalence
       // contract is what's being tested.
       expect(parsed.params).toStrictEqual({ ...state.params });
+      expect(parsed.search).toStrictEqual({ ...state.search });
       expect(parsed.path).toBe(state.path);
       expect(parsed.context).toStrictEqual({ ...state.context });
     },

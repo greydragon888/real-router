@@ -53,7 +53,7 @@ describe("Query-parameter properties", () => {
       (val) => {
         const matcher = queryMatcher({ strictQueryParams: true });
 
-        expect(matcher.match(`/search?q=${val}&page=2`)?.params).toStrictEqual({
+        expect(matcher.match(`/search?q=${val}&page=2`)?.search).toStrictEqual({
           q: val,
           page: "2",
         });
@@ -97,11 +97,9 @@ describe("Query-parameter properties", () => {
         expect(matcher.buildPath("search", { [key]: val })).toBe("/search");
 
         // loose → key appears in the query string.
-        const loose = matcher.buildPath(
-          "search",
-          { [key]: val },
-          { queryParamsMode: "loose" },
-        );
+        const loose = matcher.buildPath("search", { [key]: val }, undefined, {
+          queryParamsMode: "loose",
+        });
 
         expect(loose).toContain(key);
         expect(loose.startsWith("/search?")).toBe(true);
@@ -116,7 +114,7 @@ describe("Query-parameter properties", () => {
         const matcher = queryMatcher();
         const url = matcher.buildPath("search", { q: val });
 
-        expect(matcher.match(url)?.params).toStrictEqual({ q: val });
+        expect(matcher.match(url)?.search).toStrictEqual({ q: val });
       },
     );
   });

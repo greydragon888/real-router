@@ -2,6 +2,7 @@ import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createActiveNameSelector } from "../../src";
+import { captureAsyncRethrows } from "../helpers";
 
 import type { Router } from "@real-router/core";
 
@@ -121,15 +122,7 @@ describe("createActiveNameSelector", () => {
 
     // Capture the asynchronously re-thrown error before vitest's default
     // uncaughtException handler fails the test (mirrors BaseSource isolation).
-    const rethrown: unknown[] = [];
-    const previousListeners = [...process.listeners("uncaughtException")];
-
-    process.removeAllListeners("uncaughtException");
-    const captureHandler = (error: unknown): void => {
-      rethrown.push(error);
-    };
-
-    process.on("uncaughtException", captureHandler);
+    const rethrown = captureAsyncRethrows();
 
     try {
       // Two "users" listeners (throwing first), then a DIFFERENT name "home"
@@ -152,15 +145,11 @@ describe("createActiveNameSelector", () => {
       expect(otherNameSurvivor).toHaveBeenCalledTimes(1);
 
       // Drain the microtask queue so the queueMicrotask(throw) lands.
-      await Promise.resolve();
-      await Promise.resolve();
+      await rethrown.flush();
 
-      expect(rethrown).toStrictEqual([thrown]);
+      expect(rethrown.errors).toStrictEqual([thrown]);
     } finally {
-      process.removeListener("uncaughtException", captureHandler);
-      for (const listener of previousListeners) {
-        process.on("uncaughtException", listener);
-      }
+      rethrown.restore();
     }
   });
 
@@ -170,15 +159,7 @@ describe("createActiveNameSelector", () => {
 
     // Capture the asynchronously re-thrown recompute error before vitest's
     // default uncaughtException handler fails the test (mirrors the #767 capture).
-    const rethrown: unknown[] = [];
-    const previousListeners = [...process.listeners("uncaughtException")];
-
-    process.removeAllListeners("uncaughtException");
-    const captureHandler = (error: unknown): void => {
-      rethrown.push(error);
-    };
-
-    process.on("uncaughtException", captureHandler);
+    const rethrown = captureAsyncRethrows();
 
     try {
       // "__throws__" (mocked `areRoutesRelated` throws for it) is iterated FIRST;
@@ -196,17 +177,13 @@ describe("createActiveNameSelector", () => {
       expect(laterNameSurvivor).toHaveBeenCalledTimes(1);
 
       // Drain the microtask queue so the queueMicrotask(throw) lands.
-      await Promise.resolve();
-      await Promise.resolve();
+      await rethrown.flush();
 
       // The genuine recompute error still surfaces asynchronously (not swallowed).
-      expect(rethrown).toHaveLength(1);
-      expect((rethrown[0] as Error).message).toBe("recompute boom");
+      expect(rethrown.errors).toHaveLength(1);
+      expect((rethrown.errors[0] as Error).message).toBe("recompute boom");
     } finally {
-      process.removeListener("uncaughtException", captureHandler);
-      for (const listener of previousListeners) {
-        process.on("uncaughtException", listener);
-      }
+      rethrown.restore();
     }
   });
 

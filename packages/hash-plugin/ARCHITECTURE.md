@@ -187,9 +187,13 @@ TypeScript allows extending existing interfaces via `declare module`. The plugin
 // index.ts
 declare module "@real-router/core" {
   interface Router {
-    buildUrl: (name: string, params?: Params) => string;
+    buildUrl: (name: string, params?: Params, search?: SearchParams) => string;
     matchUrl: (url: string) => State | undefined;
-    replaceHistoryState: (name: string, params?: Params) => void;
+    replaceHistoryState: (
+      name: string,
+      params?: Params,
+      search?: SearchParams,
+    ) => void;
     start(path?: string): Promise<State>; // overload — makes path optional
   }
 }
@@ -202,8 +206,11 @@ TypeScript augmentation is type-level only. The actual methods are registered in
 ```typescript
 // plugin.ts, constructor
 const urlPrefix = `${options.base}#${options.hashPrefix}`;
-const pluginBuildUrl = (route: string, params?: Params) =>
-  urlPrefix + router.buildPath(route, params);
+const pluginBuildUrl = (
+  route: string,
+  params?: Params,
+  search?: SearchParams,
+) => urlPrefix + router.buildPath(route, params, search);
 
 this.#removeExtensions = api.extendRouter({
   buildUrl: pluginBuildUrl, // pre-computed urlPrefix + buildPath()
@@ -213,14 +220,13 @@ this.#removeExtensions = api.extendRouter({
   },
   replaceHistoryState: createReplaceHistoryState(
     api,
-    router,
     browser,
     pluginBuildUrl,
   ),
 });
 ```
 
-`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it builds state via `api.buildState`/`api.makeState` and calls `browser.replaceState`.
+`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target **and both channels** via `api.buildNavigationState` (the caller's `search` goes in, the resolved `params`/`search` come out), then writes that state as the record and builds the URL from it, both via `browser.replaceState`. Taking the query from the resolved state rather than the raw argument is what keeps a `forwardTo` chain's query-channel `defaultParams` in `history.state` (#1574) — and the URL is built from the same resolved triple, so the two halves of one `replaceState` call cannot describe different states (#1585). Before that they could: the URL went through `buildUrl` with the caller's RAW arguments, which reach the public `buildPath` — no `forwardTo` resolution, no `forwardState` seam — so a `persistent-params` injection landed in the record and not in the URL beside it. The record is the resolved state VERBATIM; there is no `api.makeState` re-make, which was a leftover from `buildState` (that primitive built no path, so one had to be supplied) and cost a third pass through the `buildPath` interceptor chain per record.
 
 ### Cleanup on teardown
 
@@ -289,7 +295,7 @@ Each new plugin instance registers its own popstate + hashchange listeners in `o
 ## Data Flow: Navigation
 
 ```
-router.navigate(name, params, opts)
+router.navigate(name, params, search, opts)
         │
         ▼
   Transition completed successfully
@@ -309,7 +315,7 @@ router.navigate(name, params, opts)
         │
         └── updateBrowserState(toState, url, shouldReplace, browser)
                   │
-                   ├── Create historyState = { name, params, path }
+                   ├── Create historyState = { name, params, search, path }
                    └── browser.pushState() or browser.replaceState()
 ```
 
@@ -342,7 +348,7 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │               └── Hash URL matching as fallback
         │
         ├── route found?
-        │     YES: await router.navigate(route.name, route.params, transitionOptions)
+        │     YES: await router.navigate(route.name, route.params, route.search, transitionOptions)
         │     NO + allowNotFound: router.navigateToNotFound(location)
         │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + rollbackUrlToCurrentState()
         │                          (no silent navigateToDefault — see #483)

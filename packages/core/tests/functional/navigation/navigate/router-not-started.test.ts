@@ -105,7 +105,7 @@ describe("router.navigate() - router not started", () => {
       const options = { replace: true, force: true };
 
       try {
-        await router.navigate("profile", {}, options);
+        await router.navigate("profile", {}, undefined, options);
 
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
       } catch (error: any) {

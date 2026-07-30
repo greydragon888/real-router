@@ -112,6 +112,7 @@ describe("navigateToState", () => {
       const fake: State = {
         name: "ghost.route",
         params: {},
+        search: {},
         path: "/ghost",
         transition: {
           phase: "activating",
@@ -165,6 +166,7 @@ describe("navigateToState", () => {
       const synthetic: State = {
         name: "users",
         params: {},
+        search: {},
         path: "/users",
         transition: {
           phase: "activating",
@@ -210,6 +212,7 @@ describe("navigateToState", () => {
       const ghost: State = {
         name: "ghost.route",
         params: {},
+        search: {},
         path: "/ghost",
         transition: {
           phase: "activating",
@@ -236,6 +239,7 @@ describe("navigateToState", () => {
       const unknownState: State = {
         name: "@@router/UNKNOWN_ROUTE",
         params: {},
+        search: {},
         path: "/anything",
         transition: {
           phase: "activating",

@@ -10,19 +10,8 @@ import {
   arbNavigableRoute,
   arbIdParam,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
-
-function getParamsForRoute(name: string): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id: "abc" };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
-}
 
 describe("pluginApi.buildNavigationState Properties", () => {
   test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
@@ -72,7 +61,7 @@ describe("pluginApi.addEventListener Properties", () => {
       pluginApi.addEventListener(events.TRANSITION_SUCCESS, listener);
 
       await router.start("/");
-      await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+      await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
       expect(listener).toHaveBeenCalled();
 

@@ -19,8 +19,8 @@ const PRODUCTS: Product[] = [
 type SortDirection = "asc" | "desc";
 
 export function ProductsList() {
-  const { route } = useRoute<{ sort?: SortDirection }>();
-  const sort: SortDirection = route.params.sort === "desc" ? "desc" : "asc";
+  const { route } = useRoute();
+  const sort: SortDirection = route.search.sort === "desc" ? "desc" : "asc";
 
   const items = useMemo(() => {
     const sorted = PRODUCTS.toSorted((left, right) =>
@@ -46,7 +46,7 @@ export function ProductsList() {
         <span>Sort:</span>
         <Link
           routeName="products"
-          routeParams={{ sort: "asc" }}
+          routeSearch={{ sort: "asc" }}
           ignoreQueryParams={false}
         >
           A → Z
@@ -54,7 +54,7 @@ export function ProductsList() {
         {" · "}
         <Link
           routeName="products"
-          routeParams={{ sort: "desc" }}
+          routeSearch={{ sort: "desc" }}
           ignoreQueryParams={false}
         >
           Z → A

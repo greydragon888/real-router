@@ -87,12 +87,17 @@ export class NavigationPlugin {
   // browser.navigate / browser.updateCurrentEntry. The Navigation API
   // structured-clones state synchronously inside the call, so this object
   // never escapes — same trick createReplaceHistoryState uses.
-  readonly #historyStateBuffer: { name: string; params: object; path: string } =
-    {
-      name: "",
-      params: {},
-      path: "",
-    };
+  readonly #historyStateBuffer: {
+    name: string;
+    params: object;
+    search: object;
+    path: string;
+  } = {
+    name: "",
+    params: {},
+    search: {},
+    path: "",
+  };
 
   constructor(
     router: Router,
@@ -155,7 +160,6 @@ export class NavigationPlugin {
         api.matchPath(urlToPath(url, options.base)) ?? undefined,
       replaceHistoryState: createReplaceHistoryState(
         api,
-        router,
         this.#browser,
         pluginBuildUrl,
       ),
@@ -246,7 +250,16 @@ export class NavigationPlugin {
     // does via navOptions.hash for browser-initiated navigation.
     this.#pendingTraverseHash = extractHashFromEntryUrl(entryUrl);
 
-    return this.#router.navigate(matchedState.name, matchedState.params);
+    // Both channels, not just the path (#1586). `matchedState` came from
+    // matching the entry's URL, so its `search` is populated whenever that URL
+    // carried a query — and the browser is about to traverse to that very
+    // entry. Committing the path alone leaves the address bar and the router
+    // describing different pages.
+    return this.#router.navigate(
+      matchedState.name,
+      matchedState.params,
+      matchedState.search,
+    );
   }
 
   getPlugin(): Plugin {
@@ -347,6 +360,7 @@ export class NavigationPlugin {
 
           this.#historyStateBuffer.name = toState.name;
           this.#historyStateBuffer.params = toState.params;
+          this.#historyStateBuffer.search = toState.search;
           this.#historyStateBuffer.path = toState.path;
 
           // Two cases route through `updateCurrentEntry` (state-only mutation

@@ -146,8 +146,7 @@ describe("Link component", () => {
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
       await act(async () => {
-        await router.navigate(linkRouteName, {
-          ...linkRouteParams,
+        await router.navigate(linkRouteName, linkRouteParams, {
           a: "b",
           c: "d",
         });
@@ -168,8 +167,7 @@ describe("Link component", () => {
       );
 
       await act(async () => {
-        await router.navigate(linkRouteName, {
-          ...linkRouteParams,
+        await router.navigate(linkRouteName, linkRouteParams, {
           e: "f",
           g: "h",
         });
@@ -532,6 +530,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         expect.any(Object),
+        undefined,
         expect.objectContaining({ replace: true }),
       );
 
@@ -552,6 +551,7 @@ describe("Link component", () => {
       expect(router.navigate).toHaveBeenCalledWith(
         "one-more-test",
         expect.any(Object),
+        undefined,
         expect.objectContaining({ reload: true }),
       );
     });
@@ -660,20 +660,17 @@ describe("Link component", () => {
       rerender(<Harness params={{ page: 2, id: "1" }} />);
 
       expect(renderCount).toBe(rendersAfterFirst + 2);
-      expect(screen.getByTestId("link")).toHaveAttribute(
-        "href",
-        "/users/1?page=2",
-      );
+      // `page` is undeclared on this route and rides the path bag, so it is not
+      // printed (Phase 2 step 2-1). The subject here is the memo bail-out, and
+      // the href still tracks the params that DO reach the URL.
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/users/1");
 
       // Structural change: params now differ → href must update.
       await act(async () => {
         rerender(<Harness params={{ id: "2", page: 2 }} />);
       });
 
-      expect(screen.getByTestId("link")).toHaveAttribute(
-        "href",
-        "/users/2?page=2",
-      );
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/users/2");
     });
 
     it("should re-render when routeParams contains a nested object with new ref (gotcha)", () => {
@@ -791,12 +788,11 @@ describe("Link component", () => {
       }).not.toThrow();
 
       expect(screen.getByTestId("link")).toBeInTheDocument();
-      // href IS present: buildHref's catch branch did not fire; circular `self`
-      // gets stringified as "[object Object]" in the query string (loose mode).
-      expect(screen.getByTestId("link")).toHaveAttribute(
-        "href",
-        "/users/1?self=%5Bobject%20Object%5D",
-      );
+      // href IS present: buildHref's catch branch did not fire. The circular
+      // `self` rides the PATH bag and the route declares no such query name, so
+      // since Phase 2 step 2-1 it is not printed — what this test guards is that
+      // the build survives it, not where it lands.
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/users/1");
     });
 
     it("should not throw when routeParams contains a BigInt value", () => {
@@ -833,11 +829,10 @@ describe("Link component", () => {
       }).not.toThrow();
 
       expect(screen.getByTestId("link")).toBeInTheDocument();
-      // NaN path segment → "NaN"; Infinity query param → "Infinity" (loose mode).
-      expect(screen.getByTestId("link")).toHaveAttribute(
-        "href",
-        "/users/NaN?page=Infinity",
-      );
+      // NaN path segment → "NaN". `page` is undeclared on this route and rides
+      // the path bag, so it is not printed (Phase 2 step 2-1); the point of the
+      // test is that neither value throws.
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/users/NaN");
     });
 
     it("should treat two distinct circular-ref params as unequal (comparator catch branch)", () => {
@@ -881,10 +876,7 @@ describe("Link component", () => {
       // href changed to reflect `second` (id "2") — proves memo did NOT bail out:
       // shallowEqual(first, second) is false because id "1" ≠ "2", so a re-render
       // happened and buildHref was called with the new params.
-      expect(screen.getByTestId("link")).toHaveAttribute(
-        "href",
-        "/users/2?self=%5Bobject%20Object%5D",
-      );
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/users/2");
     });
   });
 
@@ -1102,7 +1094,7 @@ describe("Link component", () => {
 
       expect(call).toBeDefined();
 
-      const opts = call?.[2] as Record<string, unknown> | undefined;
+      const opts = call?.[3] as Record<string, unknown> | undefined;
 
       expect(opts?.hash).toBeUndefined();
     });
@@ -1125,7 +1117,7 @@ describe("Link component", () => {
 
       expect(call).toBeDefined();
 
-      const opts = call?.[2] as Record<string, unknown> | undefined;
+      const opts = call?.[3] as Record<string, unknown> | undefined;
 
       expect(opts?.hash).toBe("");
     });
@@ -1135,7 +1127,7 @@ describe("Link component", () => {
       // next click is a same-route+params navigation that only differs in
       // hash — exactly the SAME_STATES bypass case navigateWithHash handles.
       await act(async () => {
-        await router.navigate("one-more-test", {}, { hash: "a" });
+        await router.navigate("one-more-test", {}, undefined, { hash: "a" });
       });
 
       const navigateSpy = vi.spyOn(router, "navigate");
@@ -1155,7 +1147,7 @@ describe("Link component", () => {
 
       expect(call).toBeDefined();
 
-      const opts = call?.[2] as Record<string, unknown> | undefined;
+      const opts = call?.[3] as Record<string, unknown> | undefined;
 
       expect(opts?.hash).toBe("b");
       expect(opts?.force).toBe(true);
@@ -1192,7 +1184,9 @@ describe("Link component", () => {
       expect(screen.getByTestId("link-account")).not.toHaveClass("active");
 
       await act(async () => {
-        await router.navigate("one-more-test", {}, { hash: "profile" });
+        await router.navigate("one-more-test", {}, undefined, {
+          hash: "profile",
+        });
       });
 
       expect(screen.getByTestId("link-profile")).toHaveClass("active");
@@ -1226,7 +1220,7 @@ describe("Link component", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "users", undefined, {
+      createActiveRouteSource(router, "users", undefined, undefined, {
         strict: false,
         ignoreQueryParams: false,
       });

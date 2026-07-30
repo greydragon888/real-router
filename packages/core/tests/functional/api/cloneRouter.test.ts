@@ -132,13 +132,17 @@ describe("cloneRouter()", () => {
       return {};
     });
 
-    // Base factory sees the defaultParams (page=1 folded into the query).
-    expect(snapshots).toStrictEqual(["/users/1?page=1"]);
+    // Base factory sees the config. `page` is an ARBITRARY default here (the
+    // route declares neither `:page` nor `?page`), so since Phase 2 step 2-1 it
+    // is not printed into the URL — the factory's snapshot is the path alone.
+    // What this test pins is unchanged: both snapshots must be EQUAL, i.e. the
+    // clone's factory must not observe an empty-config window (#1176).
+    expect(snapshots).toStrictEqual(["/users/1"]);
 
     cloneRouter(base);
 
     // The clone re-ran the factory against the SAME full config — not "/users/1".
-    expect(snapshots).toStrictEqual(["/users/1?page=1", "/users/1?page=1"]);
+    expect(snapshots).toStrictEqual(["/users/1", "/users/1"]);
   });
 
   // cloneRouter re-registers DEFINITION guards (from route config) with

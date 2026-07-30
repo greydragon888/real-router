@@ -33,7 +33,7 @@ import {
 import { createRouter } from "../../src";
 import { getLifecycleApi, getPluginApi } from "../../src/api";
 
-import type { Params, Route } from "../../src";
+import type { Params, Route, SearchParams } from "../../src";
 import type { Bench } from "tinybench";
 
 /**
@@ -263,9 +263,10 @@ export async function run(): Promise<void> {
   // click-through. Non-empty params hit the branches every navigate bench
   // above skips: normalizeParams' non-empty arm (the static-route benches all
   // reuse the frozen EMPTY_PARAMS singleton, #1027), freezeStateInPlace over a
-  // real params object, setStateMetaParams with content, and the param-encode
-  // inside buildNavigateState's buildPath. Two alternating ids keep every
-  // iteration a real transition (paths differ → no same-state reject).
+  // real params object, the param-source lookup via getMetaForState (RFC-4 M2 /
+  // #1548 — replaced the per-State setStateMetaParams sidecar), and the
+  // param-encode inside buildNavigateState's buildPath. Two alternating ids keep
+  // every iteration a real transition (paths differ → no same-state reject).
   {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -286,10 +287,15 @@ export async function run(): Promise<void> {
 
   // query navigation under the DEFAULT loose queryParamsMode — the form apps
   // run unless they opt into strict (that branch lives in
-  // strict-query.bench.ts). Query values ride normalizeParams + the
-  // search-params stringify on every build; alternating sets keep the paths
-  // distinct (the same-state check compares paths, and query params are part
-  // of the path), so every iteration is a real transition.
+  // strict-query.bench.ts). Query values ride the search-params stringify on
+  // every build; alternating sets keep the paths distinct (the same-state check
+  // compares paths, and query params are part of the path), so every iteration
+  // is a real transition.
+  //
+  // The bags go in the `search` argument, not `params` (RFC-4 M2 / #1548): the
+  // single-bag spelling this arm used to carry now throws at the facade
+  // (channel guard P1, #1572), so it is not a form that can be measured — the
+  // same reason `navigate/search-single-bag` was retired below.
   {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -297,7 +303,7 @@ export async function run(): Promise<void> {
     ]);
 
     await router.start("/");
-    const targets: Params[] = [
+    const targets: SearchParams[] = [
       { q: "alpha", page: "1" },
       { q: "beta", page: "2" },
     ];
@@ -306,7 +312,7 @@ export async function run(): Promise<void> {
     bench.add(
       "navigate/query-params",
       batched(192, () => {
-        void router.navigate("search", targets[i++ % targets.length]);
+        void router.navigate("search", {}, targets[i++ % targets.length]);
       }),
     );
   }
@@ -386,12 +392,26 @@ export async function run(): Promise<void> {
     {
       name: "withDefaults",
       path: "/wd/:id?tab",
-      defaultParams: { tab: "overview" },
+      // `tab` is `?`-declared, so it is a QUERY default — RFC-4 M2 / #1548, where
+      // the slot became the channel. Spelling it in `defaultParams` is refused at
+      // registration now (`assertRouteDefaultChannels`), which is exactly how this
+      // suite died in CI: `createRouter` threw before a single benchmark ran, so
+      // CodSpeed reported all 122 core benchmarks as "skipped" and silently reused
+      // the master baseline.
+      // The bench NAME below (`buildPath/warm-defaultParams`) deliberately keeps
+      // its old identity: renaming archives the series on CodSpeed and starts a new
+      // one, which costs the entire history to buy nothing measurable — what the
+      // benchmark measures (a route default merged under the caller's value on the
+      // way to a URL) is unchanged.
+      defaultSearch: { tab: "overview" },
     },
     {
       name: "encoded",
       path: "/enc/:id",
-      encodeParams: (params) => ({ ...params, id: `e-${params.id as string}` }),
+      encodeParams: ({ params, search }) => ({
+        params: { ...params, id: `e-${params.id as string}` },
+        search,
+      }),
     },
     { name: "files", path: "/files/*path" },
   ]);
@@ -454,7 +474,7 @@ export async function run(): Promise<void> {
   bench.add(
     "state/isActiveRoute-strict",
     batched(6144, () => {
-      keep(view.isActiveRoute("users.view", { id: "123" }, true));
+      keep(view.isActiveRoute("users.view", { id: "123" }, undefined, true));
     }),
   );
   {
@@ -502,8 +522,11 @@ export async function run(): Promise<void> {
     ]);
 
     await eq.start("/");
-    const sA = await eq.navigate("search", { q: "a", page: "1" });
-    const sB = await eq.navigate("search", { q: "a", page: "2" });
+    // Two-channel spelling (RFC-4 M2 / #1548) — setup only, and it commits the
+    // same two states the single-bag form used to: the query keys land in
+    // `state.search` either way, so what `areStatesEqual` compares is unchanged.
+    const sA = await eq.navigate("search", {}, { q: "a", page: "1" });
+    const sB = await eq.navigate("search", {}, { q: "a", page: "2" });
 
     bench.add(
       "state/areStatesEqual-ignoreQuery",
@@ -515,6 +538,115 @@ export async function run(): Promise<void> {
       "state/areStatesEqual-fullCompare",
       batched(8192, () => {
         keep(eq.areStatesEqual(sA, sB, false));
+      }),
+    );
+  }
+
+  // ========================================================================
+  // Search channel (RFC-4 M2 / #1548) — the two-channel WRITE / active paths.
+  // `matchPath/search-params` (Axis B below) covers the READ/parse side; these
+  // cover navigate / buildPath / isActiveRoute with an explicit `search`
+  // argument (the canonical M2 form) AND the v1 single-bag form (query merged
+  // into `params`, split out by `splitParamsBySearch` on the navigate path) —
+  // so the split cost is visible as the delta between the two navigate benches.
+  // Separate routers per scenario: navigate mutates state, so isolation keeps
+  // each measure independent (same discipline as the blocks above).
+  // ========================================================================
+
+  // navigate — explicit `search` channel: caller pre-separates path/query, so
+  // buildNavigateState skips `splitParamsBySearch`. Alternating page keeps every
+  // iteration a real transition (paths differ → no same-state reject).
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page&sort" },
+    ]);
+
+    await router.start("/");
+    const searches: SearchParams[] = [
+      { q: "a", page: "1", sort: "date" },
+      { q: "a", page: "2", sort: "date" },
+    ];
+    let i = 0;
+
+    bench.add(
+      "navigate/search-channel",
+      batched(192, () => {
+        void router.navigate("search", {}, searches[i++ % searches.length]);
+      }),
+    );
+  }
+
+  // navigate — the channel guard's cost on a HEALTHY call. Replaces
+  // `navigate/search-single-bag` (#1572): that arm measured the per-navigate
+  // split a migrated-from-v1 call site paid, and the form it measured now
+  // throws, which would take the whole harness process down with it.
+  //
+  // What is worth measuring instead is what EVERY caller now pays for the
+  // always-on guard: the predicate scans the route's declared query names
+  // (small, cached) rather than the caller's bag, so the arm carries the widest
+  // declaration list in this file to keep that scan honest. The route below
+  // declares five query names against a two-key bag — the shape where the guard
+  // does the most work and finds nothing.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page&sort&filter&limit" },
+    ]);
+
+    await router.start("/");
+    const searches: SearchParams[] = [
+      { q: "a", page: "1" },
+      { q: "a", page: "2" },
+    ];
+    let i = 0;
+
+    bench.add(
+      "navigate/channel-guard-clean",
+      batched(192, () => {
+        void router.navigate("search", {}, searches[i++ % searches.length]);
+      }),
+    );
+  }
+
+  // buildPath — search-aware, explicit query channel (path slots from `params`,
+  // query string from `search`). The canonical M2 build for a query URL.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page&sort" },
+    ]);
+
+    await router.start("/");
+    const search: SearchParams = { q: "test", page: "1", sort: "date" };
+
+    bench.add(
+      "buildPath/warm-search",
+      batched(768, () => {
+        keep(router.buildPath("search", {}, search));
+      }),
+    );
+  }
+
+  // isActiveRoute — active state carries a query; the check compares the search
+  // channel by passing `ignoreQueryParams: false` (position 5, after the
+  // `search` slot at 3 and `strictEquality` at 4). The default arm ignores query
+  // — that path is already covered by `state/isActiveRoute-exact` above.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q&page&sort" },
+    ]);
+
+    await router.start("/");
+    const search: SearchParams = { q: "a", page: "1", sort: "date" };
+
+    await router.navigate("search", {}, search);
+
+    bench.add(
+      "state/isActiveRoute-search",
+      batched(4096, () => {
+        keep(router.isActiveRoute("search", {}, search, undefined, false));
       }),
     );
   }
@@ -593,9 +725,15 @@ export async function run(): Promise<void> {
       routes: [
         { name: "home", path: "/" },
         {
+          // Same migration as `withDefaults` above, and the reason the scan
+          // mattered: this one sits 320 lines later, so fixing only the first
+          // would have moved the crash rather than removed it. `sort` / `page`
+          // are both `?`-declared → query defaults. The measured shape is
+          // unchanged — the URL supplies `sort=desc` (caller wins) and `page`
+          // comes from the default, exactly as before.
           name: "users",
           path: "/users?sort&page",
-          defaultParams: { sort: "asc", page: "1" },
+          defaultSearch: { sort: "asc", page: "1" },
         },
       ],
       start: "/",

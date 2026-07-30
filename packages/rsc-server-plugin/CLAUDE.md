@@ -10,7 +10,8 @@
 | `rscActionPluginFactory`  | function | Plugin factory — pass `() => RscActionResult \| undefined`, claims `"rscAction"` |
 | `getSsrRscMode`           | function | Read `state.context.ssrRscMode` with `"full"` fallback                      |
 | `invalidate`              | function | `(router, "rsc") => void` — mark `"rsc"` stale; next navigation re-runs the RSC loader |
-| `RscLoaderFn`             | type     | Compiled loader signature: `(params) => Promise<ReactNode> \| ReactNode`   |
+| `RscLoaderFn`             | type     | Compiled loader signature: `({ params, search }) => Promise<ReactNode> \| ReactNode` (RFC-4 M2 / #1548) |
+| `RscLoaderTarget`         | type     | `{ params, search }` — the two destination channels handed to a loader     |
 | `RscLoaderFnFactory`      | type     | Factory signature: `(router, getDependency) => RscLoaderFn`                |
 | `RscRouteEntry`           | type     | Per-route entry: factory (short form) or `{ ssr?, loader? }` object        |
 | `RscLoaderFactoryMap`     | type     | Record of route entries — pass to `rscServerPluginFactory()`               |
@@ -72,14 +73,14 @@ rscServerPluginFactory({
   "admin.dashboard": { ssr: false },                       // false → "client-only"
   "users.profile": {
     ssr: "full",
-    loader: () => async (params) => {
+    loader: () => async ({ params }) => {
       const user = await fetchUser(params.id);
       return <UserProfile user={user} />;
     },
   },
   "docs.detail": {
-    ssr: (state) => state.params.format === "pdf" ? "client-only" : "full",
-    loader: () => async (params) => <Doc id={params.id} />,
+    ssr: (state) => state.search.format === "pdf" ? "client-only" : "full",
+    loader: () => async ({ params }) => <Doc id={params.id} />,
   },
 });
 ```
@@ -127,7 +128,7 @@ if (mode === "full") {
 }
 ```
 
-Function-form resolvers receive `state` **before** the mode is written. Use `state.params` / `state.path` / `state.name` for branching; do not read `state.context.ssrRscMode`.
+Function-form resolvers receive `state` **before** the mode is written. Use `state.params` / `state.search` / `state.path` / `state.name` for branching; do not read `state.context.ssrRscMode`.
 
 ## Module Structure
 
@@ -206,7 +207,7 @@ invalidate(router, "rsc");
 
 // Explicit await — pair with a same-route reload
 invalidate(router, "rsc");
-await router.navigate(state.name, state.params, { reload: true });
+await router.navigate(state.name, state.params, state.search, { reload: true });
 ```
 
 Mechanics: `invalidate()` flips a per-router `Set<namespace>` flag (`WeakMap` keyed by router). The plugin's `subscribeLeave` listener consumes the flag in the awaited LEAVE_APPROVE phase of the **next** navigation — re-runs the RSC loader for the destination route (`nextRoute.name`), writes a fresh `ReactNode` to `nextRoute.context.rsc`, then resolves. Activation guards run, `completeTransition` fires `TRANSITION_SUCCESS`, and subscribers see the new payload.
@@ -244,12 +245,12 @@ import { rscServerPluginFactory } from "@real-router/rsc-server-plugin";
 
 router.usePlugin(
   ssrDataPluginFactory({
-    "users.profile": () => async (params) => ({
+    "users.profile": () => async ({ params }) => ({
       preferences: await prefs.get(params.id),
     }),
   }),
   rscServerPluginFactory({
-    "users.profile": () => async (params) => {
+    "users.profile": () => async ({ params }) => {
       const user = await db.users.findById(params.id);
       return <UserProfile user={user} />;
     },

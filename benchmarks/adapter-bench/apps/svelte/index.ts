@@ -21,6 +21,7 @@ const routes: Route[] = [
     children: [{ name: "details", path: "/details" }],
   },
   { name: "about", path: "/about" },
+  { name: "search", path: "/search?tab" },
 ];
 
 export async function mountTestApp(
@@ -37,8 +38,8 @@ export async function mountTestApp(
   flushSync();
 
   return {
-    commitNavigate: (name, params) => {
-      void router.navigate(name, params);
+    commitNavigate: (name, params, search) => {
+      void router.navigate(name, params, search);
       flushSync();
     },
     commitHistory: (dir) => {

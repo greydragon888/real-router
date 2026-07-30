@@ -36,7 +36,9 @@ describe("Stale registry leak budget", () => {
     // a successful navigation, or as a Set-size assertion drift on a
     // long run.
     const loaders: DataLoaderFactoryMap = {
-      "users.profile": () => (params) => ({ id: params.id }),
+      "users.profile":
+        () =>
+        ({ params }) => ({ id: params.id }),
     };
 
     const router = createRouter(routes, { defaultRoute: "home" });
@@ -52,7 +54,9 @@ describe("Stale registry leak budget", () => {
       // Same-route reload — guarantees the leave handler fires and the
       // loader writes data (which is the only branch that clears the
       // stale flag).
-      await router.navigate("users.profile", { id: `i${i}` }, { reload: true });
+      await router.navigate("users.profile", { id: `i${i}` }, undefined, {
+        reload: true,
+      });
 
       // Sample every 1000th iteration into an array, then assert once
       // outside the loop. Vitest's `no-conditional-expect` rule

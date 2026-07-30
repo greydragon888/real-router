@@ -7,6 +7,7 @@ import { resolveEntryToMatchedState } from "../../src/history-extensions";
 import { MockNavigation } from "../helpers/mockNavigation";
 import {
   createMockNavigationBrowser,
+  queryRouterConfig,
   routerConfig,
 } from "../helpers/testUtils";
 
@@ -362,7 +363,7 @@ describe("Navigation Plugin — History Extensions", () => {
       // not "" (stripped) and not undefined (urlClaim skipped).
       mockNav.reset("http://localhost/");
       await router.start();
-      await router.navigate("users.list", {}, { hash: "anchor" });
+      await router.navigate("users.list", {}, undefined, { hash: "anchor" });
       await router.navigate("home");
 
       const state = await router.traverseToLast("users.list");
@@ -428,6 +429,40 @@ describe("Navigation Plugin — History Extensions", () => {
       // rejects ?undeclared=1 during entry matching — no entry is found
       await expect(router.traverseToLast("users.list")).rejects.toThrow(
         "No history entry",
+      );
+    });
+
+    it("commits the destination entry's query, not just its path (#1586)", async () => {
+      // The output arm of the journey #449 fixed on the input side: since that
+      // fix `resolveEntryToMatchedState` hands back a matchedState carrying
+      // `search`, and traverseToLast used to throw that half away by calling
+      // `navigate(name, params)` with nothing in the query slot.
+      //
+      // Asserting the COMMITTED state is what makes this discriminating — the
+      // resolved `matchedState` has been correct since #449, so an assertion
+      // stopping there passes on the bug. The browser meanwhile traverses to
+      // the entry, whose URL still carries the query, so a lost channel leaves
+      // URL and state disagreeing.
+      router.stop();
+      unsubscribe?.();
+
+      mockNav = new MockNavigation("http://localhost/");
+      browser = createMockNavigationBrowser(mockNav);
+      router = createRouter(queryRouterConfig, { defaultRoute: "home" });
+      unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
+
+      await router.start();
+      await router.navigate("users.list", {}, { tab: "a", sort: "z" });
+      await router.navigate("home");
+
+      const state = await router.traverseToLast("users.list");
+
+      expect(state.search).toStrictEqual({ tab: "a", sort: "z" });
+      expect(state.path).toBe("/users/list?tab=a&sort=z");
+      // The entry the browser landed on — the two must not disagree, or a
+      // second back/forward round trip shows something else again.
+      expect(browser.currentEntry?.url).toBe(
+        "http://localhost/users/list?tab=a&sort=z",
       );
     });
   });

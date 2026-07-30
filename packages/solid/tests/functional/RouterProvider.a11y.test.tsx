@@ -180,7 +180,7 @@ describe("RouterProvider — announceNavigation", () => {
     // the manual mutation should survive.
     announcer!.textContent = "MUTATED";
 
-    await router.navigate("home", {}, { force: true });
+    await router.navigate("home", {}, undefined, { force: true });
 
     expect(announcer?.textContent).toBe("MUTATED");
 

@@ -186,12 +186,13 @@ describe("isLeafNode behavior in matching", () => {
     const tree = createRouteTree("", "", [{ name: "search", path: "/search" }]);
 
     // Query params after path
-    const result = matchPath(tree, "/search?q=test", {
+    const result = matchSegments(tree, "/search?q=test", {
       strictTrailingSlash: false,
     });
 
-    expect(result?.name).toBe("search");
-    expect(result?.params.q).toBe("test");
+    expect(result?.segments.at(-1)?.fullName).toBe("search");
+    // q is a query param — lives in the search channel (RFC-4 M2 / #1548)
+    expect(result?.search.q).toBe("test");
   });
 
   it("should NOT replace leading slash in remainingPath for non-leaf", () => {
@@ -205,12 +206,13 @@ describe("isLeafNode behavior in matching", () => {
     ]);
 
     // Query params after nested path
-    const result = matchPath(tree, "/api/search?q=test", {
+    const result = matchSegments(tree, "/api/search?q=test", {
       strictTrailingSlash: false,
     });
 
-    expect(result?.name).toBe("api.search");
-    expect(result?.params.q).toBe("test");
+    expect(result?.segments.at(-1)?.fullName).toBe("api.search");
+    // q is a query param — lives in the search channel (RFC-4 M2 / #1548)
+    expect(result?.search.q).toBe("test");
   });
 });
 
@@ -246,13 +248,14 @@ describe("queryParamsMode strict behavior", () => {
       { name: "search", path: "/search?q&page" },
     ]);
 
-    const result = matchPath(tree, "/search?q=test&page=1", {
+    const result = matchSegments(tree, "/search?q=test&page=1", {
       queryParamsMode: "strict",
     });
 
-    expect(result?.name).toBe("search");
+    expect(result?.segments.at(-1)?.fullName).toBe("search");
+    // q and page are query params — the whole set lives in the search channel.
     // No queryParams config ⇒ default (auto) strategies, same as buildPath. (#744)
-    expect(result?.params).toStrictEqual({ q: "test", page: 1 });
+    expect(result?.search).toStrictEqual({ q: "test", page: 1 });
   });
 
   it("should reject path with only query params remaining when queryParamsMode=strict", () => {
@@ -267,11 +270,12 @@ describe("queryParamsMode strict behavior", () => {
     expect(resultStrict).toBeNull();
 
     // In default mode, extra query params are parsed
-    const resultDefault = matchPath(tree, "/api?extra=value", {
+    const resultDefault = matchSegments(tree, "/api?extra=value", {
       queryParamsMode: "default",
     });
 
-    expect(resultDefault?.params.extra).toBe("value");
+    // extra is a query param — lives in the search channel (RFC-4 M2 / #1548)
+    expect(resultDefault?.search.extra).toBe("value");
   });
 });
 
@@ -323,9 +327,10 @@ describe("default value mutations", () => {
     const tree = createRouteTree("", "", [{ name: "page", path: "/page" }]);
 
     // Default mode parses extra query params
-    const resultDefault = matchPath(tree, "/page?extra=value");
+    const resultDefault = matchSegments(tree, "/page?extra=value");
 
-    expect(resultDefault?.params.extra).toBe("value");
+    // extra is a query param — lives in the search channel (RFC-4 M2 / #1548)
+    expect(resultDefault?.search.extra).toBe("value");
   });
 });
 
@@ -534,11 +539,12 @@ describe("additional edge cases for mutation coverage", () => {
     const tree = createRouteTree("", "", [{ name: "api", path: "/api" }]);
 
     // Path with trailing slash AND query params
-    const result = matchPath(tree, "/api/?extra=value");
+    const result = matchSegments(tree, "/api/?extra=value");
 
     // In default mode (strictTrailingSlash=false), should match and include query params
-    expect(result?.name).toBe("api");
-    expect(result?.params.extra).toBe("value");
+    expect(result?.segments.at(-1)?.fullName).toBe("api");
+    // extra is a query param — lives in the search channel (RFC-4 M2 / #1548)
+    expect(result?.search.extra).toBe("value");
   });
 
   it("should handle segment.slice(consumedPath.length) vs segment for query extraction", () => {
@@ -549,12 +555,14 @@ describe("additional edge cases for mutation coverage", () => {
     ]);
 
     // Query params in both route definition and URL
-    const result = matchPath(tree, "/users/123?tab=settings&extra=value");
+    const result = matchSegments(tree, "/users/123?tab=settings&extra=value");
 
+    // id is a path param — stays in the params channel
     expect(result?.params.id).toBe("123");
-    expect(result?.params.tab).toBe("settings");
+    // tab and extra are query params — the search channel (RFC-4 M2 / #1548)
+    expect(result?.search.tab).toBe("settings");
     // Extra params should also be parsed in default mode
-    expect(result?.params.extra).toBe("value");
+    expect(result?.search.extra).toBe("value");
   });
 
   it("should handle isRoot correctly when matching at root level", () => {
@@ -562,10 +570,11 @@ describe("additional edge cases for mutation coverage", () => {
     const tree = createRouteTree("", "", [{ name: "home", path: "/" }]);
 
     // Matching at root "/" with root node
-    const result = matchPath(tree, "/?param=value");
+    const result = matchSegments(tree, "/?param=value");
 
-    expect(result?.name).toBe("home");
-    expect(result?.params.param).toBe("value");
+    expect(result?.segments.at(-1)?.fullName).toBe("home");
+    // param is a query param — lives in the search channel (RFC-4 M2 / #1548)
+    expect(result?.search.param).toBe("value");
   });
 
   it("should handle absolute routes with query params", () => {
@@ -580,10 +589,11 @@ describe("additional edge cases for mutation coverage", () => {
     ]);
 
     // Root has query param, section has absolute child (modal)
-    const result = matchPath(tree, "/modal?globalParam=1");
+    const result = matchSegments(tree, "/modal?globalParam=1");
 
-    expect(result?.name).toBe("app.section.modal");
-    expect(result?.params.globalParam).toBe(1); // auto default (no queryParams) (#744)
+    expect(result?.segments.at(-1)?.fullName).toBe("app.section.modal");
+    // globalParam is a query param — lives in the search channel (RFC-4 M2 / #1548)
+    expect(result?.search.globalParam).toBe(1); // auto default (no queryParams) (#744)
   });
 
   it("should handle absolute segment matching", () => {
@@ -615,9 +625,10 @@ describe("additional edge cases for mutation coverage", () => {
 
     // Query string in middle of path (unusual but valid URL encoding scenario)
     // /parent/child?param=with/slash
-    const result = matchPath(tree, "/parent/child?param=with/slash");
+    const result = matchSegments(tree, "/parent/child?param=with/slash");
 
-    expect(result?.name).toBe("parent.child");
-    expect(result?.params.param).toBe("with/slash");
+    expect(result?.segments.at(-1)?.fullName).toBe("parent.child");
+    // param is a query param — lives in the search channel (RFC-4 M2 / #1548)
+    expect(result?.search.param).toBe("with/slash");
   });
 });

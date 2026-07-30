@@ -85,7 +85,13 @@ describe("URL-param cache invalidation on tree mutation (#723)", () => {
 
     // Warm the cache for "item" (tab is a query param here → ignored → true)
     expect(
-      router.isActiveRoute("item", { id: "1", tab: "b" }, false, true),
+      router.isActiveRoute(
+        "item",
+        { id: "1", tab: "b" },
+        undefined,
+        false,
+        true,
+      ),
     ).toBe(true);
 
     getRoutesApi(router).replace([
@@ -97,7 +103,13 @@ describe("URL-param cache invalidation on tree mutation (#723)", () => {
 
     // tab is now a path param → active item has tab "a", query target tab "b"
     expect(
-      router.isActiveRoute("item", { id: "1", tab: "b" }, false, true),
+      router.isActiveRoute(
+        "item",
+        { id: "1", tab: "b" },
+        undefined,
+        false,
+        true,
+      ),
     ).toBe(false);
   });
 });

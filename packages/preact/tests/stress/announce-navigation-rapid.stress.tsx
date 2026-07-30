@@ -76,7 +76,9 @@ async function consumeInitialNav(router: Router): Promise<Element> {
   // After mount, the first TRANSITION_SUCCESS is marked as "initial" and
   // skipped. Fire a no-op force-nav on the start route to consume it.
   await act(async () => {
-    await router.navigate("route0", {}, { force: true }).catch(() => {});
+    await router
+      .navigate("route0", {}, undefined, { force: true })
+      .catch(() => {});
   });
   await flushAnnouncerPipeline();
 
@@ -176,7 +178,9 @@ describe("R — announceNavigation rapid (§7.2 #14)", () => {
     // announcer content stable.
     for (let i = 0; i < 10; i++) {
       await act(async () => {
-        await router.navigate("route1", {}, { force: true }).catch(() => {});
+        await router
+          .navigate("route1", {}, undefined, { force: true })
+          .catch(() => {});
       });
       await flushAnnouncerPipeline();
     }

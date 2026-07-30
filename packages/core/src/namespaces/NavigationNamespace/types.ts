@@ -3,9 +3,10 @@
 import type {
   GuardFn,
   NavigationOptions,
-  Options,
+  AnyOptions,
   Params,
   RouterLogger,
+  SearchParams,
   State,
 } from "../../types";
 
@@ -30,10 +31,31 @@ export interface NavigationDependencies {
   logger: RouterLogger;
 
   /** Get router options */
-  getOptions: () => Options;
+  // The erased view: these namespaces READ configuration (`defaultRoute`
+  // truthiness, `allowNotFound`) — they never resolve a callback, which is
+  // `resolveDefault`'s job. Taking `AnyOptions` keeps the dependency-map
+  // generic out of every namespace that has no use for it.
+  getOptions: () => AnyOptions;
 
   /** Check if route exists */
   hasRoute: (name: string) => boolean;
+
+  /**
+   * The route's DECLARED query-param names — the same registry the URL build
+   * prints from (#1556), minus path slots. Feeds the always-on channel guard
+   * (#1572); read here rather than re-derived, so classification cannot drift.
+   */
+  getQueryParams: (name: string) => readonly string[];
+
+  /**
+   * Per-segment param-source map for a route name (`{ segment: { param: "url" |
+   * "query" } }`), read from the live matcher — the ownership channel for
+   * `getTransitionPath` (RFC-4 M2 / #1548, replaced the removed `stateMetaStore`
+   * WeakMap). `undefined` when the name is not in the tree.
+   */
+  getMetaForState: (
+    name: string,
+  ) => Record<string, Record<string, "url" | "query">> | undefined;
 
   /** Get current state */
   getState: () => State | undefined;
@@ -45,10 +67,17 @@ export interface NavigationDependencies {
   buildNavigateState: (
     routeName: string,
     routeParams: Params,
+    routeSearch?: SearchParams,
   ) => State | undefined;
 
-  /** Resolve defaultRoute and defaultParams options (static value or callback) */
-  resolveDefault: () => { route: string; params: Params };
+  /**
+   * Resolve the `defaultRoute` / `defaultParams` / `defaultSearch` options
+   * (each a static value or a callback). Two channels, never one bag — the
+   * default route may be chosen dynamically, so its query defaults have to
+   * travel in their own slot rather than be re-channelled downstream
+   * (RFC-4 M2 / #1548).
+   */
+  resolveDefault: () => { route: string; params: Params; search: SearchParams };
 
   /** Start transition and send NAVIGATE event to routerFSM */
   startTransition: (toState: State, fromState: State | undefined) => void;

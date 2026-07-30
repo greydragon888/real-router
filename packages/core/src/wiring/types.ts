@@ -24,7 +24,7 @@ export interface NamespaceBag<Dependencies extends DefaultDependencies> {
   /** Router instance — passed to namespaces for factory initialization */
   router: Router<Dependencies>;
   /** Options namespace */
-  options: OptionsNamespace;
+  options: OptionsNamespace<Dependencies>;
   /** Immutable limits configuration */
   limits: Limits;
   /** Dependencies store */

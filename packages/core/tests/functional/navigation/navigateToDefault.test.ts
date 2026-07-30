@@ -1,6 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events, RouterError } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  events,
+  RouterError,
+} from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { captureUnhandledRejections, createTestRouter } from "../../helpers";
@@ -95,7 +100,11 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault();
 
       expect(state.name).toBe("users.view");
-      expect(state.params).toStrictEqual(defaultParams);
+      // `id` is the path param; `tab` is undeclared (not a `?tab` query on
+      // `/users/view/:id`), so under the router-level defaultParams it now
+      // routes to state.params, not state.search (RFC-4 M2 / #1548, rule 4).
+      expect(state.params).toStrictEqual({ id: 123, tab: "profile" });
+      expect(state.search).toStrictEqual({});
     });
 
     it("should work with nested defaultRoute", async () => {
@@ -104,6 +113,8 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault();
 
       expect(state.name).toBe("settings.account");
+      // `section` is undeclared on `/settings/account`, so a router-level
+      // defaultParams key lands in state.params (RFC-4 M2 / #1548, rule 4).
       expect(state.params).toStrictEqual({ section: "privacy" });
     });
 
@@ -135,7 +146,8 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault();
 
       expect(state.name).toBe("users.view");
-      expect(state.params).toStrictEqual(defaultParams);
+      expect(state.params).toStrictEqual({ id: 42, tab: "profile" });
+      expect(state.search).toStrictEqual({});
     });
 
     it("should navigate to nested defaultRoute correctly", async () => {
@@ -263,7 +275,7 @@ describe("navigateToDefault", () => {
       await withDefault("profile");
 
       // Navigate to profile first
-      await router.navigate("profile", {}, {});
+      await router.navigate("profile", {}, undefined, {});
 
       // Navigate to default with force (same route)
       const state = await router.navigateToDefault({ force: true });
@@ -323,7 +335,7 @@ describe("navigateToDefault", () => {
       await withDefault("users");
 
       // Navigate to different route first
-      await router.navigate("profile", {}, {});
+      await router.navigate("profile", {}, undefined, {});
 
       expect(router.getState()?.name).toBe("profile");
 
@@ -360,7 +372,8 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault();
 
       expect(state.name).toBe("users.view");
-      expect(state.params).toStrictEqual(defaultParams);
+      expect(state.params).toStrictEqual({ id: 42, category: "tech" });
+      expect(state.search).toStrictEqual({});
     });
 
     it("should use defaultParams with navigation options", async () => {
@@ -415,7 +428,20 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault();
 
       expect(state.name).toBe("users.view");
-      expect(state.params).toStrictEqual(defaultParams);
+      // Only `id` is declared (path param on `/users/view/:id`); the rest are
+      // undeclared, so the whole router-level defaultParams bag (minus none) is
+      // routed to state.params (RFC-4 M2 / #1548, rule 4).
+      expect(state.params).toStrictEqual({
+        id: 789,
+        filters: {
+          category: "electronics",
+          minPrice: 100,
+          maxPrice: 1000,
+        },
+        sort: "price_asc",
+        page: 1,
+      });
+      expect(state.search).toStrictEqual({});
     });
 
     it("should handle defaultParams as empty object", async () => {
@@ -459,6 +485,9 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault();
 
       expect(state.name).toBe("withEncoder");
+      // `withEncoder` declares no query params, so the router-level
+      // defaultParams (`one`/`two`) stay in the state.params channel; the
+      // encoder maps them to the path slots only at buildPath time (M2 #1548).
       expect(state.params).toStrictEqual(defaultParams);
       expect(state.path).toBe("/encoded/value1/value2");
     });
@@ -512,7 +541,9 @@ describe("navigateToDefault", () => {
           }),
         );
 
-        // Guard should receive correct toState with defaultParams
+        // Guard should receive correct toState with defaultParams. `admin`
+        // declares no query params, so the router-level defaultParams (`id`)
+        // routes to state.params, not state.search (RFC-4 M2 / #1548, rule 4).
         expect(blockingGuard).toHaveBeenCalledWith(
           expect.objectContaining({
             name: "admin",
@@ -575,6 +606,8 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault();
 
       expect(state.name).toBe("users");
+      // `users` declares no query params, so all keys route to state.params
+      // (RFC-4 M2 / #1548, rule 4).
       expect(state.params).toStrictEqual(defaultParams);
     });
 
@@ -593,7 +626,9 @@ describe("navigateToDefault", () => {
       state = await router.navigateToDefault();
 
       expect(state.name).toBe("users.view");
+      // `id` is the path param; `new` is undeclared → both in state.params.
       expect(state.params).toStrictEqual({ id: 2, new: "param" });
+      expect(state.search).toStrictEqual({});
     });
   });
 
@@ -658,7 +693,7 @@ describe("navigateToDefault", () => {
 
     it("should pass force option and allow same-state navigation", async () => {
       // First navigate to users
-      await router.navigate("users", { id: 123 }, {});
+      await router.navigate("users", { id: 123 }, undefined, {});
 
       // Then try to navigate to default (same route) without force - should fail
       try {
@@ -943,6 +978,96 @@ describe("navigateToDefault", () => {
       await expect(router.navigateToDefault()).rejects.toThrow(
         "callback exploded",
       );
+    });
+  });
+
+  describe("defaultSearch — the router-level query channel", () => {
+    // The query-channel twin of `defaultParams` (RFC-4 M2 / #1548). A route's
+    // own config has had both slots since M2; the router option had only the
+    // path one, so the default route's query defaults could be spelled ONLY in
+    // `defaultParams` — and reached the URL only because the `forwardState`
+    // seam still re-channelled the bag on the way through. That repair is
+    // stage ②, which the nav-pipeline design removes; without this option the
+    // default route's query would then silently stop reaching the URL, with no
+    // error and no correct spelling to migrate to.
+    const queryRoutes = [
+      { name: "list", path: "/list?tab&sort" },
+      { name: "home", path: "/home" },
+    ];
+
+    afterEach(() => {
+      router.stop();
+    });
+
+    it("commits into state.search and prints into the URL", async () => {
+      router.stop();
+      router = createRouter(queryRoutes, {
+        defaultRoute: "list",
+        defaultSearch: { tab: "a", sort: "z" },
+      });
+      await router.start("/home");
+
+      const state = await router.navigateToDefault();
+
+      expect(state.search).toStrictEqual({ tab: "a", sort: "z" });
+      expect(state.path).toBe("/list?tab=a&sort=z");
+    });
+
+    it("keeps the two option channels apart", async () => {
+      // The discriminating pair: an UNDECLARED key in `defaultParams` is
+      // app-level data and stays in `state.params`, while `defaultSearch`
+      // reaches the query string. One bag could not express both.
+      router.stop();
+      router = createRouter(queryRoutes, {
+        defaultRoute: "list",
+        defaultParams: { flag: "keep" },
+        defaultSearch: { tab: "a" },
+      });
+      await router.start("/home");
+
+      const state = await router.navigateToDefault();
+
+      expect(state.params).toStrictEqual({ flag: "keep" });
+      expect(state.search).toStrictEqual({ tab: "a" });
+      expect(state.path).toBe("/list?tab=a");
+    });
+
+    it("accepts a callback, re-evaluated per navigateToDefault", async () => {
+      // Callback form. The dependency-typed spelling is pinned separately, at
+      // the type level, in `options.test.ts` — here the point is the RUNTIME
+      // contract: never cached, re-resolved at each point of use.
+      let tab = "first";
+
+      router.stop();
+      router = createRouter(queryRoutes, {
+        defaultRoute: "list",
+        defaultSearch: () => ({ tab }),
+      });
+      await router.start("/home");
+
+      const first = await router.navigateToDefault();
+
+      expect(first.search).toStrictEqual({ tab: "first" });
+
+      tab = "second";
+
+      const second = await router.navigateToDefault({ reload: true });
+
+      // Never cached — resolved at the point of use, like its siblings.
+      expect(second.search).toStrictEqual({ tab: "second" });
+      expect(second.path).toBe("/list?tab=second");
+    });
+
+    it("defaults to an empty bag when unset", async () => {
+      router.stop();
+      router = createRouter(queryRoutes, { defaultRoute: "list" });
+      await router.start("/home");
+
+      const state = await router.navigateToDefault();
+
+      expect(state.search).toStrictEqual({});
+      expect(state.path).toBe("/list");
+      expect(getPluginApi(router).getOptions().defaultSearch).toStrictEqual({});
     });
   });
 });

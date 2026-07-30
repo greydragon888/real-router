@@ -54,7 +54,7 @@ describe("useIsActiveRoute", () => {
 
     const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-    createActiveRouteSource(router, "users", undefined, {
+    createActiveRouteSource(router, "users", undefined, undefined, {
       strict: false,
       ignoreQueryParams: true,
     });
@@ -80,17 +80,23 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should handle non-strict mode", () => {
-    const { result } = renderHook(() => useIsActiveRoute("users", {}, false), {
-      wrapper: (props) => wrapper({ ...props, router }),
-    });
+    const { result } = renderHook(
+      () => useIsActiveRoute("users", {}, undefined, false),
+      {
+        wrapper: (props) => wrapper({ ...props, router }),
+      },
+    );
 
     expect(result.current).toBe(true);
   });
 
   it("should handle strict mode", () => {
-    const { result } = renderHook(() => useIsActiveRoute("users", {}, true), {
-      wrapper: (props) => wrapper({ ...props, router }),
-    });
+    const { result } = renderHook(
+      () => useIsActiveRoute("users", {}, undefined, true),
+      {
+        wrapper: (props) => wrapper({ ...props, router }),
+      },
+    );
 
     expect(result.current).toBe(false);
   });
@@ -129,7 +135,7 @@ describe("useIsActiveRoute", () => {
     it("should update when activeStrict changes and router navigates", async () => {
       const { result, rerender } = renderHook(
         ({ strict }: { strict: boolean }) =>
-          useIsActiveRoute("users", {}, strict),
+          useIsActiveRoute("users", {}, undefined, strict),
         {
           wrapper: (props) => wrapper({ ...props, router }),
           initialProps: { strict: false },
@@ -167,11 +173,21 @@ describe("useIsActiveRoute", () => {
         filter: "active",
         sort: "date",
         page: 1,
-        nested: { a: 1, b: 2 },
+        // A primitive array is a valid route-param value (SearchParamValue) and
+        // compares by CONTENT (areParamValuesEqual). A nested object is NOT a
+        // valid param value (M2 params are primitives / primitive arrays) and
+        // would compare by reference — fragile across adapters.
+        tags: [1, 2],
       };
 
+      // `/complex` has no path params and these keys are undeclared, so they
+      // don't render to the URL — both navigations build the same path. `reload`
+      // allows the same-URL re-navigation; isActiveRoute still compares the
+      // params bag (path/arbitrary channel), which is what this test exercises.
       await act(async () => {
-        await router.navigate("complex", complexParams);
+        await router.navigate("complex", complexParams, undefined, {
+          reload: true,
+        });
       });
 
       const { result } = renderHook(
@@ -182,7 +198,14 @@ describe("useIsActiveRoute", () => {
       expect(result.current).toBe(true);
 
       await act(async () => {
-        await router.navigate("complex", { ...complexParams, page: 2 });
+        await router.navigate(
+          "complex",
+          { ...complexParams, page: 2 },
+          undefined,
+          {
+            reload: true,
+          },
+        );
       });
 
       const { result: result2 } = renderHook(
@@ -283,14 +306,23 @@ describe("useIsActiveRoute", () => {
 
       expect(stringParam.current).toBe(true);
 
-      // URL params are always parsed as strings — numeric 123 does not match
-      // the stored string "123", so the hook returns false for number inputs.
+      // URL params decode as strings, but a caller commonly passes the number —
+      // both print the same path (/users/123), so the hook reports active for
+      // either form (#1554, provenance-tolerant comparison in core).
       const { result: numericParam } = renderHook(
         () => useIsActiveRoute("users.view", { id: 123 }),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
-      expect(numericParam.current).toBe(false);
+      expect(numericParam.current).toBe(true);
+
+      // Still discriminating: a genuinely different value is not active.
+      const { result: otherParam } = renderHook(
+        () => useIsActiveRoute("users.view", { id: 124 }),
+        { wrapper: (props) => wrapper({ ...props, router }) },
+      );
+
+      expect(otherParam.current).toBe(false);
 
       await act(async () => {
         const navErr = await router
@@ -301,7 +333,8 @@ describe("useIsActiveRoute", () => {
       });
 
       expect(stringParam.current).toBe(true);
-      expect(numericParam.current).toBe(false);
+      expect(numericParam.current).toBe(true);
+      expect(otherParam.current).toBe(false);
     });
   });
 
@@ -396,21 +429,21 @@ describe("useIsActiveRoute", () => {
       });
 
       const { result: nonStrict } = renderHook(
-        () => useIsActiveRoute("settings", {}, false),
+        () => useIsActiveRoute("settings", {}, undefined, false),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
       expect(nonStrict.current).toBe(true);
 
       const { result: strict } = renderHook(
-        () => useIsActiveRoute("settings", {}, true),
+        () => useIsActiveRoute("settings", {}, undefined, true),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
       expect(strict.current).toBe(false);
 
       const { result: intermediate } = renderHook(
-        () => useIsActiveRoute("settings.profile", {}, false),
+        () => useIsActiveRoute("settings.profile", {}, undefined, false),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 

@@ -1,5 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import {
@@ -455,5 +456,165 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     getLifecycleApi(fresh).addDeactivateGuard("admin", () => () => false);
 
     expect(fresh.canNavigateTo("admin")).toBe(true);
+  });
+
+  // #1576 — the predicate must mirror EVERY way `navigate` refuses the same
+  // arguments, not only the guard verdict. The channel guard (#1572) gave
+  // `navigate` a new synchronous rejection; without this the predicate promised
+  // a navigation that throws on the click.
+  it("returns false for a declared query key handed in the params bag (#1576)", async () => {
+    const fresh = createRouter([
+      { name: "home", path: "/" },
+      { name: "search", path: "/search?q" },
+    ]);
+
+    await fresh.start("/home");
+
+    // The verb refuses this argument shape outright — synchronously, at the
+    // facade, before any transition exists.
+    expect(() => fresh.navigate("search", { q: "a" })).toThrow(TypeError);
+
+    expect(fresh.canNavigateTo("search", { q: "a" })).toBe(false);
+
+    // Discrimination: the spelling `navigate` accepts stays navigable, so the
+    // predicate has not degenerated into a constant `false`.
+    expect(fresh.canNavigateTo("search", {}, { q: "a" })).toBe(true);
+
+    fresh.stop();
+  });
+
+  // #1577 — the predicate is TOTAL (invariant canNavigateTo #5): no input makes
+  // it throw. `forwardState` sat outside its try, so user code running during
+  // resolution escaped as an exception instead of an answer. Its sibling
+  // `isActiveRoute` has wrapped the same primitive since #1573.
+  it("returns false and warns when a dynamic forwardTo throws during resolution (#1577)", async () => {
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    const fresh = createRouter([
+      { name: "home", path: "/" },
+      {
+        name: "src",
+        path: "/src",
+        forwardTo: () => {
+          throw new Error("dynamic boom");
+        },
+      },
+      { name: "dst", path: "/dst" },
+    ]);
+
+    await fresh.start("/home");
+
+    expect(fresh.canNavigateTo("src")).toBe(false);
+
+    // Never silent: user code crashed, which is an operational fault, not a
+    // route that legitimately blocks — same policy as a throwing guard (#959)
+    // and as the sibling predicate.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("src"),
+      expect.any(Error),
+    );
+
+    // The sibling already answered; the two predicates must not disagree about
+    // what a throwing resolution means.
+    expect(fresh.isActiveRoute("src")).toBe(false);
+
+    warnSpy.mockRestore();
+    fresh.stop();
+  });
+
+  it("returns false when the params bag's getter throws during channel separation (#1577)", async () => {
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    const fresh = createRouter([
+      { name: "home", path: "/" },
+      { name: "x", path: "/x?page" },
+    ]);
+
+    await fresh.start("/home");
+
+    // A declared query name is required for the seam to walk the bag at all —
+    // with no `?name` on the route the split short-circuits and the read never
+    // happens (`helpers.ts:48`), which is why the two cases below stay `false`
+    // even without this fix.
+    const hostile = {} as Record<string, unknown>;
+
+    Object.defineProperty(hostile, "page", {
+      get() {
+        throw new Error("accessor boom");
+      },
+      enumerable: true,
+    });
+
+    expect(fresh.canNavigateTo("x", hostile as never)).toBe(false);
+
+    // Symmetry (#1577): the sibling render-path predicate states the same policy
+    // in its own code — "a predicate answers, it never throws from inside a
+    // render" (RoutesNamespace.ts:616-618) — but only wrapped the destination
+    // arm. Its literal arm walks the bag too (canonicalize's literal form), as does the
+    // descendant branch's combined-bag spread.
+    expect(fresh.isActiveRoute("x", hostile as never)).toBe(false);
+    expect(fresh.isActiveRoute("x", {}, hostile as never)).toBe(false);
+
+    warnSpy.mockRestore();
+    fresh.stop();
+  });
+
+  it("isActiveRoute answers false for a hostile bag on the descendant branch (#1577)", async () => {
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    const fresh = createRouter([
+      { name: "home", path: "/" },
+      {
+        name: "users",
+        path: "/users?q",
+        children: [{ name: "profile", path: "/:id" }],
+      },
+    ]);
+
+    await fresh.start("/users/7?q=5");
+
+    const hostile = {} as Record<string, unknown>;
+
+    Object.defineProperty(hostile, "zzz", {
+      get() {
+        throw new Error("accessor boom");
+      },
+      enumerable: true,
+    });
+
+    // Active state is the DESCENDANT, so the predicate takes the hierarchical
+    // branch and recombines both channels into one bag — a second surface that
+    // reads the caller's object.
+    expect(fresh.isActiveRoute("users", hostile as never)).toBe(false);
+
+    warnSpy.mockRestore();
+    fresh.stop();
+  });
+
+  // The mirror must not OVER-reach: a name occupying both a path slot and a
+  // query declaration is legitimately path-owned (#843 / #1549), so
+  // `getQueryParams` excludes it, `navigate` does NOT throw — and the predicate
+  // must keep answering `true`.
+  it("keeps a path/query collision navigable — the carve-out `navigate` also honours (#1576)", async () => {
+    const fresh = createRouter([
+      { name: "home", path: "/" },
+      { name: "item", path: "/items/:id?id" },
+    ]);
+
+    await fresh.start("/home");
+
+    await expect(fresh.navigate("item", { id: "7" })).resolves.toMatchObject({
+      path: "/items/7",
+    });
+
+    expect(fresh.canNavigateTo("item", { id: "7" })).toBe(true);
+
+    fresh.stop();
   });
 });

@@ -9,8 +9,12 @@ export type {
 // Base types
 export type {
   Params,
+  NavigationTarget,
+  ParamsSearch,
+  SearchParams,
+  SearchParamValue,
+  SearchParamPrimitive,
   State,
-  StateMetaInput,
   SimpleState,
   Unsubscribe,
   RouterError,
@@ -85,7 +89,7 @@ export interface NavigationOptions {
    *
    * @example
    * // Redirect after login - prevent back button to login page
-   * router.navigate('dashboard', {}, { replace: true });
+   * router.navigate('dashboard', {}, undefined, { replace: true });
    *
    * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/History/replaceState}
    */
@@ -129,13 +133,22 @@ export interface NavigationOptions {
    * @default false
    *
    * @example
-   * // Refresh current page data
-   * router.navigate(currentRoute.name, currentRoute.params, { reload: true });
+   * // Refresh current page data. Options sit at slot 4 since RFC-4 M2
+   * // (#1548) — slot 3 is the query channel, so the pre-M2 three-argument
+   * // spelling puts `{ reload: true }` in `search`: the reload never happens
+   * // and the page's own query is rebuilt from an object that does not have
+   * // it (measured: `/search?term=react` → `/search`).
+   * router.navigate(
+   *   currentRoute.name,
+   *   currentRoute.params,
+   *   currentRoute.search,
+   *   { reload: true },
+   * );
    *
    * @example
-   * // Force re-fetch on same route with different query params
-   * // Note: query params are in path, not checked for equality
-   * router.navigate('search', { term: 'react' }, { reload: true });
+   * // Force re-fetch on the same route with a different query. The query is
+   * // its own channel now — pass it at slot 3, not inside the path bag.
+   * router.navigate('search', {}, { term: 'react' }, { reload: true });
    *
    * @see {@link force} for alternative that forces transition
    * @see {@link Router.areStatesEqual} for state comparison logic
@@ -163,7 +176,7 @@ export interface NavigationOptions {
    *
    * @example
    * // Force transition for tracking even if params didn't change
-   * router.navigate('analytics', { event: 'pageview' }, { force: true });
+   * router.navigate('analytics', {}, { event: 'pageview' }, { force: true });
    *
    * @see {@link reload} for semantic equivalent (preferred for refresh scenarios)
    */
@@ -193,7 +206,7 @@ export interface NavigationOptions {
    * @example
    * // Force logout even with unsaved changes
    * function forceLogout() {
-   *   router.navigate('login', {}, {
+   *   router.navigate('login', {}, undefined, {
    *     forceDeactivate: true,
    *     replace: true
    *   });
@@ -248,9 +261,11 @@ export type {
   Plugin,
   Listener,
   Options,
+  AnyOptions,
   DefaultRouteCallback,
   ForwardToCallback,
   DefaultParamsCallback,
+  DefaultSearchCallback,
   GuardFn,
   DefaultDependencies,
   SubscribeState,

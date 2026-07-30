@@ -17,7 +17,7 @@ import type { Router } from "@real-router/core";
 // asserting each call produces the CORRECT state (name pinned to the input),
 // which catches a factory regression the old `toBeDefined()` / bare-heap form
 // would pass straight through.
-describe("S21: makeState / buildState memory", () => {
+describe("S21: makeState / buildNavigationState memory", () => {
   let router: Router;
 
   afterEach(() => {
@@ -37,31 +37,12 @@ describe("S21: makeState / buildState memory", () => {
       const state = pluginApi.makeState(
         `route${i % 100}`,
         { id: String(i) },
+        undefined,
         `/route${i % 100}`,
       );
 
       expect(state.name).toBe(`route${i % 100}`);
       expect(state.params.id).toBe(String(i));
-    }
-
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(1 * MB);
-  }, 30_000);
-
-  it("S21.2: buildState() × 10,000 — correct + heap stable", async () => {
-    router = createStressRouter(100);
-    await router.start("/route0");
-
-    const pluginApi = getPluginApi(router);
-
-    const heapBefore = takeHeapSnapshot();
-
-    for (let i = 0; i < 10_000; i++) {
-      const result = pluginApi.buildState(`route${i % 100}`, { id: String(i) });
-
-      expect(result?.name).toBe(`route${i % 100}`);
     }
 
     const heapAfter = takeHeapSnapshot();

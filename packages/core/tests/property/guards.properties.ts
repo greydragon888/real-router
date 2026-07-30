@@ -10,19 +10,8 @@ import {
   FIXTURE_ROUTE_NAMES,
   ROUTE_PATHS,
   NUM_RUNS,
+  navArgsForRoute,
 } from "./helpers";
-
-function getParamsForRoute(name: string): Record<string, string> {
-  if (name === "users.view" || name === "users.edit") {
-    return { id: "abc" };
-  }
-
-  if (name === "search") {
-    return { q: "test", page: "1" };
-  }
-
-  return {};
-}
 
 /**
  * Independent cumulative segment ids for a dotted route name — the model oracle,
@@ -48,7 +37,7 @@ describe("Guards + navigate() Interaction Properties", () => {
       await router.start("/");
 
       try {
-        await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+        await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
         expect.unreachable("should have thrown");
       } catch (error) {
@@ -73,7 +62,7 @@ describe("Guards + navigate() Interaction Properties", () => {
       await router.start("/");
       const state = await router.navigate(
         targetRoute,
-        getParamsForRoute(targetRoute),
+        ...navArgsForRoute(targetRoute),
       );
 
       expect(state.name).toBe(targetRoute);
@@ -155,7 +144,7 @@ describe("Guards + navigate() Interaction Properties", () => {
       // Guards attached to `from` may have fired on start (activation chain).
       callOrder.length = 0;
 
-      await router.navigate(to, getParamsForRoute(to));
+      await router.navigate(to, ...navArgsForRoute(to));
 
       // Independent model of the diverging suffix (never via core's nameToIDs).
       const fromIds = cumulativeIds(from);
@@ -222,7 +211,7 @@ describe("Guards + navigate() Interaction Properties", () => {
       await router.start("/");
 
       try {
-        await router.navigate(targetRoute, getParamsForRoute(targetRoute));
+        await router.navigate(targetRoute, ...navArgsForRoute(targetRoute));
 
         expect.unreachable("should have thrown");
       } catch (error) {
@@ -247,7 +236,7 @@ describe("Guards + navigate() Interaction Properties", () => {
       await router.start("/");
       const state = await router.navigate(
         targetRoute,
-        getParamsForRoute(targetRoute),
+        ...navArgsForRoute(targetRoute),
       );
 
       expect(state.name).toBe(targetRoute);

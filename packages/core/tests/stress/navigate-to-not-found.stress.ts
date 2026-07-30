@@ -7,7 +7,7 @@ import {
   UNKNOWN_ROUTE,
   RouterError,
 } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getLifecycleApi } from "@real-router/core/api";
 
 import { createStressRouter } from "./helpers";
 
@@ -58,7 +58,6 @@ describe("S12: navigateToNotFound() stress", () => {
 
     router = createRouter(routes, { allowNotFound: true });
 
-    const { getLifecycleApi } = await import("@real-router/core/api");
     const lifecycle = getLifecycleApi(router);
 
     lifecycle.addActivateGuard("slow", delayedResolveGuardFactory);

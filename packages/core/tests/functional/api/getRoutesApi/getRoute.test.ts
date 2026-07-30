@@ -4,7 +4,12 @@ import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { GuardFnFactory, Params, Route, Router } from "@real-router/core";
+import type {
+  GuardFnFactory,
+  ParamsSearch,
+  Route,
+  Router,
+} from "@real-router/core";
 import type { LifecycleApi, RoutesApi } from "@real-router/core/api";
 
 let router: Router;
@@ -119,9 +124,9 @@ describe("core/routes/routeTree/getRoute", () => {
     });
 
     it("should return route with decodeParams", () => {
-      const decoder = (params: Params): Params => ({
-        ...params,
-        id: Number(params.id),
+      const decoder = ({ params, search }: ParamsSearch): ParamsSearch => ({
+        params: { ...params, id: Number(params.id) },
+        search,
       });
 
       routesApi.add({
@@ -134,14 +139,16 @@ describe("core/routes/routeTree/getRoute", () => {
 
       // Verify decoder function works correctly (may be wrapped)
       expect(route?.decodeParams).toBeDefined();
-      expect(route?.decodeParams?.({ id: "42" })).toStrictEqual({ id: 42 });
+      expect(
+        route?.decodeParams?.({ params: { id: "42" }, search: {} }),
+      ).toStrictEqual({ params: { id: 42 }, search: {} });
     });
 
     it("should return route with encodeParams", () => {
-      const encoder = (params: Params): Params => {
+      const encoder = ({ params, search }: ParamsSearch): ParamsSearch => {
         const idValue = params.id as string;
 
-        return { ...params, id: `encoded-${idValue}` };
+        return { params: { ...params, id: `encoded-${idValue}` }, search };
       };
 
       routesApi.add({
@@ -154,9 +161,9 @@ describe("core/routes/routeTree/getRoute", () => {
 
       // Verify encoder function works correctly
       expect(route?.encodeParams).toBeDefined();
-      expect(route?.encodeParams?.({ id: "123" })).toStrictEqual({
-        id: "encoded-123",
-      });
+      expect(
+        route?.encodeParams?.({ params: { id: "123" }, search: {} }),
+      ).toStrictEqual({ params: { id: "encoded-123" }, search: {} });
     });
 
     it("should return route with canActivate", () => {
@@ -192,14 +199,14 @@ describe("core/routes/routeTree/getRoute", () => {
     });
 
     it("should return route with all properties", () => {
-      const decoder = (params: Params): Params => ({
-        ...params,
-        id: Number(params.id),
+      const decoder = ({ params, search }: ParamsSearch): ParamsSearch => ({
+        params: { ...params, id: Number(params.id) },
+        search,
       });
-      const encoder = (params: Params): Params => {
+      const encoder = ({ params, search }: ParamsSearch): ParamsSearch => {
         const idValue = params.id as string;
 
-        return { ...params, id: `v${idValue}` };
+        return { params: { ...params, id: `v${idValue}` }, search };
       };
       const guardFactory: GuardFnFactory = () => () => true;
 
@@ -222,9 +229,13 @@ describe("core/routes/routeTree/getRoute", () => {
       expect(route?.defaultParams).toStrictEqual({ page: 1 });
       // Verify functions work correctly (they may be wrapped)
       expect(route?.decodeParams).toBeDefined();
-      expect(route?.decodeParams?.({ id: "42" })).toStrictEqual({ id: 42 });
+      expect(
+        route?.decodeParams?.({ params: { id: "42" }, search: {} }),
+      ).toStrictEqual({ params: { id: 42 }, search: {} });
       expect(route?.encodeParams).toBeDefined();
-      expect(route?.encodeParams?.({ id: "42" })).toStrictEqual({ id: "v42" });
+      expect(
+        route?.encodeParams?.({ params: { id: "42" }, search: {} }),
+      ).toStrictEqual({ params: { id: "v42" }, search: {} });
       expect(route?.canActivate).toBe(guardFactory);
     });
   });

@@ -139,7 +139,10 @@ export interface SegmentNode {
 
 export interface MatchResult {
   readonly segments: readonly MatcherInputNode[];
+  /** PATH params (query still folded in for A2 back-compat, RFC-4 M2 / #1548). */
   readonly params: Readonly<Record<string, unknown>>;
+  /** QUERY params — the query channel; frozen `{}` when no query string. */
+  readonly search: Readonly<Record<string, unknown>>;
   readonly meta: Readonly<Record<string, Record<string, "url" | "query">>>;
 }
 

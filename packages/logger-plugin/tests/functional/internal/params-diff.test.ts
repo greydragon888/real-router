@@ -180,10 +180,10 @@ describe("params-diff utilities", () => {
         removed: {},
       };
 
-      logParamsDiff(diff, "test-context");
+      logParamsDiff(diff, "test-context", "params");
 
       expect(logSpy).toHaveBeenCalledWith(
-        '[test-context]  Changed: { id: "123" → "456" }',
+        '[test-context]  params Changed: { id: "123" → "456" }',
       );
     });
 
@@ -194,10 +194,10 @@ describe("params-diff utilities", () => {
         removed: {},
       };
 
-      logParamsDiff(diff, "test-context");
+      logParamsDiff(diff, "test-context", "params");
 
       expect(logSpy).toHaveBeenCalledWith(
-        '[test-context]  Added: {"tab":"settings"}',
+        '[test-context]  params Added: {"tab":"settings"}',
       );
     });
 
@@ -208,10 +208,10 @@ describe("params-diff utilities", () => {
         removed: { tab: "profile" },
       };
 
-      logParamsDiff(diff, "test-context");
+      logParamsDiff(diff, "test-context", "params");
 
       expect(logSpy).toHaveBeenCalledWith(
-        '[test-context]  Removed: {"tab":"profile"}',
+        '[test-context]  params Removed: {"tab":"profile"}',
       );
     });
 
@@ -222,10 +222,10 @@ describe("params-diff utilities", () => {
         removed: { sort: "name" },
       };
 
-      logParamsDiff(diff, "test-context");
+      logParamsDiff(diff, "test-context", "params");
 
       expect(logSpy).toHaveBeenCalledWith(
-        '[test-context]  Changed: { id: "123" → "456" }, Added: {"page":"2"}, Removed: {"sort":"name"}',
+        '[test-context]  params Changed: { id: "123" → "456" }, Added: {"page":"2"}, Removed: {"sort":"name"}',
       );
     });
 
@@ -239,7 +239,7 @@ describe("params-diff utilities", () => {
         removed: {},
       };
 
-      logParamsDiff(diff, "test-context");
+      logParamsDiff(diff, "test-context", "params");
 
       const call = logSpy.mock.calls[0][0] as string;
 
@@ -254,10 +254,10 @@ describe("params-diff utilities", () => {
         removed: {},
       };
 
-      logParamsDiff(diff, "custom-context");
+      logParamsDiff(diff, "custom-context", "params");
 
       expect(logSpy).toHaveBeenCalledWith(
-        '[custom-context]  Changed: { id: "1" → "2" }',
+        '[custom-context]  params Changed: { id: "1" → "2" }',
       );
     });
   });

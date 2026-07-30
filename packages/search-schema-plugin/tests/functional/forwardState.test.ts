@@ -32,7 +32,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: searchSchema(),
           },
         ],
@@ -47,11 +47,15 @@ describe("Search schema plugin", () => {
     });
 
     it("should pass valid params through unchanged on navigate", async () => {
-      await router.navigate("search", { q: "hello", page: 2, sort: "desc" });
+      await router.navigate(
+        "search",
+        {},
+        { q: "hello", page: 2, sort: "desc" },
+      );
 
       const state = router.getState();
 
-      expect(state?.params).toMatchObject({
+      expect(state?.search).toMatchObject({
         q: "hello",
         page: 2,
         sort: "desc",
@@ -59,11 +63,15 @@ describe("Search schema plugin", () => {
     });
 
     it("should pass valid params through unchanged on buildPath", () => {
-      const path = router.buildPath("search", {
-        q: "hello",
-        page: 2,
-        sort: "desc",
-      });
+      const path = router.buildPath(
+        "search",
+        {},
+        {
+          q: "hello",
+          page: 2,
+          sort: "desc",
+        },
+      );
 
       expect(path).toBe("/search?q=hello&page=2&sort=desc");
     });
@@ -77,7 +85,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort&extra",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: searchSchema(),
           },
         ],
@@ -94,30 +102,33 @@ describe("Search schema plugin", () => {
     });
 
     it("should strip unknown params when strict is true", async () => {
-      await router.navigate("search", {
-        q: "hello",
-        page: 2,
-        sort: "desc",
-        extra: "should-be-gone",
-      });
+      await router.navigate(
+        "search",
+        {},
+        { q: "hello", page: 2, sort: "desc", extra: "should-be-gone" },
+      );
 
       const state = router.getState();
 
-      expect(state?.params).toMatchObject({
+      expect(state?.search).toMatchObject({
         q: "hello",
         page: 2,
         sort: "desc",
       });
-      expect(state?.params).not.toHaveProperty("extra");
+      expect(state?.search).not.toHaveProperty("extra");
     });
 
     it("should not strip unknowns from buildPath (schema only runs on navigate)", () => {
-      const path = router.buildPath("search", {
-        q: "test",
-        page: 1,
-        sort: "asc",
-        extra: "still-here",
-      });
+      const path = router.buildPath(
+        "search",
+        {},
+        {
+          q: "test",
+          page: 1,
+          sort: "asc",
+          extra: "still-here",
+        },
+      );
 
       expect(path).toContain("q=test");
       expect(path).toContain("extra=still-here");
@@ -132,7 +143,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort&extra",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: searchSchema(),
           },
         ],
@@ -149,16 +160,15 @@ describe("Search schema plugin", () => {
     });
 
     it("should preserve unknown params via merge when strict is false", async () => {
-      await router.navigate("search", {
-        q: "hello",
-        page: 2,
-        sort: "desc",
-        extra: "keep-me",
-      });
+      await router.navigate(
+        "search",
+        {},
+        { q: "hello", page: 2, sort: "desc", extra: "keep-me" },
+      );
 
       const state = router.getState();
 
-      expect(state?.params).toMatchObject({
+      expect(state?.search).toMatchObject({
         q: "hello",
         page: 2,
         sort: "desc",
@@ -175,7 +185,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: createMockSchema({
               validate: (value) => {
                 const params = value as Record<string, unknown>;
@@ -208,17 +218,17 @@ describe("Search schema plugin", () => {
     });
 
     it("should strip invalid keys and merge defaultParams", async () => {
-      await router.navigate("search", {
-        q: "hello",
-        page: "bad",
-        sort: "desc",
-      });
+      await router.navigate(
+        "search",
+        {},
+        { q: "hello", page: "bad", sort: "desc" },
+      );
 
       const state = router.getState();
 
-      expect(state?.params.q).toBe("hello");
-      expect(state?.params.page).toBe(1);
-      expect(state?.params.sort).toBe("desc");
+      expect(state?.search.q).toBe("hello");
+      expect(state?.search.page).toBe(1);
+      expect(state?.search.sort).toBe("desc");
     });
   });
 
@@ -249,7 +259,7 @@ describe("Search schema plugin", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      await router.navigate("search", { q: "hello", page: "1" });
+      await router.navigate("search", {}, { q: "hello", page: "1" });
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("[search-schema-plugin]"),
@@ -292,7 +302,7 @@ describe("Search schema plugin", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      await router.navigate("search", { q: "hello", page: "1" });
+      await router.navigate("search", {}, { q: "hello", page: "1" });
 
       expect(consoleSpy).not.toHaveBeenCalled();
 
@@ -334,7 +344,7 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      await router.navigate("search", { q: "hello", page: "1" });
+      await router.navigate("search", {}, { q: "hello", page: "1" });
 
       expect(onErrorSpy).toHaveBeenCalledTimes(1);
       expect(onErrorSpy).toHaveBeenCalledWith(
@@ -347,7 +357,7 @@ describe("Search schema plugin", () => {
 
       const state = router.getState();
 
-      expect(state?.params).toMatchObject({ q: "fallback", page: "1" });
+      expect(state?.search).toMatchObject({ q: "fallback", page: "1" });
     });
   });
 
@@ -378,9 +388,9 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      await expect(router.navigate("search", { q: "test" })).rejects.toThrow(
-        "Custom onError failure",
-      );
+      await expect(
+        router.navigate("search", {}, { q: "test" }),
+      ).rejects.toThrow("Custom onError failure");
     });
   });
 
@@ -412,7 +422,7 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      await router.navigate("search", { q: "test" });
+      await router.navigate("search", {}, { q: "test" });
 
       expect(consoleSpy).not.toHaveBeenCalled();
 
@@ -439,13 +449,13 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "development" }));
       await router.start("/");
 
-      await expect(router.navigate("search", { q: "test" })).rejects.toThrow(
-        TypeError,
-      );
+      await expect(
+        router.navigate("search", {}, { q: "test" }),
+      ).rejects.toThrow(TypeError);
 
-      await expect(router.navigate("search", { q: "test" })).rejects.toThrow(
-        /Async schema validation is not supported/,
-      );
+      await expect(
+        router.navigate("search", {}, { q: "test" }),
+      ).rejects.toThrow(/Async schema validation is not supported/);
     });
   });
 
@@ -469,15 +479,15 @@ describe("Search schema plugin", () => {
     });
 
     it("should pass params through unmodified for routes without schema", async () => {
-      await router.navigate("about", { ref: "homepage" });
+      await router.navigate("about", {}, { ref: "homepage" });
 
       const state = router.getState();
 
-      expect(state?.params).toMatchObject({ ref: "homepage" });
+      expect(state?.search).toMatchObject({ ref: "homepage" });
     });
 
     it("should build path without modification for routes without schema", () => {
-      const path = router.buildPath("about", { ref: "homepage" });
+      const path = router.buildPath("about", {}, { ref: "homepage" });
 
       expect(path).toBe("/about?ref=homepage");
     });
@@ -507,11 +517,11 @@ describe("Search schema plugin", () => {
     });
 
     it("should fill undefined fields with schema defaults", async () => {
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
       const state = router.getState();
 
-      expect(state?.params).toMatchObject({
+      expect(state?.search).toMatchObject({
         q: "hello",
         page: 1,
         sort: "relevance",
@@ -519,7 +529,7 @@ describe("Search schema plugin", () => {
     });
 
     it("should not affect buildPath (schema only runs on navigate)", () => {
-      const path = router.buildPath("search", { q: "hello" });
+      const path = router.buildPath("search", {}, { q: "hello" });
 
       expect(path).toContain("q=hello");
       expect(path).not.toContain("page=");
@@ -550,12 +560,120 @@ describe("Search schema plugin", () => {
     });
 
     it("should strip invalid keys with no defaultParams to restore them", async () => {
-      await router.navigate("search", { q: "hello", page: "bad" });
+      await router.navigate("search", {}, { q: "hello", page: "bad" });
 
       const state = router.getState();
 
-      expect(state?.params.q).toBe("hello");
-      expect(state?.params).not.toHaveProperty("page");
+      expect(state?.search.q).toBe("hello");
+      expect(state?.search).not.toHaveProperty("page");
+    });
+  });
+
+  describe("write-back of an UNDECLARED key riding the path bag (#1572)", () => {
+    // The surviving population of `#writeBack`'s params-branch. Since #1572 a
+    // caller cannot put a DECLARED query key in `params` — P1 throws — but the
+    // guard fires only on names the route declares with `?`. An UNDECLARED key
+    // therefore still rides the path bag untouched by core (channel separation
+    // routes declared names only), reaches `#writeBack` inside `result.params`,
+    // and must be written back from the schema's validated output rather than
+    // passed through unchecked or silently dropped.
+    it("keeps an undeclared params key that the schema validated", async () => {
+      const router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "search",
+            path: "/search?q",
+            searchSchema: {
+              "~standard": {
+                version: 1 as const,
+                vendor: "test",
+                // Echoes the whole channel, so `validated` carries the
+                // undeclared key too — the condition the branch tests.
+                validate: (value: unknown) => ({ value }),
+              },
+            },
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+      await router.start("/");
+
+      const state = await router.navigate(
+        "search",
+        { extra: "fromParams" },
+        { q: "hello" },
+      );
+
+      expect(state.params).toStrictEqual({ extra: "fromParams" });
+      expect(state.search).toStrictEqual({ q: "hello" });
+    });
+
+    it("drops an undeclared params key the schema did NOT return", async () => {
+      // The other arm of the same branch: the key rides `params` and the
+      // schema's output omits it, so it must be REMOVED — a schema that strips
+      // a key and a state that keeps it would contradict each other.
+      //
+      // `strict: true` is load-bearing here, not decoration: in the default
+      // (non-strict) mode the plugin merges the whole channel back under the
+      // schema output (`{ ...channel, ...value }`), so an omitted key is
+      // restored and this arm is unreachable by construction.
+      const router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "search",
+            path: "/search?q",
+            searchSchema: {
+              "~standard": {
+                version: 1 as const,
+                vendor: "test",
+                // Returns ONLY `q` — `extra` is absent from `validated`.
+                validate: (value: unknown) => ({
+                  value: { q: (value as { q?: unknown }).q },
+                }),
+              },
+            },
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(
+        searchSchemaPlugin({ mode: "production", strict: true }),
+      );
+      await router.start("/");
+
+      const state = await router.navigate(
+        "search",
+        { extra: "fromParams" },
+        { q: "hello" },
+      );
+
+      expect(state.params).toStrictEqual({});
+      expect(state.search).toStrictEqual({ q: "hello" });
+    });
+
+    it("throws for the DECLARED twin — the discriminator", async () => {
+      const router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "search", path: "/search?q" },
+        ],
+        { defaultRoute: "home" },
+      );
+
+      router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+      await router.start("/");
+
+      // Same shape, declared key: core refuses it before the plugin sees it.
+      // Without this arm the test above would read as "params keys survive",
+      // which is exactly what stopped being true.
+      expect(() =>
+        router.navigate("search", { q: "fromParams" }, { q: "hello" }),
+      ).toThrow(/declares `q` as a query param/);
     });
   });
 
@@ -568,7 +686,7 @@ describe("Search schema plugin", () => {
             {
               name: "search",
               path: "/search?q&page",
-              defaultParams: { page: 1 },
+              defaultSearch: { page: 1 },
               searchSchema: failingSchema([
                 {
                   message: "page is invalid",
@@ -586,11 +704,11 @@ describe("Search schema plugin", () => {
         router.usePlugin(searchSchemaPlugin({ mode: "production" }));
         await router.start("/");
 
-        await router.navigate("search", { q: "hello", page: "bad" });
+        await router.navigate("search", {}, { q: "hello", page: "bad" });
 
         const state = router.getState();
 
-        expect(state?.params.page).toBe(1);
+        expect(state?.search.page).toBe(1);
       });
 
       it("should ignore issues without path (whole-object validation)", async () => {
@@ -611,12 +729,12 @@ describe("Search schema plugin", () => {
         router.usePlugin(searchSchemaPlugin({ mode: "production" }));
         await router.start("/");
 
-        await router.navigate("search", { q: "hello", page: "1" });
+        await router.navigate("search", {}, { q: "hello", page: "1" });
 
         const state = router.getState();
 
-        expect(state?.params.q).toBe("hello");
-        expect(state?.params.page).toBe("1");
+        expect(state?.search.q).toBe("hello");
+        expect(state?.search.page).toBe("1");
       });
 
       it("should ignore issues with empty path array", async () => {
@@ -639,11 +757,11 @@ describe("Search schema plugin", () => {
         router.usePlugin(searchSchemaPlugin({ mode: "production" }));
         await router.start("/");
 
-        await router.navigate("search", { q: "hello" });
+        await router.navigate("search", {}, { q: "hello" });
 
         const state = router.getState();
 
-        expect(state?.params.q).toBe("hello");
+        expect(state?.search.q).toBe("hello");
       });
     });
 
@@ -668,17 +786,17 @@ describe("Search schema plugin", () => {
         router.usePlugin(searchSchemaPlugin({ mode: "production" }));
         await router.start("/");
 
-        await router.navigate("search", {
-          q: "hello",
-          page: "bad",
-          sort: "asc",
-        });
+        await router.navigate(
+          "search",
+          {},
+          { q: "hello", page: "bad", sort: "asc" },
+        );
 
         const state = router.getState();
 
-        expect(state?.params.q).toBe("hello");
-        expect(state?.params.sort).toBe("asc");
-        expect(state?.params).not.toHaveProperty("page");
+        expect(state?.search.q).toBe("hello");
+        expect(state?.search.sort).toBe("asc");
+        expect(state?.search).not.toHaveProperty("page");
       });
     });
   });
@@ -691,7 +809,7 @@ describe("Search schema plugin", () => {
           {
             name: "search",
             path: "/search?q&page&sort",
-            defaultParams: { page: 1, sort: "asc" },
+            defaultSearch: { page: 1, sort: "asc" },
             searchSchema: failingSchema([
               { message: "page is bad", path: ["page"] },
               { message: "sort is bad", path: ["sort"] },
@@ -707,17 +825,17 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      await router.navigate("search", {
-        q: "hello",
-        page: "bad",
-        sort: "bad",
-      });
+      await router.navigate(
+        "search",
+        {},
+        { q: "hello", page: "bad", sort: "bad" },
+      );
 
       const state = router.getState();
 
-      expect(state?.params.q).toBe("hello");
-      expect(state?.params.page).toBe(1);
-      expect(state?.params.sort).toBe("asc");
+      expect(state?.search.q).toBe("hello");
+      expect(state?.search.page).toBe(1);
+      expect(state?.search.sort).toBe("asc");
     });
   });
 
@@ -747,13 +865,13 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      await router.navigate("search", { x: 1, y: 2 });
+      await router.navigate("search", {}, { x: 1, y: 2 });
 
       const state = router.getState();
 
-      expect(state?.params.x).toBe("override"); // overridden by schema
-      expect(state?.params.y).toBe(2); // preserved from original
-      expect(state?.params.z).toBe(3); // added by schema
+      expect(state?.search.x).toBe("override"); // overridden by schema
+      expect(state?.search.y).toBe(2); // preserved from original
+      expect(state?.search.z).toBe(3); // added by schema
     });
 
     it("should NOT preserve unknowns in strict mode", async () => {
@@ -778,13 +896,13 @@ describe("Search schema plugin", () => {
       );
       await router.start("/");
 
-      await router.navigate("search", { x: 1, y: 2 });
+      await router.navigate("search", {}, { x: 1, y: 2 });
 
       const state = router.getState();
 
-      expect(state?.params.x).toBe("override"); // overridden by schema
-      expect(state?.params).not.toHaveProperty("y"); // stripped in strict mode
-      expect(state?.params.z).toBe(3); // from schema
+      expect(state?.search.x).toBe("override"); // overridden by schema
+      expect(state?.search).not.toHaveProperty("y"); // stripped in strict mode
+      expect(state?.search.z).toBe(3); // from schema
     });
   });
 
@@ -805,12 +923,16 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      await router.navigate("search", { q: "  Hello World  ", tag: "  JS  " });
+      await router.navigate(
+        "search",
+        {},
+        { q: "  Hello World  ", tag: "  JS  " },
+      );
 
       const state = router.getState();
 
-      expect(state?.params.q).toBe("hello world");
-      expect(state?.params.tag).toBe("js");
+      expect(state?.search.q).toBe("hello world");
+      expect(state?.search.tag).toBe("js");
     });
 
     it("should not transform values in buildPath", async () => {
@@ -829,7 +951,7 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      const path = router.buildPath("search", { q: "  HELLO  " });
+      const path = router.buildPath("search", {}, { q: "  HELLO  " });
 
       expect(path).not.toContain("q=hello");
     });
@@ -853,9 +975,9 @@ describe("Search schema plugin", () => {
       await router.start("/");
 
       // Under schema1, `q` is stripped.
-      await router.navigate("search", { q: "hello" });
+      await router.navigate("search", {}, { q: "hello" });
 
-      expect(router.getState()?.params).not.toHaveProperty("q");
+      expect(router.getState()?.search).not.toHaveProperty("q");
 
       // Hot-swap the schema via update — typed precisely via the augmentation.
       // Before #797 this was silently dropped (the stale schema kept validating).
@@ -864,9 +986,9 @@ describe("Search schema plugin", () => {
       });
 
       // Under schema2 (pass-through), `q` is now preserved.
-      await router.navigate("search", { q: "world" });
+      await router.navigate("search", {}, { q: "world" });
 
-      expect(router.getState()?.params).toMatchObject({ q: "world" });
+      expect(router.getState()?.search).toMatchObject({ q: "world" });
     });
   });
 });

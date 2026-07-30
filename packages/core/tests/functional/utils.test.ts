@@ -34,7 +34,9 @@ describe("core/utils", () => {
       );
       expect(router.isActiveRoute("users.view")).toStrictEqual(false);
       expect(router.isActiveRoute("users")).toStrictEqual(true);
-      expect(router.isActiveRoute("users", {}, true)).toStrictEqual(false);
+      expect(router.isActiveRoute("users", {}, undefined, true)).toStrictEqual(
+        false,
+      );
 
       await router.navigate("section.query", { section: "section1" });
 
@@ -54,6 +56,7 @@ describe("core/utils", () => {
         router.isActiveRoute(
           "section.query",
           { section: "section1", param2: "123" },
+          undefined,
           false,
           false,
         ),
@@ -117,13 +120,17 @@ describe("core/utils", () => {
       await router.start("/home");
     });
 
-    it("should build paths with extra parameters", () => {
+    it("builds paths with extra parameters spelled in the query channel", () => {
+      // Renamed at Phase 2 step 2-1: an undeclared key rides the QUERY channel
+      // to reach the URL. Handed in the path bag it is app-level data and is not
+      // printed — the same URL `navigate` commits for that intent.
       expect(
-        router.buildPath("users.view", {
-          id: "123",
-          username: "thomas",
-        }),
+        router.buildPath("users.view", { id: "123" }, { username: "thomas" }),
       ).toStrictEqual("/users/view/123?username=thomas");
+
+      expect(
+        router.buildPath("users.view", { id: "123", username: "thomas" }),
+      ).toStrictEqual("/users/view/123");
     });
   });
 
@@ -147,10 +154,14 @@ describe("core/utils", () => {
 
     it("should build paths", () => {
       expect(
-        router.buildPath("query", {
-          param1: true,
-          param2: false,
-        }),
+        router.buildPath(
+          "query",
+          {},
+          {
+            param1: true,
+            param2: false,
+          },
+        ),
       ).toStrictEqual("/query?param1=true&param2=false");
     });
 
@@ -162,7 +173,7 @@ describe("core/utils", () => {
       }
 
       expect(
-        router.buildPath("query", { param1: true, param2: false }),
+        router.buildPath("query", {}, { param1: true, param2: false }),
       ).toStrictEqual("/query?param1=true&param2=false");
 
       const match = getPluginApi(router).matchPath<{
@@ -170,7 +181,7 @@ describe("core/utils", () => {
         param: boolean;
       }>("/query?param1=true&param2=false");
 
-      expect(match?.params).toStrictEqual({
+      expect(match?.search).toStrictEqual({
         param1: true,
         param2: false,
       });
@@ -181,7 +192,7 @@ describe("core/utils", () => {
     it("should match on start", async () => {
       await router.start("/query?param1=true&param2=false");
 
-      expect(router.getState()?.params).toStrictEqual({
+      expect(router.getState()?.search).toStrictEqual({
         param1: true,
         param2: false,
       });

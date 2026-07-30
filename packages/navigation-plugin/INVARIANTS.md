@@ -15,7 +15,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Postcondition:**
 - `browser.getLocation()` returns a path that matches `S.path`
-- `browser.currentEntry.getState()` contains `{ name: S.name, params: S.params, path: S.path }`
+- `browser.currentEntry.getState()` contains `{ name: S.name, params: S.params, search: S.search, path: S.path }` — the entry state is two-channel since RFC-4 M2 (#1548); the recovery writer was the last one still omitting `search` (#1586)
 - If `navOptions.replace === true`, history was replaced (not pushed)
 - If `navOptions.replace === false`, history was pushed
 
@@ -70,8 +70,8 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Postcondition (by `opts.hash` value):**
 - `opts.hash === undefined` (or omitted) → **preserve** the current fragment, regardless of whether the target path equals the source path. `router.navigate("home")` from `/users#section` lands on `/home#section`.
-- `opts.hash === ""` → **clear** the fragment. `router.navigate("home", {}, { hash: "" })` lands on `/home`.
-- `opts.hash === "value"` (non-empty string) → **set** the fragment. `router.navigate("home", {}, { hash: "footer" })` lands on `/home#footer`. Decoded form (no leading `#`); the plugin encodes per RFC 3986 (`encodeHashFragment`).
+- `opts.hash === ""` → **clear** the fragment. `router.navigate("home", {}, undefined, { hash: "" })` lands on `/home`.
+- `opts.hash === "value"` (non-empty string) → **set** the fragment. `router.navigate("home", {}, undefined, { hash: "footer" })` lands on `/home#footer`. Decoded form (no leading `#`); the plugin encodes per RFC 3986 (`encodeHashFragment`).
 
 `state.context.url.hashChanged` is `true` only when the resolved hash differs from the previous transition's published hash (`fromState.context.url.hash`), or when the browser fires `event.hashChange === true` for a hash-only navigation. Subscribers should branch on `hashChanged`, not on the overloaded `force` flag.
 
@@ -277,6 +277,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 **Postcondition:**
 - Router transitions to the last `users.list` entry (index 3)
 - `router.getState().name === "users.list"`
+- **Both channels of that entry are committed (#1586)** — if its URL was `/users/list?tab=a`, then `getState().search` is `{ tab: "a" }` and `getState().path` carries the query. The browser traverses to the entry's full URL either way, so committing only `params` leaves the address bar and the router describing different pages.
 - `router.peekBack()` returns `users.view`
 - `router.peekForward()` returns `undefined`
 - `state.context.navigation` has `navigationType: "traverse"` and `direction: "back"`
@@ -380,7 +381,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Precondition:**
 - Current state: `{ name: "home", path: "/" }`
-- Call `router.navigate("users.list", {}, { reload: true })`
+- Call `router.navigate("users.list", {}, undefined, { reload: true })`
 
 **Postcondition:**
 - If `reload: true` and `toState.path === fromState.path`: `navigationType = "reload"`
@@ -792,6 +793,7 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 - `recoverFromNavigateError()` is called
 - `browser.navigate(url, { history: "replace" })` is called with URL matching current state
 - Browser URL is restored to `/`
+- **The rebuilt URL carries every channel of the surviving state (#1586)** — `buildUrl(name, params, state.search, { hash })`, and the buffered entry state carries `search`. Recovery rebuilds the state that SURVIVED the failure, so a dropped channel publishes a URL the router itself does not hold. This applies to the `RouterError` branch (`withRecovery` → `syncUrlToRouterState`) identically.
 
 **Why it matters:** Prevents URL from being stuck in an inconsistent state.
 

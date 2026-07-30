@@ -4,7 +4,7 @@ import type { JSX } from "react";
 
 export function About(): JSX.Element {
   const { route } = useRoute();
-  const lang = (route.params.lang as string | undefined) ?? "en";
+  const lang = (route.search.lang as string | undefined) ?? "en";
 
   return (
     <div>

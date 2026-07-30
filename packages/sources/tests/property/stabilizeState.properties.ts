@@ -5,7 +5,7 @@ import {
   arbRouteName,
   createStartedRouter,
   NUM_RUNS,
-  paramsForRoute,
+  channelsForRoute,
 } from "./helpers";
 import { stabilizeState } from "../../src/stabilizeState.js";
 
@@ -14,7 +14,9 @@ import type { State } from "@real-router/core";
 async function makeStateFromRouter(routeName: string): Promise<State> {
   const router = await createStartedRouter();
 
-  await router.navigate(routeName, paramsForRoute(routeName)).catch(() => {});
+  await router
+    .navigate(routeName, ...channelsForRoute(routeName))
+    .catch(() => {});
   const state = router.getState()!;
 
   router.stop();
@@ -108,7 +110,7 @@ describe("stabilizeState — reload-aware (#605)", () => {
       const router = await createStartedRouter();
 
       await router
-        .navigate(routeName, paramsForRoute(routeName))
+        .navigate(routeName, ...channelsForRoute(routeName))
         .catch(() => {});
 
       const prev = router.getState()!;
@@ -116,7 +118,7 @@ describe("stabilizeState — reload-aware (#605)", () => {
       // Reload navigation against the same target produces a fresh state with
       // transition.reload=true; stabilizer must surface it.
       try {
-        await router.navigate(routeName, paramsForRoute(routeName), {
+        await router.navigate(routeName, ...channelsForRoute(routeName), {
           reload: true,
         });
       } catch {

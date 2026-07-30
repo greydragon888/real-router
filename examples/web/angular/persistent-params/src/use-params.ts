@@ -5,7 +5,7 @@ export function useStringParam(key: string, fallback: string): Signal<string> {
   const route = injectRoute();
 
   return computed(() => {
-    const raw = route.routeState().route.params[key];
+    const raw = route.routeState().route.search[key];
 
     return typeof raw === "string" ? raw : fallback;
   });

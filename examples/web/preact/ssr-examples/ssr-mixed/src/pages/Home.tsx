@@ -17,7 +17,9 @@ export function Home() {
   // with the fresh snapshot written by the plugin's subscribeLeave handler.
   const handleRefresh = (): void => {
     invalidate(router, "data");
-    void router.navigate(route.name, route.params, { reload: true });
+    void router.navigate(route.name, route.params, undefined, {
+      reload: true,
+    });
   };
 
   return (

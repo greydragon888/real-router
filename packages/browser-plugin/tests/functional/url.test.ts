@@ -89,16 +89,22 @@ describe("Browser Plugin — URL", () => {
         });
       });
 
-      it("matches URL with query params", async () => {
+      it("matches a URL with undeclared query params but keeps none of them (#1575)", async () => {
         const state = router.matchUrl(
           "https://example.com/users/list?page=1&sort=asc",
         );
 
+        // `queryParamsMode: "default"` (set on this suite's router) and
+        // `users.list` declares no `?page&sort`. The URL still MATCHES — that is
+        // what separates `default` from `strict` — but the keys do not become
+        // state: the rebuilt `path` prints declared names only, so keeping them
+        // in `search` published a state contradicting its own path (#1575).
         expect(withoutMeta(state!)).toStrictEqual({
           name: "users.list",
-          params: { page: 1, sort: "asc" },
+          params: {},
           path: "/users/list",
         });
+        expect(state!.search).toStrictEqual({});
       });
 
       it("handles IPv6 addresses", async () => {
@@ -350,10 +356,14 @@ describe("Browser Plugin — URL", () => {
       });
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      const url = router.buildUrl("search", {
-        q: "test&debug=true",
-        category: "books",
-      });
+      const url = router.buildUrl(
+        "search",
+        {},
+        {
+          q: "test&debug=true",
+          category: "books",
+        },
+      );
 
       // Ampersand in param value should be encoded
       expect(url).toContain("test%26debug%3Dtrue");
@@ -422,7 +432,7 @@ describe("Browser Plugin — URL", () => {
       globalThis.dispatchEvent(new Event("hashchange"));
 
       // Reload same route — path stays the same, hash should be preserved
-      await router.navigate("home", {}, { reload: true });
+      await router.navigate("home", {}, undefined, { reload: true });
 
       // Tri-state preserve (#532): opts.hash === undefined ⇒ keep prevHash from fromState.context.url.hash
       expect(replaceStateSpy).toHaveBeenCalled();
@@ -491,7 +501,7 @@ describe("Browser Plugin — URL", () => {
         "/home#section",
       );
 
-      await router.navigate("users.list", {}, { hash: "" });
+      await router.navigate("users.list", {}, undefined, { hash: "" });
 
       const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
 
@@ -503,7 +513,7 @@ describe("Browser Plugin — URL", () => {
 
       const pushStateSpy = vi.spyOn(mockedBrowser, "pushState");
 
-      await router.navigate("users.list", {}, { hash: "footer" });
+      await router.navigate("users.list", {}, undefined, { hash: "footer" });
 
       const lastUrl = pushStateSpy.mock.calls.at(-1)?.[1];
 
@@ -535,16 +545,20 @@ describe("Browser Plugin — URL", () => {
 
     it("router.buildUrl(name, params, { hash }) appends fragment (#532)", () => {
       expect(
-        router.buildUrl("users.view", { id: "1" }, { hash: "anchor" }),
+        router.buildUrl("users.view", { id: "1" }, undefined, {
+          hash: "anchor",
+        }),
       ).toBe("/users/view/1#anchor");
     });
 
     it("router.buildUrl returns base URL when hash option is empty string (#532)", () => {
-      expect(router.buildUrl("home", {}, { hash: "" })).toBe("/home");
+      expect(router.buildUrl("home", {}, undefined, { hash: "" })).toBe(
+        "/home",
+      );
     });
 
     it("router.buildUrl strips leading # defensively (#532)", () => {
-      expect(router.buildUrl("home", {}, { hash: "#anchor" })).toBe(
+      expect(router.buildUrl("home", {}, undefined, { hash: "#anchor" })).toBe(
         "/home#anchor",
       );
     });
@@ -553,7 +567,7 @@ describe("Browser Plugin — URL", () => {
       // D1=A: `{ hash: "a%20b" }` is the LITERAL fragment `a%20b` (not `a b`), so
       // the `%` is encoded → `#a%2520b`. Before #1211 normalizeHashInput's second
       // decode turned it into `a b` → `#a%20b`, splitting the plugin↔adapter policy.
-      expect(router.buildUrl("home", {}, { hash: "a%20b" })).toBe(
+      expect(router.buildUrl("home", {}, undefined, { hash: "a%20b" })).toBe(
         "/home#a%2520b",
       );
     });
@@ -588,7 +602,7 @@ describe("Browser Plugin — URL", () => {
       // replaceHistoryState re-syncs it (#1212 — the sibling replaceState writer
       // to the nav-write that #1019 already syncs). Without the sync, a later
       // preserve-navigate reads the stale cache and wipes the fragment.
-      router.replaceHistoryState("home", {}, { hash: "ch1" });
+      router.replaceHistoryState("home", {}, undefined, { hash: "ch1" });
 
       // A preserve-navigate (opts.hash === undefined) must carry that fragment.
       await router.navigate("users.list");

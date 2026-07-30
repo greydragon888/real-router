@@ -286,11 +286,11 @@ describe("§7.2 #13 — Mass concurrent clicks with force=true (Vue)", () => {
     const calls: { name: string; options: unknown }[] = [];
     const original = router.navigate.bind(router);
 
-    router.navigate = (name, params, options) => {
+    router.navigate = ((name, params, search, options) => {
       calls.push({ name, options: options ?? {} });
 
-      return original(name, params, options);
-    };
+      return original(name, params, search, options);
+    }) as typeof router.navigate;
 
     const wrapper = mountWithProvider(router, () =>
       h(
@@ -338,11 +338,11 @@ describe("§7.2 #13 — Mass concurrent clicks with force=true (Vue)", () => {
     const calls: { name: string; options: unknown }[] = [];
     const original = router.navigate.bind(router);
 
-    router.navigate = (name, params, options) => {
+    router.navigate = ((name, params, search, options) => {
       calls.push({ name, options: options ?? {} });
 
-      return original(name, params, options);
-    };
+      return original(name, params, search, options);
+    }) as typeof router.navigate;
 
     const wrapper = mountWithProvider(router, () =>
       Array.from({ length: 5 }, (_, i) =>

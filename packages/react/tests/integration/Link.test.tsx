@@ -429,7 +429,12 @@ describe("Link - Integration Tests", () => {
       // After #532, buildHref passes a 3rd undefined argument when no hash
       // is provided so URL plugins can opt into fragment support without
       // breaking 2-arg signatures.
-      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined);
+      expect(buildUrlSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        undefined,
+        undefined,
+      );
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/custom-url");
     });
 
@@ -448,8 +453,12 @@ describe("Link - Integration Tests", () => {
 
     it("should pass hash option to buildUrl when hash prop is set (#532)", () => {
       const buildUrlSpy = vi.fn(
-        (_name: string, _params?: object, opts?: { hash?: string }): string =>
-          opts?.hash ? `/url#${opts.hash}` : "/url",
+        (
+          _name: string,
+          _params?: object,
+          _search?: object,
+          opts?: { hash?: string },
+        ): string => (opts?.hash ? `/url#${opts.hash}` : "/url"),
       );
 
       router.buildUrl = buildUrlSpy;
@@ -461,20 +470,137 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
+      expect(buildUrlSpy).toHaveBeenCalledWith("one-more-test", {}, undefined, {
+        hash: "anchor",
+      });
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#anchor");
+    });
+
+    it("should pass routeSearch to buildUrl at the query slot (#1548)", () => {
+      const buildUrlSpy = vi.fn(
+        (
+          _name: string,
+          _params?: object,
+          search?: Record<string, string>,
+          _opts?: { hash?: string },
+        ): string =>
+          search ? `/url?${new URLSearchParams(search).toString()}` : "/url",
+      );
+
+      router.buildUrl = buildUrlSpy;
+
+      render(
+        <Link
+          routeName="one-more-test"
+          routeSearch={{ tab: "posts" }}
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      // The query channel rides at position 3 (RFC-4 M2), hash options at 4.
       expect(buildUrlSpy).toHaveBeenCalledWith(
         "one-more-test",
         {},
-        {
-          hash: "anchor",
-        },
+        { tab: "posts" },
+        undefined,
       );
-      expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#anchor");
+      expect(screen.getByTestId("link")).toHaveAttribute(
+        "href",
+        "/url?tab=posts",
+      );
+    });
+
+    it("should navigate with routeSearch at the query slot on click (#1548)", () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        <Link
+          routeName="one-more-test"
+          routeSearch={{ tab: "posts" }}
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"));
+
+      // navigate(name, params, search, opts) — search at position 3.
+      expect(navigateSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        {},
+        { tab: "posts" },
+        expect.anything(),
+      );
+    });
+
+    it("should decompose a `to` descriptor into name/params/search (#1548)", () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        <Link
+          to={{
+            name: "one-more-test",
+            params: { id: "7" },
+            search: { tab: "posts" },
+          }}
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("link"));
+
+      // The descriptor's three fields land in the positional navigate channels.
+      expect(navigateSpy).toHaveBeenCalledWith(
+        "one-more-test",
+        { id: "7" },
+        { tab: "posts" },
+        expect.anything(),
+      );
+    });
+
+    it("should warn when `to` and channel props are both supplied (#1548)", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      render(
+        // @ts-expect-error — the union rejects mixing `to` with channel props;
+        // this exercises the runtime backstop for JS consumers / spreads.
+        <Link
+          to={{ name: "one-more-test" }}
+          routeName="users"
+          data-testid="link"
+        >
+          Test
+        </Link>,
+        { wrapper },
+      );
+
+      // `to` wins, and the conflict is surfaced. The href resolves from
+      // `to.name` ("one-more-test" → "/test"), NOT the ignored channel
+      // `routeName="users"` (→ "/users") — proof the descriptor took over.
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("received both `to` and channel props"),
+      );
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
+
+      warnSpy.mockRestore();
     });
 
     it("should re-render href when the hash prop changes (#532)", () => {
       const buildUrlSpy = vi.fn(
-        (_name: string, _params?: object, opts?: { hash?: string }): string =>
-          opts?.hash ? `/url#${opts.hash}` : "/url",
+        (
+          _name: string,
+          _params?: object,
+          _search?: object,
+          opts?: { hash?: string },
+        ): string => (opts?.hash ? `/url#${opts.hash}` : "/url"),
       );
 
       router.buildUrl = buildUrlSpy;
@@ -505,7 +631,7 @@ describe("Link - Integration Tests", () => {
       render(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "123", filter: "active" }}
+          routeSearch={{ id: "123", filter: "active" }}
           data-testid="link"
         >
           Test
@@ -523,7 +649,7 @@ describe("Link - Integration Tests", () => {
       const { rerender } = render(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "1" }}
+          routeSearch={{ id: "1" }}
           data-testid="link"
         >
           Test
@@ -538,7 +664,7 @@ describe("Link - Integration Tests", () => {
       rerender(
         <Link
           routeName="one-more-test"
-          routeParams={{ id: "2" }}
+          routeSearch={{ id: "2" }}
           data-testid="link"
         >
           Test
@@ -555,7 +681,7 @@ describe("Link - Integration Tests", () => {
       render(
         <Link
           routeName="one-more-test"
-          routeParams={{
+          routeSearch={{
             search: "test query",
             sort: "asc",
             page: "1",

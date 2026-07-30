@@ -90,7 +90,7 @@ describe("SegmentMatcher.buildPath — undefined-strip invariants (level 2)", ()
   test.prop([arbMixedParams], { numRuns: NUM_RUNS.thorough })(
     "URL output never contains '=undefined' or literal 'undefined' for a query param",
     (params) => {
-      const url = matcher.buildPath("view", params, {
+      const url = matcher.buildPath("view", params, undefined, {
         queryParamsMode: "loose",
       });
 
@@ -105,7 +105,7 @@ describe("SegmentMatcher.buildPath — undefined-strip invariants (level 2)", ()
   test.prop([arbMixedParams], { numRuns: NUM_RUNS.standard })(
     "URL roundtrip: build→match recovers only defined keys from input",
     (params) => {
-      const url = matcher.buildPath("view", params, {
+      const url = matcher.buildPath("view", params, undefined, {
         queryParamsMode: "loose",
       });
 
@@ -141,10 +141,10 @@ describe("SegmentMatcher.buildPath — undefined-strip invariants (level 2)", ()
         }
       }
 
-      const urlWith = matcher.buildPath("view", withUndefined, {
+      const urlWith = matcher.buildPath("view", withUndefined, undefined, {
         queryParamsMode: "loose",
       });
-      const urlWithout = matcher.buildPath("view", defined, {
+      const urlWithout = matcher.buildPath("view", defined, undefined, {
         queryParamsMode: "loose",
       });
 

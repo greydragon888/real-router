@@ -69,7 +69,7 @@ describe("core/observable", () => {
         const cb = vi.fn();
 
         getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, cb);
-        await router.navigate("users", {}, {});
+        await router.navigate("users", {}, undefined, {});
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -86,7 +86,7 @@ describe("core/observable", () => {
         getPluginApi(router).addEventListener(events.TRANSITION_ERROR, cb);
 
         await expect(
-          router.navigate("admin-protected", {}, {}),
+          router.navigate("admin-protected", {}, undefined, {}),
         ).rejects.toMatchObject({ code: errorCodes.CANNOT_ACTIVATE });
 
         expect(cb).toHaveBeenCalledTimes(1);
@@ -251,7 +251,7 @@ describe("core/observable", () => {
         const previousState = router.getState();
 
         router.subscribe(listener);
-        await router.navigate("users", {}, {});
+        await router.navigate("users", {}, undefined, {});
 
         expect(listener).toHaveBeenCalledWith({
           route: expect.objectContaining({ name: "users" }),
@@ -315,7 +315,7 @@ describe("core/observable", () => {
         router.subscribe(after);
 
         // navigate must still resolve despite the throwing listener
-        const state = await router.navigate("users", {}, {});
+        const state = await router.navigate("users", {}, undefined, {});
 
         expect(state.name).toBe("users");
         expect(before).toHaveBeenCalledTimes(1);

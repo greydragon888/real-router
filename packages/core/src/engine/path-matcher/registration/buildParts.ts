@@ -40,11 +40,20 @@ export function compileBuildParts(
   normalizedPath: string,
   segments: readonly MatcherInputNode[],
   encoding: URLParamsEncodingType,
+  rootUrlParams: readonly string[],
 ): {
   buildStaticParts: readonly string[];
   buildParamSlots: readonly BuildParamSlot[];
 } {
-  const allUrlParams = new Set<string>();
+  // `normalizedPath` carries the ROOT path as its prefix, but the root node is
+  // absent from `segments` — so seeding these from the segment walk alone made a
+  // root-declared slot invisible here, and the fast path below emitted the whole
+  // path (`:tenant` included) as literal static text (#1567).
+  const allUrlParams = new Set<string>(rootUrlParams);
+  // Splat names come from the segment walk only: a ROOT splat is never the final
+  // segment (a route path always follows it), so it never becomes a slot and its
+  // encoder is never chosen. (#1567 seeded it from the root too; #1568 made that
+  // unreachable — see the finality rule below.)
   const allSplatParams = new Set<string>();
 
   for (const segment of segments) {
@@ -77,13 +86,25 @@ export function compileBuildParts(
   // `parseSegment` sees only name/optional; each `/` separator `splitPathSegments`
   // split away is re-added to the running static part.
   const pathSegments = splitPathSegments(normalizedPath);
+  const lastIndex = pathSegments.length - 1;
 
   for (const [i, pathSegment] of pathSegments.entries()) {
+    const token = parseSegment(pathSegment);
+
+    // A splat binds ONLY as the final segment. The trie matches a splat node's
+    // children at the splat's OWN position (INVARIANTS Matching #24: `/n/*rest`
+    // + `/n/*rest/edit` → `/n/edit` resolves to the child), so a splat with
+    // anything after it always captures the empty string. Emitting a slot for it
+    // printed a URL `match` could not resolve — or, under a splat parent, one
+    // that fell back to the parent's wildcard. It contributes neither text nor
+    // separator. (#1568)
+    if (!("error" in token) && token.kind === "splat" && i !== lastIndex) {
+      continue;
+    }
+
     if (i > 0) {
       current += "/";
     }
-
-    const token = parseSegment(pathSegment);
 
     if ("error" in token || token.kind === "static") {
       // Static text — or a malformed segment, whose route is rejected at

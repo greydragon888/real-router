@@ -27,7 +27,8 @@ export function App() {
         {" | "}
         <Link
           routeName="docs.detail"
-          routeParams={{ id: "guide", format: "pdf" }}
+          routeParams={{ id: "guide" }}
+          routeSearch={{ format: "pdf" }}
         >
           Doc PDF (client-only)
         </Link>

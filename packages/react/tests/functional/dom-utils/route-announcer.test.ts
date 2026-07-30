@@ -281,7 +281,7 @@ describe("createRouteAnnouncer", () => {
 
     getAnnouncerElement()!.textContent = "";
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     expect(getAnnouncerElement()?.textContent).toBe("");
 
@@ -446,7 +446,7 @@ describe("createRouteAnnouncer", () => {
 
     expect(focusSpy).toHaveBeenCalledTimes(1);
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     expect(focusSpy).toHaveBeenCalledTimes(1);
 
@@ -566,7 +566,7 @@ describe("createRouteAnnouncer", () => {
 
     expect(getAnnouncerElement()?.textContent).toBe("");
 
-    await router.navigate("about", {}, { reload: true });
+    await router.navigate("about", {}, undefined, { reload: true });
 
     expect(getAnnouncerElement()?.textContent).toBe("Navigated to About");
 

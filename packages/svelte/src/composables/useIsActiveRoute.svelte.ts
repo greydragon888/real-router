@@ -3,11 +3,12 @@ import { createActiveSource } from "@real-router/sources";
 import { createReactiveSource } from "../createReactiveSource.svelte";
 import { useRouter } from "./useRouter.svelte";
 
-import type { Params } from "@real-router/core";
+import type { Params, SearchParams } from "@real-router/core";
 
 export function useIsActiveRoute(
   routeName: string,
   params: Params | undefined,
+  search: SearchParams | undefined,
   strict: boolean,
   ignoreQueryParams: boolean,
   hash?: string,
@@ -25,6 +26,7 @@ export function useIsActiveRoute(
       router,
       routeName,
       params,
+      search,
       strict,
       ignoreQueryParams,
       hash,

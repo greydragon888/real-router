@@ -443,7 +443,11 @@ export function keyOf(state: State): string {
     return cached;
   }
 
-  const key = `${state.name}:${canonicalJson(state.params)}`;
+  // Key over BOTH channels — path params AND query (RFC-4 M2 / #1548). Merged
+  // (not `params:search`) so a query-less route keeps its v1 key shape
+  // (`name:{}`), and an unserializable value (BigInt / cyclic) in EITHER channel
+  // still throws in `canonicalJson` → `safeKeyOf` drops+warns.
+  const key = `${state.name}:${canonicalJson({ ...state.params, ...state.search })}`;
 
   KEY_CACHE.set(state, key);
 

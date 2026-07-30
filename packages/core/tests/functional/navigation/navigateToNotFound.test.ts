@@ -38,6 +38,27 @@ describe("router.navigateToNotFound()", () => {
       expect(state.params).toStrictEqual({});
     });
 
+    it.each([
+      ["/nope?a=1&b=2", "a query string"],
+      ["/other?x=9#frag", "a query string and a fragment"],
+      ["/plain", "neither"],
+    ])(
+      "keeps BOTH channels empty and the whole URL in path for %s (%s)",
+      (url) => {
+        const state = router.navigateToNotFound(url);
+
+        // The contract the nav pipeline deliberately does NOT cover (Phase 2,
+        // step 2-7): this entry point does not build a state from an INTENT, it
+        // wraps a string — so it has no channels to canonicalise, and the query
+        // stays part of `path` rather than being parsed into `search`. Pinned
+        // for a URL WITH a query precisely because that is the input where a
+        // future "let materialize handle it too" would show up as a diff.
+        expect(state.params).toStrictEqual({});
+        expect(state.search).toStrictEqual({});
+        expect(state.path).toBe(url);
+      },
+    );
+
     it("should default path from current state", () => {
       const state = router.navigateToNotFound();
 

@@ -92,7 +92,7 @@ describe("Link component", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "one-more-test", undefined, {
+      createActiveRouteSource(router, "one-more-test", undefined, undefined, {
         strict: false,
         ignoreQueryParams: true,
       });
@@ -112,7 +112,7 @@ describe("Link component", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "one-more-test", undefined, {
+      createActiveRouteSource(router, "one-more-test", undefined, undefined, {
         strict: true,
         ignoreQueryParams: true,
       });
@@ -358,9 +358,9 @@ describe("Link component", () => {
 
       expect(router.navigate).toHaveBeenCalledTimes(1);
 
-      const [name, params, options] = (
+      const [name, params, , options] = (
         router.navigate as ReturnType<typeof vi.fn>
-      ).mock.calls[0] as [string, object, object];
+      ).mock.calls[0] as [string, object, undefined, object];
 
       expect(name).toBe("one-more-test");
       // params identity is preserved through navigateWithHash → singleton.
@@ -690,9 +690,9 @@ describe("Link component", () => {
 
       expect(router.navigate).toHaveBeenCalledTimes(1);
 
-      const [name, params, options] = (
+      const [name, params, , options] = (
         router.navigate as ReturnType<typeof vi.fn>
-      ).mock.calls[0] as [string, object, object];
+      ).mock.calls[0] as [string, object, undefined, object];
 
       expect(name).toBe("one-more-test");
       expect(params).toBe(EMPTY_PARAMS);
@@ -766,7 +766,7 @@ describe("Link component", () => {
 
       const isActiveRouteSpy = vi.spyOn(router, "isActiveRoute");
 
-      createActiveRouteSource(router, "users", undefined, {
+      createActiveRouteSource(router, "users", undefined, undefined, {
         strict: false,
         ignoreQueryParams: false,
       });
