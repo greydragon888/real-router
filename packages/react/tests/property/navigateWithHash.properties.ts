@@ -24,7 +24,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { arbHash, arbParams, arbRouteName, NUM_RUNS } from "./helpers";
-import { navigateWithHash } from "../../src/dom-utils";
+import { navigateWithHash, shallowEqual } from "../../src/dom-utils";
 
 import type {
   NavigationOptions,
@@ -53,6 +53,13 @@ function makeRouter(
             params: current.params,
             context: { url: { hash: current.hash } },
           } as unknown as State),
+    // Part of the contract since #1555: the helper asks the router "is this the
+    // same location?" instead of comparing the bags itself. This arbitrary-built
+    // state shares the caller's provenance, so `shallowEqual` answers exactly what
+    // the real predicate answers — the properties below stay about the hash delta
+    // and the opts it assembles, which is what they were always about.
+    isActiveRoute: (name: string, params: Params) =>
+      current?.name === name && shallowEqual(current.params, params),
     navigate: (
       name: string,
       params: Params,
