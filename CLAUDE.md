@@ -36,7 +36,7 @@ shared/
 | Tool / runtime  | Version | Source of truth (actualize from here)                                      |
 | --------------- | ------- | -------------------------------------------------------------------------- |
 | Node.js         | 24      | **`.nvmrc`** — single source of truth; every workflow reads it via `node-version-file` (sole deliberate exception: `changesets.yml`, exact-pinned `24.18.0`, see its comment). Minor floats. `.husky/pre-commit` warns when the local major differs. No root `engines` — deliberately, see IMPLEMENTATION_NOTES. Do NOT dev on another major: host globals differ (Node ≥ 26 ships Web Storage unflagged and shadows jsdom's `sessionStorage` under vitest — IMPLEMENTATION_NOTES "Adapter scroll tests mock `sessionStorage`"). On macOS/Homebrew use `node@24` + `brew pin node`; the unversioned `node` formula tracks the latest major and will silently upgrade you |
-| npm             | 11.16   | bundled with Node 24. **Not used for publishing** — pnpm 11 publishes natively (OIDC + provenance). npm's only deliberate use is the consumer smoke-test (`scripts/smoke-test-packages.sh`: `npm install` to simulate a real consumer). Installs/builds/publish are pnpm |
+| npm             | 11.16   | bundled with Node 24 — but npm's own `latest` is already **12.x**, and the smoke test is the repo's only contact surface with npm, so it runs `--strict-allow-scripts=true` to hold the v12 posture (dependency lifecycle scripts opt-in) regardless of which npm the runner bundles. **Not used for publishing** — pnpm 11 publishes natively (OIDC + provenance). npm's only deliberate use is the consumer smoke-test (`scripts/smoke-test-packages.sh`: `npm install` to simulate a real consumer). Installs/builds/publish are pnpm |
 | pnpm            | 11.18   | `packageManager` field, root `package.json`; behavioral config in `pnpm-workspace.yaml` (overrides/allowBuilds/settings — pnpm 11 no longer reads `.npmrc`/`package.json#pnpm`). Bumping the field is enough — all `pnpm/action-setup@v6` call-sites auto-detect from it, and pnpm self-switches locally |
 | TypeScript      | 6.0     | root `devDependencies` (pinned exact, `save-exact`)                         |
 | Vitest          | 4.1     | root `devDependencies`                                                      |
@@ -102,10 +102,24 @@ pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting O
 
 ## Release Process
 
-- **Main workflow:** `changesets.yml` — publishing via npm OIDC Trusted Publishing
-- **Manual workflow:** `release.yml` — for emergency releases
-- Trusted Publisher configured for all @real-router/\* packages with workflow `changesets.yml`
-- New packages must be published manually first (`pnpm publish`), then configure Trusted Publisher
+- **Only workflow:** `changesets.yml` — publishing via npm OIDC Trusted Publishing. There is no `release.yml`; an "emergency release" is a re-run of this workflow (`changeset publish` is idempotent — already-published versions are skipped, and the reconcile step backfills tags/Releases)
+- Trusted Publisher configured for all @real-router/\* packages with workflow `changesets.yml`. The release job **must stay on a GitHub-hosted runner** — npm trusted publishing does not support self-hosted ones, and moving it would fail only at publish time, on master. Guarded by `scripts/release-workflow.test.mjs`
+- **Publishing is tokenless.** No `NPM_TOKEN` anywhere; every version is published by `trustedPublisher: github` with SLSA provenance. Never "fix" a publish problem by minting an npm token — least of all a 2FA-bypass granular token, the credential class npm is winding down (it loses direct publishing around Jan 2027)
+
+### Adding a new package to npm (one-time, human-only)
+
+A trusted publisher can only be attached to a package that **already exists** on the registry ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), so the first publish is manual — and it **cannot be scripted or delegated to CI/an agent**. The account's 2FA is `auth-and-writes` with a WebAuthn security key as the only second factor, so any write action needs a browser ceremony; run headlessly, npm just dies with `EOTP` (there is no TOTP fallback — npm stopped accepting new TOTP enrollments in Sept 2025).
+
+```bash
+npm login --auth-type=web          # opens the browser → "Use security key"
+pnpm publish --filter <pkg>        # the one-time first publish
+npm trust github <pkg> --file changesets.yml \
+  --repo greydragon888/real-router --allow-publish
+```
+
+`--allow-publish` is **not optional**: trusted-publisher configurations created after 2026-05-20 must name at least one allowed action (older ones, i.e. the existing 23 packages, default to publish-only). Same applies to `npm deprecate` on a retired package — a write action, same ceremony.
+
+If the manual step is skipped, the release run says so: the preflight (`.changeset/unpublished-packages.mjs`) distinguishes "never published" from "one release behind" and emits an `::error::` naming exactly this procedure, instead of letting `changeset publish` die on a bare 404.
 
 ## Versioning
 

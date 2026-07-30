@@ -100,8 +100,20 @@ OPTIONAL_PEERS=(
 )
 
 # Install with --install-strategy=hoisted to simulate flat npm layout
-# Use npm (not pnpm) to simulate real consumer experience
-(cd "$PROJECT_DIR" && npm install --install-strategy=hoisted "${INSTALL_ARGS[@]}" "${OPTIONAL_PEERS[@]}" 2>&1) | tail -3
+# Use npm (not pnpm) to simulate real consumer experience.
+#
+# `--strict-allow-scripts=true` pins the npm-12 posture as a TESTED INVARIANT
+# rather than a lucky property of today's tree. npm 12 (already `latest`) makes
+# dependency lifecycle scripts opt-in: unapproved `preinstall`/`install`/
+# `postinstall` and implicit node-gyp builds are skipped with a warning and the
+# install still SUCCEEDS. That permissive default is exactly what would let an
+# install script silently appear in a published package's tree and only surface
+# as breakage on a consumer's machine. The strict flag turns the same situation
+# into a red CI run here. Verified against the real npm@12.0.2 that the current
+# tree (local tarballs + the optional `ink` peer) passes both with v12 defaults
+# and with this flag; npm silently ignores unknown flags, so on an older bundled
+# npm (< 11.16) this degrades to a no-op rather than failing. See #1596 item 6.
+(cd "$PROJECT_DIR" && npm install --install-strategy=hoisted --strict-allow-scripts=true "${INSTALL_ARGS[@]}" "${OPTIONAL_PEERS[@]}" 2>&1) | tail -3
 
 echo ""
 echo "=== Phase 3: Verify all exports resolve ==="

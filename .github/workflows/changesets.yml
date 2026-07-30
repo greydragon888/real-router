@@ -137,43 +137,29 @@ jobs:
           GIT_COMMITTER_NAME: ${{ github.repository_owner }}
           GIT_COMMITTER_EMAIL: ${{ github.repository_owner }}@users.noreply.github.com
 
-      # If no changesets, check if there are unpublished versions
+      # If no changesets, check if there are unpublished versions.
+      #
+      # Logic lives in .changeset/unpublished-packages.mjs (was a sequential
+      # bash loop here). Two reasons it moved:
+      #
+      # - The old `pnpm view … || echo "0.0.0"` conflated "never published" with
+      #   "one release behind" — and with genuine network/registry failures. A
+      #   brand-new package therefore reached `changeset publish`, which died
+      #   with a bare 404/403 that named nothing. The script separates the cases
+      #   and emits an ::error:: naming the missing manual step (see item 2 of
+      #   #1596); non-404 failures retry once and then fail loudly instead of
+      #   being reported as "needs publish".
+      # - It ran on EVERY changeset-free push to master (i.e. every infra push,
+      #   not just releases): 23 sequential `pnpm view` round-trips, measured at
+      #   21.2 s. Same queries through a concurrency pool → 4.4-5.2 s.
+      #
+      # `pnpm view` is still the transport, so registry/auth semantics are
+      # unchanged. Outputs: has_unpublished, packages, unpublished_specs,
+      # never_published.
       - name: Check for unpublished packages
         if: steps.check.outputs.changesets_count == '0'
         id: unpublished
-        run: |
-          echo "Checking for unpublished package versions..."
-          UNPUBLISHED=""
-
-          for dir in packages/*/; do
-            if [ -f "$dir/package.json" ]; then
-              name=$(node -p "require('./${dir}package.json').name")
-              local_version=$(node -p "require('./${dir}package.json').version")
-              private=$(node -p "require('./${dir}package.json').private || false")
-
-              if [ "$private" = "true" ]; then
-                echo "⏭️ $name is private, skipping"
-                continue
-              fi
-
-              # Check if this version exists on npm (pnpm view — pnpm 11 native)
-              npm_version=$(pnpm view "$name" version 2>/dev/null || echo "0.0.0")
-
-              if [ "$local_version" != "$npm_version" ]; then
-                echo "📦 $name: local=$local_version, npm=$npm_version (needs publish)"
-                UNPUBLISHED="$UNPUBLISHED $name"
-              else
-                echo "✅ $name: $local_version (already published)"
-              fi
-            fi
-          done
-
-          if [ -n "$UNPUBLISHED" ]; then
-            echo "has_unpublished=true" >> $GITHUB_OUTPUT
-            echo "packages=$UNPUBLISHED" >> $GITHUB_OUTPUT
-          else
-            echo "has_unpublished=false" >> $GITHUB_OUTPUT
-          fi
+        run: node .changeset/unpublished-packages.mjs
 
       # Produce dist for publish — `bundle` ONLY, not `build`. `build` dependsOn
       # `test` + `test:properties`, a redundant full re-run at publish: the
@@ -456,21 +442,22 @@ jobs:
         if: always() && steps.publish.outputs.publish_status != '' && steps.publish.outputs.publish_status != '0'
         run: |
           # Post-mortem: name the gap instead of "see the log" — list the
-          # planned packages whose local version is still absent from npm
-          # (same local-vs-npm comparison the "Check for unpublished" step
-          # uses). Only runs on the failure path, so the ~30 `pnpm view`
-          # calls cost nothing in the steady state.
-          MISSING=""
-          for dir in packages/*/; do
-            [ -f "${dir}package.json" ] || continue
-            [ "$(node -p "require('./${dir}package.json').private || false")" = "true" ] && continue
-            name=$(node -p "require('./${dir}package.json').name")
-            local_version=$(node -p "require('./${dir}package.json').version")
-            npm_version=$(pnpm view "$name" version 2>/dev/null || echo "none")
-            if [ "$local_version" != "$npm_version" ]; then
-              MISSING="$MISSING $name@$local_version"
-            fi
-          done
+          # planned packages whose local version is still absent from npm.
+          # Re-uses the same classifier as the preflight above (one source of
+          # truth for "is this version on the registry"), so it also re-emits
+          # the ::error:: for any package that was never published at all —
+          # the most likely cause of a publish failure right after a new
+          # package is added. One invocation: the human log goes to the step
+          # log, the machine-readable keys to a temp file.
+          KEYS="$(mktemp)"
+          if GITHUB_OUTPUT="$KEYS" node .changeset/unpublished-packages.mjs; then
+            MISSING="$(sed -n 's/^unpublished_specs=//p' "$KEYS")"
+          else
+            # The registry itself is unreachable — say that rather than
+            # claiming everything published.
+            echo "::error::changeset publish exited ${{ steps.publish.outputs.publish_status }}, and the post-mortem registry check ALSO failed — publish state is unknown; re-run this workflow."
+            exit 1
+          fi
 
           if [ -n "$MISSING" ]; then
             echo "::error::changeset publish exited ${{ steps.publish.outputs.publish_status }} — still unpublished:$MISSING. Tags/Releases for packages that DID publish were pushed; re-run this workflow (already-published versions are skipped, reconcile backfills tags/Releases)."
