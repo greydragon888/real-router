@@ -62,11 +62,13 @@ function setScrollY(y: number): void {
   });
 }
 
-// jsdom 29 wraps `sessionStorage` in a Proxy whose `getItem`/`setItem` are NOT
-// the global `Storage.prototype` methods, so `vi.spyOn(Storage.prototype, …)`
-// (and even `vi.spyOn(sessionStorage, …)` on the native object) silently no-op.
-// A store-backed plain-object mock installed via `vi.stubGlobal` is spyable and
-// controllable (make `setItem`/`getItem` throw for the failure-path tests).
+// `sessionStorage` here is a plain-object mock, not jsdom's Storage. On Node >= 26
+// Node ships Web Storage as unflagged globals and vitest keeps the pre-existing Node
+// global (only `Storage` comes from jsdom), so `vi.spyOn(Storage.prototype, …)` patches
+// a class nothing calls. Spying the live object fails on every Node too — Web Storage
+// is a Proxy whose named-property setter swallows the spy as a stored *item*. The mock
+// is spyable AND controllable (make `setItem`/`getItem` throw for the failure paths).
+// Why, in full: IMPLEMENTATION_NOTES.md § "Adapter scroll tests mock `sessionStorage`".
 function createMockStorage(): Storage {
   const store = new Map<string, string>();
 

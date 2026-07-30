@@ -40,12 +40,10 @@ import type { Router } from "@real-router/core";
 
 const STORAGE_KEY = "real-router:scroll";
 
-// jsdom 29 wraps `sessionStorage` in a Proxy whose `getItem`/`setItem` are NOT
-// the global `Storage.prototype` methods, so `vi.spyOn(Storage.prototype, …)`
-// silently no-ops (the spy never intercepts, the real storage runs, and the
-// quota / corrupted-storage path under test is never exercised). A store-backed
-// plain-object mock installed via `vi.stubGlobal` is spyable and controllable —
-// make `setItem`/`getItem` throw to drive the failure paths.
+// Plain-object `sessionStorage` mock — the real global is not spyable under
+// vitest+jsdom, so a `Storage.prototype` spy silently observes nothing and the
+// quota failure below would never be injected at all. Why, in full:
+// IMPLEMENTATION_NOTES.md § "Adapter scroll tests mock `sessionStorage`".
 function createMockStorage(): Storage {
   const store = new Map<string, string>();
 

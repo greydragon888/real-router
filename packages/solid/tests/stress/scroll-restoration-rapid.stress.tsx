@@ -1,5 +1,5 @@
 import { render } from "@solidjs/testing-library";
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 
 import { RouterProvider } from "@real-router/solid";
 
@@ -20,7 +20,39 @@ import { createStressRouter, takeHeapSnapshot, forceGC, MB } from "./helpers";
  * subscription/teardown survive without leaking listeners or storage
  * writes".
  */
+// Plain-object `sessionStorage` mock — the real global is not spyable under
+// vitest+jsdom, so the write-count spy below would observe nothing. Why, in full:
+// IMPLEMENTATION_NOTES.md § "Adapter scroll tests mock `sessionStorage`".
+function createMockStorage(): Storage {
+  const store = new Map<string, string>();
+
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+  };
+}
+
 describe("S1 — scrollRestoration + rapid pushState (§7.2 #10)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("sessionStorage", createMockStorage());
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     // Restore default history.scrollRestoration set by jsdom.
@@ -46,9 +78,9 @@ describe("S1 — scrollRestoration + rapid pushState (§7.2 #10)", () => {
       </RouterProvider>
     ));
 
-    // sessionStorage in jsdom is a real Storage; track write count to ensure
-    // it grows linearly (no exponential listener buildup).
-    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    // Track write count to ensure it grows linearly (no exponential listener
+    // buildup). Spied on the mock global installed in `beforeEach`.
+    const setItemSpy = vi.spyOn(sessionStorage, "setItem");
 
     const heapBefore = takeHeapSnapshot();
     const ITERATIONS = 200;
