@@ -1,5 +1,103 @@
 # @real-router/browser-plugin
 
+## 0.19.0
+
+### Minor Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Adapt `buildUrl` / `replaceHistoryState` to the RFC-4 M2 params/search slot-shift ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  `buildUrl(name, params?, search?, options?)` **and**
+  `replaceHistoryState(name, params?, search?, options?)` gain the query channel at
+  position 3; the `{ hash }` options object shifts to position 4. The plugin threads
+  `search` into core's now-search-aware `router.buildPath`, so a caller-supplied
+  `search` on `replaceHistoryState` lands in the built state and the rebuilt URL, and
+  `history.state` written by `replaceHistoryState` / `onTransitionSuccess` carries the
+  new `search` field alongside `{ name, params, path }`.
+
+  **Breaking (pre-1.0, positional slot-shift):** `buildUrl` / `replaceHistoryState`
+  callers passing `{ hash }` at position 3 move it to position 4 (query channel now
+  occupies 3).
+
+### Patch Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep the query channel and the fragment on popstate rollback ([#1586](https://github.com/greydragon888/real-router/issues/1586))
+
+  `rollbackUrlToCurrentState` rebuilt the visible URL from `name` + `params`
+  alone, so a guard rejection or an unmatched back-navigation away from
+  `/list?tab=a&sort=z#anchor` restored `/list`.
+
+  The fragment went missing for the same reason as the query: the shared
+  `PopstateHandlerDeps.buildUrl` type still described the pre-[#1548](https://github.com/greydragon888/real-router/issues/1548) three-argument
+  form `(name, params, options)` while the injected `createPluginBuildUrl` had
+  already shifted to `(name, params, search, options)`. The `{ hash }` object
+  therefore landed in the **search** slot — structurally a valid `SearchParams`,
+  so nothing complained — and `options` arrived `undefined`, which silently
+  defeated the hash preservation the call site's own [#532](https://github.com/greydragon888/real-router/issues/532) comment promises.
+
+  The deps signature now carries the query slot, and a type-equality pin between
+  it and `createPluginBuildUrl`'s return type fails the build if the two drift
+  apart again.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate `replaceHistoryState` internals off the removed `PluginApi.buildState` ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  Internal refactor in the shared `browser-env` plugin-utils: `createReplaceHistoryState` now resolves the target route via `buildNavigationState`. Observable behavior is unchanged — same existence check (throws for an unknown route), same forwardTo resolution, and the same query source for the `history.state` record.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep a forwarding route's query defaults in the `replaceHistoryState` record ([#1574](https://github.com/greydragon888/real-router/issues/1574))
+
+  `createReplaceHistoryState` (shared `browser-env`) built the `history.state`
+  record from the caller's raw `search` while taking `name`/`params` from the
+  resolved state. That asymmetry dropped every query value the caller did not
+  spell out — above all the query half of a `forwardTo` chain's own
+  `defaultParams`, which exists only after resolution.
+
+  Measured on `archive → posts` with `archive.defaultParams = {id, tab}` and
+  `posts = "/posts/:id?tab"`: the record read `{params: {id: "7"}, search: {},
+path: "/posts/7"}` while the address bar carried the query. The path half of the
+  same `defaultParams` bag survived, the query half did not — and a Back that
+  restored that record committed the page without its query.
+
+  Both channels now come from the one resolution: the caller's `search` is passed
+  INTO `buildNavigationState` (the third slot added in [#1571](https://github.com/greydragon888/real-router/issues/1571)) and the record is
+  rebuilt from `state.search`. An explicit caller value still beats the hop
+  default it collides with — `separateChannels` spreads the caller's bag last —
+  so this only adds back what was silently lost.
+
+  Passing `search` in also means the `forwardState` seam finally sees the query
+  channel, so a `search-schema` or `persistent-params` interceptor registered on
+  it observes what the caller actually sent instead of `undefined`.
+
+  The URL half is untouched: it still comes from the plugin's `buildUrl`, and its
+  own divergence for a forwarding route (`buildPath` prints the SOURCE path) is a
+  separate, tracked `buildPath` defect.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Build `replaceHistoryState`'s URL from the resolved state, and drop the redundant rebuild ([#1585](https://github.com/greydragon888/real-router/issues/1585))
+
+  The record written to history has come from `buildNavigationState` since [#1574](https://github.com/greydragon888/real-router/issues/1574),
+  so it carries the resolved channels — `forwardTo` applied, plus whatever a
+  `forwardState` interceptor (`persistent-params`, `search-schema`) injected into
+  the query. The URL written beside it was still built from the caller's raw
+  arguments, which reach the public `buildPath` — and that neither resolves
+  `forwardTo` nor runs the seam. The two therefore disagreed on exactly the keys
+  the seam contributes:
+
+  ```
+  record  /posts/9?tab=new&sort=date&lang=de
+  URL     /posts/9?tab=new&sort=date            <- injected key missing
+  ```
+
+  and, for a forwarding route, the record said `posts` while the address bar said
+  `/old`. `navigate` has always kept the pair equal; `replaceHistoryState` was the
+  only history writer of the five reading the caller's bag instead of a resolved
+  state.
+
+  The same change retires the `makeState` rebuild that followed
+  `buildNavigationState`. It produced a byte-identical state — a leftover from
+  `buildState`, which built no path of its own — and cost a third trip through the
+  `buildPath` interceptor chain per history record. Two remain by construction.
+
+- Updated dependencies [[`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507), [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507)]:
+  - @real-router/core@0.82.0
+
 ## 0.18.25
 
 ### Patch Changes
