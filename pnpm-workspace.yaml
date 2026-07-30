@@ -135,3 +135,5 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: true
   electron-winstaller: false
+patchedDependencies:
+  '@changesets/get-github-info@0.8.0': patches/@changesets__get-github-info@0.8.0.patch

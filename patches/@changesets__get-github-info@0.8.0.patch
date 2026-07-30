@@ -1,0 +1,34 @@
+diff --git a/dist/changesets-get-github-info.cjs.js b/dist/changesets-get-github-info.cjs.js
+index 6c37428da9589f0ab80b5c628cfabe3d5f3b06f5..54ae0cd34b520b3429f79526a664b918cb84ca8c 100644
+--- a/dist/changesets-get-github-info.cjs.js
++++ b/dist/changesets-get-github-info.cjs.js
+@@ -216,6 +216,12 @@ const GHDataLoader = new DataLoader__default["default"](async requests => {
+       data = _objectWithoutProperties(_ref2, _excluded2);
+     return cleanedData[repo][data.kind][data.kind === "pull" ? data.pull : data.commit];
+   });
++}, {
++  // PATCH (real-router): DataLoader defaults to maxBatchSize Infinity, so ALL
++  // changesets collapse into ONE GitHub GraphQL document. At 109 changesets the
++  // 2026-07-30 release failed with validationTimeout "Timeout on validation of
++  // query". Cap the batch so the query size is bounded by construction.
++  maxBatchSize: 20
+ });
+ async function getInfo(request) {
+   if (!request.commit) {
+diff --git a/dist/changesets-get-github-info.esm.js b/dist/changesets-get-github-info.esm.js
+index e964bd161862f2dd16b0c364a3cd4c5908f7c491..de293a44235c538b619f3a7a22f39be4571b419e 100644
+--- a/dist/changesets-get-github-info.esm.js
++++ b/dist/changesets-get-github-info.esm.js
+@@ -207,6 +207,12 @@ const GHDataLoader = new DataLoader(async requests => {
+       data = _objectWithoutProperties(_ref2, _excluded2);
+     return cleanedData[repo][data.kind][data.kind === "pull" ? data.pull : data.commit];
+   });
++}, {
++  // PATCH (real-router): DataLoader defaults to maxBatchSize Infinity, so ALL
++  // changesets collapse into ONE GitHub GraphQL document. At 109 changesets the
++  // 2026-07-30 release failed with validationTimeout "Timeout on validation of
++  // query". Cap the batch so the query size is bounded by construction.
++  maxBatchSize: 20
+ });
+ async function getInfo(request) {
+   if (!request.commit) {

@@ -55,6 +55,9 @@ overrides:
   fflate: 0.8.2
   read-yaml-file: '>=2.1.0 <3.0.0'
 
+patchedDependencies:
+  '@changesets/get-github-info@0.8.0': 4d86cf7b8c440a0fea6e090de6a52449f92b467c2d9011c30c798afbd8b75149
+
 importers:
 
   .:
@@ -15652,7 +15655,7 @@ snapshots:
 
   '@changesets/changelog-github@0.7.0':
     dependencies:
-      '@changesets/get-github-info': 0.8.0
+      '@changesets/get-github-info': 0.8.0(patch_hash=4d86cf7b8c440a0fea6e090de6a52449f92b467c2d9011c30c798afbd8b75149)
       '@changesets/types': 6.1.0
       dotenv: 8.6.0
     transitivePeerDependencies:
@@ -15711,7 +15714,7 @@ snapshots:
       picocolors: 1.1.1
       semver: 7.8.5
 
-  '@changesets/get-github-info@0.8.0':
+  '@changesets/get-github-info@0.8.0(patch_hash=4d86cf7b8c440a0fea6e090de6a52449f92b467c2d9011c30c798afbd8b75149)':
     dependencies:
       dataloader: 1.4.0
       node-fetch: 2.7.0
