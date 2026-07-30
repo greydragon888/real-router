@@ -99,8 +99,24 @@ reason = "quick-xml < 0.41.0 NsReader allocates unbounded memory for namespace d
 # every dependent (all four are `minimatch`, doing `require()` and calling the
 # result) would break. Dev/tooling transitive only — brace-expansion is in no
 # published @real-router/* package, and the ReDoS needs an attacker-supplied glob,
-# which nothing in this repo's tooling accepts. Remove this entry the moment a
-# patched 1.x or 2.x is published (then the per-line pins do the whole job again).
+# which nothing in this repo's tooling accepts.
+#
+# ⚠ Removal condition — and the trap inside it. This entry used to say "remove the
+# moment a patched 1.x or 2.x is published", which invites reading a version bump as
+# a fix. It is not: 1.1.17 and 2.1.3 BOTH shipped after this entry was written and
+# BOTH are still affected (re-verified 2026-07-30 by querying api.osv.dev/v1/query
+# per version; only 5.0.8 came back clean). GitHub's advisory still carries a single
+# range, `<= 5.0.7` → `5.0.8`, so the whole 1.x and 2.x lines are vulnerable by
+# definition and a newer patch number proves nothing. Ask OSV about the exact version
+# before dropping this entry; once a genuinely patched 1.x/2.x exists, remove it and
+# the per-line pins in pnpm-workspace.yaml do the whole job again.
+#
+# ⚠ THREE channels, not two. This file silences `lint:audit` / osv-scanner, and
+# `codeql.yml`'s `allow-ghsas:` mirrors it — but GitHub's **Dependabot alerts** are a
+# separate channel that neither one touches. GHSA-mh99-v99m-4gvg stayed open there as
+# alert #591 long after both allowlists were in place. When allowlisting a transitive
+# advisory here, dismiss the Dependabot alert too (`tolerable_risk`), or it will keep
+# surfacing as an unresolved High on the repo's security tab.
 [[IgnoredVulns]]
 id = "GHSA-mh99-v99m-4gvg"
 reason = "brace-expansion ReDoS, patched only in 5.0.8 (no 1.x/2.x fix exists). @5 is bumped to 5.0.8; the surviving 1.1.16 / 2.1.2 instances are dev/tooling-only (minimatch 3.1.5 / 5.1.9 / 9.0.9), never in a published package, and cannot be overridden to 5.x — v1/v2 export the function itself, 5.x exports a named `expand`, so the consumers' `require()`-and-call would break."
