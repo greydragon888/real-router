@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
 import { BaseSource } from "../../src/BaseSource.js";
+import { captureAsyncRethrows } from "../helpers";
 
 // Pure-function PBT — no router setup, so 1000 runs is cheap (~10ms total).
 const PURE_RUNS = 1000;
@@ -68,15 +69,7 @@ describe("BaseSource — subscribe order (audit §6 HIGH direct instrumentation)
       const source = new BaseSource<number>(0);
       const survivor = vi.fn();
 
-      const rethrown: unknown[] = [];
-      const previousListeners = [...process.listeners("uncaughtException")];
-
-      process.removeAllListeners("uncaughtException");
-      const captureHandler = (error: unknown): void => {
-        rethrown.push(error);
-      };
-
-      process.on("uncaughtException", captureHandler);
+      const rethrown = captureAsyncRethrows();
 
       try {
         source.subscribe(() => {
@@ -89,19 +82,15 @@ describe("BaseSource — subscribe order (audit §6 HIGH direct instrumentation)
         }
 
         // Drain queueMicrotask-scheduled rethrows.
-        await Promise.resolve();
-        await Promise.resolve();
+        await rethrown.flush();
 
         // Surviving listener received EVERY update — invariant "after
         // updateSnapshot, all listeners see the new snapshot" holds.
         expect(survivor).toHaveBeenCalledTimes(snapshots.length);
         // Each throwing listener call surfaces exactly one uncaughtException.
-        expect(rethrown).toHaveLength(snapshots.length);
+        expect(rethrown.errors).toHaveLength(snapshots.length);
       } finally {
-        process.removeListener("uncaughtException", captureHandler);
-        for (const listener of previousListeners) {
-          process.on("uncaughtException", listener);
-        }
+        rethrown.restore();
       }
     },
   );

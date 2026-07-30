@@ -10,6 +10,7 @@ import {
 } from "vitest";
 
 import { lifecyclePluginFactory } from "../../src";
+import { captureAsyncRethrows } from "../helpers";
 
 import type { LifecycleHook, LifecycleHookFactory } from "../../src";
 import type { Router } from "@real-router/core";
@@ -193,15 +194,7 @@ describe("Rapid Lifecycle Hook Invocation", () => {
     // A throwing onEnter is isolated and re-thrown asynchronously (#798) —
     // capture the queueMicrotask re-throws so they don't fail the run as
     // unhandled errors, then restore the previous listeners.
-    const rethrown: unknown[] = [];
-    const previousListeners = [...process.listeners("uncaughtException")];
-
-    process.removeAllListeners("uncaughtException");
-    const captureHandler = (error: unknown): void => {
-      rethrown.push(error);
-    };
-
-    process.on("uncaughtException", captureHandler);
+    const rethrown = captureAsyncRethrows();
 
     try {
       await router.start("/");
@@ -212,19 +205,15 @@ describe("Rapid Lifecycle Hook Invocation", () => {
       }
 
       // Drain queueMicrotask-scheduled re-throws.
-      await Promise.resolve();
-      await Promise.resolve();
+      await rethrown.flush();
 
       // Every throwing onEnter fired and surfaced its error asynchronously —
       // isolation neither swallowed the error nor aborted the transition.
       expect(enterCount).toBe(100);
-      expect(rethrown).toHaveLength(100);
+      expect(rethrown.errors).toHaveLength(100);
       expect(router.getState()?.name).toBe("home");
     } finally {
-      process.removeListener("uncaughtException", captureHandler);
-      for (const listener of previousListeners) {
-        process.on("uncaughtException", listener);
-      }
+      rethrown.restore();
     }
   });
 
@@ -256,15 +245,7 @@ describe("Rapid Lifecycle Hook Invocation", () => {
     // The factory (compile) throw is isolated and re-thrown asynchronously —
     // #1222 unifies it with the #798 body-throw channel. Capture the
     // queueMicrotask re-throws so they don't fail the run, then restore.
-    const rethrown: unknown[] = [];
-    const previousListeners = [...process.listeners("uncaughtException")];
-
-    process.removeAllListeners("uncaughtException");
-    const captureHandler = (error: unknown): void => {
-      rethrown.push(error);
-    };
-
-    process.on("uncaughtException", captureHandler);
+    const rethrown = captureAsyncRethrows();
 
     try {
       await router.start("/");
@@ -275,21 +256,17 @@ describe("Rapid Lifecycle Hook Invocation", () => {
       }
 
       // Drain queueMicrotask-scheduled re-throws.
-      await Promise.resolve();
-      await Promise.resolve();
+      await rethrown.flush();
 
       // Factory throws → hook not cached → factory retried each navigation.
       expect(factoryCallCount).toBe(100);
       // The throwing factory does NOT swallow the sibling onNavigate (#1222).
       expect(navCount).toBe(100);
       // Each compile-throw surfaced asynchronously (channel unified with #798).
-      expect(rethrown).toHaveLength(100);
+      expect(rethrown.errors).toHaveLength(100);
       expect(router.getState()?.name).toBe("home");
     } finally {
-      process.removeListener("uncaughtException", captureHandler);
-      for (const listener of previousListeners) {
-        process.on("uncaughtException", listener);
-      }
+      rethrown.restore();
     }
   });
 });

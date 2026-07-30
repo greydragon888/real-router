@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import { BaseSource } from "../../src/BaseSource";
+import { captureAsyncRethrows } from "../helpers";
 
 describe("BaseSource — subscribe order", () => {
   it("first listener is added BEFORE onFirstSubscribe runs", () => {
@@ -124,17 +125,9 @@ describe("BaseSource — subscribe order", () => {
     const survivor = vi.fn();
     const thrown = new Error("boom");
 
-    // Capture the asynchronously re-thrown error before vitest's default
-    // uncaughtException handler fails the test.
-    const rethrown: unknown[] = [];
-    const previousListeners = [...process.listeners("uncaughtException")];
-
-    process.removeAllListeners("uncaughtException");
-    const captureHandler = (error: unknown): void => {
-      rethrown.push(error);
-    };
-
-    process.on("uncaughtException", captureHandler);
+    // Observe the re-throw at the schedule, not at the process-level event —
+    // see the doc-block on `captureAsyncRethrows`.
+    const rethrown = captureAsyncRethrows();
 
     try {
       source.subscribe(() => {
@@ -152,16 +145,13 @@ describe("BaseSource — subscribe order", () => {
       expect(survivor).toHaveBeenCalledTimes(1);
       expect(source.getSnapshot()).toBe(1);
 
-      // Drain the microtask queue so the queueMicrotask(throw) lands.
-      await Promise.resolve();
-      await Promise.resolve();
+      await rethrown.flush();
 
-      expect(rethrown).toStrictEqual([thrown]);
+      // Exactly one schedule, carrying the original error.
+      expect(rethrown.scheduled()).toBe(1);
+      expect(rethrown.errors).toStrictEqual([thrown]);
     } finally {
-      process.removeListener("uncaughtException", captureHandler);
-      for (const listener of previousListeners) {
-        process.on("uncaughtException", listener);
-      }
+      rethrown.restore();
     }
   });
 

@@ -3,6 +3,7 @@ import { getRoutesApi } from "@real-router/core/api";
 import { describe, afterEach, it, expect, vi } from "vitest";
 
 import { lifecyclePluginFactory } from "../../src";
+import { captureAsyncRethrows } from "../helpers";
 
 import type { LifecycleHook, LifecycleHookFactory } from "../../src";
 import type { Router } from "@real-router/core";
@@ -487,35 +488,23 @@ describe("@real-router/lifecycle-plugin", () => {
 
   describe("intra-plugin hook isolation (#798)", () => {
     // A throwing hook is re-thrown asynchronously via queueMicrotask (mirrors
-    // BaseSource / createActiveNameSelector in @real-router/sources). Capture the
-    // async re-throw before vitest's default uncaughtException handler fails the
-    // test, then restore the previous listeners.
+    // BaseSource / createActiveNameSelector in @real-router/sources). Observe it
+    // at the SCHEDULE, not at the process-level `uncaughtException` event — the
+    // event count is the host's, not ours, and it is not stable across Node
+    // patch releases. See the doc-block on `captureAsyncRethrows`.
     async function withUncaughtCapture(
       run: () => Promise<void>,
     ): Promise<unknown[]> {
-      const rethrown: unknown[] = [];
-      const previousListeners = [...process.listeners("uncaughtException")];
-
-      process.removeAllListeners("uncaughtException");
-      const captureHandler = (error: unknown): void => {
-        rethrown.push(error);
-      };
-
-      process.on("uncaughtException", captureHandler);
+      const capture = captureAsyncRethrows();
 
       try {
         await run();
-        // Drain the microtask queue so the queueMicrotask(throw) lands.
-        await Promise.resolve();
-        await Promise.resolve();
+        await capture.flush();
       } finally {
-        process.removeListener("uncaughtException", captureHandler);
-        for (const listener of previousListeners) {
-          process.on("uncaughtException", listener);
-        }
+        capture.restore();
       }
 
-      return rethrown;
+      return capture.errors;
     }
 
     it("still fires onNavigate when onEnter throws (orthogonality preserved)", async () => {
