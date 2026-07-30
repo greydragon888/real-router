@@ -16,7 +16,13 @@ export interface RouterLifecycleDependencies {
    * `trailingSlash:"preserve"` mode) and avoids the redundant
    * forwardState+buildPath round-trip in `buildNavigateState`.
    */
-  navigateToState: (state: State, opts: NavigationOptions) => Promise<State>;
+  // `State | Promise<State>` since Step 0: the namespace answers synchronously
+  // when the navigation settled synchronously, and `start` is `async`, so
+  // returning either is transparent here.
+  navigateToState: (
+    state: State,
+    opts: NavigationOptions,
+  ) => State | Promise<State>;
   navigateToNotFound: (path: string) => State;
   clearState: () => void;
   matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;

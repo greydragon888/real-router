@@ -4,6 +4,8 @@ import {
   CACHED_ROUTE_NOT_FOUND_REJECTION,
   CACHED_SAME_STATES_ERROR,
   CACHED_SAME_STATES_REJECTION,
+  isExpectedRejection,
+  PRE_SUPPRESSED,
 } from "./constants";
 import { completeTransition } from "./transition/completeTransition";
 import { routeTransitionError } from "./transition/errorHandling";
@@ -66,12 +68,10 @@ function isSameNavigation(
  * overhead for the common case (no guards or sync guards).
  */
 export class NavigationNamespace {
-  // Stryker disable next-line BooleanLiteral: equivalent — reset to false at the top of every navigate()/navigateToState()/navigateToDefault(), so the initializer value is never observed.
-  lastSyncResolved = false;
-  lastSyncRejected = false;
   #deps!: NavigationDependencies;
   #currentController: AbortController | null = null;
   #navigationId = 0;
+  #onSuppressed!: (error: unknown) => void;
 
   // =========================================================================
   // Dependency injection
@@ -79,6 +79,20 @@ export class NavigationNamespace {
 
   setDependencies(deps: NavigationDependencies): void {
     this.#deps = deps;
+    // Built once here rather than per call: the closure needs THIS router's
+    // logger, so it cannot be static, and `setDependencies` is a pure
+    // assignment that runs exactly once at wiring (#1331).
+    this.#onSuppressed = (error: unknown): void => {
+      if (isExpectedRejection(error)) {
+        return;
+      }
+
+      deps.logger.error(
+        "router.navigate",
+        "Unexpected navigation error",
+        error,
+      );
+    };
   }
 
   // =========================================================================
@@ -90,44 +104,8 @@ export class NavigationNamespace {
     params: Params,
     search: SearchParams | undefined,
     opts: NavigationOptions,
-  ): Promise<State> {
-    this.lastSyncResolved = false;
-    const deps = this.#deps;
-
-    // Fast-path sync rejections: cached error + cached Promise.reject
-    // No allocations, no throw/catch overhead, facade skips .catch() suppression
-    if (!deps.canNavigate()) {
-      // Stryker disable next-line BooleanLiteral: equivalent — #721 optimization flag, not a correctness gate. Not flagging the cached (pre-suppressed) rejection routes the facade to the else-branch, which re-attaches a harmless .catch; no observable difference.
-      this.lastSyncRejected = true;
-
-      return CACHED_NOT_STARTED_REJECTION;
-    }
-
-    let toState: State | undefined;
-
-    try {
-      toState = deps.buildNavigateState(name, params, search);
-    } catch (error) {
-      /* v8 ignore next 3 -- @preserve: reachable only via validator-driven
-         throws from buildNavigateState (validateStateBuilderArgs) — covered
-         in @real-router/validation-plugin's suite, not in core. */
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided buildNavigateState
-      return Promise.reject(error);
-    }
-
-    if (!toState) {
-      deps.emitTransitionError(
-        undefined,
-        deps.getState(),
-        CACHED_ROUTE_NOT_FOUND_ERROR,
-      );
-      // Stryker disable next-line BooleanLiteral: equivalent — #721 optimization flag (see L95): the cached rejection is suppressed by the facade else-branch regardless of the flag.
-      this.lastSyncRejected = true;
-
-      return CACHED_ROUTE_NOT_FOUND_REJECTION;
-    }
-
-    return this.#executeNavigation(toState, opts);
+  ): State | Promise<State> {
+    return this.#settle(this.#navigate(name, params, search, opts));
   }
 
   /**
@@ -147,144 +125,15 @@ export class NavigationNamespace {
    *   transition, guards, `subscribeLeave`, `completeTransition`,
    *   plugin lifecycle hooks.
    */
-  navigateToState(state: State, opts: NavigationOptions): Promise<State> {
-    this.lastSyncResolved = false;
-    const deps = this.#deps;
-
-    if (!deps.canNavigate()) {
-      // Stryker disable next-line BooleanLiteral: equivalent — #721 optimization flag (see L95): the cached rejection is suppressed by the facade else-branch regardless of the flag.
-      this.lastSyncRejected = true;
-
-      return CACHED_NOT_STARTED_REJECTION;
-    }
-
-    // Reject states whose route no longer exists (e.g. the route tree was
-    // mutated between matchPath and navigateToState). UNKNOWN_ROUTE is
-    // structurally legal — it is the navigateToNotFound output shape.
-    if (state.name !== constants.UNKNOWN_ROUTE && !deps.hasRoute(state.name)) {
-      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-        routeName: state.name,
-      });
-
-      deps.emitTransitionError(undefined, deps.getState(), err);
-
-      // This is a FRESH reject (carries `routeName`), not one of the
-      // pre-suppressed CACHED_*_REJECTION singletons. `lastSyncRejected`
-      // contractually means "I returned a pre-suppressed cached rejection —
-      // skip your .catch()", so leaving it unset lets the facade attach its
-      // own suppression. Setting it here leaked an unhandledRejection on
-      // fire-and-forget calls (#721).
-      return Promise.reject(err);
-    }
-
-    // Channel guard, position P3 (#1572). `navigateToState` is the ONE producer
-    // that takes a ready-made `State` instead of a `params` argument, so the
-    // predicate reads `state.params ∩ queryNames(state.name)`. What it commits
-    // becomes `getState()`, so a pre-M2 layout would be silent corruption: the
-    // key sits in `state.params` and never reaches `state.path`.
-    //
-    // Costs nothing on healthy flows — a state produced by core (`matchPath`,
-    // `makeState`) is channel-correct by construction, so the predicate is
-    // empty on every popstate / memory-restore / SSR-hydration commit. `start()`
-    // commits THROUGH here (`RouterLifecycleNamespace`), which is why the guard
-    // lives in the namespace rather than on the plugin-API door.
-    //
-    // Rejects rather than throwing, mirroring the ROUTE_NOT_FOUND guard above:
-    // this method returns `Promise<State>` and its URL-plugin callers invoke it
-    // from popstate handlers, where a new synchronous throw would be a change
-    // of failure shape rather than a new failure.
-    const misChanneled = findMisChanneledKey(
-      state.params,
-      deps.getQueryParams(state.name),
-    );
-
-    if (misChanneled !== undefined) {
-      const err = new RouterError(errorCodes.WRONG_CHANNEL, {
-        routeName: state.name,
-        message: `[router.navigateToState] ${misChanneledKeyMessage(
-          state.name,
-          misChanneled,
-          "`state.params`",
-        )}`,
-      });
-
-      deps.emitTransitionError(undefined, deps.getState(), err);
-
-      return Promise.reject(err);
-    }
-
-    // States from `matchPath` are deeply frozen (`freezeStateShell`).
-    // `completeTransition` mutates `toState.transition` and `context` is
-    // intentionally extensible for plugin claim writes, so we hand the
-    // pipeline a writable shell — same shape `makeState(skipFreeze=true)`
-    // produces. `params` stays referentially shared (already frozen).
-    // `transition` is omitted so completeTransition can assign it.
-    const writableState = {
-      name: state.name,
-      params: state.params,
-      // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
-      // without this, start()'s navigateToState(matchPath(...)) would drop the
-      // matched query from the committed state.
-      search: state.search,
-      path: state.path,
-      context: { ...state.context },
-    } as State;
-
-    // No route-meta to carry any more (RFC-4 M2 / #1548): ownership is read from
-    // the live matcher by `state.name` (`getTransitionPath`'s `getMeta`), not
-    // from a per-State WeakMap. The former #1170 carry — which existed only so a
-    // matchPath-derived writable shell stayed non-meta-less across consecutive
-    // popstate navs — is obsolete: any state whose name is in the tree takes the
-    // STANDARD PATH regardless of object identity.
-
-    return this.#executeNavigation(writableState, opts);
+  navigateToState(
+    state: State,
+    opts: NavigationOptions,
+  ): State | Promise<State> {
+    return this.#settle(this.#navigateToState(state, opts));
   }
 
-  navigateToDefault(opts: NavigationOptions): Promise<State> {
-    // Reset the sync-resolution flag on entry, mirroring navigate() and
-    // navigateToState(). start() leaves `lastSyncResolved = true`, and the
-    // early reject paths below return before delegating to navigate(), so a
-    // stale `true` would make the facade take the "already resolved" branch
-    // and skip .catch() suppression — leaking an unhandledRejection on
-    // fire-and-forget calls (#721).
-    this.lastSyncResolved = false;
-    const deps = this.#deps;
-    const options = deps.getOptions();
-
-    if (!options.defaultRoute) {
-      return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute not configured",
-        }),
-      );
-    }
-
-    let route: string;
-    let params: Params;
-    let search: SearchParams;
-
-    try {
-      ({ route, params, search } = deps.resolveDefault());
-    } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided resolveDefault callback
-      return Promise.reject(error);
-    }
-
-    if (!route) {
-      return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute resolved to empty",
-        }),
-      );
-    }
-
-    // Both channels, never one bag (RFC-4 M2 / #1548). The query slot took
-    // `undefined` until `defaultSearch` existed as a router option, so a
-    // query-declared name in `defaultParams` reached the URL only via the
-    // `forwardState` seam's channel re-separation — the repair the pipeline
-    // design removes. Passing the query here makes the default route's query
-    // defaults independent of that stage.
-    return this.navigate(route, params, search, opts);
+  navigateToDefault(opts: NavigationOptions): State | Promise<State> {
+    return this.#settle(this.#navigateToDefault(opts));
   }
 
   navigateToNotFound(path: string): State {
@@ -364,7 +213,215 @@ export class NavigationNamespace {
     this.#currentController = null;
   }
 
-  #executeNavigation(toState: State, opts: NavigationOptions): Promise<State> {
+  /**
+   * The producer's own fire-and-forget guarantee (#721): whatever leaves a
+   * public method here is safe to drop on the floor.
+   *
+   * ONE checkpoint per public method, deliberately — not a `.catch()` at each of
+   * the six return sites. A forgotten site is invisible until it leaks, which is
+   * the bug this replaces; a single choke point cannot be forgotten. And the
+   * discriminator is the returned VALUE's identity, not a flag the facade reads
+   * afterwards: `PRE_SUPPRESSED` promises already carry a module-load handler, so
+   * re-suppressing them buys nothing and costs a derived promise.
+   *
+   * A synchronously-returned `State` needs nothing at all — there is no rejection
+   * to suppress, which is precisely what makes `lastSyncResolved` unnecessary:
+   * the TYPE now carries what the flag used to announce.
+   */
+  #settle(result: State | Promise<State>): State | Promise<State> {
+    if (result instanceof Promise && !PRE_SUPPRESSED.has(result)) {
+      result.catch(this.#onSuppressed);
+    }
+
+    return result;
+  }
+
+  /**
+   * `navigate`'s body, minus the fire-and-forget checkpoint.
+   *
+   * Split out because `navigateToDefault` delegates HERE, not to the public
+   * method: routing it through `navigate` would run `#settle` twice per default
+   * navigation and attach a second, pointless `.catch()` — an extra derived
+   * promise on a path that has none today.
+   */
+  #navigate(
+    name: string,
+    params: Params,
+    search: SearchParams | undefined,
+    opts: NavigationOptions,
+  ): State | Promise<State> {
+    const deps = this.#deps;
+
+    // Fast-path sync rejections: cached error + cached Promise.reject.
+    // No allocations, no throw/catch overhead; `#settle` recognises the
+    // singleton by identity and skips its `.catch()`.
+    if (!deps.canNavigate()) {
+      return CACHED_NOT_STARTED_REJECTION;
+    }
+
+    let toState: State | undefined;
+
+    try {
+      toState = deps.buildNavigateState(name, params, search);
+    } catch (error) {
+      /* v8 ignore next 3 -- @preserve: reachable only via validator-driven
+         throws from buildNavigateState (validateStateBuilderArgs) — covered
+         in @real-router/validation-plugin's suite, not in core. */
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided buildNavigateState
+      return Promise.reject(error);
+    }
+
+    if (!toState) {
+      deps.emitTransitionError(
+        undefined,
+        deps.getState(),
+        CACHED_ROUTE_NOT_FOUND_ERROR,
+      );
+
+      return CACHED_ROUTE_NOT_FOUND_REJECTION;
+    }
+
+    return this.#executeNavigation(toState, opts);
+  }
+
+  #navigateToState(
+    state: State,
+    opts: NavigationOptions,
+  ): State | Promise<State> {
+    const deps = this.#deps;
+
+    if (!deps.canNavigate()) {
+      return CACHED_NOT_STARTED_REJECTION;
+    }
+
+    // Reject states whose route no longer exists (e.g. the route tree was
+    // mutated between matchPath and navigateToState). UNKNOWN_ROUTE is
+    // structurally legal — it is the navigateToNotFound output shape.
+    if (state.name !== constants.UNKNOWN_ROUTE && !deps.hasRoute(state.name)) {
+      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        routeName: state.name,
+      });
+
+      deps.emitTransitionError(undefined, deps.getState(), err);
+
+      // A FRESH reject (it carries `routeName`), so it is deliberately NOT in
+      // `PRE_SUPPRESSED` and `#settle` will attach its `.catch()`. Adding it to
+      // that set — the modern shape of the mistake that caused #721 — would skip
+      // suppression on a promise nobody else handles and leak it.
+      return Promise.reject(err);
+    }
+
+    // Channel guard, position P3 (#1572). `navigateToState` is the ONE producer
+    // that takes a ready-made `State` instead of a `params` argument, so the
+    // predicate reads `state.params ∩ queryNames(state.name)`. What it commits
+    // becomes `getState()`, so a pre-M2 layout would be silent corruption: the
+    // key sits in `state.params` and never reaches `state.path`.
+    //
+    // Costs nothing on healthy flows — a state produced by core (`matchPath`,
+    // `makeState`) is channel-correct by construction, so the predicate is
+    // empty on every popstate / memory-restore / SSR-hydration commit. `start()`
+    // commits THROUGH here (`RouterLifecycleNamespace`), which is why the guard
+    // lives in the namespace rather than on the plugin-API door.
+    //
+    // Rejects rather than throwing, mirroring the ROUTE_NOT_FOUND guard above:
+    // this method returns `Promise<State>` and its URL-plugin callers invoke it
+    // from popstate handlers, where a new synchronous throw would be a change
+    // of failure shape rather than a new failure.
+    const misChanneled = findMisChanneledKey(
+      state.params,
+      deps.getQueryParams(state.name),
+    );
+
+    if (misChanneled !== undefined) {
+      const err = new RouterError(errorCodes.WRONG_CHANNEL, {
+        routeName: state.name,
+        message: `[router.navigateToState] ${misChanneledKeyMessage(
+          state.name,
+          misChanneled,
+          "`state.params`",
+        )}`,
+      });
+
+      deps.emitTransitionError(undefined, deps.getState(), err);
+
+      return Promise.reject(err);
+    }
+
+    // States from `matchPath` are deeply frozen (`freezeStateShell`).
+    // `completeTransition` mutates `toState.transition` and `context` is
+    // intentionally extensible for plugin claim writes, so we hand the
+    // pipeline a writable shell — same shape `makeState(skipFreeze=true)`
+    // produces. `params` stays referentially shared (already frozen).
+    // `transition` is omitted so completeTransition can assign it.
+    const writableState = {
+      name: state.name,
+      params: state.params,
+      // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
+      // without this, start()'s navigateToState(matchPath(...)) would drop the
+      // matched query from the committed state.
+      search: state.search,
+      path: state.path,
+      context: { ...state.context },
+    } as State;
+
+    // No route-meta to carry any more (RFC-4 M2 / #1548): ownership is read from
+    // the live matcher by `state.name` (`getTransitionPath`'s `getMeta`), not
+    // from a per-State WeakMap. The former #1170 carry — which existed only so a
+    // matchPath-derived writable shell stayed non-meta-less across consecutive
+    // popstate navs — is obsolete: any state whose name is in the tree takes the
+    // STANDARD PATH regardless of object identity.
+
+    return this.#executeNavigation(writableState, opts);
+  }
+
+  #navigateToDefault(opts: NavigationOptions): State | Promise<State> {
+    const deps = this.#deps;
+    const options = deps.getOptions();
+
+    if (!options.defaultRoute) {
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute not configured",
+        }),
+      );
+    }
+
+    let route: string;
+    let params: Params;
+    let search: SearchParams;
+
+    try {
+      ({ route, params, search } = deps.resolveDefault());
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided resolveDefault callback
+      return Promise.reject(error);
+    }
+
+    if (!route) {
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute resolved to empty",
+        }),
+      );
+    }
+
+    // Both channels, never one bag (RFC-4 M2 / #1548). The query slot took
+    // `undefined` until `defaultSearch` existed as a router option, so a
+    // query-declared name in `defaultParams` reached the URL only via the
+    // `forwardState` seam's channel re-separation — the repair the pipeline
+    // design removes. Passing the query here makes the default route's query
+    // defaults independent of that stage.
+    //
+    // Delegates to the PRIVATE core: the public `navigate` would run `#settle`
+    // here and again in this method's own wrapper, costing a second `.catch()`
+    // per default navigation.
+    return this.#navigate(route, params, search, opts);
+  }
+
+  #executeNavigation(
+    toState: State,
+    opts: NavigationOptions,
+  ): State | Promise<State> {
     const deps = this.#deps;
     let fromState: State | undefined;
     let transitionStarted = false;
@@ -376,8 +433,6 @@ export class NavigationNamespace {
 
       if (isSameNavigation(fromState, opts, toState)) {
         deps.emitTransitionError(toState, fromState, CACHED_SAME_STATES_ERROR);
-        // Stryker disable next-line BooleanLiteral: equivalent — #721 optimization flag (see L95): the cached rejection is suppressed by the facade else-branch regardless of the flag.
-        this.lastSyncRejected = true;
 
         return CACHED_SAME_STATES_REJECTION;
       }
@@ -530,20 +585,14 @@ export class NavigationNamespace {
         canDeactivateFunctions,
       });
 
-      // Mark sync-resolution only AFTER completeTransition returns. It emits
-      // TRANSITION_SUCCESS; listener throws are all isolated via onListenerError
-      // (the emitter re-throws nothing now that re-entrant emits are coalesced,
-      // #1033, and reentrant navigate/CRUD are banned), so the emit itself does
-      // not throw. Should completeTransition throw for any other reason, setting
-      // the flag optimistically BEFORE it would leave the flag stale-true, so the
-      // facade would read lastSyncResolved and skip its suppressing `.catch()` —
-      // the rejection would then leak as a Node unhandledRejection. Post-emit
-      // placement keeps the flag false on a throw, so control falls to catch and
-      // the facade attaches its `.catch`.
-      // Stryker disable next-line BooleanLiteral: equivalent — flipping to false routes the facade to the else-branch, which attaches a harmless .catch to an already-resolved promise; there is no rejection to suppress.
-      this.lastSyncResolved = true;
-
-      return Promise.resolve(finalState);
+      // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
+      // announces "this navigation already settled, synchronously", which used
+      // to be `lastSyncResolved`'s job. The ordering hazard the flag carried is
+      // gone with it: there is no window in which a value says "resolved" while
+      // `completeTransition` may still throw, because the value only exists once
+      // it returned. The Promise wrap moves up to the facade, which owes callers
+      // `Promise<State>`; the allocation is the same one, one frame higher.
+      return finalState;
     } catch (error) {
       this.#handleNavigateError(
         error,
