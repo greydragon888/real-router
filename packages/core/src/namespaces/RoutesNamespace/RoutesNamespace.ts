@@ -629,9 +629,20 @@ export class RoutesNamespace<
     // O(1) gate: only a route that actually forwards can have a second arm.
     // Every `<Link>` in six adapters runs this predicate on every render, so a
     // non-forwarding route must not pay for the arm at all.
+    //
+    // TREE-WIDE first, per-route second (#1595). The two maps below are
+    // `Object.create(null)` dictionaries — V8 keeps those in dictionary mode
+    // whatever their size, empty ones included — and the pair of lookups measured
+    // ~14 ns, i.e. 1.75x this predicate's pre-pipeline cost on the shape that
+    // reaches here: an INACTIVE link, which is most links on a page. The cost is
+    // not the `Object.hasOwn` form (replacing it with a plain property read
+    // measured identical) but touching the dictionaries at all, so the fix is to
+    // not touch them when no route in the tree forwards. `hasAnyForward` is
+    // maintained beside `resolvedForwardMap`, never separately.
     if (
-      !Object.hasOwn(this.#store.config.forwardMap, name) &&
-      !Object.hasOwn(this.#store.config.forwardFnMap, name)
+      !this.#store.hasAnyForward ||
+      (!Object.hasOwn(this.#store.config.forwardMap, name) &&
+        !Object.hasOwn(this.#store.config.forwardFnMap, name))
     ) {
       return false;
     }

@@ -37,6 +37,22 @@ export function createEmptyConfig(): RouteConfig {
 }
 
 /**
+ * Does ANY route in this config forward? The tree-wide answer behind
+ * `RoutesStore.hasAnyForward` — see that field for why one boolean is worth
+ * deriving (#1595).
+ *
+ * Deliberately NOT a field on {@link RouteConfig}: {@link assignConfigEntries}
+ * enumerates that interface's values and assumes every one is a record object,
+ * so a boolean there would be copied as if it had entries.
+ */
+export function anyForwardConfigured(config: RouteConfig): boolean {
+  return (
+    Object.keys(config.forwardMap).length > 0 ||
+    Object.keys(config.forwardFnMap).length > 0
+  );
+}
+
+/**
  * Copies every {@link RouteConfig} sub-map's entries from `source` into
  * `target` (shallow per map — entries are shared by reference). Driven by
  * `Object.keys(source)` instead of one `Object.assign` per field, so a newly
