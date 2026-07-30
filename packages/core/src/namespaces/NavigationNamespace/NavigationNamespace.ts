@@ -20,7 +20,11 @@ import {
 import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
-import type { NavigationContext, NavigationDependencies } from "./types";
+import type {
+  NavigationContext,
+  NavigationDependencies,
+  NavigationPlan,
+} from "./types";
 import type { TransitionPath } from "../../transitionPath";
 import type {
   GuardFn,
@@ -30,6 +34,12 @@ import type {
   State,
   TransitionMeta,
 } from "../../types";
+
+// Write-once placeholders for `NavigationPlan`'s pass-2 fields. Module-level so
+// building a plan allocates nothing beyond the plan itself; never mutated —
+// `#planPhases` overwrites the SLOTS, it does not write through them.
+const NO_SEGMENTS: string[] = Object.freeze([]) as unknown as string[];
+const NO_GUARDS = new Map<string, GuardFn>();
 
 const FROZEN_ACTIVATED: string[] = Object.freeze([
   constants.UNKNOWN_ROUTE,
@@ -418,6 +428,92 @@ export class NavigationNamespace {
     return this.#navigate(route, params, search, opts);
   }
 
+  /**
+   * Pass 1 of the shared prologue: reserve the navigation, then announce it.
+   *
+   * Ends with `startTransition` DELIBERATELY, and nothing follows it here. That
+   * makes "this threw" strictly equivalent to "TRANSITION_START never fired", so
+   * the caller can set its `transitionStarted` marker immediately after the call
+   * and stay exactly as accurate as the inline version was.
+   *
+   * The three statements before it are ordered, not incidental:
+   * `#abortPreviousNavigation` may run FSM `CANCEL` (whose listeners can add or
+   * drop subscriptions), so `suspendable` has to be read after it — and before
+   * `startTransition`, whose listeners a `stop()` would use to empty those same
+   * lists (#1169, the QB/QE hole).
+   */
+  #beginTransition(
+    toState: State,
+    fromState: State | undefined,
+    opts: NavigationOptions,
+  ): NavigationPlan {
+    const deps = this.#deps;
+
+    this.#abortPreviousNavigation(opts.signal);
+
+    // Stryker disable next-line UpdateOperator: equivalent — `#navigationId` is only ever compared by identity (`!== myId`) to detect supersession; uniqueness per navigation is all that matters, so `--` (decreasing ids) is indistinguishable from `++`.
+    const myId = ++this.#navigationId;
+
+    // `suspendable` is true only when a synchronous supersede is reachable — an
+    // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit plugin
+    // listener (`onTransitionStart` / `onTransitionLeaveApprove`); the pure
+    // synchronous navigate (none of these) is uncancellable and skips the
+    // commit-gate, keeping the #307 hot path perf-neutral.
+    const plan: NavigationPlan = {
+      toState,
+      fromState,
+      opts,
+      myId,
+      suspendable:
+        opts.signal !== undefined ||
+        deps.hasLeaveListeners() ||
+        deps.hasPreCommitListeners(),
+      // Write-once placeholders — pass 2 fills them (see `NavigationPlan`).
+      toDeactivate: NO_SEGMENTS,
+      toActivate: NO_SEGMENTS,
+      intersection: "",
+      canDeactivateFunctions: NO_GUARDS,
+      canActivateFunctions: NO_GUARDS,
+      shouldDeactivate: false,
+      shouldActivate: false,
+      hasGuards: false,
+    };
+
+    deps.startTransition(toState, fromState);
+
+    return plan;
+  }
+
+  /**
+   * Pass 2: work out the shape of the transition, now that it is announced.
+   *
+   * Runs AFTER `startTransition` because a `TRANSITION_START` listener may still
+   * register a guard, and the guard maps must reflect that.
+   */
+  #planPhases(plan: NavigationPlan): void {
+    const deps = this.#deps;
+    const [canDeactivateFunctions, canActivateFunctions] =
+      deps.getLifecycleFunctions();
+
+    const { toDeactivate, toActivate, intersection } = getTransitionPath(
+      plan.toState,
+      plan.fromState,
+      (name) => deps.getMetaForState(name),
+    );
+
+    plan.canDeactivateFunctions = canDeactivateFunctions;
+    plan.canActivateFunctions = canActivateFunctions;
+    plan.toDeactivate = toDeactivate;
+    plan.toActivate = toActivate;
+    plan.intersection = intersection;
+    plan.shouldDeactivate =
+      !!plan.fromState && !plan.opts.forceDeactivate && toDeactivate.length > 0;
+    plan.shouldActivate =
+      plan.toState.name !== constants.UNKNOWN_ROUTE && toActivate.length > 0;
+    plan.hasGuards =
+      canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
+  }
+
   #executeNavigation(
     toState: State,
     opts: NavigationOptions,
@@ -437,26 +533,8 @@ export class NavigationNamespace {
         return CACHED_SAME_STATES_REJECTION;
       }
 
-      this.#abortPreviousNavigation(opts.signal);
+      const plan = this.#beginTransition(toState, fromState, opts);
 
-      // Stryker disable next-line UpdateOperator: equivalent — `#navigationId` is only ever compared by identity (`!== myId`) to detect supersession; uniqueness per navigation is all that matters, so `--` (decreasing ids) is indistinguishable from `++`.
-      const myId = ++this.#navigationId;
-
-      // #1169 commit-gate — liveness snapshot captured BEFORE the pre-commit
-      // listener windows. A listener's `stop()`/`dispose()` runs `clearAll()`,
-      // which empties the listener lists, so the marker must be read now, not at
-      // the commit site (that self-destruct was the QB/QE hole, RFC §5-bis).
-      // `suspendable` is true only when a synchronous supersede is reachable — an
-      // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit
-      // plugin listener (`onTransitionStart` / `onTransitionLeaveApprove`); the
-      // pure synchronous navigate (none of these) is uncancellable and skips the
-      // gate, keeping the #307 hot path perf-neutral.
-      const suspendable =
-        opts.signal !== undefined ||
-        deps.hasLeaveListeners() ||
-        deps.hasPreCommitListeners();
-
-      deps.startTransition(toState, fromState);
       transitionStarted = true;
 
       // Post-`startTransition` supersession is now caught at the commit-gate
@@ -466,20 +544,19 @@ export class NavigationNamespace {
       // additionally caught in `#finishAsyncNavigation` / the guard pipeline's
       // `isCurrentNav`; a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
 
-      const [canDeactivateFunctions, canActivateFunctions] =
-        deps.getLifecycleFunctions();
-      const isUnknownRoute = toState.name === constants.UNKNOWN_ROUTE;
+      this.#planPhases(plan);
 
-      const transitionPath = getTransitionPath(toState, fromState, (name) =>
-        deps.getMetaForState(name),
-      );
-      const { toDeactivate, toActivate, intersection } = transitionPath;
-
-      const shouldDeactivate =
-        fromState && !opts.forceDeactivate && toDeactivate.length > 0;
-      const shouldActivate = !isUnknownRoute && toActivate.length > 0;
-      const hasGuards =
-        canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
+      const {
+        myId,
+        suspendable,
+        canDeactivateFunctions,
+        canActivateFunctions,
+        toDeactivate,
+        toActivate,
+        shouldDeactivate,
+        shouldActivate,
+        hasGuards,
+      } = plan;
 
       const confirmedToState = toState;
 
@@ -489,7 +566,7 @@ export class NavigationNamespace {
           fromState,
           myId,
           opts,
-          transitionPath,
+          plan,
           canDeactivateFunctions,
         );
 
@@ -527,7 +604,7 @@ export class NavigationNamespace {
           canActivateFunctions,
           toDeactivate,
           toActivate,
-          !!shouldDeactivate,
+          shouldDeactivate,
           shouldActivate,
           toState,
           fromState,
@@ -537,17 +614,11 @@ export class NavigationNamespace {
         );
 
         if (guardCompletion !== undefined) {
+          // The plan IS the `NavigationContext` (a superset of it), so the
+          // second literal this used to build is gone — one bag per navigation.
           return this.#finishAsyncNavigation(
             guardCompletion,
-            {
-              toState,
-              fromState,
-              opts,
-              toDeactivate,
-              toActivate,
-              intersection,
-              canDeactivateFunctions,
-            },
+            plan,
             controller,
             myId,
           );
@@ -575,15 +646,7 @@ export class NavigationNamespace {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
       }
 
-      const finalState = completeTransition(deps, {
-        toState,
-        fromState,
-        opts,
-        toDeactivate,
-        toActivate,
-        intersection,
-        canDeactivateFunctions,
-      });
+      const finalState = completeTransition(deps, plan);
 
       // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
       // announces "this navigation already settled, synchronously", which used

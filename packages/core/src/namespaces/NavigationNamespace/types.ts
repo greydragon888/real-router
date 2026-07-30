@@ -21,6 +21,32 @@ export interface NavigationContext {
 }
 
 /**
+ * Everything a navigation works out BEFORE any guard runs, in one bag.
+ *
+ * A superset of {@link NavigationContext}, so the same object is handed to
+ * `completeTransition` / `#finishAsyncNavigation` at the end instead of a second
+ * literal being built there — the allocation count per navigation is unchanged
+ * (one), which is why this is a refactor and not a hot-path regression.
+ *
+ * Filled in two passes across the FSM's `TRANSITION_START` emit, because the
+ * order is observable: `suspendable` must be read BEFORE the pre-commit listener
+ * windows (#1169 — a listener's `stop()` empties the listener lists), while the
+ * guard maps must be read AFTER, since a `TRANSITION_START` listener may still
+ * register a guard. The fields of the second pass therefore start as write-once
+ * placeholders.
+ */
+export interface NavigationPlan extends NavigationContext {
+  /** Supersession token — `#navigationId` at the moment this one began. */
+  myId: number;
+  /** Whether a synchronous supersede is reachable at all (#1169 commit-gate). */
+  suspendable: boolean;
+  canActivateFunctions: Map<string, GuardFn>;
+  shouldDeactivate: boolean;
+  shouldActivate: boolean;
+  hasGuards: boolean;
+}
+
+/**
  * Dependencies injected into NavigationNamespace.
  *
  * These are function references from other namespaces/facade,
