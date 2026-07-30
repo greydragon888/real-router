@@ -1,5 +1,1581 @@
 # @real-router/core
 
+## 0.82.0
+
+### Minor Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Let a caller's value outrank a forwardTo chain default in either bag ([#1570](https://github.com/greydragon888/real-router/issues/1570))
+
+  Layering a chain default into the channel the TARGET declares ([#1570](https://github.com/greydragon888/real-router/issues/1570)) split the
+  default and the caller's value across DIFFERENT bags whenever the caller named
+  the key in `params` while the target declares it with `?`. Nothing ranks two
+  values in two channels, and the channel-separation seam spreads `search` last —
+  so the DEFAULT won and the caller's value was lost, silently:
+
+  ```ts
+  createRouter([
+    {
+      name: "src",
+      path: "/src",
+      forwardTo: "dst",
+      defaultParams: { lang: "fr" },
+    },
+    { name: "dst", path: "/dst?lang" },
+  ]);
+
+  router.navigate("src", { lang: "de" }); // committed /dst?lang=fr — "de" gone
+  ```
+
+  `forwardState` now splits the chain defaults ALONE and layers each half under the
+  caller in its own channel, declining to default a slot the caller already filled
+  in either bag. Nothing moves between channels — the caller's key stays where the
+  caller put it — so channel correctness remains the producer's contract.
+
+  Two fixes for the price of one: the same code path used a spread to merge the
+  query half, which copied an explicit `undefined` over and DELETED the default.
+  `undefined` is absence on both sides of a merge ([#1550](https://github.com/greydragon888/real-router/issues/1550) / [#1551](https://github.com/greydragon888/real-router/issues/1551)), so
+  `navigate("src", {}, { lang: undefined })` now keeps `lang: "fr"` — symmetric
+  with a route-level `defaultSearch`, where the rule already held.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Give `buildNavigationState` a `search?` slot ([#1571](https://github.com/greydragon888/real-router/issues/1571))
+
+  `getPluginApi().buildNavigationState(name, params)` was the ONE pipeline entry
+  point that could not express a query intent — `navigate`, `buildPath`,
+  `canNavigateTo`, `isActiveRoute` and `makeState` all take a query channel
+  (verified individually). A caller could only reach `state.search` by riding
+  declared keys in the `params` bag, which is exactly the shape the always-on
+  channel guard is meant to reject.
+
+  ```ts
+  buildNavigationState(name, params?, search?)   // third slot, additive
+  ```
+
+  The argument flows THROUGH the `forwardState` seam rather than past it, so it
+  picks up the same semantics the other five have: an explicit value beats a
+  declared twin the caller rode in `params`, and a `search-schema` interceptor
+  sees the query channel. Left undefined it stays undefined — the frozen
+  empty-search singleton is applied downstream, so the two-argument form allocates
+  exactly as before.
+
+  Purely additive: every existing two-argument call keeps its behaviour. Measured
+  acceptance — the one-call form now reproduces, byte for byte, the double-call
+  workaround its only consumer (`shared/browser-env`'s `createReplaceHistoryState`)
+  uses today, across a plain intent, a params-bag twin, a `defaultSearch` route, a
+  `forwardTo` resolution and an empty bag. Dropping that workaround is its own
+  step ([#1574](https://github.com/greydragon888/real-router/issues/1574)).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Apply a route's query defaults in `buildPath` when the caller names no search channel ([#1578](https://github.com/greydragon888/real-router/issues/1578))
+
+  Routing a route's own defaults by channel ([#1549](https://github.com/greydragon888/real-router/issues/1549)) had to spare one caller: a v1
+  single-bag call (`buildPath(name, { page })`) rides the declared query key in the
+  params bag and depends on the matcher's `search ?? params` fallback to print it.
+  Defining `search` switches that fallback off, so the split was skipped whenever
+  the `search` argument was absent.
+
+  That test was one step too wide. "Absent `search` argument" also covers the caller
+  who names no query channel at **all** — which is the arm every adapter's `<Link>`
+  takes, since `buildHref` forwards an absent search prop verbatim. Those calls lost
+  the route's `defaultSearch` from the URL, leaving `buildPath` the only producer
+  disagreeing with `navigate`, `makeState` and the `matchPath` rebuild:
+
+  ```ts
+  // Route: { name: "x", path: "/x?page", defaultSearch: { page: "1" } }
+  router.buildPath("x"); // "/x?page=1"  (was: "/x")
+  router.buildPath("x", {}); // "/x?page=1"  (was: "/x")
+  (await router.navigate("x", {})).path; // "/x?page=1" — unchanged
+  ```
+
+  So `<Link to="x">` rendered `href="/x"` while the click committed `/x?page=1`, and
+  the round trip broke in the sharp direction: `buildPath` emitted a URL `matchPath`
+  immediately rewrote into a different one. SSG manifests (`getStaticPaths`) dropped
+  the same queries.
+
+  The exemption now keys on the caller's **bag** rather than on the absence of the
+  argument — it applies only when a route-declared query name actually rides in
+  `params`, which is the single-bag shape the fallback exists to serve. Unchanged
+  and re-probed after the fix: a params-twin still outranks the default
+  (`buildPath("x", { page: "9" })` → `/x?page=9`), a route with no query default
+  keeps `search` `undefined` so the fallback still prints an undeclared key in
+  `loose`, and the `/coll/:id?id` collision stays path-owned ([#843](https://github.com/greydragon888/real-router/issues/843) / [#1549](https://github.com/greydragon888/real-router/issues/1549)).
+
+  The property tier gained the block that was missing: every other block reaches the
+  URL through a state builder that merges `defaultSearch` itself, which is why the
+  file's own measured map recorded "`buildPath` stops merging `defaultSearch` →
+  kills none". Block 8 draws the arm with no builder in front of `buildPath` and
+  dies on both mutations alone.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Route `buildPath` through the nav pipeline, retiring its single-bag query form (nav-pipeline Phase 2, step 2-1)
+
+  `buildPath` composed its URL by hand and leaned on the matcher's `search ?? params`
+  fallback, which printed a query string out of the PATH bag. That made it the one
+  producer disagreeing with `navigate`, `makeState` and the `matchPath` rebuild on
+  the same intent. It now runs stage ③ and the mode gate through `canonicalize` in
+  its LITERAL form — `{ resolveForward: false }`, the first growth of the pipeline's
+  API — and prints the query from the canonical query channel alone.
+
+  **Behaviour changes.** The query string is no longer printed from the params bag:
+
+  ```ts
+  // Route: /x?page
+  buildPath("x", { page: "2" }); // "/x"          (was "/x?page=2")
+  buildPath("x", {}, { page: "2" }); // "/x?page=2"   unchanged
+
+  // Route: /t (loose mode) — an undeclared key
+  buildPath("t", { foo: "1" }); // "/t"          (was "/t?foo=1")
+  buildPath("t", {}, { foo: "1" }); // "/t?foo=1"    unchanged
+
+  // Route: /items/:id?id — the [#843](https://github.com/greydragon888/real-router/issues/843) collision
+  buildPath("i", { id: "V" }); // "/items/V"    (was "/items/V?id=V")
+
+  // Route: /s with defaultParams { theme: "dark" } — an ARBITRARY default
+  buildPath("s"); // "/s"          (was "/s?theme=dark")
+  ```
+
+  Every one of these is what `navigate` already committed for the same intent, so
+  the step removes divergence rather than adding it. An arbitrary default (declared
+  by neither a path slot nor `?name`) is app-level data living in `state.params`,
+  exactly as documented — only `buildPath` used to print it.
+
+  `forwardTo` is still NOT resolved here (A.5): `buildPath("src")` stays `/src`.
+
+  **The route's default never replaces a value you supplied.** With the seam out of
+  the picture there is nothing to enforce "a default is never applied to a slot the
+  caller already filled — in EITHER bag" (INVARIANTS canonicalize [#6](https://github.com/greydragon888/real-router/issues/6)), so the
+  literal form enforces it itself: on `defaultSearch { page: "5" }`,
+  `buildPath("x", { page: "9" })` prints `/x`, not `/x?page=5`. The key you spelled
+  in the path bag is not printed — that is the single-bag retirement — but the
+  default does not take its place, which would be the very priority inversion the
+  channel split exists to remove.
+
+  Plugins are unaffected: `persistent-params` already injects into the search
+  channel in its own `buildPath` interceptor, and that interceptor zone is untouched
+  ([#1231](https://github.com/greydragon888/real-router/issues/1231)).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Answer `false` from `canNavigateTo` for a mis-channelled params bag ([#1576](https://github.com/greydragon888/real-router/issues/1576))
+
+  `canNavigateTo` is a capability predicate in parity with `navigate` — it answers
+  whether that navigation would work. Since the channel guard's P1 became a throw
+  ([#1572](https://github.com/greydragon888/real-router/issues/1572)), a declared query key handed in the `params` bag made `navigate` throw a
+  synchronous `TypeError` while the predicate still answered `true`: an adapter got
+  a green light for a link whose click throws.
+
+  The predicate already had a written policy for exactly this situation and honoured
+  it for the other rejection reason — a missing required path param returns `false`
+  rather than letting `buildPath` throw ([#725](https://github.com/greydragon888/real-router/issues/725)). It now mirrors the channel rejection
+  the same way, reading the RAW caller bag against the RAW route name, so it is
+  neither stricter nor laxer than the verb:
+
+  ```ts
+  // Route: { name: "search", path: "/search?q" }
+  router.canNavigateTo("search", { q: "shoes" }); // false (was: true)
+  router.navigate("search", { q: "shoes" }); // throws — unchanged
+  router.canNavigateTo("search", {}, { q: "shoes" }); // true — unchanged
+  ```
+
+  Still navigable, in the predicate and in `navigate` alike: a name occupying both
+  a path slot and a query declaration (`/items/:id?id`) is legitimately path-owned
+  ([#843](https://github.com/greydragon888/real-router/issues/843) / [#1549](https://github.com/greydragon888/real-router/issues/1549)), and an `undefined` value is the removal marker, not a value in
+  the wrong channel ([#1550](https://github.com/greydragon888/real-router/issues/1550) / [#1551](https://github.com/greydragon888/real-router/issues/1551)).
+
+  `false` rather than a rethrow: a predicate answers, it never throws, and it runs
+  on every `<Link>` render across six adapters — which is why P1 deliberately does
+  not instrument the predicates. Not instrumented does not mean blind.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Layer a `forwardTo` chain's defaults into the channel the TARGET declares ([#1570](https://github.com/greydragon888/real-router/issues/1570))
+
+  A forwarding hop can only spell a default in `defaultParams` — that is the single
+  slot a route config gives it. But the **channel** belongs to the resolved target:
+  when the target declares that key with `?`, the value is a query value, and
+  `forwardState` was layering it into the path bag regardless.
+
+  ```ts
+  // src → dst,  src.defaultParams = { lang: "fr" },  dst = "/dst?lang"
+  // stage ① before:  { name: "dst", params: { lang: "fr" }, search: {} }   ← wrong channel
+  // stage ① now:     { name: "dst", params: {},             search: { lang: "fr" } }
+  ```
+
+  The split reuses `separateChannels` over `getQueryParams` — the same classifier
+  and the same printing registry the URL build reads ([#1556](https://github.com/greydragon888/real-router/issues/1556)) — so no second
+  derivation of "which channel is this key" is introduced. A name that also
+  occupies a path slot (`/dst/:id?id`) stays path-owned, inheriting the [#843](https://github.com/greydragon888/real-router/issues/843) /
+  [#1549](https://github.com/greydragon888/real-router/issues/1549) carve-out rather than re-deciding it. An explicit caller value still beats
+  the layered default, in **both** channels.
+
+  **Observable only to `forwardState` interceptors.** The committed state is
+  byte-identical: channel separation at the seam moved the key one line later, so
+  `state.params` / `state.search` / `state.path` were already correct end-to-end.
+  What changes is what a plugin's `forwardState` interceptor reads from `next(...)`
+  — which is the point: stage ① is now channel-correct at the producer, and core
+  stops being the one producer its own channel contract could not cover.
+
+  The whole suite stays green with no test migrated.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Add the always-on channel guard — reject a mis-channelled State, warn on a mis-channelled argument ([#1572](https://github.com/greydragon888/real-router/issues/1572))
+
+  Core gains a fifth always-on invariant guard. The predicate is one line —
+  `params ∩ queryNames(name) ≠ ∅` — and it is a **detector, never a normaliser**:
+  the key is not moved. Moving it is what channel separation does, and the
+  nav-pipeline design removes that stage precisely so channel-correctness becomes
+  the producer's contract instead of a repair performed behind everyone's back.
+
+  The two positions cover different populations, and — measured — they are not the
+  same kind of problem, so they ship with different reactions.
+
+  **P3 — `navigateToState` REJECTS.** It is the one producer that takes a
+  ready-made `State`, so the predicate reads `state.params ∩ queryNames(state.name)`.
+  There is no working form behind it: a hand-made State in the pre-M2 layout
+  commits silently corrupt — the key sits in `state.params` and never reaches
+  `state.path`, so `getState()` disagrees with the URL. The rejection mirrors the
+  `ROUTE_NOT_FOUND` guard beside it (rejected promise + `TRANSITION_ERROR`) rather
+  than throwing synchronously, because URL plugins call this from popstate
+  handlers and a new sync throw would change an existing method's failure shape.
+  `start()` commits through the same primitive, so the guard covers every start
+  including SSR hydration — at zero cost, since a state produced by core is
+  channel-correct by construction.
+
+  **P1 — `navigate` / `makeState` / `buildNavigationState` WARN**, on the caller's
+  raw argument, before interceptors. Behaviour is unchanged: the legacy single-bag
+  form still works on `navigate` and `buildNavigationState` (channel separation
+  moves the key one line downstream), and it is pinned today by a benchmark, a
+  stress test, a property and an INVARIANTS row. Announcing the contract first
+  lets every call site identify itself in the logs; promoting it to a throw is a
+  deliberate break with its own test migration and ships separately.
+
+  One position is not merely an announcement: a **direct `makeState`** has no
+  channel separation upstream of it, so the key stays in `params`, never reaches
+  the URL, and the warning reports a state that is already inconsistent with its
+  own path.
+
+  The guard is `undefined`-blind (the documented persistent-key removal marker is
+  not a mis-channel), inherits the `/items/:id?id` carve-out from the same
+  declaration registry the URL build prints from ([#1556](https://github.com/greydragon888/real-router/issues/1556)) rather than re-deriving
+  it, short-circuits on a route with no query declarations, and **never becomes
+  the thing that throws**: a bag backed by an accessor that throws is left to the
+  consumer that actually needed the value, so a diagnostic cannot move the origin
+  of an existing failure.
+
+  New error code: `WRONG_CHANNEL`.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Promote the channel guard's P1 from warn to throw ([#1572](https://github.com/greydragon888/real-router/issues/1572))
+
+  The warn-first step announced the contract so every call site could identify
+  itself in the logs. This is the promotion it announced.
+
+  `navigate` / `makeState` / `buildNavigationState` now throw a **`TypeError`,
+  synchronously**, when a key the route declares with `?name` arrives in the
+  `params` bag:
+
+  ```ts
+  navigate("products", { lang: "en" }); // ✗ TypeError
+  navigate("products", {}, { lang: "en" }); // ✓
+  ```
+
+  Synchronous even on `navigate`, which otherwise reports failure through a
+  rejected promise: this is an ARGUMENT-SHAPE defect at the API boundary, caught
+  before any interceptor or transition exists — the same class as the `subscribe`
+  / `start` guards. Rejecting instead would let a `.catch()` written for
+  navigation failures swallow a programming error.
+
+  **Unchanged, deliberately:**
+
+  - **P3 (`navigateToState`) keeps REJECTING** with `WRONG_CHANNEL`. It takes a
+    ready-made `State` from a popstate handler, where a new synchronous throw
+    would change an existing method's failure shape.
+  - **The predicates (`buildPath` / `isActiveRoute` / `canNavigateTo`) are NOT
+    guarded.** They run on every `<Link>` render, their answer is read immediately
+    and corrupts nothing, and throwing inside a render across six adapters is not
+    a trade this guard is worth. The single-bag form still works there, and an
+    explicit `search` still beats a params-bag twin.
+  - An UNDECLARED key is not a mis-channel — the guard only fires on names the
+    route declares with `?`. `undefined` stays the documented removal marker.
+
+  **INVARIANTS #2a reworded.** It used to state the precedence between an explicit
+  `search` and a params-bag twin "in every one" of the six entry points. A
+  producer can no longer SPELL that collision, so the precedence is now stated for
+  the predicates only — the rule did not change, its domain did.
+
+  The `navigate/search-single-bag` benchmark measured a form that now throws (and
+  would have taken the whole perf harness down with it). Replaced by
+  `navigate/channel-guard-clean`, which measures what every caller actually pays:
+  the guard's scan on a healthy call, against the widest declaration list in the
+  file.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Layer the defaults of every hop on a `forwardTo` chain ([#1566](https://github.com/greydragon888/real-router/issues/1566))
+
+  `forwardState` consulted the `defaultParams` of the **entered** route only, while
+  the chain had already been collapsed to its terminal — so a default declared on
+  an _intermediate_ hop never reached the target:
+
+  ```ts
+  createRouter([
+    { name: "m1", path: "/m1", forwardTo: "m2" },
+    { name: "m2", path: "/m2", forwardTo: "m3", defaultParams: { p: "P2" } },
+    { name: "m3", path: "/m3/:p" },
+  ]);
+
+  await router.navigate("m1");
+  // before: rejects — [SegmentMatcher.buildPath] Missing required param 'p'
+  // now:    "/m3/P2"
+  ```
+
+  The URL direction failed differently and silently: `matchPath("/m1")` committed a
+  state naming the resolved target but carrying the **source** URL and an empty
+  params bag (`name: "m3"`, `path: "/m1"`, `params: {}`). `canNavigateTo` simply
+  returned `false`. Both are consistent now.
+
+  Every forwarding hop's defaults are layered in walk order, so an **earlier** hop
+  wins over a later one and the caller wins over all of them. The terminal route is
+  still excluded — its own defaults are merged downstream by the state builder
+  ([#1549](https://github.com/greydragon888/real-router/issues/1549)), unchanged.
+
+  Covers all three chain kinds: static, dynamic (`forwardTo: () => "…"`), and mixed
+  static→dynamic — the dynamic resolver now reports the hops it walked instead of
+  only the terminal. Single-hop chains and the query channel (`defaultSearch`, which
+  has no source-layering by design) are unaffected.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Light up a `<Link>` whose route forwards elsewhere ([#1573](https://github.com/greydragon888/real-router/issues/1573))
+
+  `isActiveRoute` compared the given name against the committed state and never
+  resolved `forwardTo`, so a link pointing at a forwarding route was dark on the
+  very page it navigates to:
+
+  ```ts
+  // s2 → d2,  s2.defaultParams = { z: "5" },  d2 = "/d2/:z"
+  await router.navigate("s2", {}); // commits /d2/5
+  router.isActiveRoute("s2", {}); // false  ← the link the user just clicked
+  ```
+
+  It gains a second arm — `literal || destination` — where the destination repeats
+  **the same predicate** on the full output of stage ①: the resolved terminal name
+  together with the chain's defaults layered into the target's channels.
+
+  Three measured reasons it is that shape and not a simpler one:
+
+  - **A fallback, not a pre-resolution.** Resolving before comparing would send a
+    section link (`users` forwarding to `users.list`) to the leaf and darken it
+    while a sibling descendant (`users.profile`) is active. The literal arm is
+    what keeps that link lit.
+  - **The predicate is repeated on ①'s OUTPUT, not on a substituted name.** The
+    chain's `defaultParams` live on the forwarding SOURCE and are layered by
+    `forwardState` ([#1566](https://github.com/greydragon888/real-router/issues/1566)/[#1570](https://github.com/greydragon888/real-router/issues/1570)) — never by the forward map — so substituting only
+    the name still compares an empty bag against a committed `{z:"5"}`. It also
+    carries no `search`, which is where ① routes a hop default whose key the
+    target declares with `?`.
+  - **A dynamic `forwardTo` is not in the forward map at all**, so name
+    substitution is a no-op there; going through stage ① resolves it.
+
+  Cost is gated: a route that does not forward pays one `Object.hasOwn` and
+  returns, so the six adapters calling this on every `<Link>` render are
+  unaffected. The arm calls the namespace primitive rather than the interceptable
+  seam, so no plugin interceptor chain runs per render. A dynamic `forwardTo`
+  callback that throws is caught — the predicate answers `false` and logs, it
+  never throws from inside a render (same policy as `canNavigateTo` on a throwing
+  guard, [#959](https://github.com/greydragon888/real-router/issues/959)).
+
+  Unchanged on purpose: `buildPath("s2")` still prints `/s2`, not the destination
+  — href-is-not-destination for `forwardTo` is a separate, deliberate decision.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Route `isActiveRoute` through the nav pipeline and retire its single-bag query form (nav-pipeline Phase 2, step 2-5)
+
+  The last entry point that owned a channel-separation stage of its own. Both arms
+  now build their comparison target through `canonicalize` in the LITERAL form
+  (`{ resolveForward: false }`) and compare channel by channel. The `forwardTo` arm
+  keeps running through the NON-interceptable namespace primitive — the literal
+  form never touches the port, so a plugin's interceptor chain still does not run
+  once per `<Link>` per render — and the safe barrier around the whole predicate
+  ([#1577](https://github.com/greydragon888/real-router/issues/1577)) is untouched.
+
+  This is the one step of the phase that genuinely removes stage ② from a point:
+  `matchPath`, `canNavigateTo` and `buildNavigationState` reach ② through the seam
+  their port calls, and keep it until Phase 4. `isActiveRoute` had its own
+  `separateChannels` call, and it is gone.
+
+  **Three behaviour changes.**
+
+  1. A declared query key handed in the `params` bag is no longer re-routed to the
+     query channel before comparison, so the v1 single-bag spelling stops matching:
+     `isActiveRoute("x", { page: "2" }, undefined, false, false)` answers `false`
+     where it answered `true`. Spell it in the query slot instead. (On the EXACT
+     arm the default `ignoreQueryParams: true` is unaffected — it compares path
+     slots only. The DESCENDANT arm is a different story; see 2 below.)
+     `persistent-params` is unaffected: it injects into `search` itself.
+  2. The descendant arm now obeys `ignoreQueryParams`, the same flag the exact arm
+     hands to `areStatesEqual`. It could not before: it folded query into the path
+     bag before matching, so an ancestor link compared its query even when the
+     caller asked to ignore it — the two arms disagreed about the flag. **This one
+     lands on the DEFAULT flag**, and it is the visible half of the change: on an
+     active `/kid?tab=1`, `isActiveRoute("p", {}, { tab: "9" })` answered `false`
+     and now answers `true`, because the caller asked for query to be ignored.
+     Monotonicity (INVARIANTS isActiveRoute [#6](https://github.com/greydragon888/real-router/issues/6)) still holds — ignoring query can
+     only make a route more active.
+  3. `undefined` in the params bag is ABSENCE, not a value to match against
+     ([#1550](https://github.com/greydragon888/real-router/issues/1550) / [#1551](https://github.com/greydragon888/real-router/issues/1551)). `isActiveRoute("users", { id: undefined })` now answers
+     `true` for an active `users.view`, and an `undefined` no longer "overrides" a
+     route default. This predicate was the last place in core where `undefined`
+     meant something other than absence; sharing `canonicalize` with every other
+     producer aligns it.
+
+  `paramsMatchExcluding` and the namespace's `makeState` dependency lost their last
+  callers and are gone — the canonical target already carries each default merged
+  under the caller's value, in the channel the route declares it in.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep query decimals that `String()` cannot reproduce as strings ([#1565](https://github.com/greydragon888/real-router/issues/1565))
+
+  `numberFormat: "auto"` states round-trip stability as its acceptance criterion —
+  a value is coerced only if the router can print it back unchanged — but enforced
+  that criterion with two hand-written special cases (`-0` and unsafe integers)
+  instead of measuring it. Decimals slipped through both, so `matchPath` rebuilt a
+  URL different from the one it had just matched:
+
+  ```ts
+  const router = createRouter([{ name: "t", path: "/t?page" }]);
+
+  getPluginApi(router).matchPath("/t?page=2.0");
+  // before: search { page: 2 },     path "/t?page=2"     ← the user's URL was rewritten
+  // now:    search { page: "2.0" }, path "/t?page=2.0"
+  ```
+
+  The criterion is now enforced directly — `String(Number(value)) === value` — which
+  subsumes the old negative-zero guard and closes the whole family it left open:
+  trailing zeros (`2.0`, `2.10`, `0.50`, `100.00`, `0.0`, `-2.0`) and precision loss
+  (`1.0000000000000000001`, `9007199254740993.5`, `12345678901234567890.5`). Under a
+  URL plugin the rewritten string reached the address bar, so this was visible, not
+  just structural.
+
+  **Behaviour change:** such a value now arrives as its exact text instead of a
+  number. `?page=2.5` and `?page=42` are unaffected — they print back identically
+  and are still coerced. Reading a lossy decimal as a number is a deliberate opt-in:
+  use `@real-router/search-schema-plugin` with `z.coerce.number()`, or convert at
+  the call site.
+
+  Values that already stayed strings are unchanged: leading zeros (`007`), exponent
+  notation (`1e5`), `-0`, and unsafe **integer** magnitudes (`9007199254740992` —
+  these round-trip textually but lose arithmetic precision, so the safe-integer
+  guard stays on top of the new predicate).
+
+  Locked by engine INVARIANT [#16](https://github.com/greydragon888/real-router/issues/16), generated through `arbNonCanonicalNumericString`,
+  so every property that consumes it now covers the family too.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Build the URL a splat-with-child route actually matches ([#1568](https://github.com/greydragon888/real-router/issues/1568))
+
+  A splat node's children are matched at the splat's **own** position, so the splat
+  captures nothing for them — that is INVARIANTS Matching [#24](https://github.com/greydragon888/real-router/issues/24), shipped and stress-
+  tested. `buildPath` did not mirror it: it demanded a value for the splat and
+  printed it, producing a URL that could not resolve back to the route it was built
+  for. The route named in the invariant's own example could not be built at all:
+
+  ```ts
+  createRouter([
+    {
+      name: "n",
+      path: "/n",
+      children: [
+        {
+          name: "all",
+          path: "/*rest",
+          children: [{ name: "edit", path: "/edit" }],
+        },
+      ],
+    },
+  ]);
+
+  router.buildPath("n.all.edit", {});
+  // before: throws — Missing required param 'rest'
+  // now:    "/n/edit"   ← the URL Matching [#24](https://github.com/greydragon888/real-router/issues/24) says resolves to n.all.edit
+  ```
+
+  With a value supplied the built URL silently resolved to the **parent**:
+  `buildPath("n.all.edit", { rest: "x" })` gave `/n/x/edit`, which the wildcard
+  swallowed whole (`n.all`, `rest: "x/edit"`).
+
+  **The rule is now one line: a splat binds only as the final segment of a route's
+  assembled path; every earlier one builds as empty.** "Assembled" spans the route's
+  own path (`/a/*rest/b` → `/a/b`), the parent chain (a child under a splat parent),
+  and `setRootPath("/app/*rest")` — all three produced the same defect and all three
+  round-trip now. A terminal splat is untouched: `buildPath("n.all", { rest: "x/y" })`
+  is still `/n/x/y`.
+
+  **Behaviour change:** such a route no longer requires the splat param, and a value
+  passed for it is no longer placed in the path (under `queryParamsMode: "loose"` it
+  becomes a query extra, the same treatment any non-slot param gets). Nothing in the
+  repo built such a URL except one test asserting the broken string.
+
+  Locked by a name-roundtrip property (`roundtrip.properties.ts`) — "matches
+  something" is too weak, because the broken build _did_ match, just the wrong route.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Make `Options` generic over the router's dependencies ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  The three resolver callbacks receive a `getDependency` accessor at runtime, but
+  `Options` was not parameterised, so it defaulted to `object` — whose `keyof` is
+  `never`. Every key was rejected, and the form the wiki documents did not compile:
+
+  ```ts
+  createRouter<MyDeps>(routes, {
+    defaultParams: (getDependency) => ({ id: getDependency("currentUserId") }),
+  });
+  // error TS2345: Argument of type '"currentUserId"' is not assignable
+  //               to parameter of type 'never'
+  ```
+
+  `Options<Dependencies>` fixes all three (`defaultRoute`, `defaultParams`,
+  `defaultSearch`), and an unknown key is still rejected — both directions are
+  pinned by a type-level test.
+
+  The parameter deliberately does not spread. Consumers that RESOLVE callbacks
+  take `Options<D>`; consumers that merely READ configuration — `PluginApi.getOptions`,
+  the matcher, the URL builders — take the new `AnyOptions` (`= Options<never>`,
+  which accepts every instantiation by contravariance, unlike `Options<object>`
+  which accepts none). Measured before choosing that split: no plugin in the repo
+  reads `defaultRoute` / `defaultParams` / `defaultSearch` at all — they read
+  `allowNotFound` and `limits`. All 16 packages type-check unchanged.
+
+  `Dependencies` defaults to `DefaultDependencies`, so every existing `Options`
+  reference keeps compiling; `AnyOptions` and `DefaultSearchCallback` are exported
+  alongside the existing option types.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Compare param values independently of provenance ([#1554](https://github.com/greydragon888/real-router/issues/1554))
+
+  `areStatesEqual` and `isActiveRoute` no longer depend on **where** a value came from. The URL direction parses query values (`?page=2` → `2`, `?a=1&a=2` → `[1, 2]`, a path slot is always a string) while the intent direction keeps whatever the caller supplied (`{ page: "2" }` stays a string) — so two states describing the SAME location (byte-identical `state.path`) compared as **unequal**, and an active link rendered inactive.
+
+  **Behavior change** (pre-1.0, hence `minor`): values that print into the same URL now compare equal.
+
+  ```diff
+    await router.start("/x?page=2");            // state.search = { page: 2 }
+  - router.isActiveRoute("x", {}, { page: "2" }, false, false);   // false
+  + router.isActiveRoute("x", {}, { page: "2" }, false, false);   // true
+
+    await router.navigate("users.view", { id: "123" });
+  - router.isActiveRoute("users.view", { id: 123 });              // false
+  + router.isActiveRoute("users.view", { id: 123 });              // true
+  ```
+
+  Scope of the tolerance: `string` / `number` / `boolean` compare by printed form, arrays element-wise under the same rule, and a singleton array against a bare scalar (`["1"]` and `1` both print `?a=1`). `null`, `undefined` and objects keep strict semantics — they print differently (`?a` vs `?a=` vs nothing), so tolerating them would equate genuinely different URLs. Value **storage** is unchanged: `state.search` keeps the mixed domain; comparison is the single place that knows the two domains describe one location.
+
+  Both `isActiveRoute` branches are covered — the exact branch (via `areStatesEqual`) and the hierarchical one, whose raw `!==` loop now shares the same predicate.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `PluginApi.buildState` ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  **Breaking Change:** `getPluginApi(router).buildState(name, params)` has been removed. After the RFC-4 M2 forwardState channel canonicalization it silently dropped the ENTIRE query channel — including user-supplied values riding in the params bag (`buildState("x", { page: "2" })` on an `/x?page` route returned `{ params: {}, search: {} }`) — while its full-composition sibling already exists.
+
+  **Migration:**
+
+  ```diff
+  - const routeInfo = api.buildState(name, params);       // RouteTreeState | undefined
+  + const state = api.buildNavigationState(name, params); // State | undefined
+  ```
+
+  `buildNavigationState` resolves forwardTo the same way and returns `undefined` for unknown routes; unlike `buildState` it also applies route defaults and carries the query channel (`state.search`, `state.path`).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a mis-channelled params bag instead of repairing it ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  The `forwardState` seam used to run `separateChannels` (stage ②) over whatever
+  came out of the interceptor chain: a key the resolved route declares with `?`,
+  sitting in the params bag, was silently moved into the query channel. That
+  repair is gone. The seam now applies the same centralized check the facade
+  already used and throws.
+
+  Three things were wrong with moving it:
+
+  - **The producer kept believing its own bag shipped.** A decoder that returned
+    `{ params: { ...params, tag } }` published a state it never wrote.
+  - **It laundered values past validation.** `search-schema-plugin` documented the
+    leak with a test literally named `LEAKS`: an interceptor registered after the
+    schema injected into `params`, the seam moved it into `search`, and an
+    unvalidated value landed in the very channel the schema owns. That test now
+    pins the refusal; the composition hazard is structurally gone.
+  - **It inverted caller precedence.** A caller's mis-channelled key and a chain
+    default's query half ended up in different bags, where no merge ranks them,
+    and the repair (spreading `search` last) handed the win to the DEFAULT —
+    the [#1570](https://github.com/greydragon888/real-router/issues/1570) defect, which needed a withholding rule to work around.
+
+  **Migration.** Pass a query value in `search`, which is knowable without reading
+  the target's config. The error names the key, the route, and — when a
+  `forwardTo` chain resolved elsewhere — the route you actually called, because a
+  caller who wrote `navigate("src", { lang })` looked at `src`, where `lang` is
+  undeclared and legitimate.
+
+  What did NOT change: a route's own defaults are still routed by the DECLARING
+  route ([#1549](https://github.com/greydragon888/real-router/issues/1549) / [#1570](https://github.com/greydragon888/real-router/issues/1570)), in `canonicalize`, `makeState` and the chain fold. That
+  is core producing two channels out of a config slot whose owner may be resolved
+  dynamically — not a repair of somebody else's bag, and the one case where the
+  author genuinely cannot know the channel.
+
+  Measured radius before and after: 7 tests across 13 packages, all in core and
+  `search-schema-plugin`; every other package (browser, hash, navigation,
+  persistent-params, sources, memory, preload, ssr-utils, ssr-data, rsc-server)
+  was already channel-correct and needed no change.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Substitute a param declared on the root path ([#1567](https://github.com/greydragon888/real-router/issues/1567))
+
+  `setRootPath("/app/:tenant")` registered and **matched** fine, but the build side
+  never substituted the slot — the literal `:tenant` stayed in every URL and the
+  value leaked into the query string as a loose extra:
+
+  ```ts
+  getPluginApi(router).setRootPath("/app/:tenant");
+
+  router.buildPath("home", { tenant: "t1" });
+  // before: "/app/:tenant/home?tenant=t1"
+  // now:    "/app/t1/home"
+  ```
+
+  Because matching _did_ extract the param, the broken string was committed:
+  `matchPath("/app/t1/home")` and `start(...)` both produced `state.path ===
+"/app/:tenant/home"`, which under a URL plugin reached the address bar. A missing
+  value was not reported either — `buildPath("home", {})` returned the literal
+  instead of throwing `Missing required param`. Both are correct now.
+
+  Same root-blindness as **[#1556](https://github.com/greydragon888/real-router/issues/1556)**, one layer over: the root node is deliberately
+  absent from a route's `matchSegments`, so anything derived from a segment walk
+  misses it. [#1556](https://github.com/greydragon888/real-router/issues/1556) fixed the query-declaration side; the build template gathered its
+  param names the same way, found none, and took the "no params here" fast path that
+  emits the whole path as static text. The root's path params (and splat names, so a
+  root splat keeps its separators instead of percent-encoding them) now travel
+  alongside its query declarations into registration.
+
+  Static root paths (`setRootPath("/app")`) and routes with their own params are
+  unaffected.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Classify a root-declared query key into the query channel ([#1556](https://github.com/greydragon888/real-router/issues/1556))
+
+  Channel separation now reads the **same** declaration registry the query-string
+  build reads, so a key declared on the root path — `setRootPath("?lang&theme")`,
+  which is how `@real-router/persistent-params-plugin` declares its keys — is
+  finally recognised as the query param it already printed as.
+
+  Previously the two disagreed: the matcher unions the root node's
+  `?`-declarations into each route's declared query params (that is why they print,
+  even under `queryParamsMode: "strict"`), but core derived its own list by walking
+  the route's match segments — which never contain the root node. A root-declared
+  key was therefore classified as a **path** param:
+
+  ```ts
+  const router = createRouter([{ name: "g", path: "/g" }]);
+  getPluginApi(router).setRootPath("?lang");
+
+  await router.start("/g?lang=en");
+  // before: params { lang: "en" }, search {}   ← wrong channel
+  // now:    params {},             search { lang: "en" }
+
+  await router.navigate("g", { lang: "fr" });
+  // before: path "/g"          ← the declared key vanished from the URL
+  // now:    path "/g?lang=fr"
+  ```
+
+  It also broke active-link detection in **both** spellings: after
+  `start("/g?lang=en")`, `isActiveRoute("g", { lang: "en" })` and
+  `isActiveRoute("g", {}, { lang: "en" })` were both `false`, so a `<Link>` carrying
+  a persistent param rendered inactive on the very page it pointed at. Both now
+  return `true`.
+
+  **Behaviour change:** a persisted / root-declared key moves from `state.params`
+  to `state.search`. This is the channel the plugin's own contract already
+  documents; read it from `state.search` (or, channel-independently, from
+  `state.context.persistentParams`). A route that repeats the declaration itself
+  (`/route/:id?lang`) was already correct and is unaffected.
+
+  The path/query name collision carve-out is unchanged: on `/items/:id?id` the
+  params-bag `id` stays path-owned and only an explicit `search` twin reaches the
+  query channel ([#843](https://github.com/greydragon888/real-router/issues/843) / [#1549](https://github.com/greydragon888/real-router/issues/1549)).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Route a route's own defaults into the channel it declares ([#1549](https://github.com/greydragon888/real-router/issues/1549))
+
+  A default is spelled in one of two slots, and the router now reads both the same
+  way in both positions — on a terminal route and on a forwarding hop.
+
+  Before, each slot worked in exactly one position:
+
+  |                | `defaultParams`                                                                                      | `defaultSearch`      |
+  | -------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
+  | forwarding hop | routed into the target's channel ([#1570](https://github.com/greydragon888/real-router/issues/1570)) | **silently ignored** |
+  | terminal route | **left in the path bag**                                                                             | routed correctly     |
+
+  The terminal half had escalated past mis-channelling: because `start()` commits
+  through `navigateToState`, the always-on channel guard's P3 position rejected
+  core's own state, so a route as ordinary as
+  `{ path: "/x?page", defaultParams: { page: "5" } }` made `start()` throw
+  `WRONG_CHANNEL`. Through `navigate()` the same config committed silently wrong —
+  the key in `state.params`, absent from `state.path`.
+
+  Both halves were fixed with the primitive already used for hop defaults
+  (`separateChannels` over the route's declared query names), applied at every
+  place a route's own defaults are merged: `pipeline/canonicalize`,
+  `StateNamespace.makeState`, `RoutesNamespace.buildPath` and the `matchPath` URL
+  rebuild. All four were needed — the URL builders run _before_ the state builders
+  split, so fixing only the latter would have published a `state.search` its own
+  `state.path` contradicts (INVARIANTS makeState [#6](https://github.com/greydragon888/real-router/issues/6)).
+
+  ⚠ **Superseded within this same release — see `core-slot-is-the-channel`.** That
+  change deletes `separateChannels` and all four call sites: the router no longer
+  routes a default by declaration at all. The SLOT is the channel, and the config
+  this entry describes as re-channelled (`{ path: "/x?page", defaultParams: { page:
+"5" } }`) is now **refused at registration**, with the error naming the slot to
+  move it to. Read the paragraphs below as the reason the routing existed, not as
+  the shipped behaviour.
+
+  `defaultSearch` is spread last and so outranks the query half of
+  `defaultParams`; an explicit caller value still outranks both. Unchanged by
+  construction: a name occupying both a path slot and a query declaration
+  (`/coll/:id?id`) stays path-owned, an arbitrary default (`{ theme: "dark" }` on
+  a static route) keeps its v1 home in `state.params`, and a path default stays in
+  `state.params`.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Add the `defaultSearch` router option — the query channel of the default route ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  `RouterOptions` carried `defaultParams` with no query twin, so the default
+  route's query defaults could be spelled only in the path bag:
+
+  ```ts
+  createRouter([{ name: "list", path: "/list?tab" }], {
+    defaultRoute: "list",
+    defaultParams: { tab: "a" }, // the only slot there was
+  });
+  ```
+
+  That reached the URL only because the `forwardState` seam still re-separates
+  channels on the way through — stage ②, the repair the navigation pipeline is
+  designed to remove. Measured by neutralising that stage: a route's own
+  `defaultParams` and a `forwardTo` hop's both survive it (their split lives in
+  the pipeline, [#1549](https://github.com/greydragon888/real-router/issues/1549) / [#1570](https://github.com/greydragon888/real-router/issues/1570)), but the router option did not — `navigateToDefault`
+  passed `undefined` in the query slot, so the key stayed in `state.params` and
+  never printed. No error, no correct spelling to migrate to, and no test to catch
+  it: the existing coverage uses only undeclared keys, which legitimately stay in
+  `params`.
+
+  ```ts
+  createRouter([{ name: "list", path: "/list?tab&sort" }], {
+    defaultRoute: "list",
+    defaultSearch: { tab: "a", sort: "z" }, // → /list?tab=a&sort=z
+  });
+  ```
+
+  Static value or a dependency-resolved callback, symmetric with `defaultRoute` /
+  `defaultParams` — the default route can itself be chosen dynamically, so its
+  query defaults have to be able to follow. Defaults to `{}`, so nothing changes
+  for a router that does not set it. `DefaultSearchCallback` is exported
+  alongside `DefaultParamsCallback`.
+
+  Also corrects the `Route.defaultParams` docstring, which claimed a
+  query-declared name placed there "is NOT routed to the query string" — the
+  opposite of what [#1549](https://github.com/greydragon888/real-router/issues/1549) deliberately ships.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - The slot IS the channel — `params` and `search` now meet only in the URL ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  `separateChannels` is deleted. The router no longer moves a key between the two
+  channels anywhere: `defaultParams` is the path channel and `defaultSearch` the
+  query channel, on a terminal route and on a forwarding hop alike, and the two
+  bags meet in exactly one place — the printed URL.
+
+  The argument that kept the defaults split ("a hop can only spell a default in
+  `defaultParams`") was false: the chain fold reads `defaultSearch` two lines
+  above. And the routing hurt the author it claimed to help — a hop could not tell
+  which channel its own config would land in without reading a target that a
+  `forwardTo` CALLBACK may not determine until navigation time.
+
+  Two checks replace it, split by what is knowable when:
+
+  - **Registration** — a route's own `defaultParams` naming a key it declares with
+    `?` is refused at `createRouter` / `add` / `replace` / `update` /
+    `setRootPath`, prepare-then-commit, so a rejected batch leaves the store
+    untouched. Without it the router builds a state out of config it accepted and
+    its own always-on channel guard rejects it: `start()` throwing `WRONG_CHANNEL`
+    about a bag you never passed.
+  - **Resolution** — a hop's `defaultParams` naming a key only the resolved TARGET
+    declares is refused at the `forwardState` seam, with both route names in the
+    message.
+
+  **Migration.** Move query defaults to `defaultSearch`. The error names the route,
+  the key and the slot.
+
+  Two pieces of machinery fell out as dead once nothing was split: the
+  cross-channel withholding loop in the chain fold ([#1570](https://github.com/greydragon888/real-router/issues/1570) needed it only because
+  the split scattered a caller's value and its default across bags no merge
+  ranks), and `search-schema-plugin`'s own copy of the split.
+
+  Measured radius: 29 tests across 3 packages (core, `search-schema-plugin`,
+  `browser-plugin`); the other 14 packages needed no change.
+
+  ⚠ The first count said 28, and it was measured wrong rather than merely stale:
+  it came from `pnpm -F <pkg> test` alone, which runs the unit config. The property
+  tier is a separate config and a separate script, so a green `test` says nothing
+  about it — `search-schema-plugin`'s `pipeline.properties.ts` built a route whose
+  `defaultParams` named its own `?`-declared keys and stayed red, unseen, until it
+  was run directly.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Offer an opt-in diagnostic for a param key the route declares nowhere ([#1579](https://github.com/greydragon888/real-router/issues/1579))
+
+  A key named neither by a path slot nor with `?` has no channel to own it, so it
+  stays in `state.params` as app-level data — documented behaviour, and the reason
+  the state does not round-trip through its own `state.path`. That asymmetry was
+  the complaint behind [#1553](https://github.com/greydragon888/real-router/issues/1553).
+
+  **Core's behaviour is deliberately unchanged.** Dropping the key was the original
+  proposal and was rejected on measurement, not on taste: a temporary detector on
+  the `navigate` facade (positive control fired) reddened **52 tests across 6
+  packages**, and the "declared nowhere" predicate cannot separate a typo from a
+  legitimate `navigate("users", { id })` on a parent route whose CHILD declares
+  `:id`. Dropping would have retired a shipped, documented capability to fix an
+  asymmetry that is mostly a documentation problem.
+
+  Instead the port grows an opt-in sink, `reportUndeclaredParamKey`, in the shape
+  the mode gate already uses ([#1575](https://github.com/greydragon888/real-router/issues/1575)): absent unless `validation-plugin` is
+  installed, so bare core checks one `undefined` and never walks the bag.
+
+  The diagnostic is opted into by the **committing producers** (`navigate`,
+  `buildNavigationState`) rather than inferred from the compositional form. That
+  distinction is measured too: `canNavigateTo` resolves `forwardTo`, so a
+  form-based test caught it and warned — on a predicate that runs on every `<Link>`
+  render, which is precisely the flood the channel guard avoids by not
+  instrumenting predicates at all. Every predicate now stays silent, pinned.
+
+  `RouteResolver` also gains `pathNames` — the other half of "is this declared
+  anywhere?", which `queryNames` alone cannot answer.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Gate the query channel on `queryParamsMode`: a key the mode does not print no longer becomes state ([#1575](https://github.com/greydragon888/real-router/issues/1575))
+
+  One rule, all three modes, both directions: **a key the active
+  `queryParamsMode` does not PRINT does not enter the canonical query channel.**
+
+  The URL build has always printed declared names only under `default` / `strict`.
+  Both the parse side and the intent side kept an undeclared key in `state.search`
+  anyway, so those modes published states whose own `path` contradicted their own
+  `search` — measured:
+
+  | mode      | `navigate("t", {}, { foo: "1" })` | before               | after       |
+  | --------- | --------------------------------- | -------------------- | ----------- |
+  | `loose`   | `search` / `path`                 | `{foo}` / `/t?foo=1` | unchanged   |
+  | `default` | `search` / `path`                 | `{foo}` / **`/t`**   | `{}` / `/t` |
+  | `strict`  | `search` / `path`                 | `{foo}` / **`/t`**   | `{}` / `/t` |
+
+  and on the URL side `matchPath("/d?dec=1&foo=2")` under `default` returned
+  `search {dec, foo}` beside `path "/d?dec=1"`.
+
+  The acquired invariant is `keys(state.search) ⊆ keys(matchPath(state.path).search)`
+  in every mode — operationalised by KEYS, since values stay a mixed domain by
+  decision (`{page: 2}` from a URL, `{page: "2"}` from an intent).
+
+  What does NOT change: `default` still MATCHES a URL carrying an undeclared key —
+  that is exactly what separates it from `strict` — it just does not keep it.
+  `strict`'s parse-side rejection is untouched. `loose` is untouched end to end,
+  and short-circuits, so the repo default pays nothing.
+
+  It is a DROP, not a move: the key does not fall back into `state.params`.
+  Re-channelling it there would re-create the per-entry-point ambiguity the step
+  exists to remove.
+
+  The gate runs AFTER the default merge, so a `defaultSearch` declared for a key
+  the route does not carry as `?name` is dead config under `default` / `strict` —
+  the side edge is deliberate, not an oversight.
+
+  Wired at the three terminals that produce a canonical query bag — the pipeline's
+  `canonicalize` (the navigate path), `makeState` (the other intent producers), and
+  the `matchPath` rebuild (the URL direction). The pipeline reads it through one
+  boolean port accessor, `admitsUndeclaredQuery()`, rather than learning the mode.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Treat `undefined` as absence on both sides of the default merge ([#1550](https://github.com/greydragon888/real-router/issues/1550), [#1551](https://github.com/greydragon888/real-router/issues/1551))
+
+  A route default is merged UNDER the caller's value; `undefined` on either side now means "this key was not given", so it can never reach the committed state.
+
+  **[#1550](https://github.com/greydragon888/real-router/issues/1550) — the caller side.** An explicitly-`undefined` query value used to outrank `defaultSearch` and survive as an `undefined`-valued own key in the frozen `state.search`. It now behaves like the path channel always did:
+
+  ```diff
+    // route: { name: "x", path: "/x?page", defaultSearch: { page: "1" } }
+    const state = await router.navigate("x", {}, { page: undefined });
+  - state.search; // { page: undefined }   → own key, default killed
+  - state.path;   // "/x"
+  + state.search; // { page: "1" }         → default keeps the slot
+  + state.path;   // "/x?page=1"
+  ```
+
+  **[#1551](https://github.com/greydragon888/real-router/issues/1551) — the default side.** A default that itself carries `undefined` (`defaultSearch: { q: undefined }`, `defaultParams: { extra: undefined }`) leaked that own key into every produced state — through `navigate`, `matchPath`, `makeState`, a route codec's input, and `forwardState`'s source-layering. Such an entry now behaves exactly like no entry; a genuinely missing required path param still fails with the same `Missing required param` error, for the right reason.
+
+  **Behavior change** (pre-1.0, hence `minor`): code that passed `{ key: undefined }` to clear a route default must omit the key — or wait for an explicit reset semantics, which is deliberately not `undefined` (RFC-4 M2 §10.12).
+
+  Implementation: one `mergeDefined` helper in `src/helpers.ts` replaces four spread-based merges (`makeState`'s channel merge, `buildPath`'s `defaultParams`, `forwardState`'s source `defaultParams`, `buildPath`'s `defaultSearch`), so the rule is a property of the merge rather than of the order in which a normalize step happens to run.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - RFC-4 M2: `Route.defaultSearch` — explicit query-channel defaults ([#1549](https://github.com/greydragon888/real-router/issues/1549))
+
+  Adds `Route.defaultSearch?: SearchParams` (and `RouteConfigUpdate.defaultSearch`)
+  as the query-channel twin of `defaultParams`, completing the params/search split
+  ([#1548](https://github.com/greydragon888/real-router/issues/1548)) for route defaults. `defaultParams` now owns the **path + arbitrary**
+  channel only, `defaultSearch` owns the **query** channel — the two are
+  independent and can coexist for a colliding name (`/coll/:id?id` →
+  `defaultParams.id` fills the path slot, `defaultSearch.id` the query twin).
+
+  Core no longer **infers** a default's channel from the route's `?`-declaration.
+  Defaults route by FIELD: `defaultParams → state.params`, `defaultSearch →
+state.search`, in `makeState`, `buildPath`, `forwardState`, the `matchPath` URL
+  rebuild, and `isActiveRoute`. The inference machinery is removed
+  (`routeDefaultsByChannel` / `#mergeQueryDefaults` / `getNonQueryDefaultKeys` /
+  `stripQueryDefaults` / `applySearchWinsForDeclaredQuery` / `splitParamsBySearch`).
+
+  **Breaking (pre-1.0, minor):**
+
+  - A query-declared default MUST now live in `defaultSearch` to reach
+    `state.search` / the URL query cleanly. A query-declared name left in
+    `defaultParams` is treated as an arbitrary params-channel default (it lands in
+    `state.params`).
+  - On the v1 single-bag `navigate(name, params)` path, an **undeclared** caller
+    key now routes to `state.params` (RFC §2.2 п.5, align-to-RFC), not the URL
+    query — pass it via the `search` argument (`navigate(name, params, search)`)
+    or declare `?key` to put it in the query.
+
+  The `matchPath` URL rebuild also now derives `state.path` from the
+  forwardState-returned query (`forwardedSearch`), not the raw matched query, so a
+  recovering/validating `forwardState` interceptor keeps `state.path` in step with
+  `state.search` (closes the URL/state divergence behind the search-schema
+  recovery e2e). The rebuild additionally routes a declared `?key` that rides in
+  the params bag — a plugin's `forwardState` injection (persistent-params on
+  `start()`), a decoder-injected query key — into the rebuilt URL query, matching
+  the channel `makeState` commits it to (previously such a key reached
+  `state.search` but not `state.path` on the initial match).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - RFC-4 M2: forwardState carries the query channel ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  `forwardState(name, params, search?)` gains a third `search` argument and now
+  returns `{ name, params, search }`. `matchPath` threads `matchResult.search`
+  through it (marking the URL→State path), so a `forwardState` interceptor can
+  observe and validate the query on route matching, not only on navigate. Both
+  interceptable methods (`buildPath`, `forwardState`) are now three-argument via
+  `createTernaryInterceptable`; the unused two-argument `createBinaryInterceptable`
+  helper is removed. All first-party interceptors (persistent-params, search-schema)
+  register the full three-argument form; a shorter-arity third-party interceptor
+  stays type-valid (TS allows fewer params, and `next(a, b)` leaves the search slot
+  `undefined`).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Route defaults are routed by channel ([#1549](https://github.com/greydragon888/real-router/issues/1549), RFC-4 M2 §4 follow-up) — superseded within this release by "the slot IS the channel" ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  ⚠ **Read the `core-slot-is-the-channel` entry first; it revises everything
+  below.** This change routed a route's own `defaultParams` by the route's
+  `?`-declaration, so a default spelled for a query name landed in `state.search`.
+  A later commit in the same release removed the routing entirely: the SLOT is the
+  channel, and a `defaultParams` naming a key the route declares with `?` is now
+  **refused at registration** rather than re-channelled. The migration is therefore
+  not "read it from `state.search`" but "spell it in `defaultSearch`".
+
+  What survives from this change, because it is about the merge and not the
+  routing:
+
+  - The `matchPath` URL rebuild resolves declared query names search-first, so
+    `state.path` honours the URL's query value over a query default
+    (`match("/x?page=9")` no longer rebuilds `/x?page=5`).
+  - `buildPath(name, params, search)` merges query defaults into the query string
+    instead of silently dropping them (`buildPath("x", {}, { sort: "asc" })` →
+    `/x?page=5&sort=asc`); an explicitly-passed value still wins.
+  - Colliding names (`/items/:id?id`) stay path-owned — the [#843](https://github.com/greydragon888/real-router/issues/843) precedence is
+    untouched.
+  - An **arbitrary** (declared-nowhere) default keeps its home in `state.params`.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - RFC-4 M2: two-channel `encodeParams` / `decodeParams` — codecs see both the path and query channels ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  Per-route codecs move from the params-only signature to a two-channel one, so a
+  codec can read and reshape the query channel as well as the path channel. This
+  restores v1's reach: v1 ran the whole (path + query) bag through both callbacks,
+  which the M2 params-only interim had silently narrowed to path-only.
+
+  **Breaking (pre-1.0):**
+
+  - `Route.encodeParams` / `Route.decodeParams` (and their `RouteConfigUpdate`
+    twins) change from `(params) => params` to
+    `({ params, search }) => ({ params, search })`. The callback now receives one
+    argument `{ params, search }` and must return `{ params, search }` — transform
+    whichever channel you own and **pass the other through explicitly**.
+  - New `ParamsSearch` type exported from `@real-router/core` (and `/types`) for
+    typing these callbacks.
+
+  **Migration:**
+
+  ```ts
+  // before (params-only)
+  decodeParams: (params) => ({ ...params, id: Number(params.id) }),
+  encodeParams: ({ one, two }) => ({ param1: one, param2: two }),
+
+  // after (two-channel) — wrap the old result in `params`, return `search` as-is
+  decodeParams: ({ params, search }) => ({
+    params: { ...params, id: Number(params.id) },
+    search,
+  }),
+  encodeParams: ({ params: { one, two }, search }) => ({
+    params: { param1: one, param2: two },
+    search,
+  }),
+  ```
+
+  A codec that only touches path params returns `search` unchanged (the common
+  case). A query-aware codec may now reshape `search` too — the returned `search`
+  lands in `state.search` (on decode) and the built query string (on encode).
+
+  **Order / semantics:** `decodeParams` runs inside `matchPath` (the engine),
+  **before** any search-schema plugin validation on the `forwardState` seam
+  (engine → plugin, the v1 order). On the write path (`buildPath` / `navigate`) the
+  encoder's returned `params` fills the path slots and its returned `search` builds
+  the query string. A nullish return from a user codec falls back to the input
+  channels (unchanged from v1's `?? params` leniency). The `matchPath` URL rebuild
+  still folds the encoded query into a single bag (an explicit two-channel rebuild
+  there awaits the `defaultParams` field-split, a later milestone) — the committed
+  `state.params` / `state.search` split is exact.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - RFC-4 M2: remove the per-State meta sidecar; read route param ownership from the live matcher ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  The internal `stateMetaStore` WeakMap that carried each state's per-segment
+  param-source map (`{ segment: { param: "url" | "query" } }`) is removed. That map
+  is 1:1 with the route name, so `getTransitionPath` now looks it up from the live
+  matcher by `state.name` (via a `RouteMetaLookup` callback → `getMetaForState`)
+  instead of storing a per-State copy.
+
+  **Breaking (pre-1.0):**
+
+  - `PluginApi.makeState` drops its trailing `meta` argument — the signature is now
+    `makeState(name, params?, search?, path?)`. A plugin that called `makeState` with a
+    fifth `meta` / `StateMetaInput` argument must drop it; the param-source map is
+    derived from the route name automatically.
+  - The `StateMetaInput` type is no longer exported from `@real-router/core` (or its
+    `/types` subpath).
+
+  Internal-only (not part of any public surface): `getStateMetaParams` /
+  `setStateMetaParams` and `stateMetaStore.ts` are gone. Behavior is unchanged for
+  every in-tree route name; a state whose route was removed from the tree (e.g. via
+  `replace()`) resolves to a full-reload transition path, exactly as the WeakMap-keyed
+  form did.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - RFC-4 M2: split navigation into path (`params`) and query (`search`) channels ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  `State.params` now carries **only** path params; query params move to the new
+  `State.search` channel (always present — a frozen `{}` when empty). Match results,
+  `makeState`, and the navigate/build pipeline are search-aware end to end.
+
+  **Breaking (pre-1.0, positional slot-shift):**
+
+  - `navigate` gains two equal-standing forms — descriptor `navigate(target, opts?)`
+    (where `target: NavigationTarget = { name, params?, search? }`) and positional
+    `navigate(name, params?, search?, opts?)`. The v1 `navigate(name, params, opts)`
+    form is gone: options move from position 3 to position 4.
+  - `isActiveRoute(name, params?, search?, strictEquality?, ignoreQueryParams?)` —
+    the query channel is inserted at position 3; `strictEquality` / `ignoreQueryParams`
+    shift to 4 / 5.
+
+  **Additive:**
+
+  - `buildPath(route, params?, search?)` and `canNavigateTo(name, params?, search?)`
+    accept an explicit query channel. `buildPath` is now search-aware, so a colliding
+    declaration `/items/:id?id` builds `/items/5?id=7` (path and a same-named query
+    param keep their own slots — the killed [#843](https://github.com/greydragon888/real-router/issues/843) precedence).
+  - New `NavigationTarget<P, S>` type exported from `@real-router/core` (and `/types`).
+  - New `createTernaryInterceptable`; the `buildPath` interceptable is now
+    three-argument (search-aware). Legacy two-arg `buildPath`/`forwardState`
+    interceptors remain valid.
+
+### Patch Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Compose `buildNavigationState` through the nav pipeline (nav-pipeline Phase 2, step 2-4)
+
+  The last of the four state-producing entry points moves onto the shared
+  composition: `canonicalize` → existence check → `buildURL` → `materialize`, from
+  the same `RouteResolver` port `navigate`, `matchPath`, `buildPath` and
+  `canNavigateTo` now use. Behaviour is unchanged, verified byte-for-byte across 14
+  fixtures covering both channels, route defaults in either slot, `forwardTo`
+  (including a chain default and a chain resolving to a target that does not
+  exist), the `/coll/:id?id` collision, an unknown route, a missing required param,
+  and an undeclared key in `loose`.
+
+  The order inside the entry point is load-bearing and preserved: existence is
+  checked BEFORE the URL is built, because `buildURL` prints through the matcher,
+  which throws on an unknown route, whereas this entry point answers `undefined`
+  for one. P1 (`throwOnMisChanneledKey`) still runs first, on the caller's raw
+  argument.
+
+  `RouterInternals` gains a lazy `port()` accessor — a closure rather than a value,
+  because the port is created during wiring while `registerInternals` runs before
+  it, the same shape the interceptable methods already use.
+
+  Also re-anchored: the comment in `shared/browser-env/plugin-utils.ts` explaining
+  why an explicit query value outranks a `forwardTo` hop's default. It credited the
+  spread order inside `separateChannels` — stage ②, which Phase 4 removes. The
+  guarantee actually comes from [#1570](https://github.com/greydragon888/real-router/issues/1570)'s rule (a default is never applied to a slot
+  the caller already filled, in either bag), which is a property of the merge and
+  survives the seam's removal. The two agree today, which is exactly why the wrong
+  one was easy to write down.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix the contracts of the two bypass entry points (nav-pipeline Phase 2, step 2-7)
+
+  `navigateToState` was already under the channel guard's P3 position since 0b-2 —
+  re-verified: a hand-made state carrying a declared query key in `state.params` is
+  rejected with `WRONG_CHANNEL`, while the channel-correct one commits.
+
+  `navigateToNotFound` is declared an EXCEPTION to the pipeline, and recorded as an
+  INVARIANT rather than a "we skip it": `params` AND `search` are both `{}` for
+  every input — including a URL carrying a query string or a fragment — with the
+  whole URL living in `state.path` as a string, query included. Measured across
+  `/nope?a=1&b=2`, `/other?x=9#frag` and `/plain`.
+
+  It has no channels BY CONSTRUCTION, not by omission: it does not build a state
+  from an intent, it wraps a string. A `materialize` special form would either run
+  empty channels through machinery that exists to merge them, or require a
+  `Canonical` with no intent — at which point the brand stops meaning "canonical
+  intent". Two other systems already treat it the same way (no FSM transition, no
+  guard phase, only `TRANSITION_SUCCESS`), so a third is consistency rather than a
+  gap.
+
+  Pinned in `tests/functional/navigation/navigateToNotFound.test.ts` over all three
+  URL shapes, and stated in `INVARIANTS.md` → navigateToNotFound [#2](https://github.com/greydragon888/real-router/issues/2), so the next
+  audit does not reopen the question.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Compose `canNavigateTo` through the nav pipeline (nav-pipeline Phase 2, step 2-3)
+
+  The predicate resolved the route, normalised the params, built the URL and made
+  the state in four hand-written steps. It now runs `canonicalize` → `buildURL` →
+  `materialize`, from the same read-model `navigate`, `matchPath` and `buildPath`
+  use. Behaviour is unchanged, verified byte-for-byte across 11 fixtures covering
+  both channels, route defaults in either slot, `forwardTo`, the `/coll/:id?id`
+  collision, a missing required param, an undeclared key in `loose`, and the
+  mis-channelled bag the predicate answers `false` for ([#1576](https://github.com/greydragon888/real-router/issues/1576)).
+
+  Both `try` boundaries are preserved deliberately, and they mean different things:
+  resolution runs USER code and must be logged when it throws ([#1577](https://github.com/greydragon888/real-router/issues/1577) / [#959](https://github.com/greydragon888/real-router/issues/959)), while
+  an unbuildable path is a normal "unreachable with this input" answer and stays
+  silent ([#725](https://github.com/greydragon888/real-router/issues/725)). The predicate remains total — it answers, it never throws.
+
+  This step also settles the `materialize` fork the milestone left open: it does
+  NOT grow a port argument. With both deferred consumers finally on the table the
+  answer is that neither needs one — `canNavigateTo` builds the URL through
+  `buildURL` (safe here, since this point is not the one the port prints through),
+  and `isActiveRoute` passes `path: ""` because `areStatesEqual` compares channels
+  and never reads the URL.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop charging every producer for a merge that has nothing to merge ([#1589](https://github.com/greydragon888/real-router/issues/1589))
+
+  The nav pipeline made every producer share one implementation. It also made every
+  producer run the whole pass whether or not the route has anything to merge, and
+  the core benchmark suite prices that at 10–78 % against master.
+
+  `canonicalize` now returns early when the route has no `defaultParams`, no
+  `defaultSearch` and no `?`-declaration and the caller named no query channel: the
+  whole tail is provably identity there — `withholdFilledSlots` short-circuits on an
+  undefined default, both merges collapse to their empty singletons, and the mode
+  gate cannot drop a key from a query channel that is empty in every mode. Channels
+  stay frozen, so the invariant is untouched.
+
+  `mergeWithDefault` gains an internal `valueIsOwned` flag, used only by
+  `canonicalize`'s path channel: with no default it used to freeze a defensive COPY
+  of the bag, which is right in general (the caller's bag must never be frozen) but
+  wasteful for the object `normalizeParams` minted one line earlier. The path bag
+  was being copied twice per producer call, on every entry point.
+
+  No behaviour change: the same channels, the same freezing, the same diagnostics.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Channel correctness becomes a subsystem, not a corner of `helpers.ts`
+
+  The rule "`params` is the path channel, `search` the query channel, and the
+  router moves nothing between them" was enforced from two files both named
+  `helpers.ts` — the bag check in `src/helpers.ts`, the config check in
+  `namespaces/RoutesNamespace/helpers.ts`. That split is how [#1584](https://github.com/greydragon888/real-router/issues/1584)'s existence
+  precondition came to land on one half and not the other. Both halves now live in
+  `src/channels/`: `guard` (the predicate, the assert, the message), `defaults`
+  (the registration-time check and the caller-beats-default precedence rule) and
+  `modeGate`.
+
+  A subsystem rather than a namespace method because the rule has no owning
+  module. The other four always-on guards each do — `subscribe` belongs to
+  `EventBusNamespace`, `start(path)` to `RouterLifecycleNamespace`,
+  `navigateToNotFound` to the facade, `claimContextNamespace` to `getPluginApi` —
+  while this one runs from the facade, from `internals`, from the `forwardState`
+  seam, from the `decodeParams` boundary, from `updateRoute` and from four
+  registration entry points. A cross-cutting invariant with five callers in four
+  modules is a subsystem; a file named "helpers" is what let it drift.
+
+  `src/channels/` imports nothing from the namespaces, the engine or the pipeline —
+  the same inversion `src/pipeline` makes with its `RouteResolver` port. Declared
+  query names arrive as DATA (`readonly string[]`, or a `queryNamesOf` accessor),
+  never as a matcher, so a second derivation of the one registry that both
+  classifies and prints ([#1556](https://github.com/greydragon888/real-router/issues/1556)) cannot grow inside it. The config check took the
+  matcher before; it now takes the accessor, and
+  `RoutesNamespace/helpers.assertRouteDefaultChannelsFor` is the five-line adapter
+  that supplies it — with the caches local to the attempt, which is what the four
+  entry points need, since each validates PREPARED artifacts before any swap. The
+  boundary is enforced by `no-restricted-imports`, verified to fail on a
+  deliberately added `../engine` import.
+
+  No behaviour change. `src/helpers.ts` drops 580 -> 318 lines and is now merge,
+  comparison and state-freeze semantics only.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Validate a route decoder's output again on the `matchPath` path ([#1582](https://github.com/greydragon888/real-router/issues/1582))
+
+  `matchPath` builds a state out of whatever a route's `decodeParams` returns, and
+  that return value is USER code — external input, not a router-produced
+  intermediate. The check on it went missing when the entry point moved onto the
+  nav pipeline ([#1548](https://github.com/greydragon888/real-router/issues/1548), step 2-2): it lived inside a `forwardState` dependency
+  wrapper the migration deleted, and its removal was justified as dropping a check
+  on "the bags `matchPath` had just produced itself (matcher output + decoder
+  output)". That reading is right about the matcher and wrong about the decoder.
+
+  Bare core is unaffected — it was, and remains, tolerant here (measured
+  byte-for-byte across seven return shapes). What came back is the opt-in
+  diagnostic: with `@real-router/validation-plugin` installed, six shapes that had
+  started committing silently throw an actionable `TypeError` again.
+
+  ```ts
+  // decodeParams returning …          bare core (unchanged)   with the plugin
+  ["a"]; // params { "0": "a" }     TypeError
+  ("oops"); // params { "0": "o", … }  TypeError
+  new Map([["a", "1"]]); // params {}               TypeError
+  new Custom(); // params { a: "1" }       TypeError
+  Object.create({ inherited: "x" }); // params {}               TypeError
+  ```
+
+  Two things are better than before the regression, not merely restored:
+
+  - The message names **`matchPath`**. The pre-pipeline call reported
+    `[router.forwardState] Invalid routeParams` for a fault raised on the
+    `matchPath` path, because that is the wrapper it happened to sit in.
+  - It runs **only when a decoder actually ran**. The matcher's own output on the
+    same line is router-produced and plain by construction, so validating it was
+    the internal-intermediate check the migration was right to drop.
+
+  `RoutesDependencies` gains `getValidator` — the same per-call closure EventBus,
+  RouteLifecycle and Plugins already receive, so the validator stays resolved at
+  call time (absent before registration, absent again after teardown).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Say nothing about the params when the route does not exist ([#1584](https://github.com/greydragon888/real-router/issues/1584))
+
+  Both opt-in diagnostics answer "does route X declare this key?", and both read a
+  declaration registry that returns `[]` for a route with no declarations AND for
+  a route with no existence. So for a misspelled route name every key in the
+  caller's bag was announced as "declared nowhere on route X" — blaming the params
+  for a typo in the ROUTE name, which is the most misleading direction available.
+  Return values were always right (`buildNavigationState` answers `undefined`,
+  `navigate` rejects `ROUTE_NOT_FOUND`); only the diagnostics lied.
+
+  Second-order, and reachable within one router: each bogus report took a slot in
+  the per-`route + key` de-dup cache, so the genuine warning was suppressed if that
+  name later became real.
+
+  `RouteResolver.pathNames` now answers `readonly string[] | undefined`, where
+  `undefined` means "no such route" — restoring information the matcher already
+  computes (`getSegmentsByName`) and this port member used to discard. `queryNames`
+  deliberately keeps its `[]`: its other two consumers (the default merge, the mode
+  gate's drop) want an empty list for a missing route, and only the diagnostics ask
+  a question that presupposes existence.
+
+  The **mode gate's** diagnostic had the identical defect and is fixed with it —
+  found by sweeping this file's port consumers, not named in the issue. Both drops
+  and both refusals are unchanged; only the reports are now gated.
+
+  Dev-only either way: bare core installs neither sink and never pays the lookup.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Compose `matchPath` through the navigation pipeline (nav-pipeline Phase 2, step 2-2)
+
+  `matchPath` built its state by hand: call the `forwardState` seam, split the
+  route's own defaults by channel, merge them under the user's, apply the mode
+  gate, then rebuild the URL. Every one of those steps already exists inside
+  `canonicalize`, which `navigate` has used since milestone 1 — so the two
+  producers were maintaining the same composition twice.
+
+  The entry point now reads `canonicalize` → rebuild → `materialize`, from the same
+  `RouteResolver` port `navigate` uses. Behaviour is unchanged, verified byte-for-byte
+  across 35 fixtures covering both channels, route defaults in either slot, the
+  `/coll/:id?id` collision, `forwardTo`, decoders and encoders (including an
+  encoder that throws, [#1157](https://github.com/greydragon888/real-router/issues/1157)), all three `queryParamsMode` values, every
+  `trailingSlash` mode, `rewritePathOnMatch: false`, a `forwardState` interceptor
+  injection, `setRootPath`, and the unmatched path.
+
+  Two supporting changes ride along:
+
+  - `materialize` is now generic (`materialize<P, S>`), so the public chain
+    `matchPath<P>` → `materialize<P>` → `State<P>` keeps the caller's param type.
+    Without it the chain collapsed to `State<Params>` and a consumer's typed
+    assignment failed to compile. Pinned by a type-level test.
+  - The port is created once in `wireNamespaces` rather than inside
+    `wireNavigation`, because `navigate` is no longer its only consumer.
+
+  Note for anyone reading the RFC alongside this: stage ② (channel separation) does
+  **not** leave `matchPath`'s path here, and could not — `separateChannels` lives in
+  the `forwardState` seam, which the port itself calls. Measured: a `forwardState`
+  interceptor injecting a declared query key into `result.params` lands in
+  `state.search` both before and after this change, identically to `navigate`. The
+  channel guard's P2 position therefore stays dormant until the seam's wrapper is
+  removed.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Correct the `reload` JSDoc examples to the four-slot `navigate` signature ([#1586](https://github.com/greydragon888/real-router/issues/1586))
+
+  `NavigationOptions.reload`'s examples still taught the pre-M2 spelling
+  `router.navigate(name, params, { reload: true })`. Slot 3 has been the query
+  channel since RFC-4 M2 ([#1548](https://github.com/greydragon888/real-router/issues/1548)), so that form lands `{ reload: true }` in
+  `search`: no reload happens, and the page's own query is rebuilt from an object
+  that does not contain it. Measured on `/search?term=react`:
+
+  ```
+  default mode:  → /search              search {}
+  loose mode:    → /search?reload=true  search { reload: true }
+  ```
+
+  Both examples now pass the query at slot 3 and the options at slot 4.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Add the phase lock: entry points of one compositional form agree on one intent (nav-pipeline Phase 2, step 2-8)
+
+  The final step of the phase, and the reason the phase is a unit rather than seven
+  unrelated refactors. The property needs ≥2 migrated points per class, so after
+  milestone 1 it could not be written at all — class ① held only `navigate`. With
+  all seven points on the pipeline it can, and what it locks is not "each point
+  still works" but "no two points can drift apart again": a divergence is now a
+  property failure instead of a bug someone has to notice.
+
+  Two classes, deliberately NOT interchangeable — `navigate` / `matchPath` /
+  `buildNavigationState` resolve `forwardTo`, while `buildPath` / `makeState` /
+  `isActiveRoute`'s first arm take the literal form. A forwarding route is exactly
+  where the two must DISAGREE, so a third property asserts the divergence: without
+  it the first two would both pass on a router that ignored `resolveForward`
+  entirely, which is the one regression the lock exists to catch.
+
+  Verified mutationally, per property — and the SITE of the mutation is part of the
+  claim, because the two classes reach `buildPath` through different depths.
+  Dropping the query at the FACADE (`Router.buildPath`, the argument surface M2's
+  slot shift moved) reddens the LITERAL class and nothing else; the same drop deep
+  in the namespace method reddens class ① instead, via the `matchPath` re-parse.
+  Ignoring the literal form reddens the divergence property and nothing else.
+
+  All four caveats from the parent RFC's §5 are carried and documented in the file,
+  including the one an earlier revision lost: `canNavigateTo` returns a `boolean`,
+  so its `Canonical` is observable only from inside the module — asserting it
+  through the public return would be a tautology, and it is deliberately not
+  asserted structurally here.
+
+  Also confirmed by scan, with a positive control on the detector: no test in the
+  suite pins the INTERMEDIATE shape of a composition any more. The two remaining
+  interceptor-based reads are contracts, not pins — `captureStageOne` is the only
+  place channel classification is observable at all, and the `matchPath` interceptor
+  test pins that interceptors run ([#525](https://github.com/greydragon888/real-router/issues/525)).
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix four defects an RFC review found in nav-pipeline Phase 2 ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  **`buildPath` disagreed with every other producer again.** Step 2-1's
+  `withholdFilledSlots` — the rule that stops a route default replacing a value the
+  caller supplied — applied to any key, not only to a name the route declares with
+  `?`. Only a declared query name can HAVE a params-bag twin, so on anything else
+  it withheld a default nobody was competing for:
+
+  ```ts
+  // Route: /u with defaultSearch { theme: "dark" }  (theme declared nowhere)
+  buildPath("u", { theme: "X" }); // "/u"  — every other producer commits "/u?theme=dark"
+
+  // Route: /items/:id?id with defaultSearch { id: "D" }  (the [#843](https://github.com/greydragon888/real-router/issues/843) carve-out)
+  buildPath("coll", { id: "V" }); // "/items/V"  — navigate commits "/items/V?id=D"
+  ```
+
+  That is the [#1552](https://github.com/greydragon888/real-router/issues/1552)/[#1578](https://github.com/greydragon888/real-router/issues/1578) class the step set out to close, and round-trip broke in
+  the sharp direction: `matchPath` rewrote the printed href into a different URL on
+  the spot. The rule is now scoped to `?`-declared names, so the documented
+  single-bag retirement is unchanged (`buildPath("x", { page: "9" })` on
+  `defaultSearch { page: "5" }` still prints `/x`, not `/x?page=5`).
+
+  **`state.search` could be unfrozen.** The mode gate's drop branch is the one
+  place a channel is rebuilt after `mergeWithDefault` froze it. Every pre-Phase-2
+  consumer re-merged downstream in `makeState` and re-froze it by accident;
+  `materialize` deliberately does not, so a state whose query the gate had touched
+  shipped with a mutable `search`, against "states are deeply frozen".
+
+  **A route codec could no longer edit its `search` argument.** `buildPath` copied
+  `canonical.path` before handing it to `encodeParams` but passed `canonical.query`
+  through verbatim — and the canonical channels are frozen, so a codec that edits
+  in place silently lost its query edit (or threw, under ESM). Both channels are
+  copied now.
+
+  **The [#1579](https://github.com/greydragon888/real-router/issues/1579) diagnostic's opt-in gate did nothing.** `port.reportUndeclaredParamKey`
+  was a closure forwarding into an optional-chained validator, so it was always
+  truthy: the "absent unless `validation-plugin` is installed" gate read as taken
+  and bare core walked the caller's params bag on every commit. It is a getter
+  returning `undefined` while no validator is installed, which is what the port's
+  own contract said all along.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - `makeState` IS the pipeline's literal form — one terminal, not two (nav-pipeline Phase 4, [#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  `StateNamespace.makeState` carried its own copy of stage ③ (merge each channel's
+  route default UNDER the caller's value) and of the mode gate — a second
+  canonicalisation living outside `src/pipeline`. It now calls
+  `canonicalize(…, { resolveForward: false })` + `materialize`, the same form
+  `buildPath` and `isActiveRoute`'s literal arm take, which is exactly this
+  method's documented contract: `forwardTo` is not resolved, but the NAMED route's
+  defaults are applied (forwardState invariants [#7](https://github.com/greydragon888/real-router/issues/7)/[#8](https://github.com/greydragon888/real-router/issues/8)).
+
+  Two terminals for one rule was never a style problem. [#1584](https://github.com/greydragon888/real-router/issues/1584)'s existence
+  precondition — "do not name a route that does not exist" — landed on the
+  pipeline's terminal and not on this one, because it was found by sweeping
+  `canonicalize`'s PORT consumers and this method read its own dependency bag
+  instead. That is now structurally impossible: there is one implementation, and
+  its mutant reddens both arms of the gate's test file.
+
+  **No behaviour change**, verified rather than argued: a 71-cell before/after
+  snapshot (three `queryParamsMode` values × 23 shapes — both default slots,
+  overrides, `undefined` on either side, the `/coll/:id?id` collision, an
+  `Object.prototype` key, an undeclared key, a nonexistent route, explicit vs
+  derived path, singleton identity, frozen-ness) is byte-identical. The literal
+  form additionally applies `withholdFilledSlots`, and that is unreachable here
+  rather than new: the only door to this method is `PluginApi.makeState`, whose P1
+  channel guard refuses the bag that would trigger it on the _same_ predicate —
+  own key, defined value, `?`-declared.
+
+  Two pieces of dead surface fell out, both found by coverage rather than by
+  reading:
+
+  - **`makeState`'s `skipFreeze` parameter is gone.** It died when Phase 2 moved
+    its last two callers (`canNavigateTo`, `isActiveRoute`) onto
+    `materialize({ skipFreeze: true })`; the old body hid the death by forwarding
+    `undefined` into a slot that needs no branch. The public `PluginApi.makeState`
+    type never had it.
+  - **`StateNamespaceDependencies` drops seven of its eight members** — both
+    default maps, `getQueryParams`, `hasRoute`, `admitsUndeclaredQuery`,
+    `getDropReporter` and `buildPath` existed only to feed the duplicate. One
+    arrives (the port); `getUrlParams` survives, for `areStatesEqual`.
+
+  A new test pins the merge's own-key guard through the QUERY channel: the path
+  channel is filtered by `normalizeParams` before the merge for every producer
+  now, so the query side is the only one that still reaches it — and it needs a
+  route that HAS a `defaultSearch`, since the merge short-circuits without one.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep the render-path predicates total against hostile input ([#1577](https://github.com/greydragon888/real-router/issues/1577))
+
+  `canNavigateTo` and `isActiveRoute` both document that they answer rather than
+  throw — a predicate running on every `<Link>` render must not raise into a
+  render. Both leaked an exception when user code ran while they answered:
+
+  - `canNavigateTo` called `forwardState` outside its `try`, so a dynamic
+    `forwardTo` callback, a plugin's `forwardState` interceptor, or the caller's
+    own bag (channel separation walks it with `Object.entries`, so an
+    accessor-backed key throws there) escaped to the caller;
+  - `isActiveRoute` had wrapped only the destination arm ([#1573](https://github.com/greydragon888/real-router/issues/1573)). Its literal arm
+    splits the caller's bags and its ancestor branch recombines them, so both
+    still read a hostile `Proxy` / getter / reactive object unprotected.
+
+  Both now answer `false` and log a `logger.warn` — never silent, because user
+  code crashing is an operational fault rather than a route that legitimately
+  blocks (the split [#959](https://github.com/greydragon888/real-router/issues/959) already drew for a throwing guard), and never
+  propagated. `isActiveRoute` takes one boundary around the whole walk rather than
+  a `try` per read, the shape `isParams` took for the same class of input ([#1052](https://github.com/greydragon888/real-router/issues/1052)).
+
+  `buildPath` is deliberately unchanged: it is a builder with a documented
+  throwing contract, which is exactly why `canNavigateTo` wraps its call to it.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Pin the contracts of `forwardState` and `makeState` (nav-pipeline Phase 2, step 2-6)
+
+  With every entry point now composing through the pipeline, the two primitives are
+  reached only from the plugin surface — so what they promise is worth stating
+  rather than inferring. Both contracts were measured, not assumed, and are now
+  pinned by tests and recorded as INVARIANTS forwardState [#7](https://github.com/greydragon888/real-router/issues/7) and [#8](https://github.com/greydragon888/real-router/issues/8).
+
+  - **`forwardState` is stage ① alone.** It resolves the `forwardTo` chain and
+    layers each HOP's defaults, and stops there: the TERMINAL route's own defaults
+    are not applied. On `src → dst` where `dst` declares `defaultSearch { tab: "new" }`,
+    `forwardState("src", {})` returns `{ name: "dst", params: {}, search: {} }`,
+    while `navigate("src")` — ① then ③ — commits `/dst?tab=new`. That split is what
+    makes the primitive composable.
+  - **`makeState` is the literal form.** It never resolves `forwardTo`
+    (`makeState("src")` stays on `"src"`, path `/src`), but it does apply ③ for the
+    route it was NAMED (`defaultSearch { page: "5" }` → `?page=5`). Equivalent to
+    `canonicalize(..., { resolveForward: false })`, the same form `buildPath` and
+    `isActiveRoute` take — which is why a plugin can build a state for an alias
+    without being teleported off it.
+
+  Also corrected: INVARIANTS isActiveRoute [#9](https://github.com/greydragon888/real-router/issues/9) still described the predicate's two
+  branches as "the exact branch splits them (`separateChannels`), the descendant
+  branch spreads them into one". Step 2-5 removed both of those; the totality
+  guarantee it documents is unchanged, only the mechanism it names.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Three fixes the Phase 2 code review found ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  **`replace()` no longer erases definition guards on a refused batch.** The
+  config-time channel check (`assertRouteDefaultChannels`, shipped with "the slot
+  IS the channel") ran inside `adoptRouteArtifacts`, one line before the swap.
+  That is early enough for `add` and too late for `replace`, which calls
+  `clearDefinitionGuards()` first: a batch the check refused left the tree intact
+  and the old definition guards GONE, so a route whose `canActivate` was blocking
+  became freely activatable — with nothing in the error saying access control had
+  just been dropped. Measured: `canNavigateTo("guarded")` `false` → **`true`**
+  after a rejected `replace`. The check moved into both callers' PREPARE phases,
+  beside the [#1046](https://github.com/greydragon888/real-router/issues/1046) handler-limit and [#1193](https://github.com/greydragon888/real-router/issues/1193) guard-compile hoists that closed the
+  same fail-open twice before; `adoptRouteArtifacts` is now genuinely throw-free,
+  which is what its "atomic swap" contract already claimed.
+
+  **The mode gate's diagnostic is silent about a nonexistent route at BOTH
+  terminals ([#1584](https://github.com/greydragon888/real-router/issues/1584)).** The existence precondition landed only in
+  `pipeline/canonicalize`, because it was found by sweeping that file's PORT
+  consumers — a sweep that cannot see `StateNamespace.makeState`, which reads its
+  own dependency bag. `makeState` with an explicit `path` is exactly how a URL
+  plugin rebuilds a state from a serialized history entry, so it does not fail on
+  its own the way the navigate arm does; it reported `Query key "q" is not declared
+on route "nope"` about a name that is not a route. The de-dup cache is shared by
+  both terminals, so each bogus report also burnt the slot that would have carried
+  the genuine warning once that name became real.
+
+  **A `defaultSearch` whose key is an `Object.prototype` name is applied again.**
+  The withholding rule ("a default is not applied to a slot the caller already
+  filled") read the caller's bag with a bare `params[key]`, which walks the
+  prototype — so on an EMPTY bag `toString` / `constructor` / `valueOf` read as
+  filled. The rule runs only in the literal form, so `buildPath` and
+  `isActiveRoute` withheld while `navigate` / `makeState` applied: one producer out
+  of agreement, printing an href its own route does not reproduce — the [#1552](https://github.com/greydragon888/real-router/issues/1552)/[#1578](https://github.com/greydragon888/real-router/issues/1578)
+  shape the rule exists to close. Guarded with `Object.hasOwn`, as the sibling
+  `findMisChanneledKey` already was.
+
+  Also: `port.reportDroppedQueryKey` is a getter, like its sibling
+  `reportUndeclaredParamKey` — a plain closure is always truthy, so the pipeline's
+  optional-chain never gated anything and bare core paid [#1584](https://github.com/greydragon888/real-router/issues/1584)'s `pathNames`
+  existence lookup once per dropped key with no sink behind it. Both sinks now
+  report their absence honestly, and the two comments that asserted this gate are
+  true rather than aspirational.
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Route `navigate()` through the nav pipeline (`src/pipeline/`, milestone 1) — no behaviour change ([#1569](https://github.com/greydragon888/real-router/issues/1569))
+
+  The transformation "navigation intent → committed state + URL" was spread across
+  eight entry points, each re-composing the same operations in its own order. This
+  introduces the module that owns it: three primitives over one opaque type, and
+  switches the first entry point onto them.
+
+  ```ts
+  canonicalize(port, name, params, search); // ① forwardTo + ③ route defaults → Canonical
+  buildURL(canonical, port); // ⑤a — the URL of that intent
+  materialize(canonical, opts); // ⑤b — the State of that intent
+  ```
+
+  `Canonical` carries a `unique symbol` brand that is never exported, so
+  `materialize({ name, path, query })` does not compile. "Build a URL or a State out
+  of un-defaulted channels" becomes unrepresentable rather than a bug to remember —
+  `buildURL` prints the query from `canonical.query` alone, never from a
+  `search ?? params` fallback.
+
+  **Pure refactor: `navigate()` behaves as before on every ordinary input.** The
+  whole existing suite passes with no test edited (182 files / 3702 tests), which is
+  this step's acceptance criterion — any test that needed changing would mean
+  semantics moved, and that belongs to the follow-up steps, not here.
+
+  One measured exception, on an input class no test covers: stage ③ now runs inside
+  `canonicalize`, i.e. **before** the route-existence check, so on an **unknown**
+  route a `search` bag whose property access throws now surfaces that throw instead
+  of rejecting with `ROUTE_NOT_FOUND` (plain bags, and every bag on a route that
+  exists, are unaffected).
+
+  Two implementation details are deliberate and load-bearing, both measured rather
+  than assumed:
+
+  - The port's `resolveForward` is wired to the `forwardState` **seam**
+    (interceptors + the channel-separation wrapper), so channel separation stays
+    in the port implementation and never enters the pipeline module. The module is
+    already in its target shape; the seam is what changes later.
+  - The port's `buildPath` is wired to the **interceptable** `ctx.buildPath`,
+    because one `navigate()` runs both the `forwardState` and the `buildPath`
+    interceptor today. Calling the engine's matcher directly would have silently
+    stopped running `persistent-params`' `buildPath` interceptor on the navigate
+    path.
+
+  Stage ③ now has two callers (`makeState` and `canonicalize`), so the merge helper
+  and the state-object constructor moved to shared helpers — one source of truth for
+  "route default under the caller's value" and one state shape, instead of two
+  copies free to drift.
+
+  Locked by five properties on `canonicalize` as a pure function
+  (`canonicalize.properties.ts`, mutation-validated): caller beats default on both
+  channels, `undefined` is absence on both sides, channels are never re-split,
+  channels are frozen at merge time while the caller's bag is not, and stage ③ is
+  idempotent.
+
 ## 0.81.0
 
 ### Minor Changes

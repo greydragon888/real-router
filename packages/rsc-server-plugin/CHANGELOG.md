@@ -1,5 +1,28 @@
 # @real-router/rsc-server-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Two-channel RSC loader target — `{ params, search }` ([#1548](https://github.com/greydragon888/real-router/issues/1548))
+
+  `RscLoaderFn` now receives `({ params, search }, context?)` instead of
+  `(params, context?)` (RFC-4 M2), mirroring `ssr-data-plugin`. Closes the same
+  query-param gap: a loader reading a query param now reads `target.search.x`.
+  New `RscLoaderTarget` type is exported. Breaking loader signature (pre-1.0);
+  migrate `(params) => …` to `({ params }) => …`.
+
+### Patch Changes
+
+- [#1587](https://github.com/greydragon888/real-router/pull/1587) [`cb6b507`](https://github.com/greydragon888/real-router/commit/cb6b507bcd93c6ba2736ae8ac0aa17090b247507) Thanks [@greydragon888](https://github.com/greydragon888)! - Correct the `invalidate` JSDoc reload example to the four-slot signature ([#1586](https://github.com/greydragon888/real-router/issues/1586))
+
+  The "explicit await — pair with a same-route reload" snippet taught
+  `router.navigate(state.name, state.params, { reload: true })`. Slot 3 has been
+  the query channel since RFC-4 M2 ([#1548](https://github.com/greydragon888/real-router/issues/1548)), so that form puts `{ reload: true }`
+  in `search` — the reload never fires and the rebuilt URL loses the page's own
+  query. The same snippet in `shared/ssr/staleRegistry.ts` (symlinked into both
+  SSR loader plugins) is corrected alongside it.
+
 ## 0.2.14
 
 ### Patch Changes
