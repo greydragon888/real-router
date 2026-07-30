@@ -485,6 +485,28 @@ export class NavigationNamespace {
   }
 
   /**
+   * The uninterruptible navigation, end to end (RFC §5.1, разрез А).
+   *
+   * Reached only when `!hasGuards && !suspendable` — no guards to run, no
+   * `subscribeLeave` listener, no caller `signal`, no pre-commit plugin
+   * listener. Nothing can cancel it and nothing in it can suspend, so the
+   * cancellation machinery is not *skipped* here: it is ABSENT. No
+   * `AbortController`, no `isCurrentNav` closure, no commit-gate, and the return
+   * type is a plain `State` rather than a Promise — being unable to suspend is a
+   * property of the code, not a fact one has to remember.
+   *
+   * The `LEAVE_APPROVE` emit stays: it is an FSM transition every navigation
+   * makes, and with no leave listeners there is nothing to await behind it.
+   */
+  #completeImmediate(plan: NavigationPlan): State {
+    const deps = this.#deps;
+
+    deps.sendLeaveApprove(plan.toState, plan.fromState);
+
+    return completeTransition(deps, plan);
+  }
+
+  /**
    * Pass 2: work out the shape of the transition, now that it is announced.
    *
    * Runs AFTER `startTransition` because a `TRANSITION_START` listener may still
@@ -545,6 +567,21 @@ export class NavigationNamespace {
       // `isCurrentNav`; a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
 
       this.#planPhases(plan);
+
+      // Разрез А (RFC §5.1). `immediate` is the RFC's four-term predicate
+      // written in the terms that already exist: `suspendable` IS
+      // `signal || leaveListeners || preCommitListeners`, so the whole thing is
+      // `!hasGuards && !suspendable`. Nothing can interrupt such a navigation and
+      // nothing in it can suspend, so the machinery for both is not skipped —
+      // `#completeImmediate` does not contain it.
+      //
+      // Decided HERE and not at the entry point, deliberately: `hasGuards` is
+      // only knowable after `startTransition`, because a `TRANSITION_START`
+      // listener may still register a guard. Hoisting the read would change
+      // behaviour, not just shape.
+      if (!plan.hasGuards && !plan.suspendable) {
+        return this.#completeImmediate(plan);
+      }
 
       const {
         myId,
