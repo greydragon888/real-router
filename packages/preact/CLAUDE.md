@@ -357,8 +357,11 @@ const LazyDashboard = lazy(() => import("./Dashboard"));
 <Link routeName="users" routeSearch={{ page: "2" }} ignoreQueryParams={false} />
 ```
 
-A route's query still works when passed inside `routeParams` (the pre-split path);
-`routeSearch` is the explicit, type-clean channel.
+`routeSearch` is the only channel a route's declared `?query` may travel in. The
+pre-split form — passing it inside `routeParams` — is **refused**: core's always-on
+channel guard (#1572) throws a `TypeError` on the click, because the slot IS the
+channel since RFC-4 M2. (An UNDECLARED key handed in `routeParams` still rides
+along as app-level data; it just never reaches the URL — see the wiki's `Route.md`.)
 
 ### `to` Descriptor Prop (#1548)
 

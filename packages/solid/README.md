@@ -246,7 +246,7 @@ Navigation link with automatic active state detection. Uses `classList` for acti
 <Link routeName="users" routeSearch={{ page: "2" }} ignoreQueryParams={false} />
 ```
 
-A route's query still works when passed inside `routeParams` (the pre-split path); `routeSearch` is the explicit, type-clean channel.
+`routeSearch` is the only channel a route's declared `?query` may travel in — passing it inside `routeParams` is refused by core's channel guard (#1572), since the slot IS the channel.
 
 #### `to` descriptor — single-object target
 

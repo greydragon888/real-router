@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { navigateWithHash } from "../../src/dom-utils";
+import { navigateWithHash, shallowEqual } from "../../src/dom-utils";
 
 import type {
   NavigationOptions,
@@ -15,10 +15,11 @@ import type {
 // Link targeting the current route+params but a *different* fragment.
 //
 // We hand-roll a fake router rather than instantiating @real-router/core +
-// browser-plugin, because the helper only touches `getState()` and
-// `navigate()` — the rest of the router contract is irrelevant here and a
+// browser-plugin, because the helper touches only `getState()`, `isActiveRoute()`
+// and `navigate()` — the rest of the router contract is irrelevant here and a
 // hand-rolled fake makes the test's surface area exactly the behavior under
-// test.
+// test. (`isActiveRoute` joined that list in #1555, when the "same location?"
+// question moved from a hand-rolled comparison here to the router that owns it.)
 
 type HashAwareOpts = NavigationOptions & {
   hash?: string;
@@ -69,6 +70,14 @@ function makeFakeRouter(current: FakeCurrent | undefined): {
         context,
       } as unknown as State;
     },
+    // Part of the contract since #1555: the "is this the same location?" question
+    // moved to the router, which is the only thing that knows the channel rule and
+    // the provenance-tolerant comparison (#1554). This fake's state shares the
+    // caller's provenance, so `shallowEqual` answers exactly what the real
+    // predicate answers — these cases stay about the hash delta and the opts they
+    // assemble, which is what they were always about.
+    isActiveRoute: (name: string, params: Params) =>
+      current?.name === name && shallowEqual(current.params, params),
     navigate: (
       name: string,
       params: Params,

@@ -216,14 +216,33 @@ export function navigateWithHash(
 
   const current = router.getState();
 
+  // "Does this link point at where we already are?" is a question the router
+  // owns, and asking it here by hand got two things wrong at once (#1555).
+  //
+  // The hand-rolled version compared with `Object.is` per key, so a link writing
+  // `routeSearch={{ page: "2" }}` never matched a state parsed from `?page=2`,
+  // where the value is the NUMBER 2 — the bypass silently did not fire, core
+  // rejected the navigation as SAME_STATES, and `<Link hash>` looked dead. The
+  // predicate carries the provenance-tolerant comparison (#1554) that makes the
+  // two forms equal because they print the same URL.
+  //
+  // It also compared the caller's whole `routeParams` bag against `state.params`,
+  // which stopped meaning anything once the channels split (#1548) — the
+  // predicate applies the channel rule instead of re-deriving it.
+  //
+  // `strictEquality: true` — a link to a PARENT route is a different location, so
+  // the hierarchical arm must not match. `ignoreQueryParams: false` — the query is
+  // part of the location here; ignoring it would fire the bypass across a real
+  // query change and let `force: true` smuggle it through as a hash change.
   if (
-    current?.name === routeName &&
-    shallowEqual(current.params, routeParams) &&
-    // Same-route hash bypass must also match the query channel (RFC-4 M2 /
-    // #1548): a `routeSearch`-less link ignores it (compare current.search to
-    // itself), so hash-only navigation on an unchanged query still bypasses
-    // SAME_STATES.
-    shallowEqual(current.search, routeSearch ?? current.search)
+    current !== undefined &&
+    router.isActiveRoute(
+      routeName,
+      routeParams,
+      routeSearch ?? current.search,
+      true,
+      false,
+    )
   ) {
     const currentHash =
       (current.context as { url?: { hash?: string } } | undefined)?.url?.hash ??

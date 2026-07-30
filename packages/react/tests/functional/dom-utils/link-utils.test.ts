@@ -1,3 +1,4 @@
+import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi } from "vitest";
 
 import {
@@ -9,7 +10,7 @@ import {
   applyLinkA11y,
 } from "../../../src/dom-utils";
 
-import type { Router, State } from "@real-router/core";
+import type { Params, Router, State } from "@real-router/core";
 
 describe("shouldNavigate", () => {
   it("1 — returns true for left click with no modifiers", () => {
@@ -566,10 +567,22 @@ describe("buildHref — fragment encoding (encodeFragmentInline)", () => {
 });
 
 describe("navigateWithHash", () => {
+  // `isActiveRoute` joined the contract the helper depends on (#1555): the
+  // "same location?" question moved to the router, which is the only thing that
+  // knows the channel rule and the provenance-tolerant comparison. These states
+  // are hand-written, so their values share the caller's provenance and a shallow
+  // comparison answers exactly what the real predicate answers — which keeps
+  // these cases about what they were always about, the hash delta and the opts
+  // it assembles. The provenance divergence itself is covered against a REAL
+  // router further down.
   const makeRouter = (state: State | undefined): Router =>
     ({
       getState: vi.fn().mockReturnValue(state),
       navigate: vi.fn().mockResolvedValue({}),
+      isActiveRoute: vi.fn(
+        (name: string, params: Params) =>
+          state?.name === name && shallowEqual(state.params, params),
+      ),
     }) as unknown as Router;
 
   it("adds force + hashChange when the same route+params gets a new hash", async () => {
@@ -652,6 +665,97 @@ describe("navigateWithHash", () => {
     await navigateWithHash(router, "r", {}, undefined, undefined);
 
     expect(router.navigate).toHaveBeenCalledWith("r", {}, undefined, {});
+  });
+});
+
+// #1555 — the same-route hash bypass against a REAL router.
+//
+// The mock-based cases above cannot express this defect: their `getState()`
+// returns a hand-written state whose query values are the same literals the
+// caller passes, so any comparison — tolerant or strict — says "equal". The
+// divergence only exists when the two sides have different PROVENANCE: the URL
+// direction parses `?page=2` into the number `2`, while a `<Link routeSearch>`
+// prop carries whatever the consumer wrote, normally the string `"2"`.
+describe("navigateWithHash — same-route bypass against a real router (#1555)", () => {
+  const makeRealRouter = async () => {
+    const router = createRouter([
+      { name: "x", path: "/x?page" },
+      { name: "y", path: "/y" },
+    ]);
+
+    // Committed from a URL, so `state.search.page` is the PARSED number 2.
+    await router.start("/x?page=2");
+
+    return router;
+  };
+
+  it("fires when the link writes the query as a string and the state parsed it", async () => {
+    const router = await makeRealRouter();
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "x", {}, { page: "2" }, "section2").catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith(
+      "x",
+      {},
+      { page: "2" },
+      expect.objectContaining({ force: true, hashChange: true }),
+    );
+
+    router.dispose();
+  });
+
+  it("fires when the link omits routeSearch entirely (query unchanged)", async () => {
+    const router = await makeRealRouter();
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "x", {}, undefined, "section2").catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith(
+      "x",
+      {},
+      undefined,
+      expect.objectContaining({ force: true, hashChange: true }),
+    );
+
+    router.dispose();
+  });
+
+  // Discrimination: the bypass must NOT fire for a different location, or
+  // `force: true` would smuggle a real navigation through as a hash change.
+  it("does not fire when the query value actually differs", async () => {
+    const router = await makeRealRouter();
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "x", {}, { page: "3" }, "section2").catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith(
+      "x",
+      {},
+      { page: "3" },
+      { hash: "section2" },
+    );
+
+    router.dispose();
+  });
+
+  it("does not fire for a different route", async () => {
+    const router = await makeRealRouter();
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "y", {}, undefined, "section2").catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith("y", {}, undefined, { hash: "section2" });
+
+    router.dispose();
   });
 });
 

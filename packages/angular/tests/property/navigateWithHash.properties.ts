@@ -28,7 +28,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS, arbHash, arbRouteName, arbRouteNameWide } from "./helpers";
-import { navigateWithHash } from "../../src/dom-utils";
+import { navigateWithHash, shallowEqual } from "../../src/dom-utils";
 
 import type {
   NavigationOptions,
@@ -57,6 +57,13 @@ function makeRouter(
             params: current.params,
             context: { url: { hash: current.hash } },
           } as unknown as State),
+    // Part of the contract since #1555: the helper asks the router "is this the
+    // same location?" instead of comparing the bags itself. This arbitrary-built
+    // state shares the caller's provenance, so `shallowEqual` answers exactly what
+    // the real predicate answers — the properties below stay about the hash delta
+    // and the opts it assembles, which is what they were always about.
+    isActiveRoute: (name: string, params: Params) =>
+      current?.name === name && shallowEqual(current.params, params),
     navigate: (
       name: string,
       params: Params,
@@ -456,6 +463,9 @@ describe("navigateWithHash — Property Tests", () => {
               params: {},
               context: {},
             }) as unknown as State,
+          // #1555 — the helper asks the router whether the link points at the
+          // current location; this mock answers for its own hand-written state.
+          isActiveRoute: (n: string) => n === routeName,
           navigate: (
             name: string,
             params: Params,
@@ -485,6 +495,9 @@ describe("navigateWithHash — Property Tests", () => {
       const router = {
         getState: () =>
           ({ name: "home", params: {}, context: {} }) as unknown as State,
+        // #1555 — the helper asks the router whether the link points at the
+        // current location; this mock answers for its own hand-written state.
+        isActiveRoute: (n: string) => n === "home",
         navigate: (
           name: string,
           params: Params,
@@ -654,6 +667,9 @@ describe("navigateWithHash — Property Tests", () => {
             params: currentState.params,
             context: { url: { hash: currentState.hash } },
           }) as unknown as State,
+        // #1555 — the helper asks the router whether the link points at the
+        // current location; this mock answers for its own hand-written state.
+        isActiveRoute: (n: string) => n === currentState.name,
         navigate: (
           name: string,
           params: Params,
@@ -722,6 +738,9 @@ describe("navigateWithHash — Property Tests", () => {
             params: currentState.params,
             context: { url: { hash: currentState.hash } },
           }) as unknown as State,
+        // #1555 — the helper asks the router whether the link points at the
+        // current location; this mock answers for its own hand-written state.
+        isActiveRoute: (n: string) => n === currentState.name,
         navigate: (
           name: string,
           params: Params,
@@ -772,6 +791,9 @@ describe("navigateWithHash — Property Tests", () => {
             context: { url: { hash: currentState.hash } },
           }) as unknown as State,
         // NOTE: we do NOT commit hash here, simulating queued navigations.
+        // #1555 — the helper asks the router whether the link points at the
+        // current location; this mock answers for its own hand-written state.
+        isActiveRoute: (n: string) => n === currentState.name,
         navigate: (
           name: string,
           params: Params,

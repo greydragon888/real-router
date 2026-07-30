@@ -242,9 +242,9 @@ In a template:
 ```
 
 `routeSearch` is the query (search) channel of the path/query split — parallel
-to `routeParams`, the path channel. A route's query still works when passed
-inside `routeParams` (the pre-split form); `routeSearch` is the explicit,
-type-clean channel. `<Link>` also accepts a single `to={{ name, params?, search?
+to `routeParams`, the path channel. It is the only channel a route's declared
+`?query` may travel in — passing it inside `routeParams` is refused by core's
+channel guard (#1572), since the slot IS the channel. `<Link>` also accepts a single `to={{ name, params?, search?
 }}` descriptor as an alternative to the `routeName`/`routeParams`/`routeSearch`
 channel props — see [CLAUDE.md](./CLAUDE.md) → "`routeSearch` Prop" / "`to`
 Descriptor Prop" for the full breakdown.
