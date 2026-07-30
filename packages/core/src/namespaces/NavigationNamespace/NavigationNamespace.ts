@@ -213,7 +213,7 @@ export class NavigationNamespace {
       return Promise.reject(err);
     }
 
-    // States from `matchPath` are deeply frozen (`freezeStateInPlace`).
+    // States from `matchPath` are deeply frozen (`freezeStateShell`).
     // `completeTransition` mutates `toState.transition` and `context` is
     // intentionally extensible for plugin claim writes, so we hand the
     // pipeline a writable shell — same shape `makeState(skipFreeze=true)`

@@ -1,7 +1,7 @@
 // packages/core/src/pipeline/materialize.ts
 
 import { DEFAULT_TRANSITION } from "../constants";
-import { freezeStateInPlace } from "../helpers";
+import { freezeStateShell } from "../helpers";
 
 import type { Canonical } from "./types";
 import type { Params, SearchParams, State } from "../types";
@@ -62,5 +62,5 @@ export function materialize<
     ...(!opts.skipFreeze && { transition: DEFAULT_TRANSITION }),
   } as State<P, S>;
 
-  return opts.skipFreeze ? state : freezeStateInPlace(state);
+  return opts.skipFreeze ? state : freezeStateShell(state);
 }

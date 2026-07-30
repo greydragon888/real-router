@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+
+import type { State } from "@real-router/core/types";
 
 /**
- * State freeze semantics (`freezeStateInPlace`, src/helpers.ts).
+ * State freeze semantics (`freezeStateShell`, src/helpers.ts).
  *
  * The observable contract is proven through the PUBLIC pipeline: every committed
  * state from `navigate()` / `getState()` is top-level frozen, its `context` stays
@@ -13,7 +16,7 @@ import { createRouter } from "@real-router/core";
  * navigate, `params` is frozen UPSTREAM by `setState`, and the meta WeakMap store
  * is covered by transitionPath/state tests — neither is observable here.
  *
- * `freezeStateInPlace` runs on every navigation (StateNamespace freezes via it),
+ * `freezeStateShell` runs on every navigation (StateNamespace freezes via it),
  * so it is fully covered here. Its former `!state` guard was redundant cruft
  * (`Object.freeze` returns null/undefined as-is) and has been removed from src —
  * hence no white-box null test remains.
@@ -66,5 +69,138 @@ describe("State freeze semantics (via navigate + getState)", () => {
 
     expect(first).toBe(second);
     expect(Object.isFrozen(first)).toBe(true);
+  });
+});
+
+/**
+ * The producer matrix (#1599).
+ *
+ * "States are deeply frozen" is a documented guarantee with NO single owner: the
+ * depth is assembled from four unrelated places — `canonicalize`'s fast path,
+ * `mergeWithDefault`, `admittedSearch` in the mode gate, and the shell freeze
+ * above — and none of them is the publisher. The describe above proves the
+ * guarantee for ONE producer (navigate). This proves it for every producer that
+ * can hand a state to user code, which is what makes the assembly safe to
+ * REARRANGE: #1598 moves one of the four sites, and without this matrix that move
+ * would be invisible to CI whether it was right or wrong.
+ *
+ * Deliberately black-box, through the public surface each producer is reached by.
+ * `context` is the one documented carve-out (plugins write into it after the
+ * commit), so it is asserted mutable rather than frozen — that asymmetry IS the
+ * contract, not an omission.
+ */
+describe("state immutability across every producer (#1599)", () => {
+  const ROUTES = [
+    { name: "home", path: "/home" },
+    { name: "user", path: "/users/:id" },
+    { name: "query", path: "/q?a" },
+    { name: "defaults", path: "/d/:x", defaultParams: { x: "1" } },
+  ];
+
+  const make = () =>
+    createRouter(ROUTES, { defaultRoute: "home", allowNotFound: true });
+
+  /** Every channel a published state exposes, plus the documented carve-out. */
+  const expectPublishedShape = (state: State | undefined) => {
+    expect(state).toBeDefined();
+    expect(Object.isFrozen(state)).toBe(true);
+    expect(Object.isFrozen(state!.params)).toBe(true);
+    expect(Object.isFrozen(state!.search)).toBe(true);
+    expect(Object.isFrozen(state!.transition)).toBe(true);
+    // The carve-out: `claimContextNamespace` depends on this staying writable.
+    expect(Object.isFrozen(state!.context)).toBe(false);
+  };
+
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("navigate — path params (fast path)", async () => {
+    const router = make();
+
+    await router.start("/users/7");
+
+    expectPublishedShape(router.getState());
+  });
+
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("navigate — query channel", async () => {
+    const router = make();
+
+    await router.start("/home");
+    await router.navigate("query", {}, { a: "1" });
+
+    expectPublishedShape(router.getState());
+  });
+
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("navigate — route defaults (slow path)", async () => {
+    const router = make();
+
+    await router.start("/home");
+    await router.navigate("defaults");
+
+    expectPublishedShape(router.getState());
+  });
+
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("makeState — the plugin primitive, with and without params", async () => {
+    const router = make();
+
+    await router.start("/home");
+
+    const api = getPluginApi(router);
+
+    expectPublishedShape(api.makeState("user", { id: "9" }));
+    expectPublishedShape(api.makeState("home"));
+  });
+
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("navigateToNotFound — the one producer that bypasses the pipeline", async () => {
+    const router = make();
+
+    await router.start("/home");
+    router.navigateToNotFound("/nope");
+
+    expectPublishedShape(router.getState());
+  });
+
+  // The mode gate freezes the query channel itself (`admittedSearch`), and reaching
+  // that freeze needs TWO conditions the happy path does not meet — both found by
+  // mutation while building this matrix, neither by reading:
+  //
+  //   1. a non-`loose` mode, because `loose` is the repo default and short-circuits
+  //      the gate entirely;
+  //   2. a key that is actually DROPPED **and** one that is admitted — the no-drop
+  //      branch hands back the input, already frozen by `mergeWithDefault`, and an
+  //      all-dropped bag collapses to the frozen `EMPTY_SEARCH` singleton. Only the
+  //      mixed case builds the fresh object this freeze exists for.
+
+  it("non-loose mode with a dropped key — the mode gate's own freeze", async () => {
+    const router = createRouter(ROUTES, {
+      defaultRoute: "home",
+      queryParamsMode: "strict",
+    });
+
+    await router.start("/home");
+    await router.navigate("query", {}, { a: "1", undeclared: "9" });
+
+    const state = router.getState();
+
+    expectPublishedShape(state);
+
+    // The gate dropped it, so the freeze under test ran on a bag it built itself.
+    expect(state?.search).toStrictEqual({ a: "1" });
+  });
+
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("replace() revalidation — a state committed by route-CRUD", async () => {
+    const router = make();
+
+    await router.start("/users/7");
+
+    getRoutesApi(router).replace([
+      { name: "home", path: "/home" },
+      { name: "user", path: "/users/:id" },
+    ]);
+
+    expectPublishedShape(router.getState());
   });
 });

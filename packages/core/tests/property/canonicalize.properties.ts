@@ -21,6 +21,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { arbParamKey, NUM_RUNS } from "./helpers";
+import { EMPTY_SEARCH } from "../../src/constants";
 import { canonicalize } from "../../src/pipeline";
 
 import type { RouteResolver } from "../../src/pipeline";
@@ -158,26 +159,49 @@ describe("canonicalize (pure) — properties", () => {
   // governs. The navigate path defers the state freeze, so a guard would
   // otherwise observe mutable bags. The caller's own bag must never be frozen
   // out from under it.
+  //
+  // ⚠ Crosses BOTH paths on purpose (#1599). The fast-path gate discriminates on
+  // exactly the query bag's form, and a fresh `{...callerSearch}` is neither
+  // `undefined` nor the `EMPTY_SEARCH` singleton — so until this property carried
+  // the other two forms, every one of its runs took the SLOW path and the fast
+  // path's own `Object.freeze` was asserted by nothing at all. Demonstrated by
+  // mutation: with a `throw` in place of the fast-path `return`, this property
+  // used to pass while 81 others failed.
   test.prop([fc.string(), arbDefinedBag, arbDefinedBag, arbDefinedBag], {
     numRuns: NUM_RUNS.standard,
   })(
-    "channels are frozen; the caller's bag is not",
+    "channels are frozen on both paths; the caller's own bag is not",
     (name, callerParams, callerSearch, defaultBag) => {
+      // `undefined` and the singleton reach the fast path only while the route
+      // carries no defaults — with `defaultBag` the gate falls through, which is
+      // why the query forms are crossed with the defaults rather than listed.
+      const queryForms: (SearchParams | undefined)[] = [
+        { ...callerSearch },
+        undefined,
+        EMPTY_SEARCH,
+      ];
+
       for (const routeDefaults of [undefined, defaultBag]) {
-        const params = { ...callerParams };
-        const search = { ...callerSearch };
+        for (const search of queryForms) {
+          const params = { ...callerParams };
 
-        const canonical = canonicalize(
-          makePort(routeDefaults, routeDefaults),
-          name,
-          params,
-          search,
-        );
+          const canonical = canonicalize(
+            makePort(routeDefaults, routeDefaults),
+            name,
+            params,
+            search,
+          );
 
-        expect(Object.isFrozen(canonical.path)).toBe(true);
-        expect(Object.isFrozen(canonical.query)).toBe(true);
-        expect(Object.isFrozen(params)).toBe(false);
-        expect(Object.isFrozen(search)).toBe(false);
+          expect(Object.isFrozen(canonical.path)).toBe(true);
+          expect(Object.isFrozen(canonical.query)).toBe(true);
+          expect(Object.isFrozen(params)).toBe(false);
+
+          // Only a bag the caller OWNS may be asserted mutable: `EMPTY_SEARCH` is
+          // the shared frozen singleton, and `undefined` has nothing to assert.
+          if (search !== undefined && search !== EMPTY_SEARCH) {
+            expect(Object.isFrozen(search)).toBe(false);
+          }
+        }
       }
     },
   );

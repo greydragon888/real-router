@@ -187,26 +187,44 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
 // =============================================================================
 
 /**
- * Shallow-freezes a State object in place.
+ * Freezes the State object's own level — the SHELL, not the state.
  *
- * Freezes only the top-level State object (blocks reassignment of `name`,
- * `params`, `path`, `transition`, `context`). Nested objects (`params`,
- * `transition`, `transition.segments`, `transition.segments.{deactivated,activated}`)
- * are expected to be **already frozen at creation time** by their producers:
+ * Named for what it does after #1599: it used to be called
+ * `freezeStateInPlace`, which promised a depth it has never delivered, and
+ * `CLAUDE.md` described it as "consolidated into one recursive traversal" long
+ * after the traversal was gone. It blocks reassignment of `name` / `params` /
+ * `search` / `path` / `transition` / `context` and nothing more.
  *
- * - `params` frozen in `makeState()` / `navigateToNotFound()`
- * - `transition`, `segments`, `deactivated`, `activated` frozen in
- *   `buildTransitionMeta()` (or inline in `navigateToNotFound()`)
+ * **The depth is a POLICY, not this function's job: every object is frozen once,
+ * where it is created.** That is deliberate and measured — re-freezing an
+ * already-frozen object costs ~8 ns, so a recursive walk would pay per node for
+ * work its producers already did. The four producers and what each owns:
+ *
+ * - `params` — `pipeline/canonicalize` on the fast path, {@link mergeWithDefault}
+ *   on the slow one
+ * - `search` — the `EMPTY_SEARCH` singleton, or `admittedSearch`
+ *   (`channels/modeGate.ts`) on its DROP branch, the one branch that builds a bag
+ *   the caller did not already freeze
+ * - `transition` + nested — `buildTransitionMeta()` (or inline in
+ *   `navigateToNotFound()`)
+ * - the shell — here
  *
  * `state.context` is **intentionally not frozen** — plugins write to it via
  * `claim.write(state, value)` after state creation.
  *
+ * The whole matrix is pinned black-box in
+ * `tests/functional/error/helpers.test.ts` ("state immutability across every
+ * producer"), mutationally validated against all four sites. Before #1599 two of
+ * them were unguarded: deleting the `canonicalize` freeze left the entire suite
+ * green, and the mode gate's freeze was reachable only under a non-`loose` mode
+ * with one key dropped AND one admitted.
+ *
  * @internal
  */
-export function freezeStateInPlace<T extends State>(state: T): T {
+export function freezeStateShell<T extends State>(state: T): T {
   // `Object.freeze` returns non-objects (incl. null/undefined) unchanged, so the
   // former `if (!state) return state` guard was redundant — callers also gate it
-  // (`state ? freezeStateInPlace(state) : undefined`) and `T extends State` is
+  // (`state ? freezeStateShell(state) : undefined`) and `T extends State` is
   // typed non-null.
   return Object.freeze(state);
 }

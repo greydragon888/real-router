@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
 import { EMPTY_PARAMS } from "../../constants";
-import { areParamValuesEqual, freezeStateInPlace } from "../../helpers";
+import { areParamValuesEqual, freezeStateShell } from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -57,7 +57,7 @@ export class StateNamespace {
 
     // If state is already frozen (from makeState()), use it directly.
     // For external states, freeze in place without cloning.
-    this.#frozenState = state ? freezeStateInPlace(state) : undefined;
+    this.#frozenState = state ? freezeStateShell(state) : undefined;
   }
 
   /**
