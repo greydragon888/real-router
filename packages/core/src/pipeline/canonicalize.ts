@@ -245,7 +245,7 @@ export function canonicalize(
     // overlap, and an inline `as SearchParams` is redundant to the receiver.
     const fastPath: { name: string; path: Params; query: SearchParams } = {
       name: resolvedName,
-      path: Object.freeze(pathBag),
+      path: pathBag,
       query: EMPTY_SEARCH,
     };
 

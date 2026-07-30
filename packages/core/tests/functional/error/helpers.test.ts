@@ -120,6 +120,25 @@ describe("state immutability across every producer (#1599)", () => {
     expectPublishedShape(router.getState());
   });
 
+  // ⚠ The cell that matters most, and the one the first draft of this matrix
+  // MISSED: the transition pipeline commits through `materialize({skipFreeze:
+  // true})`, so on this path nothing downstream freezes the channels — and it only
+  // bites with a NON-EMPTY bag on the fast path, because an empty one collapses to
+  // the already-frozen `EMPTY_PARAMS` singleton and a route with defaults is
+  // frozen by `mergeWithDefault` instead. `start()` does not cover it either: it
+  // commits through the `matchPath` rebuild. Found by mutation — moving the
+  // `materialize` freeze below the `skipFreeze` branch left every other case here
+  // green.
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("navigate — non-empty params through the transition pipeline (skipFreeze)", async () => {
+    const router = make();
+
+    await router.start("/home");
+    await router.navigate("user", { id: "9" });
+
+    expectPublishedShape(router.getState());
+  });
+
   // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
   it("navigate — query channel", async () => {
     const router = make();

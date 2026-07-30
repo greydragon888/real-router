@@ -200,8 +200,9 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
  * already-frozen object costs ~8 ns, so a recursive walk would pay per node for
  * work its producers already did. The four producers and what each owns:
  *
- * - `params` — `pipeline/canonicalize` on the fast path, {@link mergeWithDefault}
- *   on the slow one
+ * - `params` — {@link mergeWithDefault} on the slow path; on the fast one there is
+ *   no merge to freeze it, so `pipeline/materialize` does at the publication
+ *   boundary (#1598), before its own `skipFreeze` branch
  * - `search` — the `EMPTY_SEARCH` singleton, or `admittedSearch`
  *   (`channels/modeGate.ts`) on its DROP branch, the one branch that builds a bag
  *   the caller did not already freeze
