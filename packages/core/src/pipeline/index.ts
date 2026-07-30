@@ -21,11 +21,7 @@
  * `.` / `./types` / `./api` / `./validation`). Its consumers are the router's
  * own facade, namespaces and wiring.
  */
-export {
-  canonicalize,
-  DIAGNOSE_UNDECLARED,
-  LITERAL_FORM,
-} from "./canonicalize";
+export { canonicalize } from "./canonicalize";
 
 export { buildURL } from "./buildURL";
 

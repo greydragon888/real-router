@@ -11,7 +11,7 @@ import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
 import { assertChannelCorrect } from "../../channels";
 import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import { mergeDefined } from "../../helpers";
-import { canonicalize, LITERAL_FORM, materialize } from "../../pipeline";
+import { canonicalize, materialize } from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -63,16 +63,6 @@ interface CachedBuildPathOpts {
   readonly trailingSlash?: "always" | "never" | undefined;
   readonly queryParamsMode?: "default" | "strict" | "loose" | undefined;
 }
-
-/**
- * `materialize` options for the active-route comparison (#1589) — hoisted for the
- * same reason as the pipeline's own two: every field is constant, and an inline
- * literal allocated a fresh bag on every `<Link>` render.
- *
- * `path: ""` because `areStatesEqual` never reads the URL, and `skipFreeze`
- * because the state exists for the length of one comparison.
- */
-const COMPARE_ONLY = Object.freeze({ path: "", skipFreeze: true });
 
 /**
  * Independent namespace for managing routes.
@@ -262,13 +252,9 @@ export class RoutesNamespace<
     // key in `loose` (`/t?foo=1` vs `/t`), the `/coll/:id?id` collision
     // (`/items/V?id=V` vs `/items/V`), and a route's arbitrary `defaultParams`
     // (`/s?theme=d` vs `/s`). All three now agree.
-    const canonical = canonicalize(
-      this.#deps.port,
-      route,
-      params,
-      search,
-      LITERAL_FORM,
-    );
+    const canonical = canonicalize(this.#deps.port, route, params, search, {
+      resolveForward: false,
+    });
 
     // Stage ⑤a stays LOCAL to this method rather than going through `buildURL`,
     // and this is structural, not a preference: `buildURL` prints via
@@ -819,13 +805,9 @@ export class RoutesNamespace<
     // so a v1 single-bag call stops matching. Channel-correctness is the
     // caller's contract, exactly as for `navigate` (which throws on that shape)
     // and `buildPath` (which prints without it).
-    const canonical = canonicalize(
-      this.#deps.port,
-      name,
-      params,
-      searchArg,
-      LITERAL_FORM,
-    );
+    const canonical = canonicalize(this.#deps.port, name, params, searchArg, {
+      resolveForward: false,
+    });
 
     // Exact match case. Path "" skips the URL build — `areStatesEqual` compares
     // channels and never reads the URL, which is also why `materialize` needs no
@@ -838,7 +820,7 @@ export class RoutesNamespace<
       // that happens in `canonicalize`, and it is the part that matters
       // (canonicalize invariant #4). Measured at 926 µs, ~5 % of this benchmark.
       return this.#deps.areStatesEqual(
-        materialize(canonical, COMPARE_ONLY),
+        materialize(canonical, { path: "", skipFreeze: true }),
         activeState,
         ignoreQueryParams,
       );

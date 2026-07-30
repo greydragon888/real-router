@@ -48,50 +48,6 @@ export interface CanonicalizeOptions {
 }
 
 /**
- * The two option bags the router actually passes, hoisted to module constants
- * (#1589).
- *
- * Every field in both is a compile-time constant, so an inline literal at the
- * call site allocated a fresh object on EVERY call — five call sites, three of
- * them on the render path (`buildPath`, `isActiveRoute`, `makeState`). Frozen so
- * a caller cannot mutate a bag the next caller will read.
- *
- * Not a micro-optimisation dressed up: `isActiveRoute` runs per `<Link>` per
- * re-render across six adapters, and the measured cost of that predicate is
- * dominated by allocation and by V8 declining to inline it once the body grew.
- * Two of its seven per-call allocations were these literals.
- */
-export const LITERAL_FORM: CanonicalizeOptions = Object.freeze({
-  resolveForward: false,
-});
-
-export const DIAGNOSE_UNDECLARED: CanonicalizeOptions = Object.freeze({
-  diagnoseUndeclared: true,
-});
-
-/**
- * THE single producer of {@link Canonical}: one pass over stage ① (resolve the
- * `forwardTo` chain) and stage ③ (merge each channel's route default UNDER the
- * caller's value). There is no separating stage ② — channels arrive correct by
- * the producer contract, and the port's `resolveForward` is wired to the seam
- * that REFUSES a mis-channelled bag rather than repairing one.
- *
- * Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name
- * (target defaults cannot be read before `forwardTo` resolves), so ① always
- * precedes it.
- *
- * `undefined` is absence on both sides of the merge (`mergeWithDefault`,
- * #1550/#1551) — an explicitly-`undefined` caller value leaves the default in
- * place, and a default carrying `undefined` behaves like no entry.
- *
- * Channels are frozen here, at merge time — NOT in `materialize`. The two
- * freezes are different things: `materialize`'s `skipFreeze` governs the state
- * object (the navigate path defers it so `completeTransition` can attach
- * `transition`), while `params` / `search` must be immutable the moment a guard
- * can see them. `mergeWithDefault` also copies before freezing, so the caller's
- * own bag is never frozen out from under it.
- */
-/**
  * The undeclared-key diagnostic (#1579 — the params half of #1553), lifted out of
  * {@link canonicalize} so the fast path (#1589) fits the cognitive-complexity
  * budget beside it.
@@ -130,6 +86,36 @@ function diagnoseUndeclaredKeys(
   }
 }
 
+/**
+ * THE single producer of {@link Canonical}: one pass over stage ① (resolve the
+ * `forwardTo` chain) and stage ③ (merge each channel's route default UNDER the
+ * caller's value). There is no separating stage ② — channels arrive correct by
+ * the producer contract, and the port's `resolveForward` is wired to the seam
+ * that REFUSES a mis-channelled bag rather than repairing one.
+ *
+ * Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name
+ * (target defaults cannot be read before `forwardTo` resolves), so ① always
+ * precedes it.
+ *
+ * `undefined` is absence on both sides of the merge (`mergeWithDefault`,
+ * #1550/#1551) — an explicitly-`undefined` caller value leaves the default in
+ * place, and a default carrying `undefined` behaves like no entry.
+ *
+ * Channels are frozen here, at merge time — NOT in `materialize`. The two
+ * freezes are different things: `materialize`'s `skipFreeze` governs the state
+ * object (the navigate path defers it so `completeTransition` can attach
+ * `transition`), while `params` / `search` must be immutable the moment a guard
+ * can see them. `mergeWithDefault` also copies before freezing, so the caller's
+ * own bag is never frozen out from under it.
+ *
+ * ⚠ The option bags at the call sites are INLINE LITERALS on purpose (#1589).
+ * Hoisting them to shared frozen module constants was tried and measured worse:
+ * `buildPath` and `isActiveRoute` slowed 6.6–10.5 % while sites that pass no
+ * options moved 2 %. The literal in a small hot function is not an allocation at
+ * all — V8 inlines the function, escape analysis removes the object, and the flag
+ * folds to a constant. A shared frozen object replaces that with a property read
+ * off the heap. Do not "optimise" these back.
+ */
 export function canonicalize(
   port: RouteResolver,
   name: string,
