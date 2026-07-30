@@ -48,6 +48,28 @@ export interface CanonicalizeOptions {
 }
 
 /**
+ * The two option bags the router actually passes, hoisted to module constants
+ * (#1589).
+ *
+ * Every field in both is a compile-time constant, so an inline literal at the
+ * call site allocated a fresh object on EVERY call — five call sites, three of
+ * them on the render path (`buildPath`, `isActiveRoute`, `makeState`). Frozen so
+ * a caller cannot mutate a bag the next caller will read.
+ *
+ * Not a micro-optimisation dressed up: `isActiveRoute` runs per `<Link>` per
+ * re-render across six adapters, and the measured cost of that predicate is
+ * dominated by allocation and by V8 declining to inline it once the body grew.
+ * Two of its seven per-call allocations were these literals.
+ */
+export const LITERAL_FORM: CanonicalizeOptions = Object.freeze({
+  resolveForward: false,
+});
+
+export const DIAGNOSE_UNDECLARED: CanonicalizeOptions = Object.freeze({
+  diagnoseUndeclared: true,
+});
+
+/**
  * THE single producer of {@link Canonical}: one pass over stage ① (resolve the
  * `forwardTo` chain) and stage ③ (merge each channel's route default UNDER the
  * caller's value). There is no separating stage ② — channels arrive correct by

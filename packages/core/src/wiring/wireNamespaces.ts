@@ -2,7 +2,12 @@
 
 import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
-import { buildURL, canonicalize, materialize } from "../pipeline";
+import {
+  buildURL,
+  canonicalize,
+  DIAGNOSE_UNDECLARED,
+  materialize,
+} from "../pipeline";
 
 import type { NamespaceBag } from "./types";
 import type { NavigationDependencies } from "../namespaces/NavigationNamespace";
@@ -287,9 +292,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         routeName,
         routeParams,
         routeSearch,
-        {
-          diagnoseUndeclared: true,
-        },
+        DIAGNOSE_UNDECLARED,
       );
       const meta = ns.routes.getMetaForState(canonical.name);
 

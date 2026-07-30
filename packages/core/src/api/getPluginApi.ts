@@ -1,4 +1,9 @@
-import { buildURL, canonicalize, materialize } from "../pipeline";
+import {
+  buildURL,
+  canonicalize,
+  DIAGNOSE_UNDECLARED,
+  materialize,
+} from "../pipeline";
 import { throwIfDisposed } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
@@ -111,9 +116,13 @@ export function getPluginApi<
       // so the seam is still where an explicit query value wins over a declared
       // twin the caller rode in `params`, and where a `search-schema`
       // interceptor sees the query channel.
-      const canonical = canonicalize(ctx.port(), name, params, search, {
-        diagnoseUndeclared: true,
-      });
+      const canonical = canonicalize(
+        ctx.port(),
+        name,
+        params,
+        search,
+        DIAGNOSE_UNDECLARED,
+      );
 
       // Existence is checked BEFORE the URL is built, and the order is
       // load-bearing: `buildURL` prints through the matcher, which throws on an

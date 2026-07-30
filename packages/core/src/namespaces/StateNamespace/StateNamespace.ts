@@ -2,7 +2,12 @@
 
 import { EMPTY_PARAMS } from "../../constants";
 import { areParamValuesEqual, freezeStateInPlace } from "../../helpers";
-import { buildURL, canonicalize, materialize } from "../../pipeline";
+import {
+  buildURL,
+  canonicalize,
+  LITERAL_FORM,
+  materialize,
+} from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
 import type { Params, SearchParams, State } from "../../types";
@@ -132,9 +137,13 @@ export class StateNamespace {
     // whole difference from `navigate`'s form, and it is this method's contract:
     // the route NAMED is the route answered about.
     const port = this.#deps.port();
-    const canonical = canonicalize(port, name, params ?? EMPTY_PARAMS, search, {
-      resolveForward: false,
-    });
+    const canonical = canonicalize(
+      port,
+      name,
+      params ?? EMPTY_PARAMS,
+      search,
+      LITERAL_FORM,
+    );
 
     // ⑤a only when the caller did not supply the URL. `buildURL` prints through
     // `port.buildPath` — the interceptable `ctx.buildPath` this method already
