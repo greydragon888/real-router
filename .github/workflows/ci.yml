@@ -632,7 +632,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
 
       # jscpd only reads packages/*/src/ and has NO workspace-package deps — its
@@ -685,7 +685,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
 
       # Merge every per-path coverage artifact into one tree: leaf emits a single
       # `coverage-reports-leaf`; sharded emits `coverage-reports-base` + one
@@ -765,7 +765,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
 
       # Same per-path coverage merge as the Codecov job (leaf single artifact OR
       # base + per-shard). check-coverage-scope --emit rescans after the merge.

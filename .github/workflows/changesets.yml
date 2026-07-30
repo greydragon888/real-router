@@ -85,8 +85,10 @@ jobs:
           # @changesets/changelog-github → @changesets/get-github-info against
           # api.github.com/graphql — failing `changeset version` intermittently
           # (~every release on 24.17.0; clean on 24.16.0). Fixed in 24.18.0
-          # (nodejs/node#64004). Relax back to `24` once runner toolcaches resolve
-          # >= 24.18.0 by default. See IMPLEMENTATION_NOTES "Pin Node 24.18.0 in
+          # (nodejs/node#64004). Relax back to `node-version-file: .nvmrc` (what
+          # every other workflow uses) once runner toolcaches resolve >= 24.18.0
+          # by default — deliberately NOT `.nvmrc` today, because this pin has to
+          # stay exact. See IMPLEMENTATION_NOTES "Pin Node 24.18.0 in
           # changesets.yml".
           node-version: 24.18.0
           cache: pnpm

@@ -5,6 +5,21 @@ set -e
 
 echo "🔍 Running pre-commit checks..."
 
+# Node-major drift guard (WARNING only, never blocks). A local major other than
+# the one CI runs silently changes host-provided globals: Node >= 26 ships Web
+# Storage unflagged, which shadows jsdom's `sessionStorage` under vitest and made
+# 7 adapter scroll tests fail locally while CI stayed green for ten days (see
+# IMPLEMENTATION_NOTES "Adapter scroll tests mock sessionStorage"). Silent when
+# the majors match.
+if [ -f .nvmrc ]; then
+  want_node="$(tr -d '[:space:]' < .nvmrc)"
+  have_node="$(node -p 'process.versions.node.split(".")[0]')"
+  if [ -n "$want_node" ] && [ "$want_node" != "$have_node" ]; then
+    echo "⚠️  Node major $have_node ≠ .nvmrc ($want_node) — CI runs $want_node."
+    echo "   Host globals may differ; a local-only failure here may not be real."
+  fi
+fi
+
 # Auto-deduplicate lockfile if it's being committed.
 # pnpm add/update don't dedupe automatically (pnpm/pnpm#7258),
 # so we do it here to keep the lockfile clean.

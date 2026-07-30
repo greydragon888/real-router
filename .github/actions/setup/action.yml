@@ -1,8 +1,9 @@
 name: Setup
-description: Shared CI setup — pnpm, Node 24, and a pnpm install. Centralises the
-  block repeated across every build job so the Node version / cache / install
-  flags live in one place. The caller must run actions/checkout first (a local
-  composite action needs the repo present to be resolved).
+description: Shared CI setup — pnpm, Node (from `.nvmrc`), and a pnpm install.
+  Centralises the block repeated across every build job so the Node version /
+  cache / install flags live in one place. The caller must run actions/checkout
+  first (a local composite action needs the repo present to be resolved — and
+  `node-version-file` needs `.nvmrc` on disk).
 inputs:
   install-args:
     description: Arguments passed to `pnpm install` (e.g. `--frozen-lockfile --ignore-scripts`).
@@ -27,7 +28,12 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
-        node-version: 24
+        # Read from `.nvmrc` (repo root, resolved against GITHUB_WORKSPACE) so
+        # the major CI runs and the major a dev machine selects cannot drift —
+        # they did, and it cost ten days of a locally-red / CI-green test suite
+        # (IMPLEMENTATION_NOTES "`.nvmrc` as the Node single source of truth").
+        # Safe here because every caller checks out first, as documented above.
+        node-version-file: .nvmrc
         cache: ${{ inputs.node-cache }}
 
     - name: Install dependencies
