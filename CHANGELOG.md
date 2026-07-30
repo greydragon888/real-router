@@ -7,6 +7,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-30]
 
+### @real-router/core@0.82.1
+
+### Patch Changes
+
+- [#1597](https://github.com/greydragon888/real-router/pull/1597) [`3798458`](https://github.com/greydragon888/real-router/commit/3798458dc7305105aff51ac6a3cb0a9695e6c1fc) Thanks [@greydragon888](https://github.com/greydragon888)! - perf: the path channel is frozen where it is published, not where it is merged ([#1598](https://github.com/greydragon888/real-router/issues/1598))
+
+  `canonicalize`'s fast path froze the params bag on every call — including the
+  calls that never publish it. `buildPath` returns a string, `isActiveRoute` returns
+  a boolean, and both discarded the frozen bag on the next line, so the freeze was
+  paid by every `<Link>` render for a guarantee only a committed state needs.
+
+  The freeze moves to `materialize`, the one place a `Canonical` becomes something
+  user code can hold — before its `skipFreeze` branch, which defers the state SHELL
+  and never the channels, so guards on the navigate path still see immutable bags.
+
+  `params` only. `canonical.query` is already frozen on every path (the
+  `EMPTY_SEARCH` singleton on the fast one, `admittedSearch`'s own result on the
+  slow one), and re-freezing a frozen object is not free — freezing both regressed
+  `isActiveRoute-exact` by 9.8 % where freezing one wins.
+
+  Measured against pre-pipeline `0fed89b`, medians of 9 alternating single-module
+  processes, A/A floor ≤ 1 %: `buildPath` −14.6 % params / −9.3 % static / −7.9 % on
+  a `?`-declaring route, `canNavigateTo` −6.9 % (now **0.99×** of pre-pipeline — that
+  predicate's pipeline cost is fully paid back), `isActiveRoute-parent` −6.8 %.
+  `isActiveRoute-exact` is flat by construction: it publishes a state, so it pays the
+  same freeze one line later.
+
+  The `Canonical`-level contract narrows accordingly and is restated in
+  `INVARIANTS.md`: channels are frozen by PUBLICATION rather than by merge. That is
+  safe because a `Canonical` has exactly two consumers — `buildURL`, which reads, and
+  `materialize`, which publishes — and the brand is unexported, so there can be no
+  third.
+
+- [#1597](https://github.com/greydragon888/real-router/pull/1597) [`3798458`](https://github.com/greydragon888/real-router/commit/3798458dc7305105aff51ac6a3cb0a9695e6c1fc) Thanks [@greydragon888](https://github.com/greydragon888)! - perf: `canonicalize`'s fast-path gate reads two values, not three ([#1589](https://github.com/greydragon888/real-router/issues/1589))
+
+  The gate that decides "nothing to merge, nothing to gate" read `defaultParams`,
+  `defaultSearch` and `queryNames` on every call — three port hops per `<Link>`
+  render — and discarded all three on the fast path.
+
+  The third term was redundant. The gate's other half already establishes that the
+  caller brought no query bag, and the merged query bag has exactly two sources
+  (`defaultSearch` and the caller's own), so an empty bag has nothing for the mode
+  gate to drop however many `?names` the route declares. That is established rather
+  than argued: the term survives all 3808 tests, and a 33-probe × 3-mode matrix
+  over a `?`-declaring route with no defaults is byte-identical without it. It cost
+  ~12 ns per call, because `getQueryParams` is a four-frame chain to a cached Map
+  rather than a Map read — and dropping it widens the fast path to routes that
+  declare query params but carry no defaults.
+
+  The two remaining reads stay above the gate on purpose: they are its route half
+  AND the slow path's first input, so the fast path pays two hops and the slow path
+  pays nothing extra. A variant collapsing them into one `mergesNothing()`
+  predicate was built and measured — indistinguishable on the fast arms, +10.6 % on
+  the defaults path — and dropped.
+
+  No behaviour change. Measured against pre-pipeline `0fed89b` as medians of 9
+  alternating single-module processes, A/A floor ≤ 0.7 %: `isActiveRoute` −12.2 % /
+  −12.8 %, `buildPath` −16.8 % static / −13.7 % params / −19.9 % on a `?`-declaring
+  route, `canNavigateTo` −8.2 % (now 1.06× of pre-pipeline — parity), and −0.3 % on
+  the defaults path.
+
+- [#1597](https://github.com/greydragon888/real-router/pull/1597) [`3798458`](https://github.com/greydragon888/real-router/commit/3798458dc7305105aff51ac6a3cb0a9695e6c1fc) Thanks [@greydragon888](https://github.com/greydragon888)! - perf: `isActiveRoute` stops touching the forward maps in a tree that has no `forwardTo` ([#1595](https://github.com/greydragon888/real-router/issues/1595))
+
+  `isActiveRoute`'s second arm ([#1573](https://github.com/greydragon888/real-router/issues/1573)) is gated on "does this route forward?", asked
+  as two lookups in `config.forwardMap` / `config.forwardFnMap`. Both are
+  `Object.create(null)` objects, which V8 keeps in **dictionary mode** whatever their
+  size — empty ones included — and the pair measured ~14 ns. That was paid by every
+  route in the tree for a feature only forwarding routes use, on the shape that
+  reaches the gate: an **inactive** link, which is most links on a page.
+
+  The gate now asks a tree-wide question first: `RoutesStore.hasAnyForward`, one
+  boolean load. A tree with no `forwardTo` never touches the maps; a tree that has
+  one falls through to the same per-route check as before.
+
+  The cost was **not** the `Object.hasOwn` form — replacing it with a plain property
+  read measured identical — but touching the dictionaries at all. Two other
+  candidate mechanisms were built and measured null before this one: extracting the
+  arm's tail into its own method, and giving each arm a monomorphic
+  `#matchesActiveState` call site.
+
+  `hasAnyForward` is derived state, and a stale `false` would silently switch the arm
+  off — a `<Link>` to a forwarding route rendering inactive again, the defect [#1573](https://github.com/greydragon888/real-router/issues/1573)
+  exists to fix. It is therefore maintained only alongside `resolvedForwardMap`,
+  through a single `adoptForwardState` helper, and pinned across `add` / `update` /
+  `replace` / `clear` / dynamic-callback / never-forwards by six cases in
+  `isActiveRoute.test.ts` (mutationally validated: pinning the flag fails four of
+  them).
+
+  Measured against pre-pipeline `0fed89b` as medians of 9 alternating single-module
+  processes, A/A floor ≤ 1 %: `isActiveRoute` on an inactive link 44.3 → 32.9 ns
+  (−25.7 %), which is 1.75× → 1.29× of its pre-pipeline cost. No other arm moved.
+
+- [#1597](https://github.com/greydragon888/real-router/pull/1597) [`3798458`](https://github.com/greydragon888/real-router/commit/3798458dc7305105aff51ac6a3cb0a9695e6c1fc) Thanks [@greydragon888](https://github.com/greydragon888)! - refactor: name the owner of state immutability, and guard it per producer ([#1599](https://github.com/greydragon888/real-router/issues/1599))
+
+  "States are deeply frozen" was true but owned by nobody. The depth is assembled
+  from four unrelated places — `canonicalize`'s fast path, `mergeWithDefault`,
+  `admittedSearch`'s drop branch, and a shell freeze — and two of them were guarded
+  by no test at all: deleting the `canonicalize` freeze left the entire suite green,
+  and the mode gate's freeze was reachable only under a non-`loose` mode with one
+  query key dropped and one admitted.
+
+  No behaviour change. What changed is that the policy is now stated and pinned:
+
+  - `INVARIANTS.md` gains **State immutability (who freezes what)** — every object
+    is frozen once, at its origin, with the measured reason not to centralise into a
+    recursive walk (re-freezing an already-frozen object costs ~8 ns, so a walk pays
+    per node for work the producers already did).
+  - A black-box producer matrix in `tests/functional/error/helpers.test.ts` covers
+    `navigate` (path params / query channel / route defaults), `makeState` with and
+    without params, `navigateToNotFound`, `replace()` revalidation, and a non-`loose`
+    mode with a dropped key. Mutationally validated against all four freeze sites.
+  - The `canonicalize` freeze property now crosses **both** paths — it used to pass a
+    fresh query bag on every run, so it only ever exercised the slow one.
+  - `freezeStateInPlace` → `freezeStateShell`: the old name promised a depth it never
+    delivered, and `CLAUDE.md` described a recursive traversal that had been gone for
+    some time. Internal, never exported from the package.
+
+
 ### @real-router/browser-plugin@0.19.0
 
 ### Minor Changes
