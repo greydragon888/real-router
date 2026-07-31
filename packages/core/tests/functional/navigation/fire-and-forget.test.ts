@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
@@ -183,6 +183,69 @@ describe("#721 fire-and-forget — no unhandledRejection leaks", () => {
     });
 
     local.stop();
+  });
+});
+
+/**
+ * #1605 — `start()`'s own half of the same contract.
+ *
+ * The suppressor used to be attached at the BOTTOM of `start()`, below an early
+ * `return Promise.reject(CACHED_ALREADY_STARTED_ERROR)`. So the one rejection
+ * that leaves the method first was the one nothing covered: a second, unawaited
+ * `start()` raised an `unhandledRejection`, which under Node 22+'s default
+ * `--unhandled-rejections=throw` terminates the process — with a stack pointing
+ * at the cached error's module constant, not at the caller.
+ *
+ * Fixed the way Step 0 fixed the navigate family: ONE checkpoint per public
+ * method, so no return site can be missed. These tests pin both halves — that
+ * nothing leaks, and that a caller's own no-op is not reported as a fault.
+ */
+describe("#1605 fire-and-forget — start()", () => {
+  it("a second, unawaited start() does not leak an unhandledRejection", async () => {
+    const router = createTestRouter();
+
+    await router.start("/home");
+
+    const leaked = await captureUnhandledRejections(() => {
+      void router.start("/home");
+    });
+
+    router.stop();
+
+    expect(leaked).toStrictEqual([]);
+  });
+
+  it("stays silent — ALREADY_STARTED is a caller-owned outcome, not a fault", async () => {
+    const router = createTestRouter();
+
+    await router.start("/home");
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    void router.start("/home");
+
+    // let the suppressing .catch() run
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const messages = errorSpy.mock.calls.map((call) => String(call[0]));
+
+    errorSpy.mockRestore();
+    router.stop();
+
+    expect(messages).toStrictEqual([]);
+  });
+
+  it("still rejects for an awaiting caller", async () => {
+    const router = createTestRouter();
+
+    await router.start("/home");
+
+    await expect(router.start("/home")).rejects.toMatchObject({
+      code: errorCodes.ROUTER_ALREADY_STARTED,
+    });
+
+    router.stop();
   });
 });
 

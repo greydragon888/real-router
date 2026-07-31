@@ -62,12 +62,19 @@ CACHED_SAME_STATES_REJECTION.catch(() => {}); // NOSONAR
 // =============================================================================
 
 /**
- * Rejection codes that are EXPECTED navigation outcomes owned by the caller,
- * not internal bugs. The fire-and-forget safety net stays silent for them and
- * lets an awaiting caller see the rejection. `CANNOT_ACTIVATE` /
- * `CANNOT_DEACTIVATE` belong here: a guard blocking (or a plugin's guard-blocked
- * `back()`/`forward()`) is a normal result, so a call without `await` must not
- * emit a spurious "Unexpected navigation error".
+ * Rejection codes that are EXPECTED, caller-owned outcomes, not internal bugs.
+ * The fire-and-forget safety net stays silent for them and lets an awaiting
+ * caller see the rejection. `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE` belong here:
+ * a guard blocking (or a plugin's guard-blocked `back()`/`forward()`) is a
+ * normal result, so a call without `await` must not emit a spurious "Unexpected
+ * navigation error".
+ *
+ * Most of them are navigation outcomes, but not all — `ROUTER_ALREADY_STARTED`
+ * is a LIFECYCLE precondition (#1605), and it is the same kind of thing:
+ * `start()` called twice says "already done", exactly as `SAME_STATES` does for
+ * `navigate()`. Silence is the symmetric answer; logging it would report a
+ * caller's own no-op as an internal fault. It costs nothing on the navigation
+ * side — `navigate()` cannot produce that code.
  *
  * Lives here rather than moving into the namespace with navigate-suppression,
  * because it is genuinely SHARED: `Router.start()` classifies its own failures
@@ -83,6 +90,7 @@ export const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
   errorCodes.ROUTE_NOT_FOUND,
   errorCodes.CANNOT_ACTIVATE,
   errorCodes.CANNOT_DEACTIVATE,
+  errorCodes.ROUTER_ALREADY_STARTED,
 ]);
 
 /** Module-level, so classifying allocates nothing per navigate()/start(). */

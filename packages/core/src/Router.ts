@@ -582,57 +582,21 @@ export class Router<
     return this.#eventBus.isActive();
   }
 
+  /**
+   * ONE fire-and-forget checkpoint for `start()`, deliberately — the same shape
+   * `NavigationNamespace.#settle` gives the navigate family, and for the same
+   * reason: a `.catch()` remembered at each `return` site is a thing that can be
+   * forgotten, and a forgotten one is invisible until it leaks.
+   *
+   * It HAD been forgotten (#1605). The `ALREADY_STARTED` rejection left through
+   * an early `return` above the suppressor, so a second, unawaited `start()`
+   * raised an `unhandledRejection` — process-fatal under Node 22+'s default
+   * `--unhandled-rejections=throw`, with a stack pointing at the cached error's
+   * module constant rather than at the caller. Every return site now leaves
+   * through `#start`, so no future early return can reopen it.
+   */
   start(startPath: string): Promise<State> {
-    if (!this.#eventBus.canStart()) {
-      return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
-    }
-
-    getInternals(this).validator?.navigation.validateStartArgs(startPath);
-
-    // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
-    // design, NOT a missed consolidation (#940): `sendStart()` runs HERE, before
-    // the interceptor chain, so the STARTING window spans the whole start
-    // pipeline. A pre-`next()` interceptor throw then unwinds via STARTING →
-    // `sendFail`, which emits TRANSITION_ERROR from STARTING (EventBusNamespace
-    // FAIL action) for `onTransitionError` plugins. Moving `sendStart()` into the
-    // namespace (the interceptor *target*) would skip STARTING on a pre-`next()`
-    // throw — the namespace is never reached — silently dropping that
-    // TRANSITION_ERROR: a #668 regression. The commit (`completeStart`) lives in
-    // the namespace; recovery needs facade state (`#state`, `#lifecycle`), so it
-    // stays here in `#unwindFailedStart`.
-    this.#eventBus.sendStart();
-
-    // Convert sync interceptor throws to rejections so the recovery path is
-    // reachable; otherwise the throw escapes synchronously, the FSM is left in
-    // STARTING, and the router is permanently bricked (#668).
-    let internalStart: Promise<State>;
-
-    try {
-      const chainResult: unknown = getInternals(this).start(startPath);
-
-      // A `start` interceptor that returns without calling next() yields a
-      // non-thenable (typically undefined); the `.catch` below would then throw
-      // a cryptic `TypeError: ...reading 'catch'` and leave the FSM stuck in
-      // STARTING. Reject with an actionable message so recovery unwinds via
-      // #unwindFailedStart — the same deferred-crash class as the #939
-      // start-path guard (#1411).
-      internalStart =
-        typeof (chainResult as { then?: unknown } | null | undefined)?.then ===
-        "function"
-          ? (chainResult as Promise<State>)
-          : Promise.reject(
-              new TypeError(
-                "[router.start] a `start` interceptor returned without calling next(). Every start interceptor must return `next(path)`.",
-              ),
-            );
-    } catch (syncError: unknown) {
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided start interceptor
-      internalStart = Promise.reject(syncError);
-    }
-
-    const promiseState = internalStart.catch((error: unknown) =>
-      this.#unwindFailedStart(error),
-    );
+    const promiseState = this.#start(startPath);
 
     promiseState.catch(this.#onSuppressedStartError);
 
@@ -1044,6 +1008,59 @@ export class Router<
    */
   static #asPromise(result: State | Promise<State>): Promise<State> {
     return result instanceof Promise ? result : Promise.resolve(result);
+  }
+
+  #start(startPath: string): Promise<State> {
+    if (!this.#eventBus.canStart()) {
+      return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
+    }
+
+    getInternals(this).validator?.navigation.validateStartArgs(startPath);
+
+    // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
+    // design, NOT a missed consolidation (#940): `sendStart()` runs HERE, before
+    // the interceptor chain, so the STARTING window spans the whole start
+    // pipeline. A pre-`next()` interceptor throw then unwinds via STARTING →
+    // `sendFail`, which emits TRANSITION_ERROR from STARTING (EventBusNamespace
+    // FAIL action) for `onTransitionError` plugins. Moving `sendStart()` into the
+    // namespace (the interceptor *target*) would skip STARTING on a pre-`next()`
+    // throw — the namespace is never reached — silently dropping that
+    // TRANSITION_ERROR: a #668 regression. The commit (`completeStart`) lives in
+    // the namespace; recovery needs facade state (`#state`, `#lifecycle`), so it
+    // stays here in `#unwindFailedStart`.
+    this.#eventBus.sendStart();
+
+    // Convert sync interceptor throws to rejections so the recovery path is
+    // reachable; otherwise the throw escapes synchronously, the FSM is left in
+    // STARTING, and the router is permanently bricked (#668).
+    let internalStart: Promise<State>;
+
+    try {
+      const chainResult: unknown = getInternals(this).start(startPath);
+
+      // A `start` interceptor that returns without calling next() yields a
+      // non-thenable (typically undefined); the `.catch` below would then throw
+      // a cryptic `TypeError: ...reading 'catch'` and leave the FSM stuck in
+      // STARTING. Reject with an actionable message so recovery unwinds via
+      // #unwindFailedStart — the same deferred-crash class as the #939
+      // start-path guard (#1411).
+      internalStart =
+        typeof (chainResult as { then?: unknown } | null | undefined)?.then ===
+        "function"
+          ? (chainResult as Promise<State>)
+          : Promise.reject(
+              new TypeError(
+                "[router.start] a `start` interceptor returned without calling next(). Every start interceptor must return `next(path)`.",
+              ),
+            );
+    } catch (syncError: unknown) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided start interceptor
+      internalStart = Promise.reject(syncError);
+    }
+
+    return internalStart.catch((error: unknown) =>
+      this.#unwindFailedStart(error),
+    );
   }
 
   /**
