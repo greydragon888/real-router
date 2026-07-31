@@ -593,10 +593,10 @@ export class Router<
    * raised an `unhandledRejection` — process-fatal under Node 22+'s default
    * `--unhandled-rejections=throw`, with a stack pointing at the cached error's
    * module constant rather than at the caller. Every return site now leaves
-   * through `#start`, so no future early return can reopen it.
+   * through `#runStart`, so no future early return can reopen it.
    */
   start(startPath: string): Promise<State> {
-    const promiseState = this.#start(startPath);
+    const promiseState = this.#runStart(startPath);
 
     promiseState.catch(this.#onSuppressedStartError);
 
@@ -1010,7 +1010,7 @@ export class Router<
     return result instanceof Promise ? result : Promise.resolve(result);
   }
 
-  #start(startPath: string): Promise<State> {
+  #runStart(startPath: string): Promise<State> {
     if (!this.#eventBus.canStart()) {
       return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
     }
