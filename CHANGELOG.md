@@ -5,6 +5,141 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-31]
+
+### @real-router/core@0.82.2
+
+### Patch Changes
+
+- [#1604](https://github.com/greydragon888/real-router/pull/1604) [`72d2a48`](https://github.com/greydragon888/real-router/commit/72d2a4849df47bbe9b001ae82323cf15f33d3ef0) Thanks [@greydragon888](https://github.com/greydragon888)! - The navigation pipeline is cut by cancellability, and driven by one phase program ([#1588](https://github.com/greydragon888/real-router/issues/1588))
+
+  Internal refactor — no public behaviour changes, and the cancellation property
+  suite that pins them is green and untouched.
+
+  Two cuts. **By cancellability:** a navigation that nothing can cancel and nothing
+  in which can suspend — no guards, no `subscribeLeave` listener, no caller
+  `signal`, no pre-commit plugin listener — now runs through a path where the
+  cancellation machinery is not skipped but ABSENT. No `AbortController`, no
+  liveness closure, no commit-gate, and a plain `State` return. Being unable to
+  suspend became a property of the code rather than a fact to remember.
+
+  **By program and interpreter:** the guard pipeline was three orchestrators and
+  two copies of the guard loop, differing in one branch, each wired to its own
+  continuation. It is now one program of three fixed phases walked by a cursor of
+  two numbers, with a synchronous interpreter that stops when a step hands back a
+  Promise and an asynchronous one that settles it and hands the cursor straight
+  back. Switching between them is a single act rather than four bespoke tails.
+
+  The payoff is not speed or size — both came out at parity, as predicted. It is
+  that **eight cancellation checks became one, and that one is observable.** Five
+  of the eight were mutationally unkillable: neutralising them left the whole suite
+  green, which means their _breakage_ was as invisible as their removal, because a
+  navigation reaching them was already covered by the liveness check one layer up.
+  The single check that replaces them sits where nothing else guards it — removing
+  it now fails four tests.
+
+- [#1604](https://github.com/greydragon888/real-router/pull/1604) [`72d2a48`](https://github.com/greydragon888/real-router/commit/72d2a4849df47bbe9b001ae82323cf15f33d3ef0) Thanks [@greydragon888](https://github.com/greydragon888)! - A guard on a route the transition never walks no longer arms the cancellation machinery ([#1588](https://github.com/greydragon888/real-router/issues/1588))
+
+  `hasGuards` was read from the router-wide guard Maps (`size > 0`), so a single
+  `canActivate` on an admin page sent **every** navigation down the guarded branch:
+  an `AbortController`, the `isCurrentNav` closure and a three-phase interpreter
+  walk that found no guard on any of its steps. The predicate now asks about the
+  segments this transition actually walks, mirroring what the interpreter would do
+  (a phase whose short-circuit is false runs no step, so `forceDeactivate` disarms
+  it too).
+
+  Measured on the production bundle, same-session A/B with an A/A control: a
+  navigation that never touches the guarded route went from **+97.7 ns / +643 B**
+  over the guard-free path to **+4.7 ns / +24 B** — −12% time and −29% allocations
+  on that navigation. Routers with no guards are unaffected (one `Map.size` load).
+
+  No behaviour change: the two branches were already equivalent, which is why the
+  waste was invisible to the suite. Pinned by counting allocated controllers
+  (`guards-off-path.test.ts`), not by timing.
+
+- [#1604](https://github.com/greydragon888/real-router/pull/1604) [`72d2a48`](https://github.com/greydragon888/real-router/commit/72d2a4849df47bbe9b001ae82323cf15f33d3ef0) Thanks [@greydragon888](https://github.com/greydragon888)! - Fire-and-forget suppression moves to the producer, and the `lastSync*` side channel is gone ([#1588](https://github.com/greydragon888/real-router/issues/1588))
+
+  Internal refactor. `navigate` / `navigateToDefault` and the `navigateToState`
+  plugin primitive still return `Promise<State>`, still suppress the same expected
+  rejections, and still hand back the same cached rejection singletons by identity.
+
+  One measurable timing change, in the only place the widened return type reaches
+  an `async` caller: `router.start()` now settles **two microtask ticks earlier**
+  on the sync-commit path, because `RouterLifecycleNamespace.start` returns a bare
+  `State` instead of a thenable it has to adopt. Only ever earlier, never later,
+  and the committed state is identical — but if you order work against `start()`
+  by microtask position rather than by `await`, that is the one thing to re-check.
+
+  What changed underneath: `NavigationNamespace` exposed two mutable public fields,
+  `lastSyncResolved` / `lastSyncRejected`, that the facade read in three identical
+  blocks to decide whether to attach a suppressing `.catch()`. That is a side
+  channel for something a return type can say, and it had already produced two bugs
+  ([#721](https://github.com/greydragon888/real-router/issues/721)) by going out of sync with reality.
+
+  Now the namespace answers with `State | Promise<State>` — a synchronously settled
+  navigation says so by returning a `State`, which is what `lastSyncResolved`
+  announced — and it suppresses its own rejections at one checkpoint per public
+  method, recognising its pre-suppressed singletons by identity instead of by flag.
+  The three facade blocks collapse to a single `Promise` wrap.
+
+  The two mechanisms cost the same (measured: ~5 ns either way), but they fail in
+  opposite directions: a missed identity costs one redundant `.catch()`, while a
+  flag left stale skips suppression on a _later_ navigation and leaks the
+  rejection — [#721](https://github.com/greydragon888/real-router/issues/721) exactly. The suppression policy itself (`SUPPRESSED_ERROR_CODES`)
+  is now shared rather than duplicated: `start()` classifies its own failures by it
+  too.
+
+- [#1604](https://github.com/greydragon888/real-router/pull/1604) [`72d2a48`](https://github.com/greydragon888/real-router/commit/72d2a4849df47bbe9b001ae82323cf15f33d3ef0) Thanks [@greydragon888](https://github.com/greydragon888)! - Decompose NavigationNamespace — the per-navigation state first, the orchestration after ([#1607](https://github.com/greydragon888/real-router/issues/1607))
+
+  `NavigationNamespace.ts` was 962 lines, and almost all of it belonged there: 13
+  of its 19 members need the DI bag, which is the namespace's reason to exist. The
+  exception was a coherent sub-domain with a tiny owner set — `#currentController`
+  and `#navigationId`, the lifecycle of one in-flight navigation.
+
+  Naming that state as `InFlightNavigation` (`begin` / `isCurrent` / `adopt` /
+  `release` / `abort`, one instance per router) is what let the orchestration
+  follow: `executeNavigation`, the two-pass prologue, `finishAsyncNavigation` and
+  `handleNoGuardsLeave` are now functions over `(deps, inFlight, plan)` in
+  `transition/executeNavigation.ts`. `navigateToNotFound` — the one commit
+  primitive that is not a transition — and `resolveAsyncGuard` moved to their own
+  homes too. The namespace is 327 lines and holds the entry points, their
+  fire-and-forget checkpoint, and the DI bag.
+
+  Internal only: no public API, no behaviour change. Verified with a zero
+  test-delta pathspec (positive control), 3840 functional / 432 property / 153
+  stress green, coverage 100%, and allocations bit-identical against the
+  production bundle across alternating OLD/NEW runs.
+
+- [#1604](https://github.com/greydragon888/real-router/pull/1604) [`72d2a48`](https://github.com/greydragon888/real-router/commit/72d2a4849df47bbe9b001ae82323cf15f33d3ef0) Thanks [@greydragon888](https://github.com/greydragon888)! - `start()` no longer leaks an unhandledRejection when called twice without `await` ([#1605](https://github.com/greydragon888/real-router/issues/1605))
+
+  `Router.start()` attached its fire-and-forget suppressor at the BOTTOM of the
+  method, below an early `return Promise.reject(CACHED_ALREADY_STARTED_ERROR)`. So
+  the one rejection that leaves `start()` first was the one nothing covered: a
+  second, unawaited `start()` raised an `unhandledRejection`, which under Node
+  22+'s default `--unhandled-rejections=throw` **terminates the process** — with a
+  stack pointing at the cached error's module constant rather than at the caller.
+  `canStart()` is also false during `STARTING`, so this covered two _concurrent_
+  `start()` calls, not only sequential ones — the shape a double mount, a React
+  StrictMode double effect, or an HMR reload produces.
+
+  It was the only uncovered rejection site in the package: the seven in
+  `NavigationNamespace` go through its `#settle` checkpoint, the three cached
+  rejection singletons carry a module-load `.catch()`, and the remaining two in
+  `Router.start()` land in `internalStart`, which already had two handlers.
+
+  Fixed the way the navigate family was fixed — **one checkpoint per public
+  method** rather than a `.catch()` remembered at each `return` site, because a
+  remembered one can be forgotten and a forgotten one is invisible until it leaks.
+  `start()` is now a wrapper that suppresses whatever `#start()` returns, so no
+  future early return can reopen the hole.
+
+  `ROUTER_ALREADY_STARTED` joins `SUPPRESSED_ERROR_CODES`, so the safety net stays
+  silent for it: calling `start()` twice reports "already done", exactly as
+  `SAME_STATES` does for `navigate()`, and reporting a caller's own no-op as an
+  internal fault would be the wrong answer. Awaiting callers are unaffected —
+  `start()` still rejects with `ROUTER_ALREADY_STARTED`. Nothing changes on the
+  navigation side; `navigate()` cannot produce that code.
+
 ## [2026-07-30]
 
 ### @real-router/angular@0.17.1
