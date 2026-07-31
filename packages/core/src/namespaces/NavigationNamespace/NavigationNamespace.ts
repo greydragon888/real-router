@@ -7,6 +7,7 @@ import {
   isExpectedRejection,
   PRE_SUPPRESSED,
 } from "./constants";
+import { InFlightNavigation } from "./inFlightNavigation";
 import { completeTransition } from "./transition/completeTransition";
 import { routeTransitionError } from "./transition/errorHandling";
 import { executeGuardPipeline } from "./transition/guardPhase";
@@ -102,9 +103,10 @@ function isSameNavigation(
  */
 export class NavigationNamespace {
   #deps!: NavigationDependencies;
-  #currentController: AbortController | null = null;
-  #navigationId = 0;
   #onSuppressed!: (error: unknown) => void;
+  // The controller + supersession token of the navigation in flight, owned as
+  // one thing (#1607). Built here, one per router — never per navigation.
+  readonly #inFlight = new InFlightNavigation();
 
   // =========================================================================
   // Dependency injection
@@ -240,10 +242,7 @@ export class NavigationNamespace {
    * defaults to `TRANSITION_CANCELLED`.
    */
   abortCurrentController(reason?: unknown): void {
-    this.#currentController?.abort(
-      reason ?? new RouterError(errorCodes.TRANSITION_CANCELLED),
-    );
-    this.#currentController = null;
+    this.#inFlight.abort(reason);
   }
 
   /**
@@ -477,8 +476,7 @@ export class NavigationNamespace {
 
     this.#abortPreviousNavigation(opts.signal);
 
-    // Stryker disable next-line UpdateOperator: equivalent — `#navigationId` is only ever compared by identity (`!== myId`) to detect supersession; uniqueness per navigation is all that matters, so `--` (decreasing ids) is indistinguishable from `++`.
-    const myId = ++this.#navigationId;
+    const myId = this.#inFlight.begin();
 
     // `suspendable` is true only when a synchronous supersede is reachable — an
     // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit plugin
@@ -655,9 +653,9 @@ export class NavigationNamespace {
       // eslint-disable-next-line unicorn/prefer-else-if -- two exhaustive `if`s read clearer here than an else-if; merging cascades into no-negated-condition / no-unnecessary-condition in this hot guard-setup branch
       if (hasGuards) {
         controller = new AbortController();
-        this.#currentController = controller;
+        this.#inFlight.adopt(controller);
         const isCurrentNav = () =>
-          this.#navigationId === myId && deps.isActive();
+          this.#inFlight.isCurrent(myId) && deps.isActive();
 
         const signal = controller.signal;
 
@@ -704,7 +702,7 @@ export class NavigationNamespace {
           throw new RouterError(errorCodes.TRANSITION_CANCELLED);
         }
 
-        this.#cleanupController(controller, false);
+        this.#inFlight.release(controller, false);
       }
 
       // #1169 commit-gate — refuse to commit a navigation cancelled or
@@ -714,9 +712,9 @@ export class NavigationNamespace {
       // Gated on `suspendable` so the pure sync hot path pays nothing. A
       // `stop()`/`dispose()` from the listener lands the FSM in IDLE/DISPOSED
       // (caught by `!isActive()`); an external `opts.signal` abort is caught
-      // directly. No `#navigationId` check: a reentrant navigate() (the only
-      // thing that could bump it synchronously) is banned (REENTRANT_NAVIGATION,
-      // §4), so on this sync path `#navigationId === myId` always holds — async
+      // directly. No supersession check: a reentrant navigate() (the only thing
+      // that could bump the token synchronously) is banned
+      // (REENTRANT_NAVIGATION, §4), so on this sync path the token still holds — async
       // supersede is caught in `#finishAsyncNavigation`'s `isCurrentNav`.
       if (suspendable && (!deps.isActive() || opts.signal?.aborted === true)) {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
@@ -754,7 +752,7 @@ export class NavigationNamespace {
   ): Promise<State> {
     const deps = this.#deps;
     const isActive = () =>
-      this.#navigationId === myId &&
+      this.#inFlight.isCurrent(myId) &&
       !controller.signal.aborted &&
       deps.isActive();
 
@@ -842,10 +840,10 @@ export class NavigationNamespace {
 
       throw error;
       // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
-      // emptying the finally only skips #cleanupController, which is unobservable
+      // emptying the finally only skips the controller release, which is unobservable
       // (defense-in-depth: on a CANCEL the FSM CANCEL action already aborted+nulled
       // the controller via abortCurrentController, RFC §5; the success-path
-      // ref-release is proven unobservable — see #cleanupController's disable). It
+      // ref-release is proven unobservable — see InFlightNavigation.release's disable). It
       // cannot be inline-`Stryker disable`d: the catch `}` and finally `{` share one
       // line, so there is no comment position that targets the finally body. Left documented.
     } finally {
@@ -855,7 +853,7 @@ export class NavigationNamespace {
         externalSignal?.removeEventListener("abort", onExternalAbort);
       }
 
-      // Detach the abort-race listener before #cleanupController aborts the
+      // Detach the abort-race listener before the release below aborts the
       // controller below, so the cleanup abort cannot re-fire it. `undefined`
       // only when the controller was already aborted at setup (the early-resolve
       // branch above registered no listener).
@@ -866,7 +864,7 @@ export class NavigationNamespace {
       // Success drops the controller without aborting (the subscribeLeave signal
       // must stay unaborted); cancel/error aborts it with the originating reason
       // so captured signals expose the real cause via `signal.reason` (#943).
-      this.#cleanupController(controller, !succeeded, failureReason);
+      this.#inFlight.release(controller, !succeeded, failureReason);
     }
   }
 
@@ -878,7 +876,7 @@ export class NavigationNamespace {
     fromState: State | undefined,
   ): void {
     if (controller) {
-      this.#cleanupController(controller, true, error);
+      this.#inFlight.release(controller, true, error);
     }
 
     if (transitionStarted && toState) {
@@ -904,11 +902,10 @@ export class NavigationNamespace {
     if (deps.hasLeaveListeners()) {
       const controller = new AbortController();
 
-      // Track as the current navigation BEFORE listeners run so a reentrant
-      // navigate() / stop() / dispose() from a sync listener aborts THIS leave
-      // signal — parity with the guard path (#722). On success the controller is
-      // released without aborting (see #cleanupController).
-      this.#currentController = controller;
+      // Adopted BEFORE listeners run so a reentrant navigate() / stop() /
+      // dispose() from a sync listener aborts THIS leave signal — parity with
+      // the guard path (#722).
+      this.#inFlight.adopt(controller);
 
       let leaveResult: Promise<void> | undefined;
 
@@ -922,7 +919,7 @@ export class NavigationNamespace {
         // A sync listener threw — the navigation fails; abort the leave signal
         // with the thrown value so a listener that captured the signal sees the
         // real cause via `signal.reason`, not a generic AbortError (#943).
-        this.#cleanupController(controller, true, error);
+        this.#inFlight.release(controller, true, error);
 
         throw error;
       }
@@ -934,7 +931,7 @@ export class NavigationNamespace {
       // Sync listeners settled. A synchronous reentrant navigate() can no longer
       // supersede here (banned, RFC §4), so the leave always succeeds: release the
       // controller WITHOUT aborting (the subscribeLeave signal must stay live).
-      this.#cleanupController(controller, false);
+      this.#inFlight.release(controller, false);
 
       return undefined;
     }
@@ -942,35 +939,6 @@ export class NavigationNamespace {
     // No leave listeners: nothing synchronous could have superseded this
     // navigation during the LEAVE_APPROVE emit (reentrant navigate is banned).
     return undefined;
-  }
-
-  /**
-   * Release a navigation's AbortController. The same `controller.signal` is
-   * handed to `subscribeLeave` listeners, so it must abort **only** when the
-   * navigation is cancelled or errors — never on success (#722). On the success
-   * path pass `cancelled = false`: the reference is dropped without aborting, so
-   * a listener that captured the signal still sees `aborted === false`.
-   *
-   * On the failure/cancellation path (`cancelled = true`) pass the originating
-   * `reason` so `signal.reason` carries router/error context (a `RouterError`,
-   * or the value a sync leave listener threw) — consistent with the cancellation
-   * abort `RouterError(TRANSITION_CANCELLED)`, not a generic `AbortError` (#943).
-   * `abort()` is idempotent: a controller already aborted by a superseding
-   * navigation keeps its first (also-meaningful) reason.
-   */
-  #cleanupController(
-    controller: AbortController,
-    cancelled: boolean,
-    reason?: unknown,
-  ): void {
-    if (cancelled) {
-      controller.abort(reason);
-    }
-
-    // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — controller identity-guard; cleanup correctness is enforced by #abortPreviousNavigation + the navigationId/isCurrentNav checks. Full suite stays green with `=== → !==` (nulls the wrong controller) and with the body removed (ref never nulled), so no mutant here is observable.
-    if (this.#currentController === controller) {
-      this.#currentController = null;
-    }
   }
 
   #abortPreviousNavigation(externalSignal?: AbortSignal): void {
