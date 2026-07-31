@@ -537,6 +537,11 @@ async function finishAsyncNavigation(
  * `#finishAsyncNavigation` reads the same fact off `controller.signal.aborted`,
  * which this arc cannot: the guard-free leave arc keeps its controller local and
  * has already released it by the time an error arrives here.
+ *
+ * ⚠ Interim form (#1609) — see `asCancellation` in `./errorHandling` for what
+ * absorbs it and what does NOT: `mayFail` on the in-flight FAIL edges takes the
+ * load-bearing half by construction, the `READY`-edge noise waits on the open
+ * RFC-10a §16.5.
  */
 function handleNavigateError(
   deps: NavigationDependencies,
