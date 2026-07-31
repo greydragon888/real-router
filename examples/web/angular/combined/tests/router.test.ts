@@ -230,10 +230,7 @@ describe("Route tree swap", () => {
 
     expect(router.getState()?.name).toBe("login");
 
-    const routesApi = getRoutesApi(router);
-
-    routesApi.clear();
-    routesApi.add(privateRoutes);
+    getRoutesApi(router).replace(privateRoutes);
 
     const state = await router.navigate("dashboard");
 

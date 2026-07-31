@@ -254,11 +254,9 @@ describe("Route tree swap", () => {
 
     expect(router.getState()?.name).toBe("login");
 
-    // Swap route tree: clear + add (replaceRoutes via getRoutesApi().replace() is also available)
-    const routesApi = getRoutesApi(router);
-
-    routesApi.clear();
-    routesApi.add(privateRoutes);
+    // Swap route tree atomically: replace() is the tool for a running router —
+    // it notifies subscribers, while clear() is teardown-only and refuses here (#1612)
+    getRoutesApi(router).replace(privateRoutes);
 
     const state = await router.navigate("dashboard");
 

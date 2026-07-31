@@ -47,10 +47,13 @@ describe("solid/combined — components", () => {
       expect(sidebar).toHaveTextContent("Home");
       expect(sidebar).toHaveTextContent("Login");
 
-      const routesApi = getRoutesApi(testRouter);
+      // Log in from the login page, as the app does. `/login` has no counterpart
+      // in the private tree, so the swap's revalidation lands on 404 and the
+      // navigate below is what reaches the dashboard. Swapping while on `/`
+      // would arrive there already — `home` forwards to `dashboard` there.
+      await testRouter.navigate("login");
 
-      routesApi.clear();
-      routesApi.add(privateRoutes);
+      getRoutesApi(testRouter).replace(privateRoutes);
       getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
       store.set("user", {
         id: "1",

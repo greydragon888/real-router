@@ -54,10 +54,13 @@ describe("solid/auth-guards — components", () => {
       // Swap routes BEFORE store update — Solid's synchronous reactivity
       // would otherwise create Link components for route names that don't
       // exist yet, causing buildPath errors.
-      const routesApi = getRoutesApi(testRouter);
+      // Log in from the login page, as the app does. `/login` has no counterpart
+      // in the private tree, so the swap's revalidation lands on 404 and the
+      // navigate below is what reaches the dashboard. Swapping while on `/`
+      // would arrive there already — `home` forwards to `dashboard` there.
+      await testRouter.navigate("login");
 
-      routesApi.clear();
-      routesApi.add(privateRoutes);
+      getRoutesApi(testRouter).replace(privateRoutes);
       getDependenciesApi(testRouter).set("abilities", defineAbilities("admin"));
       store.set("user", {
         id: "1",
@@ -99,10 +102,7 @@ describe("solid/auth-guards — components", () => {
       expect(sidebar).toHaveTextContent("Dashboard");
 
       // Swap routes before store update (same reason as login test)
-      const routesApi = getRoutesApi(testRouter);
-
-      routesApi.clear();
-      routesApi.add(publicRoutes);
+      getRoutesApi(testRouter).replace(publicRoutes);
       getDependenciesApi(testRouter).set("abilities", []);
       store.set("user", null);
 

@@ -48,10 +48,13 @@ describe("solid/auth-guards — router", () => {
 
       expect(router.getState()?.name).toBe("home");
 
-      const routesApi = getRoutesApi(router);
+      // Log in from the login page, as the app does. `/login` has no counterpart
+      // in the private tree, so the swap's revalidation lands on 404 and the
+      // navigate below is what reaches the dashboard. Swapping while on `/`
+      // would arrive there already — `home` forwards to `dashboard` there.
+      await router.navigate("login");
 
-      routesApi.clear();
-      routesApi.add(privateRoutes);
+      getRoutesApi(router).replace(privateRoutes);
       getDependenciesApi(router).set("abilities", defineAbilities("admin"));
 
       const state = await router.navigate("dashboard");
@@ -71,10 +74,7 @@ describe("solid/auth-guards — router", () => {
 
       expect(router.getState()?.name).toBe("dashboard");
 
-      const routesApi = getRoutesApi(router);
-
-      routesApi.clear();
-      routesApi.add(publicRoutes);
+      getRoutesApi(router).replace(publicRoutes);
       getDependenciesApi(router).set("abilities", []);
 
       const state = await router.navigate("home");
@@ -93,10 +93,7 @@ describe("solid/auth-guards — router", () => {
       getDependenciesApi(router).set("abilities", defineAbilities("admin"));
       await router.start("/dashboard");
 
-      const routesApi = getRoutesApi(router);
-
-      routesApi.clear();
-      routesApi.add(publicRoutes);
+      getRoutesApi(router).replace(publicRoutes);
 
       await expect(router.navigate("dashboard")).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,

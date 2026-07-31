@@ -48,10 +48,10 @@ export function App(): JSX.Element {
         ];
 
   const onLogin = async (loggedInUser: User) => {
-    const routesApi = getRoutesApi(router);
-
-    routesApi.clear();
-    routesApi.add(privateRoutes);
+    // `replace()`, not `clear() + add()`: the router is running, so the swap
+    // has to be atomic and has to notify subscribers. `clear()` is a teardown
+    // primitive and refuses while a state is committed (#1612).
+    getRoutesApi(router).replace(privateRoutes);
     getDependenciesApi(router).set(
       "abilities",
       defineAbilities(loggedInUser.role),
@@ -61,10 +61,7 @@ export function App(): JSX.Element {
   };
 
   const onLogout = async () => {
-    const routesApi = getRoutesApi(router);
-
-    routesApi.clear();
-    routesApi.add(publicRoutes);
+    getRoutesApi(router).replace(publicRoutes);
     getDependenciesApi(router).set("abilities", []);
     store.set("user", null);
     await navigator.navigate("home");
