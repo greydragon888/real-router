@@ -430,6 +430,13 @@ router.navigate(name, params, search, opts)   // search = query channel; opts at
   ├── liveness snapshot (suspendable? — external signal / leave / start listeners; #1169)
   ├── FSM send(NAVIGATE) → action emits TRANSITION_START
   │
+  ├── IMMEDIATE PATH (!hasGuards && !suspendable — разрез А, #1588):
+  │   └── #completeImmediate() → sendLeaveApprove + completeTransition
+  │       nothing can cancel it and nothing in it can suspend, so the
+  │       cancellation machinery is not skipped here — it is ABSENT:
+  │       no AbortController, no liveness closure, no commit-gate,
+  │       and the return is a bare State, not a Promise
+  │
   ├── Guard pipeline (executeGuardPipeline)
   │   ├── Deactivation guards (innermost → outermost)
   │   ├── LEAVE_APPROVE phase: FSM send(LEAVE_APPROVE) → action emits TRANSITION_LEAVE_APPROVE
@@ -463,19 +470,25 @@ On error at any step: `emitTransitionError()` → `Plugin.onTransitionError()` �
 
 ```
 namespaces/NavigationNamespace/
-├── NavigationNamespace.ts     — navigate(), #finishAsyncNavigation()
-├── constants.ts               — cached error instances (CACHED_*_REJECTION)
-├── types.ts                   — NavigationContext, NavigationDependencies
+├── NavigationNamespace.ts     — public wrappers → #settle → private cores;
+│                                #beginTransition / #planPhases (the two-pass
+│                                prologue), #completeImmediate, #executeNavigation,
+│                                #finishAsyncNavigation, #handleNoGuardsLeave
+├── constants.ts               — cached error instances (CACHED_*_REJECTION),
+│                                SUPPRESSED_ERROR_CODES, PRE_SUPPRESSED
+├── types.ts                   — NavigationContext, NavigationPlan, NavigationDependencies
 ├── index.ts                   — exports
 └── transition/
-    ├── guardPhase.ts          — executeGuardPipeline(), runGuards(), resolveRemainingGuards()
+    ├── guardPhase.ts          — executeGuardPipeline(), runFrom(), resumeFrom(), runPhase(), runStep()
     ├── completeTransition.ts  — completeTransition(), buildTransitionMeta()
     └── errorHandling.ts       — handleGuardError(), routeTransitionError()
 ```
 
-**Guard pipeline** (`guardPhase.ts`): `executeGuardPipeline()` orchestrates deactivation → activation phases. `runGuards()` iterates guards synchronously, returns `Promise<void>` on first async guard. `resolveRemainingGuards()` continues the async tail as a flat for-loop (no `.slice()` allocations).
+**Guard pipeline** (`guardPhase.ts`) — **one program, two interpreters** (#1588). The program is three fixed phases (`0 = deactivate`, `1 = leave`, `2 = activate`) walked by a cursor of two numbers. `runFrom()` is the synchronous interpreter: it walks until a step hands back a Promise, then stops and returns a `Suspension` saying where. `resumeFrom()` is the asynchronous one: it settles that Promise and hands the cursor straight back to `runFrom()`. `runPhase()` applies the phase's short-circuit (`shouldDeactivate` / `shouldActivate` — these carry `opts.forceDeactivate`, so they are contract, not an emptiness test) and `runStep()` runs one step. `executeGuardPipeline()` keeps the same outer contract as before: `undefined` when everything ran synchronously, a `Promise<void>` otherwise.
 
-**`NavigationContext`** (`types.ts`): Shared interface passed from `navigate()` through async path to `completeTransition()`. Avoids constructing intermediate objects on the hot path.
+This replaced three orchestrators (`executeGuardPipeline` / `finishAsyncPipeline` / `finishAfterAsyncLeave`) and two copies of the guard loop (`runGuards` / `resolveRemainingGuards`). The payoff is **one cancellation check instead of eight**: five of the eight were mutationally unkillable — their breakage was as invisible as their removal, because the liveness check in `#finishAsyncNavigation` already covered any navigation that reached them. The single check in the head of `runStep()` sits where nothing else guards it; removing it fails four tests.
+
+**`NavigationContext` / `NavigationPlan`** (`types.ts`): `NavigationPlan` is what a navigation actually builds — everything worked out before any guard runs, filled in **two passes** across the `TRANSITION_START` emit (`suspendable` must be read before the pre-commit listener window, the guard maps after it, since a `TRANSITION_START` listener may still register a guard). It **extends** `NavigationContext`, so the same object is handed to `completeTransition()` / `#finishAsyncNavigation()` instead of a second literal — one context object per navigation.
 
 ### Guards vs Plugins
 
@@ -872,7 +885,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - `nameToIDs()` has fast paths for 1-4 segments
 - Route tree is immutable (Object.freeze) — cloneRouter() rebuilds from definitions (not shared)
 - Router options are immutable — deep-frozen at construction (`OptionsNamespace`), safe to return directly
-- `static #onSuppressedNavigateError` / `#onSuppressedStartError` — cached suppressor callbacks, one allocation per class (not per navigate/start); both share `#isExpectedRejection` for the silent-suppress classification
+- Fire-and-forget suppressors are **per-router, and split by owner** (#1588): `NavigationNamespace.#onSuppressed` (built once in `setDependencies`) covers navigate / navigateToState / navigateToDefault, because the layer that CREATES a promise is the only one that can tell a fresh rejection from one of its own pre-suppressed singletons; `Router.#onSuppressedStartError` stays on the facade, which builds `start()`'s promise itself. Both classify through one shared module-level `isExpectedRejection` / `SUPPRESSED_ERROR_CODES` in `NavigationNamespace/constants.ts` — one owner, two readers. (Neither is `static`: they log through THIS router's logger, #724.)
 - Segment cleanup uses `Array.includes()` instead of `new Set()` (1-5 elements — linear faster)
 - `createInterceptable()` — empty-array fast path skips iteration when no interceptors registered
 - FSM `canSend()` — O(1) via cached `#currentTransitions`
@@ -883,9 +896,9 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 
 ### Async subscribeLeave overhead
 
-- **0 listeners (hot path):** on the no-guards path `#handleNoGuardsLeave` runs only `sendLeaveApprove` + a `hasLeaveListeners()` check + a `navigationId` check — no `{nav}` context, no `LeaveState`, no `AbortController` (all allocated only when listeners exist)
+- **0 listeners (hot path):** `#handleNoGuardsLeave` is not on it at all since разрез А (#1588) — no leave listeners means `suspendable` is false, so a guard-free navigation returns from `#completeImmediate`, which runs `sendLeaveApprove` + `completeTransition` and nothing else. No `LeaveState`, no `AbortController`, no commit-gate. `#handleNoGuardsLeave` now serves only the guard-free **suspendable** arcs (external `signal` / pre-commit listener / leave listeners), where it still allocates a controller only `if (hasLeaveListeners())` — which is why folding it into the guard machinery was measured and rejected (the guard path allocates one unconditionally)
 - **N sync listeners:** AbortController created + released (not aborted on success, #722; ~5µs total with cleanup), frozen `LeaveState` object, N try/catch (V8 zero-cost on happy path), N×2 thenable checks
-- **Lazy closures:** `isCurrentNav` / `emitLeaveApproveCallback` closures and the `{nav}` context are created inside the `if (hasGuards)` branch (or the async tail) only — not on the no-guards hot path
+- **Lazy closures:** `isCurrentNav` / `emitLeaveApproveCallback` closures are created inside the `if (hasGuards)` branch (or the async tail) only — never on the guard-free path. The context bag is not lazy and does not need to be: `NavigationPlan` is built once per navigation and IS the `NavigationContext` handed to `completeTransition` / `#finishAsyncNavigation`
 - **Benchmarks:** `navigate/leave-1` / `navigate/leave-3` in `tests/benchmarks/default.bench.ts` (gated tinybench + CodSpeed hot-path suite) — run via `pnpm -F @real-router/core bench`
 
 ## Code Conventions

@@ -18,7 +18,8 @@ import type { State } from "../../types";
 // This is acceptable because:
 // 1. These errors indicate expected conditions, not internal bugs
 // 2. Error code and message are sufficient for debugging
-// 3. The facade skips .catch() suppression for cached promises (zero alloc)
+// 3. The producer skips .catch() suppression for these promises (zero alloc) —
+//    see PRE_SUPPRESSED at the bottom of this file
 // =============================================================================
 
 export const CACHED_NOT_STARTED_ERROR = new RouterError(
@@ -32,8 +33,10 @@ export const CACHED_ROUTE_NOT_FOUND_ERROR = new RouterError(
 export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
 
 // Pre-suppressed rejected promises — .catch() at module load prevents
-// unhandled rejection warnings. The facade skips additional .catch() calls
-// via the lastSyncRejected flag (zero derived-promise allocation).
+// unhandled rejection warnings. `NavigationNamespace.#settle` skips additional
+// .catch() calls by recognising these three by IDENTITY (`PRE_SUPPRESSED`
+// below), so no derived promise is allocated. The retired `lastSyncRejected`
+// flag used to carry that signal to the facade instead.
 export const CACHED_NOT_STARTED_REJECTION: Promise<State> = Promise.reject(
   CACHED_NOT_STARTED_ERROR,
 );

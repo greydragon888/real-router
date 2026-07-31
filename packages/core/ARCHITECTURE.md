@@ -461,23 +461,23 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Performance Characteristics
 
-| Optimization                                | Purpose                                                                 |
-| ------------------------------------------- | ----------------------------------------------------------------------- |
-| `nameToIDs()` fast paths (0-4 segments)     | Avoids `split()` for most common route depths                           |
-| Single-entry transition path cache          | N-1 redundant computations eliminated per navigation                    |
-| validation-plugin opt-in                    | DX validation via `@real-router/validation-plugin` (skip in production) |
-| `static #onSuppressed{Navigate,Start}Error` | One allocation per class, not per `navigate()`/`start()` call           |
-| Deep freeze with WeakSet cache              | Avoids re-freezing already frozen state objects                         |
-| `Array.includes()` for segment cleanup      | Faster than `new Set()` for 1-5 elements                                |
-| FSM `canSend()` — O(1)                      | Cached `#currentTransitions` lookup                                     |
-| `createInterceptable()` fast path           | Empty-array check skips iteration when no interceptors                  |
-| `canonicalize` fast-path gate: 2 reads      | Was 3 — the `?`-declaration term was redundant (#1589)                  |
-| `store.hasAnyForward` — tree-wide gate      | isActiveRoute skips the forwardTo maps when nothing forwards (#1595)    |
-| Lazy event listeners                        | No allocation until first subscription                                  |
-| Cached error rejections                     | Pre-allocated `Promise.reject()` for common errors                      |
-| Async leave: no-abort on sync path          | AbortController.abort() skipped when all leave listeners are sync       |
-| Async leave: deferred NavigationContext     | `{nav}` object created only in async branch, not on every navigate      |
-| Async leave: `isCurrentNav` scoped          | Closure moved to guards block — not allocated on no-guards path         |
+| Optimization                            | Purpose                                                                 |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths                           |
+| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                    |
+| validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production) |
+| Per-router suppressors, split by owner  | One allocation per router, not per `navigate()`/`start()` (#1588)       |
+| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects                         |
+| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements                                |
+| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                                     |
+| `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors                  |
+| `canonicalize` fast-path gate: 2 reads  | Was 3 — the `?`-declaration term was redundant (#1589)                  |
+| `store.hasAnyForward` — tree-wide gate  | isActiveRoute skips the forwardTo maps when nothing forwards (#1595)    |
+| Lazy event listeners                    | No allocation until first subscription                                  |
+| Cached error rejections                 | Pre-allocated `Promise.reject()` for common errors                      |
+| Async leave: no-abort on sync path      | AbortController.abort() skipped when all leave listeners are sync       |
+| One context bag per navigation          | `NavigationPlan` IS the `NavigationContext` — no second literal (#1588) |
+| Async leave: `isCurrentNav` scoped      | Closure moved to guards block — not allocated on no-guards path         |
 
 ## Stress Test Coverage
 

@@ -259,12 +259,14 @@ export async function run(): Promise<void> {
   }
 
   // ------------------------------------------------------------------------
-  // The three terms of the `immediate` predicate that nothing measured before
-  // (RFC navigation-two-pipelines §7.2). Two of them — an external `signal` and
-  // a pre-commit listener — make a navigation SUSPENDABLE without making it
-  // asynchronous, which is the axis divergence the RFC's central claim rests on
-  // and which had no arc at all. The third measures the async tail with no I/O
-  // hiding it.
+  // The two terms of the `immediate` predicate that nothing measured before
+  // (RFC navigation-two-pipelines §7.2). An external `signal` and a pre-commit
+  // listener each make a navigation SUSPENDABLE without making it asynchronous,
+  // which is the axis divergence the RFC's central claim rests on and which had
+  // no arc at all. A third arc (`async-guard-microtask`) was drafted and then
+  // dropped before push: an async guard with real I/O dwarfs the ~800 ns async
+  // tail by four orders of magnitude, so it would have been a CodSpeed number
+  // nobody should tune against.
   // ------------------------------------------------------------------------
 
   // pre-commit-listener: an `onTransitionStart` plugin, no guards, no leave

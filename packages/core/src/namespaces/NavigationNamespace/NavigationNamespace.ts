@@ -25,7 +25,6 @@ import type {
   NavigationDependencies,
   NavigationPlan,
 } from "./types";
-import type { TransitionPath } from "../../transitionPath";
 import type {
   GuardFn,
   NavigationOptions,
@@ -274,9 +273,12 @@ export class NavigationNamespace {
     try {
       toState = deps.buildNavigateState(name, params, search);
     } catch (error) {
-      /* v8 ignore next 3 -- @preserve: reachable only via validator-driven
-         throws from buildNavigateState (validateStateBuilderArgs) — covered
-         in @real-router/validation-plugin's suite, not in core. */
+      // No `v8 ignore` here any more: the comment that used to sit above this
+      // line claimed the path was "reachable only via validator-driven throws
+      // … covered in @real-router/validation-plugin's suite, not in core", and
+      // that stopped being true when the always-on channel guard (#1572) began
+      // throwing from core's own `buildNavigateState`. Measured: with the ignore
+      // removed, core's suite still reports 100% — it was masking a live region.
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided buildNavigateState
       return Promise.reject(error);
     }
@@ -598,21 +600,22 @@ export class NavigationNamespace {
       const confirmedToState = toState;
 
       if (!hasGuards) {
-        const asyncLeave = this.#handleNoGuardsLeave(
-          confirmedToState,
-          fromState,
-          myId,
-          opts,
-          plan,
-          canDeactivateFunctions,
-        );
+        const asyncLeave = this.#handleNoGuardsLeave(plan);
 
         if (asyncLeave !== undefined) {
           return asyncLeave;
         }
       }
 
-      // Stryker disable next-line ConditionalExpression: equivalent — running the guard pipeline on the no-guards path does not double-emit LEAVE_APPROVE (full suite green with `if (true)`); the BlockStatement mutant stays live (killed by guarded-route tests).
+      // NOT equivalent, and the `Stryker disable: equivalent` that used to sit
+      // here was wrong: with `if (true)` the guard branch runs AFTER
+      // `#handleNoGuardsLeave` already emitted LEAVE_APPROVE, so
+      // `emitLeaveApproveCallback` dispatches every `subscribeLeave` listener a
+      // SECOND time (measured: 2 calls, 1 expected). The whole suite stayed
+      // green because the shared `createTestRouter` fixture carries definition
+      // guards, so no test ever reached this branch with `hasGuards` false —
+      // `guard-phase-emit-leave-approve.test.ts` now builds a guard-free router
+      // and kills both mutants.
       // eslint-disable-next-line unicorn/prefer-else-if -- two exhaustive `if`s read clearer here than an else-if; merging cascades into no-negated-condition / no-unnecessary-condition in this hot guard-setup branch
       if (hasGuards) {
         controller = new AbortController();
@@ -847,15 +850,18 @@ export class NavigationNamespace {
     }
   }
 
-  #handleNoGuardsLeave(
-    toState: State,
-    fromState: State | undefined,
-    myId: number,
-    opts: NavigationOptions,
-    transitionPath: TransitionPath,
-    canDeactivateFunctions: Map<string, GuardFn>,
-  ): Promise<State> | undefined {
+  /**
+   * The leave phase for a navigation with no guards, but with something that
+   * can suspend it. Takes the `plan` whole rather than six projections of it:
+   * every argument it used to receive was a field of that same bag, and the bag
+   * IS a `NavigationContext`, so handing it straight to `#finishAsyncNavigation`
+   * keeps this arc at ONE context object per navigation — the allocation
+   * neutrality the extracted prologue was supposed to buy everywhere, not only
+   * on the guard path.
+   */
+  #handleNoGuardsLeave(plan: NavigationPlan): Promise<State> | undefined {
     const deps = this.#deps;
+    const { toState, fromState, myId } = plan;
 
     deps.sendLeaveApprove(toState, fromState);
 
@@ -886,20 +892,7 @@ export class NavigationNamespace {
       }
 
       if (leaveResult !== undefined) {
-        return this.#finishAsyncNavigation(
-          leaveResult,
-          {
-            toState,
-            fromState,
-            opts,
-            toDeactivate: transitionPath.toDeactivate,
-            toActivate: transitionPath.toActivate,
-            intersection: transitionPath.intersection,
-            canDeactivateFunctions,
-          },
-          controller,
-          myId,
-        );
+        return this.#finishAsyncNavigation(leaveResult, plan, controller, myId);
       }
 
       // Sync listeners settled. A synchronous reentrant navigate() can no longer

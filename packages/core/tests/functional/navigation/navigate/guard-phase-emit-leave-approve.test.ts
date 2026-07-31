@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
@@ -112,5 +112,64 @@ describe("navigate() — LEAVE_APPROVE emission & guard order", () => {
 
     expect(leave).toHaveBeenCalledTimes(1);
     expect(activate).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The NO-GUARDS half of this file, and the only one that needs its own
+   * router: `createTestRouter`'s tree carries definition guards
+   * (`admin-protected` / `auth-protected`), so `hasGuards` is unconditionally
+   * true for the shared fixture and every test above enters `#executeNavigation`
+   * through the guard branch. Nothing reached the other branch — which is how
+   * the two `if (hasGuards)` arms came to run in sequence under a mutant with
+   * the whole suite green.
+   *
+   * `#executeNavigation` splits the guard-free navigation in two: with no leave
+   * listener it is `immediate` and returns from `#completeImmediate`; WITH one
+   * it is suspendable, so `#handleNoGuardsLeave` emits LEAVE_APPROVE and the
+   * guard branch must then stay shut. Running both would emit the phase twice
+   * and call every `subscribeLeave` listener a second time.
+   */
+  describe("no guards registered", () => {
+    let bare: Router;
+
+    beforeEach(async () => {
+      bare = createRouter([
+        { name: "home", path: "/home" },
+        { name: "users", path: "/users" },
+      ]);
+
+      await bare.start("/home");
+    });
+
+    afterEach(() => {
+      if (bare.isActive()) {
+        bare.stop();
+      }
+    });
+
+    it("emits leave-approve exactly ONCE with a sync listener (no double dispatch)", async () => {
+      const leave = vi.fn();
+      const approve = vi.fn();
+
+      bare.subscribeLeave(leave);
+      bare.usePlugin(() => ({ onTransitionLeaveApprove: approve }));
+
+      await bare.navigate("users");
+
+      expect(leave).toHaveBeenCalledTimes(1);
+      expect(approve).toHaveBeenCalledTimes(1);
+    });
+
+    it("emits leave-approve exactly ONCE with an async listener", async () => {
+      const leave = vi.fn(async () => {
+        await Promise.resolve();
+      });
+
+      bare.subscribeLeave(leave);
+
+      await bare.navigate("users");
+
+      expect(leave).toHaveBeenCalledTimes(1);
+    });
   });
 });

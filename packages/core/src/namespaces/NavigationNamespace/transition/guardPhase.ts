@@ -20,8 +20,14 @@ import type { GuardFn, State } from "../../../types";
  * check**. There were eight, and five of them were mutationally unkillable —
  * their breakage was as unobservable as their removal, because a navigation
  * reaching them was already covered by the liveness check one layer up. A single
- * check in the head of the step runs at every position the eight covered, and it
- * sits where nothing else guards it, so it is killable again.
+ * check in the head of the step runs at every position that mattered, and it
+ * sits where nothing else guards it, so it is killable again (removing it fails
+ * four tests).
+ *
+ * It does NOT reproduce the five redundant positions, deliberately: there is no
+ * check after the LAST activation guard settles, nor after an async leave when
+ * `shouldActivate` is false, because the walk simply ends there. Those were two
+ * of the five, and `#finishAsyncNavigation`'s liveness check still covers both.
  */
 
 const PHASE_DEACTIVATE = 0;

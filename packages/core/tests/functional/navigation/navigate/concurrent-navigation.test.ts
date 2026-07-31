@@ -752,9 +752,9 @@ describe("router.navigate() - concurrent navigation", () => {
 
       await router.navigate("users.view", { id: 123 });
 
-      // Deactivate "users.view" async → triggers #continueAsyncNavigation
+      // Deactivate "users.view" async → the walk suspends and `resumeFrom` takes over
       // Remaining activate: ["orders", "orders.view"] — both async
-      // Two async guards resolved by resolveRemainingGuards loop
+      // Two async guards settled by the resumeFrom → runFrom cursor handoff
       lifecycle.addDeactivateGuard(
         "users.view",
         () => () =>

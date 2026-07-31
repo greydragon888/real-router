@@ -11,7 +11,7 @@ import type { LifecycleApi } from "@real-router/core/api";
 let router: Router;
 let lifecycle: LifecycleApi;
 
-describe("resolveRemainingGuards branches", () => {
+describe("async-tail branches (resumeFrom → runFrom)", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
@@ -89,9 +89,10 @@ describe("resolveRemainingGuards branches", () => {
   });
 
   it("includes the failing segment name when a sync guard returns false in the async tail", async () => {
-    // resolveRemainingGuards tail loop: sync guard returns false after an async
-    // guard resolved. Asserting `segment` kills the ObjectLiteral mutant on the
-    // tail-loop `throw new RouterError(errorCode, { segment })`.
+    // The async tail: a sync guard returns false on the step AFTER an async one
+    // resolved, i.e. `resumeFrom` handed the cursor back to `runFrom`. Asserting
+    // `segment` kills the ObjectLiteral mutant on `runStep`s
+    // `throw new RouterError(errorCode, { segment })`.
     lifecycle.addActivateGuard("orders", () => vi.fn().mockResolvedValue(true));
     lifecycle.addActivateGuard("orders.pending", () =>
       vi.fn().mockReturnValue(false),
