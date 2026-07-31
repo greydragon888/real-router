@@ -980,7 +980,9 @@ describe("@real-router/lifecycle-plugin", () => {
       // replace removing "about"/"added": exercises the replace removal loop.
       routesApi.replace([{ name: "home", path: "/" }]);
 
-      // clear: empties the whole compiled-hook map.
+      // clear: empties the whole compiled-hook map. #1612 — clear() is a
+      // teardown primitive, so the router is stopped first.
+      router.stop();
       routesApi.clear();
 
       // teardown: removes the TREE_CHANGED subscription.

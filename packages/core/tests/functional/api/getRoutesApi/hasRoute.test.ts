@@ -78,6 +78,9 @@ describe("core/routes/routeTree/hasRoute", () => {
 
       expect(routesApi.has("hr-clearable")).toBe(true);
 
+      // #1612: clear() is a teardown primitive — it refuses while a state is
+      // committed, and the fixture starts the router.
+      router.stop();
       routesApi.clear();
 
       expect(routesApi.has("hr-clearable")).toBe(false);

@@ -33,7 +33,7 @@ export function Dashboard({ onLogout }: DashboardProps): JSX.Element {
       )}
       <p>
         The route tree was atomically replaced on login:{" "}
-        <code>routesApi.clear() + routesApi.add(privateRoutes)</code>
+        <code>routesApi.replace(privateRoutes)</code>
       </p>
       <button
         className="danger"

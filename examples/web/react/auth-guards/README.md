@@ -4,7 +4,7 @@ Demonstrates runtime route tree replacement for authentication, role-based acces
 
 ## What it covers
 
-- `getRoutesApi(router).clear()` + `.add()` — atomic route tree swap on login/logout
+- `getRoutesApi(router).replace()` — atomic route tree swap on login/logout (notifies subscribers; `clear()` is a teardown primitive and refuses on a running router, #1612)
 - `getDependenciesApi(router).set("abilities", ...)` — injecting role-based abilities into DI
 - `canActivate` guard reading abilities from DI via `getDep("abilities")`
 - `canDeactivate` guard with `window.confirm` for unsaved changes (Settings page)

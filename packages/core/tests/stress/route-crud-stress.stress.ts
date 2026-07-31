@@ -95,6 +95,9 @@ describe("S19: Route CRUD under load", () => {
 
     await Promise.allSettled(promises);
 
+    // #1612: clear() is a teardown primitive and refuses while a state is
+    // committed — the concurrent navigations above left one.
+    router.stop();
     routesApi.clear();
 
     expect(routesApi.has("route0")).toBe(false);
