@@ -545,7 +545,17 @@ function handleNoGuardsLeave(
 
     let leaveResult: Promise<void> | undefined;
 
+    // This catches the SYNCHRONOUS throw only — a leave listener that throws
+    // inline, before any Promise exists (three tests in
+    // `leave-signal-cancellation.test.ts` fail without it: the sync-throw
+    // rejection, its `signal.reason` (#943), and the reentrant-navigate abort).
+    // A rejection of the RETURNED Promise is deliberately not caught here: it is
+    // awaited in `finishAsyncNavigation`, which routes it through
+    // `routeTransitionError` with the controller released as cancelled. Sonar's
+    // S4822 flags the shape (a promise-returning call inside `try`) and cannot
+    // see that split.
     try {
+      // NOSONAR -- S4822: the try is for the sync listener throw, never for the Promise
       leaveResult = deps.awaitLeaveListeners(
         toState,
         fromState,
