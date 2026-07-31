@@ -7,6 +7,172 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-07-31]
 
+### @real-router/core@0.84.0
+
+### Minor Changes
+
+- [#1619](https://github.com/greydragon888/real-router/pull/1619) [`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): `clear()` refuses while a state is committed, instead of resetting it silently ([#1612](https://github.com/greydragon888/real-router/issues/1612))
+
+  **Breaking change (pre-1.0).** `getRoutesApi(router).clear()` now throws `RouterError(ROUTER_NOT_STOPPED)` when `router.getState() !== undefined`. It is legal before `start()` and after `stop()`.
+
+  `clear()` used to drop the committed state to `undefined` and tell nobody: every `router.subscribe` consumer — `@real-router/sources` and all six framework adapters through `useSyncExternalStore` / signals — kept rendering a route the router had already discarded. It also left the router in `isActive() === true` with no state, a shape that otherwise exists only _during_ `start()`; an always-on guard already misreads it, with path-less `navigateToNotFound()` answering `ROUTER_NOT_STARTED` on a started router.
+
+  Announcing the reset instead (making `clear()` behave like `replace([])`) was measured and rejected. It would make route CRUD emit a transition event as a **rule** — `replace()` is deliberately the one structural mutation that emits one — and it would not remove the shape, only make it prettier. It is also not the same operation: `replace([])` preserves external guards, `clear()` destroys them. Refusing removes the crossing outright: `clear()` stops writing into state it does not own.
+
+  **Migration.** To swap the tree on a **running** router use `replace(routes)` — atomic, one tree rebuild, notifies subscribers, and preserves external guards:
+
+  ```diff
+  - routesApi.clear();
+  - routesApi.add(newRoutes);
+  + routesApi.replace(newRoutes);
+  ```
+
+  To genuinely tear the router down, stop it first:
+
+  ```diff
+  + router.stop();
+    routesApi.clear();
+  ```
+
+  The pre-existing "navigation in progress" precondition is unchanged and still logs-and-no-ops; the two hand over to each other, since it now applies only in the window where a navigation is in flight and no state is committed yet — the initial `start()`.
+
+  Also records `clear()`'s atomicity contract, which was never written down: unlike `replace` / `add` / `update` (prepare-then-commit, pre-flighted, declared), `clear()`'s is **structural** — three consecutive steps that hold together only because no user code runs in them. `INVARIANTS.md` now states it with its class named, backed by a post-condition property test (tree, guards and BOTH state cells go empty together), so a callback landing in one of those steps is recognised as a contract break rather than a refactor.
+
+  New error code: `errorCodes.ROUTER_NOT_STOPPED` (`"NOT_STOPPED"`).
+
+### @real-router/angular@0.17.3
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+  - @real-router/sources@0.13.2
+
+### @real-router/browser-plugin@0.19.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/hash-plugin@0.9.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/lifecycle-plugin@0.7.8
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/logger-plugin@0.6.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/memory-plugin@0.4.35
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/navigation-plugin@0.8.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/persistent-params-plugin@0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/preact@0.18.3
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+  - @real-router/sources@0.13.2
+
+### @real-router/preload-plugin@0.7.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/react@0.30.3
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+  - @real-router/sources@0.13.2
+
+### @real-router/rx@0.3.39
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/search-schema-plugin@0.5.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/solid@0.19.3
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+  - @real-router/sources@0.13.2
+
+### @real-router/sources@0.13.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/svelte@0.17.3
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+  - @real-router/sources@0.13.2
+
+### @real-router/validation-plugin@0.13.2
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+
+### @real-router/vue@0.19.3
+
+### Patch Changes
+
+- Updated dependencies [[`f8ae8a6`](https://github.com/greydragon888/real-router/commit/f8ae8a6b34e587180dcdcfb0a21c5387309325f5)]:
+  - @real-router/core@0.84.0
+  - @real-router/sources@0.13.2
+
+
 ### @real-router/core@0.83.1
 
 ### Patch Changes
