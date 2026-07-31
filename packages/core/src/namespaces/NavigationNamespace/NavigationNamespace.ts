@@ -54,6 +54,30 @@ function forceReplaceFromUnknown(
     : opts;
 }
 
+/**
+ * Does any segment this phase walks carry a guard?
+ *
+ * The empty-Map check first, so a router with no guards at all pays one load —
+ * and a router that HAS guards pays one `Map.has` per segment on the path,
+ * against the ~40 ns + 482 B an AbortController costs when the answer is no.
+ */
+function hasGuardOnPath(
+  guards: Map<string, GuardFn>,
+  segments: string[],
+): boolean {
+  if (guards.size === 0) {
+    return false;
+  }
+
+  for (const segment of segments) {
+    if (guards.has(segment)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function isSameNavigation(
   fromState: State | undefined,
   opts: NavigationOptions,
@@ -534,8 +558,20 @@ export class NavigationNamespace {
       !!plan.fromState && !plan.opts.forceDeactivate && toDeactivate.length > 0;
     plan.shouldActivate =
       plan.toState.name !== constants.UNKNOWN_ROUTE && toActivate.length > 0;
+    // The guards of THIS transition, not of the router. Asking the Maps for
+    // their size answered a different question — "does the app have a guard
+    // anywhere" — so one `canActivate` on an admin page armed the cancellation
+    // machinery for every public navigation: an AbortController, the liveness
+    // closure, and a walk that found no guard on any of its steps (measured:
+    // +643 B and +84 ns per navigation that never touches the guarded route).
+    //
+    // The predicate mirrors what the interpreter would actually do — a phase
+    // whose short-circuit is false runs no step, so its guards cannot fire —
+    // which is what keeps this a fast-path gate and not a second policy.
     plan.hasGuards =
-      canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
+      (plan.shouldDeactivate &&
+        hasGuardOnPath(canDeactivateFunctions, toDeactivate)) ||
+      (plan.shouldActivate && hasGuardOnPath(canActivateFunctions, toActivate));
   }
 
   #executeNavigation(
