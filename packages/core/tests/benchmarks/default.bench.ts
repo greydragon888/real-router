@@ -24,6 +24,7 @@ import {
   isMain,
   keep,
   makeBench,
+  noopStartPlugin,
   noopSuccessPlugin,
   passthroughGuardFactory,
   settleHeap,
@@ -222,6 +223,107 @@ export async function run(): Promise<void> {
 
   // sync-deactivate-guards: deactivation-phase guards every iteration — helper.
   await addDeactivateGuards(bench);
+
+  // sync-guards-both-phases: the full three-phase pass in ONE navigation.
+  // `sync-guards` carries activation guards only and `sync-deactivate-guards`
+  // deactivation only, so until now no arc ran deactivate → leave → activate
+  // end to end — the exact shape a phase-program interpreter walks. Composition
+  // of two covered halves, so the risk it guards is low; the point is that the
+  // composition itself is what the interpreter measures, and it had no arc.
+  {
+    const router = createRouter([
+      { name: "a", path: "/a" },
+      { name: "b", path: "/b" },
+    ]);
+
+    for (const name of ["a", "b"] as const) {
+      for (let g = 0; g < 3; g++) {
+        getLifecycleApi(router).addDeactivateGuard(
+          name,
+          passthroughGuardFactory,
+        );
+        getLifecycleApi(router).addActivateGuard(name, passthroughGuardFactory);
+      }
+    }
+
+    await router.start("/a");
+    const targets = ["b", "a"] as const;
+    let i = 0;
+
+    bench.add(
+      "navigate/sync-guards-both-phases",
+      batched(192, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
+  }
+
+  // ------------------------------------------------------------------------
+  // The two terms of the `immediate` predicate that nothing measured before
+  // (RFC navigation-two-pipelines §7.2). An external `signal` and a pre-commit
+  // listener each make a navigation SUSPENDABLE without making it asynchronous,
+  // which is the axis divergence the RFC's central claim rests on and which had
+  // no arc at all. A third arc (`async-guard-microtask`) was drafted and then
+  // dropped before push: an async guard with real I/O dwarfs the ~800 ns async
+  // tail by four orders of magnitude, so it would have been a CodSpeed number
+  // nobody should tune against.
+  // ------------------------------------------------------------------------
+
+  // pre-commit-listener: an `onTransitionStart` plugin, no guards, no leave
+  // listeners — `hasPreCommitListeners()` true, so `suspendable` is true and the
+  // commit-gate runs, while `hasGuards` is false so NO AbortController is
+  // allocated. The only shape where the two axes visibly disagree in flight.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "about", path: "/about" },
+      { name: "users", path: "/users" },
+    ]);
+
+    router.usePlugin(noopStartPlugin);
+
+    await router.start("/");
+    const targets = ["about", "users", "home"] as const;
+    let i = 0;
+
+    bench.add(
+      "navigate/pre-commit-listener",
+      batched(384, () => {
+        void router.navigate(targets[i++ % targets.length]);
+      }),
+    );
+  }
+
+  // external-signal: a live (never aborted) `opts.signal`. Same suspendable-but-
+  // synchronous shape as above, reached through the OTHER term — and the term
+  // that allocates nothing: no AbortController is created, the caller supplied
+  // the signal. The controller is reused across iterations precisely because it
+  // must stay unaborted; aborting would measure the rejection path instead.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "about", path: "/about" },
+      { name: "users", path: "/users" },
+    ]);
+
+    await router.start("/");
+    const controller = new AbortController();
+    const opts = { signal: controller.signal };
+    const targets = ["about", "users", "home"] as const;
+    let i = 0;
+
+    bench.add(
+      "navigate/external-signal",
+      batched(384, () => {
+        void router.navigate(
+          targets[i++ % targets.length],
+          undefined,
+          undefined,
+          opts,
+        );
+      }),
+    );
+  }
 
   // deep transition: long activate/deactivate chain (nested 5 / 10).
   for (const depth of [5, 10]) {

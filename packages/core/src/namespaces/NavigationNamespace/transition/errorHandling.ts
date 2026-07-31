@@ -140,3 +140,31 @@ export function wrapSyncError(
   // Return base metadata only - the primitive value isn't useful as metadata
   return base;
 }
+
+/**
+ * Settle a guard's Promise into the pipeline's terms: `false` and a rejection
+ * both become the phase's `RouterError`, nothing else escapes.
+ *
+ * Lives here rather than with the interpreter because that IS this module's
+ * concern — turning a guard's refusal into the right error (#1607). The
+ * interpreter only decides WHERE it stopped.
+ */
+export async function resolveAsyncGuard(
+  promise: Promise<boolean>,
+  errorCode: string,
+  segment: string,
+): Promise<void> {
+  let result: boolean;
+
+  try {
+    result = await promise;
+  } catch (error: unknown) {
+    handleGuardError(error, errorCode, segment);
+
+    return; // unreachable — handleGuardError returns never
+  }
+
+  if (!result) {
+    throw new RouterError(errorCode, { segment });
+  }
+}

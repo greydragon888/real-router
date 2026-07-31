@@ -18,7 +18,8 @@ import type { State } from "../../types";
 // This is acceptable because:
 // 1. These errors indicate expected conditions, not internal bugs
 // 2. Error code and message are sufficient for debugging
-// 3. The facade skips .catch() suppression for cached promises (zero alloc)
+// 3. The producer skips .catch() suppression for these promises (zero alloc) —
+//    see PRE_SUPPRESSED at the bottom of this file
 // =============================================================================
 
 export const CACHED_NOT_STARTED_ERROR = new RouterError(
@@ -32,8 +33,10 @@ export const CACHED_ROUTE_NOT_FOUND_ERROR = new RouterError(
 export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
 
 // Pre-suppressed rejected promises — .catch() at module load prevents
-// unhandled rejection warnings. The facade skips additional .catch() calls
-// via the lastSyncRejected flag (zero derived-promise allocation).
+// unhandled rejection warnings. `NavigationNamespace.#settle` skips additional
+// .catch() calls by recognising these three by IDENTITY (`PRE_SUPPRESSED`
+// below), so no derived promise is allocated. The retired `lastSyncRejected`
+// flag used to carry that signal to the facade instead.
 export const CACHED_NOT_STARTED_REJECTION: Promise<State> = Promise.reject(
   CACHED_NOT_STARTED_ERROR,
 );
@@ -53,3 +56,65 @@ export const CACHED_SAME_STATES_REJECTION: Promise<State> = Promise.reject(
 CACHED_NOT_STARTED_REJECTION.catch(() => {}); // NOSONAR -- intentional suppression, not a promise chain
 CACHED_ROUTE_NOT_FOUND_REJECTION.catch(() => {}); // NOSONAR
 CACHED_SAME_STATES_REJECTION.catch(() => {}); // NOSONAR
+
+// =============================================================================
+// Fire-and-forget suppression policy (#721) — shared, not per-caller
+// =============================================================================
+
+/**
+ * Rejection codes that are EXPECTED, caller-owned outcomes, not internal bugs.
+ * The fire-and-forget safety net stays silent for them and lets an awaiting
+ * caller see the rejection. `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE` belong here:
+ * a guard blocking (or a plugin's guard-blocked `back()`/`forward()`) is a
+ * normal result, so a call without `await` must not emit a spurious "Unexpected
+ * navigation error".
+ *
+ * Most of them are navigation outcomes, but not all — `ROUTER_ALREADY_STARTED`
+ * is a LIFECYCLE precondition (#1605), and it is the same kind of thing:
+ * `start()` called twice says "already done", exactly as `SAME_STATES` does for
+ * `navigate()`. Silence is the symmetric answer; logging it would report a
+ * caller's own no-op as an internal fault. It costs nothing on the navigation
+ * side — `navigate()` cannot produce that code.
+ *
+ * Lives here rather than moving into the namespace with navigate-suppression,
+ * because it is genuinely SHARED: `Router.start()` classifies its own failures
+ * by the same policy (`#onSuppressedStartError`), and start commits through
+ * `navigateToState`, so its rejections are navigation rejections. One owner, two
+ * readers — duplicating the classifier is the copy this refactor exists to
+ * remove.
+ */
+export const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
+  errorCodes.SAME_STATES,
+  errorCodes.TRANSITION_CANCELLED,
+  errorCodes.ROUTER_NOT_STARTED,
+  errorCodes.ROUTE_NOT_FOUND,
+  errorCodes.CANNOT_ACTIVATE,
+  errorCodes.CANNOT_DEACTIVATE,
+  errorCodes.ROUTER_ALREADY_STARTED,
+]);
+
+/** Module-level, so classifying allocates nothing per navigate()/start(). */
+export function isExpectedRejection(error: unknown): boolean {
+  return error instanceof RouterError && SUPPRESSED_ERROR_CODES.has(error.code);
+}
+
+/**
+ * The three cached rejections ABOVE, by identity.
+ *
+ * They already carry a `.catch()` from module load, so they can never raise an
+ * `unhandledRejection` — a second `.catch()` on them prevents nothing and only
+ * allocates a derived promise (measured: ~40 ns, which is ~12.5% of a
+ * SAME_STATES `navigate()`). This set is what lets the producer skip that work
+ * without a mutable cross-layer flag.
+ *
+ * Identity, not a flag, because the two fail in OPPOSITE directions: a missed
+ * identity costs 40 ns and nothing else, while a flag left stale-true skips
+ * suppression on a LATER navigation and leaks the rejection — #721 exactly. The
+ * mechanism is therefore fail-safe by construction: anything not recognised here
+ * gets suppressed.
+ */
+export const PRE_SUPPRESSED: ReadonlySet<unknown> = new Set([
+  CACHED_NOT_STARTED_REJECTION,
+  CACHED_ROUTE_NOT_FOUND_REJECTION,
+  CACHED_SAME_STATES_REJECTION,
+]);

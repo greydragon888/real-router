@@ -16,7 +16,18 @@ export interface RouterLifecycleDependencies {
    * `trailingSlash:"preserve"` mode) and avoids the redundant
    * forwardState+buildPath round-trip in `buildNavigateState`.
    */
-  navigateToState: (state: State, opts: NavigationOptions) => Promise<State>;
+  // `State | Promise<State>` since Step 0: the namespace answers synchronously
+  // when the navigation settled synchronously. `start` is `async`, so both
+  // shapes type-check and the committed state is identical — but they are not
+  // timing-identical: returning a bare `State` costs one adoption tick instead
+  // of three, so `router.start()` now settles TWO microtasks earlier on the
+  // sync-commit path (measured). Only ever earlier, never later, and nothing in
+  // the repo orders work against that gap — but it is a real observable, not a
+  // transparent widening.
+  navigateToState: (
+    state: State,
+    opts: NavigationOptions,
+  ) => State | Promise<State>;
   navigateToNotFound: (path: string) => State;
   clearState: () => void;
   matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;

@@ -430,6 +430,15 @@ router.navigate(name, params, search, opts)   // search = query channel; opts at
   ├── liveness snapshot (suspendable? — external signal / leave / start listeners; #1169)
   ├── FSM send(NAVIGATE) → action emits TRANSITION_START
   │
+  ├── IMMEDIATE PATH (!hasGuards && !suspendable — разрез А, #1588):
+  │   hasGuards asks about the guards of THIS transition — a guard on a route
+  │   the walk never reaches does not arm anything (see Performance Notes)
+  │   └── completeImmediate() → sendLeaveApprove + completeTransition
+  │       nothing can cancel it and nothing in it can suspend, so the
+  │       cancellation machinery is not skipped here — it is ABSENT:
+  │       no AbortController, no liveness closure, no commit-gate,
+  │       and the return is a bare State, not a Promise
+  │
   ├── Guard pipeline (executeGuardPipeline)
   │   ├── Deactivation guards (innermost → outermost)
   │   ├── LEAVE_APPROVE phase: FSM send(LEAVE_APPROVE) → action emits TRANSITION_LEAVE_APPROVE
@@ -443,7 +452,7 @@ router.navigate(name, params, search, opts)   // search = query channel; opts at
   │       → return Promise.resolve(state)
   │
   └── ASYNC PATH (async guard detected):
-      └── #finishAsyncNavigation(guardCompletion, ...)
+      └── finishAsyncNavigation(guardCompletion, ...)
           ├── receives AbortController (set up upfront when guards/leave-listeners present)
           ├── await guardCompletion
           └── completeTransition() → same as sync
@@ -463,19 +472,36 @@ On error at any step: `emitTransitionError()` → `Plugin.onTransitionError()` �
 
 ```
 namespaces/NavigationNamespace/
-├── NavigationNamespace.ts     — navigate(), #finishAsyncNavigation()
-├── constants.ts               — cached error instances (CACHED_*_REJECTION)
-├── types.ts                   — NavigationContext, NavigationDependencies
+├── NavigationNamespace.ts     — the entry points (navigate / navigateToState /
+│                                navigateToDefault / navigateToNotFound), their
+│                                #settle fire-and-forget checkpoint, private cores,
+│                                and the DI bag. Nothing else.
+├── InFlightNavigation.ts      — the AbortController + supersession token of ONE
+│                                navigation, one instance per router
+├── constants.ts               — cached error instances (CACHED_*_REJECTION),
+│                                SUPPRESSED_ERROR_CODES, PRE_SUPPRESSED
+├── types.ts                   — NavigationContext, NavigationPlan, NavigationDependencies
 ├── index.ts                   — exports
 └── transition/
-    ├── guardPhase.ts          — executeGuardPipeline(), runGuards(), resolveRemainingGuards()
+    ├── executeNavigation.ts   — executeNavigation() + the two-pass prologue
+    │                            (beginTransition / planPhases), completeImmediate(),
+    │                            finishAsyncNavigation(), handleNoGuardsLeave(),
+    │                            abortPreviousNavigation()
+    ├── guardPhase.ts          — executeGuardPipeline(), runFrom(), resumeFrom(), runPhase(), runStep()
     ├── completeTransition.ts  — completeTransition(), buildTransitionMeta()
-    └── errorHandling.ts       — handleGuardError(), routeTransitionError()
+    ├── navigateToNotFound.ts  — the one commit primitive that is NOT a transition
+    └── errorHandling.ts       — handleGuardError(), routeTransitionError(), resolveAsyncGuard()
 ```
 
-**Guard pipeline** (`guardPhase.ts`): `executeGuardPipeline()` orchestrates deactivation → activation phases. `runGuards()` iterates guards synchronously, returns `Promise<void>` on first async guard. `resolveRemainingGuards()` continues the async tail as a flat for-loop (no `.slice()` allocations).
+**The state came out first, and that order is the point (#1607).** `#currentController` + `#navigationId` were the namespace's one sub-domain with a small owner set (four members and three, against thirteen that need the DI bag), so naming them as `InFlightNavigation` is what let the orchestration around them become functions over `(deps, inFlight, plan)` — moving the methods first would have threaded the mutable state through parameters instead, growing more of the flat 13-position signatures `guardPhase.ts` pays for deliberately. The namespace went 962 → 327 lines with zero test delta and bit-identical allocations.
 
-**`NavigationContext`** (`types.ts`): Shared interface passed from `navigate()` through async path to `completeTransition()`. Avoids constructing intermediate objects on the hot path.
+⚠ **The controller is ADOPTED by `InFlightNavigation`, never manufactured in it.** The two creation sites have different conditions — the guard branch allocates unconditionally, the guard-free leave arc only `if (hasLeaveListeners())` — because an external `opts.signal` or a pre-commit listener makes a navigation *suspendable* without giving it anything to hand a signal to. A `take()` that created the controller would allocate on those arcs, which is the regression Step 1b of #1588 refused by measurement. Pinned by `controller-allocation.test.ts` (counts allocated controllers; the forbidden edit fails two of them). `InFlightNavigation` lives beside the namespace rather than in `transition/` because its state outlives any single transition: the token is monotonic across navigations and `abortCurrentController` reaches it from the FSM `CANCEL` action, outside a transition entirely.
+
+**Guard pipeline** (`guardPhase.ts`) — **one program, two interpreters** (#1588). The program is three fixed phases (`0 = deactivate`, `1 = leave`, `2 = activate`) walked by a cursor of two numbers. `runFrom()` is the synchronous interpreter: it walks until a step hands back a Promise, then stops and returns a `Suspension` saying where. `resumeFrom()` is the asynchronous one: it settles that Promise and hands the cursor straight back to `runFrom()`. `runPhase()` applies the phase's short-circuit (`shouldDeactivate` / `shouldActivate` — these carry `opts.forceDeactivate`, so they are contract, not an emptiness test) and `runStep()` runs one step. `executeGuardPipeline()` keeps the same outer contract as before: `undefined` when everything ran synchronously, a `Promise<void>` otherwise.
+
+This replaced three orchestrators (`executeGuardPipeline` / `finishAsyncPipeline` / `finishAfterAsyncLeave`) and two copies of the guard loop (`runGuards` / `resolveRemainingGuards`). The payoff is **one cancellation check instead of eight**: five of the eight were mutationally unkillable — their breakage was as invisible as their removal, because the liveness check in `finishAsyncNavigation` already covered any navigation that reached them. The single check in the head of `runStep()` sits where nothing else guards it; removing it fails four tests.
+
+**`NavigationContext` / `NavigationPlan`** (`types.ts`): `NavigationPlan` is what a navigation actually builds — everything worked out before any guard runs, filled in **two passes** across the `TRANSITION_START` emit (`suspendable` must be read before the pre-commit listener window, the guard maps after it, since a `TRANSITION_START` listener may still register a guard). It **extends** `NavigationContext`, so the same object is handed to `completeTransition()` / `finishAsyncNavigation()` instead of a second literal — one context object per navigation.
 
 ### Guards vs Plugins
 
@@ -497,7 +523,7 @@ namespaces/NavigationNamespace/
 - Async cleanup that must complete before activation
 - Data prefetch coordinated with leave event
 
-Sync listeners run inline; a sync throw rejects `navigate()` with that **original error** and emits `TRANSITION_ERROR` — it is **not** converted to `TRANSITION_CANCELLED`. The first sync throw wins, and a sync throw takes priority over any async listener rejection. The `signal` in the payload aborts when the navigation is **cancelled** — superseded by a newer `navigate()`, `stop()`, `dispose()`, or an external `opts.signal` abort — **or fails** (a sync leave throw, a rejecting activation guard), and **never** on successful completion. This holds identically on the guard and no-guards pipeline paths: the same controller backs the signal, and core releases it without aborting on success (`#cleanupController(controller, /* cancelled */ false)`), so a listener that captured the signal still observes `aborted === false` after the navigation commits (#722).
+Sync listeners run inline; a sync throw rejects `navigate()` with that **original error** and emits `TRANSITION_ERROR` — it is **not** converted to `TRANSITION_CANCELLED`. The first sync throw wins, and a sync throw takes priority over any async listener rejection. The `signal` in the payload aborts when the navigation is **cancelled** — superseded by a newer `navigate()`, `stop()`, `dispose()`, or an external `opts.signal` abort — **or fails** (a sync leave throw, a rejecting activation guard), and **never** on successful completion. This holds identically on the guard and no-guards pipeline paths: the same controller backs the signal, and core releases it without aborting on success (`InFlightNavigation.release(controller, /* cancelled */ false)`), so a listener that captured the signal still observes `aborted === false` after the navigation commits (#722).
 
 **`subscribe(listener)`** — subscribe to `TRANSITION_SUCCESS` (post-commit). In contrast to `subscribeLeave`:
 
@@ -854,6 +880,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 ### Navigate hot path (#307)
 
 - **Optimistic sync execution** — guards run synchronously, async path deferred. No AbortController/Promise on sync path
+- **`hasGuards` is per-TRANSITION, not per-router.** `planPhases` asks whether a segment THIS transition walks carries a guard (`hasGuardOnPath`, one `Map.has` per segment, short-circuited by an empty-Map check), not whether the router holds a guard anywhere. Reading the Maps' `size` answered a different question, and the difference was pure waste: one `canActivate` on an admin route armed the full cancellation machinery for every public navigation — an `AbortController`, the `isCurrentNav` closure and a three-phase walk that found no guard on any step. Measured on the production bundle (same-session A/B, alternating processes, medians of 3+3 runs, A/A floor 0.3–3.5%): a navigation that never touches the guarded route cost **+97.7 ns / +643 B** over the guard-free one and now costs **+4.7 ns / +24 B** — i.e. **−93 ns (−12%) and −619 B (−29%)** on the affected navigation, with the guard-free router unchanged. The predicate mirrors the interpreter (a phase whose short-circuit is false runs no step, so `forceDeactivate` also disarms it), so it is a gate on the fast path and not a second policy about guards. ⚠ The two branches are behaviourally equivalent — which is why the waste was invisible to 3826 tests — so it is pinned by COUNTING controllers (`guards-off-path.test.ts`, mutationally validated on both halves of the predicate: widening it fails 2 tests, disarming the deactivate half 1, the activate half 3), never by timing
 - **FSM `send()` (table-driven, #1169)** — the NAVIGATE/LEAVE_APPROVE/COMPLETE transitions dispatch through the FSM table via `send()`, which fires the registered emit action; **`forceState()` is no longer called anywhere in core** — the bypass primitive was removed from the FSM engine (`src/utils/fsm`) outright, and `tests/functional/fsm-state-authority.test.ts` locks the invariant in two layers (the FSM engine exposes no `forceState`; a static scan of core `src` finds zero `.forceState` accesses). An invalid transition (e.g. `COMPLETE` after a listener's `stop()`/`dispose()`) is a table no-op, so the FSM is the sole authority over state and cannot be resurrected out of IDLE/DISPOSED. Deliberate trade-off (owner decision): ~+15–20% on `navigate/*` + one transition-payload allocation per navigation, bought for structural determinism (cancellation enforced by the state machine, not scattered re-checks). The pre-`setState` **commit-gate** in `NavigationNamespace` (active only when a listener window is reachable) rejects a navigation cancelled/terminated mid-flight before it commits
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` instead of `...args` to avoid V8 rest-param array allocation
 - **Cached error rejections** — pre-allocated `Promise.reject()` for SAME_STATES, ROUTER_NOT_STARTED, ROUTE_NOT_FOUND (zero alloc per rejection)
@@ -872,7 +899,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - `nameToIDs()` has fast paths for 1-4 segments
 - Route tree is immutable (Object.freeze) — cloneRouter() rebuilds from definitions (not shared)
 - Router options are immutable — deep-frozen at construction (`OptionsNamespace`), safe to return directly
-- `static #onSuppressedNavigateError` / `#onSuppressedStartError` — cached suppressor callbacks, one allocation per class (not per navigate/start); both share `#isExpectedRejection` for the silent-suppress classification
+- Fire-and-forget suppressors are **per-router, and split by owner** (#1588): `NavigationNamespace.#onSuppressed` (built once in `setDependencies`) covers navigate / navigateToState / navigateToDefault, because the layer that CREATES a promise is the only one that can tell a fresh rejection from one of its own pre-suppressed singletons; `Router.#onSuppressedStartError` stays on the facade, which builds `start()`'s promise itself. Both classify through one shared module-level `isExpectedRejection` / `SUPPRESSED_ERROR_CODES` in `NavigationNamespace/constants.ts` — one owner, two readers. (Neither is `static`: they log through THIS router's logger, #724.)
 - Segment cleanup uses `Array.includes()` instead of `new Set()` (1-5 elements — linear faster)
 - `createInterceptable()` — empty-array fast path skips iteration when no interceptors registered
 - FSM `canSend()` — O(1) via cached `#currentTransitions`
@@ -883,9 +910,9 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 
 ### Async subscribeLeave overhead
 
-- **0 listeners (hot path):** on the no-guards path `#handleNoGuardsLeave` runs only `sendLeaveApprove` + a `hasLeaveListeners()` check + a `navigationId` check — no `{nav}` context, no `LeaveState`, no `AbortController` (all allocated only when listeners exist)
+- **0 listeners (hot path):** `handleNoGuardsLeave` is not on it at all since разрез А (#1588) — no leave listeners means `suspendable` is false, so a guard-free navigation returns from `completeImmediate`, which runs `sendLeaveApprove` + `completeTransition` and nothing else. No `LeaveState`, no `AbortController`, no commit-gate. `handleNoGuardsLeave` now serves only the guard-free **suspendable** arcs (external `signal` / pre-commit listener / leave listeners), where it still allocates a controller only `if (hasLeaveListeners())` — which is why folding it into the guard machinery was measured and rejected (the guard path allocates one unconditionally)
 - **N sync listeners:** AbortController created + released (not aborted on success, #722; ~5µs total with cleanup), frozen `LeaveState` object, N try/catch (V8 zero-cost on happy path), N×2 thenable checks
-- **Lazy closures:** `isCurrentNav` / `emitLeaveApproveCallback` closures and the `{nav}` context are created inside the `if (hasGuards)` branch (or the async tail) only — not on the no-guards hot path
+- **Lazy closures:** `isCurrentNav` / `emitLeaveApproveCallback` closures are created inside the `if (hasGuards)` branch (or the async tail) only — never on the guard-free path. The context bag is not lazy and does not need to be: `NavigationPlan` is built once per navigation and IS the `NavigationContext` handed to `completeTransition` / `finishAsyncNavigation`
 - **Benchmarks:** `navigate/leave-1` / `navigate/leave-3` in `tests/benchmarks/default.bench.ts` (gated tinybench + CodSpeed hot-path suite) — run via `pnpm -F @real-router/core bench`
 
 ## Code Conventions
@@ -1013,7 +1040,7 @@ Key types:
 
 Cancellation: Pass `{ signal }` via `NavigationOptions` for external `AbortController` cancellation. `router.stop()`, `router.dispose()`, and concurrent navigation cancel the in-flight navigation automatically. **The FSM is the single owner of cancellation.** Every source routes through FSM `CANCEL` (`stop`/`dispose` → `sendCancelIfPossible`; supersede / external `opts.signal` → `cancelNavigation`), and the `CANCEL` action (`handleCancel`) aborts the in-flight controller via the injected `abortController` effect — so the invariant **"FSM `CANCEL` ⟹ controller aborted (pipeline woken) + `TRANSITION_CANCEL` emitted"** holds atomically in one place. No source aborts the controller by hand. Aborting `#currentController` sets `signal.aborted`, which the async pipeline's post-race `isActive()` (`navigationId === myId && !signal.aborted && deps.isActive()`) detects regardless of the resulting FSM state (`READY` for external, `IDLE`/`DISPOSED` for stop/dispose, the superseding nav's `TRANSITION_STARTED` for supersede). The external `opts.signal` reason is threaded through `cancelNavigation(reason)` → the controller's `signal.reason` (#943). Before this unification the external-signal path only aborted the controller and left the FSM stuck in `TRANSITION_STARTED`/`LEAVE_APPROVED` (#1030) — `isTransitioning()` stayed true (route-CRUD silently blocked) and `isLeaveApproved()` was falsely true until the next navigation; the cross-source invariant property test (`tests/property/cancellation.properties.ts`) now locks recovery for every source × suspension point.
 Guards receive `signal` as optional 3rd parameter for cooperative cancellation (e.g., `fetch(url, { signal })`).
-**Non-cooperative guards are also bounded (#1018):** `#finishAsyncNavigation` races the guard completion against the controller's abort — `await Promise.race([guardCompletion, abortRace])`, where `abortRace` resolves on abort and the existing post-race `isActive()` check then rejects with `TRANSITION_CANCELLED`. So an async guard whose Promise **never settles** and ignores `signal` no longer wedges `navigate()` forever: `stop()`/`dispose()`/supersede abort the controller and the navigation rejects instead of hanging. Mirrors the leave-path protection `settleLeavePromises` (#663/#673). Consequence: when an abort precedes a slow guard's own verdict, cancellation wins — the navigation rejects `TRANSITION_CANCELLED` rather than waiting for the guard's `CANNOT_ACTIVATE`.
+**Non-cooperative guards are also bounded (#1018):** `finishAsyncNavigation` races the guard completion against the controller's abort — `await Promise.race([guardCompletion, abortRace])`, where `abortRace` resolves on abort and the existing post-race `isActive()` check then rejects with `TRANSITION_CANCELLED`. So an async guard whose Promise **never settles** and ignores `signal` no longer wedges `navigate()` forever: `stop()`/`dispose()`/supersede abort the controller and the navigation rejects instead of hanging. Mirrors the leave-path protection `settleLeavePromises` (#663/#673). Consequence: when an abort precedes a slow guard's own verdict, cancellation wins — the navigation rejects `TRANSITION_CANCELLED` rather than waiting for the guard's `CANNOT_ACTIVATE`.
 `AbortError` thrown in guards is auto-converted to `TRANSITION_CANCELLED`. A guard may also throw `RouterError(TRANSITION_CANCELLED)` directly to signal a quiet cancel — it is **preserved** (not re-coded to `CANNOT_ACTIVATE`/`CANNOT_DEACTIVATE`), so the navigation rejects with `TRANSITION_CANCELLED` and `onTransitionError` does **not** fire (#933). Any other thrown `RouterError` is still re-coded to the guard's `CANNOT_ACTIVATE`/`CANNOT_DEACTIVATE`.
 
 ## See Also

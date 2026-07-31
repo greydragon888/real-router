@@ -33,6 +33,7 @@ import {
   StateNamespace,
   createDependenciesStore,
 } from "./namespaces";
+import { isExpectedRejection } from "./namespaces/NavigationNamespace/constants";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import { buildURL, canonicalize, materialize } from "./pipeline";
 import { RouterError } from "./RouterError";
@@ -63,22 +64,6 @@ import type {
 import type { Limits, RouterEventMap } from "./types/internal";
 
 const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
-
-// Module-level so #isExpectedRejection allocates nothing per navigate()/start() call.
-// These are expected navigation outcomes owned by the caller, not internal
-// bugs — the safety net stays silent for them and lets awaiting callers see
-// the rejection. CANNOT_ACTIVATE / CANNOT_DEACTIVATE belong here: a guard
-// blocking (or a plugin's guard-blocked back()/forward()) is a normal result,
-// so a fire-and-forget call must not emit a spurious "Unexpected navigation
-// error" (#721).
-const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
-  errorCodes.SAME_STATES,
-  errorCodes.TRANSITION_CANCELLED,
-  errorCodes.ROUTER_NOT_STARTED,
-  errorCodes.ROUTE_NOT_FOUND,
-  errorCodes.CANNOT_ACTIVATE,
-  errorCodes.CANNOT_DEACTIVATE,
-]);
 
 /**
  * Router class with integrated namespace architecture.
@@ -118,19 +103,19 @@ export class Router<
   readonly #eventBus: EventBusNamespace;
 
   /**
-   * Per-instance suppressors for fire-and-forget navigate / start. They log
-   * through THIS router's logger (built in the constructor) — so, unlike the
-   * former static "one allocation per class" closures, they are two closures per
-   * instance. Trade accepted with the per-router logger (#724): the logger is
-   * per-instance, so its suppressors must be too. The #931 category split is
-   * preserved — navigate failures log under "router.navigate", start failures
-   * under "router.start" (a start interceptor throwing a plain Error after
-   * next() committed, #763, or a cryptic path TypeError — neither a suppressed
-   * RouterError). The log line IS reachable: a subscribeLeave listener that
-   * throws rejects navigate() with the original NON-suppressed error, and a
-   * Symbol path-param's stringify TypeError is likewise non-suppressed.
+   * Per-instance suppressor for fire-and-forget `start()`. It logs through THIS
+   * router's logger (built in the constructor), so it cannot be static (#724).
+   *
+   * Only start, since Step 0: the navigate/navigateToState/navigateToDefault
+   * suppressor moved to `NavigationNamespace`, which is where those promises are
+   * created and therefore the only layer that knows which of them are already
+   * pre-suppressed. Start keeps its own because it suppresses a promise the
+   * FACADE builds (`internalStart.catch(#unwindFailedStart)`), and because the
+   * #931 category split survives — start failures log under "router.start" (a
+   * start interceptor throwing a plain Error after next() committed, #763, or a
+   * cryptic path TypeError — neither a suppressed RouterError). Both sides still
+   * classify through ONE shared policy, `isExpectedRejection`.
    */
-  readonly #onSuppressedNavigateError: (error: unknown) => void;
   readonly #onSuppressedStartError: (error: unknown) => void;
 
   // ============================================================================
@@ -163,17 +148,10 @@ export class Router<
     // their deps at wiring; plugins reach it through getPluginApi(router).logger.
     const logger = new RouterLogger(loggerConfig);
 
-    // Per-instance fire-and-forget suppressors (see field declarations): they
-    // log through THIS router's logger, so they are built here, not static.
-    this.#onSuppressedNavigateError = (error: unknown): void => {
-      if (Router.#isExpectedRejection(error)) {
-        return;
-      }
-
-      logger.error("router.navigate", "Unexpected navigation error", error);
-    };
+    // Per-instance fire-and-forget suppressor (see the field declaration): it
+    // logs through THIS router's logger, so it is built here, not static.
     this.#onSuppressedStartError = (error: unknown): void => {
-      if (Router.#isExpectedRejection(error)) {
+      if (isExpectedRejection(error)) {
         return;
       }
 
@@ -372,26 +350,15 @@ export class Router<
         interceptorsMap,
       ),
       navigateToState: (state, navOpts) => {
-        // Plugin-only navigation primitive (#525). Mirrors the same
-        // unhandled-rejection suppression and lastSync* bookkeeping used by
-        // the public Router.navigate facade so plugin call-sites can
-        // fire-and-forget the returned promise (popstate handlers do).
+        // Plugin-only navigation primitive (#525). Fire-and-forget safe like the
+        // public facade methods — popstate handlers call it without awaiting —
+        // but the safety now belongs to the namespace that creates the promise,
+        // so this closure only owes callers the Promise shape.
         this.#assertNotReentrant();
 
-        const promiseState = this.#navigation.navigateToState(
-          state,
-          navOpts ?? EMPTY_OPTS,
+        return Router.#asPromise(
+          this.#navigation.navigateToState(state, navOpts ?? EMPTY_OPTS),
         );
-
-        if (this.#navigation.lastSyncResolved) {
-          this.#navigation.lastSyncResolved = false;
-        } else if (this.#navigation.lastSyncRejected) {
-          this.#navigation.lastSyncRejected = false;
-        } else {
-          this.#suppressUnhandledRejection(promiseState);
-        }
-
-        return promiseState;
       },
       interceptors: interceptorsMap,
       setRootPath: (rootPath) => {
@@ -615,62 +582,23 @@ export class Router<
     return this.#eventBus.isActive();
   }
 
+  /**
+   * ONE fire-and-forget checkpoint for `start()`, deliberately — the same shape
+   * `NavigationNamespace.#settle` gives the navigate family, and for the same
+   * reason: a `.catch()` remembered at each `return` site is a thing that can be
+   * forgotten, and a forgotten one is invisible until it leaks.
+   *
+   * It HAD been forgotten (#1605). The `ALREADY_STARTED` rejection left through
+   * an early `return` above the suppressor, so a second, unawaited `start()`
+   * raised an `unhandledRejection` — process-fatal under Node 22+'s default
+   * `--unhandled-rejections=throw`, with a stack pointing at the cached error's
+   * module constant rather than at the caller. Every return site now leaves
+   * through `#runStart`, so no future early return can reopen it.
+   */
   start(startPath: string): Promise<State> {
-    if (!this.#eventBus.canStart()) {
-      return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
-    }
+    const promiseState = this.#runStart(startPath);
 
-    getInternals(this).validator?.navigation.validateStartArgs(startPath);
-
-    // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
-    // design, NOT a missed consolidation (#940): `sendStart()` runs HERE, before
-    // the interceptor chain, so the STARTING window spans the whole start
-    // pipeline. A pre-`next()` interceptor throw then unwinds via STARTING →
-    // `sendFail`, which emits TRANSITION_ERROR from STARTING (EventBusNamespace
-    // FAIL action) for `onTransitionError` plugins. Moving `sendStart()` into the
-    // namespace (the interceptor *target*) would skip STARTING on a pre-`next()`
-    // throw — the namespace is never reached — silently dropping that
-    // TRANSITION_ERROR: a #668 regression. The commit (`completeStart`) lives in
-    // the namespace; recovery needs facade state (`#state`, `#lifecycle`), so it
-    // stays here in `#unwindFailedStart`.
-    this.#eventBus.sendStart();
-
-    // Convert sync interceptor throws to rejections so the recovery path is
-    // reachable; otherwise the throw escapes synchronously, the FSM is left in
-    // STARTING, and the router is permanently bricked (#668).
-    let internalStart: Promise<State>;
-
-    try {
-      const chainResult: unknown = getInternals(this).start(startPath);
-
-      // A `start` interceptor that returns without calling next() yields a
-      // non-thenable (typically undefined); the `.catch` below would then throw
-      // a cryptic `TypeError: ...reading 'catch'` and leave the FSM stuck in
-      // STARTING. Reject with an actionable message so recovery unwinds via
-      // #unwindFailedStart — the same deferred-crash class as the #939
-      // start-path guard (#1411).
-      internalStart =
-        typeof (chainResult as { then?: unknown } | null | undefined)?.then ===
-        "function"
-          ? (chainResult as Promise<State>)
-          : Promise.reject(
-              new TypeError(
-                "[router.start] a `start` interceptor returned without calling next(). Every start interceptor must return `next(path)`.",
-              ),
-            );
-    } catch (syncError: unknown) {
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided start interceptor
-      internalStart = Promise.reject(syncError);
-    }
-
-    const promiseState = internalStart.catch((error: unknown) =>
-      this.#unwindFailedStart(error),
-    );
-
-    this.#suppressUnhandledRejection(
-      promiseState,
-      this.#onSuppressedStartError,
-    );
+    promiseState.catch(this.#onSuppressedStartError);
 
     return promiseState;
   }
@@ -1004,23 +932,14 @@ export class Router<
     ctx.validator?.navigation.validateParams(routeParams, "navigate");
     ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
 
-    const promiseState = this.#navigation.navigate(
-      routeName,
-      routeParams ?? EMPTY_PARAMS,
-      search,
-      opts,
+    return Router.#asPromise(
+      this.#navigation.navigate(
+        routeName,
+        routeParams ?? EMPTY_PARAMS,
+        search,
+        opts,
+      ),
     );
-
-    if (this.#navigation.lastSyncResolved) {
-      this.#navigation.lastSyncResolved = false;
-    } else if (this.#navigation.lastSyncRejected) {
-      // Cached rejection — already pre-suppressed at module load, skip .catch()
-      this.#navigation.lastSyncRejected = false;
-    } else {
-      this.#suppressUnhandledRejection(promiseState);
-    }
-
-    return promiseState;
   }
 
   navigateToDefault(options?: NavigationOptions): Promise<State> {
@@ -1037,17 +956,7 @@ export class Router<
       "navigateToDefault",
     );
 
-    const promiseState = this.#navigation.navigateToDefault(opts);
-
-    if (this.#navigation.lastSyncResolved) {
-      this.#navigation.lastSyncResolved = false;
-    } else if (this.#navigation.lastSyncRejected) {
-      this.#navigation.lastSyncRejected = false;
-    } else {
-      this.#suppressUnhandledRejection(promiseState);
-    }
-
-    return promiseState;
+    return Router.#asPromise(this.#navigation.navigateToDefault(opts));
   }
 
   navigateToNotFound(path?: string): State {
@@ -1085,40 +994,73 @@ export class Router<
   }
 
   /**
-   * Classifies a fire-and-forget rejection as an EXPECTED outcome that must
-   * stay silent (no log). Shared by the navigate and start suppressors so the
-   * suppression contract lives in one place.
+   * Hands the namespace's result back as the `Promise<State>` the public API
+   * owes, and does nothing else.
    *
-   * A suppressed RouterError code is a normal caller-owned navigation result
-   * (a guard block, SAME_STATES, ROUTER_NOT_STARTED, …) — see
-   * SUPPRESSED_ERROR_CODES (#721).
+   * A non-Promise means the navigation already settled synchronously — the
+   * return TYPE says so, which is what retired `lastSyncResolved`. Suppression is
+   * not the facade's business any more: the namespace attaches it where the
+   * promise is created, the only layer that can tell a fresh rejection from one
+   * of its own pre-suppressed singletons.
    *
-   * The #945 RecursionDepthError carve-out is gone: a reentrant navigate() from a
-   * listener can no longer self-feed — it throws REENTRANT_NAVIGATION
-   * synchronously at the facade (RFC navigation-cancellation-unification §4), so
-   * navigate()'s promise never rejects with a recursion error (re-entrant emits
-   * are coalesced at the emitter, #1033; reentrant route-CRUD throws
-   * REENTRANT_TREE_MUTATION to the CRUD caller, #1032 — not through a navigate
-   * promise).
+   * The Promise wrap is not a new cost — the namespace used to allocate exactly
+   * this one and return it.
    */
-  static #isExpectedRejection(error: unknown): boolean {
-    return (
-      error instanceof RouterError && SUPPRESSED_ERROR_CODES.has(error.code)
-    );
+  static #asPromise(result: State | Promise<State>): Promise<State> {
+    return result instanceof Promise ? result : Promise.resolve(result);
   }
 
-  /**
-   * Fire-and-forget safety: prevents unhandled rejection warnings when
-   * navigate/navigateToDefault/start is called without await. Expected errors
-   * are silently suppressed; unexpected ones are logged under `onSuppressed`'s
-   * category — navigate by default; start() passes #onSuppressedStartError so
-   * its failures are logged as "router.start", not "router.navigate" (#931).
-   */
-  #suppressUnhandledRejection(
-    promise: Promise<State>,
-    onSuppressed: (error: unknown) => void = this.#onSuppressedNavigateError,
-  ): void {
-    promise.catch(onSuppressed);
+  #runStart(startPath: string): Promise<State> {
+    if (!this.#eventBus.canStart()) {
+      return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
+    }
+
+    getInternals(this).validator?.navigation.validateStartArgs(startPath);
+
+    // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
+    // design, NOT a missed consolidation (#940): `sendStart()` runs HERE, before
+    // the interceptor chain, so the STARTING window spans the whole start
+    // pipeline. A pre-`next()` interceptor throw then unwinds via STARTING →
+    // `sendFail`, which emits TRANSITION_ERROR from STARTING (EventBusNamespace
+    // FAIL action) for `onTransitionError` plugins. Moving `sendStart()` into the
+    // namespace (the interceptor *target*) would skip STARTING on a pre-`next()`
+    // throw — the namespace is never reached — silently dropping that
+    // TRANSITION_ERROR: a #668 regression. The commit (`completeStart`) lives in
+    // the namespace; recovery needs facade state (`#state`, `#lifecycle`), so it
+    // stays here in `#unwindFailedStart`.
+    this.#eventBus.sendStart();
+
+    // Convert sync interceptor throws to rejections so the recovery path is
+    // reachable; otherwise the throw escapes synchronously, the FSM is left in
+    // STARTING, and the router is permanently bricked (#668).
+    let internalStart: Promise<State>;
+
+    try {
+      const chainResult: unknown = getInternals(this).start(startPath);
+
+      // A `start` interceptor that returns without calling next() yields a
+      // non-thenable (typically undefined); the `.catch` below would then throw
+      // a cryptic `TypeError: ...reading 'catch'` and leave the FSM stuck in
+      // STARTING. Reject with an actionable message so recovery unwinds via
+      // #unwindFailedStart — the same deferred-crash class as the #939
+      // start-path guard (#1411).
+      internalStart =
+        typeof (chainResult as { then?: unknown } | null | undefined)?.then ===
+        "function"
+          ? (chainResult as Promise<State>)
+          : Promise.reject(
+              new TypeError(
+                "[router.start] a `start` interceptor returned without calling next(). Every start interceptor must return `next(path)`.",
+              ),
+            );
+    } catch (syncError: unknown) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided start interceptor
+      internalStart = Promise.reject(syncError);
+    }
+
+    return internalStart.catch((error: unknown) =>
+      this.#unwindFailedStart(error),
+    );
   }
 
   /**
