@@ -710,10 +710,14 @@ describe("@real-router/logger-plugin", () => {
       );
     });
 
-    it("does not create an empty-label error mark or warn on a guard-redirect", async () => {
-      // Classic guard-redirect: guard navigates elsewhere and returns false.
-      // Core emits a double terminal (cancel + error) for the one redirect; the
-      // late error lands after the redirect target's success cleared the slot.
+    it("logs a guard-redirect as a single cancel, with no trailing error (#1609)", async () => {
+      // Classic guard-redirect: the guard navigates elsewhere and returns false.
+      // Core USED TO emit a double terminal for that one redirect — the guard's
+      // `CANNOT_ACTIVATE` was reported after the redirect target had already
+      // committed, so the logger saw `[START, CANCEL, START, SUCCESS, ERROR]`
+      // and had to survive an out-of-band error on a cleared perf slot. #1609
+      // removed the stale report at the source: a navigation that is no longer
+      // the one in flight is a cancellation, and cancellations are not reported.
       lifecycle.addActivateGuard("users", () => () => {
         void router.navigate("admin");
 
@@ -724,14 +728,22 @@ describe("@real-router/logger-plugin", () => {
 
       perfMarkSpy.mockClear();
       warnSpy.mockClear();
+      errorSpy.mockClear();
 
       await expect(router.navigate("users")).rejects.toMatchObject({
-        code: errorCodes.CANNOT_ACTIVATE,
+        code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      // Let the redirect's success + the trailing out-of-band error settle.
+      // Let the redirect target's success settle.
       await new Promise((resolve) => setTimeout(resolve, 20));
 
+      expect(router.getState()?.name).toBe("admin");
+      // The superseded navigation produces no error output at all — a regression
+      // to the double terminal shows up here first.
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Transition error"),
+        expect.anything(),
+      );
       expect(perfMarkSpy).not.toHaveBeenCalledWith("router:transition-error:");
       expect(warnSpy).not.toHaveBeenCalledWith(
         expect.stringContaining("Failed to create performance measure"),

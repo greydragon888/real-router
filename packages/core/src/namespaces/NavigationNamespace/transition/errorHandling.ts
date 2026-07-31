@@ -6,6 +6,46 @@ import { RouterError } from "../../../RouterError";
 import type { State } from "../../../types";
 import type { NavigationDependencies } from "../types";
 
+/**
+ * Is this thrown value already the router's quiet-cancel outcome?
+ *
+ * Asked by {@link handleGuardError} (a guard signalling a quiet cancel by
+ * throwing the RouterError directly, #933) and by {@link asCancellation}, which
+ * must not re-wrap one.
+ */
+function isTransitionCancelled(error: unknown): boolean {
+  return (
+    error instanceof RouterError &&
+    error.code === errorCodes.TRANSITION_CANCELLED
+  );
+}
+
+/**
+ * Restate a failure as the cancellation it actually was (#1609).
+ *
+ * Called by both failure arcs for a navigation that has LOST liveness — and
+ * every way to lose it (superseded, aborted, the router stopped, the FSM already
+ * out of the transition band) is a cancellation, one the navigation has already
+ * emitted `TRANSITION_CANCEL` to announce. Whatever verdict its guard or
+ * listener reached in the meantime is about a navigation nobody is waiting for:
+ * carrying it let a `FAIL` land in the FSM under a navigation that was still
+ * running, because {@link routeTransitionError} filters by error CODE and
+ * `CANNOT_ACTIVATE` is not `TRANSITION_CANCELLED` — and it left the caller's
+ * promise contradicting the event stream for the same navigation.
+ *
+ * The liveness question itself stays at the call sites: the two arcs answer it
+ * from different facts (see `finishAsyncNavigation` and `handleNavigateError`).
+ *
+ * A value that ALREADY carries the code is returned untouched, so #1197's
+ * canonicalized leave rejection keeps its `reason` (#943) and the cancellation
+ * the resolve path throws is not wrapped in a second one.
+ */
+export function asCancellation(error: unknown): unknown {
+  return isTransitionCancelled(error)
+    ? error
+    : new RouterError(errorCodes.TRANSITION_CANCELLED, { reason: error });
+}
+
 export function routeTransitionError(
   deps: NavigationDependencies,
   error: unknown,
@@ -40,10 +80,7 @@ export function handleGuardError(
   // drives the downstream suppression (routeTransitionError early-returns,
   // fire-and-forget stays silent), so re-coding would surface the intended
   // quiet cancel as a reported transition error (#933).
-  if (
-    error instanceof RouterError &&
-    error.code === errorCodes.TRANSITION_CANCELLED
-  ) {
+  if (isTransitionCancelled(error)) {
     throw error;
   }
 
