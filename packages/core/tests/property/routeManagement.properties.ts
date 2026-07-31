@@ -151,6 +151,81 @@ describe("Route Management (getRoutesApi) Properties", () => {
     }
   });
 
+  /**
+   * `clear()` atomicity, and it is a POST-CONDITION property on purpose.
+   *
+   * Unlike `replace` / `add` / `update`, whose prepare-then-commit contract is
+   * declared and tested (#698 / #1046 / #1193), `clear()`'s atomicity is
+   * STRUCTURAL: three consecutive steps — `resetStore` →
+   * `lifecycleNamespace.clearAll()` → `clearState()` — with no try/catch, which
+   * hold together only because no user code runs in them. There is no exception
+   * to test against, so this asserts the observable instead: whatever the router
+   * had before, afterwards the three are consistently empty **together**.
+   * Stronger than "clear → has" above, which only looks at the tree.
+   *
+   * If a callback ever lands in one of those three steps, partial application
+   * becomes possible and this is what notices — see INVARIANTS
+   * "Route Management" #17.
+   */
+  test.prop([fc.array(arbSegmentName, { maxLength: 4 }), fc.boolean()], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "clear atomicity: tree, guards and state go empty together",
+    async (extra, ran) => {
+      const router = createFixtureRouter();
+      const routesApi = getRoutesApi(router);
+      const lifecycle = getLifecycleApi(router);
+
+      // "Whatever the router had before" includes having RUN: a stopped router
+      // keeps its `previousState`, so this axis is what makes the state clause
+      // non-vacuous (and kills the mutant that drops `clearState()`).
+      if (ran) {
+        await router.start("/home");
+        await router.navigate("search");
+        router.stop();
+      }
+
+      // Arbitrary prior shape: extra routes on top of the fixture, every route
+      // carrying a BLOCKING guard so a survivor would be observable.
+      for (const name of extra) {
+        if (
+          !FIXTURE_ROUTE_NAMES.includes(name as never) &&
+          !routesApi.has(name)
+        ) {
+          routesApi.add({ name, path: `/${name}` });
+        }
+      }
+
+      for (const name of [...FIXTURE_ROUTE_NAMES, ...extra]) {
+        if (routesApi.has(name)) {
+          lifecycle.addActivateGuard(name, () => () => false);
+        }
+      }
+
+      routesApi.clear();
+
+      // 1. the tree
+      for (const name of [...FIXTURE_ROUTE_NAMES, ...extra]) {
+        expect(routesApi.has(name)).toBe(false);
+      }
+
+      // 2. the state — BOTH cells, current and previous
+      expect(router.getState()).toBeUndefined();
+      expect(router.getPreviousState()).toBeUndefined();
+
+      // 3. the guards — re-adding a name must not resurrect the blocking guard
+      // that used to sit on it. Observed through behaviour, not internals, and
+      // deliberately on a name that DID carry one: starting on a fresh name
+      // would pass even if `clearAll()` never ran (measured — that is exactly
+      // the mutant this arm exists to kill).
+      routesApi.add({ name: "home", path: "/home" });
+
+      await router.start("/home");
+
+      expect(router.getState()?.name).toBe("home");
+    },
+  );
+
   it("add with parent: child is accessible via dot notation", () => {
     const router = createFixtureRouter();
     const routesApi = getRoutesApi(router);

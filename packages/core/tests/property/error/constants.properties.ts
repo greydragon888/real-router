@@ -175,9 +175,10 @@ describe("RouterError Constants Properties", () => {
   describe("errorCodes backward compatibility", () => {
     it("errorCodes contains exact number of codes", () => {
       // If this number changes, it may break backward compatibility.
-      // 15 since WRONG_CHANNEL was added (always-on channel guard, #1572);
-      // 14 was the count from REENTRANT_TREE_MUTATION (reentrant route-CRUD ban, #1032).
-      const expectedCount = 15;
+      // 16 since ROUTER_NOT_STOPPED was added (clear() refuses while a state is
+      // committed, #1612); 15 was the count from WRONG_CHANNEL (always-on
+      // channel guard, #1572); 14 from REENTRANT_TREE_MUTATION (#1032).
+      const expectedCount = 16;
       const actualCount = Object.keys(errorCodes).length;
 
       expect(actualCount).toBe(expectedCount);

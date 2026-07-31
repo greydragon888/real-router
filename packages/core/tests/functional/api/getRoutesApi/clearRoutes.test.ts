@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { events } from "@real-router/core";
+import { errorCodes, events } from "@real-router/core";
 import {
   getDependenciesApi,
   getLifecycleApi,
@@ -18,11 +18,14 @@ let routesApi: RoutesApi;
 let lifecycle: LifecycleApi;
 
 describe("core/routes/clearRoutes", () => {
-  beforeEach(async () => {
+  // NOT started (#1612): `clear()` is a teardown primitive and refuses while a
+  // state is committed, so the shared fixture no longer starts the router. The
+  // handful of tests that genuinely need a running router start it themselves —
+  // which also makes each of them say what it actually depends on.
+  beforeEach(() => {
     router = createTestRouter();
     routesApi = getRoutesApi(router);
     lifecycle = getLifecycleApi(router);
-    await router.start("/home");
   });
 
   afterEach(() => {
@@ -205,19 +208,23 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Verify guard is active before clear
+      await router.start("/home");
+
       try {
         await router.navigate("protected");
       } catch (error: any) {
         expect(error?.code).toBe("CANNOT_ACTIVATE");
       }
 
+      // #1612: clear() is a teardown primitive — tear the router down first.
+      router.stop();
       routesApi.clear();
 
       // Re-add route without guard
       routesApi.add({ name: "protected", path: "/protected" });
 
       // Navigation should succeed (no guard after clear)
-      await router.navigate("protected");
+      await router.start("/protected");
 
       expect(router.getState()?.name).toBe("protected");
     });
@@ -226,6 +233,7 @@ describe("core/routes/clearRoutes", () => {
       routesApi.add({ name: "editor", path: "/editor" });
       lifecycle.addDeactivateGuard("editor", () => () => false); // blocking guard
 
+      await router.start("/home");
       await router.navigate("editor");
 
       // Try to leave - should be blocked
@@ -237,12 +245,14 @@ describe("core/routes/clearRoutes", () => {
 
       expect(router.getState()?.name).toBe("editor");
 
+      // #1612: clear() is a teardown primitive — tear the router down first.
+      router.stop();
       routesApi.clear();
 
       // Re-add routes without guards
       routesApi.add({ name: "editor", path: "/editor" });
       routesApi.add({ name: "home", path: "/home" });
-      await router.navigate("editor");
+      await router.start("/editor");
 
       // Now leaving should work (guard was cleared)
       await router.navigate("home");
@@ -271,7 +281,7 @@ describe("core/routes/clearRoutes", () => {
       routesApi.add({ name: "route2", path: "/route2" });
 
       // All navigations should work (all guards were cleared)
-      await router.navigate("home");
+      await router.start("/home");
       await router.navigate("route1");
       await router.navigate("route2");
 
@@ -294,7 +304,9 @@ describe("core/routes/clearRoutes", () => {
 
       // Add route and navigate to verify plugin is still active
       routesApi.add({ name: "test", path: "/test" });
-      await router.navigate("test");
+      // #1612: the router was never started (clear() requires that), so the
+      // post-clear navigation is a start().
+      await router.start("/test");
 
       // Plugin should have been called (proving it's still registered)
       expect(pluginCalls).toContain("start");
@@ -313,7 +325,9 @@ describe("core/routes/clearRoutes", () => {
 
       // Add route and navigate to verify plugin is still active
       routesApi.add({ name: "test", path: "/test" });
-      await router.navigate("test");
+      // #1612: the router was never started (clear() requires that), so the
+      // post-clear navigation is a start().
+      await router.start("/test");
 
       // Plugin should have been called (proving it's still registered)
       expect(middlewareCalls).toContain("mw");
@@ -357,7 +371,9 @@ describe("core/routes/clearRoutes", () => {
 
       // Add a route and navigate to verify listener is preserved
       routesApi.add({ name: "test", path: "/test" });
-      await router.navigate("test");
+      // #1612: the router was never started (clear() requires that), so the
+      // post-clear navigation is a start().
+      await router.start("/test");
 
       // Listener should fire after navigation
       expect(eventLog).toContain("success");
@@ -365,13 +381,18 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("state after clearRoutes - edge cases", () => {
-    it("should clear state to undefined after clearRoutes", async () => {
+    // #1612: these two used to clear a RUNNING router — the shape that is now
+    // refused. The contract they pin (a cleared router has no state, and its
+    // matcher agrees) is unchanged; only the teardown is spelled out.
+    it("leaves state undefined after stop() + clear()", async () => {
       // Navigate to a route first
+      await router.start("/home");
       await router.navigate("users.list");
 
       expect(router.getState()?.name).toBe("users.list");
 
-      // Clear all routes
+      // Tear the router down, then clear all routes
+      router.stop();
       routesApi.clear();
 
       // State should be cleared to undefined
@@ -381,7 +402,8 @@ describe("core/routes/clearRoutes", () => {
       expect(getPluginApi(router).matchPath("/home")).toBeUndefined();
     });
 
-    it("should have consistent state - both state and matchPath are undefined", async () => {
+    it("stays consistent after stop() + clear() - both state and matchPath are undefined", async () => {
+      await router.start("/home");
       await router.navigate("users.list");
 
       const currentState = router.getState();
@@ -389,6 +411,7 @@ describe("core/routes/clearRoutes", () => {
       expect(currentState?.name).toBe("users.list");
       expect(currentState?.path).toBe("/users/list");
 
+      router.stop();
       routesApi.clear();
 
       // State is cleared
@@ -409,25 +432,27 @@ describe("core/routes/clearRoutes", () => {
       await expect(result).rejects.toThrow();
     });
 
-    it("should transition to new route after clearRoutes + addRoute", async () => {
+    it("should transition to new route after stop + clearRoutes + addRoute", async () => {
+      await router.start("/home");
       await router.navigate("users.list");
 
+      router.stop();
       routesApi.clear();
       routesApi.add({ name: "dashboard", path: "/dashboard" });
 
-      // Navigate to new route - this works because addRoute registered the route
-      // Note: navigate returns synchronously when state update is immediate
-      await router.navigate("dashboard");
+      // The rebuilt tree is reachable again once the router is restarted.
+      await router.start("/dashboard");
 
       expect(router.getState()?.name).toBe("dashboard");
     });
 
-    it("should successfully navigate to new route after clearRoutes + addRoute", async () => {
-      // This is the intended workflow for route replacement
+    it("should successfully start on a new route after clearRoutes + addRoute", async () => {
+      // The teardown-then-rebuild workflow, on a router that never started.
+      // For swapping the tree on a RUNNING router, `replace()` is the tool.
       routesApi.clear();
       routesApi.add({ name: "newRoute", path: "/new" });
 
-      await router.navigate("newRoute");
+      await router.start("/new");
 
       // Navigation should work - state is updated
       expect(router.getState()?.name).toBe("newRoute");
@@ -486,9 +511,10 @@ describe("core/routes/clearRoutes", () => {
           }),
       });
 
-      // Start navigation (async)
+      // #1612: the navigation-in-progress guard is now reachable only while
+      // NO state is committed — i.e. during the START navigation. Park that.
       const navigationPromise = router
-        .navigate("asyncRoute")
+        .start("/async-route")
         .then(() => true)
         .catch(() => false);
 
@@ -529,9 +555,10 @@ describe("core/routes/clearRoutes", () => {
           }),
       });
 
-      // Start navigation (fire-and-forget — guard holds it in progress)
+      // #1612: park the START navigation — the window where the
+      // navigation-in-progress guard still applies.
       const navigationPromise = router
-        .navigate("slowRoute")
+        .start("/slow")
         .then(() => true)
         .catch(() => false);
 
@@ -562,10 +589,9 @@ describe("core/routes/clearRoutes", () => {
           }),
       });
 
-      // Start navigation
-      const navigationPromise = router
-        .navigate("tempRoute")
-        .then(() => undefined);
+      // #1612: park the START navigation — the window where the
+      // navigation-in-progress guard still applies.
+      const navigationPromise = router.start("/temp").then(() => undefined);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -583,11 +609,18 @@ describe("core/routes/clearRoutes", () => {
       // Reset spy to check next call
       errorSpy.mockClear();
 
-      // Now navigation is complete (callback was called) - clearRoutes should work
-      routesApi.clear();
-
-      // Should NOT log error this time
+      // #1612: the navigation has settled, so the in-progress guard no longer
+      // applies — but a state is committed now, so the OTHER precondition does.
+      // The two guards hand over to each other rather than overlapping.
+      expect(() => {
+        routesApi.clear();
+      }).toThrow(
+        expect.objectContaining({ code: errorCodes.ROUTER_NOT_STOPPED }),
+      );
       expect(errorSpy).not.toHaveBeenCalled();
+
+      router.stop();
+      routesApi.clear();
 
       // Routes should be cleared
       expect(getPluginApi(router).matchPath("/temp")).toBeUndefined();
@@ -612,16 +645,19 @@ describe("core/routes/clearRoutes", () => {
           }),
       });
 
-      // Start navigation on router1 (fire-and-forget — guard holds it in progress)
+      // #1612: park router1's START navigation — the window where the
+      // navigation-in-progress guard still applies.
       const navigationPromise = router
-        .navigate("asyncRoute")
+        .start("/async")
         .then(() => true)
         .catch(() => false);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // clearRoutes on router2 should work (it's not navigating)
+      // clearRoutes on router2 works once it is torn down — it is a separate
+      // instance, and router1's in-flight navigation does not reach it.
+      router2.stop();
       getRoutesApi(router2).clear();
 
       // router2 should be cleared
@@ -666,6 +702,7 @@ describe("core/routes/clearRoutes", () => {
 
     it("should work on stopped router", async () => {
       // Navigate to a route first
+      await router.start("/home");
       await router.navigate("users.list");
 
       expect(router.getState()?.name).toBe("users.list");
@@ -689,6 +726,7 @@ describe("core/routes/clearRoutes", () => {
 
     it("should work correctly with stop-start-stop cycle", async () => {
       // First cycle
+      await router.start("/home");
       await router.navigate("users.list");
 
       expect(router.getState()?.name).toBe("users.list");

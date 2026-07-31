@@ -378,10 +378,10 @@ describe("preload-plugin — lifecycle", () => {
 
     expect(preloadFn).toHaveBeenCalledTimes(1);
 
-    // clear: empties the whole compiled map.
-    routesApi.clear();
-
+    // clear: empties the whole compiled map. #1612 — clear() is a teardown
+    // primitive, so the stop() comes first.
     router.stop();
+    routesApi.clear();
   });
 
   it("invalidates the pre-resolved state cache when a route is removed", async () => {

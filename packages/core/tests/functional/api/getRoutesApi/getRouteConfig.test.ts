@@ -122,9 +122,17 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         title: "Clear Me",
       });
 
+      // #1612: clear() is a teardown primitive — it refuses while a state is
+      // committed, and the fixture starts the router.
+      router.stop();
+
       expect(pluginApi.getRouteConfig("gc-clear")).toStrictEqual({
         title: "Clear Me",
       });
+
+      // #1612: clear() is a teardown primitive — it refuses while a state is
+      // committed, and the fixture starts the router.
+      router.stop();
 
       routesApi.clear();
 

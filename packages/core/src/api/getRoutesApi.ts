@@ -1,5 +1,6 @@
 import { nodeToDefinition } from "../engine";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
+import { errorCodes } from "../constants";
 import { guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
 import {
@@ -25,6 +26,7 @@ import {
   compileArtifactGuards,
   resetStore,
 } from "../namespaces/RoutesNamespace/routesStore";
+import { RouterError } from "../RouterError";
 import { getTransitionPath } from "../transitionPath";
 
 import type { RoutesApi } from "./types";
@@ -825,6 +827,37 @@ export function getRoutesApi<
     clear: () => {
       throwIfDisposed(ctx.isDisposed);
       throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
+
+      // `clear()` is a TEARDOWN primitive, and it may only run while there is
+      // nothing to tear down out from under anyone (#1612). It used to drop the
+      // committed state to `undefined` silently: every `router.subscribe`
+      // consumer kept rendering a route the router had already discarded, and
+      // the router was left `isActive() === true` with no state — a shape that
+      // otherwise exists only *during* `start()`, which is why an always-on
+      // guard misreads it (path-less `navigateToNotFound()` answers
+      // ROUTER_NOT_STARTED on a started router).
+      //
+      // Announcing the reset instead was considered and rejected: it would make
+      // CRUD emit a transition event as a RULE (`replace()` is deliberately "the
+      // one structural mutation that emits" one) and it would not remove the
+      // shape. Refusing removes the crossing entirely — `clear()` stops writing
+      // into state it does not own. `replace(routes)` is the spelling for a
+      // running router: atomic, notifies subscribers, and preserves external
+      // guards. Design note `fsm-as-state-owner-2026-07-31.md` §11.A1, option
+      // (в), owner decision 2026-08-01.
+      //
+      // A THROW rather than the `logger.error` + no-op that `validateClearRoutes`
+      // uses below, because the two preconditions are different classes: "a
+      // navigation is in flight" clears by itself (wait and retry works), while
+      // this one never does — the caller has to change the code. That is the
+      // same line `REENTRANT_TREE_MUTATION` sits on (#1032).
+      if (ctx.getStateName() !== undefined) {
+        throw new RouterError(errorCodes.ROUTER_NOT_STOPPED, {
+          message:
+            "[router.clear] Cannot clear routes while a state is committed. " +
+            "Use replace(routes) to swap the tree on a running router, or stop() first.",
+        });
+      }
 
       const canClear = validateClearRoutes(ctx.isTransitioning(), ctx.logger);
 
