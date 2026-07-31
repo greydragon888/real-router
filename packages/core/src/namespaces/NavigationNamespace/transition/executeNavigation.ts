@@ -1,5 +1,5 @@
 import { completeTransition } from "./completeTransition";
-import { routeTransitionError } from "./errorHandling";
+import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
 import { RouterError } from "../../../RouterError";
@@ -211,7 +211,12 @@ export function executeNavigation(
   opts: NavigationOptions,
 ): State | Promise<State> {
   let fromState: State | undefined;
-  let transitionStarted = false;
+  // The token of the navigation THIS call announced — `0` until `beginTransition`
+  // returns, i.e. exactly the "did TRANSITION_START fire?" marker this used to be
+  // a boolean for. It carries the id because the error path needs both facts: it
+  // may only report for a navigation that was announced AND is still the one in
+  // flight (#1609).
+  let myId = 0;
   let controller: AbortController | null = null;
 
   try {
@@ -226,7 +231,7 @@ export function executeNavigation(
 
     const plan = beginTransition(deps, inFlight, toState, fromState, opts);
 
-    transitionStarted = true;
+    myId = plan.myId;
 
     // Post-`startTransition` supersession is now caught at the commit-gate
     // below (before `completeTransition`'s setState): a `stop()`/`dispose()`/
@@ -253,7 +258,6 @@ export function executeNavigation(
     }
 
     const {
-      myId,
       suspendable,
       canDeactivateFunctions,
       canActivateFunctions,
@@ -361,18 +365,18 @@ export function executeNavigation(
     // `Promise<State>`; the allocation is the same one, one frame higher.
     return finalState;
   } catch (error) {
-    handleNavigateError(
+    const outcome = handleNavigateError(
       deps,
       inFlight,
       error,
       controller,
-      transitionStarted,
+      myId,
       toState,
       fromState,
     );
 
     // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from guards or transition pipeline
-    return Promise.reject(error);
+    return Promise.reject(outcome);
   }
 }
 
@@ -453,6 +457,9 @@ async function finishAsyncNavigation(
       });
     }
 
+    // The race settles two ways and BOTH have to consult liveness. Only this
+    // arm did: a rejection throws straight past the check into the `catch`,
+    // which is where #1609 lived.
     await Promise.race([guardCompletion, abortRace]);
 
     if (!isActive()) {
@@ -465,11 +472,23 @@ async function finishAsyncNavigation(
 
     return state;
   } catch (error) {
-    failureReason = error;
+    // Liveness on the OTHER arm of the race (#1609). A guard that rejects one
+    // or two microtasks before a superseding `navigate()` used to report FAIL
+    // for a navigation cancelled several microtasks earlier —
+    // `routeTransitionError` filters by error CODE, and `CANNOT_ACTIVATE` is
+    // not `TRANSITION_CANCELLED`. Into a `READY` FSM that was observability
+    // noise (a terminal event for a dead navigation); into the LIVE one it was
+    // silent corruption, because `TRANSITION_STARTED --FAIL--> READY` is a real
+    // edge, so the superseding navigation's later `COMPLETE` became a table
+    // no-op: state committed, `TRANSITION_SUCCESS` never emitted, subscribers
+    // never notified.
+    const outcome = isActive() ? error : asCancellation(error);
 
-    routeTransitionError(deps, error, nav.toState, nav.fromState);
+    failureReason = outcome;
 
-    throw error;
+    routeTransitionError(deps, outcome, nav.toState, nav.fromState);
+
+    throw outcome;
     // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
     // emptying the finally only skips the controller release, which is unobservable
     // (defense-in-depth: on a CANCEL the FSM CANCEL action already aborted+nulled
@@ -499,22 +518,51 @@ async function finishAsyncNavigation(
   }
 }
 
+/**
+ * Settle a failed navigation on the SYNCHRONOUS arc: release its controller,
+ * report it only while it is still the navigation in flight, and hand back the
+ * outcome the caller's promise should carry.
+ *
+ * `myId === 0` means `TRANSITION_START` never fired, so there is no announced
+ * navigation for a terminal event to pair with — the error goes back untouched.
+ *
+ * Liveness asks the precise question — **does the FSM still hold MY
+ * transition?** — because that is the precondition for sending `FAIL` at all:
+ * the token says no newer navigation took over, and `isTransitioning()` says the
+ * FSM has not already left the transition band. `isActive()` would be the looser
+ * approximation and gets two cases wrong: a listener that runs `stop()` followed
+ * by a `start()` PARKED in an async interceptor bumps no token and puts the FSM
+ * in `STARTING`, where `isActive()` is true again — for a different lifecycle,
+ * whose start the stale `FAIL` would then kill (`STARTING --FAIL--> IDLE`).
+ * `#finishAsyncNavigation` reads the same fact off `controller.signal.aborted`,
+ * which this arc cannot: the guard-free leave arc keeps its controller local and
+ * has already released it by the time an error arrives here.
+ */
 function handleNavigateError(
   deps: NavigationDependencies,
   inFlight: InFlightNavigation,
   error: unknown,
   controller: AbortController | null,
-  transitionStarted: boolean,
+  myId: number,
   toState: State | undefined,
   fromState: State | undefined,
-): void {
+): unknown {
   if (controller) {
     inFlight.release(controller, true, error);
   }
 
-  if (transitionStarted && toState) {
-    routeTransitionError(deps, error, toState, fromState);
+  if (myId !== 0 && toState) {
+    const outcome =
+      inFlight.isCurrent(myId) && deps.isTransitioning()
+        ? error
+        : asCancellation(error);
+
+    routeTransitionError(deps, outcome, toState, fromState);
+
+    return outcome;
   }
+
+  return error;
 }
 
 /**

@@ -21,8 +21,8 @@
 import { test, fc } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { createRouter, errorCodes } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
+import { createRouter, errorCodes, RouterError } from "@real-router/core";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import { NUM_RUNS } from "./helpers";
 
@@ -339,6 +339,168 @@ describe("Cancellation matrix — suspensionPoint × callSite × guarded × sour
     "$point / $callSite / guarded=$guarded / $source → CANCELLED, FSM settled",
     async (cell) => {
       await runCell(cell);
+    },
+  );
+});
+
+// --------------------------------------------------------------------------
+// #1609 — one terminal event per navigation, under SUPERSEDE
+// --------------------------------------------------------------------------
+//
+// The two blocks above cover the "settling" sources (stop / dispose / external
+// signal) and say so in their header: supersede starts a NEW in-flight
+// navigation instead of settling the router, so it does not fit their model.
+// That excluded axis is where #1609 lived — a superseded navigation whose guard
+// had ALREADY failed reported that failure into the FSM, which by then belonged
+// to somebody else.
+//
+// The invariant is about the EVENT STREAM, not about a code: a navigation gets
+// exactly ONE terminal event. Emitting both `TRANSITION_CANCEL` and
+// `TRANSITION_ERROR` for one navigation is the defect in either direction — as
+// observability noise when the FSM had settled back to READY, and as silent
+// corruption when it had not (`TRANSITION_STARTED --FAIL--> READY` moved the
+// machine out from under the SUPERSEDING navigation, whose `COMPLETE` then
+// became a table no-op: state committed, no `TRANSITION_SUCCESS`, no subscriber
+// notified). So the second half of the property — the superseding navigation
+// always completes — is what catches the corrupting half.
+//
+// Discriminating power (mutationally verified): reverting the liveness check on
+// `finishAsyncNavigation`'s reject arm fails this property, shrinking to
+// `delay: 1` — the window in which the guard's rejection beats the abort meant
+// to silence it. Every case here parks on an async guard, so the SYNCHRONOUS
+// arc (`handleNavigateError`) is deliberately out of this property's domain and
+// is pinned functionally instead
+// (`tests/functional/navigation/superseded-guard-rejection-1609.test.ts`).
+
+type Failure = "reject" | "returnFalse" | "quietCancel";
+
+const arbSupersede = fc.record({
+  // Microtasks between the first navigation's guard settling and the supersede.
+  // 0 → the abort wins; 1-2 → the defect's window; >=3 → the first navigation
+  // has already failed on its own, and that failure is legitimately reported.
+  delay: fc.integer({ min: 0, max: 6 }),
+  failure: fc.constantFrom<Failure>("reject", "returnFalse", "quietCancel"),
+  onDeactivate: fc.boolean(),
+  // Parks the SUPERSEDING navigation too, so the stale FAIL is aimed at an FSM
+  // in TRANSITION_STARTED rather than one that has settled back to READY.
+  parkSecond: fc.boolean(),
+});
+
+const microtasks = async (n: number): Promise<void> => {
+  for (let i = 0; i < n; i++) {
+    await Promise.resolve();
+  }
+};
+
+describe("#1609 — a superseded navigation reports exactly one terminal event", () => {
+  test.prop([arbSupersede], { numRuns: NUM_RUNS.fast })(
+    "supersede leaves the first navigation with one terminal, and the second still completes",
+    async ({ delay, failure, onDeactivate, parkSecond }) => {
+      const log: string[] = [];
+
+      let settleFirst!: (value: boolean) => void;
+      let failFirst!: (reason: unknown) => void;
+      const firstGuard = new Promise<boolean>((resolve, reject) => {
+        settleFirst = resolve;
+        failFirst = reject;
+      });
+
+      let settleSecond!: (value: boolean) => void;
+      const secondGuard = new Promise<boolean>((resolve) => {
+        settleSecond = resolve;
+      });
+
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "first", path: "/first" },
+        { name: "second", path: "/second" },
+      ]);
+
+      router.usePlugin(() => ({
+        onTransitionSuccess: (to) => log.push(`SUCCESS:${to.name}`),
+        onTransitionCancel: (to) => log.push(`CANCEL:${to?.name}`),
+        onTransitionError: (to) => log.push(`ERROR:${to?.name}`),
+      }));
+
+      const lifecycle = getLifecycleApi(router);
+
+      // The first navigation parks either on its own activation guard or on the
+      // deactivation guard of the route it is leaving — both suspend the same
+      // pipeline, and both reach the same failure arc. ONE-SHOT, because a
+      // deactivate guard is keyed by the route being LEFT: handing the second
+      // navigation the same (already failed) promise would block it on its own
+      // merits and say nothing about #1609.
+      let armed = true;
+      const firstGuardOnce = (): Promise<boolean> | boolean => {
+        if (!armed) {
+          return true;
+        }
+
+        armed = false;
+
+        return firstGuard;
+      };
+
+      if (onDeactivate) {
+        lifecycle.addDeactivateGuard("home", () => firstGuardOnce);
+      } else {
+        lifecycle.addActivateGuard("first", () => firstGuardOnce);
+      }
+
+      if (parkSecond) {
+        lifecycle.addActivateGuard("second", () => () => secondGuard);
+      }
+
+      await router.start("/home");
+      log.length = 0;
+
+      const first = router.navigate("first").then(
+        () => "resolved",
+        () => "rejected",
+      );
+
+      await microtasks(8);
+
+      if (failure === "returnFalse") {
+        settleFirst(false);
+      } else if (failure === "quietCancel") {
+        failFirst(new RouterError(errorCodes.TRANSITION_CANCELLED));
+      } else {
+        failFirst(new Error("guard failed"));
+      }
+
+      await microtasks(delay);
+
+      const second = router.navigate("second").then(
+        () => "resolved",
+        () => "rejected",
+      );
+
+      await expect(first).resolves.toBe("rejected");
+
+      if (parkSecond) {
+        await microtasks(4);
+        // A deactivate guard is keyed by the route being LEFT, so the second
+        // navigation re-runs the (now settled) first guard; an activate guard on
+        // `second` is its own.
+        settleSecond(true);
+      }
+
+      await expect(second).resolves.toBe("resolved");
+
+      await microtasks(30);
+
+      const terminalsOfFirst = log.filter(
+        (entry) => entry === "CANCEL:first" || entry === "ERROR:first",
+      );
+
+      // ONE terminal for the first navigation — never a CANCEL followed by an
+      // ERROR for the same navigation.
+      expect(terminalsOfFirst).toHaveLength(1);
+
+      // ...and the navigation that superseded it committed and announced it.
+      expect(log).toContain("SUCCESS:second");
+      expect(router.getState()?.name).toBe("second");
     },
   );
 });
