@@ -160,13 +160,14 @@ These invariants cover the FSM-driven lifecycle of the router. Each state transi
 
 ## Reentrancy & dispatch
 
-The emit machinery re-entering itself from inside a transition listener (`subscribe` / `subscribeLeave` / a plugin `onTransition*` hook) is governed by three invariants (#1030-#1034, merged via #1035). Locked by `tests/functional/navigation/navigate/reentrant-ban.test.ts`.
+The emit machinery re-entering itself from inside a transition listener (`subscribe` / `subscribeLeave` / a plugin `onTransition*` hook) is governed by three invariants (#1030-#1034, merged via #1035). Locked by `tests/functional/navigation/navigate/reentrant-ban.test.ts`; invariant 4 by `tests/functional/navigation/pre-start-window-1610.test.ts`.
 
 | #   | Invariant                        | Description                                                                                                                                                                                                                                                                                                                                   |
 | --- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Reentrant-navigation ban (#1035) | A **synchronous** `navigate` / `navigateToDefault` / `navigateToState` / `navigateToNotFound` from inside a transition-event listener throws `RouterError(REENTRANT_NAVIGATION)` at the facade. Deferred (microtask / `await` / `.then`) navigation from a listener is **allowed** — the transition has settled and the FSM is `READY` again. |
 | 2   | Emit coalescing (#1033)          | A re-entrant emit of an already-in-flight event is a **no-op** (`EventEmitter` `#dispatching` guard, depth ≤ 1): the listener runs once and the mutation still commits. No depth limit, no `RecursionDepthError` (replaced the former `maxEventDepth` model). Also stated for `subscribeChanges` (Routes-mutation-events section).            |
 | 3   | Dispatch-depth tracking (#1034)  | `#dispatchDepth` is elevated across every transition emit and the synchronous `subscribeLeave` batch (`EventBusNamespace.ts`); `isProcessing()` reads it to drive the ban above. The depth returns to **0 after every navigate outcome** (success, error, or cancel) — a leaked depth would falsely ban every later top-level navigate.       |
+| 4   | Pre-start ban (#1610)            | The same four entry points also throw `REENTRANT_NAVIGATION` from the **pre-start** window — the stretch in which application code runs BEFORE the transition is announced: the `forwardState` / `buildPath` interceptor chains and a route's codecs (inside `buildNavigateState`), and the `defaultRoute` / `defaultParams` / `defaultSearch` callbacks (inside `resolveDefault`). Invariant 3's depth cannot see it — there has been no emit yet — which is how a nested navigation used to run to completion here. `NavigationNamespace.isPreparing()` carries it, raised as a DEPTH and lowered in a `finally` at each site: the early refusals (`ROUTE_NOT_FOUND`, `SAME_STATES`, `WRONG_CHANNEL`) and any user-code throw exit through that same window, and a marker left raised would deadlock the router against its own next call. Deliberately NOT the guard phase (a guard runs after the announce, so the guard-redirect stays a supersede) and NOT `matchPath` (it runs the same `buildPath` chain but prepares no navigation). ⚠ Interim form — absorbed when pre-start becomes a state of the machine (`.claude/fsm-as-state-owner-2026-07-31.md` §8, plan §10 phase 4). |
 
 ## navigateToNotFound
 
@@ -588,6 +589,29 @@ Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and 
 
 ---
 
+## Committed-state ownership
+
+Assembled from several independent decisions and, until #1610, written down
+nowhere — while `transition.from`, the `hasInflight` predicate and the whole
+commit-gate semantics lean on it (`.claude/fsm-as-state-owner-2026-07-31.md`
+§3.1, plan item 0.1).
+
+⚠ **Wording matters, and the mechanism-level phrasing does not catch the bug.**
+"While the FSM is in `TRANSITION_STARTED` / `LEAVE_APPROVED` the committed state
+is unchanged" is TRUE, but it stayed true even on #1610 — measured over the full
+generator, not argued: a nested navigation SUPERSEDES, so it cancels whatever was
+in flight before committing, and its commit always lands inside its own
+transition. It is kept below as a second, separately-asserted clause precisely so
+that difference cannot be lost again; the caller-facing clause is the one with
+discriminating power.
+
+| #   | Invariant                                        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | A navigation departs from the state committed when it was REQUESTED (#1610) | For every navigation, the `fromState` its `TRANSITION_START` carries equals `getState()` at the moment the entry point was called — equivalently, from the call until its own commit no other navigation commits. Generated over the three pre-start windows (`forwardState`, `buildPath`, `defaultRoute`) × whether another navigation is already in flight × whether the nested one suspends on an async guard. Verified **discriminating**: reverting either half of the #1610 fix fails it, with the counterexample naming the reverted window. |
+| 2   | No commit lands inside another navigation's FSM window | No `TRANSITION_SUCCESS` is emitted while `isTransitioning()` is true. The mechanism-level clause above — true today and true on the bug, asserted separately so the distinction is recorded rather than assumed.                                                                                                                                                                                                                                                                        |
+
+---
+
 ## Test Files
 
 | File                                                            | Invariants | Category                                                                                                        |
@@ -623,6 +647,7 @@ Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and 
 | `tests/property/error/constants.properties.ts`                  | 11         | errorCodes object invariants                                                                                    |
 | `tests/property/tree-changed.properties.ts`                     | 6          | TREE_CHANGED atomicity, op discriminator, replace diff, nested-subtree flatten, update conditional emit         |
 | `tests/property/cancellation.properties.ts`                     | 2          | Navigation cancellation — random cancel sequences + supersede terminal-event uniqueness                        |
+| `tests/property/committedState.properties.ts`                   | 2          | Committed-state ownership — the pre-start windows (#1610)                                                       |
 | `tests/property/empty-params-reuse.properties.ts`               | 1          | All-undefined param dict → shared EMPTY_PARAMS singleton (#1027/#1028)                                          |
 | `tests/property/canonicalize.properties.ts`                     | 8          | The nav pipeline's single producer, against a mocked port                                                       |
 | `tests/property/channelIsolation.properties.ts`                 | 7          | The two channels never exchange a key (#1548)                                                                   |

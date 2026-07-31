@@ -35,6 +35,9 @@ export class NavigationNamespace {
   // The controller + supersession token of the navigation in flight, owned as
   // one thing (#1607). Built here, one per router — never per navigation.
   readonly #inFlight = new InFlightNavigation();
+  // Depth of the PRE-START window — see `#prepare`. Interim form of what
+  // becomes a machine state in the state-ownership plan (§10, phase 4).
+  #preparingDepth = 0;
 
   // =========================================================================
   // Dependency injection
@@ -118,6 +121,49 @@ export class NavigationNamespace {
   }
 
   /**
+   * Is a navigation between its entry point and its announce — the PRE-START
+   * window (#1610)?
+   *
+   * Two stretches raise `#preparingDepth`, and both are application code running
+   * before `TRANSITION_START`: `buildNavigateState` (the `forwardState` and
+   * `buildPath` interceptor chains plus the route's own codecs) and
+   * `resolveDefault` (`defaultRoute` / `defaultParams` / `defaultSearch` may
+   * each be a dependency-resolved callback). That is precisely why the
+   * reentrancy ban did not reach them: `Router.#assertNotReentrant` keys off the
+   * emitter's dispatch depth, and there has been no emit yet — so a nested
+   * `navigate()` ran to completion here, committing a state the outer navigation
+   * overwrote a tick later and leaving the outer transition to report departing
+   * from wherever the nested one had stopped.
+   *
+   * Those two calls are the whole window. Everything after them and before the
+   * announce is core's own code, except the `CANCEL` emit inside
+   * `abortPreviousNavigation` — which the dispatch depth already covers.
+   *
+   * A DEPTH rather than a boolean, raised inline rather than through a wrapper
+   * taking a callback: the wrapper allocated a closure per navigation on the
+   * #307 hot path, and the depth makes the two sites' relationship a
+   * non-question (they are sequential today, and nesting would be safe anyway).
+   * Each site lowers it in a `finally`, because every exit has to — the early
+   * refusals live in this same window (`ROUTE_NOT_FOUND` when no state comes
+   * back, `WRONG_CHANNEL` from the always-on channel guard, any throw from user
+   * code), and a marker left raised deadlocks the router against its own next
+   * call.
+   *
+   * Read by `Router.#assertNotReentrant` alongside `EventBus.isProcessing()`;
+   * between them they span every window in which application code runs inside a
+   * navigation core has not finished setting up. A GUARD is deliberately
+   * neither: it runs after the announce, so the guard-redirect stays a supersede.
+   *
+   * ⚠ Interim form. It is absorbed by pre-start becoming a STATE of the machine
+   * — then a nested navigation is an ordinary supersede for the table and needs
+   * no marker at all. See `packages/core/.claude/fsm-as-state-owner-2026-07-31.md`
+   * §8 (why that is 10b and not 10a) and the plan in §10, phase 4.
+   */
+  isPreparing(): boolean {
+    return this.#preparingDepth > 0;
+  }
+
+  /**
    * The producer's own fire-and-forget guarantee (#721): whatever leaves a
    * public method here is safe to drop on the floor.
    *
@@ -165,6 +211,11 @@ export class NavigationNamespace {
 
     let toState: State | undefined;
 
+    // PRE-START window (#1610) — user code runs in here, before any emit. See
+    // `isPreparing`. The `finally` is load-bearing: the early refusals exit
+    // through it too.
+    this.#preparingDepth++;
+
     try {
       toState = deps.buildNavigateState(name, params, search);
     } catch (error) {
@@ -176,6 +227,8 @@ export class NavigationNamespace {
       // removed, core's suite still reports 100% — it was masking a live region.
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided buildNavigateState
       return Promise.reject(error);
+    } finally {
+      this.#preparingDepth--;
     }
 
     if (!toState) {
@@ -297,11 +350,19 @@ export class NavigationNamespace {
     let params: Params;
     let search: SearchParams;
 
+    // PRE-START window too, and for the same reason (#1610): `defaultRoute` /
+    // `defaultParams` / `defaultSearch` may each be a dependency-resolved
+    // CALLBACK, so this runs user code before there is even a route name to
+    // navigate to. Sequential with `#navigate`'s window below, never nested.
+    this.#preparingDepth++;
+
     try {
       ({ route, params, search } = deps.resolveDefault());
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided resolveDefault callback
       return Promise.reject(error);
+    } finally {
+      this.#preparingDepth--;
     }
 
     if (!route) {

@@ -1066,15 +1066,28 @@ export class Router<
   /**
    * Rejects a synchronous reentrant navigation — `navigate` /
    * `navigateToDefault` / `navigateToState` / `navigateToNotFound` called from
-   * inside a transition-event listener while a transition is being dispatched
-   * (RFC navigation-cancellation-unification §4). Throws synchronously: inside a
-   * listener the emit's `onListenerError` isolation surfaces it (visible,
-   * non-fatal); a DEFERRED (async / microtask) navigate from a listener runs
-   * after dispatch settles and is allowed. Always-on core invariant guard (not
-   * validator-gated).
+   * inside a navigation core has not finished with. Throws synchronously: inside
+   * a listener the emit's `onListenerError` isolation surfaces it (visible,
+   * non-fatal); a DEFERRED (async / microtask) navigate runs after the window
+   * closes and is allowed. Always-on core invariant guard (not validator-gated).
+   *
+   * TWO windows, because application code runs in two places core does not
+   * control, on opposite sides of the announce:
+   *
+   * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
+   *   (RFC navigation-cancellation-unification §4).
+   * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` / `buildPath`
+   *   interceptor or a route codec, BEFORE the first emit. The dispatch depth
+   *   cannot see it: there has been no emit yet, which is exactly how a nested
+   *   `navigate()` used to run to completion here, commit a phantom
+   *   `TRANSITION_SUCCESS`, and shift the outer transition's `fromState`.
+   *
+   * A guard is deliberately NOT either of them: it runs after the announce, so
+   * the classic guard-redirect (`navigate(...)` then `return false`) stays a
+   * plain supersede.
    */
   #assertNotReentrant(): void {
-    if (this.#eventBus.isProcessing()) {
+    if (this.#eventBus.isProcessing() || this.#navigation.isPreparing()) {
       throw new RouterError(errorCodes.REENTRANT_NAVIGATION);
     }
   }
