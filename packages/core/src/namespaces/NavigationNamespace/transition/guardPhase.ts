@@ -1,4 +1,4 @@
-import { handleGuardError } from "./errorHandling";
+import { handleGuardError, resolveAsyncGuard } from "./errorHandling";
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
@@ -46,26 +46,6 @@ interface Suspension {
   phase: number;
   index: number;
   pending: Promise<unknown>;
-}
-
-async function resolveAsyncGuard(
-  promise: Promise<boolean>,
-  errorCode: string,
-  segment: string,
-): Promise<void> {
-  let result: boolean;
-
-  try {
-    result = await promise;
-  } catch (error: unknown) {
-    handleGuardError(error, errorCode, segment);
-
-    return; // unreachable — handleGuardError returns never
-  }
-
-  if (!result) {
-    throw new RouterError(errorCode, { segment });
-  }
 }
 
 /**

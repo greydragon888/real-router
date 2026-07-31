@@ -10,7 +10,7 @@ import {
 } from "../constants";
 
 import type { GuardFn, NavigationOptions, State } from "../../../types";
-import type { InFlightNavigation } from "../inFlightNavigation";
+import type { InFlightNavigation } from "../InFlightNavigation";
 import type {
   NavigationContext,
   NavigationDependencies,
