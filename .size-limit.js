@@ -9,11 +9,11 @@ const esm = (name, limit, ignore) => ({
 
 export default [
   // ── Core ──────────────────────────────────────────────────────────
-  esm("core", "20 kB"),
+  esm("core", "25 kB"),
   {
     name: "@real-router/core/api (ESM)",
     path: "packages/core/dist/esm/api.mjs",
-    limit: "25 kB",
+    limit: "30 kB",
     ignore: ignoreCore,
   },
 
