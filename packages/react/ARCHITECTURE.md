@@ -45,7 +45,13 @@ dist/
 │   ├── ink.mjs                # Ink entry (Ink 7+)
 │   ├── ink.d.mts
 │   └── chunk-*.mjs            # Shared code (auto-extracted)
-└── cjs/                       # Mirror of esm/ for CJS consumers
+└── cjs/                       # Mirror of esm/ for CJS consumers — except `./ink`,
+                               # which is ESM-only in the export map (#1628): its CJS
+                               # build would require() ESM-only ink@7 (top-level await),
+                               # which Node cannot load. cjs/ink.* is still emitted —
+                               # the node10 `typesVersions` fallback points at
+                               # cjs/ink.d.ts — but no export condition references
+                               # cjs/ink.js, so it is unreachable at runtime.
 ```
 
 ## Source Structure
