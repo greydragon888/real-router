@@ -1999,6 +1999,69 @@ parse; `changesets.yml` resolves to `triggers: [workflow_run, workflow_dispatch]
 with the fallback ref, and the R2.4 integrity guard was re-checked to carry no
 `continue-on-error` of its own.
 
+### 2026-08-02 audit batch 5 — the gate meta-test's other half, and self-hosted jobs that could hang for six hours (§1.9, §4.8)
+
+**§1.9 — the preventer for the #1127 class only covered half of it.**
+`ci-gate-completeness.test.mjs` proved that every ci.yml job appears in the gate's
+`needs` (or in `OUTSIDE_GATE`). But `needs` only makes the gate **wait**; what
+blocks a merge is what the `Determine result` script **reads**. A job listed in
+`needs` whose result is never consulted is exactly as vacuous as one outside the
+gate — and membership cannot see that. All nine are read today, so this was a
+preventer gap rather than a live bug; #1127 is what a preventer gap looks like once
+it stops being one.
+
+**Solution.** A third invariant, `neededButUnread`. `parseGateScript()` slices the
+gate job's body — from its key to the **next top-level job**, not to EOF, so it
+survives a job being added after the gate — and each `needs` entry must appear as
+`needs.<job>.result` **or** `needs.<job>.outputs` (reading an output is gating too;
+that is how `check` participates).
+
+**Verification — mutational, against the REAL ci.yml rather than fixtures alone**
+(a guard whose discriminating power is only shown on a toy input is theatre):
+
+| input | `neededButUnread` |
+| --- | --- |
+| healthy `ci.yml` | `[]` |
+| read of `needs.coverage.result` removed | `["coverage"]` |
+| read of `needs.repo-lints.result` removed | `["repo-lints"]` |
+| read of `needs.smoke.result` removed | `["smoke"]` |
+
+Two fixtures back it up: one asserts that on "job waited for but never read" the new
+invariant fires **while the old `ungated` stays silent** — i.e. it catches precisely
+what membership cannot — and one pins that reading `outputs` counts. A parser-sanity
+assertion fails loudly if `parseGateScript` ever stops capturing the `Determine
+result` step, instead of degrading into a cheerful "nothing unread". 13 cases in the
+file, 59 across `scripts/*.test.mjs`.
+
+**§4.8 — four self-hosted jobs had no `timeout-minutes`, so the ceiling was the
+invisible 360-minute default.** They share ONE runner on a production host, so a
+wedged job parks every other self-hosted workflow behind it. Values are taken from
+measurement: `examples` **90** (healthy runs 4 and 7 min, ~13× headroom for a
+cold-cache build of all 139 examples), both CodSpeed suites **30** (measured 163 s
+core, 231 s adapters — ~8-10× headroom). With `cross-router-bench` (batch 3) and
+`changesets.yml`, every self-hosted job now declares one.
+
+**What the measurement turned up, and why the fix grew a second half.** Run
+`29875788664` (schedule, 2026-07-21 — the co-tenant OOM evening) sat wedged for
+**256 minutes** before anything cancelled it. Its `notify-failure` job was cancelled
+along with the run, so **no tracking issue was ever filed**. That exposes a trap in
+the fix itself: `if: failure()` does not match `cancelled`, and a job stopped by
+`timeout-minutes` ends as **cancelled**. A timeout alone would therefore have freed
+the runner *silently* — killing exactly the class (a wedged scheduled run) the
+notify job exists to surface. So `examples.yml` and `cross-router-bench.yml` now use
+`if: !success() && github.event_name == 'schedule'`.
+
+⚠ **`post-merge.yml` deliberately keeps `failure()`.** It runs with
+`cancel-in-progress: true`, so cancellation of superseded runs is routine there and
+`!success()` would open an issue on every quick second push. The asymmetry is
+recorded in both files' comments — it is a property of the trigger, not an
+oversight.
+
+**Verification.** `actionlint` 1.7.8 + shellcheck 0.11.0 in the gate's exact mode:
+clean. `node --test scripts/*.test.mjs` → 59/59. Parsed assertions: all four
+self-hosted jobs now carry `timeout-minutes` (90/30/30/360) and the two scheduled
+workflows carry the `!success()` notify condition while post-merge keeps `failure()`.
+
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
 > **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**

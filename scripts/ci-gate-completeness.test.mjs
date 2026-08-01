@@ -110,16 +110,42 @@ export function parseNeeds(yaml, jobId) {
 }
 
 /**
+ * The gate job's own body — the only place where a `needs` entry is actually
+ * READ. Sliced from the gate job's key to the next top-level job (or EOF), so it
+ * keeps working if a job is ever added after the gate.
+ */
+export function parseGateScript(yaml) {
+  const lines = yaml.split("\n");
+  const start = lines.findIndex((l) => l.startsWith(`  ${GATE_JOB}:`));
+  if (start === -1) return "";
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((l) => /^ {2}[A-Za-z_][\w-]*:/.test(l));
+  return (end === -1 ? rest : rest.slice(0, end)).join("\n");
+}
+
+/**
  * Pure core of the check — also exercised on fixtures below so the test's
  * discriminating power does not depend on the current (healthy) ci.yml.
  */
 export function findViolations(yaml, outsideGate = OUTSIDE_GATE) {
   const jobs = parseJobs(yaml);
   const needs = new Set(parseNeeds(yaml, GATE_JOB));
+  const gateScript = parseGateScript(yaml);
   return {
     jobs,
     needs,
     gateMissing: !jobs.includes(GATE_JOB) || needs.size === 0,
+    // The OTHER half of the #1127 class. `needs` only makes the gate WAIT for a
+    // job; what blocks a merge is what the "Determine result" script reads. A job
+    // listed in `needs` whose result is never read is exactly as vacuous as one
+    // outside the gate — and membership alone cannot see that. All nine are read
+    // today, so this is a preventer gap rather than a live bug; #1127 is what a
+    // preventer gap looks like once it stops being one.
+    neededButUnread: [...needs].filter(
+      (n) =>
+        !gateScript.includes(`needs.${n}.result`) &&
+        !gateScript.includes(`needs.${n}.outputs`),
+    ),
     // The #1127 class: a job whose red X would not block merge.
     ungated: jobs.filter(
       (j) => j !== GATE_JOB && !needs.has(j) && !outsideGate.has(j),
@@ -147,6 +173,11 @@ jobs:
     needs: [check]
   ci:
     needs: [check, coverage]
+    steps:
+      - name: Determine result
+        run: |
+          if [[ "\${{ needs.check.result }}" != "success" ]]; then exit 1; fi
+          COVERAGE="\${{ needs.coverage.result }}"
 `;
 
 test("fixture: fully wired workflow has no violations", () => {
@@ -190,6 +221,28 @@ test("fixture: allowlist hygiene — stale and redundantly-wired entries are cau
   assert.deepEqual(v.allowlistedButWired, ["coverage"]);
 });
 
+test("fixture: a needs job whose result is never READ is caught (#1127, other half)", () => {
+  // The gate still waits for `coverage`, but nothing consults its verdict — the
+  // exact shape #1127 had, one step further in than membership can see.
+  const mutated = FIXTURE.replace(
+    '          COVERAGE="${{ needs.coverage.result }}"\n',
+    "",
+  );
+  const v = findViolations(mutated, new Map([["bundle-size", "info-only"]]));
+  assert.deepEqual(v.neededButUnread, ["coverage"]);
+  // …and membership alone still reports everything as fine, which is the point.
+  assert.deepEqual(v.ungated, []);
+});
+
+test("fixture: reading a job's OUTPUTS counts as gating it, not only .result", () => {
+  const outputsOnly = FIXTURE.replace(
+    '          if [[ "${{ needs.check.result }}" != "success" ]]; then exit 1; fi\n',
+    '          MODE="${{ needs.check.outputs.mode }}"\n',
+  );
+  const v = findViolations(outputsOnly, new Map([["bundle-size", "info-only"]]));
+  assert.deepEqual(v.neededButUnread, []);
+});
+
 test("fixture: block-style needs is parsed too", () => {
   const block = `jobs:
   a:
@@ -231,6 +284,24 @@ test("ci.yml: every job is in the gate's needs or explicitly allowlisted (#1127 
       "nor in OUTSIDE_GATE — their red X would NOT block merge (the #1127 " +
       "class). Wire the job into the gate (needs + the result checks in " +
       "'Determine result') or allowlist it here with a written reason.",
+  );
+});
+
+test("ci.yml: every job the gate waits for is also READ by it (#1127, other half)", () => {
+  assert.deepEqual(
+    real.neededButUnread,
+    [],
+    `job(s) [${real.neededButUnread.join(", ")}] are in '${GATE_JOB}'.needs but ` +
+      "their result is never read in the 'Determine result' script — the gate " +
+      "WAITS for them and then ignores the verdict, which is as vacuous as not " +
+      "gating them at all. Read `needs.<job>.result` (or an output) there, or " +
+      "drop the job from `needs` and allowlist it in OUTSIDE_GATE.",
+  );
+  // Parser sanity: a restructured gate job must not degrade into "empty script",
+  // which would make every entry look unread rather than silently look fine.
+  assert.ok(
+    parseGateScript(readFileSync(CI_YML, "utf8")).includes("Determine result"),
+    "parseGateScript() no longer captures the gate's step — ci.yml layout changed?",
   );
 });
 
