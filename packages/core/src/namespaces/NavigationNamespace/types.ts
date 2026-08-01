@@ -11,6 +11,14 @@ import type {
 } from "../../types";
 
 export interface NavigationContext {
+  /**
+   * Supersession token — `#navigationId` at the moment this navigation began.
+   * Lives HERE and not on {@link NavigationPlan} because `completeTransition`
+   * needs it to tell "the machine is still in MY transition" from "…in somebody
+   * else's" (#1626), and it is handed a `NavigationContext`. Purely a type-level
+   * move: no `NavigationContext` is ever built independently of a plan.
+   */
+  myId: number;
   toState: State;
   fromState: State | undefined;
   opts: NavigationOptions;
@@ -36,8 +44,6 @@ export interface NavigationContext {
  * placeholders.
  */
 export interface NavigationPlan extends NavigationContext {
-  /** Supersession token — `#navigationId` at the moment this one began. */
-  myId: number;
   /** Whether a synchronous supersede is reachable at all (#1169 commit-gate). */
   suspendable: boolean;
   canActivateFunctions: Map<string, GuardFn>;

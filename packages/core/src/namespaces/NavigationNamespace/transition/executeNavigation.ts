@@ -156,11 +156,12 @@ function beginTransition(
  */
 function completeImmediate(
   deps: NavigationDependencies,
+  inFlight: InFlightNavigation,
   plan: NavigationPlan,
 ): State {
   deps.sendLeaveApprove(plan.toState, plan.fromState);
 
-  return completeTransition(deps, plan);
+  return completeTransition(deps, inFlight, plan);
 }
 
 /**
@@ -254,7 +255,7 @@ export function executeNavigation(
     // listener may still register a guard. Hoisting the read would change
     // behaviour, not just shape.
     if (!plan.hasGuards && !plan.suspendable) {
-      return completeImmediate(deps, plan);
+      return completeImmediate(deps, inFlight, plan);
     }
 
     const {
@@ -354,7 +355,7 @@ export function executeNavigation(
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
 
-    const finalState = completeTransition(deps, plan);
+    const finalState = completeTransition(deps, inFlight, plan);
 
     // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
     // announces "this navigation already settled, synchronously", which used
@@ -466,7 +467,7 @@ async function finishAsyncNavigation(
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
 
-    const state = completeTransition(deps, nav);
+    const state = completeTransition(deps, inFlight, nav);
 
     succeeded = true;
 
