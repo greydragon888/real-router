@@ -7,6 +7,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-01]
 
+### @real-router/core@0.85.0
+
+### Minor Changes
+
+- [#1624](https://github.com/greydragon888/real-router/pull/1624) [`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b) Thanks [@greydragon888](https://github.com/greydragon888)! - Never mutate a caught RouterError — re-code a copy; freeze the cached rejection singletons ([#1606](https://github.com/greydragon888/real-router/issues/1606))
+
+  `rethrowAsRouterError` used to rewrite the caught error's `code` (and message) in place via `error.setCode(...)`. The three cached rejection errors (`SAME_STATES`, `ROUTE_NOT_FOUND`, `ROUTER_NOT_STARTED`) are module-level singletons, so a guard that merely awaited a navigation rejecting with one of them permanently poisoned that error's code for the whole process — every later consumer (user `.catch()`, every plugin's `onTransitionError`), across routers and SSR per-request clones, observed `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE` instead of the real code.
+
+  - A guard-thrown (or guard-propagated) `RouterError` is now re-coded on a **copy**: same `setCode` message semantics, `segment` / `path` / custom fields / `stack` carried over. The instance the guard threw is left untouched; the [#933](https://github.com/greydragon888/real-router/issues/933) carve-out (`RouterError(TRANSITION_CANCELLED)` passes through as-is) is unaffected.
+  - **Breaking change (pre-1.0).** The three cached rejection errors are now `Object.freeze`d as a backstop: an in-place write to one of them (e.g. `err.retried = true` in a `.catch()`) throws a `TypeError` in strict mode instead of silently corrupting the error every other consumer in the process sees. Treat caught navigation errors as read-only.
+
+### @real-router/angular@0.17.4
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+  - @real-router/sources@0.13.3
+
+### @real-router/browser-plugin@0.19.3
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/hash-plugin@0.9.3
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/lifecycle-plugin@0.7.9
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/logger-plugin@0.6.3
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/memory-plugin@0.4.36
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/navigation-plugin@0.8.3
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/persistent-params-plugin@0.3.3
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/preact@0.18.4
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+  - @real-router/sources@0.13.3
+
+### @real-router/preload-plugin@0.7.3
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/react@0.30.4
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+  - @real-router/sources@0.13.3
+
+### @real-router/rx@0.3.40
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/search-schema-plugin@0.5.3
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/solid@0.19.4
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+  - @real-router/sources@0.13.3
+
+### @real-router/sources@0.13.3
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/svelte@0.17.4
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+  - @real-router/sources@0.13.3
+
+### @real-router/validation-plugin@0.13.4
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+
+### @real-router/vue@0.19.4
+
+### Patch Changes
+
+- Updated dependencies [[`9df8c95`](https://github.com/greydragon888/real-router/commit/9df8c95d243a56c548be367390513400585e2e6b)]:
+  - @real-router/core@0.85.0
+  - @real-router/sources@0.13.3
+
+
 ### @real-router/validation-plugin@0.13.3
 
 ### Patch Changes
