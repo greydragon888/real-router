@@ -694,18 +694,26 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      # jscpd only reads packages/*/src/ and has NO workspace-package deps — its
-      # engine ships as a platform binary via optionalDependencies (cpd-<arch>).
-      # So skip the full 32-package `pnpm install` (~30-60s on a store cache-miss,
-      # #734) and fetch only jscpd via dlx (hardlinked from the setup-node pnpm
-      # store cache). The version is read from package.json so a Dependabot jscpd
-      # bump can't drift. Args mirror the root `lint:duplicates:sarif` script
-      # (-t 100 = threshold 100 so jscpd always exits 0 — this job is
-      # informational, it only uploads SARIF to Code Scanning, never gates).
+      # jscpd only reads packages/*/src/ + shared/ and has NO workspace-package
+      # deps — its engine ships as a platform binary via optionalDependencies
+      # (cpd-<arch>). So skip the full 32-package `pnpm install` (~30-60s on a
+      # store cache-miss, #734) and fetch only jscpd via dlx (hardlinked from the
+      # setup-node pnpm store cache). The version is read from package.json so a
+      # Dependabot jscpd bump can't drift. Args mirror the root
+      # `lint:duplicates:sarif` script (-t 100 = threshold 100 so jscpd always
+      # exits 0 — this job is informational, it only uploads SARIF to Code
+      # Scanning, never gates).
+      #
+      # `shared/` is part of the scan set: #1523 added it to close the
+      # cross-boundary duplication blind spot (shared sources are symlinked into
+      # 10 published packages), but only in the npm scripts — this inline command
+      # kept the pre-#1523 scope until 2026-08-01, so the CI SARIF channel was
+      # still blind to exactly what #1523 paid for. Keep the two in sync.
+      # (2026-08-01 CI/CD audit §4.1.)
       - name: Detect duplication (SARIF)
         run: |
           jscpd_version="$(node -p "require('./package.json').devDependencies.jscpd")"
-          pnpm dlx "jscpd@${jscpd_version}" packages/*/src/ --no-tips -t 100 -r sarif -o jscpd-report
+          pnpm dlx "jscpd@${jscpd_version}" packages/*/src/ shared/ --no-tips -t 100 -r sarif -o jscpd-report
 
       - name: Upload SARIF to Code Scanning
         if: always()
@@ -967,12 +975,24 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      # Both size payloads arrive through `env:`, never spliced into the script
+      # body. `JSON.parse(\`${{ … }}\`)` embedded the values in a JS TEMPLATE
+      # LITERAL, so a backtick or `${` anywhere in them changed the program: the
+      # names come from .size-limit.js (a file any PR can edit) and the base
+      # payload from a downloaded artifact. Failure mode ranged from a syntax
+      # error to executing attacker-shaped JS with this job's `pull-requests:
+      # write` token. actionlint does not flag it — `steps.*.outputs.*` is not in
+      # its untrusted-input list — so nothing else would have caught the drift.
+      # (2026-08-01 CI/CD audit §1.5.)
       - name: Compare and comment
         uses: actions/github-script@v9
+        env:
+          PR_SIZES: ${{ steps.pr_sizes.outputs.sizes }}
+          BASE_SIZES: ${{ steps.base_sizes.outputs.sizes }}
         with:
           script: |
-            const prSizes = JSON.parse(`${{ steps.pr_sizes.outputs.sizes }}` || '[]');
-            const baseSizes = JSON.parse(`${{ steps.base_sizes.outputs.sizes }}` || '[]');
+            const prSizes = JSON.parse(process.env.PR_SIZES || '[]');
+            const baseSizes = JSON.parse(process.env.BASE_SIZES || '[]');
 
             const formatBytes = (bytes) => {
               if (bytes == null || isNaN(bytes)) return '—';

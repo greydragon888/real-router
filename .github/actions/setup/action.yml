@@ -26,7 +26,11 @@ runs:
       uses: pnpm/action-setup@v6
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      # Kept in lockstep with the workflows' pin by hand until 2026-08-01: this
+      # file was outside Dependabot's scan (see the `directories` note in
+      # dependabot.yml), so it sat on v6 while every workflow moved to v7 in
+      # #1531. Now covered — Dependabot bumps it with the rest.
+      uses: actions/setup-node@v7
       with:
         # Read from `.nvmrc` (repo root, resolved against GITHUB_WORKSPACE) so
         # the major CI runs and the major a dev machine selects cannot drift —

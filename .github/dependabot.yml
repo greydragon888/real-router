@@ -155,7 +155,18 @@ updates:
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
-    directory: "/"
+    # `/` covers `.github/workflows/**` only. A composite action referenced by a
+    # RELATIVE path (`uses: ./.github/actions/setup`) is not a dependency edge
+    # Dependabot follows, and its own `uses:` pins live outside that scan — so
+    # they were never bumped. Proof: PR #1531 ("bump actions/setup-node from 6 to
+    # 7") updated six workflow files and left `.github/actions/setup/action.yml`
+    # on v6; `git log -- .github/actions/` shows no dep bump in the directory's
+    # history. That action runs in 11 jobs, i.e. the pins most worth updating
+    # were the only ones frozen. Listing its directory explicitly puts it in
+    # scope. (2026-08-01 CI/CD audit §1.6.)
+    directories:
+      - "/"
+      - "/.github/actions/setup"
     schedule:
       interval: "weekly"
       day: "monday"

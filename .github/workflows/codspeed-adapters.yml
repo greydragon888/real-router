@@ -18,13 +18,37 @@ name: CodSpeed Adapters
 # must not be instrumented — only the bench process is. The bench itself is a
 # single direct `node` (no vitest, no spawn hops), the exact process shape
 # whose V8-flag injection the core gate already proved on this runner.
+#
+# PATH FILTER + concurrency: same rationale, numbers and caveats as codspeed.yml
+# (2026-08-01 audit §3.1) — this suite is the 264 s half of the 430 s a docs-only
+# master push used to cost the single self-hosted runner. Keep the ignore list
+# byte-identical to codspeed.yml's; GitHub Actions has no YAML anchors.
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - "**/*.md"
+      - ".claude/**"
+      - ".github/**"
+      - ".husky/**"
+      - "scripts/**"
   pull_request:
     branches: [master]
+    paths-ignore:
+      - "**/*.md"
+      - ".claude/**"
+      - ".github/**"
+      - ".husky/**"
+      - "scripts/**"
   # Manual re-seed / backtest of the CodSpeed baseline.
   workflow_dispatch:
+
+# Separate group from codspeed.yml (github.workflow differs), so the two suites
+# never cancel each other — they are independent signals that merely queue on the
+# same runner. PR runs supersede; push runs (baselines) never do.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

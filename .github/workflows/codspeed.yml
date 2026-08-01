@@ -41,13 +41,49 @@ name: CodSpeed
 # so a red comparison informs but does not block merges. SECURITY: the job `if`
 # gates pull_request to same-repo PRs only — fork-PR code never executes on the
 # self-hosted VPS (public-repo RCE / resource-abuse surface).
+#
+# PATH FILTER (2026-08-01 CI/CD audit §3.1). Instruction counts cannot move for a
+# change that ships no code, yet every run costs the SINGLE self-hosted runner
+# minutes of EXCLUSIVE time — measured on d766588af (a one-file `.claude/`
+# commit): core 166 s + adapters 264 s = 430 s, on a runner shared with
+# examples.yml and the weekly cross-router bench. Over the 30 days to 2026-08-01,
+# 163 of 517 master commits touched no packages/shared/examples/benchmarks file
+# at all; `.claude/` (97) and `.github/` (52) dominate. Skipping at the `on:`
+# level is safe HERE precisely because CodSpeed is not a required status check
+# (contrast codeql.yml, where a skipped workflow would deadlock the required
+# `Dependency Review` context): a workflow that never starts reports nothing and
+# nothing waits for it. Root manifests (package.json, pnpm-lock.yaml, .nvmrc,
+# turbo.json, *.config.*) are deliberately NOT ignored — a toolchain bump does
+# move instruction counts. To exercise a change to this workflow itself, use
+# workflow_dispatch. Keep the two lists identical (GitHub Actions does not
+# support YAML anchors) and in sync with codspeed-adapters.yml.
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - "**/*.md"
+      - ".claude/**"
+      - ".github/**"
+      - ".husky/**"
+      - "scripts/**"
   pull_request:
     branches: [master]
+    paths-ignore:
+      - "**/*.md"
+      - ".claude/**"
+      - ".github/**"
+      - ".husky/**"
+      - "scripts/**"
   # Manual re-seed / backtest of the CodSpeed baseline.
   workflow_dispatch:
+
+# A burst of pushes / PR synchronizes otherwise queues N runs on a runner that
+# executes one job at a time. Supersede PR runs; NEVER cancel a push run — each
+# master push seeds its own baseline and dropping one leaves a hole in the
+# comparison history.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

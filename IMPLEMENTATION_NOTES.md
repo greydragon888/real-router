@@ -1675,6 +1675,90 @@ Every healthy path is byte-identical; only the buggy input flips. `actionlint` 1
 shellcheck 0.11.0 with `SHELLCHECK_OPTS=--severity=warning` (the CI gate's exact mode)
 is clean on both edited workflows.
 
+### 2026-08-01 audit batch 2 — five low-risk closures (§1.3, §1.5, §1.6, §3.1, §4.1)
+
+The cheap half of the same audit, applied as one infra commit. Each item is
+independently small; they ship together because none of them needs a decision and
+all five are verified by the same `actionlint` run.
+
+**§3.1 — CodSpeed burned the self-hosted runner on changes that ship no code.**
+Both benchmark workflows triggered on every `push: [master]` and every same-repo
+`pull_request` with no path filter and no `concurrency`. Measured on `d766588af`,
+a one-file `.claude/` commit: `Core hot-path benchmarks` 166 s + `Adapter hot-path
+benchmarks` 264 s = **430 s of exclusive time** on the single self-hosted runner,
+which also serves `examples.yml` and the weekly cross-router bench. Over the 30
+days to 2026-08-01, **163 of 517** master commits touched no
+`packages|shared|examples|benchmarks` file at all; by file count `.claude/` (97)
+and `.github/` (52) dominate, with root `*.md` next.
+**Solution:** identical `paths-ignore` (`**/*.md`, `.claude/**`, `.github/**`,
+`.husky/**`, `scripts/**`) on both the `push` and `pull_request` triggers of
+`codspeed.yml` and `codspeed-adapters.yml`, plus
+`concurrency: cancel-in-progress: ${{ github.event_name == 'pull_request' }}`.
+**Why these paths and not others:** the ignore list is derived from the actual
+commit composition, not guessed, and root manifests (`package.json`,
+`pnpm-lock.yaml`, `.nvmrc`, `turbo.json`, `*.config.*`) are deliberately absent
+from it — a toolchain bump (tsdown/rolldown/tinybench/Node) genuinely moves
+instruction counts. **Why skipping at the `on:` level is safe here** and would not
+be in `codeql.yml`: CodSpeed is not a required status check, so a workflow that
+never starts leaves nothing pending; `Dependency Review` is, which is exactly why
+that workflow gates at the *job* level instead. **Why push runs are never
+cancelled:** each master push seeds its own baseline, and dropping one leaves a
+hole in the comparison history; only superseded PR runs are cancelled. The two
+ignore lists are duplicated verbatim because GitHub Actions does not support YAML
+anchors — keep them in sync.
+
+**§1.3 — `Validate Changesets` (a required check) failed open.** The step runs
+`node .changeset/check-changeset.mjs --json > changeset-result.json || true` and
+then decides `has_issues` by `require()`-ing that file. The validator prints its
+JSON only after a complete pass, so any abnormal exit leaves the file empty — and
+an empty file makes `require()` throw, `node -e` exit 1, and the `else` branch set
+`has_issues=false`. The required context then reported "✅ All changeset
+validations passed" having validated nothing. **Solution:** an explicit
+`Array.isArray(require(...))` probe right after `cat`, with `::error::` + `exit 1`
+when it fails — the same fail-closed stance #1133 established for `check`.
+**Verification** (mutational, per the "a guard without proven discriminating power
+is theatre" rule): a shell model of the step under `bash -e` across four inputs —
+`clean` (no errors) and `errors` behave identically before and after; `crash`
+(empty file) and `partial` (truncated JSON) flip from "exit 0, has_issues=false"
+to `exit 1`.
+
+**§1.5 — the last raw interpolation into executable code.** `bundle-size`'s
+comparison script embedded both size payloads in a JS **template literal**
+(`JSON.parse(\`${{ steps.pr_sizes.outputs.sizes }}\`)`). The names inside come
+from `.size-limit.js`, a file any PR can edit, so a backtick or `${` changed the
+program — anywhere from a syntax error to executing PR-shaped JS with the job's
+`pull-requests: write` token. actionlint cannot catch it: `steps.*.outputs.*` is
+not in its untrusted-input list. **Solution:** both values ride in `env:` and the
+script reads `process.env`. A `<<<` heredoc on `steps.publish.outputs.new_tags`
+remains in `changesets.yml`; its content is `changeset publish` output on a
+trusted master snapshot, so it is a hygiene item, not this class.
+
+**§1.6 — the composite action was invisible to Dependabot.** `package-ecosystem:
+github-actions` with `directory: "/"` covers `.github/workflows/**`; a composite
+action referenced by a relative path (`uses: ./.github/actions/setup`) is not an
+edge Dependabot follows, and its own `uses:` pins sit outside that scan. Proof, not
+inference: PR #1531 ("bump actions/setup-node from 6 to 7") updated six workflow
+files and left `.github/actions/setup/action.yml` on `@v6`; `git log --
+.github/actions/` shows no dependency bump in the directory's entire history. That
+action runs in **11 jobs** — the pins most worth updating were the only frozen
+ones. **Solution:** `directories: ["/", "/.github/actions/setup"]`, and the
+composite realigned to `actions/setup-node@v7`. Effect is observable on the next
+Monday Dependabot run (or `@dependabot recheck`).
+
+**§4.1 — #1523 only half-landed.** `lint:duplicates` / `lint:duplicates:sarif`
+scan `packages/*/src/ shared/`; the *inline* `pnpm dlx jscpd …` command in
+`ci.yml`'s `duplication` job still scanned `packages/*/src/` alone, unchanged since
+#734. So the cross-boundary duplication blind spot that #1523 paid to close stayed
+open in the one channel that runs on every PR — while both the job comment and this
+file claimed the args "mirror the root `lint:duplicates:sarif` script".
+**Solution:** add `shared/` to the inline command. No new noise expected —
+`.jscpd.json` already carries the relevant ignores and `gitignore: true`.
+
+**Verification for the batch.** `actionlint` 1.7.8 + shellcheck 0.11.0 under
+`SHELLCHECK_OPTS=--severity=warning` (the CI gate's exact mode): clean. All six
+edited YAML files parse, the four `paths-ignore` lists are byte-identical, and
+`dependabot.yml` resolves to `directories: ["/", "/.github/actions/setup"]`.
+
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
 > **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**

@@ -101,6 +101,19 @@ jobs:
           node .changeset/check-changeset.mjs --json > changeset-result.json || true
           cat changeset-result.json
 
+          # Fail CLOSED on an unusable result. The validator prints its JSON only
+          # after a full pass (check-changeset.mjs main()), so any abnormal exit —
+          # unreadable .changeset/*.md, a renamed/missing script, a node crash —
+          # leaves this file EMPTY. The `has_issues` probe below cannot tell that
+          # apart from "no errors": `require()` throws, node exits 1, the `else`
+          # branch sets has_issues=false, and this REQUIRED check ("Validate
+          # Changesets", protect-master ruleset) goes green having validated
+          # nothing. Same class as #1133. (2026-08-01 CI/CD audit §1.3.)
+          if ! node -e "const r = require('./changeset-result.json'); if (!Array.isArray(r)) process.exit(1)"; then
+            echo "::error::changeset validator produced no parsable JSON — failing closed instead of reporting 'all valid'"
+            exit 1
+          fi
+
           # Did THIS PR add/modify changesets? Scopes the stale-comment cleanup
           # (so a docs-only PR doesn't churn comments).
           CHANGESETS=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- '.changeset/*.md' | grep -v README.md || true)
