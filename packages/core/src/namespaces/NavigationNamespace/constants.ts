@@ -32,6 +32,16 @@ export const CACHED_ROUTE_NOT_FOUND_ERROR = new RouterError(
 
 export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
 
+// #1606 backstop: these instances are handed to arbitrary consumer code (every
+// `.catch()`, `onTransitionError`, leave-signal `reason`) process-wide, so an
+// in-place write — core's own `setCode` was one — rewrites the error every
+// OTHER consumer sees, across routers (SSR: across requests). Freezing turns
+// that corruption into a strict-mode TypeError at the writer (sloppy-mode
+// writes become silent no-ops); reading, including `stack`, is unaffected.
+Object.freeze(CACHED_NOT_STARTED_ERROR);
+Object.freeze(CACHED_ROUTE_NOT_FOUND_ERROR);
+Object.freeze(CACHED_SAME_STATES_ERROR);
+
 // Pre-suppressed rejected promises — .catch() at module load prevents
 // unhandled rejection warnings. `NavigationNamespace.#settle` skips additional
 // .catch() calls by recognising these three by IDENTITY (`PRE_SUPPRESSED`

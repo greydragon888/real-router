@@ -119,8 +119,19 @@ export interface SyncErrorMetadata {
 
 /**
  * Re-throws a caught error as a RouterError with the given error code.
- * If the error is already a RouterError, sets the code directly.
- * Otherwise wraps it with wrapSyncError metadata.
+ * If the error is already a RouterError, re-codes a COPY of it — never the
+ * caught instance itself. Otherwise wraps it with wrapSyncError metadata.
+ *
+ * Never mutate an error this function does not own (#1606): the three cached
+ * rejection errors are module-level singletons, and a guard that merely awaits
+ * a navigation rejecting with one of them propagates it here — `setCode` on the
+ * caught instance would rewrite that singleton's code for every later consumer
+ * in the process (SSR: across requests). The copy is built with the original
+ * code and re-coded via its own `setCode`, so the message keeps the exact
+ * setCode semantics (a standard-code message follows the new code, a custom one
+ * is preserved); `toJSON()` carries `segment` / `path` / custom fields over.
+ * The allocation is fine here: this is the guard-refusal path, whose common
+ * arm (a guard returning `false`) already allocates a fresh RouterError.
  */
 export function rethrowAsRouterError(
   error: unknown,
@@ -128,9 +139,17 @@ export function rethrowAsRouterError(
   segment: string,
 ): never {
   if (error instanceof RouterError) {
-    error.setCode(errorCode);
+    const { code, message, ...meta } = error.toJSON();
 
-    throw error;
+    const copy = new RouterError(code as string, {
+      ...meta,
+      message: message as string,
+    });
+
+    copy.setCode(errorCode);
+    copy.stack = error.stack ?? "";
+
+    throw copy;
   }
 
   throw new RouterError(errorCode, wrapSyncError(error, segment));
