@@ -61,6 +61,7 @@
   },
   "sideEffects": false,
   "devDependencies": {
+    "@real-router/core": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
     "@real-router/ssr-utils": "workspace:^",
     "@types/react": "19.2.17",

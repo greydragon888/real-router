@@ -1,0 +1,27 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "type-check": {
+      "inputs": [
+        "**/*.{ts,tsx,vue,svelte}",
+        "../../shared/**/*.ts",
+        "../core/src/**/*.ts",
+        "!dist/**",
+        "!**/node_modules/**",
+        "tsconfig.json",
+        "**/tsconfig.json"
+      ]
+    },
+    "bundle": {
+      "inputs": [
+        "src/**/*.{ts,tsx,vue,svelte}",
+        "../../shared/**/*.ts",
+        "../core/src/**/*.ts",
+        "tsdown.config.*",
+        "tsconfig.json",
+        "package.json"
+      ]
+    }
+  }
+}

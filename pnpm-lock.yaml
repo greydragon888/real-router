@@ -6395,17 +6395,16 @@ importers:
         version: 1.12.0(react@19.2.7)(vitest@4.1.10)
 
   packages/route-utils:
-    dependencies:
+    devDependencies:
       '@real-router/core':
-        specifier: workspace:>=0.1.0
+        specifier: workspace:^
         version: link:../core
 
   packages/rsc-server-plugin:
-    dependencies:
-      '@real-router/core':
-        specifier: workspace:>=0.1.0
-        version: link:../core
     devDependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../ssr-data-plugin
@@ -6502,11 +6501,10 @@ importers:
         version: link:../route-utils
 
   packages/ssr-data-plugin:
-    dependencies:
-      '@real-router/core':
-        specifier: workspace:>=0.1.0
-        version: link:../core
     devDependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
       '@real-router/ssr-utils':
         specifier: workspace:^
         version: link:../ssr-utils
