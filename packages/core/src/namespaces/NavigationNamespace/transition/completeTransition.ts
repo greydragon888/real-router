@@ -2,6 +2,7 @@ import { errorCodes, constants } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
 import type { NavigationOptions, State, TransitionMeta } from "../../../types";
+import type { InFlightNavigation } from "../InFlightNavigation";
 import type { NavigationDependencies, NavigationContext } from "../types";
 
 type MutableTransitionMeta = {
@@ -58,6 +59,7 @@ function stripSignal({
 
 export function completeTransition(
   deps: NavigationDependencies,
+  inFlight: InFlightNavigation,
   nav: NavigationContext,
 ): State {
   const { toState, fromState, opts, toDeactivate, toActivate, intersection } =
@@ -114,13 +116,23 @@ export function completeTransition(
     // `isActive()` the nested case commits the outer state over the inner
     // result; with this, the inner result stands.
     //
+    // NEITHER half subsumes the other, which is why both are asked (#1626):
+    //
+    // - `isTransitioning()` catches a factory that TERMINATED the router
+    //   (`dispose()` → DISPOSED, `stop()` → IDLE) and one whose nested
+    //   navigation already RAN TO COMPLETION (FSM back in READY). The token is
+    //   unmoved in the terminate case, so the token check alone would wave it
+    //   through.
+    // - `isCurrent(myId)` catches the nested navigation still IN FLIGHT: the
+    //   FSM sits in ITS transition, so `isTransitioning()` is true — for
+    //   somebody else — and committing here would silently overwrite a result
+    //   that has not landed yet (measured before the fix: `START:a · CANCEL:a ·
+    //   START:b · SUCCESS:a`, with b's result lost and `navigate()` RESOLVING).
+    //
     // ⚠ Interim form; absorbed when the commit is asked THROUGH the FSM right
-    // before `setState` (RFC-10a §16.7 / §9.9, plan §10 phase 3). Two cells stay
-    // open and are deliberately NOT patched here — both need a token this
-    // function is not given: a nested navigation still IN FLIGHT (the FSM is in
-    // ITS transition, so `isTransitioning()` is true for somebody else), and the
-    // `replace()`-revalidation commit, which is a different commit path.
-    if (cleared && !deps.isTransitioning()) {
+    // before `setState` (RFC-10a §16.7 / §9.9, plan §10 phase 3) — there the
+    // supersede is a table fact (`when`/epoch), not two operational questions.
+    if (cleared && (!deps.isTransitioning() || !inFlight.isCurrent(nav.myId))) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
   }

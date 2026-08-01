@@ -203,6 +203,13 @@ export interface RouterInternals<
   // Cross-namespace state (issue #174)
   readonly getStateName: () => string | undefined;
   readonly isTransitioning: () => boolean;
+  /**
+   * Is the router still live (FSM neither IDLE nor DISPOSED)? Asked by
+   * `replace()`'s revalidation commit, which runs application code
+   * (`clearDefinitionGuards` recompiles a surviving external factory) between
+   * its entry `throwIfDisposed()` and the commit itself (#1627).
+   */
+  readonly isActive: () => boolean;
   readonly clearState: () => void;
   readonly setState: (state: State) => void;
   readonly routerExtensions: { keys: string[] }[];

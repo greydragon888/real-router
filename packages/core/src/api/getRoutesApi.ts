@@ -461,6 +461,23 @@ function commitRevalidated<
   nextState: State,
   fromState: State,
 ): void {
+  // `replace()` runs application code between its entry `throwIfDisposed()` and
+  // this commit: `clearDefinitionGuards()` recompiles the compiled slot from a
+  // surviving EXTERNAL factory (#1192), and a `dispose()` / `stop()` from there
+  // left the swap running — it revalidated and committed on a dead router, with
+  // zero events, because `dispose()` had already cleared the listeners (#1627).
+  //
+  // The third revalidation arm was never exposed: it routes through
+  // `navigateToNotFound`, whose own liveness gate (#1186) throws. This restores
+  // the symmetry — same predicate, same error code, all three arms.
+  //
+  // ⚠ Interim form; absorbed when this commit goes through the machine
+  // (`system-commit`, plan §10 phase 4.1), where a dead router simply has no
+  // edge to take.
+  if (!ctx.isActive()) {
+    throw new RouterError(errorCodes.ROUTER_DISPOSED);
+  }
+
   ctx.setState(nextState);
   ctx.emitTransitionSuccess(nextState, fromState, REVALIDATE_OPTS);
 }

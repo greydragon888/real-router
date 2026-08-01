@@ -221,6 +221,79 @@ describe("#1611 — a guard factory that tears the router down mid-commit", () =
     expect(log).toStrictEqual(["SUCCESS:b"]);
   });
 
+  it("does not commit over a nested navigation that has NOT finished yet (#1626)", async () => {
+    // The sibling cell of the test above: there the nested navigation runs to
+    // completion (FSM back in READY, caught by `isTransitioning()`); here it is
+    // parked in an async activate guard, so the FSM sits in ITS transition and
+    // `isTransitioning()` is true — for somebody else. Only the supersession
+    // token tells them apart.
+    const log: string[] = [];
+    let armed = false;
+    let router!: Router;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    router = createRouter([
+      {
+        name: "home",
+        path: "/",
+        canDeactivate: () => {
+          if (armed) {
+            armed = false;
+            router.navigate("b").catch(() => {
+              /* fire-and-forget */
+            });
+          }
+
+          return () => true;
+        },
+      },
+      { name: "a", path: "/a" },
+      {
+        name: "b",
+        path: "/b",
+        canActivate: () => async () => {
+          await held;
+
+          return true;
+        },
+      },
+    ]);
+
+    router.usePlugin(() => ({
+      onTransitionSuccess: (to) => log.push(`SUCCESS:${to.name}`),
+    }));
+
+    getLifecycleApi(router).addDeactivateGuard("home", () => () => true);
+
+    await router.start("/");
+    armed = true;
+    log.length = 0;
+
+    const outcome = await router
+      .navigate("a", {}, undefined, { forceDeactivate: true })
+      .then(
+        (state) => `resolved:${state.name}`,
+        (error: unknown) => `rejected:${codeOf(error)}`,
+      );
+
+    // The outer navigation was superseded — it must not commit, and must not
+    // report success to anyone.
+    expect(outcome).toBe(`rejected:${errorCodes.TRANSITION_CANCELLED}`);
+    expect(router.getState()?.name).not.toBe("a");
+    expect(log).not.toContain("SUCCESS:a");
+
+    // ...and the nested navigation's own result still lands once it settles.
+    release();
+    await vi.waitFor(() => {
+      expect(router.getState()?.name).toBe("b");
+    });
+
+    expect(log).toStrictEqual(["SUCCESS:b"]);
+  });
+
   it("still commits normally when the recompiled factory behaves", async () => {
     const { router, log, arm } = createFixture(() => {
       /* well-behaved factory — side-effect-free with respect to the router */
