@@ -384,6 +384,7 @@ export class Router<
       // Cross-namespace state (issue #174)
       getStateName: () => this.#state.get()?.name,
       isTransitioning: () => this.#eventBus.isTransitioning(),
+      isActive: () => this.#eventBus.isActive(),
       clearState: () => {
         this.#state.set(undefined);
       },
