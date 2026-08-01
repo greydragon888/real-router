@@ -1,5 +1,23 @@
 # @real-router/validation-plugin
 
+## 0.13.3
+
+### Patch Changes
+
+- [#1622](https://github.com/greydragon888/real-router/pull/1622) [`2f3432c`](https://github.com/greydragon888/real-router/commit/2f3432cc1792208ebe85b80e75aa50b0db51ee3e) Thanks [@greydragon888](https://github.com/greydragon888)! - Make `validationPlugin()` generic over the router's dependency map ([#1621](https://github.com/greydragon888/real-router/issues/1621))
+
+  The factory returned `PluginFactory` with the `DefaultDependencies` (= `object`)
+  default. `keyof object` is `never`, so `getDependency` was typed
+  `(key: never) => never`, and TypeScript 7 — which performs a variance check
+  TypeScript 6 skipped — refuses to assign that where `PluginFactory<D>` is
+  expected for any `D` with an index signature. Consumers on `typescript@7` (now
+  `latest`) typing their dependencies as `Record<string, T>` could not register the
+  plugin at all: `router.usePlugin(validationPlugin())` failed with TS2345.
+
+  `validationPlugin<D>()` now carries the caller's map, inferred from the router in
+  the usual case. No runtime change, and no source change is required — the type
+  parameter defaults exactly as before.
+
 ## 0.13.2
 
 ### Patch Changes
