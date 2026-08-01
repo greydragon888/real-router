@@ -1881,6 +1881,124 @@ to empty because the subpath is now classified ESM-only straight from the export
 map; `node .changeset/check-changeset.mjs` → valid; `turbo run test
 --filter=@real-router/react` → 8/8 (lint + type-check + tests).
 
+### 2026-08-02 audit batch 4 — CodeQL blind to shared/, a silent release-chain break, and the two defects that reddened every Dependabot PR (§1.4, §2.1, §1.7, §1.8)
+
+**§1.4 — 24 files of shipped source had never been scanned by CodeQL.**
+`codeql-config.yml` restricted `paths` to `packages/*/src/**`, and `shared/*`
+reaches its consumers **only** through symlinks
+(`packages/{browser,hash,navigation}-plugin/src/browser-env`,
+`packages/{ssr-data,rsc-server}-plugin/src/shared-ssr`). The audit stated the
+symlink behaviour as a hypothesis; it is now measured. The `Perform CodeQL
+Analysis` step prints every extracted file, so run `30711121982` answers it
+directly:
+
+```
+gh run view 30711121982 --log | grep "build-stdout] Extracting "
+  → 586 files, of which 0 under shared/
+  → 7 hits on a `src/{dom-utils,browser-env,shared-ssr}/` path, all seven being
+    packages/angular/src/dom-utils — a git-tracked COPY, not a symlink
+```
+
+So the extractor does not follow symlinked directories, exactly as
+sonar-project.properties already assumes (`ci.yml` "Compute Sonar scope" lists
+`shared/*` for the same reason).
+
+**Solution.** Add `shared/browser-env/**` (15 files) and `shared/ssr/**` (9) to
+`paths` — History-API/URL primitives and the SSR loader scaffolding, i.e. the
+security-relevant half of the shared tree. **`shared/dom-utils` is deliberately
+NOT listed**: its 7 files are already covered 1:1 through the angular copy, and
+adding the original would analyse identical code twice and duplicate every alert.
+The condition for revisiting is written into the config (if the angular copy ever
+goes away). `packages/*/index.ts` matches nothing today but stays as a forward
+guard, now with a comment saying so instead of looking like live coverage.
+
+**§2.1 — a failed post-merge silently withheld the release.** `changesets.yml`
+triggered *only* on `workflow_run` with `conclusion == 'success'`, and
+`post-merge.yml` runs `cancel-in-progress: true`, so both a failed build and one
+cancelled by the next push produce no release run at all — version bumps sit on
+master unpublished with nothing to alert on. Re-running an older release run is
+not a recovery: a `workflow_run` re-run keeps its original event payload, so it
+checks out that run's `head_sha` and republishes that snapshot, not master's tip.
+(CLAUDE.md's "an emergency release is a re-run of this workflow" is true only for
+the snapshot that already ran.)
+
+**Solution**, both halves:
+
+- `changesets.yml` gains `workflow_dispatch`; the job `if` becomes
+  `github.event_name == 'workflow_dispatch' || …conclusion == 'success'`, and the
+  checkout ref falls back — `${{ github.event.workflow_run.head_sha || github.sha }}`
+  — so a manual run publishes master's tip while the automatic path is byte-identical
+  (on a `workflow_run` event `head_sha` is always present). Safe to fire whenever the
+  chain looks stuck: `changeset publish` skips already-published versions and the
+  reconcile step backfills tags/Releases.
+- `post-merge.yml` gains a `notify-failure` job (`if: failure()`, `issues: write`),
+  the same tracking-issue pattern `examples.yml` and `cross-router-bench.yml` already
+  use for their scheduled runs. The issue text names the *consequence* — the release
+  chain is broken, bumps are unpublished — not just the red run, and states the two
+  recoveries.
+
+**§1.7 — a Codecov outage turned a green codebase red.** The upload step ran with
+`fail_ci_if_error: true`, and the `coverage` job is a HARD requirement of the single
+required gate (`ok "$COVERAGE"`). The action downloads its uploader and verifies a
+GPG signature against a keyserver, so an outage there is indistinguishable from a
+real failure: run `30237995762` (PR #1562) died with `gpg: no valid OpenPGP data
+found` → `Coverage (Codecov)` red → `CI Result` red, while all ten shards,
+base-test, smoke and repo-lints were green. **Solution:** `continue-on-error: true`
+on the upload step. `fail_ci_if_error` deliberately STAYS — a failed upload is still
+reported as a tolerated failure rather than a silent pass. Nothing that actually
+protects coverage moves: the R2.4 integrity guard ("Verify all coverage shards
+uploaded") stays hard, and the 100 % thresholds are enforced by vitest inside each
+test job. What is given up is dashboard freshness during an outage. ⚠ The same class
+is live for `sonarcloud`, which is a required *context* in the ruleset — an outage
+there blocks a merge and `continue-on-error` cannot help, because the context itself
+gates. Left as an owner policy decision, recorded rather than changed.
+
+**§1.8 — the dedupe check was red on every Dependabot PR by construction.**
+`ci.yml` and `dependabot-dedupe.yml` start on the same `pull_request` event and race;
+CI always wins (the dedupe job does a full install first), so `repo-lints` reads the
+lockfile before the fix is pushed. Measured 2026-08-02: of the last 40 `ci.yml` runs,
+35 green / 4 red — and **all four reds are `dependabot/*` branches with `Repo Lints`
+failing** on `ERR_PNPM_DEDUPE_CHECK_ISSUES`. The goal of #1085 ("so the required
+`lint:dedupe` passes without a manual `resolve:dependabot`") was met on zero PRs.
+
+**Solution — not "skip the check for Dependabot", but "skip it exactly when an
+automatic fix is guaranteed to follow and be verified".** The plain actor guard both
+reviews proposed trades the guarantee away: with no push token the dedupe job cannot
+push, a non-deduped lockfile can reach master, and the next *human* PR fails
+`pnpm dedupe --check` for someone else's change. The condition is therefore two-part,
+and it rides on a context asymmetry:
+
+```yaml
+env:                                                        # job-level, repo-lints
+  HAS_DEDUPE_FIXER: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}
+…
+  if: github.actor != 'dependabot[bot]' || env.HAS_DEDUPE_FIXER != 'true'
+```
+
+A Dependabot-triggered run sees **only** Dependabot secrets; the run its PAT push
+retriggers is authored by the token owner and sees none of them. So:
+
+| Run | `actor` | `HAS_DEDUPE_FIXER` | dedupe check |
+| --- | --- | --- | --- |
+| Dependabot PR, token present | `dependabot[bot]` | `true` | skipped — fix lands and is verified next run |
+| Dependabot PR, token absent | `dependabot[bot]` | `false` | **hard** — nothing will fix it, so red is accurate |
+| Retriggered by the PAT push | owner | `''` | **hard**, on the head SHA that gets merged |
+| Human PR | human | `''` | **hard** |
+
+When dedupe finds nothing to change there is no second run — but then the lockfile
+was already clean. Consequence to know: until `DEPENDABOT_PUSH_TOKEN` exists this is
+a no-op and Dependabot PRs stay red, which is the honest state.
+
+**Verification.** `actionlint` 1.7.8 + shellcheck 0.11.0 under
+`SHELLCHECK_OPTS=--severity=warning`: clean. `node --test
+scripts/release-workflow.test.mjs` → 10/10, so the release job still satisfies its
+meta-invariants (GitHub-hosted runner, `id-token: write`) after the trigger change;
+`node --test scripts/ci-gate-completeness.test.mjs` → green, so the gate's
+needs-completeness invariant survives the `repo-lints` edit. All edited configs
+parse; `changesets.yml` resolves to `triggers: [workflow_run, workflow_dispatch]`
+with the fallback ref, and the R2.4 integrity guard was re-checked to carry no
+`continue-on-error` of its own.
+
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
 > **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**

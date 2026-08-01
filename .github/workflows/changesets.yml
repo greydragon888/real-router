@@ -5,6 +5,18 @@ on:
     workflows: [Post-Merge Build]
     types: [completed]
     branches: [master]
+  # Manual recovery. The trigger chain push → Post-Merge Build → workflow_run has
+  # exactly one failure mode and it is SILENT: a post-merge run that fails, or one
+  # cancelled by the next push (post-merge.yml runs cancel-in-progress: true),
+  # produces no `workflow_run` with conclusion == 'success', so version bumps sit
+  # on master unpublished with nothing to alert on. Re-running an older release
+  # run is not a substitute: a workflow_run re-run keeps its original event
+  # payload, so it checks out that run's head_sha and republishes THAT snapshot,
+  # not master's tip. `changeset publish` is idempotent (already-published
+  # versions are skipped) and the reconcile step backfills tags/Releases, so a
+  # dispatch is safe to fire whenever the chain looks stuck.
+  # (2026-08-01 CI/CD audit §2.1.)
+  workflow_dispatch:
 
 # Changesets Workflow for Automated Versioning and Publishing
 #
@@ -53,8 +65,9 @@ jobs:
     # job for the 6h default — and with concurrency cancel-in-progress: false
     # it also blocks every queued release behind it. Typical runs are 3-8 min.
     timeout-minutes: 30
-    # Only run if CI workflow succeeded
-    if: github.event.workflow_run.conclusion == 'success'
+    # Only run if the triggering Post-Merge Build succeeded — or if a human
+    # dispatched this workflow explicitly (see the `workflow_dispatch` note above).
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
@@ -68,7 +81,10 @@ jobs:
           # validated snapshot; a newer push simply produces the next run, and
           # `changeset publish` is idempotent across them. The tag backfill below
           # (HEAD_SHA) then also points at the validated commit.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # On workflow_dispatch there is no triggering run, so head_sha is empty
+          # and this falls back to github.sha — the tip of the dispatched ref,
+          # which is what a manual recovery wants (publish what is on master now).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
