@@ -279,8 +279,8 @@ importers:
         specifier: workspace:^
         version: link:../packages/vue
       '@solidjs/router':
-        specifier: ~0.16.1
-        version: 0.16.1(solid-js@1.9.14)
+        specifier: ~1.0.0
+        version: 1.0.0(solid-js@1.9.14)
       '@tanstack/react-router':
         specifier: ~1.170.17
         version: 1.170.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -3749,7 +3749,7 @@ importers:
         version: 1.60.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
-        version: 0.8.10(@solidjs/router@0.16.1(solid-js@1.9.14))(solid-js@1.9.14)
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -3792,7 +3792,7 @@ importers:
         version: 1.60.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
-        version: 0.8.10(@solidjs/router@0.16.1(solid-js@1.9.14))(solid-js@1.9.14)
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -3878,7 +3878,7 @@ importers:
         version: 1.60.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
-        version: 0.8.10(@solidjs/router@0.16.1(solid-js@1.9.14))(solid-js@1.9.14)
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -3955,7 +3955,7 @@ importers:
         version: 1.60.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
-        version: 0.8.10(@solidjs/router@0.16.1(solid-js@1.9.14))(solid-js@1.9.14)
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -3998,7 +3998,7 @@ importers:
         version: 1.60.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
-        version: 0.8.10(@solidjs/router@0.16.1(solid-js@1.9.14))(solid-js@1.9.14)
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -4094,7 +4094,7 @@ importers:
         version: 1.60.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
-        version: 0.8.10(@solidjs/router@0.16.1(solid-js@1.9.14))(solid-js@1.9.14)
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -6459,7 +6459,7 @@ importers:
         version: 16.0.3(rollup@4.62.0)
       '@solidjs/testing-library':
         specifier: ~0.8.10
-        version: 0.8.10(@solidjs/router@0.16.1(solid-js@1.9.14))(solid-js@1.9.14)
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
       '@testing-library/dom':
         specifier: ~10.4.1
         version: 10.4.1
@@ -9285,8 +9285,8 @@ packages:
     peerDependencies:
       solid-js: '>=1.8.4'
 
-  '@solidjs/router@0.16.1':
-    resolution: {integrity: sha512-IhyjedgC6LRpw/8CPGGI89FrV+r0xTHzOl2c4CRyzYQ1bLepJxbVI1LLKvsavMWY5TRBRacV7hAeOhuTXkjiqg==}
+  '@solidjs/router@1.0.0':
+    resolution: {integrity: sha512-cCSk1hvgCowiMa9bzzYWHiLu1U4E22+DfJe6/rOwAyECKrxc3jrd5QnoW3sDDJtW+e077cz/M67bPl3DqOBw1Q==}
     peerDependencies:
       solid-js: ^1.8.6
 
@@ -17589,16 +17589,16 @@ snapshots:
     dependencies:
       solid-js: 1.9.14
 
-  '@solidjs/router@0.16.1(solid-js@1.9.14)':
+  '@solidjs/router@1.0.0(solid-js@1.9.14)':
     dependencies:
       solid-js: 1.9.14
 
-  '@solidjs/testing-library@0.8.10(@solidjs/router@0.16.1(solid-js@1.9.14))(solid-js@1.9.14)':
+  '@solidjs/testing-library@0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)':
     dependencies:
       '@testing-library/dom': 10.4.1
       solid-js: 1.9.14
     optionalDependencies:
-      '@solidjs/router': 0.16.1(solid-js@1.9.14)
+      '@solidjs/router': 1.0.0(solid-js@1.9.14)
 
   '@sonar/scan@5.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)':
     dependencies:
