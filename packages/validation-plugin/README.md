@@ -54,10 +54,28 @@ Core's crash guards always run, regardless of whether this plugin is installed. 
 ### `validationPlugin()`
 
 ```typescript
-function validationPlugin(): PluginFactory;
+function validationPlugin<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(): PluginFactory<Dependencies>;
 ```
 
-Returns a `PluginFactory` to pass to `router.usePlugin()`. Takes no arguments.
+Returns a `PluginFactory` to pass to `router.usePlugin()`. Takes no runtime
+arguments; the dependency map is a type parameter, normally inferred from the
+router you register it on (#1621). Spell it explicitly only when inference has
+nothing to work from:
+
+```typescript
+type Deps = Record<string, number>;
+
+const router = createRouter<Deps>(routes);
+
+router.usePlugin(validationPlugin()); // inferred
+const factory = validationPlugin<Deps>(); // explicit
+```
+
+Without the parameter the factory would default to `object`, whose `keyof` is
+`never` — and TypeScript 7 refuses to assign that where `PluginFactory<Deps>` is
+expected for any `Deps` carrying an index signature.
 
 Throws `RouterError("VALIDATION_PLUGIN_AFTER_START")` if the router is already active. Always register before `router.start()`.
 

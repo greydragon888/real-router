@@ -86,6 +86,7 @@ import {
 
 import type { EventName, EventMethodMap } from "./validators/eventBus";
 import type {
+  DefaultDependencies,
   PluginFactory,
   RouterValidator,
   Route,
@@ -94,7 +95,9 @@ import type {
 } from "@real-router/core";
 import type { RouterInternals, Matcher } from "@real-router/core/validation";
 
-function buildValidatorObject(ctx: RouterInternals): RouterValidator {
+function buildValidatorObject<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(ctx: RouterInternals<Dependencies>): RouterValidator {
   return {
     routes: {
       validateBuildPathArgs,
@@ -323,7 +326,22 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
   };
 }
 
-export function validationPlugin(): PluginFactory {
+/**
+ * The dependency map is a type parameter so the factory carries the CALLER's
+ * `D` rather than the `object` default (#1621). `keyof object` is `never`, so a
+ * bare `PluginFactory` types `getDependency` as `(key: never) => never`, which
+ * TypeScript 7 refuses to assign where `PluginFactory<D>` is expected for any
+ * `D` with an index signature — `usePlugin(validationPlugin())` stops compiling
+ * for a consumer whose dependencies are `Record<string, T>`. TS 6 skipped that
+ * variance check, so the imprecision was always there and simply invisible.
+ *
+ * `PluginFactory<never>` does NOT work as a shorthand here (unlike
+ * `AnyOptions = Options<never>` in core): it fails on both compilers, because
+ * this plugin actually reads dependencies.
+ */
+export function validationPlugin<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(): PluginFactory<Dependencies> {
   // eslint-disable-next-line unicorn/consistent-function-scoping
   return (router) => {
     const ctx = getInternals(router);
