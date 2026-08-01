@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-01]
 
+### @real-router/core@0.85.1
+
+### Patch Changes
+
+- [#1639](https://github.com/greydragon888/real-router/pull/1639) [`2fa8aa1`](https://github.com/greydragon888/real-router/commit/2fa8aa1af2652a2d5bb49187060bf13ced540d5e) Thanks [@greydragon888](https://github.com/greydragon888)! - Do not commit over a nested navigation that has not finished yet ([#1626](https://github.com/greydragon888/real-router/issues/1626))
+
+  A guard factory recompiled inside `completeTransition` may start a nested
+  navigation. When that navigation ran to completion, [#1611](https://github.com/greydragon888/real-router/issues/1611) already refused the
+  outer commit; when it is still **in flight**, the outer navigation committed on
+  top of it — `navigate()` resolved with success, `TRANSITION_SUCCESS` was emitted
+  for a navigation the FSM had already cancelled, and the nested navigation's
+  result was silently lost.
+
+  `isTransitioning()` cannot tell the two apart: with a nested navigation parked in
+  an async guard the machine _is_ in a transition — somebody else's. The commit now
+  also asks the supersession token (`inFlight.isCurrent(nav.myId)`), and neither
+  half subsumes the other: the token is unmoved when a factory merely `dispose()`s
+  the router, and the machine is still transitioning when the supersede is another
+  navigation. A superseded navigation now rejects `TRANSITION_CANCELLED` and the
+  nested result stands.
+
+- [#1639](https://github.com/greydragon888/real-router/pull/1639) [`2fa8aa1`](https://github.com/greydragon888/real-router/commit/2fa8aa1af2652a2d5bb49187060bf13ced540d5e) Thanks [@greydragon888](https://github.com/greydragon888)! - Do not commit `replace()`'s revalidation on a router torn down mid-call ([#1627](https://github.com/greydragon888/real-router/issues/1627))
+
+  `replace()` calls `clearDefinitionGuards()`, which recompiles the compiled guard
+  slot from a surviving **external** factory ([#1192](https://github.com/greydragon888/real-router/issues/1192)) — application code, running
+  after `replace()`'s entry `throwIfDisposed()`. A `dispose()` or `stop()` from
+  there did not stop the swap: it finished, revalidated the URL and committed on a
+  dead router, emitting nothing at all (dispose had already cleared the listeners),
+  so no subscriber, plugin or adapter ever learned of the state it was left with.
+
+  The revalidation commit now re-asks liveness on the same side of that user code
+  as the commit itself, and throws `ROUTER_DISPOSED`. This also removes an
+  asymmetry: the third revalidation arm (URL no longer matches) was never exposed,
+  because it routes through `navigateToNotFound`, whose own liveness gate already
+  throws — all three arms now refuse the same way with the same code.
+
+
 ### @real-router/react@0.31.0
 
 ### Minor Changes
