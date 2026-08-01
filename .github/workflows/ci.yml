@@ -505,6 +505,15 @@ jobs:
       - name: Check coverage scope
         run: pnpm lint:coverage-scope
 
+      # Every example with a playwright.config.ts must ship at least one spec —
+      # a find+wc static check (scripts/check-e2e-specs.sh), so it belongs with
+      # the other repo-global lints. It used to run in pre-commit ONLY, which a
+      # bot push, `--no-verify` or a web edit all bypass: exactly the #813 class
+      # that moved knip/publint/attw into CI. Cheap enough to sit ahead of knip.
+      # (2026-08-01 CI/CD audit §4.3.)
+      - name: Check e2e specs
+        run: pnpm lint:e2e
+
       # Dead-code / unused-export / unused-dependency detection (knip). Pure
       # source-graph analysis — no dist needed. Catches unused introduced by a PR
       # that turbo's affected filter scored as "nothing built". Previously

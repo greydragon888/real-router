@@ -4,6 +4,16 @@ on:
   pull_request:
     branches: [master]
 
+# Least-privilege default, matching every other workflow in the repo (ci.yml,
+# post-merge.yml, examples.yml, codspeed*.yml, cross-router-bench.yml). This was
+# the ONLY workflow declaring nothing at either level, so `require-changeset`
+# inherited whatever `default_workflow_permissions` happens to be — a no-op today
+# (the repo default is `read`), insurance against a future flip of that global
+# setting. `validate-changesets` keeps its own block, which fully overrides this.
+# (2026-08-01 CI/CD audit §4.4.)
+permissions:
+  contents: read
+
 jobs:
   require-changeset:
     name: Require Changeset

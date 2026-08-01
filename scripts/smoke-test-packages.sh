@@ -13,13 +13,26 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Packages that cannot be imported in plain Node.js:
-# - types: types-only package, no runtime exports
+# Packages that cannot be imported in plain Node.js (`types` used to head this
+# list; the package was folded into core as the /types subpath in wave-2):
 # - solid: solid-js runtime requires browser/DOM environment
 # - svelte: .svelte files require Svelte compiler
 # - angular: needs @angular/compiler + DI context at import time
 #            (e.g. PlatformLocation triggers JIT compilation of injectables)
 SKIP_IMPORT="@real-router/solid @real-router/svelte @real-router/angular"
+
+# Subpaths whose export map declares `require` but whose CJS entry cannot be
+# loaded in practice. Keep this TINY and justified — like SKIP_IMPORT it is an
+# escape hatch, and every entry here is a defect to fix upstream, not a rule.
+# - @real-router/react/ink: dist/cjs/ink.js statically `require("ink")`, and
+#   ink@7 is ESM-only with top-level await in its graph (build/reconciler.js), so
+#   require() of it is impossible on any Node ("require() cannot be used on an
+#   ESM graph with top-level await"). The `require` condition on this subpath
+#   therefore advertises a CJS build no consumer can load. Fixing it edits a
+#   PUBLIC package (drop the condition, or ship a TLA-free entry) and needs a
+#   changeset, so it is tracked separately — this list keeps the gate honest
+#   about a pre-existing product defect instead of going red on it.
+SKIP_REQUIRE="@real-router/react/ink"
 TEMP_DIR="$(mktemp -d)"
 TARBALLS_DIR="$TEMP_DIR/tarballs"
 PROJECT_DIR="$TEMP_DIR/consumer"
@@ -144,18 +157,33 @@ for pkg_name in "${PACKAGES[@]}"; do
     continue
   fi
 
-  # Extract export subpaths and verify each one resolves
-  subpaths=$(node -e "
+  # Extract export subpaths, tagging each with whether its entry declares a
+  # `require` condition. Both halves of a dual build must be exercised: the ESM
+  # side alone never loads dist/cjs, so a broken CJS bundle (bad interop, missing
+  # file, syntax error from the second tsdown format) shipped green — publint
+  # only reads the manifest and attw only resolves TYPES under `require`, neither
+  # executes the CJS entry. The tag keeps that honest: angular ships FESM2022 and
+  # svelte ships svelte-package output, both a single ESM `default`, so a blind
+  # require() on them would be a false red rather than a finding. (Audit §4.6.)
+  entries=$(node -e "
     const pkg = require('$pkg_json');
     const exports = pkg.exports || {};
-    for (const key of Object.keys(exports)) {
-      // Skip conditions that are objects (handle '.' and subpaths)
-      console.log(key === '.' ? pkg.name : pkg.name + '/' + key.slice(2));
+    // A 'require' condition anywhere except inside 'types' (which resolves .d.ts,
+    // not runtime code) means the entry has a real CJS build.
+    const hasRequire = (value) =>
+      typeof value === 'object' && value !== null &&
+      Object.entries(value).some(([key, sub]) => key === 'require' || (key !== 'types' && hasRequire(sub)));
+    for (const [key, value] of Object.entries(exports)) {
+      const spec = key === '.' ? pkg.name : pkg.name + '/' + key.slice(2);
+      console.log(spec + ' ' + (hasRequire(value) ? 'dual' : 'esm-only'));
     }
-  " 2>/dev/null || echo "$pkg_name")
+  " 2>/dev/null || echo "$pkg_name esm-only")
 
-  for subpath in $subpaths; do
-    # Try to resolve the import (must run from consumer project dir)
+  while read -r subpath kind; do
+    [ -z "$subpath" ] && continue
+
+    # ESM side (must run from the consumer project dir so resolution is a real
+    # consumer's resolution, not the workspace's).
     result=$(cd "$PROJECT_DIR" && node --input-type=module -e "
       import('$subpath')
         .then(() => console.log('OK'))
@@ -165,10 +193,30 @@ for pkg_name in "${PACKAGES[@]}"; do
     if echo "$result" | grep -q "^OK"; then
       PASSED=$((PASSED + 1))
     else
-      echo "  FAIL: $subpath — $result"
+      echo "  FAIL: $subpath (esm) — $result"
       FAILED=$((FAILED + 1))
     fi
-  done
+
+    # CJS side, only where the export map actually declares `require` and the
+    # subpath is not a documented exception. `printf | grep -qxF` (whole-line,
+    # fixed-string) rather than `grep -qw`: an empty exception list must match
+    # NOTHING, and a bare `grep -qw ""` would match every subpath and silently
+    # disable the whole CJS check.
+    # shellcheck disable=SC2086
+    if [ "$kind" = "dual" ] && ! printf '%s\n' $SKIP_REQUIRE | grep -qxF "$subpath"; then
+      result=$(cd "$PROJECT_DIR" && node -e "
+        try { require('$subpath'); console.log('OK'); }
+        catch (e) { console.log('FAIL: ' + e.message.split('\n')[0]); process.exit(1); }
+      " 2>&1) || true
+
+      if echo "$result" | grep -q "^OK"; then
+        PASSED=$((PASSED + 1))
+      else
+        echo "  FAIL: $subpath (cjs) — $result"
+        FAILED=$((FAILED + 1))
+      fi
+    fi
+  done <<< "$entries"
 done
 
 echo ""

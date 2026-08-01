@@ -1759,6 +1759,68 @@ file claimed the args "mirror the root `lint:duplicates:sarif` script".
 edited YAML files parse, the four `paths-ignore` lists are byte-identical, and
 `dependabot.yml` resolves to `directories: ["/", "/.github/actions/setup"]`.
 
+### 2026-08-02 audit batch 3 — the four low-severity residuals (§4.3–§4.6)
+
+Last of the 2026-08-01 audit's mechanical items. Three are one-liners; the fourth
+found a real product defect on its first run.
+
+**§4.3 — `lint:e2e` ran in pre-commit only.** `scripts/check-e2e-specs.sh` (every
+example with a `playwright.config.ts` must ship at least one spec) had no CI
+counterpart, so a bot push, `--no-verify` or a web edit bypassed it entirely —
+the same gap that moved knip/publint/attw into CI in #813. It is a `find` + `wc`
+static check, so it now runs in `repo-lints` between `lint:coverage-scope` and
+knip (cheap checks first, fail fast).
+
+**§4.4 — `changeset-check.yml` was the only workflow declaring no
+`permissions:`.** Every other workflow states a least-privilege default with the
+same rationale ("insurance against a future flip of `default_workflow_permissions`").
+Here `require-changeset` inherited whatever that global setting happens to be. Now
+`permissions: contents: read` at the top; `validate-changesets` keeps its own
+block, which fully overrides it.
+
+**§4.5 — the cross-router bench's hang backstop was unreachable.** The matrix step
+carried `timeout-minutes: 600` with a comment calling it "the SOLE hang backstop",
+but `timeout-minutes` defaults to **360 at the job level**, so the step cap could
+never fire and a hang ended as an opaque "job cancelled" at six hours. Both
+numbers are now explicit and ordered: job `360`, matrix step `300` (~1.8×
+headroom over the measured ~2.8 h). A hang in the matrix now fails as a named
+step timeout, and the six-hour ceiling on the shared self-hosted runner is a
+deliberate figure rather than a platform accident.
+
+**§4.6 — smoke tested only half of every dual package.** Phase 3 resolved each
+export subpath with `import()`, so `dist/cjs/**` was never loaded: a broken CJS
+bundle (bad interop, missing file, a second-format tsdown regression) shipped
+green. `publint` only reads the manifest and `attw` only resolves **types** under
+the `require` condition — neither executes the CJS entry. The loop now also
+`require()`s each subpath **whose export map actually declares a `require`
+condition**, computed from `package.json` rather than assumed: `angular` (FESM2022)
+and `svelte` (svelte-package) expose a single ESM `default`, so a blind `require()`
+on them would be a false red. Assertions went from 35 to 66 — 31 CJS entries that
+had never been loaded by any gate. Also dropped a stale comment line naming the
+`types` package, folded into core as the `/types` subpath in wave-2.
+
+**What §4.6 found immediately (tracked separately).**
+`require("@real-router/react/ink")` fails with *"require() cannot be used on an
+ESM graph with top-level await"*: `dist/cjs/ink.js` statically `require("ink")`,
+and `ink@7` is ESM-only with top-level await in `build/reconciler.js`, so it
+cannot be required on any Node version. The `./ink` export therefore advertises a
+`require` condition no consumer can use. Fixing it edits `packages/react/package.json`
+— a public package, so it needs a changeset and is out of scope for an infra
+commit; the subpath sits in a documented `SKIP_REQUIRE` list in the smoke script
+meanwhile, so the gate reflects reality instead of going red on a pre-existing
+defect. Preferred fix: drop the `require`/`types.require` conditions for `./ink`
+(honest — the dependency itself is ESM-only), since a TLA-free CJS entry is not
+constructible without a dynamic `import()`.
+
+**Verification.** `actionlint` 1.7.8 + shellcheck 0.11.0 under
+`SHELLCHECK_OPTS=--severity=warning`: clean; `bash -n` and standalone
+`shellcheck -S warning` clean on the smoke script; the smoke script was run
+end-to-end locally against real packed tarballs — 66 passed / 0 failed after the
+documented exception, and it is what surfaced the `./ink` defect in the first
+place. Parsed assertions: `changeset-check.yml` resolves to
+`permissions: {contents: read}`, and the bench job's `360` is strictly greater
+than the matrix step's `300`.
+
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
 > **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**

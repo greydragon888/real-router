@@ -31,6 +31,11 @@ jobs:
     # Unsharded: ONE job runs all 5 cohorts (as per-cohort node processes — see the matrix
     # step) — coherent snapshot, one honest machine stamp (same VPS → identical env stamp).
     runs-on: self-hosted # the dedicated consistent VPS (same runner as codspeed/examples) — low-variance hardware, so the rme-gate can arm (CONSISTENT_RUNNER=1 below). schedule/workflow_dispatch only (no fork-PR) → no self-hosted RCE surface.
+    # Spelled out rather than left to the invisible default (also 360): the
+    # matrix step's own cap is set relative to THIS number, and a self-hosted job
+    # holding the single shared runner for six hours should be a deliberate
+    # figure, not a platform accident.
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup # pnpm + Node 24 + pnpm install --frozen-lockfile
@@ -92,7 +97,13 @@ jobs:
           done
           exit $rc
         working-directory: benchmarks
-        timeout-minutes: 600 # covers all five cohorts in the loop; self-hosted has NO platform cap → this timeout is the SOLE hang backstop (per-cohort heaps make OOM far less likely now)
+        # 300 min covers all five cohorts (~2.8 h measured) with ~1.8× headroom,
+        # and — unlike the previous 600 — it is REACHABLE: `timeout-minutes`
+        # defaults to 360 at the JOB level, so a 600-minute step cap could never
+        # fire and the real backstop was an opaque "job cancelled" at 6 h. Keep
+        # this strictly below the job value declared above so a hang in the
+        # matrix fails as a named step timeout. (2026-08-01 CI/CD audit §4.5.)
+        timeout-minutes: 300
         env:
           BENCH_RUNNER: "self-hosted" # machine stamp (env.cpu carries the real CPU model)
           RUNS: ${{ inputs.runs || '100' }} # via env, not inline in `run:` — a workflow_dispatch input spliced into a run-script is a shell-injection sink (matches the rme-gate step below)
