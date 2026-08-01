@@ -45,9 +45,11 @@ jobs:
       # `test:stress` as a dedicated `--concurrency=1` step (#1423). If a leak
       # ever lands on master through a bot-push that bypasses pre-push (e.g.
       # auto-merged changeset release), re-add `test:stress` to the run line.
+      # `lint` is EXPLICIT since it stopped being a `test` dependency — as a
+      # sibling task it runs in parallel with the tests instead of gating them.
       - name: Build
         run: >-
-          pnpm turbo run bundle test test:properties
+          pnpm turbo run bundle test test:properties lint
           --filter='!./examples/**'
 
       # Publish master's bundle sizes so each PR's `bundle-size` job can diff

@@ -6610,3 +6610,45 @@ The required gate's critical path is `base-test` — **231 s of 297 s** wall-clo
 turbo already computes exactly this data; the only thing missing was persistence. The cost is zero — `--summarize` writes a JSON file and does not change task hashes or execution — and it is the prerequisite for any further work on the critical path: the audit's own follow-ups (split `test:properties` into its own job, shard `core#test`) are decisions that need the split first, and both carry real trade-offs (`dependsOn` ordering, per-run 100 % coverage thresholds) that are not worth paying on a guess.
 
 This is also Phase 0 of the CI-telemetry lab (`.claude/ci-telemetry-lab/`, gitignored): forensics without any infrastructure. Phase 1 — trends via turbo's native OTLP export into a self-hosted Prometheus — is additive and changes none of the above.
+
+## `lint` left the test dependency chain — it was serialising the gate's critical path
+
+### Problem
+
+The first artifact the entry above produced answered the question it was added for, and the answer was not the expected one. `base-test`'s 183 s decomposed as:
+
+```
+core#lint             0 → 70s   ███████████████████████
+ssr-utils#type-check  0 → 3s
+core#type-check       3 → 13s
+core#test                                70 → 118s
+core#test:properties                              118 → 183s
+```
+
+Strictly sequential — 70 + 48 + 65 — because `test.dependsOn` was `["lint", "type-check"]` and `test:properties.dependsOn` was `["test", "lint", "type-check"]`. `core#test` started in the exact second `core#lint` finished, and from second 13 to second 70 the job ran **one** task on a multi-core runner.
+
+`core#lint` is genuinely expensive and that is not the defect: 449 files / 116k lines, 729 active rules, type-aware (`projectService: true`), single-threaded. Locally (12 cores) a cold run is ~29 s; the CI runner's slower core turns that into 70 s. Rule time (21.7 s of it) splits sonarjs 32 % / typescript-eslint 21 % / unicorn 16 % / prettier 12 %, and `tests/` is 25 s of the 30 (314 of the 449 files). Those are worth trimming later; none of them is why the job took 183 s.
+
+### Solution
+
+`lint` is no longer a dependency of `test` / `test:properties` / `test:stress`. It became a sibling task, listed explicitly on every run line that used to get it for free:
+
+- `ci.yml` — `pipeline-leaf`, `base-test`, `pipeline-sharded`
+- `post-merge.yml`
+- `.husky/pre-commit`
+- `turbo.json` — added to **`build.dependsOn`**, which is what keeps `pnpm build` (and therefore `.husky/pre-push`, `examples.yml`) a full validation. There it also runs in parallel with the tests instead of ahead of them.
+
+Measured A/B on `@real-router/core`, both arms with a cold `.eslintcache` (the first attempt was invalid — the "after" arm reused a warm cache from the "before" run and reported a flattering 47 s):
+
+| | wall-clock | shape |
+| --- | --- | --- |
+| before | 78.3 s | lint 0→32, test 32→49, properties 49→78 |
+| after | 58.8 s | lint 0→49 ∥ type-check 2→6 → test 6→25 → properties 25→59 |
+
+**−19.5 s (−25 %)**, and `lint` is now entirely hidden behind the test chain. On CI the same reshaping should take `base-test` from 183 s to roughly the 126 s of its `type-check → test → test:properties` chain, minus whatever the runner's four cores lose to contention — the first sharded run after this lands will say exactly.
+
+### Why
+
+The dependency was never a correctness constraint: nothing in `test` consumes lint output, and turbo's cache keys are per-task, so a lint failure and a test failure are independent verdicts. It bought **fail-fast** — a lint error stopped the run before the expensive tests — and that is the one thing this trades away: with `--continue=never` (the default) turbo still refuses to *start* new tasks after a failure, but tasks already in flight run to completion. Paying up to one test-suite's wall-clock on a lint failure is worth ~60 s on every green run of the gate's critical path.
+
+Two traps for anyone touching this again: dropping `lint` from a run line does **not** fail anything — it silently stops linting that path (hence the explicit comment at every one of them); and `build.dependsOn` is what preserves the `pnpm build` contract documented in `CLAUDE.md`, so moving lint out of there re-opens the hole on the pre-push side.

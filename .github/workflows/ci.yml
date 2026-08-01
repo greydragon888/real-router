@@ -138,7 +138,9 @@ jobs:
   # PIPELINE-LEAF: monolithic path for small, non-core PRs (mode=leaf).
   # Byte-identical to the historical single `pipeline` job; only the two
   # uploaded artifact names carry a `-leaf` suffix (coverage merge, R2.4).
-  # turbo run test triggers lint + type-check as deps.
+  # turbo run test triggers type-check as a dep; `lint` is a SIBLING task on the
+  # run line (it stopped being a `test` dependency — see IMPLEMENTATION_NOTES
+  # "lint left the test dependency chain").
   # turbo run bundle produces dist/ (cache-shared with build).
   # ============================================
 
@@ -227,9 +229,15 @@ jobs:
       # 0% coverage on any new source lines in those packages. Don't add the
       # `-- --coverage` passthrough back — each config controls its own
       # coverage.enabled.
+      # `lint` is listed EXPLICITLY here and in every other test invocation: it
+      # used to arrive as a `test` dependency, which serialised it AHEAD of the
+      # tests (measured on run 30712451199: core#lint 0→70 s, core#test only
+      # 70→118 s — three of the runner's cores idle the whole time). As a sibling
+      # task it overlaps the tests instead. Removing it from this line does not
+      # fail anything — it silently stops linting the PR.
       - name: Test with coverage
         run: >-
-          pnpm turbo run test test:properties
+          pnpm turbo run test test:properties lint
           $LEAF_FILTER
           --filter='!./examples/**'
           --filter='!./benchmarks'
@@ -447,7 +455,10 @@ jobs:
           # rides along in their shard jobs; there is no separate shared test node to
           # run here anymore.
           # shellcheck disable=SC2086
-          pnpm turbo run test test:properties $FILTERS --summarize
+          # `lint` explicit — see the note in pipeline-leaf's test step. This job
+          # is the gate's critical path, and lint gating the tests is exactly
+          # what made it 183 s (70 + 48 + 65, strictly sequential).
+          pnpm turbo run test test:properties lint $FILTERS --summarize
 
       # THE reason Phase 0 exists: base-test is the critical path of the required
       # gate (231 s of 297 s, measured on run 30693854030 — 2026-08-01 CI/CD audit
@@ -609,10 +620,11 @@ jobs:
       # to the Remote Cache, so this shard's `bundle` (whose `^bundle` chain
       # reaches core) resolves it as a HIT. A lost race just re-executes the
       # upstream bundle here — a benign duplicate, never a failure.
+      # `lint` explicit — see the note in pipeline-leaf's test step.
       - name: Test shard
         env:
           SHARD_FILTER: ${{ matrix.filter }}
-        run: pnpm turbo run test test:properties $SHARD_FILTER --filter='!./examples/**' --summarize
+        run: pnpm turbo run test test:properties lint $SHARD_FILTER --filter='!./examples/**' --summarize
 
       - name: Bundle shard
         env:

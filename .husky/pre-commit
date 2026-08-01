@@ -44,8 +44,14 @@ pnpm lint:coverage-scope
 
 # Run type checking, linting, and tests via turbo pipeline
 # (turbo caching makes lint-staged redundant)
-echo "🧪 Running tests (includes type-check and lint via turbo)..."
-pnpm turbo run test --filter='!./examples/**'
+#
+# `lint` is listed EXPLICITLY: it used to ride along as a `test` dependency, but
+# that serialised it in front of every test run (core#lint alone is ~70 s on a CI
+# runner, and nothing started until it finished). It is now a sibling task, so it
+# runs in parallel with the tests instead of gating them. Dropping it from this
+# line would silently stop linting on commit.
+echo "🧪 Running tests + lint (type-check rides along via turbo)..."
+pnpm turbo run test lint --filter='!./examples/**'
 
 # Check that e2e directories have specs
 # Cheap static check (find + wc) — catches forgotten e2e/ during scaffolding.

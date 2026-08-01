@@ -54,7 +54,7 @@ shared/
 
 - **NEVER** push without explicit user request
 - **Infrastructure tasks go straight to `master` — no PR, no changeset.** Build/tooling/CI/packaging changes that don't touch `packages/*/src/` are committed directly on `master` (no feature branch, no PR). They need no changeset either — `changeset-check.yml` only requires one when public-package `src/` changes, so the fix simply ships with each package's next release
-- After completing a task, run: `pnpm build` (turbo runs the full graph: type-check → lint → test → build)
+- After completing a task, run: `pnpm build` (turbo runs the full graph: type-check → test → build, with lint in PARALLEL — it is a `build` dependency, no longer a `test` one)
 - Prefer editing existing files over creating new ones
 - Keep changes minimal and focused
 - **Update `IMPLEMENTATION_NOTES.md` after any infrastructure change** — new scripts/hooks (`.husky/*`, `scripts/*.sh`), CI workflow edits (`.github/workflows/*.yml`), build pipeline changes (turbo.json, tsdown configs, custom export conditions), dependency-audit tooling, or anything that changes "how the repo builds/ships/audits itself." Use the Problem → Solution → Why format established there. This is what makes the file useful as the "why is it this way?" reference
@@ -62,7 +62,7 @@ shared/
 ## Key Commands
 
 ```bash
-pnpm build              # Full validation + build (type-check → lint → test → bundle)
+pnpm build              # Full validation + build (type-check → test → bundle; lint runs in parallel)
 pnpm build:verbose      # Build with full output (debugging)
 pnpm bundle             # Bundle only (tsdown/rollup/svelte-package, no validation)
 pnpm test -- --run      # Run tests once (errors-only output)
