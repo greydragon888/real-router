@@ -6,7 +6,7 @@
 
 | Export              | Kind      | Description                                                                 |
 | ------------------- | --------- | --------------------------------------------------------------------------- |
-| `validationPlugin`  | function  | Plugin factory — pass to `router.usePlugin()`. Takes no arguments.          |
+| `validationPlugin`  | function  | Plugin factory — pass to `router.usePlugin()`. No runtime arguments; generic over the router's dependency map, normally inferred (#1621) |
 | `RouterValidator`   | type      | Full validator interface that core calls into via `ctx.validator?.ns.fn()`. |
 
 ## Validator Namespaces
@@ -25,6 +25,26 @@ The `RouterValidator` interface is organized into 8 namespaces, matching core's 
 | `eventBus`     | `validateListenerArgs` — validates event names: `$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`; `validateCountThresholds` — proactive `warn@20% / error@50%` on the per-event listener count for `subscribe` / `addEventListener` (#1188), mirroring the plugins / lifecycle / dependencies counters |
 
 ## Gotchas
+
+### The factory is generic over the dependency map (#1621)
+
+`validationPlugin<D>()` carries the CALLER's dependency map instead of the
+`DefaultDependencies` (= `object`) default. `keyof object` is `never`, so a bare
+`PluginFactory` types `getDependency` as `(key: never) => never`, and TypeScript
+7 — which runs a variance check TS 6 skipped — refuses to assign that where
+`PluginFactory<D>` is expected for any `D` with an **index signature**. In
+practice `usePlugin(validationPlugin())` stopped compiling for a consumer typing
+dependencies as `Record<string, T>`; a map with concrete keys was always fine.
+
+`PluginFactory<never>` is NOT the shorthand here, even though core uses exactly
+that for `AnyOptions = Options<never>`: measured, it fails on BOTH compilers,
+because this plugin actually reads dependencies. `buildValidatorObject` is
+generic for the same reason — otherwise `RouterInternals<D>` does not fit its
+`RouterInternals<object>` parameter.
+
+⚠ The same `(): PluginFactory` default is still on the other nine plugin
+factories — see #1621 for the list. Anything added here should take the type
+parameter from the start.
 
 ### Register before start()
 
