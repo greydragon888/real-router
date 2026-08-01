@@ -35,12 +35,22 @@ export function navigateToNotFound(
   // while a start-interceptor is parked (FSM already DISPOSED) would let the
   // resuming pipeline commit an UNKNOWN_ROUTE state on the disposed router and
   // `start()` resolve. Symmetric with `navigateToState`'s `canNavigate()` gate
-  // (the matched-route branch is already protected). `!isActive()` also covers
-  // a merely-stopped (IDLE) router: the only reachable path to that is a direct
-  // `router.navigateToNotFound()` on a stopped instance (internal callers run
-  // during STARTING, which is active), so the ROUTER_DISPOSED code is slightly
-  // broad there — fail-closed is deliberate (committing on a stopped router is
-  // out of contract), and the disposed race is the case that matters.
+  // (the matched-route branch is already protected).
+  //
+  // ⚠ Reached ONLY through the INTERNALS door — `getInternals(router)
+  // .navigateToNotFound(path)` — never from the facade, whose own `!isActive()`
+  // check fires first (measured: facade + stopped throws `ROUTER_NOT_STARTED`,
+  // facade + disposed throws `ROUTER_DISPOSED` from the disposal swap; only
+  // `getInternals(…)` on a stopped or disposed router lands here). So the
+  // callers this gate actually protects against are the internal ones —
+  // `replace()`'s revalidation no-match arm is the demonstrated case, and it is
+  // why that arm was already safe while the two commit arms beside it were not
+  // (#1627).
+  //
+  // `!isActive()` covers a merely-stopped (IDLE) router as well as a disposed
+  // one, so the `ROUTER_DISPOSED` code is slightly broad for the stopped case
+  // — fail-closed is deliberate (committing on a stopped router is out of
+  // contract), and the disposed race is the one that matters.
   if (!deps.isActive()) {
     throw new RouterError(errorCodes.ROUTER_DISPOSED);
   }
