@@ -1,5 +1,12 @@
 # router-benchmarks
 
+## 0.3.105
+
+### Patch Changes
+
+- Updated dependencies [[`50b414d`](https://github.com/greydragon888/real-router/commit/50b414de63ed8e11d75cae97a59703d422d96b29)]:
+  - @real-router/react@0.31.0
+
 ## 0.3.104
 
 ### Patch Changes
