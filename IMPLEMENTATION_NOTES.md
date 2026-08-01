@@ -1821,6 +1821,66 @@ place. Parsed assertions: `changeset-check.yml` resolves to
 `permissions: {contents: read}`, and the bench job's `360` is strictly greater
 than the matrix step's `300`.
 
+### `@real-router/react/ink` is ESM-only — the published `require` condition could never load (#1628)
+
+**Problem.** `exports["./ink"]` advertised `require` → `dist/cjs/ink.js` (plus
+`types.require`), but that entry was unloadable on every Node version:
+
+```
+$ node -e "require('@real-router/react/ink')"
+require() cannot be used on an ESM graph with top-level await. Use import() instead.
+```
+
+Both halves are structural: `dist/cjs/ink.js` **statically** `require("ink")`, and
+`ink@7` is ESM-only (`"type": "module"`) with top-level await in its graph
+(`build/reconciler.js`), which `require(esm)` cannot cross. A CJS-targeting
+bundler is no better off — top-level await has no representation in CJS output.
+So the published contract promised a build no consumer could use.
+
+**Why nothing caught it for a year.** publint reads the manifest; attw resolves
+**types** under the `require` condition; the package smoke test resolved every
+subpath through `import()` only, so `dist/cjs/**` was never *executed* by any
+gate. Adding a `require()` pass to the smoke test (2026-08-02 audit batch 3, §4.6)
+flagged it on the first run.
+
+**Solution.** Drop `require` and `types.require` from `exports["./ink"]`. The
+subpath is ESM-only, which is honest — its dependency is ESM-only.
+`require("@real-router/react/ink")` now fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`,
+naming the real situation instead of a confusing TLA error; `import` is unchanged.
+
+**Two consequences worth recording.**
+
+1. **attw needed a scoped exemption.** tsdown runs attw with `profile: "strict"`,
+   which requires every entrypoint to resolve in every mode, so an ESM-only
+   subpath is reported as `No resolution (node16-cjs)` — and `failOnWarn:
+   "ci-only"` makes that a red build in CI. `packages/react/tsdown.config.mts`
+   therefore carries `attw: { excludeEntrypoints: ["./ink"] }`. The alternatives
+   are both package-wide and were rejected: `profile: "esm-only"` stops flagging
+   CJS-resolution problems for the six genuinely dual entries (precisely what attw
+   is for), and `ignoreRules: ["no-resolution"]` would also silence a missing ESM
+   resolution anywhere. Residual risk of the scoped exemption is small: ink's
+   `.d.mts` comes off the same rolldown-dts pipeline as the six entries that stay
+   checked, its runtime ESM resolution is now asserted by the smoke test, and
+   `tests/functional/ink-entry.test.tsx` exercises the entry.
+2. **`dist/cjs/ink.*` is still emitted, deliberately.** The node10 fallback
+   `typesVersions` (`"ink": ["./dist/cjs/ink.d.ts"]`) points into it, so pruning
+   the entry from the CJS build would break type resolution for
+   `moduleResolution: node` consumers and leave a manifest entry aimed at a
+   missing file. The runtime `dist/cjs/ink.js` is simply unreachable — no export
+   condition references it.
+
+**Bump level.** `minor`, not `patch`: no working consumer can be affected (the
+removed path never resolved), but the published export map loses a condition, and
+the pre-1.0 convention maps a breaking contract change to `minor`.
+
+**Verification.** `pnpm -F @real-router/react bundle` → `✔ [attw] No problems
+found` (it reported the `No resolution` warning before the exemption, which is how
+the strict-profile interaction was found); `scripts/smoke-test-packages.sh`
+end-to-end against real tarballs → 66 passed / 0 failed, with `SKIP_REQUIRE` back
+to empty because the subpath is now classified ESM-only straight from the export
+map; `node .changeset/check-changeset.mjs` → valid; `turbo run test
+--filter=@real-router/react` → 8/8 (lint + type-check + tests).
+
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
 > **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**
