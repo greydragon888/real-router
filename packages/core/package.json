@@ -95,7 +95,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --max-warnings 0",
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "bundle": "rm -rf dist && tsdown --config-loader unrun && node scripts/check-dts-augment-targets.mjs"
+    "bundle": "RR_DTS_PASS=1 tsdown --config-loader unrun && tsdown --config-loader unrun && node scripts/check-dts-augment-targets.mjs"
   },
   "sideEffects": false,
   "devDependencies": {

@@ -26,7 +26,8 @@
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte}",
         "../../shared/**/*.ts",
-        "tsdown.config.*",
+        "tsdown.*",
+        "scripts/**/*.mjs",
         "tsconfig.json",
         "package.json"
       ],

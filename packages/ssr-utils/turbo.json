@@ -18,7 +18,8 @@
         "src/**/*.{ts,tsx,vue,svelte}",
         "../../shared/**/*.ts",
         "../core/src/**/*.ts",
-        "tsdown.config.*",
+        "tsdown.*",
+        "scripts/**/*.mjs",
         "tsconfig.json",
         "package.json"
       ]
