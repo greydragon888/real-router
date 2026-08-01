@@ -70,8 +70,20 @@ jobs:
           # ERE has no lookahead, so do it in two passes over the changed set (docs
           # dropped up front): (1) everything not under .github/, plus (2) anything
           # under .github/actions/. The '|| true' guards keep a grep no-match exit
-          # from tripping the step's `set -eo pipefail`.
-          CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep -vE '\.md$' || true)
+          # from tripping the step's `set -e`.
+          #
+          # `git diff` runs on its OWN line, unpiped and WITHOUT `|| true`: piped into
+          # `grep … || true` its failure was indistinguishable from "no files changed"
+          # (grep on empty input exits 1, the guard swallows it) — the step then
+          # SUCCEEDED with should_run=false and the required gate printed
+          # "✅ Skipped — no code changes" without running anything. The #1133 guard
+          # can't catch that: it fires on check.result != success, and this variant
+          # keeps the job green. `set -o pipefail` would NOT fix it either — the
+          # trailing `|| true` still swallows the pipeline status. Splitting the two
+          # commands is what makes a git failure fail the step (bash -e), which then
+          # turns the gate red via the #1133 guard. (2026-08-01 CI/CD audit §1.2.)
+          ALL_CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+          CHANGED=$(printf '%s\n' "$ALL_CHANGED" | grep -vE '\.md$' || true)
           NON_GH=$(printf '%s\n' "$CHANGED" | grep -vE '^\.github/' || true)
           GH_ACTIONS=$(printf '%s\n' "$CHANGED" | grep -E '^\.github/actions/' || true)
           CODE_CHANGES=$(printf '%s\n%s\n' "$NON_GH" "$GH_ACTIONS" | grep . | head -1 || true)
@@ -221,6 +233,7 @@ jobs:
           $LEAF_FILTER
           --filter='!./examples/**'
           --filter='!./benchmarks'
+          --summarize
 
       # Bundle affected packages (tsdown/rollup/svelte-package).
       # bundle:upstream → cache hit from test step (^bundle already executed).
@@ -231,6 +244,24 @@ jobs:
           $LEAF_FILTER
           --filter='!./examples/**'
           --filter='!./benchmarks'
+          --summarize
+
+      # Per-task execution timings (.turbo/runs/*.json), mirroring the shards'
+      # step: without them a job's wall-clock is a single opaque number and any
+      # "which task dominates?" question is guesswork (2026-08-01 CI/CD audit
+      # §3.2). Each turbo invocation writes its OWN summary, so this uploads the
+      # whole directory — the test run and the bundle run are separate files.
+      - name: Upload turbo run summaries (per-task timings)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          # NOT `turbo-summary-leaf`: `leaf` is also one of build-matrix.mjs's
+          # GROUP_NAMES, so a sharded run can emit `turbo-summary-leaf` for the
+          # catch-all shard. The two modes never coexist in one run (so artifact
+          # names can't actually collide), but comparing runs later would.
+          name: turbo-summary-pipeline-leaf
+          path: .turbo/runs/
+          retention-days: 14
 
       # Did turbo's affected filter actually build/test any package? On a
       # root config/docs-only PR the answer is no — and there are no dist/
@@ -339,10 +370,19 @@ jobs:
           fi
 
       - name: Bundle core layer
-        run: pnpm turbo run bundle --filter='@real-router/core...'
+        run: pnpm turbo run bundle --filter='@real-router/core...' --summarize
 
       - name: Validate core published artifacts (publint + attw)
         run: pnpm turbo run lint:package lint:types --filter='@real-router/core...'
+
+      # Per-task timings — see the note in pipeline-leaf (audit §3.2).
+      - name: Upload turbo run summaries (per-task timings)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: turbo-summary-base-bundle
+          path: .turbo/runs/
+          retention-days: 14
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
@@ -407,7 +447,20 @@ jobs:
           # rides along in their shard jobs; there is no separate shared test node to
           # run here anymore.
           # shellcheck disable=SC2086
-          pnpm turbo run test test:properties $FILTERS
+          pnpm turbo run test test:properties $FILTERS --summarize
+
+      # THE reason Phase 0 exists: base-test is the critical path of the required
+      # gate (231 s of 297 s, measured on run 30693854030 — 2026-08-01 CI/CD audit
+      # §3.2), and until now nothing said how that time splits between core#test,
+      # core#test:properties and their lint/type-check dependencies. Any decision
+      # about splitting or sharding this job was guesswork without these numbers.
+      - name: Upload turbo run summaries (per-task timings)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: turbo-summary-base-test
+          path: .turbo/runs/
+          retention-days: 14
 
       - name: Fix coverage paths
         run: bash scripts/fix-lcov-paths.sh
@@ -533,13 +586,19 @@ jobs:
       # localize which shard task dominates (e.g. solid#test vs react#test under
       # vite-plugin-solid's on-the-fly babel compile). if: always() so a failing
       # shard still uploads what ran.
+      #
+      # 14 days, not 1: at one day these are per-run forensics you can only read
+      # while the run is still fresh. Two weeks is what makes "is this shard
+      # slower than it was?" answerable at all — the artifacts are a few KB each,
+      # unlike the coverage/dist uploads below, which stay at 1 day because they
+      # are only consumed by downstream jobs of the SAME run.
       - name: Upload turbo run summary (per-task timings)
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: turbo-summary-${{ matrix.name }}
           path: .turbo/runs/
-          retention-days: 1
+          retention-days: 14
 
       - name: Validate shard published artifacts (publint + attw)
         env:

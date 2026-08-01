@@ -10,18 +10,44 @@ name: Dependabot Lockfile Dedupe
 # fails → CI red on nearly every Dependabot PR. Human commits avoid this via the
 # pre-commit auto-dedupe hook, which Dependabot bypasses.
 #
-# WHY no PAT / stored secret: this is a `pull_request` run gated to Dependabot,
-# and GitHub honors a workflow's declared `permissions:` to grant GITHUB_TOKEN
-# write access for Dependabot runs (documented platform behavior). The push uses
-# the default GITHUB_TOKEN; nothing to configure. If elevation is ever refused,
-# the push fails loudly with a 403 — switch to a PAT then, not preemptively.
+# WHY the push needs a PAT (2026-08-01 — this REVERSES the original design):
+# the first version pushed with the default GITHUB_TOKEN, reasoning that "a
+# GITHUB_TOKEN push does not re-trigger CI … re-evaluation is handled at merge
+# time". There is no merge-time re-evaluation: `protect-master` requires five
+# per-SHA status contexts (Require Changeset, CI Result, Validate Changesets,
+# Dependency Review, SonarCloud), and GitHub's loop-prevention means a
+# GITHUB_TOKEN push creates NO workflow run for the new head SHA. The PR then
+# sits on "Expected — waiting for status" forever: strictly worse than the red
+# `lint:dedupe` it was meant to fix, and silent (no red X anywhere).
+# Measured on the only two PRs this workflow ever pushed to:
+#   gh api …/commits/aa7aacf0a/check-runs → 0 check-runs   (bot head, PR #1562)
+#   gh api …/commits/cc909e6da/check-runs → 32 check-runs  (its Dependabot parent)
+# #1368 was closed unmerged; #1562 stayed open. Neither dedupe commit reached master.
+#
+# A push authenticated with a PAT DOES trigger workflows — the same reason
+# changesets.yml uses PAT_TOKEN for the Release PR. Platform asymmetry to know:
+# a Dependabot-triggered run can read **Dependabot secrets only**, never Actions
+# secrets, so PAT_TOKEN is invisible here — the token must be stored separately
+# under Settings → Secrets and variables → **Dependabot** as
+# `DEPENDABOT_PUSH_TOKEN` (fine-grained, this repo only, Contents: read+write).
+# Side effect: the retriggered run is authored by the PAT owner, not
+# dependabot[bot], so it is an ORDINARY Actions run — full Actions secrets/vars,
+# a superset of what the Dependabot context sees. (Not a Remote-Cache win today:
+# TURBO_TOKEN is already mirrored into the Dependabot secret store, so the
+# "cold Dependabot run" note in ci.yml's leaf-filter comment (#1067) may itself
+# be stale — verify before citing it.)
+#
+# Until that secret exists the job still dedupes but REFUSES to push and points
+# at `pnpm resolve:dependabot <PR#>` — degraded, never silently harmful.
 # (`pull_request_target` would be the wrong tool here: for Dependabot it yields a
 # read-only token with no secrets, and it would run a privileged checkout of an
 # untrusted head. `pull_request` + declared write is both simpler and safer.)
 #
-# NOTE on re-runs: a GITHUB_TOKEN push does not itself re-trigger CI (GitHub
-# loop-prevention) — which also guarantees this workflow can't loop. Re-evaluation
-# of the pushed fix is handled at merge time.
+# NOTE on loops: a PAT push DOES re-trigger `pull_request`, so this workflow can
+# re-enter — but it cannot loop. Two independent stops: the retriggered run's
+# `github.actor` is the PAT owner, not `dependabot[bot]`, so the job's `if:`
+# skips it; and `pnpm dedupe` is idempotent, so a second pass yields no lockfile
+# diff (`changed=false`) and pushes nothing.
 
 on:
   pull_request:
@@ -29,9 +55,14 @@ on:
     paths:
       - "pnpm-lock.yaml"
 
-# Elevated for the push. Honored for Dependabot `pull_request` runs via this key.
+# Read-only since 2026-08-01: the push is authenticated by DEPENDABOT_PUSH_TOKEN
+# (checkout's `token:`), not by GITHUB_TOKEN, so no write scope is needed — and a
+# Dependabot-context run no longer carries a write-capable token at all. Only
+# checkout reads through GITHUB_TOKEN (fallback path). If the PAT is ever dropped
+# in favour of a GITHUB_TOKEN push again, this must go back to `contents: write`
+# — and the merge-blocking problem in the header comes back with it.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: dependabot-dedupe-${{ github.event.pull_request.number }}
@@ -42,13 +73,22 @@ jobs:
     # Only Dependabot PRs — never touch a human PR branch.
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    env:
+      # The `secrets` context is NOT available in a job-level `if:`, so the
+      # presence check is materialised here and read by the two terminal steps.
+      HAS_PUSH_TOKEN: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v7
         with:
           # Dependabot branches live in this repo (not a fork), so head_ref is
-          # pushable with the persisted GITHUB_TOKEN.
+          # pushable. The token has to be the PAT: checkout persists it as the
+          # credential `git push` uses, and only a non-GITHUB_TOKEN push creates
+          # workflow runs for the new head SHA (see the header). The
+          # GITHUB_TOKEN fallback keeps the checkout itself working when the PAT
+          # is absent — in that case the push step is skipped, not downgraded.
           ref: ${{ github.head_ref }}
+          token: ${{ secrets.DEPENDABOT_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -75,7 +115,7 @@ jobs:
           fi
 
       - name: Commit & push deduped lockfile
-        if: steps.dedupe.outputs.changed == 'true'
+        if: steps.dedupe.outputs.changed == 'true' && env.HAS_PUSH_TOKEN == 'true'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
@@ -84,3 +124,27 @@ jobs:
           git add pnpm-lock.yaml
           git commit -m "chore(deps): pnpm dedupe lockfile for #${PR_NUMBER}"
           git push
+
+      # No push token → do NOT push. A GITHUB_TOKEN push would move the PR head to
+      # a commit no workflow ever validates, and branch protection would then block
+      # the merge on five contexts that never report (see the header). Not a
+      # failure either: `lint:dedupe` in ci.yml already reports the same problem as
+      # a red REQUIRED check, so a second red X here would be pure noise. Warn,
+      # name the manual command, stay green.
+      - name: Explain why nothing was pushed (no Dependabot push token)
+        if: steps.dedupe.outputs.changed == 'true' && env.HAS_PUSH_TOKEN != 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "::warning::pnpm-lock.yaml needs a dedupe, but the DEPENDABOT_PUSH_TOKEN Dependabot secret is not configured — refusing to push. Fix locally: pnpm resolve:dependabot ${PR_NUMBER}"
+          {
+            echo "### Lockfile dedupe NOT applied"
+            echo
+            echo "\`pnpm dedupe\` changes \`pnpm-lock.yaml\`, but no \`DEPENDABOT_PUSH_TOKEN\` secret is"
+            echo "configured, so this job did not push. (A \`GITHUB_TOKEN\` push would leave the PR"
+            echo "head without any status checks and block the merge on checks that never report.)"
+            echo
+            echo "Either run \`pnpm resolve:dependabot ${PR_NUMBER}\` locally, or add the token under"
+            echo "Settings → Secrets and variables → **Dependabot** (fine-grained PAT, this repo,"
+            echo "Contents: read and write)."
+          } >> "$GITHUB_STEP_SUMMARY"

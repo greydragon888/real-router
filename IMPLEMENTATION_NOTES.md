@@ -1436,6 +1436,12 @@ on the new head SHA; re-evaluation is handled at merge time. `resolve:dependabot
 the tool for **conflicting** PRs (rebase onto `master`) and if a token elevation is ever
 refused — this workflow only removes the dedupe-only chore.
 
+> **⚠ The last two sentences were WRONG and are SUPERSEDED (2026-08-01).** There is
+> no "re-evaluation at merge time": required status checks are evaluated per head
+> SHA, and a SHA no workflow ever ran against blocks the merge outright. The push
+> now uses a PAT — see "2026-08-01 CI/CD audit fixes" below for the measurement and
+> the fix. The loop argument above still holds, for a different reason (see there).
+
 #### UI frameworks / third-party routers / testing libs float latest patch (`~`)
 
 **Problem:** every UI-framework, competitor-router, and testing-library dependency
@@ -1582,6 +1588,92 @@ The three low-severity residuals left open by the 2026-07-03 audit wave (re-audi
 **Solution.** `scripts/ci-gate-completeness.test.mjs` — stdlib `node:test`, picked up automatically by the existing repo-lints glob step (`node --test scripts/*.test.mjs`, renamed "Test CI meta …"), so the preventer needed zero wiring of its own. Two single-purpose fail-closed extractors (top-level job ids; the gate's `needs` in flow and block styles) feed a pure `findViolations()` that asserts: (1) every job is in the gate's `needs` or in the in-test `OUTSIDE_GATE` allowlist, each entry carrying a written reason (today: `duplication` — informational jscpd SARIF channel, the hard threshold deliberately lives pre-push-only per #813; `bundle-size` — informational size-limit PR comment, "not a gate" by design per infra-review W4 §3.4); (2) the gate's `needs` reference existing jobs only (catches renames under the gate); (3) the allowlist is current — an entry that disappeared from ci.yml *or* got wired into `needs` after all fails the test. Fixtures inside the same file exercise every violation kind, so the check's discriminating power does not depend on the current (healthy) ci.yml.
 
 **Why / verification.** Mutation-validated against the REAL ci.yml (per the stress-test doctrine — a guard without proven discriminating power is theatre): removing `coverage` from the gate's `needs` (the exact #1127 recurrence) fails the test naming the class; appending a phantom job fails it; the restored file + the full repo-lints glob pass. Not a YAML library: the extractors are ~30 lines and fail closed — a ci.yml restructuring that breaks them breaks the assertions loudly instead of passing vacuously. Not an actionlint rule: actionlint validates workflow syntax/expressions, not repo policy ("every job must feed the gate"). The allowlist lives in the test rather than a config file so the reason strings sit next to the enforcement and exempting a job is a reviewed code diff.
+
+### 2026-08-01 CI/CD audit fixes — dedupe push blocked the merge + `check` failed open
+
+Two findings from the deep CI/CD audit (`.claude/ci-cd-audit-2026-08-01.md`, §1.1 and
+§1.2), fixed straight on master (infra — no changeset). Both are the same shape as the
+#1133 class: a mechanism that looks like a gate but resolves to "nothing happened".
+
+**Problem 1 — `dependabot-dedupe.yml` made Dependabot PRs unmergeable.** The workflow
+commits the deduped `pnpm-lock.yaml` and pushes it with the default `GITHUB_TOKEN`.
+GitHub's loop-prevention means such a push creates **no workflow run**, so the new head
+SHA never receives the five contexts `protect-master` requires (`Require Changeset`,
+`CI Result`, `Validate Changesets`, `Dependency Review`, `SonarCloud`). The PR then sits
+on "Expected — waiting for status" indefinitely — strictly worse than the red
+`lint:dedupe` the workflow exists to prevent, and silent (no red X anywhere). The design
+note above assumed "re-evaluation is handled at merge time"; there is no such thing for
+per-SHA required checks. Measured on the only two PRs the workflow ever pushed to:
+
+```
+gh api …/commits/aa7aacf0a/check-runs → {"total":0}   ← bot head (PR #1562)
+gh api …/commits/cc909e6da/check-runs → 32 check-runs ← its Dependabot parent
+git merge-base --is-ancestor {aa7aacf0a,1e2cfafee} master → NO / NO
+```
+
+#1368 was closed unmerged; #1562 stayed open, both dedupe commits stranded on their
+branches. Delivered value over the workflow's lifetime: zero.
+
+**Solution 1.** The push is authenticated with a PAT (`DEPENDABOT_PUSH_TOKEN`), which
+does trigger workflows — the same lever `changesets.yml` already pulls with `PAT_TOKEN`
+so the Release PR runs CI. Two consequences worth knowing:
+
+- **The token must be a _Dependabot_ secret, not an Actions secret.** A run triggered by
+  Dependabot can read Dependabot secrets only, so `PAT_TOKEN` is invisible here.
+  Settings → Secrets and variables → **Dependabot** → `DEPENDABOT_PUSH_TOKEN`
+  (fine-grained, this repo only, Contents: read and write).
+- **Until that secret exists the job dedupes but refuses to push**, emitting a
+  `::warning::` + step summary naming `pnpm resolve:dependabot <PR#>`. Deliberately not
+  a failure: `lint:dedupe` in `repo-lints` already reports the same problem as a red
+  *required* check, so a second red X would be noise. Degraded, never silently harmful —
+  the presence check rides in a job-level `env:` because the `secrets` context is not
+  available in a job-level `if:`.
+
+The loop argument survives with a new basis: a PAT push *does* re-trigger
+`pull_request`, but the retriggered run's `github.actor` is the PAT owner rather than
+`dependabot[bot]`, so the job's `if:` skips it — and `pnpm dedupe` is idempotent anyway
+(`changed=false` on a second pass). Side benefit: that retriggered run is an ordinary
+Actions run with full secrets, so `TURBO_TOKEN` is present and the graph runs warm
+instead of the cold Dependabot-context run of #1067.
+
+**Problem 2 — `check`'s change detection failed open on a `git diff` error.** The step
+read `CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep -vE '\.md$' || true)`. If
+`git diff` fails (bad object, truncated fetch), it prints nothing to stdout; `grep` on
+empty input exits 1; the trailing `|| true` swallows it. Result: `CHANGED=""` →
+`should_run=false` → the step **succeeds** → the required gate prints
+"✅ Skipped — no code changes" and exits 0, having validated nothing. The #1133 guard
+cannot catch this variant: it fires on `needs.check.result != 'success'`, and here the
+job stays green. `set -o pipefail` would not have fixed it either — the trailing
+`|| true` still swallows the pipeline status.
+
+**Solution 2.** Split the two commands so the `git` invocation carries its own exit
+status under the step's `bash -e`:
+
+```diff
+-CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep -vE '\.md$' || true)
++ALL_CHANGED=$(git diff --name-only "$BASE" "$HEAD")
++CHANGED=$(printf '%s\n' "$ALL_CHANGED" | grep -vE '\.md$' || true)
+```
+
+A `git` failure now fails the step → `check.result=failure` → the #1133 guard reddens
+`CI Result`. The `|| true` guards on the three `grep` stages stay: they still exist for
+the legitimate no-match exit.
+
+**Why / verification.** No vitest harness exists for bash-in-YAML, so — as with #1133 —
+the fix was validated with a faithful shell model of the step run under the exact
+default shell (`bash -e`, no `pipefail`), old vs new, across five scenarios:
+
+| scenario | old | new |
+| --- | --- | --- |
+| source change | exit 0, `should_run=true` | exit 0, `should_run=true` |
+| docs-only | exit 0, `should_run=false` | exit 0, `should_run=false` |
+| workflow-only | exit 0, `should_run=false` | exit 0, `should_run=false` |
+| composite-action-only (#1128) | exit 0, `should_run=true` | exit 0, `should_run=true` |
+| **`git diff` fails** | **exit 0, `should_run=false`** | **exit 128** |
+
+Every healthy path is byte-identical; only the buggy input flips. `actionlint` 1.7.8 +
+shellcheck 0.11.0 with `SHELLCHECK_OPTS=--severity=warning` (the CI gate's exact mode)
+is clean on both edited workflows.
 
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
@@ -6110,3 +6202,24 @@ Everything else lives in `tsdown.config.mts`, not in the script. Pass 1 discards
 **Turbo inputs widened in the same change.** `bundle`'s inputs never covered `scripts/**`, so `check-dts-augment-targets.mjs` — which the build runs and which can fail it — could change without invalidating that build. Confirmed by probe (append a line, re-hash: unchanged), then fixed to `tsdown.*` + `scripts/**/*.mjs` and re-probed (now invalidates). `packages/ssr-utils/turbo.json` overrides these inputs and was updated in lockstep — exactly the drift its own note warns about.
 
 **One thing that could NOT be established.** An end-to-end probe of the augmentation itself — an external project resolving `dist` through `node16`, declaring `declare module "@real-router/core/types"` — compiles green both against a healthy `dist` and against a deliberately barrel-ised `types` entry, so it discriminates nothing and proves nothing. The reason is `State["context"]: StateContext & Record<string, unknown>`: with the augmentation missing, the key still type-checks through the index signature. The structural guard (`check-dts-augment-targets.mjs`) _does_ fail on that mutation and remains the real gate; do not replace it with a compile-a-consumer test without first showing the test goes red.
+
+## Per-task CI timings: `--summarize` everywhere, summaries kept 14 days
+
+### Problem
+
+The required gate's critical path is `base-test` — **231 s of 297 s** wall-clock (measured on run 30693854030, 2026-08-01 CI/CD audit §3.2) — and nothing in CI could say how that time splits between `core#test`, `core#test:properties` and their `lint` / `type-check` dependencies. Only the shards passed `--summarize` (and kept the result for one day), so every "which task dominates?" question — and therefore every proposal to split or shard a job — was guesswork. The same blindness covered `pipeline-leaf` and `base-bundle`.
+
+### Solution
+
+`--summarize` on every `test` / `bundle` invocation in `ci.yml` (`pipeline-leaf` ×2, `base-bundle`, `base-test`), an `if: always()` upload of `.turbo/runs/` in each of those three jobs, and the shards' existing summary artifact bumped from 1 day to 14.
+
+- **The whole directory is uploaded, never "the newest file".** A job that runs turbo more than once writes one summary per invocation (`pipeline-leaf` writes two), so picking a single file would silently drop the rest — the exact bug the first draft of the telemetry uploader had.
+- **14 days only for the summaries.** The `coverage-reports-*` / `dist-*` artifacts stay at 1 day: they are consumed by downstream jobs of the *same* run and are large. The summaries are a few KB and their whole point is cross-run comparison, which one day makes impossible.
+- **`turbo-summary-pipeline-leaf`, not `turbo-summary-leaf`.** `leaf` is also one of `build-matrix.mjs`'s `GROUP_NAMES`, so a sharded run can emit `turbo-summary-leaf` for the catch-all shard. The two modes never coexist in one run, so artifact names cannot actually collide — but comparing artifacts *across* runs would.
+- **`lint:package` / `lint:types` invocations deliberately left without `--summarize`.** publint/attw run as their own CI step, so their cost is already visible in the step timing; adding a third summary per job buys nothing.
+
+### Why
+
+turbo already computes exactly this data; the only thing missing was persistence. The cost is zero — `--summarize` writes a JSON file and does not change task hashes or execution — and it is the prerequisite for any further work on the critical path: the audit's own follow-ups (split `test:properties` into its own job, shard `core#test`) are decisions that need the split first, and both carry real trade-offs (`dependsOn` ordering, per-run 100 % coverage thresholds) that are not worth paying on a guess.
+
+This is also Phase 0 of the CI-telemetry lab (`.claude/ci-telemetry-lab/`, gitignored): forensics without any infrastructure. Phase 1 — trends via turbo's native OTLP export into a self-hosted Prometheus — is additive and changes none of the above.
