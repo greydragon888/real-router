@@ -223,7 +223,6 @@ stateDiagram-v2
     IDLE --> DISPOSED : DISPOSE
 
     STARTING --> READY : STARTED
-    STARTING --> STARTING : SYSTEM_COMMIT
     STARTING --> IDLE : FAIL
     STARTING --> IDLE : STOP
     STARTING --> DISPOSED : DISPOSE
@@ -248,7 +247,7 @@ stateDiagram-v2
     DISPOSED --> [*]
 ```
 
-**21 edges over 6 states and 10 events**, and the diagram is the whole table — read it as the complete inventory, because two of its shapes are easy to mis-summarise. `SYSTEM_COMMIT` needs a self-loop on BOTH `READY` and `STARTING` (`start()` with `allowNotFound` commits its 404 while the machine is still starting), and there is deliberately no `READY --FAIL--> READY`: that edge was removed with the two senders it had (#1641), so a stale `FAIL` arriving in `READY` is a table no-op structurally rather than by a predicate.
+**20 edges over 6 states and 10 events**, and the diagram is the whole table — read it as the complete inventory, because two of its ABSENCES are deliberate and measured. There is no `READY --FAIL--> READY`: that edge went with the two senders it had (#1641), so a stale `FAIL` in `READY` is a table no-op structurally rather than by a predicate. And `SYSTEM_COMMIT` has ONE self-loop, on `READY` — an edge on `STARTING` shipped alongside it and was removed once measured, because the two arcs said to need it both commit from `READY` (`completeStart()` leaves `STARTING` before `navigateToNotFound` runs, an order standing since #123).
 
 `DISPOSE` is wired from every non-DISPOSED state so `router.dispose()` always settles the FSM at `DISPOSED`. For healthy flows the facade still orchestrates cleanup through `IDLE` (`STOP` → `IDLE` → `DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` first (e.g. `dispose()` mid-`STARTING` after a start-pipeline throw). `STARTING --STOP--> IDLE` is the other non-obvious one (#1185): a `stop()` while `start()` is parked in an async interceptor cancels the start.
 
@@ -277,7 +276,7 @@ FSM events trigger observable emissions through two paths:
 - `NAVIGATE` (`sendNavigate`) → `send(NAVIGATE, {toState, fromState})` → action `emitTransitionStart()`
 - `LEAVE_APPROVE` (`sendLeaveApprove`) → `send(LEAVE_APPROVE, {…})` → action `emitTransitionLeaveApprove()`
 - `COMPLETE` (`sendComplete`) → `send(COMPLETE, {…})` → action `emitTransitionSuccess()`
-- `SYSTEM_COMMIT` (`systemCommit`) → `send(SYSTEM_COMMIT, {…})` → action `emitTransitionSuccess()` — the two commits that are NOT transitions (`navigateToNotFound`, the `replace()` revalidation). It needs TWO edges, `READY` and `STARTING`, because `start()` with `allowNotFound` commits while the machine is still starting
+- `SYSTEM_COMMIT` (`systemCommit`) → `send(SYSTEM_COMMIT, {…})` → action `emitTransitionSuccess()` — the two commits that are NOT transitions (`navigateToNotFound`, the `replace()` revalidation). One edge, on `READY`: both commits happen after start has completed, and `systemCommit()` asks `canSend` before sending, so an attempt from anywhere else throws instead of silently not committing (#1186)
 
 Cost: three transition-payload allocations per navigation (`NAVIGATE`, `LEAVE_APPROVE`, `COMPLETE` each carry one) — a deliberate trade of micro-optimization for structural determinism. Correctness is enforced by the state machine, not by scattered re-checks. **Since the state-ownership slice the table also OWNS the committed state**: `current` / `previous` are fields of the FSM context written by four edge `update`s and by nothing else, so "committed" and "announced" cannot come apart (`packages/core/INVARIANTS.md`, "Committed-state ownership").
 

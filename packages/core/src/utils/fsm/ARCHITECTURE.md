@@ -80,14 +80,15 @@ interface FSMConfig<TStates, TEvents, TContext> {
 
 // Distributive union over the event (#886): narrowing `info.event` narrows
 // `info.payload` to that event's payload — symmetric with `on`'s action.
-type TransitionInfo<TStates, TEvents, TPayloadMap> = TEvents extends infer E extends TEvents
-  ? {
-      from: TStates;
-      to: TStates;
-      event: E;
-      payload: E extends keyof TPayloadMap ? TPayloadMap[E] : undefined;
-    }
-  : never;
+type TransitionInfo<TStates, TEvents, TPayloadMap> =
+  TEvents extends infer E extends TEvents
+    ? {
+        from: TStates;
+        to: TStates;
+        event: E;
+        payload: E extends keyof TPayloadMap ? TPayloadMap[E] : undefined;
+      }
+    : never;
 ```
 
 ## Core Data Structures
@@ -244,9 +245,9 @@ onTransition(listener) {
 // fired order = ["A", "D", "B"]   (C skipped; D called this same send)
 ```
 
-This **intentionally differs** from the sibling `@real-router/event-emitter`, which snapshots the listener set (`[...set]`) before iterating, so mutations there only affect the *next* emit. Do not assume the two repo primitives share mutation-during-dispatch semantics. (See [#755](https://github.com/greydragon888/real-router/issues/755).)
+This **intentionally differs** from the sibling `@real-router/event-emitter`, which snapshots the listener set (`[...set]`) before iterating, so mutations there only affect the _next_ emit. Do not assume the two repo primitives share mutation-during-dispatch semantics. (See [#755](https://github.com/greydragon888/real-router/issues/755).)
 
-**Actions, by contrast, are single-captured.** The matching `on()` action is read into a local **before** it fires (`const action = …; action(payload)`), so a reentrant `on()` that overwrites the `(from, event)` action **during its own dispatch** does *not* re-fire it in the current `send()` (it applies to the next `send`). Live iteration is a **listener-only** property — actions and listeners intentionally differ on mutation-during-dispatch.
+**Actions, by contrast, are single-captured.** The matching `on()` action is read into a local **before** it fires (`const action = …; action(payload)`), so a reentrant `on()` that overwrites the `(from, event)` action **during its own dispatch** does _not_ re-fire it in the current `send()` (it applies to the next `send`). Live iteration is a **listener-only** property — actions and listeners intentionally differ on mutation-during-dispatch.
 
 ## Hot-Path Optimizations
 
@@ -267,7 +268,9 @@ The constructor (`initial`), `on` (`from`), and every transition **target** in t
 function requireDeclared(transitions, state, where) {
   const t = transitions[state];
   if (t === undefined) {
-    throw new Error(`[FSM.${where}] state "${state}" is not declared in config.transitions`);
+    throw new Error(
+      `[FSM.${where}] state "${state}" is not declared in config.transitions`,
+    );
   }
   return t;
 }
@@ -296,13 +299,18 @@ fsm.send("START"); // triggers IDLE → STARTING → READY
 
 `info` is captured **once** per `send()` (before the listener loop) and the reentrant call mutates the shared `#state` without save/restore. Consequently:
 
-- An **outer** listener's `info.to` reflects *its own* transition's target, but `getState()` may already reflect a deeper (nested) state — `info.to !== getState()` is possible.
-- Observations run in **reverse-causal order**: the nested transition is fully observed *before* the outer transition's listener loop resumes.
+- An **outer** listener's `info.to` reflects _its own_ transition's target, but `getState()` may already reflect a deeper (nested) state — `info.to !== getState()` is possible.
+- Observations run in **reverse-causal order**: the nested transition is fully observed _before_ the outer transition's listener loop resumes.
 
 ```typescript
 // transitions: { a:{go:"b"}, b:{go:"c"}, c:{} }
-fsm.onTransition((info) => { if (first) { first = false; fsm.send("go"); }
-  obs.push({ to: info.to, live: fsm.getState() }); });
+fsm.onTransition((info) => {
+  if (first) {
+    first = false;
+    fsm.send("go");
+  }
+  obs.push({ to: info.to, live: fsm.getState() });
+});
 fsm.send("go");
 // obs = [ {to:"c", live:"c"},   ← reentrant (b→c) listener runs first
 //         {to:"b", live:"c"} ]  ← outer (a→b) listener: info.to="b" but getState()="c"
@@ -367,7 +375,6 @@ stateDiagram-v2
     IDLE --> DISPOSED : DISPOSE
 
     STARTING --> READY : STARTED
-    STARTING --> STARTING : SYSTEM_COMMIT
     STARTING --> IDLE : FAIL
     STARTING --> IDLE : STOP
     STARTING --> DISPOSED : DISPOSE
@@ -396,8 +403,10 @@ stateDiagram-v2
 `routerFSM.ts` edge-for-edge by `scripts/fsm-diagram-parity.test.mjs` — edit the
 table and this block fails until it is redrawn. It had drifted four ways before
 that guard existed (a `READY --FAIL--> READY` that no longer exists, both
-`SYSTEM_COMMIT` self-loops, `STARTING --STOP--> IDLE`, and every `DISPOSE`
-safety-net edge but one).
+`SYSTEM_COMMIT` self-loop, `STARTING --STOP--> IDLE`, and every `DISPOSE`
+safety-net edge but one). A second `SYSTEM_COMMIT` edge on `STARTING` existed
+briefly and was removed once measured — both arcs said to need it commit from
+`READY` instead.
 
 ### EventBusNamespace Integration
 

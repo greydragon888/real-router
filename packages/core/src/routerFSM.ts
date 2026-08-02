@@ -269,7 +269,7 @@ const endNavigation = (ctx: RouterFSMContext): void => {
  *    are these: `abortPreviousNavigation` walks the machine back to READY
  *    before `sendNavigate`, so the loop never fires, but its DECLARATION is
  *    what makes `canSend(NAVIGATE)` true mid-navigation, i.e. what makes
- *    supersede legal. Removing them fails 9 and 29 tests respectively — with
+ *    supersede legal. Removing them fails 5 and 14 tests respectively — with
  *    supersede dying SILENTLY at the predicate, not at the send. `canSend` is
  *    read exactly three times in core (NAVIGATE / START / CANCEL); an edge for
  *    one of those events is a candidate for this category by construction.
@@ -297,16 +297,23 @@ const routerTransitions: TransitionTable<
     },
   },
   [routerStates.STARTING]: {
+    // ⚑ There is no SYSTEM_COMMIT edge here, and its absence is a MEASURED
+    // answer rather than an omission. One was added on the strength of the
+    // phase-4.1 spikes ("`start()` with `allowNotFound` commits its 404 while
+    // still STARTING; so does a `replace()` inside an async start
+    // interceptor") and both claims are false against this code:
+    // `RouterLifecycleNamespace.start` calls `completeStart()` — which sends
+    // STARTED and leaves STARTING — BEFORE `navigateToNotFound`, an order
+    // standing since #123 (2026-02-20); and the `replace()` revalidation
+    // commits only when a state IS committed, which means start finished.
+    // Both arcs traced through `READY --SYSTEM_COMMIT--> READY`, no test of
+    // 4506 traversed the STARTING edge, and removing it failed none.
+    //
+    // Consequence worth knowing: a system commit attempted from STARTING is
+    // now LOUD. `systemCommit()` asks `canSend` first and throws
+    // `ROUTER_DISPOSED` (#1186), so an arc nobody has named would surface
+    // instead of silently not committing.
     [routerEvents.STARTED]: routerStates.READY,
-    // ⚠ Two SYSTEM_COMMIT edges are needed, not one, and this is the
-    // non-obvious half: `start()` with `allowNotFound` commits its 404 while
-    // the machine is still STARTING, and so does a `replace()` running inside
-    // an async start interceptor (#1204). Confirmed independently on both
-    // ruptures by the phase-4.1 spikes.
-    [routerEvents.SYSTEM_COMMIT]: {
-      target: routerStates.STARTING,
-      update: commitSystemState,
-    },
     [routerEvents.FAIL]: routerStates.IDLE,
     [routerEvents.STOP]: { target: routerStates.IDLE, update: clearCurrent },
     [routerEvents.DISPOSE]: {

@@ -195,10 +195,9 @@ fsm.on("LEAVE_APPROVED", "COMPLETE", (p) =>
   emitter.emit("$$success", p.toState, p.fromState, stripSignal(p.opts)),
 );
 
-// SYSTEM_COMMIT — the two commits that are NOT transitions. Two states, because
-// start() with allowNotFound commits while the machine is still STARTING.
+// SYSTEM_COMMIT — the two commits that are NOT transitions. ONE state: both
+// happen after start completed, so both commit from READY.
 fsm.on("READY", "SYSTEM_COMMIT", handleSystemCommit);
-fsm.on("STARTING", "SYSTEM_COMMIT", handleSystemCommit);
 
 // CANCEL owns the abort: it aborts the in-flight controller (waking the parked
 // async pipeline) and only then emits.
@@ -210,7 +209,7 @@ fsm.on("LEAVE_APPROVED", "CANCEL", handleCancel);
 // which report to observers rather than failing a transition.
 ```
 
-14 registrations, 12 of them reachable. The unreachable three are the two
+13 registrations, 11 of them reachable. The unreachable three are the two
 NAVIGATE self-loops above; their declaration is what makes supersede legal, so
 removing them costs 9 and 29 tests while never firing.
 

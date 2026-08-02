@@ -811,11 +811,6 @@ export class EventBusNamespace {
     };
 
     fsm.on(routerStates.READY, routerEvents.SYSTEM_COMMIT, handleSystemCommit);
-    fsm.on(
-      routerStates.STARTING,
-      routerEvents.SYSTEM_COMMIT,
-      handleSystemCommit,
-    );
 
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, (payload) => {
       this.#emitFailPayload(payload);
