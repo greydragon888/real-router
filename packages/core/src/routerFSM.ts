@@ -67,6 +67,18 @@ export interface RouterPayloads {
     fromState?: State | undefined;
     opts?: NavigationOptions | undefined;
   };
+  /**
+   * RFC-10a §7.2 — FAIL and CANCEL carry their own data now. This is what kills
+   * the `#pending*` side channel (satellite S2): the action reads a parameter
+   * instead of instance fields written "just before send()", so the #949
+   * "valid only in this window" contract has no field left to attach to.
+   */
+  FAIL: {
+    toState?: State | undefined;
+    fromState?: State | undefined;
+    error?: unknown;
+  };
+  CANCEL: { toState: State; fromState?: State | undefined; reason?: unknown };
 }
 
 /**

@@ -125,11 +125,7 @@ export class EventBusNamespace {
   #dispatchDepth = 0;
 
   #currentToState: State | undefined;
-  #pendingToState: State | undefined;
-  #pendingFromState: State | undefined;
-  #pendingError: unknown;
   // Abort reason for the pending CANCEL — read by handleCancel, set by sendCancel.
-  #pendingCancelReason: unknown;
 
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
@@ -333,10 +329,7 @@ export class EventBusNamespace {
   }
 
   sendFail(toState?: State, fromState?: State, error?: unknown): void {
-    this.#pendingToState = toState;
-    this.#pendingFromState = fromState;
-    this.#pendingError = error;
-    this.#fsm.send(routerEvents.FAIL);
+    this.#fsm.send(routerEvents.FAIL, { toState, fromState, error });
 
     // Nav failed — clear (unconditional; synchronous reentrant navigate is
     // banned (RFC §4), so nothing replaces #currentToState during the emit).
@@ -371,10 +364,7 @@ export class EventBusNamespace {
   }
 
   sendCancel(toState: State, fromState?: State, reason?: unknown): void {
-    this.#pendingToState = toState;
-    this.#pendingFromState = fromState;
-    this.#pendingCancelReason = reason;
-    this.#fsm.send(routerEvents.CANCEL);
+    this.#fsm.send(routerEvents.CANCEL, { toState, fromState, reason });
 
     // Nav cancelled — clear (unconditional; synchronous reentrant navigate is
     // banned (RFC §4), so nothing replaces #currentToState during the emit).
@@ -708,23 +698,18 @@ export class EventBusNamespace {
     }
   }
 
-  #emitPendingError(): void {
+  /**
+   * The FAIL action. Its data rides the payload now, so there is no instance
+   * field to keep valid "only in this window" (#949) and nothing to clear
+   * afterwards — the whole hygiene block that used to live here is gone with
+   * the fields it protected.
+   */
+  #emitFailPayload(payload: RouterPayloads["FAIL"]): void {
     this.emitTransitionError(
-      this.#pendingToState,
-      this.#pendingFromState,
-      this.#pendingError as RouterError | undefined,
+      payload.toState,
+      payload.fromState,
+      payload.error as RouterError | undefined,
     );
-
-    // Clear the pending payload once this FAIL action has consumed it. `#pending*`
-    // is only meaningful in the window between the sendFail()/sendFailSafe() that
-    // sets it and this emit; keeping it afterwards pins a stale State/RouterError
-    // on the instance and leaves an implicit "valid only in this window" coupling
-    // (#949). Hygiene only — every consumer overwrites the fields before
-    // re-reading (handleCancel reads what its own sendCancel just set), so there
-    // is no observable behaviour change.
-    this.#pendingToState = undefined;
-    this.#pendingFromState = undefined;
-    this.#pendingError = undefined;
   }
 
   #setupFSMActions(): void {
@@ -772,11 +757,8 @@ export class EventBusNamespace {
       );
     });
 
-    const handleCancel = () => {
-      const toState = this.#pendingToState;
-      const reason = this.#pendingCancelReason;
-
-      this.#pendingCancelReason = undefined;
+    const handleCancel = (payload: RouterPayloads["CANCEL"]) => {
+      const { toState, fromState, reason } = payload;
 
       // (RFC navigation-cancellation-unification §5): the FSM CANCEL
       // action OWNS the abort. Aborting the in-flight controller wakes the parked
@@ -786,31 +768,26 @@ export class EventBusNamespace {
       // No cycle: onInternalAbort is wake-only, it does not re-enter cancel.
       this.#abortController(reason);
 
-      /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
-      if (toState === undefined) {
-        return;
-      }
-
-      this.emitTransitionCancel(toState, this.#pendingFromState);
+      this.emitTransitionCancel(toState, fromState);
     };
 
     fsm.on(routerStates.TRANSITION_STARTED, routerEvents.CANCEL, handleCancel);
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.CANCEL, handleCancel);
 
-    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, () => {
-      this.#emitPendingError();
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, (payload) => {
+      this.#emitFailPayload(payload);
     });
 
-    fsm.on(routerStates.STARTING, routerEvents.FAIL, () => {
-      this.#emitPendingError();
+    fsm.on(routerStates.STARTING, routerEvents.FAIL, (payload) => {
+      this.#emitFailPayload(payload);
     });
 
-    fsm.on(routerStates.READY, routerEvents.FAIL, () => {
-      this.#emitPendingError();
+    fsm.on(routerStates.READY, routerEvents.FAIL, (payload) => {
+      this.#emitFailPayload(payload);
     });
 
-    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.FAIL, () => {
-      this.#emitPendingError();
+    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.FAIL, (payload) => {
+      this.#emitFailPayload(payload);
     });
   }
 }
