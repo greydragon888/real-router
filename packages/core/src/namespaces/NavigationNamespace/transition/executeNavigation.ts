@@ -270,7 +270,6 @@ export function executeNavigation(
     }
 
     const {
-      suspendable,
       canDeactivateFunctions,
       canActivateFunctions,
       toDeactivate,
@@ -351,20 +350,15 @@ export function executeNavigation(
       inFlight.release(controller, false);
     }
 
-    // #1169 commit-gate — refuse to commit a navigation cancelled or
-    // terminated during a listener window, BEFORE `completeTransition`'s
-    // setState. The FSM table (D-full) already prevents the forceState
-    // resurrection; this prevents the state commit that precedes the emit.
-    // Gated on `suspendable` so the pure sync hot path pays nothing. A
-    // `stop()`/`dispose()` from the listener lands the FSM in IDLE/DISPOSED
-    // (caught by `!isActive()`); an external `opts.signal` abort is caught
-    // directly. No supersession check: a reentrant navigate() (the only thing
-    // that could bump the token synchronously) is banned
-    // (REENTRANT_NAVIGATION, §4), so on this sync path the token still holds — async
-    // supersede is caught in `#finishAsyncNavigation`'s `isCurrentNav`.
-    if (suspendable && (!deps.isActive() || opts.signal?.aborted === true)) {
-      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-    }
+    // ⚑ The #1169 external commit-gate stood HERE and is gone, absorbed by
+    // `when: mayCommit` on the COMPLETE edge. Both of its clauses are that
+    // condition now: a `stop()`/`dispose()` from a listener leaves the machine
+    // in IDLE/DISPOSED, where COMPLETE is not declared, and an aborted external
+    // `opts.signal` is read straight off the commit payload.
+    //
+    // Proven by two-sided mutation, not by reading: removing it alone leaves
+    // 3897/3897 green, removing it together with the ask reds eight tests
+    // across `commit-gate-1169` and `commit-after-teardown-1611`.
 
     const finalState = completeTransition(deps, plan);
 

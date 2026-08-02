@@ -104,6 +104,14 @@ function settleLeavePromises(
   });
 }
 
+/** Drop the caller's `AbortSignal` before the state is announced. */
+function stripSignal({
+  signal: _,
+  ...rest
+}: NavigationOptions): NavigationOptions {
+  return rest;
+}
+
 export class EventBusNamespace {
   readonly #fsm: FSM<
     RouterState,
@@ -782,10 +790,16 @@ export class EventBusNamespace {
     );
 
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.COMPLETE, (payload) => {
+      // Subscribers never see the caller's `AbortSignal`: it is an input to the
+      // navigation, not part of what was committed. The TABLE does see it —
+      // `mayCommit` refuses a commit whose signal was aborted — which is why
+      // the stripping lives here, on the announcement, and not upstream.
       this.emitTransitionSuccess(
         payload.toState,
         payload.fromState,
-        payload.opts,
+        payload.opts?.signal === undefined
+          ? payload.opts
+          : stripSignal(payload.opts),
       );
     });
 

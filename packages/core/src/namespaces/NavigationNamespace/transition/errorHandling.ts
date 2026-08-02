@@ -49,13 +49,16 @@ function isTransitionCancelled(error: unknown): boolean {
  *   silent commit (state committed, no `TRANSITION_SUCCESS`, no subscriber
  *   notified) stops being expressible. That covers BOTH arcs — the table does
  *   not care which one sent it;
- * - the **noise** half does not, yet: the `READY` edge is unconditional in that
- *   same sketch, so a stale `FAIL` arriving after somebody else's
- *   `TRANSITION_SUCCESS` is still stopped by an operational check and not by the
- *   table. Whether to put `mayFail` there (or drop the edge outright) is the
- *   OPEN question RFC-10a §16.5.
+ * - the **noise** half does not, yet: the `READY` edge is still unconditional,
+ *   so a stale `FAIL` arriving after somebody else's `TRANSITION_SUCCESS` is
+ *   stopped by an operational check and not by the table.
  *
- * So: delete this when §7.3 lands **and** §16.5 is answered — not on §7.3 alone.
+ * ⚑ §16.5 is ANSWERED (owner, 2026-08-02): the `READY→FAIL` edge is REMOVED
+ * rather than conditioned — stronger, because a stale FAIL there becomes a
+ * table no-op structurally rather than by a predicate. The load-bearing half
+ * already went with `when: mayFail` on the in-flight edges. So the only thing
+ * this comment is still waiting for is the removal itself, which is coupled to
+ * splitting `sendFailSafe` (the edge has two live senders until then).
  * Plan `.claude/fsm-as-state-owner-2026-07-31.md` §10, phase 0 item 0.2.
  */
 export function asCancellation(error: unknown): unknown {

@@ -49,13 +49,6 @@ function buildTransitionMeta(
   return Object.freeze(meta);
 }
 
-function stripSignal({
-  signal: _,
-  ...rest
-}: NavigationOptions): NavigationOptions {
-  return rest;
-}
-
 export function completeTransition(
   deps: NavigationDependencies,
   nav: NavigationContext,
@@ -105,13 +98,17 @@ export function completeTransition(
 
   const finalState = Object.freeze(toState);
 
-  const transitionOpts = opts.signal === undefined ? opts : stripSignal(opts);
-
+  // ⚠ The payload carries `opts` UNSTRIPPED, signal and all. `mayCommit` reads
+  // the external signal from it, so stripping here would make that clause
+  // inert — measured: with the signal removed before the send, the condition
+  // never sees an abort and the QD arc (an `opts.signal` aborted from a sync
+  // `subscribeLeave`) walks straight through. Sanitising for SUBSCRIBERS is the
+  // announcement's job and happens in the action.
   const commit = {
     epoch: nav.myEpoch,
     toState: finalState,
     fromState,
-    opts: transitionOpts,
+    opts,
   };
 
   // ask, then fire — both read the SAME table row, one after the other, with no
