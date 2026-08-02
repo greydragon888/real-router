@@ -54,10 +54,12 @@ class FSM<
   TContext,
   TPayloadMap extends Partial<Record<TEvents, unknown>> = Record<never, never>,
 > {
-  constructor(config: FSMConfig<TStates, TEvents, TContext>);
+  constructor(config: FSMConfig<TStates, TEvents, TContext, TPayloadMap>);
 
+  // The correlated rest tuple lives in the OVERLOAD; the implementation takes
+  // the payload positionally, so no array is materialised per call.
   send<E extends TEvents>(event: E, ...args: PayloadArgs<E>): TStates;
-  canSend(event: TEvents): boolean;
+  canSend<E extends TEvents>(event: E, ...args: OptionalPayloadArgs<E>): boolean;
   getState(): TStates;
   getContext(): TContext;
   on<E extends TEvents>(
@@ -72,11 +74,22 @@ class FSM<
 ### Types
 
 ```typescript
-interface FSMConfig<TStates, TEvents, TContext> {
+interface FSMConfig<TStates, TEvents, TContext, TPayloadMap> {
   initial: TStates;
   context: TContext;
-  transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
+  transitions: TransitionTable<TStates, TEvents, TContext, TPayloadMap>;
 }
+
+// ONE table entry, in either accepted form: a bare target, or the guarded /
+// context-writing object. `when` decides whether the edge fires at all (before
+// the swap); `update` is the machine's own bookkeeping (after it).
+type TransitionDeclaration<TStates, …> =
+  | TStates
+  | {
+      readonly target: TStates;
+      readonly when?: ((ctx, payload) => boolean) | undefined;
+      readonly update?: ((ctx, payload) => void) | undefined;
+    };
 
 // Distributive union over the event (#886): narrowing `info.event` narrows
 // `info.payload` to that event's payload — symmetric with `on`'s action.

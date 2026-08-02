@@ -8,9 +8,29 @@
 | --- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Validity            | After any sequence of `send()` calls, `getState()` always returns a value that belongs to the set of states defined in the config. The FSM can never enter a state that wasn't declared. |
 | 2   | Determinism         | Two independent FSM instances created from the same config always reach the same state after the same event sequence. Any non-determinism would indicate hidden mutable state.           |
-| 3   | Rejection           | Sending an event that has no transition defined for the current state leaves the state unchanged. Unknown events are silently ignored.                                                   |
-| 4   | canSend correlation | `canSend(event)` returns `true` if and only if `send(event)` fires transition listeners. When `canSend` returns `false`, neither the state nor any listener is affected.                 |
+| 3   | Rejection           | Sending an event that has no transition defined for the current state leaves the state unchanged. Unknown events are silently ignored. **A declared edge whose `when` refuses is indistinguishable from this** — no swap, no `update`, no action, no listeners, and `send` returns the unchanged state. |
+| 4   | canSend correlation | For a **payload-independent** edge, `canSend(event)` is `true` if and only if `send(event)` fires transition listeners; when it is `false`, neither the state nor any listener is affected. For a **payload-dependent** `when` the two must be asked with the SAME payload to correlate: `canSend(e)` without one answers whatever the condition answers for `undefined`, which is a conservative refusal for some predicates and a permissive accept for others (`send` is still the authority). Callers that need the guarantee pass the payload they intend to send — core does, at its one commit-gate ask. |
 | 5   | Initial state       | Immediately after construction, `getState()` equals `config.initial`. The initial state is fully predictable and independent of field initialization order.                              |
+
+## Guarded transitions (`when`) and context updates (`update`)
+
+Added with the object edge form (RFC-10a §6, state-ownership slice #1641).
+⚠ **These are held by the FUNCTIONAL tier, not the property one** — `arbFSMConfig`
+still generates string-only tables, so no generated table carries a `when` or an
+`update`. Extending the arbitraries is open work; until then read the "covered
+by" column as the whole coverage, not as a summary of it.
+
+| #   | Invariant              | Description                                                                                                                                                                                                              | Covered by                                                        |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| 1   | Refusal equivalence    | A `when` returning `false` is indistinguishable by every observable from an undeclared event: no swap, no `update`, no action, no listener, `send` returns the current state.                                            | `fsm.test.ts` §13.1-1                                             |
+| 2   | Totality over absence  | `when` is called with the payload as `undefined` when asked through `canSend(event)`, so a condition must answer without one rather than dereference it.                                                                 | `fsm.test.ts` §13.1-2                                             |
+| 3   | Dispatch order         | `when` (before the swap) → swap → `update` → action → listeners. An `update` cannot run for a transition that did not fire, and no action or listener can observe a fired transition whose `update` has not run.         | `fsm.test.ts` §13.1-3                                             |
+| 4   | Update exactly once    | A fired transition runs its `update` exactly once; a refused one never runs it.                                                                                                                                          | `fsm.test.ts` §13.1-3                                             |
+| 5   | Condition purity       | A throwing `when` is a contract break, and the only case where the state is NOT yet changed — conditions run before the swap, so the machine is left exactly as it was.                                                  | `fsm.test.ts` §13.1-4                                             |
+| 6   | Closure validation     | A non-function `when` / `update` throws at construction with the `[FSM.constructor] transitions["state"]["event"]` coordinate, alongside the existing dangling-target check.                                             | `fsm.test.ts` §13.1-5                                             |
+| 7   | Context ownership      | The engine itself never writes the context; only an edge's `update` does. `getContext()` returns the same reference the config passed in.                                                                                | `fsm.test.ts` §13.1-6, Edge Cases #5                              |
+| 8   | Normalisation neutrality | The string form and its `{ target }` twin are indistinguishable at every observable — the pre-normalisation that makes the hot-path load monomorphic changes nothing but the shape `send` reads.                       | `fsm.test.ts` §13.1-7                                             |
+| 9   | Cache scope            | The normalised table is cached per table OBJECT (a `WeakMap`), so instances sharing one table share one normalisation; the CONTEXT is per instance and never travels through the cache.                                  | `fsm.test.ts` §13.1-7 (identity half; the allocation half is open) |
 
 ## Listener Lifecycle
 
@@ -60,7 +80,7 @@
 | 7   | Reentrant info staleness | When a listener **or action** performs a reentrant `send()`, an **outer** listener still receives `info.to` equal to *its own* transition's target, while `getState()` may already reflect a later (nested) state, and observations run in reverse-causal order (the nested transition is observed before the outer one completes). Listeners must **not** assume `info.to === getState()` under reentrancy. (Edge #4 covers `send()`'s **return value**; this covers the **`TransitionInfo`** seen by listeners.) |
 | 8   | Action-throw abort | If an action throws, it propagates through `send()` and **no** `onTransition` listener runs (actions fire before listeners; there is no error isolation). `getState()` already reflects the transition. |
 | 9   | Listener-throw abort | If an `onTransition` listener throws, listeners after it in slot order do **not** run (no per-listener `try/catch`). `getState()` already reflects the transition. |
-| 10  | No bricking | After any sequence of `send`, the FSM stays consistent: `getState()` is always a declared state and `canSend()` never throws. |
+| 10  | No bricking | After any sequence of `send`, the FSM stays consistent: `getState()` is always a declared state, and `canSend()` never throws **of its own accord** — the one way it can is a `when` that throws, which is a documented contract break on the table's author (conditions must be pure and total), not an engine fault. A throwing `when` is also the one case where the state is NOT yet changed: conditions run before the swap. |
 
 > Every invariant above is covered by a dedicated property test (see the file table below). The earlier `†` carve-out for reentrancy / live-iteration ([#755](https://github.com/greydragon888/real-router/issues/755)) is now closed.
 
