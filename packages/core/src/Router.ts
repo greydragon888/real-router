@@ -198,6 +198,11 @@ export class Router<
 
     const routerFSM = createRouterFSM();
 
+    // The state service reads the machine's context from here on — the cells
+    // themselves live there (plan §11.A2). Assigned before anything can read
+    // state: the namespaces are still being constructed.
+    this.#state.setContext(routerFSM.getContext());
+
     const emitter = new EventEmitter<RouterEventMap>({
       // Shared per-listener error sink: EventEmitter reports synchronous listener
       // throws here, and EventBusNamespace.subscribe routes an async listener's

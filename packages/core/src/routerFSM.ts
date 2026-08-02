@@ -118,10 +118,26 @@ export interface RouterFSMContext {
   epoch: number;
   /** Target of the in-flight navigation — the former `EventBus.#currentToState`. */
   inflightToState: State | undefined;
+  /**
+   * The committed state, and the one it displaced. Formerly
+   * `StateNamespace.#frozenState` / `#previousState`.
+   *
+   * The pair moves TOGETHER and never separately: `set()` shifts one into the
+   * other, so splitting them between the machine and a store would smear that
+   * shift across two owners — the exact defect the move exists to remove
+   * (plan §11.A2).
+   */
+  current: State | undefined;
+  previous: State | undefined;
 }
 
 export function createInitialRouterFSMContext(): RouterFSMContext {
-  return { epoch: 0, inflightToState: undefined };
+  return {
+    epoch: 0,
+    inflightToState: undefined,
+    current: undefined,
+    previous: undefined,
+  };
 }
 
 /**

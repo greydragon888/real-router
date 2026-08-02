@@ -5,24 +5,29 @@ import { areParamValuesEqual, freezeStateShell } from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
+import type { RouterFSMContext } from "../../routerFSM";
 import type { Params, SearchParams, State } from "../../types";
 
 /**
- * Independent namespace for managing router state storage and creation.
+ * State SERVICE — no longer the owner of the state.
  *
- * Static methods handle validation (called by facade).
- * Instance methods handle state storage, freezing, and creation.
+ * The two cells live in the FSM context (plan §11.A2); this class keeps a
+ * PRIVATE reference to it and reads through that rather than calling
+ * `fsm.getContext()` per read. The form was chosen by measurement, not taste:
+ * own field 569 ps, private ref 1.98 ns, `fsm.getContext()` 2.39 ns, port hop
+ * 2.58 ns — and these reads sit on the render path, where `isActiveRoute` for
+ * an inactive link costs ~33 ns in total.
+ *
+ * What stays here is the SERVICE half — `makeState` and `areStatesEqual` — which
+ * never touched the cells: the two halves shared a class name and nothing else
+ * (measured: the members' intersection is empty).
  */
 export class StateNamespace {
   /**
-   * Cached frozen state - avoids structuredClone on every getState() call.
+   * The machine's context — the actual home of `current` / `previous`.
+   * Assigned once, right after the FSM exists; nothing reads state before that.
    */
-  #frozenState: State | undefined = undefined;
-
-  /**
-   * Previous state before the last setState call.
-   */
-  #previousState: State | undefined = undefined;
+  #ctx!: RouterFSMContext;
 
   /**
    * Dependencies injected from Router.
@@ -40,7 +45,7 @@ export class StateNamespace {
    * Returns `undefined` if the router has not been started or has been stopped.
    */
   get<P extends Params = Params>(): State<P> | undefined {
-    return this.#frozenState as State<P> | undefined; // NOSONAR -- generic narrowing needed for public API
+    return this.#ctx.current as State<P> | undefined; // NOSONAR -- generic narrowing needed for public API
   }
 
   /**
@@ -53,23 +58,31 @@ export class StateNamespace {
    */
   set(state: State | undefined): void {
     // Preserve current state as previous before updating
-    this.#previousState = this.#frozenState;
+    this.#ctx.previous = this.#ctx.current;
 
     // If state is already frozen (from makeState()), use it directly.
     // For external states, freeze in place without cloning.
-    this.#frozenState = state ? freezeStateShell(state) : undefined;
+    this.#ctx.current = state ? freezeStateShell(state) : undefined;
   }
 
   /**
    * Returns the previous router state (before the last navigation).
    */
   getPrevious(): State | undefined {
-    return this.#previousState;
+    return this.#ctx.previous;
   }
 
   reset(): void {
-    this.#frozenState = undefined;
-    this.#previousState = undefined;
+    this.#ctx.current = undefined;
+    this.#ctx.previous = undefined;
+  }
+
+  /**
+   * Hand the service its context. Separate from construction because the
+   * namespace is built before the FSM exists — same shape as `setDependencies`.
+   */
+  setContext(ctx: RouterFSMContext): void {
+    this.#ctx = ctx;
   }
 
   // =========================================================================
