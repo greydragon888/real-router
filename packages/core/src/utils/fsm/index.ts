@@ -1,3 +1,8 @@
 export { FSM } from "./fsm";
 
-export type { FSMConfig, TransitionInfo } from "./types";
+export type {
+  FSMConfig,
+  TransitionDeclaration,
+  TransitionInfo,
+  TransitionTable,
+} from "./types";

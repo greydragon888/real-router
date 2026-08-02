@@ -86,7 +86,12 @@ export interface RouterPayloads {
  * stuck if cleanup is skipped (e.g. dispose mid-STARTING when the start
  * pipeline threw before STARTED/FAIL).
  */
-const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
+const routerFSMConfig: FSMConfig<
+  RouterState,
+  RouterEvent,
+  null,
+  RouterPayloads
+> = {
   initial: routerStates.IDLE,
   context: null,
   transitions: {

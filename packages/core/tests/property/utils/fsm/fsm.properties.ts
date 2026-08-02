@@ -14,6 +14,8 @@ import {
 } from "./helpers";
 import { FSM } from "../../../../src/utils/fsm/index.js";
 
+import type { TransitionTable } from "../../../../src/utils/fsm/index.js";
+
 describe("FSM State Transition Properties", () => {
   test.prop(
     [
@@ -505,10 +507,18 @@ describe("FSM Edge Case Properties", () => {
   )(
     "getContext() returns the exact config.context reference",
     (gen, context) => {
-      const fsm = new FSM({
+      // `TransitionTable` is INVARIANT in TContext — conditions and updates take
+      // the context in a parameter position — so a table generated for `null`
+      // needs a cast to be reused under another context type (RFC-10a §9).
+      const fsm = new FSM<string, string, typeof context>({
         initial: gen.config.initial,
         context,
-        transitions: gen.config.transitions,
+        transitions: gen.config.transitions as unknown as TransitionTable<
+          string,
+          string,
+          typeof context,
+          Record<never, never>
+        >,
       });
 
       expect(fsm.getContext()).toBe(context);

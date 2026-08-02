@@ -77,10 +77,7 @@ export const arbFSMConfigWithSelfLoop: fc.Arbitrary<GeneratedFSMConfigWithSelfLo
         string
       >;
 
-      const updatedTransitions: Record<
-        string,
-        Partial<Record<string, string>>
-      > = {
+      const updatedTransitions: typeof gen.config.transitions = {
         ...gen.config.transitions,
         [initial]: {
           ...currentTrans,
