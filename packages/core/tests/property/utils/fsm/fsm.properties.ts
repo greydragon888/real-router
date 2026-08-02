@@ -4,6 +4,7 @@ import { describe, expect } from "vitest";
 import {
   NUM_RUNS,
   arbFSMConfig,
+  arbGuardedFSMConfig,
   arbFSMConfigWithInitialTransition,
   arbFSMConfigWithSelfLoop,
   arbFSMConfigWithTwoStepChain,
@@ -11,6 +12,7 @@ import {
   arbMixedEventSequence,
   createFSM,
   createFSMWithPayloads,
+  newCounterContext,
 } from "./helpers";
 import { FSM } from "../../../../src/utils/fsm/index.js";
 
@@ -874,6 +876,162 @@ describe("FSM Declared-State Guard Properties", () => {
       expect(
         () => new FSM({ ...gen.config, transitions: brokenTransitions }),
       ).toThrow("is not declared in config.transitions");
+    },
+  );
+});
+
+/**
+ * Guarded edges (`when`) and context updates (`update`) — RFC-10a §13.1, #1646.
+ *
+ * S1 gave the engine these two and the property tier never saw them:
+ * `arbFSMConfig` generates bare-string edges only, so every invariant below was
+ * held by hand-written functional cases and by nothing generative. The gap is
+ * not cosmetic — the guarded form is what the router's cancellation semantics
+ * are built on (`mayCommit`, `isOwnEpoch`), and the string form cannot exercise
+ * the ordering contract at all.
+ *
+ * `arbGuardedFSMConfig` is a SIBLING of `arbFSMConfig`, not a widening of it: a
+ * refused `when` is observationally identical to an undeclared event, so mixing
+ * the two axes would quietly change what the existing "Rejection" and "canSend
+ * correlation" properties are about.
+ */
+describe("FSM Guarded-Edge Properties", () => {
+  test.prop(
+    [
+      arbGuardedFSMConfig.chain((gen) =>
+        fc.tuple(fc.constant(gen), arbEventSequence(gen.events)),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "pre-normalisation is neutral: with every `when` allowed, the mixed table and its bare-string twin are indistinguishable",
+    ([gen, events]) => {
+      const mixed = new FSM({ ...gen.config, context: newCounterContext() });
+      const twin = new FSM({ ...gen.stringTwin, context: newCounterContext() });
+      const mixedLog: string[] = [];
+      const twinLog: string[] = [];
+
+      mixed.onTransition((info) => mixedLog.push(`${info.from}>${info.to}`));
+      twin.onTransition((info) => twinLog.push(`${info.from}>${info.to}`));
+
+      for (const event of events) {
+        // `allow: true` so no generated condition refuses — the only difference
+        // left between the two tables is the SHAPE the normaliser widens.
+        mixed.send(event, { allow: true });
+        twin.send(event, { allow: true });
+      }
+
+      expect(mixed.getState()).toBe(twin.getState());
+      expect(mixedLog).toStrictEqual(twinLog);
+    },
+  );
+
+  test.prop(
+    [
+      arbGuardedFSMConfig.chain((gen) =>
+        fc.tuple(fc.constant(gen), arbEventSequence(gen.events)),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "a refused `when` blocks the swap AND its update, and notifies nobody",
+    ([gen, events]) => {
+      const fsm = new FSM({ ...gen.config, context: newCounterContext() });
+      let notified = 0;
+
+      fsm.onTransition(() => {
+        notified++;
+      });
+
+      for (const event of events) {
+        const before = fsm.getState();
+        const firedBefore = fsm.getContext().fired;
+        const notifiedBefore = notified;
+        const guarded = gen.guardedEdges.has(`${before}|${event}`);
+
+        // Every generated `when` reads `payload.allow`, so this refuses each
+        // guarded edge and leaves every other edge to the table.
+        const after = fsm.send(event, { allow: false });
+
+        if (guarded) {
+          // All four observables at once — that IS the equivalence claim.
+          expect(after).toBe(before);
+          expect(fsm.getState()).toBe(before);
+          expect(fsm.getContext().fired).toBe(firedBefore);
+          expect(notified).toBe(notifiedBefore);
+        }
+      }
+    },
+  );
+
+  test.prop(
+    [
+      arbGuardedFSMConfig.chain((gen) =>
+        fc.tuple(fc.constant(gen), arbEventSequence(gen.events)),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "`update` runs exactly once per fired transition that carries one",
+    ([gen, events]) => {
+      const fsm = new FSM({ ...gen.config, context: newCounterContext() });
+      let expected = 0;
+
+      for (const event of events) {
+        const from = fsm.getState();
+
+        // `allow: true` fires every declared edge, guarded or not, so an edge
+        // carrying an `update` runs it exactly once — no more, no fewer.
+        fsm.send(event, { allow: true });
+
+        if (gen.updatingEdges.has(`${from}|${event}`)) {
+          expected++;
+        }
+      }
+
+      expect(fsm.getContext().fired).toBe(expected);
+    },
+  );
+
+  test.prop(
+    [
+      arbGuardedFSMConfig.chain((gen) =>
+        fc.tuple(fc.constant(gen), arbEventSequence(gen.events)),
+      ),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "canSend correlates with send BOTH ways when both are asked with the same payload",
+    ([gen, events]) => {
+      const fsm = new FSM({ ...gen.config, context: newCounterContext() });
+
+      for (const event of events) {
+        for (const allow of [true, false]) {
+          const before = fsm.getState();
+          const predicted = fsm.canSend(event, { allow });
+
+          // The discriminator is a LISTENER, not `after !== before`: a self-loop
+          // fires without moving the state, so reading the identity off the
+          // state alone would make the `true` direction vacuous — and it is the
+          // `true` direction that dies when `canSend` stops consulting `when`
+          // (mutationally checked: asserting only the `false` branch leaves that
+          // mutant alive, which is the very defect #1646 is about).
+          let fired = false;
+          const unsub = fsm.onTransition(() => {
+            fired = true;
+          });
+          const after = fsm.send(event, { allow });
+
+          unsub();
+
+          expect(fired).toBe(predicted);
+
+          if (!predicted) {
+            expect(after).toBe(before);
+            expect(fsm.getState()).toBe(before);
+          }
+        }
+      }
     },
   );
 });
