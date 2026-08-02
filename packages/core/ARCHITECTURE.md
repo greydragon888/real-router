@@ -175,20 +175,44 @@ FSM actions trigger event emission. Registered in `EventBusNamespace.#setupFSMAc
 ```typescript
 fsm.on("STARTING", "STARTED", () => emitter.emit("$start"));
 fsm.on("READY", "STOP", () => emitter.emit("$stop"));
+
+// NAVIGATE is registered on THREE states, and two of them never fire — the
+// self-loops are a permission bit read through canSend(), not a transition
+// (see the edge taxonomy above routerTransitions in routerFSM.ts).
 fsm.on("READY", "NAVIGATE", (p) =>
   emitter.emit("$$start", p.toState, p.fromState),
 );
+fsm.on("TRANSITION_STARTED", "NAVIGATE" /* same action, unreachable */);
+fsm.on("LEAVE_APPROVED", "NAVIGATE" /* same action, unreachable */);
+
 fsm.on("TRANSITION_STARTED", "LEAVE_APPROVE", (p) =>
   emitter.emit("$$leaveApprove", p.toState, p.fromState),
 );
 fsm.on("LEAVE_APPROVED", "COMPLETE", (p) =>
-  emitter.emit("$$success", p.state, p.fromState, p.opts),
+  // the caller's AbortSignal is stripped here: it is an input to the
+  // navigation, not part of what was committed — but the TABLE sees it,
+  // because `when: mayCommit` refuses a commit whose signal was aborted
+  emitter.emit("$$success", p.toState, p.fromState, stripSignal(p.opts)),
 );
-fsm.on("TRANSITION_STARTED", "CANCEL", (p) =>
-  emitter.emit("$$cancel", p.toState, p.fromState),
-);
-// FAIL actions on STARTING, READY, TRANSITION_STARTED, LEAVE_APPROVED → emitter.emit("$$error", ...)
+
+// SYSTEM_COMMIT — the two commits that are NOT transitions. Two states, because
+// start() with allowNotFound commits while the machine is still STARTING.
+fsm.on("READY", "SYSTEM_COMMIT", handleSystemCommit);
+fsm.on("STARTING", "SYSTEM_COMMIT", handleSystemCommit);
+
+// CANCEL owns the abort: it aborts the in-flight controller (waking the parked
+// async pipeline) and only then emits.
+fsm.on("TRANSITION_STARTED", "CANCEL", handleCancel);
+fsm.on("LEAVE_APPROVED", "CANCEL", handleCancel);
+
+// FAIL on STARTING, TRANSITION_STARTED, LEAVE_APPROVED → emitter.emit("$$error", ...)
+// NOT on READY: that edge was removed with its two senders (#1641), both of
+// which report to observers rather than failing a transition.
 ```
+
+14 registrations, 12 of them reachable. The unreachable three are the two
+NAVIGATE self-loops above; their declaration is what makes supersede legal, so
+removing them costs 9 and 29 tests while never firing.
 
 **`send*` vs `emit*` naming convention** in `EventBusNamespace`:
 
@@ -246,7 +270,21 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
            │
            ▼
 ┌──────────────────────┐
-│  AbortController     │  new AbortController() + link external opts.signal
+│  разрез А (#1588)    │  !hasGuards && !suspendable → completeImmediate():
+│  IMMEDIATE PATH      │    sendLeaveApprove + completeTransition, then RETURN
+│                      │    Nothing below runs. The cancellation machinery is
+│                      │    not skipped here — it is ABSENT: no controller, no
+│                      │    liveness closure, and the return is a bare State
+└──────────┬───────────┘
+           │ (suspendable or guarded)
+           ▼
+┌──────────────────────┐
+│  AbortController     │  ADOPTED, not manufactured — allocated only when this
+│                      │  navigation has guards, or (on the guard-free arc)
+│                      │  only if hasLeaveListeners(). An external opts.signal
+│                      │  makes a navigation suspendable without giving it
+│                      │  anything to hand a signal to, which is why a `take()`
+│                      │  that created the controller was measured and refused
 └──────────┬───────────┘
            │
            ▼
