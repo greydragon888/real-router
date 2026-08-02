@@ -69,6 +69,7 @@ export function routeTransitionError(
   error: unknown,
   toState: State,
   fromState: State | undefined,
+  epoch: number,
 ): void {
   const routerError = error as RouterError;
 
@@ -79,7 +80,7 @@ export function routeTransitionError(
     return;
   }
 
-  deps.sendTransitionFail(toState, fromState, routerError);
+  deps.sendTransitionFail(toState, fromState, routerError, epoch);
 }
 
 export function handleGuardError(

@@ -5,7 +5,12 @@ import { RouterError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
 import type { EventBusOptions } from "./types";
-import type { RouterEvent, RouterPayloads, RouterState } from "../../routerFSM";
+import type {
+  RouterEvent,
+  RouterFSMContext,
+  RouterPayloads,
+  RouterState,
+} from "../../routerFSM";
 import type {
   EventName,
   LeaveFn,
@@ -100,7 +105,12 @@ function settleLeavePromises(
 }
 
 export class EventBusNamespace {
-  readonly #fsm: FSM<RouterState, RouterEvent, null, RouterPayloads>;
+  readonly #fsm: FSM<
+    RouterState,
+    RouterEvent,
+    RouterFSMContext,
+    RouterPayloads
+  >;
   readonly #emitter: EventEmitter<RouterEventMap>;
   // Effect of the FSM CANCEL action: aborts the in-flight navigation's
   // controller. Wired to NavigationNamespace.
@@ -124,14 +134,12 @@ export class EventBusNamespace {
   // no-op at the emitter, #1033 — so no event can re-enter its own dispatch.)
   #dispatchDepth = 0;
 
-  #currentToState: State | undefined;
   // Abort reason for the pending CANCEL — read by handleCancel, set by sendCancel.
 
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
     this.#abortController = options.abortController;
-    this.#currentToState = undefined;
     this.#setupFSMActions();
   }
 
@@ -297,8 +305,15 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.STARTED);
   }
 
+  /**
+   * The epoch of the navigation the machine is currently carrying. Read right
+   * after `startTransition`, so the pipeline can stamp its own FAILs with it.
+   */
+  getNavigationEpoch(): number {
+    return this.#fsm.getContext().epoch;
+  }
+
   sendNavigate(toState: State, fromState?: State): void {
-    this.#currentToState = toState;
     // Table-driven: the FSM action emits TRANSITION_START (#1169 D-full). A
     // NAVIGATE that the table rejects is a no-op — the FSM never leaves an
     // invalid state and no event fires.
@@ -314,12 +329,6 @@ export class EventBusNamespace {
     // COMPLETE from IDLE/DISPOSED (a listener stopped/disposed mid-transition)
     // is a table no-op — no resurrection, no phantom success emit.
     this.#fsm.send(routerEvents.COMPLETE, { toState: state, fromState, opts });
-
-    // Nav committed — clear so a later stop()/dispose() cannot cancel a finished
-    // navigation. Unconditional now that synchronous reentrant navigate is banned
-    // (RFC §4): nothing can replace #currentToState during the emit above, so the
-    // #308 reentrant-preserve guard is no longer needed.
-    this.#currentToState = undefined;
   }
 
   sendLeaveApprove(toState: State, fromState?: State): void {
@@ -328,12 +337,13 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.LEAVE_APPROVE, { toState, fromState });
   }
 
-  sendFail(toState?: State, fromState?: State, error?: unknown): void {
-    this.#fsm.send(routerEvents.FAIL, { toState, fromState, error });
-
-    // Nav failed — clear (unconditional; synchronous reentrant navigate is
-    // banned (RFC §4), so nothing replaces #currentToState during the emit).
-    this.#currentToState = undefined;
+  sendFail(
+    toState?: State,
+    fromState?: State,
+    error?: unknown,
+    epoch?: number,
+  ): void {
+    this.#fsm.send(routerEvents.FAIL, { epoch, toState, fromState, error });
   }
 
   /**
@@ -365,10 +375,6 @@ export class EventBusNamespace {
 
   sendCancel(toState: State, fromState?: State, reason?: unknown): void {
     this.#fsm.send(routerEvents.CANCEL, { toState, fromState, reason });
-
-    // Nav cancelled — clear (unconditional; synchronous reentrant navigate is
-    // banned (RFC §4), so nothing replaces #currentToState during the emit).
-    this.#currentToState = undefined;
   }
 
   canBeginTransition(): boolean {
@@ -668,7 +674,7 @@ export class EventBusNamespace {
   // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
   // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
   sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
-    const toState = this.#currentToState;
+    const toState = this.#fsm.getContext().inflightToState;
 
     if (!this.canCancel() || toState === undefined) {
       return;

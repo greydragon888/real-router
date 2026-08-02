@@ -133,9 +133,17 @@ function beginTransition(
     shouldDeactivate: false,
     shouldActivate: false,
     hasGuards: false,
+    // Written below: the epoch does not exist until the NAVIGATE update ran.
+    myEpoch: 0,
   };
 
   deps.startTransition(toState, fromState);
+
+  // Read AFTER `startTransition`, because that is what runs the NAVIGATE update
+  // that bumps it. Safe to read synchronously: a reentrant navigate is banned
+  // (RFC navigation-cancellation-unification §4), so nothing can bump it again
+  // between the send and this line.
+  plan.myEpoch = deps.getNavigationEpoch();
 
   return plan;
 }
@@ -218,6 +226,9 @@ export function executeNavigation(
   // may only report for a navigation that was announced AND is still the one in
   // flight (#1609).
   let myId = 0;
+  // Hoisted for the same reason as `myId`: the catch below cannot see `plan`,
+  // and the error path needs the epoch to stamp its FAIL with.
+  let myEpoch = 0;
   let controller: AbortController | null = null;
 
   try {
@@ -233,6 +244,7 @@ export function executeNavigation(
     const plan = beginTransition(deps, inFlight, toState, fromState, opts);
 
     myId = plan.myId;
+    myEpoch = plan.myEpoch;
 
     // Post-`startTransition` supersession is now caught at the commit-gate
     // below (before `completeTransition`'s setState): a `stop()`/`dispose()`/
@@ -372,6 +384,7 @@ export function executeNavigation(
       error,
       controller,
       myId,
+      myEpoch,
       toState,
       fromState,
     );
@@ -487,7 +500,13 @@ async function finishAsyncNavigation(
 
     failureReason = outcome;
 
-    routeTransitionError(deps, outcome, nav.toState, nav.fromState);
+    routeTransitionError(
+      deps,
+      outcome,
+      nav.toState,
+      nav.fromState,
+      nav.myEpoch,
+    );
 
     throw outcome;
     // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
@@ -550,6 +569,7 @@ function handleNavigateError(
   error: unknown,
   controller: AbortController | null,
   myId: number,
+  myEpoch: number,
   toState: State | undefined,
   fromState: State | undefined,
 ): unknown {
@@ -563,7 +583,7 @@ function handleNavigateError(
         ? error
         : asCancellation(error);
 
-    routeTransitionError(deps, outcome, toState, fromState);
+    routeTransitionError(deps, outcome, toState, fromState, myEpoch);
 
     return outcome;
   }

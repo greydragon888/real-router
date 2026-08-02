@@ -340,14 +340,15 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     startTransition: (toState, fromState) => {
       ns.eventBus.sendNavigate(toState, fromState);
     },
+    getNavigationEpoch: () => ns.eventBus.getNavigationEpoch(),
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },
     sendTransitionDone: (state, fromState, opts) => {
       ns.eventBus.sendComplete(state, fromState, opts);
     },
-    sendTransitionFail: (toState, fromState, error) => {
-      ns.eventBus.sendFail(toState, fromState, error);
+    sendTransitionFail: (toState, fromState, error, epoch) => {
+      ns.eventBus.sendFail(toState, fromState, error, epoch);
     },
     emitTransitionError: (toState, fromState, error) => {
       ns.eventBus.sendFailSafe(toState, fromState, error);

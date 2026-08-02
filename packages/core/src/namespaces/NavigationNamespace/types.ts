@@ -19,6 +19,13 @@ export interface NavigationContext {
    * move: no `NavigationContext` is ever built independently of a plan.
    */
   myId: number;
+  /**
+   * The machine's epoch for THIS navigation, read right after the NAVIGATE
+   * update ran. Stamped onto the FAILs this navigation sends, so a report from
+   * one that has already been superseded is refused by the table
+   * (`when: mayFail`) instead of moving the machine out from under the live one.
+   */
+  myEpoch: number;
   toState: State;
   fromState: State | undefined;
   opts: NavigationOptions;
@@ -114,6 +121,9 @@ export interface NavigationDependencies {
   /** Start transition and send NAVIGATE event to routerFSM */
   startTransition: (toState: State, fromState: State | undefined) => void;
 
+  /** The machine's current navigation epoch — read right after `startTransition`. */
+  getNavigationEpoch: () => number;
+
   /**
    * Cancel the in-flight navigation via the FSM `CANCEL` event. The `CANCEL`
    * action aborts the current controller (with `reason`, if given — surfaces as
@@ -129,11 +139,15 @@ export interface NavigationDependencies {
     opts: NavigationOptions,
   ) => void;
 
-  /** Send FAIL event to routerFSM */
+  /**
+   * Send FAIL event to routerFSM, stamped with the sending navigation's epoch
+   * so the table can refuse a report from one that has already been superseded.
+   */
   sendTransitionFail: (
     toState: State,
     fromState: State | undefined,
     error: unknown,
+    epoch: number,
   ) => void;
 
   /** Emit TRANSITION_ERROR event to listeners */
