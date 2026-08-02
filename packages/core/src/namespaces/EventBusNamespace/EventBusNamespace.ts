@@ -376,7 +376,7 @@ export class EventBusNamespace {
    */
   systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): void {
     if (!this.#fsm.canSend(routerEvents.SYSTEM_COMMIT)) {
-      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+      throw this.#refuseSystemCommit();
     }
 
     this.#fsm.send(routerEvents.SYSTEM_COMMIT, payload);
@@ -707,6 +707,33 @@ export class EventBusNamespace {
         methodName,
       );
     }
+  }
+
+  /**
+   * Why the table refused, said out loud (#1644).
+   *
+   * The gate this ask replaced (#1186) was `!isActive()`, i.e. IDLE or DISPOSED
+   * — so `ROUTER_DISPOSED` was very nearly true wherever it fired. The table's
+   * `canSend(SYSTEM_COMMIT)` is a different question: the edge is declared on
+   * `READY` alone, so it also refuses while starting and mid-transition, on a
+   * router that `isActive()` reports as live. Keeping the old code there told
+   * callers the router was terminated when it was merely busy.
+   *
+   * Two codes, split by what the caller can DO about it: `ROUTER_DISPOSED` is
+   * terminal, everything else is transient. No code in the registry says
+   * "mid-transition", so the phase rides the message rather than growing the
+   * public `errorCodes` surface for one internal refusal.
+   */
+  #refuseSystemCommit(): RouterError {
+    if (this.isDisposed()) {
+      return new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
+    return new RouterError(errorCodes.ROUTER_NOT_STARTED, {
+      message: this.isTransitioning()
+        ? "[router] cannot commit a state while a transition is in flight — the navigation in progress commits its own"
+        : "[router] cannot commit a state before the router has started",
+    });
   }
 
   /**
