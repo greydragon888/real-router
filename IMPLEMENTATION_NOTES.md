@@ -2104,9 +2104,24 @@ gate. pre-push and post-merge filter them out too, so the only coverage was the
 weekly `examples.yml`: a break surfaced up to seven days late, on the repo's own
 dogfooding surface.
 
-**Solution — affected-scoped, not all-or-nothing.** `deriveAffected` now returns a
-third set (the affected examples), `check` emits `examples_filter` as explicit
-`--filter=<pkg>` tokens, and a new `examples-build` job builds exactly those.
+**Solution — touched-scoped, not all-or-nothing.** `deriveAffected` now returns a
+third set (the example workspaces the query reports), the planner narrows it with
+`filterTouchedExamples` to the ones the diff actually EDITS, `check` emits
+`examples_filter` as explicit `--filter=<pkg>` tokens, and a new `examples-build`
+job builds exactly those.
+
+⚠ **The narrowing is not cosmetic — it was added after the first version regressed
+the gate.** `turbo query affected --packages` is the TARGET set: changed **plus
+dependents**. Every example depends on core, so on PR #1642 (36 files under
+`packages/core`, zero under `examples/`) the unfiltered set selected all 145 example
+workspaces, `examples-build` ran 156 turbo tasks for 5m23s, and — being in the gate's
+`needs` — it displaced `base-test` as the critical path, moving `CI Result` from
+10:51 to 10:53 (+35% on the repo's most-edited package). The planner therefore
+intersects the query set with `git diff --name-only origin/master...HEAD`, verified
+end-to-end on that same branch: 65 changed files, 0 under `examples/`, 145 examples
+from the query, **0** after the intersection. Dropping dependents is deliberate — the
+finding is "an examples-only PR is validated by nothing"; a library change breaking an
+example remains the weekly `examples.yml`'s job, exactly as before.
 `build` pulls `^bundle`, so the libs an example resolves through `dist` arrive as
 Remote-Cache hits. The job is in the gate's `needs` and read as `ok()` — it
 legitimately skips on the majority of PRs, which touch no example, and costs zero

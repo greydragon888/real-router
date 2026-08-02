@@ -32,6 +32,7 @@ import {
   classify,
   CORE_LAYER,
   deriveAffected,
+  filterTouchedExamples,
   deriveMembership,
   K,
 } from "./build-matrix.mjs";
@@ -540,6 +541,67 @@ test("examples: an examples-ONLY change yields zero packages but a non-empty exa
   const { affected, examples } = deriveAffected(queryJson);
   assert.deepEqual(affected, []);
   assert.deepEqual(examples, ["react-combined-example"]);
+});
+
+test("examples: a core-only PR touches NO example — the #1642 regression", () => {
+  // Reproduces the shape that made examples-build the gate's critical path:
+  // `query affected` returns changed PLUS dependents, so 36 changed files under
+  // packages/core dragged every example in and the job ran 156 tasks for 5m23s
+  // on a PR with zero example edits.
+  const examples = ["react-combined-example", "electron-react-example"];
+  const dirOf = new Map([
+    ["react-combined-example", "examples/web/react/combined"],
+    ["electron-react-example", "examples/desktop/electron/react"],
+  ]);
+  const changed = [
+    "packages/core/src/Router.ts",
+    "packages/core/tests/functional/router.test.ts",
+    "IMPLEMENTATION_NOTES.md",
+  ].join("\n");
+  assert.deepEqual(filterTouchedExamples(examples, dirOf, changed), []);
+});
+
+test("examples: only the example the diff EDITS survives the intersection", () => {
+  const examples = ["react-combined-example", "electron-react-example"];
+  const dirOf = new Map([
+    ["react-combined-example", "examples/web/react/combined"],
+    ["electron-react-example", "examples/desktop/electron/react"],
+  ]);
+  const changed = [
+    "packages/core/src/Router.ts",
+    "examples/web/react/combined/src/main.tsx",
+  ].join("\n");
+  assert.deepEqual(filterTouchedExamples(examples, dirOf, changed), [
+    "react-combined-example",
+  ]);
+});
+
+test("examples: a sibling whose path is a PREFIX of another does not steal its change", () => {
+  // `examples/web/react/combined` must not match a file under
+  // `examples/web/react/combined-ssr` — hence the trailing slash in the compare.
+  const examples = ["combined", "combined-ssr"];
+  const dirOf = new Map([
+    ["combined", "examples/web/react/combined"],
+    ["combined-ssr", "examples/web/react/combined-ssr"],
+  ]);
+  const changed = "examples/web/react/combined-ssr/src/main.tsx";
+  assert.deepEqual(filterTouchedExamples(examples, dirOf, changed), [
+    "combined-ssr",
+  ]);
+});
+
+test("examples: an absolute dirOf (filesystem-built) still matches git output", () => {
+  const dirOf = new Map([
+    ["combined", `${process.cwd()}/examples/web/react/combined`],
+  ]);
+  assert.deepEqual(
+    filterTouchedExamples(
+      ["combined"],
+      dirOf,
+      "examples/web/react/combined/src/main.tsx",
+    ),
+    ["combined"],
+  );
 });
 
 test("distPaths: a grouped shard lists EVERY member's dist, one per line", () => {

@@ -684,12 +684,17 @@ jobs:
   # `built=false`, downstream skipped, gate green. pre-push and post-merge filter
   # them out too, so 139 runnable apps were covered only by the weekly
   # examples.yml — a break surfaced up to seven days late. This job closes that
-  # with the SAME routing set the shards use: explicit `--filter=<pkg>` tokens
-  # for the affected examples only, never the whole-repo balloon a git-ref filter
-  # yields on a lockfile bump. `build` pulls `^bundle`, so the libs an example
-  # resolves through dist are built (Remote-Cache hits) first. Skipped — and
-  # `ok()`-tolerated by the gate — whenever no example is affected.
-  # (2026-08-01 CI/CD audit §4.2.)
+  # with explicit `--filter=<pkg>` tokens for the examples the diff actually
+  # EDITS — the planner intersects the routing query with `git diff --name-only`,
+  # because the query set carries DEPENDENTS and every example depends on core.
+  # Measured on PR #1642 before that intersection landed: 36 changed files under
+  # packages/core, zero under examples/, and this job still ran 156 turbo tasks
+  # for 5m23s — displacing base-test as the gate's critical path and pushing
+  # CI Result out by ~2 minutes. `build` pulls `^bundle`, so the libs an example
+  # resolves through dist arrive as Remote-Cache hits. Skipped — and
+  # `ok()`-tolerated by the gate — whenever the diff touches no example, which is
+  # most PRs. A library change that breaks an example stays the weekly
+  # examples.yml's job, as before. (2026-08-01 CI/CD audit §4.2.)
   # ============================================
   examples-build:
     name: Examples (affected)

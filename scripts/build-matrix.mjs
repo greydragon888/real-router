@@ -151,11 +151,11 @@ export function deriveAffected(queryJson) {
   // (they are not shardable and every pipeline filters them out), which is why
   // they used to be validated by nothing on a PR: an examples-only change gives
   // `affected = []` → mode=leaf → a leaf filter that resolves to zero tasks.
-  // Taken from `query affected` rather than a git-ref filter on purpose: the
-  // git-ref form treats ANY root-file change as touching every workspace, so a
-  // lockfile bump would balloon into "build all 139 examples" (measured: 166
-  // packages selected by `{./examples/**}[HEAD~50]`), while the query attributes
-  // a root file to the packages that actually depend on it. (Audit §4.2.)
+  //
+  // ⚠ This is the query's TARGET set, i.e. changed **plus dependents** (A5
+  // above), so on any `packages/core` change every example lands here — all 139
+  // of them depend on core transitively. `filterTouchedExamples` narrows it to
+  // the ones the diff actually edits; see there for why that matters.
   const examples = items
     .filter((p) => (p.path ?? "").startsWith("examples/"))
     .map((p) => p.name);
@@ -408,6 +408,53 @@ export function buildPlan(
   return { mode: "sharded", matrix: { include }, leafFilter: "" };
 }
 
+/**
+ * Narrow the query's example set to the ones this diff actually EDITS.
+ *
+ * Measured on PR #1642 (36 files under `packages/core`, zero under `examples/`):
+ * the unfiltered set selected every example, the `examples-build` job ran 156
+ * turbo tasks for 5m23s, and — being in the gate's `needs` — it displaced
+ * `base-test` as the critical path, pushing `CI Result` from 10:51 to 10:53. A
+ * +35% gate on the repo's most-edited package is the wrong price for validating
+ * examples nobody touched.
+ *
+ * Dependents are dropped rather than kept because the finding this closes
+ * (audit §4.2) is "an examples-only PR is validated by NOTHING" — a library
+ * change breaking an example stays the weekly `examples.yml`'s job, exactly as
+ * before. The intersection also avoids the git-ref alternative
+ * (`--filter='{./examples/**}[ref]'`), which parses but balloons on any
+ * root-file change: `{./examples/**}[HEAD~50]` selected 166 packages because
+ * `[ref]` treats a lockfile edit as touching every workspace.
+ *
+ * @param {string[]} examples example workspace names (from `deriveAffected`)
+ * @param {Map<string,string>} dirOf name→directory
+ * @param {string} changedFiles newline-separated paths, `git diff --name-only`
+ * @returns {string[]} the subset whose own directory contains a changed file
+ */
+export function filterTouchedExamples(examples, dirOf, changedFiles) {
+  const changed = changedFiles.split("\n").filter(Boolean);
+  return examples.filter((name) => {
+    const dir = dirOf.get(name);
+    if (!dir) return false;
+    // Same normalisation as distPathsFor: turbo emits repo-relative paths, a
+    // filesystem-built dirOf absolute ones, and only the former can prefix-match
+    // `git diff` output.
+    const rel = relative(process.cwd(), dir);
+    return changed.some((file) => file.startsWith(`${rel}/`));
+  });
+}
+
+/**
+ * Files this PR changes, against the same base the affected query uses.
+ * Separated so tests never spawn git.
+ */
+export function runChangedFilesQuery() {
+  return execSync("git diff --name-only origin/master...HEAD", {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
 /** Run the native turbo affected query (separated so tests never spawn turbo). */
 export function runAffectedQuery() {
   return execSync(
@@ -454,12 +501,18 @@ export function main() {
   process.stdout.write(`mode=${mode}\n`);
   process.stdout.write(`matrix=${JSON.stringify(matrix)}\n`);
   process.stdout.write(`leaf_filter=${leafFilter}\n`);
-  // Explicit `--filter=<pkg>` tokens for the affected EXAMPLES, empty when none
-  // (the examples-build job keys off that emptiness). Emitted straight from the
-  // routing query, so it is never the whole-repo balloon a git-ref filter would
-  // produce on a lockfile bump. (Audit §4.2.)
+  // Explicit `--filter=<pkg>` tokens for the examples this diff EDITS, empty
+  // when none (the examples-build job keys off that emptiness). Intersected with
+  // the changed files rather than taken from the query verbatim — the query set
+  // carries dependents, so a core change would otherwise queue all 139 examples
+  // onto the gate's critical path. (Audit §4.2.)
+  const touchedExamples = filterTouchedExamples(
+    examples,
+    mergedDirOf,
+    runChangedFilesQuery(),
+  );
   process.stdout.write(
-    `examples_filter=${examples.map((p) => `--filter=${p}`).join(" ")}\n`,
+    `examples_filter=${touchedExamples.map((p) => `--filter=${p}`).join(" ")}\n`,
   );
 }
 
