@@ -100,7 +100,7 @@ Router.ts (facade — validates and delegates)
     ├── PluginsNamespace          — plugin lifecycle (factory → instance → hooks)
     ├── NavigationNamespace       — navigate(), navigateToNotFound(), transition pipeline
     ├── EventBusNamespace         — FSM + EventEmitter encapsulation
-    └── RouterLifecycleNamespace  — start(), stop()
+    └── RouterLifecycleNamespace  — start() (stop() is the STOP edge's update, not a method)
 ```
 
 **Facade pattern flow:**
@@ -209,9 +209,10 @@ fsm.on("LEAVE_APPROVED", "CANCEL", handleCancel);
 // which report to observers rather than failing a transition.
 ```
 
-13 registrations, 11 of them reachable. The unreachable three are the two
-NAVIGATE self-loops above; their declaration is what makes supersede legal, so
-removing them costs 9 and 29 tests while never firing.
+13 registrations, 11 of them reachable. The unreachable two are the NAVIGATE
+self-loops above; their declaration is what makes supersede legal, so removing
+them costs 9 and 29 behaviour tests while never firing (10 and 30 counting the
+edge-reachability closure assertion that notices the edge is gone).
 
 **`send*` vs `emit*` naming convention** in `EventBusNamespace`:
 

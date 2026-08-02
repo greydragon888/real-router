@@ -6755,10 +6755,12 @@ a hand-comparison gets done once, by whoever happens to be auditing, and then
 never again.
 
 It is not a cosmetic gap. `routerFSM.ts` carries a standing warning that **this
-graph may not be cleaned by trace coverage** — 15 of the 21 edges are never
-traversed by the suite, and each of the rest was mutated away individually to
-prove it is load-bearing. A diagram that under-draws the table is an argument
-for deleting live edges, aimed at exactly the reader who came to tidy up.
+graph may not be cleaned by trace coverage** — the suite traverses 15 of the
+table's edges, and each of the FIVE it never reaches was mutated away
+individually to prove it is load-bearing. A diagram that under-draws the table
+is an argument for deleting live edges, aimed at exactly the reader who came to
+tidy up. (The audit compared 21 edges; the table is 20 since `ec1affa7d`
+removed the `STARTING --SYSTEM_COMMIT-->` edge the slice had added.)
 
 ### Solution
 

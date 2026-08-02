@@ -214,7 +214,27 @@ Router.ts is a thin facade — validates inputs and delegates to namespaces. All
 
 ## Router FSM
 
-All router lifecycle and navigation state is managed by a single finite state machine:
+All router lifecycle and navigation state is managed by a single finite state machine — and since the state-ownership slice (#1641) the machine owns **data**, not only a state name:
+
+```typescript
+interface RouterFSMContext {
+  epoch: number; // navigation epoch — bumped ONLY by the NAVIGATE update
+  inflightToState: State | undefined; // target of the navigation in flight
+  current: State | undefined; // the committed state…
+  previous: State | undefined; // …and the one it displaced
+}
+```
+
+Two forms of edge express that. A bare target is the unconditional transition; `{ target, when?, update? }` is the guarded one, where **`when` runs BEFORE the state swap and is the only thing that can refuse a declared transition, `update` runs AFTER it and is the only writer sanctioned to touch the context**. That ordering is what makes "decided" and "did" inseparable: an `update` cannot run for a transition that did not fire, and no action or listener can observe a fired transition whose `update` has not run. A refused `when` is indistinguishable from an undeclared event by every observable.
+
+| Predicate     | On                                      | Refuses                                                                      |
+| ------------- | --------------------------------------- | ---------------------------------------------------------------------------- |
+| `mayCommit`   | `LEAVE_APPROVED --COMPLETE-->`          | a foreign epoch (superseded navigation) or an aborted external `opts.signal` |
+| `mayFail`     | the two in-flight `FAIL` edges          | a report stamped with an epoch that is no longer the live one                |
+| `isOwnEpoch`  | `TRANSITION_STARTED --LEAVE_APPROVE-->` | a leave approval belonging to another navigation                             |
+| `hasInflight` | the two `CANCEL` edges                  | a cancel when there is nothing in flight                                     |
+
+The four writers of the committed pair are likewise edges, not call sites: `commitNavigation` (`COMPLETE`), `commitSystemState` (`SYSTEM_COMMIT`), `clearCurrent` (`STOP`, shifts) and `resetState` (`DISPOSE`, zeroes both).
 
 ```mermaid
 stateDiagram-v2
@@ -269,16 +289,20 @@ FSM events trigger observable emissions through two paths:
 - `STARTED` → `emitRouterStart()`
 - `STOP` → `emitRouterStop()`
 - `CANCEL` (from `TRANSITION_STARTED` or `LEAVE_APPROVED`) → `emitTransitionCancel()`
-- `FAIL` (from `STARTING`, `TRANSITION_STARTED` or `LEAVE_APPROVED`) → `emitTransitionError()`. **Not from `READY`** — that edge was removed with the two senders it had, both of which report to observers rather than failing a transition, so they emit directly (#1643's sibling, #1641 S7). `STARTING --FAIL--> IDLE` is how a failed `start()` unwinds and is unconditional; the two in-flight edges carry `when: mayFail`, so a stale FAIL from a superseded navigation is a table no-op
+- `FAIL` (from `STARTING`, `TRANSITION_STARTED` or `LEAVE_APPROVED`) → `emitTransitionError()`. **Not from `READY`** — that edge was removed with the two senders it had, both of which report to observers rather than failing a transition, so they emit directly (#1641 S7, answering RFC-10a §16.5). `STARTING --FAIL--> IDLE` is how a failed `start()` unwinds and is unconditional; the two in-flight edges carry `when: mayFail`, so a stale FAIL from a superseded navigation is a table no-op. ⚠ That last clause is **structural, not yet tested** — removing `when: mayFail` from both edges leaves the whole functional and property suite green (measured), so it is design intent without a discriminating pin
 
 **Via the FSM table `send()` + emit action** — the navigation transitions dispatch through the FSM table via `send()`, which fires a registered action that emits; `forceState()` is **not** used in core (a bundle-invariant). An invalid transition (e.g. `COMPLETE` from IDLE/DISPOSED after a listener's `stop()`/`dispose()`) is a table no-op that emits nothing, so the table is the sole authority over state — the FSM cannot be resurrected out of a terminal state:
 
 - `NAVIGATE` (`sendNavigate`) → `send(NAVIGATE, {toState, fromState})` → action `emitTransitionStart()`
 - `LEAVE_APPROVE` (`sendLeaveApprove`) → `send(LEAVE_APPROVE, {…})` → action `emitTransitionLeaveApprove()`
 - `COMPLETE` (`sendComplete`) → `send(COMPLETE, {…})` → action `emitTransitionSuccess()`
-- `SYSTEM_COMMIT` (`systemCommit`) → `send(SYSTEM_COMMIT, {…})` → action `emitTransitionSuccess()` — the two commits that are NOT transitions (`navigateToNotFound`, the `replace()` revalidation). One edge, on `READY`: both commits happen after start has completed, and `systemCommit()` asks `canSend` before sending, so an attempt from anywhere else throws instead of silently not committing (#1186)
+- `SYSTEM_COMMIT` (`systemCommit`) → `send(SYSTEM_COMMIT, {…})` → action `emitTransitionSuccess()` — the two commits that are NOT transitions (`navigateToNotFound`, the `replace()` revalidation). One edge, on `READY`: both commits happen after start has completed, and `systemCommit()` asks `canSend` before sending, so an attempt from anywhere else throws instead of silently not committing (#1186). ⚠ **That ask refuses wider than the `!isActive()` gate it replaced, and its error code does not say so**: declared on `READY` alone, it also throws in `STARTING` and mid-transition, calling all of them `ROUTER_DISPOSED` on a router whose `isActive()` is `true`. Two arcs changed behaviour against the pre-slice base and are undeclared in any changeset — see #1644
 
-Cost: three transition-payload allocations per navigation (`NAVIGATE`, `LEAVE_APPROVE`, `COMPLETE` each carry one) — a deliberate trade of micro-optimization for structural determinism. Correctness is enforced by the state machine, not by scattered re-checks. **Since the state-ownership slice the table also OWNS the committed state**: `current` / `previous` are fields of the FSM context written by four edge `update`s and by nothing else, so "committed" and "announced" cannot come apart (`packages/core/INVARIANTS.md`, "Committed-state ownership").
+Cost: three transition-payload allocations per navigation (`NAVIGATE`, `LEAVE_APPROVE`, `COMPLETE` each carry one) — a deliberate trade of micro-optimization for structural determinism. Correctness is enforced by the state machine rather than by scattered re-checks: the #1169 commit-gate and the #1611/#1626 pre-`setState` sentinel are both gone, absorbed by `when: mayCommit`.
+
+**The commit is asked of the table TWICE, and the second ask is not a duplicate of the first.** `completeTransition` runs one piece of destructive bookkeeping before it commits — the post-leave cleanup that unregisters the departing route's EXTERNAL `canDeactivate` — so it asks once **before** that (a cancelled navigation must not unregister the guard of the route the user is staying on; the absorbed #1169 gate used to give this for free by sitting one frame higher) and once immediately **before the send**, which is the ask that sees what a guard factory recompiled by that cleanup has just done (#1611). The first ask is gated on there actually being a slot to clear, so the common navigation pays a walk of a 1–3 element array and no `canSend` at all.
+
+**The table also OWNS the committed state.** `current` / `previous` are fields of the FSM context written by the four edge `update`s above and by nothing else, so "committed" and "announced" cannot come apart — the silent commit (state written, `TRANSITION_SUCCESS` never emitted, no subscriber notified) stops being expressible rather than being guarded against (`packages/core/INVARIANTS.md`, "Committed-state ownership"). One observable consequence: the pair is zeroed on the `DISPOSE` edge, several steps earlier than the old `#state.reset()`, so a plugin `teardown()` reading `getPreviousState()` now sees `undefined`.
 
 ### Route-tree mutation channel — `TREE_CHANGED` (orthogonal to the FSM)
 
