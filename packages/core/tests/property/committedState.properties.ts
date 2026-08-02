@@ -233,10 +233,24 @@ describe("fromState of the next commit is toState of the previous one", () => {
       ];
       const router = createRouter(definitions);
       const commits: { to: string; from: string | undefined }[] = [];
+      // The CELL, read at the moment of each commit — not the payload. The two
+      // are different claims and only this one is about the slice: before it,
+      // both non-transition commits already emitted the previously-committed
+      // state as `fromState`, so the payload chain held on the pre-slice code
+      // too (measured). What moved into the machine is the PAIR, and a shift
+      // that stopped shifting would leave the payload chain intact (#1646).
+      const cells: {
+        current: string | undefined;
+        previous: string | undefined;
+      }[] = [];
 
       router.usePlugin(() => ({
         onTransitionSuccess: (to, from) => {
           commits.push({ to: to.name, from: from?.name });
+          cells.push({
+            current: router.getState()?.name,
+            previous: router.getPreviousState()?.name,
+          });
         },
       }));
 
@@ -264,6 +278,17 @@ describe("fromState of the next commit is toState of the previous one", () => {
 
       for (let index = 1; index < commits.length; index++) {
         expect(commits[index].from).toBe(commits[index - 1].to);
+      }
+
+      // The pair is a shift register driven by the table: at every commit the
+      // cell holds what this commit wrote, and `previous` holds what it
+      // displaced — i.e. the `toState` of the commit before it.
+      for (const [index, cell] of cells.entries()) {
+        expect(cell.current).toBe(commits[index].to);
+
+        if (index > 0) {
+          expect(cell.previous).toBe(commits[index - 1].to);
+        }
       }
 
       router.dispose();
