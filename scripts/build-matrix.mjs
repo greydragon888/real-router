@@ -40,7 +40,7 @@
 
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 /**
  * Routing threshold: PRs touching ≤ K packages AND not touching the core layer
@@ -147,7 +147,19 @@ export function deriveAffected(queryJson) {
   const affected = items
     .filter((p) => (p.path ?? "").startsWith("packages/"))
     .map((p) => p.name);
-  return { affected, dirOf };
+  // The example apps, from the SAME query — they are dropped from `affected`
+  // (they are not shardable and every pipeline filters them out), which is why
+  // they used to be validated by nothing on a PR: an examples-only change gives
+  // `affected = []` → mode=leaf → a leaf filter that resolves to zero tasks.
+  // Taken from `query affected` rather than a git-ref filter on purpose: the
+  // git-ref form treats ANY root-file change as touching every workspace, so a
+  // lockfile bump would balloon into "build all 139 examples" (measured: 166
+  // packages selected by `{./examples/**}[HEAD~50]`), while the query attributes
+  // a root file to the packages that actually depend on it. (Audit §4.2.)
+  const examples = items
+    .filter((p) => (p.path ?? "").startsWith("examples/"))
+    .map((p) => p.name);
+  return { affected, examples, dirOf };
 }
 
 /**
@@ -344,17 +356,37 @@ export function buildPlan(
   // consumers surface; `affected` (declared-dep) would omit them (#1067).
   const groups = groupAffected(membership, dirOf, readers);
   const include = [];
+  // Upload path for the shard's OWN packages. Without it every shard uploaded
+  // `packages/*/dist/`, i.e. its whole workspace — which after `^bundle` also
+  // holds core and the rest of the upstream chain, so core's dist shipped once
+  // per shard (×10 on a wide PR) and `merge-multiple: true` then overwrote the
+  // copies on download. Consumers stay whole: `base-bundle` still uploads every
+  // dist, and `bundle-size` fills any gap from the Remote Cache. (Audit §3.3.)
+  // `relative(cwd, …)` normalises either shape: turbo emits repo-relative paths
+  // (`packages/react`) and resolving a relative input against cwd is a no-op,
+  // while an absolute dir — what a filesystem-built dirOf yields — collapses to
+  // the same thing. upload-artifact needs workspace-relative paths, so this must
+  // not depend on which of the two the caller happened to pass.
+  const distPathsFor = (pkgs) =>
+    pkgs
+      .map((p) => `${relative(process.cwd(), dirOf.get(p))}/dist/`)
+      .join("\n");
   for (const a of groups.adapter) {
     include.push({
       name: a.replace(/^@real-router\//, ""),
       filter: `--filter=${a}`,
+      distPaths: distPathsFor([a]),
     });
   }
   for (const name of GROUP_NAMES) {
     if (name === "base" || name === "adapter") continue;
     const pkgs = groups[name];
     if (pkgs.length === 0) continue;
-    include.push({ name, filter: pkgs.map((p) => `--filter=${p}`).join(" ") });
+    include.push({
+      name,
+      filter: pkgs.map((p) => `--filter=${p}`).join(" "),
+      distPaths: distPathsFor(pkgs),
+    });
   }
 
   // Guard (#1067): a shared-source PR MUST surface its consumers as shards. An
@@ -407,7 +439,7 @@ export function runMembershipQuery() {
 
 /** Entry point: query (routing) + dry-run (membership) → plan → GITHUB_OUTPUT. */
 export function main() {
-  const { affected, dirOf } = deriveAffected(runAffectedQuery());
+  const { affected, examples, dirOf } = deriveAffected(runAffectedQuery());
   const { members, dirOf: memberDirOf } =
     deriveMembership(runMembershipQuery());
   // Merge dirs so classify() can resolve every membership package; query's dirOf
@@ -422,6 +454,13 @@ export function main() {
   process.stdout.write(`mode=${mode}\n`);
   process.stdout.write(`matrix=${JSON.stringify(matrix)}\n`);
   process.stdout.write(`leaf_filter=${leafFilter}\n`);
+  // Explicit `--filter=<pkg>` tokens for the affected EXAMPLES, empty when none
+  // (the examples-build job keys off that emptiness). Emitted straight from the
+  // routing query, so it is never the whole-repo balloon a git-ref filter would
+  // produce on a lockfile bump. (Audit §4.2.)
+  process.stdout.write(
+    `examples_filter=${examples.map((p) => `--filter=${p}`).join(" ")}\n`,
+  );
 }
 
 // Run main() only when invoked directly (`node scripts/build-matrix.mjs`),

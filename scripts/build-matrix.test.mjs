@@ -477,7 +477,11 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   // Adapter shard carries a single-package filter.
   assert.deepEqual(
     matrix.include.find((i) => i.name === "react"),
-    { name: "react", filter: "--filter=@real-router/react" },
+    {
+      name: "react",
+      filter: "--filter=@real-router/react",
+      distPaths: "packages/react/dist/",
+    },
   );
 });
 
@@ -491,6 +495,76 @@ test("routing: full rebuild (all 23) → base excluded, 10 shards", () => {
     assert.ok(names.includes(g), g);
   }
   assert.equal(matrix.include.length, 10);
+});
+
+// ─── examples (§4.2) + per-shard dist paths (§3.3) ──────────────────────────
+
+test("examples: derived from the SAME query, and kept OUT of `affected`", () => {
+  const queryJson = JSON.stringify({
+    data: {
+      affectedPackages: {
+        items: [
+          { name: "@real-router/react", path: "packages/react" },
+          { name: "react-combined-example", path: "examples/web/react/combined" },
+          { name: "electron-react-example", path: "examples/desktop/electron/react" },
+          { name: "@real-router/shared-sources", path: "shared" },
+          { name: "//", path: "" },
+        ],
+      },
+    },
+  });
+  const { affected, examples } = deriveAffected(queryJson);
+  // Routing is unchanged: examples never become shards and must not inflate the
+  // K count or flip touchesCore.
+  assert.deepEqual(affected, ["@real-router/react"]);
+  // …but they are no longer INVISIBLE, which is what left them unvalidated.
+  assert.deepEqual(examples, [
+    "react-combined-example",
+    "electron-react-example",
+  ]);
+});
+
+test("examples: an examples-ONLY change yields zero packages but a non-empty example set", () => {
+  // The exact shape that used to route to leaf with an empty filter → zero tasks
+  // → green gate with nothing validated.
+  const queryJson = JSON.stringify({
+    data: {
+      affectedPackages: {
+        items: [
+          { name: "react-combined-example", path: "examples/web/react/combined" },
+          { name: "//", path: "" },
+        ],
+      },
+    },
+  });
+  const { affected, examples } = deriveAffected(queryJson);
+  assert.deepEqual(affected, []);
+  assert.deepEqual(examples, ["react-combined-example"]);
+});
+
+test("distPaths: a grouped shard lists EVERY member's dist, one per line", () => {
+  // core forces the sharded path (three url-plugins alone are under K → leaf,
+  // where include is empty by design and there is no shard to inspect).
+  const { mode, matrix } = buildPlan(
+    [...URL_PLUGINS, "@real-router/core"],
+    realDirOf,
+  );
+  assert.equal(mode, "sharded");
+  const urlShard = matrix.include.find((i) => i.name === "url-plugin");
+  assert.deepEqual(
+    urlShard.distPaths.split("\n").sort(),
+    [
+      "packages/browser-plugin/dist/",
+      "packages/hash-plugin/dist/",
+      "packages/navigation-plugin/dist/",
+    ],
+  );
+  // The filter and the upload scope must name the same packages — a shard that
+  // builds three and uploads one (or the whole workspace) is the drift §3.3 fixed.
+  assert.equal(
+    urlShard.filter.split(" ").length,
+    urlShard.distPaths.split("\n").length,
+  );
 });
 
 // ─── leafFilter — leaf EXECUTION scope == ROUTING decision (root-lockfile fix) ─

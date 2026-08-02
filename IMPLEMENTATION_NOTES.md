@@ -2062,6 +2062,66 @@ clean. `node --test scripts/*.test.mjs` → 59/59. Parsed assertions: all four
 self-hosted jobs now carry `timeout-minutes` (90/30/30/360) and the two scheduled
 workflows carry the `!success()` notify condition while post-merge keeps `failure()`.
 
+### 2026-08-02 audit batch 6 — the last three: a scripts-free release install, per-shard dist uploads, and examples back inside a gate (§2.2, §3.3, §4.2)
+
+**§2.2 — the release install ran dependency lifecycle scripts in the one job that
+can mint an OIDC publish token.** `changesets.yml` carries `id-token: write`, so the
+token-request env is reachable from ANY step in it, and `PAT_TOKEN` joins two steps
+later. pnpm's `allowBuilds` allowlist narrows *who* may run scripts, but the release
+job needs none of them. What kept this open was the unknown "does `bundle` still work
+without them" — settled by experiment rather than argument: a fresh clone,
+`pnpm install --frozen-lockfile --ignore-scripts`, then the job's exact
+`turbo run bundle --filter='!./examples/**'` → **23/23 tasks, 0 cached** (every
+bundler really executed: tsdown, ng-packagr/esbuild for angular, rollup+babel for
+solid, svelte-package), exit 0 in 38 s. Publishing is untouched: the flag skips
+DEPENDENCY lifecycle scripts at install time, not our own `version`/prepack scripts
+that `changeset version` and `pnpm publish` invoke.
+
+**§3.3 — every shard uploaded the whole workspace's dist.** `path: packages/*/dist/`
+also swept up whatever `^bundle` built upstream, so core's dist shipped once per
+shard (×10 on a wide PR) and `merge-multiple: true` overwrote the copies on
+download. The planner now emits `distPaths` per shard from the same `dirOf` that
+builds the filter, and the upload uses it.
+
+⚠ The test caught a shape mismatch worth recording: turbo emits **repo-relative**
+paths in CI, while a `dirOf` built from the filesystem (what the test fixture uses)
+holds **absolute** ones — unnormalised, the artifact would have carried
+`/Users/…/packages/react/dist/`. `distPathsFor` therefore runs `relative(cwd, …)`,
+which is a no-op on the relative form and collapses the absolute one. Consumers stay
+whole: `base-bundle` still uploads the full set and `bundle-size` fills any gap from
+the Remote Cache. A new test asserts that a grouped shard's `filter` token count
+equals its `distPaths` line count — "builds three, uploads one" cannot pass.
+
+**§4.2 — the 139 example apps were validated by nothing on a PR.**
+`deriveAffected` drops example workspaces (they are not shardable and every pipeline
+filters them out), so an examples-only PR yielded `affected = []` → `mode=leaf` → a
+leaf filter resolving to zero tasks → `built=false` → downstream skipped → green
+gate. pre-push and post-merge filter them out too, so the only coverage was the
+weekly `examples.yml`: a break surfaced up to seven days late, on the repo's own
+dogfooding surface.
+
+**Solution — affected-scoped, not all-or-nothing.** `deriveAffected` now returns a
+third set (the affected examples), `check` emits `examples_filter` as explicit
+`--filter=<pkg>` tokens, and a new `examples-build` job builds exactly those.
+`build` pulls `^bundle`, so the libs an example resolves through `dist` arrive as
+Remote-Cache hits. The job is in the gate's `needs` and read as `ok()` — it
+legitimately skips on the majority of PRs, which touch no example, and costs zero
+there.
+
+**Why not a git-ref filter.** `--filter='{./examples/**}[ref]'` is valid turbo syntax
+(verified), but measurement killed it: `{./examples/**}[HEAD~50]` selected **166
+packages** — effectively everything — because `[ref]` treats any root-file change as
+touching every workspace. That is the same balloon `leaf_filter` exists to avoid
+(#1067). `query affected` attributes a root file to the packages that actually
+depend on it, so the token list stays narrow.
+
+**Verification.** `actionlint` clean; `node --test scripts/*.test.mjs` → **62/62**
+(three new cases: examples derived from the same query and kept OUT of `affected`,
+an examples-only change yielding zero packages but a non-empty example set, and the
+grouped-shard `distPaths` ↔ `filter` parity). The new job also exercises §1.9's
+fresh invariant immediately — it had to be added to the gate's `needs` *and* read in
+`Determine result`, or the meta-test would have failed.
+
 ### `#trivial` now skips the *required* changeset gate, not just Danger
 
 > **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**
