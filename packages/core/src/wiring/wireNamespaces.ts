@@ -4,6 +4,7 @@ import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 
+import type { RouterError } from "../RouterError";
 import type { NamespaceBag } from "./types";
 import type { NavigationDependencies } from "../namespaces/NavigationNamespace";
 import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
@@ -351,8 +352,11 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     sendTransitionFail: (toState, fromState, error, epoch) => {
       ns.eventBus.sendFail(toState, fromState, error, epoch);
     },
+    // Channel (б): early refusals (ROUTE_NOT_FOUND, the P3 channel guard,
+    // same-state) report to observers without moving the machine — there is no
+    // transition of theirs to fail.
     emitTransitionError: (toState, fromState, error) => {
-      ns.eventBus.sendFailSafe(toState, fromState, error);
+      ns.eventBus.emitTransitionError(toState, fromState, error as RouterError);
     },
     sendLeaveApprove: (epoch, toState, fromState) => {
       ns.eventBus.sendLeaveApprove(epoch, toState, fromState);

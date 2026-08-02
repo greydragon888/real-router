@@ -290,10 +290,14 @@ const routerTransitions: TransitionTable<
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
     },
-    // ⚠ Unconditional on purpose. Its clients are the two `sendFailSafe` sites
-    // (early validation errors, the plugin-facing report), which are re-routed
-    // off the machine in S7 — the edge itself goes with them.
-    [routerEvents.FAIL]: routerStates.READY,
+    // ⚑ There is no FAIL edge from READY, and its absence is the ANSWER to
+    // RFC-10a §16.5 rather than an omission. The edge existed for exactly two
+    // senders — early validation errors and the plugin-facing report — and both
+    // are channel (б): reports to observers, not failures of a transition. Once
+    // they emit directly, nothing legal is left to send FAIL from here, and a
+    // STALE one (a superseded navigation reporting late) becomes a table no-op
+    // structurally, which is stronger than the `mayFail` predicate the sketch
+    // proposed for it.
     [routerEvents.SYSTEM_COMMIT]: {
       target: routerStates.READY,
       update: commitSystemState,

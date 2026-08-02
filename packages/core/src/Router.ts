@@ -341,7 +341,14 @@ export class Router<
         interceptorsMap,
       ),
       emitTransitionError: (error) => {
-        this.#eventBus.sendFailSafe(undefined, this.#state.get(), error);
+        // Channel (б): a REPORT to observers, not a machine failure. It comes
+        // from a plugin, at a moment core does not control, so it must never
+        // drive a transition that could collide with one in flight.
+        this.#eventBus.emitTransitionError(
+          undefined,
+          this.#state.get(),
+          error as RouterError,
+        );
       },
       navigateToNotFound: (path) => this.#navigation.navigateToNotFound(path),
       start: createInterceptable(
