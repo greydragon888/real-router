@@ -49,6 +49,28 @@ function buildTransitionMeta(
   return Object.freeze(meta);
 }
 
+/**
+ * Would the post-leave cleanup below unregister anything?
+ *
+ * The same predicate the loop applies, asked first so the commit can be put to
+ * the table BEFORE the destructive part rather than only after it. Separate
+ * function so the ask reads as one decision instead of a flag threaded through
+ * a loop body.
+ */
+function hasSlotToClear(
+  nav: NavigationContext,
+  toDeactivate: string[],
+  toActivate: string[],
+): boolean {
+  for (const name of toDeactivate) {
+    if (!toActivate.includes(name) && nav.canDeactivateFunctions.has(name)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function completeTransition(
   deps: NavigationDependencies,
   nav: NavigationContext,
@@ -69,7 +91,43 @@ export function completeTransition(
     throw err;
   }
 
-  if (fromState) {
+  // ⚠ The payload carries `opts` UNSTRIPPED, signal and all. `mayCommit` reads
+  // the external signal from it, so stripping here would make that clause
+  // inert — measured: with the signal removed before the send, the condition
+  // never sees an abort and the QD arc (an `opts.signal` aborted from a sync
+  // `subscribeLeave`) walks straight through. Sanitising for SUBSCRIBERS is the
+  // announcement's job and happens in the action.
+  //
+  // Built BEFORE the post-leave cleanup so the same payload can be asked twice
+  // (below). `Object.freeze` returns its argument, so `commit.toState` IS the
+  // object that gets its `transition` attached and frozen further down — one
+  // object, two asks, no second literal on the #307 hot path.
+  const commit = {
+    epoch: nav.myEpoch,
+    toState,
+    fromState,
+    opts,
+  };
+
+  // ⚑ Ask BEFORE the post-leave cleanup, not only after it. That cleanup is
+  // DESTRUCTIVE — it unregisters the departing route's external `canDeactivate`
+  // — and it is only legitimate for a navigation that is actually going to
+  // commit. The #1169 commit-gate used to stand in `executeNavigation`, i.e.
+  // BEFORE this function was entered at all, so a cancelled navigation never
+  // reached the loop; absorbing that gate into `when: mayCommit` moved the
+  // verdict to AFTER it and let a cancelled navigation eat the guard of the
+  // route the user is STAYING on (measured A/B against `4c3b95424`: with an
+  // `opts.signal` aborted from a sync `subscribeLeave` listener, the next
+  // `navigate` away was refused on base and went through here).
+  //
+  // Gated on there being a slot to clear, so a navigation with nothing to
+  // unregister — the common case — pays one walk of a 1–3 element array and no
+  // `canSend` at all.
+  if (fromState && hasSlotToClear(nav, toDeactivate, toActivate)) {
+    if (!deps.canCommitTransition(commit)) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    }
+
     for (const name of toDeactivate) {
       if (toActivate.includes(name) || !nav.canDeactivateFunctions.has(name)) {
         continue;
@@ -85,7 +143,8 @@ export function completeTransition(
     // no COMPLETE edge at all. The user code that made the guard necessary — the
     // definition factory recompiled just above — still runs here; what changed
     // is that the verdict is no longer asked BEFORE the write, because there is
-    // no separate write left to run ahead of it.
+    // no separate write left to run ahead of it. That is why the ask below stays
+    // where it is: it is the one that has to see what the factory just did.
   }
 
   (toState as { transition: TransitionMeta }).transition = buildTransitionMeta(
@@ -97,19 +156,6 @@ export function completeTransition(
   );
 
   const finalState = Object.freeze(toState);
-
-  // ⚠ The payload carries `opts` UNSTRIPPED, signal and all. `mayCommit` reads
-  // the external signal from it, so stripping here would make that clause
-  // inert — measured: with the signal removed before the send, the condition
-  // never sees an abort and the QD arc (an `opts.signal` aborted from a sync
-  // `subscribeLeave`) walks straight through. Sanitising for SUBSCRIBERS is the
-  // announcement's job and happens in the action.
-  const commit = {
-    epoch: nav.myEpoch,
-    toState: finalState,
-    fromState,
-    opts,
-  };
 
   // ask, then fire — both read the SAME table row, one after the other, with no
   // user code in between (RFC-10a §7.4). The ask is what tells THIS navigation
