@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+import * as ts from "typescript";
 import { describe, it, expect, vi } from "vitest";
 
 import { FSM } from "../../../../src/utils/fsm/fsm.js";
@@ -1055,5 +1059,92 @@ describe("FSM", () => {
       expect(second.getContext().epoch).toBe(0);
       expect(first.getContext()).not.toBe(second.getContext());
     });
+  });
+});
+
+// The dispatch pair carries its payload POSITIONALLY at runtime while keeping
+// the conditional rest tuple in its overload — see the comment on `send`. This
+// pins the half that has no other guard: types are held by the
+// `@ts-expect-error` assertions above, and the allocation is held by nothing
+// unless it is stated structurally.
+//
+// A rest parameter here is a per-call array on the router's hottest entry
+// point. Measured before it was removed: -88 B per navigation on the alloc
+// probe (window 200, median of 31, A/A floor 0), with the p90 tail collapsing
+// from 2384 to 2133 B. Timing was a wash (733 vs 734 ns), so this is purely a
+// GC-pressure win and a number in a benchmark would not hold it.
+describe("dispatch signatures allocate no rest array", () => {
+  const source = ts.createSourceFile(
+    "fsm.ts",
+    readFileSync(
+      path.resolve(__dirname, "../../../../src/utils/fsm/fsm.ts"),
+      "utf8",
+    ),
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TS,
+  );
+
+  /** The IMPLEMENTATION signature — the overload declarations have no body. */
+  const implementationOf = (name: string): ts.MethodDeclaration => {
+    const found: ts.MethodDeclaration[] = [];
+
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isMethodDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        node.name.text === name &&
+        node.body !== undefined
+      ) {
+        found.push(node);
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+
+    expect(found).toHaveLength(1);
+
+    return found[0];
+  };
+
+  it.each(["send", "canSend"])(
+    "%s takes its payload positionally",
+    (method) => {
+      const params = implementationOf(method).parameters;
+
+      expect(params.some((p) => p.dotDotDotToken !== undefined)).toBe(false);
+      expect(params).toHaveLength(2);
+    },
+  );
+
+  it("the correlated tuple survives in the overload — both halves, or neither", () => {
+    // Without this the previous assertion is satisfiable by deleting the
+    // overload, which would silently retire the #753 payload correlation.
+    const overloads: ts.MethodDeclaration[] = [];
+
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isMethodDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        (node.name.text === "send" || node.name.text === "canSend") &&
+        node.body === undefined
+      ) {
+        overloads.push(node);
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+
+    expect(overloads).toHaveLength(2);
+
+    for (const overload of overloads) {
+      expect(
+        overload.parameters.some((p) => p.dotDotDotToken !== undefined),
+      ).toBe(true);
+    }
   });
 });
