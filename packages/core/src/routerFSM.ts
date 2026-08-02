@@ -1,5 +1,6 @@
 // packages/core/src/routerFSM.ts
 
+import { freezeStateShell } from "./helpers";
 import { FSM } from "./utils/fsm";
 
 import type { NavigationOptions, State } from "./types";
@@ -68,8 +69,13 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  */
 export interface RouterPayloads {
   NAVIGATE: { toState: State; fromState?: State | undefined };
-  LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
+  LEAVE_APPROVE: {
+    epoch: number;
+    toState: State;
+    fromState?: State | undefined;
+  };
   COMPLETE: {
+    epoch: number;
     toState: State;
     fromState?: State | undefined;
     opts?: NavigationOptions | undefined;
@@ -155,12 +161,73 @@ const mayFail = (
 const hasInflight = (ctx: RouterFSMContext): boolean =>
   ctx.inflightToState !== undefined;
 
+/**
+ * The commit gate, as a condition on the edge the commit takes. Both halves of
+ * the interim check it replaces are here: a superseded navigation carries a
+ * FOREIGN epoch (the nested NAVIGATE bumped it), and a terminated router has no
+ * COMPLETE edge at all — COMPLETE is declared from LEAVE_APPROVED only.
+ */
+const mayCommit = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["COMPLETE"] | undefined,
+): boolean =>
+  payload?.epoch === ctx.epoch && payload.opts?.signal?.aborted !== true;
+
+/** A leave approval belongs to the navigation that asked for it. */
+const isOwnEpoch = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["LEAVE_APPROVE"] | undefined,
+): boolean => payload?.epoch === ctx.epoch;
+
+/**
+ * The pair shift, and the ONLY place it happens for a navigation commit. It
+ * runs as an `update`, i.e. after the machine has already decided the
+ * transition fires — so "committed" and "announced" cannot come apart.
+ */
+const commitState = (ctx: RouterFSMContext, state: State): void => {
+  ctx.previous = ctx.current;
+  ctx.current = freezeStateShell(state);
+};
+
+const commitNavigation = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["COMPLETE"],
+): void => {
+  commitState(ctx, payload.toState);
+  ctx.inflightToState = undefined;
+};
+
+const commitSystemState = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["SYSTEM_COMMIT"],
+): void => {
+  commitState(ctx, payload.toState);
+};
+
+/**
+ * `stop()` — SHIFTS the pair, so `getPreviousState()` still answers with the
+ * state the router was stopped from. Deliberately not the same primitive as
+ * DISPOSE below (plan §11.A2 measured the difference: `stop()` leaves
+ * `undefined / b`, `dispose()` leaves `undefined / undefined`).
+ */
+const clearCurrent = (ctx: RouterFSMContext): void => {
+  ctx.previous = ctx.current;
+  ctx.current = undefined;
+};
+
+/** `dispose()` — zeroes BOTH cells at once, no shift. */
+const resetState = (ctx: RouterFSMContext): void => {
+  ctx.current = undefined;
+  ctx.previous = undefined;
+  ctx.inflightToState = undefined;
+};
+
 const beginNavigation = (
   ctx: RouterFSMContext,
-  payload: RouterPayloads["NAVIGATE"] | undefined,
+  payload: RouterPayloads["NAVIGATE"],
 ): void => {
   ctx.epoch++;
-  ctx.inflightToState = payload?.toState;
+  ctx.inflightToState = payload.toState;
 };
 
 const endNavigation = (ctx: RouterFSMContext): void => {
@@ -192,7 +259,10 @@ const routerTransitions: TransitionTable<
 > = {
   [routerStates.IDLE]: {
     [routerEvents.START]: routerStates.STARTING,
-    [routerEvents.DISPOSE]: routerStates.DISPOSED,
+    [routerEvents.DISPOSE]: {
+      target: routerStates.DISPOSED,
+      update: resetState,
+    },
   },
   [routerStates.STARTING]: {
     [routerEvents.STARTED]: routerStates.READY,
@@ -201,10 +271,16 @@ const routerTransitions: TransitionTable<
     // the machine is still STARTING, and so does a `replace()` running inside
     // an async start interceptor (#1204). Confirmed independently on both
     // ruptures by the phase-4.1 spikes.
-    [routerEvents.SYSTEM_COMMIT]: routerStates.STARTING,
+    [routerEvents.SYSTEM_COMMIT]: {
+      target: routerStates.STARTING,
+      update: commitSystemState,
+    },
     [routerEvents.FAIL]: routerStates.IDLE,
-    [routerEvents.STOP]: routerStates.IDLE,
-    [routerEvents.DISPOSE]: routerStates.DISPOSED,
+    [routerEvents.STOP]: { target: routerStates.IDLE, update: clearCurrent },
+    [routerEvents.DISPOSE]: {
+      target: routerStates.DISPOSED,
+      update: resetState,
+    },
   },
   [routerStates.READY]: {
     // The one NAVIGATE edge that is ever TRAVERSED, and therefore the one that
@@ -218,9 +294,15 @@ const routerTransitions: TransitionTable<
     // (early validation errors, the plugin-facing report), which are re-routed
     // off the machine in S7 — the edge itself goes with them.
     [routerEvents.FAIL]: routerStates.READY,
-    [routerEvents.SYSTEM_COMMIT]: routerStates.READY,
-    [routerEvents.STOP]: routerStates.IDLE,
-    [routerEvents.DISPOSE]: routerStates.DISPOSED,
+    [routerEvents.SYSTEM_COMMIT]: {
+      target: routerStates.READY,
+      update: commitSystemState,
+    },
+    [routerEvents.STOP]: { target: routerStates.IDLE, update: clearCurrent },
+    [routerEvents.DISPOSE]: {
+      target: routerStates.DISPOSED,
+      update: resetState,
+    },
   },
   [routerStates.TRANSITION_STARTED]: {
     // ⚠ A PERMISSION BIT read through `canSend`, not a transition. Its presence
@@ -232,7 +314,10 @@ const routerTransitions: TransitionTable<
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
     },
-    [routerEvents.LEAVE_APPROVE]: routerStates.LEAVE_APPROVED,
+    [routerEvents.LEAVE_APPROVE]: {
+      target: routerStates.LEAVE_APPROVED,
+      when: isOwnEpoch,
+    },
     [routerEvents.CANCEL]: {
       target: routerStates.READY,
       when: hasInflight,
@@ -243,14 +328,11 @@ const routerTransitions: TransitionTable<
       when: mayFail,
       update: endNavigation,
     },
-    // ⚠ `endNavigation` here too, and it is not decoration: the field it clears
-    // used to be cleared UNCONDITIONALLY by the sender, while a table update
-    // only runs when its edge fires. `dispose()` from inside a transition takes
-    // this edge (STOP is not declared from here), so without it a disposed
-    // router would keep the last in-flight `State` alive in its context.
+    // `dispose()` from inside a transition takes THIS edge — STOP is not
+    // declared here — so it is the one that has to zero everything.
     [routerEvents.DISPOSE]: {
       target: routerStates.DISPOSED,
-      update: endNavigation,
+      update: resetState,
     },
   },
   [routerStates.LEAVE_APPROVED]: {
@@ -259,13 +341,15 @@ const routerTransitions: TransitionTable<
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
     },
-    // ⚠ `when: mayCommit` does NOT land here yet, and the order is why:
-    // `completeTransition` calls `setState` BEFORE `send(COMPLETE)`, so a
-    // refused COMPLETE would leave the state committed with no
-    // `TRANSITION_SUCCESS` — the exact corrupting shape #1609 describes. The
-    // condition arrives in S5 together with the commit becoming an `update`,
-    // where there is no separate `setState` left to run ahead of it.
-    [routerEvents.COMPLETE]: routerStates.READY,
+    // The commit IS this edge now: `when` decides, `update` writes, the action
+    // announces. There is no separate `setState` left to run ahead of the
+    // verdict, which is what makes "committed" and "announced" inseparable —
+    // a refused COMPLETE writes nothing at all.
+    [routerEvents.COMPLETE]: {
+      target: routerStates.READY,
+      when: mayCommit,
+      update: commitNavigation,
+    },
     [routerEvents.CANCEL]: {
       target: routerStates.READY,
       when: hasInflight,
@@ -276,14 +360,11 @@ const routerTransitions: TransitionTable<
       when: mayFail,
       update: endNavigation,
     },
-    // ⚠ `endNavigation` here too, and it is not decoration: the field it clears
-    // used to be cleared UNCONDITIONALLY by the sender, while a table update
-    // only runs when its edge fires. `dispose()` from inside a transition takes
-    // this edge (STOP is not declared from here), so without it a disposed
-    // router would keep the last in-flight `State` alive in its context.
+    // `dispose()` from inside a transition takes THIS edge — STOP is not
+    // declared here — so it is the one that has to zero everything.
     [routerEvents.DISPOSE]: {
       target: routerStates.DISPOSED,
-      update: endNavigation,
+      update: resetState,
     },
   },
   [routerStates.DISPOSED]: {},

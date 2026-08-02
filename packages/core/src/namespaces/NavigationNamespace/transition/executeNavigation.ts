@@ -164,12 +164,11 @@ function beginTransition(
  */
 function completeImmediate(
   deps: NavigationDependencies,
-  inFlight: InFlightNavigation,
   plan: NavigationPlan,
 ): State {
-  deps.sendLeaveApprove(plan.toState, plan.fromState);
+  deps.sendLeaveApprove(plan.myEpoch, plan.toState, plan.fromState);
 
-  return completeTransition(deps, inFlight, plan);
+  return completeTransition(deps, plan);
 }
 
 /**
@@ -267,7 +266,7 @@ export function executeNavigation(
     // listener may still register a guard. Hoisting the read would change
     // behaviour, not just shape.
     if (!plan.hasGuards && !plan.suspendable) {
-      return completeImmediate(deps, inFlight, plan);
+      return completeImmediate(deps, plan);
     }
 
     const {
@@ -309,7 +308,7 @@ export function executeNavigation(
       const signal = controller.signal;
 
       const emitLeaveApproveCallback = (): Promise<void> | undefined => {
-        deps.sendLeaveApprove(confirmedToState, fromState);
+        deps.sendLeaveApprove(plan.myEpoch, confirmedToState, fromState);
 
         if (deps.hasLeaveListeners()) {
           return deps.awaitLeaveListeners(confirmedToState, fromState, signal);
@@ -367,7 +366,7 @@ export function executeNavigation(
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
 
-    const finalState = completeTransition(deps, inFlight, plan);
+    const finalState = completeTransition(deps, plan);
 
     // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
     // announces "this navigation already settled, synchronously", which used
@@ -480,7 +479,7 @@ async function finishAsyncNavigation(
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
 
-    const state = completeTransition(deps, inFlight, nav);
+    const state = completeTransition(deps, nav);
 
     succeeded = true;
 
@@ -607,7 +606,7 @@ function handleNoGuardsLeave(
 ): Promise<State> | undefined {
   const { toState, fromState, myId } = plan;
 
-  deps.sendLeaveApprove(toState, fromState);
+  deps.sendLeaveApprove(plan.myEpoch, toState, fromState);
 
   if (deps.hasLeaveListeners()) {
     const controller = new AbortController();

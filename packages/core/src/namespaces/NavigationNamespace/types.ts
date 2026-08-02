@@ -10,6 +10,14 @@ import type {
   State,
 } from "../../types";
 
+/** The single payload both halves of the commit read — ask-free by design. */
+export interface CommitPayload {
+  epoch: number;
+  toState: State;
+  fromState?: State | undefined;
+  opts?: NavigationOptions | undefined;
+}
+
 export interface NavigationContext {
   /**
    * Supersession token — `#navigationId` at the moment this navigation began.
@@ -99,9 +107,6 @@ export interface NavigationDependencies {
   /** Get current state */
   getState: () => State | undefined;
 
-  /** Set router state */
-  setState: (state: State) => void;
-
   /** Build complete navigate state: forwardState + route check + buildPath + makeState in one step */
   buildNavigateState: (
     routeName: string,
@@ -144,11 +149,9 @@ export interface NavigationDependencies {
   cancelNavigation: (reason?: unknown) => void;
 
   /** Send COMPLETE event to routerFSM */
-  sendTransitionDone: (
-    state: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ) => void;
+  /** ask-half of the commit — same table row as {@link sendTransitionDone}. */
+  canCommitTransition: (payload: CommitPayload) => boolean;
+  sendTransitionDone: (payload: CommitPayload) => void;
 
   /**
    * Send FAIL event to routerFSM, stamped with the sending navigation's epoch
@@ -169,7 +172,11 @@ export interface NavigationDependencies {
   ) => void;
 
   /** Send LEAVE_APPROVE event to routerFSM and emit to listeners */
-  sendLeaveApprove: (toState: State, fromState: State | undefined) => void;
+  sendLeaveApprove: (
+    epoch: number,
+    toState: State,
+    fromState: State | undefined,
+  ) => void;
 
   /** Check if navigation can begin (router is started) */
   canNavigate: () => boolean;

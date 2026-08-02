@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
 import { EMPTY_PARAMS } from "../../constants";
-import { areParamValuesEqual, freezeStateShell } from "../../helpers";
+import { areParamValuesEqual } from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -49,20 +49,19 @@ export class StateNamespace {
   }
 
   /**
-   * Sets the current router state.
+   * The LAST write that is not a table update: `clear()` resetting the pair.
    *
-   * The state is deeply frozen before storage to ensure immutability.
-   * The previous state is preserved and accessible via `getPrevious()`.
+   * It takes no state because there is none to take — every path that writes a
+   * state moved onto an edge (`COMPLETE`, `SYSTEM_COMMIT`, `STOP`, `DISPOSE`),
+   * and `clear()` is legal only on a STOPPED router (#1612), where `current` is
+   * already `undefined` and the shift merely carries that into `previous`.
    *
-   * @param state - Already validated by facade, or undefined to clear
+   * Kept as a method rather than folded into `clear()` so the cells stay behind
+   * this class — the authority test pins that there is exactly one such caller.
    */
-  set(state: State | undefined): void {
-    // Preserve current state as previous before updating
+  clearCommitted(): void {
     this.#ctx.previous = this.#ctx.current;
-
-    // If state is already frozen (from makeState()), use it directly.
-    // For external states, freeze in place without cloning.
-    this.#ctx.current = state ? freezeStateShell(state) : undefined;
+    this.#ctx.current = undefined;
   }
 
   /**
@@ -70,11 +69,6 @@ export class StateNamespace {
    */
   getPrevious(): State | undefined {
     return this.#ctx.previous;
-  }
-
-  reset(): void {
-    this.#ctx.current = undefined;
-    this.#ctx.previous = undefined;
   }
 
   /**

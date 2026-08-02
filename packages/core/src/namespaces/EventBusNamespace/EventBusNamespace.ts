@@ -116,7 +116,6 @@ export class EventBusNamespace {
   // controller. Wired to NavigationNamespace.
   readonly #abortController: (reason?: unknown) => void;
 
-  readonly #commitState: (state: State) => void;
   // Lazy accessor for the opt-in RouterValidator (wired by wireNamespaces).
   // Returns `null` until validation-plugin is registered — so the proactive
   // listener-count threshold (#1188) costs the no-plugin path nothing.
@@ -142,7 +141,6 @@ export class EventBusNamespace {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
     this.#abortController = options.abortController;
-    this.#commitState = options.commitState;
     this.#setupFSMActions();
   }
 
@@ -323,21 +321,26 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.NAVIGATE, { toState, fromState });
   }
 
-  sendComplete(
-    state: State,
-    fromState?: State,
-    opts: NavigationOptions = {},
-  ): void {
+  /**
+   * ask-half of the commit protocol (RFC-10a §7.4). Reads the SAME table row
+   * `sendComplete` fires, in the same synchronous window, with no user code
+   * between them.
+   */
+  canCommitTransition(payload: RouterPayloads["COMPLETE"]): boolean {
+    return this.#fsm.canSend(routerEvents.COMPLETE, payload);
+  }
+
+  sendComplete(payload: RouterPayloads["COMPLETE"]): void {
     // Table-driven: the FSM action emits TRANSITION_SUCCESS (#1169 D-full).
     // COMPLETE from IDLE/DISPOSED (a listener stopped/disposed mid-transition)
     // is a table no-op — no resurrection, no phantom success emit.
-    this.#fsm.send(routerEvents.COMPLETE, { toState: state, fromState, opts });
+    this.#fsm.send(routerEvents.COMPLETE, payload);
   }
 
-  sendLeaveApprove(toState: State, fromState?: State): void {
+  sendLeaveApprove(epoch: number, toState: State, fromState?: State): void {
     // Table-driven: the FSM action emits TRANSITION_LEAVE_APPROVE (#1169 D-full).
     // LEAVE_APPROVE from IDLE/DISPOSED is a table no-op — no resurrection.
-    this.#fsm.send(routerEvents.LEAVE_APPROVE, { toState, fromState });
+    this.#fsm.send(routerEvents.LEAVE_APPROVE, { epoch, toState, fromState });
   }
 
   sendFail(
@@ -810,7 +813,9 @@ export class EventBusNamespace {
     const handleSystemCommit = (
       payload: RouterPayloads["SYSTEM_COMMIT"],
     ): void => {
-      this.#commitState(payload.toState);
+      // The WRITE is the edge's `update`; the action only announces. Same
+      // layering as every other transition — bookkeeping in `update`, effects in
+      // the action (RFC-10a §6.2).
       this.emitTransitionSuccess(
         payload.toState,
         payload.fromState,

@@ -258,9 +258,6 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     getQueryParams: (name) => ns.routes.getQueryParams(name),
     getMetaForState: (name) => ns.routes.getMetaForState(name),
     getState: () => ns.state.get(),
-    setState: (state) => {
-      ns.state.set(state);
-    },
     buildNavigateState: (routeName, routeParams, routeSearch) => {
       const ctx = getInternals(ns.router);
 
@@ -347,8 +344,9 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },
-    sendTransitionDone: (state, fromState, opts) => {
-      ns.eventBus.sendComplete(state, fromState, opts);
+    canCommitTransition: (payload) => ns.eventBus.canCommitTransition(payload),
+    sendTransitionDone: (payload) => {
+      ns.eventBus.sendComplete(payload);
     },
     sendTransitionFail: (toState, fromState, error, epoch) => {
       ns.eventBus.sendFail(toState, fromState, error, epoch);
@@ -356,8 +354,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     emitTransitionError: (toState, fromState, error) => {
       ns.eventBus.sendFailSafe(toState, fromState, error);
     },
-    sendLeaveApprove: (toState, fromState) => {
-      ns.eventBus.sendLeaveApprove(toState, fromState);
+    sendLeaveApprove: (epoch, toState, fromState) => {
+      ns.eventBus.sendLeaveApprove(epoch, toState, fromState);
     },
     canNavigate: () => ns.eventBus.canBeginTransition(),
     getLifecycleFunctions: () => ns.routeLifecycle.getFunctions(),
@@ -385,9 +383,6 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
     navigateToState: (state, opts) =>
       ns.navigation.navigateToState(state, opts),
     navigateToNotFound: (path) => ns.navigation.navigateToNotFound(path),
-    clearState: () => {
-      ns.state.set(undefined);
-    },
     matchPath: (path) => ns.routes.matchPath(path, ns.options.get()),
     completeStart: () => {
       ns.eventBus.sendStarted();

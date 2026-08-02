@@ -227,12 +227,6 @@ export class Router<
       abortController: (reason) => {
         this.#navigation.abortCurrentController(reason);
       },
-      // The FSM SYSTEM_COMMIT action writes the state through this effect, so
-      // the 404 bypass and `replace()`'s revalidation stop writing it
-      // themselves — "no commit outside the table".
-      commitState: (state) => {
-        this.#state.set(state);
-      },
     });
 
     // =========================================================================
@@ -396,7 +390,7 @@ export class Router<
         this.#eventBus.systemCommit({ toState, fromState, opts });
       },
       clearState: () => {
-        this.#state.set(undefined);
+        this.#state.clearCommitted();
       },
       routerExtensions: [],
       contextClaimRecords: new Set(),
@@ -630,7 +624,7 @@ export class Router<
       return this;
     }
 
-    this.#lifecycle.stop();
+    // The STOP edge's `update` shifts the pair — the facade only sends.
     this.#eventBus.sendStop();
 
     return this;
@@ -646,7 +640,6 @@ export class Router<
     this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
-      this.#lifecycle.stop();
       this.#eventBus.sendStop();
     }
 
@@ -678,7 +671,6 @@ export class Router<
 
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
-    this.#state.reset();
     this.#dependenciesStore.dependencies = Object.create(
       null,
     ) as Partial<Dependencies>;
@@ -1121,7 +1113,6 @@ export class Router<
    */
   #unwindFailedStart(error: unknown): never {
     if (this.#eventBus.isReady() && this.#state.get() === undefined) {
-      this.#lifecycle.stop();
       this.#eventBus.sendStop();
     } else if (this.#eventBus.isStarting()) {
       this.#eventBus.sendFail(undefined, undefined, error);

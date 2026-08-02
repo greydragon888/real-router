@@ -10,6 +10,22 @@ export type PayloadOf<
 > = E extends keyof TPayloadMap ? TPayloadMap[E] | undefined : undefined;
 
 /**
+ * The payload an `update` sees — WITHOUT `| undefined`, unlike {@link PayloadOf}.
+ *
+ * The difference is reachability, not taste: `when` is also called from
+ * `canSend`, which is a legal ask with no payload, so it must be total over its
+ * absence. `update` runs only from `send`, where the payload is required by the
+ * signature. Typing them the same forces every update to carry a `payload &&`
+ * guard for a branch that cannot execute — dead code the coverage gate then
+ * reports, correctly.
+ */
+export type SentPayloadOf<
+  TEvents extends string,
+  TPayloadMap extends Partial<Record<TEvents, unknown>>,
+  E extends TEvents,
+> = E extends keyof TPayloadMap ? TPayloadMap[E] : undefined;
+
+/**
  * One edge of the table, in either of the two accepted forms.
  *
  * - `TStates` — the v1 string form: an unconditional transition. Stays first-class.
@@ -44,7 +60,10 @@ export type TransitionDeclaration<
           ) => boolean)
         | undefined;
       readonly update?:
-        | ((ctx: TContext, payload: PayloadOf<TEvents, TPayloadMap, E>) => void)
+        | ((
+            ctx: TContext,
+            payload: SentPayloadOf<TEvents, TPayloadMap, E>,
+          ) => void)
         | undefined;
     };
 
