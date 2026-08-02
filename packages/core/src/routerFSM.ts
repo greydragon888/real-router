@@ -250,6 +250,38 @@ const endNavigation = (ctx: RouterFSMContext): void => {
  * for healthy flows; the direct transitions guarantee the FSM is not left
  * stuck if cleanup is skipped (e.g. dispose mid-STARTING when the start
  * pipeline threw before STARTED/FAIL).
+ *
+ * ⛔ **THIS GRAPH MAY NOT BE CLEANED BY TRACE COVERAGE.** Read this before
+ * deleting an edge that "nothing ever takes". It was established by
+ * measurement, not caution: an `onTransition` recorder over all 4469 tests of
+ * the three tiers traversed **15 of 20** edges, and every one of the other five
+ * was then mutated away individually. Not one was dead. An edge belongs to
+ * exactly one of three categories, and only the first is removable:
+ *
+ * 1. **No sender** — nothing left in core can send the event from this state.
+ *    Removable, and the inventory of senders is the proof. The `READY→FAIL`
+ *    edge was the one instance: it had two, both re-routed off the machine as
+ *    reports, and the edge went with them (§16.5). Note that it was TRAVERSED
+ *    while it lived — traversal did not make it necessary, and non-traversal
+ *    does not make the others removable. The two facts are independent.
+ * 2. **Permission bit** — never traversed, load-bearing anyway, because it is
+ *    read through `canSend()` rather than taken. The two `NAVIGATE` self-loops
+ *    are these: `abortPreviousNavigation` walks the machine back to READY
+ *    before `sendNavigate`, so the loop never fires, but its DECLARATION is
+ *    what makes `canSend(NAVIGATE)` true mid-navigation, i.e. what makes
+ *    supersede legal. Removing them fails 9 and 29 tests respectively — with
+ *    supersede dying SILENTLY at the predicate, not at the send. `canSend` is
+ *    read exactly three times in core (NAVIGATE / START / CANCEL); an edge for
+ *    one of those events is a candidate for this category by construction.
+ * 3. **Fail-safe** — dead on every healthy flow and there precisely for the
+ *    unhealthy one. The three direct `DISPOSE` edges (#660) are these: 3881
+ *    tests pass without them because no test reaches the state they exist for.
+ *
+ * The corollary for the two `NAVIGATE` self-loops specifically: their `update`
+ * is dead code (the epoch is bumped by the READY edge, the only one that
+ * fires), and it is kept anyway so the three declarations stay identical —
+ * a self-loop that silently differed from its sibling is a worse failure than
+ * an unreachable line, and coverage does not see either.
  */
 const routerTransitions: TransitionTable<
   RouterState,

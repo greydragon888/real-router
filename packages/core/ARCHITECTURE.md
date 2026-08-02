@@ -36,7 +36,7 @@ core/
 │   │
 │   ├── namespaces/
 │   │   ├── RoutesNamespace/         — Route tree, path operations, forwarding
-│   │   ├── StateNamespace/          — State storage (current, previous)
+│   │   ├── StateNamespace/          — State service (the pair lives in RouterFSMContext)
 │   │   ├── NavigationNamespace/     — navigate(), navigateToNotFound(), transition pipeline
 │   │   ├── EventBusNamespace/       — FSM + EventEmitter, subscribe
 │   │   ├── PluginsNamespace/        — Plugin lifecycle
@@ -94,7 +94,7 @@ Router.ts (facade — validates and delegates)
     │
     ├── OptionsNamespace          — immutable options store
     ├── DependenciesStore         — DI container (plain data interface)
-    ├── StateNamespace            — current/previous state, makeState(), deep freeze
+    ├── StateNamespace            — makeState(), deep freeze; the committed pair is owned by the FSM context
     ├── RoutesNamespace           — route tree, matchPath(), buildPath(), forwarding
     ├── RouteLifecycleNamespace   — canActivate/canDeactivate guard registry
     ├── PluginsNamespace          — plugin lifecycle (factory → instance → hooks)
