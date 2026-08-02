@@ -21,12 +21,15 @@ Nothing on the public surface changes shape: `getState()`, `getPreviousState()`,
 **One deliberate behaviour change, and it is why this is a `minor`.** Zeroing
 the committed pair now rides the `DISPOSE` edge, which fires several steps
 earlier in `dispose()` than the old `#state.reset()` — that call sat almost last,
-*after* `plugins.disposeAll()`. So a plugin's `teardown()` that reads
-`router.getState()` now sees `undefined` where it used to see the state the
-router was disposed from. No `teardown()` body in this repository reads it and
-core does not touch the state in that window, but `teardown` is public API.
-If yours needs the final state, capture it in `onTransitionSuccess` instead of
-reading it during teardown.
+*after* `plugins.disposeAll()`. The accessor this is observable through is
+**`getPreviousState()`**: a plugin's `teardown()` that reads it now sees
+`undefined` where it used to see the state the router was disposed from.
+(`getState()` is unaffected — it was already `undefined` in `teardown()`, because
+`dispose()` routes through `stop()`, which has always cleared the current state
+before the plugin teardown step.) No `teardown()` body in this repository reads
+either one and core does not touch the state in that window, but `teardown` is
+public API. If yours needs the final state, capture it in `onTransitionSuccess`
+instead of reading it during teardown.
 
 Two smaller consequences of the same move:
 
