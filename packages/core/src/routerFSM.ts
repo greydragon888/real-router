@@ -151,10 +151,33 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
 }
 
 /**
- * A FAIL with no epoch is legal (start-unwind, early validation errors); one
- * carrying a FOREIGN epoch is stale — it belongs to a navigation that has
- * already been superseded, and letting it through would move the machine out
- * from under the live one, turning its COMPLETE into a table no-op (#1609).
+ * A FAIL with no epoch is legal (start-unwind); one carrying a FOREIGN epoch is
+ * stale — it belongs to a navigation that has already been superseded, and
+ * letting it through would move the machine out from under the live one,
+ * turning its COMPLETE into a table no-op (#1609).
+ *
+ * ⚠ **This predicate cannot currently refuse, and that is measured, not
+ * assumed (#1646).** Instrumented over the whole functional tier it is asked
+ * 206 times and returns `false` zero times — never once with a foreign epoch.
+ * The reason is structural rather than lucky: the epoch is bumped ONLY by the
+ * NAVIGATE update, which no sender reaches without `InFlightNavigation.begin()`
+ * having bumped the token in the same breath, so the two move together; and
+ * both live FAIL senders are already gated on `isCurrent(myId)`, with
+ * `asCancellation` restating a lost-liveness failure as `TRANSITION_CANCELLED`
+ * — which `routeTransitionError` filters out before any send. Three adversarial
+ * arcs (guard-redirect, a guard rejecting after a supersede landed, the
+ * ROUTE_NOT_FOUND arc) were driven deliberately: all three end in `CANCELLED`
+ * with no `TRANSITION_ERROR` at all. The `epoch === undefined` half is dead for
+ * a second reason — the only no-epoch sender takes `STARTING --FAIL--> IDLE`,
+ * which carries no `when`.
+ *
+ * So it is a PROVEN EQUIVALENT in the mutation-testing sense, kept as
+ * defence-in-depth for the day the liveness gates above it change: the table is
+ * the last thing between a stale terminal report and the live navigation, and
+ * two comparisons is what that costs. Do NOT read its survival as a coverage
+ * gap to be closed with a test — no test can reach it without changing
+ * production code first (core CLAUDE.md, "Mutation testing": prove equivalence,
+ * then document rather than chase).
  */
 const mayFail = (
   ctx: RouterFSMContext,

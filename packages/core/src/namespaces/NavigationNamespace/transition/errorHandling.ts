@@ -43,10 +43,14 @@ function isTransitionCancelled(error: unknown): boolean {
  * ⚑ NOT interim any more, and the reason is worth keeping: both halves this
  * was written against ARE absorbed by the table now, and it survived anyway.
  *
- * - the **load-bearing** half went by construction — `when: mayFail` on the
- *   `TRANSITION_STARTED` / `LEAVE_APPROVED` edges makes a `FAIL` with a foreign
- *   epoch a table no-op, so the silent commit (state committed, no
- *   `TRANSITION_SUCCESS`, no subscriber notified) is no longer expressible;
+ * - the **load-bearing** half is held HERE, not by the table. `when: mayFail` on
+ *   the `TRANSITION_STARTED` / `LEAVE_APPROVED` edges would make a `FAIL` with a
+ *   foreign epoch a table no-op — but it never gets the chance, because this
+ *   function restates the lost-liveness failure first and `routeTransitionError`
+ *   filters `TRANSITION_CANCELLED` before any send. Measured (#1646): `mayFail`
+ *   is asked 206 times across the functional tier and refuses zero, and three
+ *   adversarial supersede arcs all end in `CANCELLED` with no report at all. The
+ *   predicate is defence-in-depth behind this call site, not the mechanism;
  * - the **noise** half went further than the sketch proposed: the `READY→FAIL`
  *   edge is REMOVED rather than conditioned (§16.5, owner 2026-08-02), and
  *   since the emit rides the edge's action, a stale report there now emits
