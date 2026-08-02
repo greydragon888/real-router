@@ -62,6 +62,7 @@ linted the fixture), cleans up in `finally`. Auto-runs in repo-lints via the
 `node --test scripts/*.test.mjs` glob.
 
 **Fallout triage (the revived rules' first sweep, all 22 packages):**
+
 - **2 REAL value cycles in angular** — `providers.ts` declared the DI tokens AND
   imported the install helpers, while `internal/install.ts` injected `ROUTER`
   back (`providers → install → providers`); it only worked because the helpers
@@ -81,7 +82,7 @@ linted the fixture), cleans up in `finally`. Auto-runs in repo-lints via the
 **Why.** A dead error-level gate is worse than no gate — it certifies what it
 doesn't check. The layered architecture kept real cycles rare (exactly why nobody
 noticed), but the very first live sweep still found two genuine ones. Rule docs
-note for posterity: `no-cycle` *ignores type-only imports by design* — the #1519
+note for posterity: `no-cycle` _ignores type-only imports by design_ — the #1519
 type-only-cycle question stays answered even with the rule alive.
 
 ## CI runtime: base-bundle no longer gates base-test/shards; sonarcloud off the CI Result path
@@ -97,6 +98,7 @@ Result's `needs`, making a third-party scanner the longest serial tail of the
 merge-gating check.
 
 **Solution.**
+
 - `base-test` and `pipeline-sharded` now `needs: [check]` — they start immediately,
   parallel to base-bundle.
 - The shard step is split into two turbo invocations: `test test:properties` first
@@ -168,7 +170,7 @@ where no stryker config exists — mutation testing runs from package dirs;
 `dependsOn: ["^bundle", …]`, so the pre-commit hook (`turbo run test
 --filter='!./examples/**'`) rebuilt every upstream `dist/` on every commit, and CI
 shards bundled upstream deps before testing. The documented rationale ("Why `^bundle`
-instead of `^build`" below) was *upstream dist for import resolution* — written before
+instead of `^build`" below) was _upstream dist for import resolution_ — written before
 the resolution stack went dist-free. Worse, the built dists were actively harmful in
 worktrees: a stale `dist/` flips vitest's alias resolution and breaks test runs (the
 `rm -rf packages/*/dist && pnpm install` ritual documented in memory), i.e. the
@@ -177,7 +179,7 @@ broken by.
 
 **Solution.** Removed `^bundle` from all five tasks in `turbo.json`. Kept it where
 dist is genuinely consumed: `test:e2e` (Playwright runs built example apps), `bundle`
-itself (attw resolves a package's `.d.ts` against upstream *published* entry points →
+itself (attw resolves a package's `.d.ts` against upstream _published_ entry points →
 upstream dist required for artifact validation), and the `build` orchestrator /
 pre-push (`turbo run build lint:package lint:types`) which exists to validate
 artifacts and still builds everything in dependency order.
@@ -198,11 +200,11 @@ pre-commit (only pre-push still builds dists — deliberately, for artifact vali
 
 **Problem.** The routing engine shipped as three private packages with a strict
 dependency chain (`route-tree` → `path-matcher`, `search-params`), but the boundaries
-were no longer boundaries of *consumption*: `route-tree` was the sole consumer of the
+were no longer boundaries of _consumption_: `route-tree` was the sole consumer of the
 other two, and `@real-router/core` was the sole consumer of `route-tree`. The split
 cost ~30 config files, three entries in every package-set list (CORE_LAYER, codecov,
-syncpack), and forced grammar single-sources to be cross-package *exports* where an
-internal *import* was meant. This is iteration 1 of 2 (iteration 2 folds `engine` into
+syncpack), and forced grammar single-sources to be cross-package _exports_ where an
+internal _import_ was meant. This is iteration 1 of 2 (iteration 2 folds `engine` into
 core — a separate RFC).
 
 **Solution.** One zero-dependency `engine` package. The former `route-tree` facade sits
@@ -223,10 +225,10 @@ core `route-tree` → `engine` (devDep, tsdown `alwaysBundle`, 13 src imports); 
 (tree-shaking already kept the layers internal — 0 `getSearch` occurrences in
 `core/dist`, dist byte-identical), so this is a pure structural refactor. Engine holds
 100% coverage (869 unit/functional + 210 property + 42 stress) — but that overall 100%
-would *hide* code the public facade can't reach (the layer tiers keep every line green).
+would _hide_ code the public facade can't reach (the layer tiers keep every line green).
 So a **reachability ratchet** (`scripts/reachability-check.mjs` +
 `packages/engine/ENGINE_REACHABILITY.json`, RFC §5.5) runs a facade-only coverage pass
-and fails on any *new* facade-unreachable file/line. Its baseline confirms the pre-merge
+and fails on any _new_ facade-unreachable file/line. Its baseline confirms the pre-merge
 dead-code sweep (#1505): 16 files / 571 lines facade-unreachable, ALL in the two layers,
 0 in the route-tree facade, none dead (each covered by its own layer tier). Not wired
 into pre-push until the registry is triaged to "empty + KEEP" (Faza 2). **(The ratchet
@@ -251,6 +253,7 @@ core/src/engine/` (39 files, self-contained — only relative internal imports),
 `core/tests/engine/` (74 files, import paths codemod'd: bare `"engine"` → the
 `src/engine` barrel, `../src/foundation/engine` depths recomputed). The engine's
 discipline ported into core intact:
+
 - **6 layer/whitebox eslint rules** appended to `core/eslint.config.mjs` (§4 layer
   boundaries — search-params leaf, path-matcher leaf, route-tree barrel-only; §5
   whitebox tiers — facade, path-matcher-unit, search-params-unit). Globs re-scoped
@@ -287,12 +290,12 @@ caught by running the gate, not by reading the config. A third trap in **knip**:
 the engine barrel `src/engine/index.ts` re-exports `MatchResult`, consumed only by
 a functional-test helper (`tests/engine/functional/operations/helpers.ts`, outside
 knip's `project` scope) that correctly imports it from the barrel per the facade
-convention. Pre-fold, engine's `index.ts` was the *package* `exports` entry, so knip
+convention. Pre-fold, engine's `index.ts` was the _package_ `exports` entry, so knip
 auto-counted every barrel export as used; folded in, the barrel is internal, so knip
 demanded a real importer and flagged `MatchResult` as unused. Fix: declare
 `src/engine/index.ts` a knip `entry` in the `packages/core` workspace — restoring the
 "this barrel is the engine's public surface" semantic (the whitebox facade tier is
-*required* to import from it). NOT a code removal: `MatchResult` is genuinely used (the
+_required_ to import from it). NOT a code removal: `MatchResult` is genuinely used (the
 operations test helper imports it from the barrel), and the 100% line-coverage gate
 independently catches any genuinely dead line in `src/engine` — declaring the barrel a
 knip entry only relaxes knip's export-level check, not coverage. The engine's own bundle
@@ -505,12 +508,12 @@ used as a **value** (`throw` / `instanceof`) and its public-types entry is a for
 declaration that matches the class, so the class-at-root is correct for it.
 
 **Why the subpath for augmentation, not the root (verified on tsc 6.0).** Interface module
-augmentation does **not** propagate through a *type-only* re-export: `declare module
+augmentation does **not** propagate through a _type-only_ re-export: `declare module
 "@real-router/core" { interface StateContext … }` against a root that merely
 `export type *`-re-exports `StateContext` creates a phantom interface — the namespace never
 reaches the real `state.context`. It merges only at the **declaration-site** (the subpath)
 or through a **value** re-export (which is exactly why `memory-plugin` augments the `Router`
-**class** via `@real-router/core` and it works). Making the root `Router` the *interface*
+**class** via `@real-router/core` and it works). Making the root `Router` the _interface_
 (dropping the class export) was tried and reverted: `browser-plugin` overrides `start` as a
 **method** in its augmentation, but the interface declares `start` as a **property**, so the
 merge is a `Duplicate identifier` — plus generic-variance ripples in `cloneRouter`. The
@@ -532,7 +535,7 @@ stale-since-M1 `TG` bundle edges / layer diagram), and the JSDoc augmentation ex
 **Why (empirically verified).** All packages type-check; core keeps **100% coverage** (2760
 functional + property + stress green); the affected plugins + `route-utils` stay at 100%;
 `build-matrix.test` 31/31; full linters green. Ordering: this M2 lands **after** M1 so
-`type-guards` (which typed *upward* onto the folded types) never has to point at core.
+`type-guards` (which typed _upward_ onto the folded types) never has to point at core.
 
 **Follow-up — `public-types/` consolidated into `src/types/`.** `public-types` was only ever
 a name chosen to dodge the pre-existing `src/types.ts`-file-vs-`src/types/`-dir clash (the dir
@@ -659,7 +662,7 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 - First publish must be manual (`pnpm publish`) - can't configure Trusted Publisher before package exists (pnpm 11 publishes natively; no npm CLI needed even for bootstrap)
 - Trusted Publisher configured with workflow: `changesets.yml`
 
-**Build optimization:** the release "Bundle packages for publish" step runs `pnpm turbo run bundle --filter='!./examples/**'` — dist artifacts only, no test gate. It deliberately does NOT run `turbo run build`: `build` `dependsOn` `test:stress`, and **no CI/post-merge job ever warms `test:stress`** (stress is pre-push-only — see "CI: test:stress lives only in pre-push"). So `turbo run build` at release cold-ran all ~23 `test:stress` tasks every publish (~3m of *guaranteed* cache misses — 156/179 hit, the 23 misses were exactly the 23 stress-test packages) plus a redundant full test re-run. The commit being published already passed the complete gate on its release-PR CI, and pre-push runs stress; the publish step only needs artifacts. `bundle` is a full cache hit off the post-merge build of the same commit. (An earlier version of this note claimed `build:dist-only` + `test`; that task never existed and the workflow actually ran bare `build` — corrected here.) **Update #1423:** `build` no longer `dependsOn test:stress` (stress moved to a dedicated `--concurrency=1` pre-push step), so `turbo run build` no longer cold-runs stress at release — but `bundle`-not-`build` stays correct, since `build` still adds `test` + `test:properties`, redundant at publish.
+**Build optimization:** the release "Bundle packages for publish" step runs `pnpm turbo run bundle --filter='!./examples/**'` — dist artifacts only, no test gate. It deliberately does NOT run `turbo run build`: `build` `dependsOn` `test:stress`, and **no CI/post-merge job ever warms `test:stress`** (stress is pre-push-only — see "CI: test:stress lives only in pre-push"). So `turbo run build` at release cold-ran all ~23 `test:stress` tasks every publish (~3m of _guaranteed_ cache misses — 156/179 hit, the 23 misses were exactly the 23 stress-test packages) plus a redundant full test re-run. The commit being published already passed the complete gate on its release-PR CI, and pre-push runs stress; the publish step only needs artifacts. `bundle` is a full cache hit off the post-merge build of the same commit. (An earlier version of this note claimed `build:dist-only` + `test`; that task never existed and the workflow actually ran bare `build` — corrected here.) **Update #1423:** `build` no longer `dependsOn test:stress` (stress moved to a dedicated `--concurrency=1` pre-push step), so `turbo run build` no longer cold-runs stress at release — but `bundle`-not-`build` stays correct, since `build` still adds `test` + `test:properties`, redundant at publish.
 
 ### Critical: Use `pnpm publish` NOT `npm publish`
 
@@ -745,15 +748,15 @@ Per-package releases — every published package tag gets its own GitHub release
 
 ### Idempotent GitHub-Release reconciliation (#731)
 
-**Problem.** The release pipeline was **not idempotent across runs**. `Create GitHub Releases` was gated `if: steps.unpublished.outputs.has_unpublished == 'true'` and iterated *current* `packages/*/` versions. When that step failed once (observed: run 27213292219, `exit 128`, no diagnostics — the `run:` had no `set -euo pipefail`/tracing), the packages were already on npm with tags pushed, so the **next** run saw `local == npm` → `has_unpublished=false` → the entire publish/release branch was skipped → the missing releases were never recreated. The 0.56.0 batch shipped to npm with 15/16 GitHub Releases missing, recoverable only by hand. A second latent path: `concurrency.cancel-in-progress: true` could cancel a run between `npm publish` and tag/release creation.
+**Problem.** The release pipeline was **not idempotent across runs**. `Create GitHub Releases` was gated `if: steps.unpublished.outputs.has_unpublished == 'true'` and iterated _current_ `packages/*/` versions. When that step failed once (observed: run 27213292219, `exit 128`, no diagnostics — the `run:` had no `set -euo pipefail`/tracing), the packages were already on npm with tags pushed, so the **next** run saw `local == npm` → `has_unpublished=false` → the entire publish/release branch was skipped → the missing releases were never recreated. The 0.56.0 batch shipped to npm with 15/16 GitHub Releases missing, recoverable only by hand. A second latent path: `concurrency.cancel-in-progress: true` could cancel a run between `npm publish` and tag/release creation.
 
 **Solution.** Three changes in `changesets.yml`:
 
-1. **Replaced `Create GitHub Releases` with `Reconcile GitHub Releases`** — gated only on `changesets_count == '0'` (the publish branch), **not** on `has_unpublished`, so it runs on every publish-path invocation including no-op ones. It is **tag-driven**: enumerate `git tag -l '*@*'`, skip any tag already in the one-shot `gh release list` set, and create the rest. This both creates this run's releases *and* backfills any an earlier failed run dropped. Per-version notes come from the `## <version>` CHANGELOG section (not the file's top section, so backfilled older tags get correct notes). `--verify-tag` ensures it attaches to the existing remote tag and never mints a new one.
+1. **Replaced `Create GitHub Releases` with `Reconcile GitHub Releases`** — gated only on `changesets_count == '0'` (the publish branch), **not** on `has_unpublished`, so it runs on every publish-path invocation including no-op ones. It is **tag-driven**: enumerate `git tag -l '*@*'`, skip any tag already in the one-shot `gh release list` set, and create the rest. This both creates this run's releases _and_ backfills any an earlier failed run dropped. Per-version notes come from the `## <version>` CHANGELOG section (not the file's top section, so backfilled older tags get correct notes). `--verify-tag` ensures it attaches to the existing remote tag and never mints a new one.
 2. **`set -euo pipefail` + `::group::` tracing** so a failure is diagnosable (the original `exit 128` was not). `gh release list` failure is fail-fast, not silently "treat all tags as missing".
 3. **`concurrency.cancel-in-progress: false`** — serialize publishing, never cancel a run mid-`changeset publish`.
 
-**Why tag-driven, not current-version.** Iterating current `packages/*/` versions only reconciles the latest batch; if a release is missed and then a *newer* version is published before the next reconcile, the older miss is orphaned forever. Enumerating tags closes that gap. Cost is bounded by fetching the full release set in a single `gh release list --limit 1000` call (800+ tags exist — a per-tag `gh release view` sweep would be 800+ API calls) and a late per-candidate `gh release view` guard only for the few that look missing.
+**Why tag-driven, not current-version.** Iterating current `packages/*/` versions only reconciles the latest batch; if a release is missed and then a _newer_ version is published before the next reconcile, the older miss is orphaned forever. Enumerating tags closes that gap. Cost is bounded by fetching the full release set in a single `gh release list --limit 1000` call (800+ tags exist — a per-tag `gh release view` sweep would be 800+ API calls) and a late per-candidate `gh release view` guard only for the few that look missing.
 
 **Verified** (dry-run of the exact reconcile shell against the live repo, `gh release create` stubbed): on the real tag set it flags exactly the genuine gaps — e.g. it surfaced `@real-router/ssr-data-plugin@0.3.4` (tag present, Release absent) with correct notes, while skipping all 864 existing releases; the two-pass ordering and per-version notes/`--prerelease` detection were confirmed against `@real-router/core@0.56.0` (featured, 36-line notes) vs `@real-router/sources@0.8.5` (dep-only, 4-line notes). `actionlint` on the workflow: no new findings.
 
@@ -815,7 +818,7 @@ The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to
 
 #### Changeset content validation (pre-push fast-block)
 
-**Problem.** `.changeset/README.md` documented a contract for changeset files — quoted package names, a valid bump level, public packages only, a PR/issue reference, one package per file — and its "CI Integration" section *claimed* CI enforced the content rules. It did not: `.github/workflows/changeset-check.yml` only checks that a changeset **exists** when public-package `src/` changes. Nothing validated the **contents**. A malformed changeset (unknown package, typo'd bump level like `mihor`, a private package such as `route-tree`, a missing `#NN`, two packages in one file) sailed through every gate and only surfaced at `changeset version` on the release run — the slowest, most expensive place to find it.
+**Problem.** `.changeset/README.md` documented a contract for changeset files — quoted package names, a valid bump level, public packages only, a PR/issue reference, one package per file — and its "CI Integration" section _claimed_ CI enforced the content rules. It did not: `.github/workflows/changeset-check.yml` only checks that a changeset **exists** when public-package `src/` changes. Nothing validated the **contents**. A malformed changeset (unknown package, typo'd bump level like `mihor`, a private package such as `route-tree`, a missing `#NN`, two packages in one file) sailed through every gate and only surfaced at `changeset version` on the release run — the slowest, most expensive place to find it.
 
 **Solution.** `.changeset/check-changeset.mjs` (`pnpm lint:changeset`), wired **first** in `.husky/pre-push` so it fails fast before the heavy build. It validates the machine-checkable subset of the README contract against every pending `.changeset/*.md`:
 
@@ -825,7 +828,7 @@ The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to
 - exactly one package per file
 - a `#NN` reference in the body
 
-**No changeset files present → exit 0, silently.** A WIP push or an infra-only push (which by repo convention carries no changeset) is never blocked — so there is no opt-out env flag: when changesets *are* present, they must be valid (the only blunt override is git's own `--no-verify`, which skips the whole hook).
+**No changeset files present → exit 0, silently.** A WIP push or an infra-only push (which by repo convention carries no changeset) is never blocked — so there is no opt-out env flag: when changesets _are_ present, they must be valid (the only blunt override is git's own `--no-verify`, which skips the whole hook).
 
 **Why pre-push, not CI.** The rules are author-facing policy — better heard before the push than after a red CI round-trip. It's a static `git`-free filesystem read (~10 ms), cheaper than every other pre-push gate, so it earns first place. **Not** machine-checked (semantic, left to the author): "one logical change per file", "don't mix features/fixes", "right bump for the change type". The same commit corrected `.changeset/README.md`, which contradicted itself — Principles + a "Multiple Packages — Single File" example permitted multi-package files while the CI-Integration section forbade them; the real practice (and now the linter) is **one package per file, always**.
 
@@ -835,10 +838,10 @@ The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to
 
 **Solution.** Two complementary local layers, mirroring the existing "external tool, non-blocking if absent" pattern of `lint:audit`:
 
-1. **`eslint-plugin-security`** (`eslint.config.mjs`, **shipped `src` only**) — in-process, zero marginal cost (runs in the existing `lint` pass, already in the pre-push build graph). High-signal rules stay ON (`detect-unsafe-regex`, `detect-eval-with-expression`, `detect-child-process`, `detect-pseudoRandomBytes`, …). Three rules are OFF as **structural** false positives for a view-layer router: `detect-object-injection` (fires on every `obj[key]`), `detect-non-literal-regexp` (the matcher builds RegExps from trusted route *config*, not user input), `detect-possible-timing-attacks` (no secret comparison exists). One verified-safe `detect-unsafe-regex` hit (`FULL_ROUTE_PATTERN` — a `.`-anchored nested `*` with disjoint classes, no backtracking) is suppressed inline with justification, keeping the rule active everywhere else.
+1. **`eslint-plugin-security`** (`eslint.config.mjs`, **shipped `src` only**) — in-process, zero marginal cost (runs in the existing `lint` pass, already in the pre-push build graph). High-signal rules stay ON (`detect-unsafe-regex`, `detect-eval-with-expression`, `detect-child-process`, `detect-pseudoRandomBytes`, …). Three rules are OFF as **structural** false positives for a view-layer router: `detect-object-injection` (fires on every `obj[key]`), `detect-non-literal-regexp` (the matcher builds RegExps from trusted route _config_, not user input), `detect-possible-timing-attacks` (no secret comparison exists). One verified-safe `detect-unsafe-regex` hit (`FULL_ROUTE_PATTERN` — a `.`-anchored nested `*` with disjoint classes, no backtracking) is suppressed inline with justification, keeping the rule active everywhere else.
 2. **`scripts/check-semgrep.sh`** (`pnpm lint:security`, pre-push) — semgrep over `packages/**/src`, **diff-aware** via `--baseline-commit $(git merge-base origin/master HEAD)` so only findings **introduced by the branch** can block (a legacy finding never blocks an unrelated push). Rulesets: `p/javascript` (registry breadth, cached after first fetch) + `.semgrep/rules.yml` (local custom rules, incl. an `incomplete-multi-character-sanitization` rule that mirrors the exact CodeQL alert, network-independent). Resolves a runner (`semgrep`, else `uvx semgrep`); **skips gracefully** if neither is present. Findings (exit 1) block; tool/network errors (exit ≥2) only warn.
 
-**Why this split.** No free tool is both as deep as CodeQL *and* pre-push-fast: CodeQL's depth comes from its compiled DB. So CodeQL stays the authoritative gate in CI; the local layers are **shift-left** convenience — pattern-based (eslint-security) + AST-based diff scan (semgrep) catch the common, recognizable classes (including the one that fired here) seconds after editing, while genuinely deep taint analysis remains in CI. Both local layers are non-blocking when their tool is absent, matching `lint:audit` — fresh clones and `--no-verify`/automerge pushes are never wedged, and CI CodeQL still runs.
+**Why this split.** No free tool is both as deep as CodeQL _and_ pre-push-fast: CodeQL's depth comes from its compiled DB. So CodeQL stays the authoritative gate in CI; the local layers are **shift-left** convenience — pattern-based (eslint-security) + AST-based diff scan (semgrep) catch the common, recognizable classes (including the one that fired here) seconds after editing, while genuinely deep taint analysis remains in CI. Both local layers are non-blocking when their tool is absent, matching `lint:audit` — fresh clones and `--no-verify`/automerge pushes are never wedged, and CI CodeQL still runs.
 
 #### CI parity for publint / attw / knip (#813)
 
@@ -869,8 +872,9 @@ Both fold into the required `CI Result` (they're steps in `pipeline`).
 
 **Problem:** the `jscpd` 5.0.4 → 5.0.9 bump in the dev-dependencies group (#831) re-broke the pre-push duplication gate: `pnpm lint:duplicates` failed at **6.84%** over 2%, again counting the deliberately-excluded clones (`packages/preact/src/**`, etc.) that `.jscpd.json`'s `ignorePattern` list named. jscpd also began emitting `config file .jscpd.json: unknown field '_comment'` and `unknown field 'skipComments'` warnings.
 
-**Root cause:** the Rust `cpd` rewrite reshuffled its option vocabulary *again* between 5.0.4 and 5.0.9 (verified against the installed 5.0.9 `--help`):
-- **File-level glob ignore moved back to `ignore`** (`-i, --ignore` — "File-level glob patterns to ignore"). `ignorePattern` was **reassigned** to a *different* feature: `--ignore-pattern` is now "Code-level regex patterns to skip matching tokens" (e.g. `//\s*cpd-disable`). So our `ignorePattern: [globs]` was silently reinterpreted as token-regexes that match no code → every file exclusion evaporated (same failure mode as #714, opposite key).
+**Root cause:** the Rust `cpd` rewrite reshuffled its option vocabulary _again_ between 5.0.4 and 5.0.9 (verified against the installed 5.0.9 `--help`):
+
+- **File-level glob ignore moved back to `ignore`** (`-i, --ignore` — "File-level glob patterns to ignore"). `ignorePattern` was **reassigned** to a _different_ feature: `--ignore-pattern` is now "Code-level regex patterns to skip matching tokens" (e.g. `//\s*cpd-disable`). So our `ignorePattern: [globs]` was silently reinterpreted as token-regexes that match no code → every file exclusion evaporated (same failure mode as #714, opposite key).
 - **`skipComments` is gone**, replaced by `--skip-comments` = "Alias for `--mode weak`". The config key is now `mode` (`mild | weak | strict`).
 - `_comment` is rejected as an unknown field (5.0.9 validates the config shape and warns on anything it doesn't recognize), so the inline doc-comment had to leave the file.
 
@@ -1003,11 +1007,11 @@ Cancels in-progress runs when new commit pushed.
 
 Post-removal numbers:
 
-| Workflow             | Before        | After                 |
-| -------------------- | ------------- | --------------------- |
-| PR CI full rebuild   | ~28 min       | **~22–23 min**        |
-| Post-Merge Build full rebuild | ~25 min | **~18–20 min**       |
-| Cache hit (any)      | unchanged     | unchanged (~1–5 min)  |
+| Workflow                      | Before    | After                |
+| ----------------------------- | --------- | -------------------- |
+| PR CI full rebuild            | ~28 min   | **~22–23 min**       |
+| Post-Merge Build full rebuild | ~25 min   | **~18–20 min**       |
+| Cache hit (any)               | unchanged | unchanged (~1–5 min) |
 
 **Why this is safe enough.** Pre-push covers stress for every human push. Dependabot PRs bypass pre-push (the bot pushes directly to its fork), so framework-adapter bumps (React/Vue/Solid/Svelte) lose their stress safety net here — a deliberate trade-off, on the bet that adapter bumps are rare and locally re-runnable when a leak is suspected.
 
@@ -1021,16 +1025,16 @@ Two heuristics disagreed. The `check` job's "is this a code change?" filter only
 
 **Solution.** `pipeline` now emits a `built` output, set by a "Detect produced artifacts" step (`id: artifacts`) that checks whether any real artifact **file** exists post-bundle. The two upload steps gate on the step-local `steps.artifacts.outputs.built == 'true'`; the three downstream artifact-consuming jobs (`coverage`, `sonarcloud`, `bundle-size`) gate on the job output `needs.pipeline.outputs.built == 'true'`. On a zero-affected PR they **skip** instead of failing; the `ci` gate already treats `skipped` as a pass (`ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }`), so CI Result goes green. A real source change still produces `dist/coverage` → `built=true` → the jobs run normally, including their fill-in-from-cache logic for non-affected packages.
 
-**Why not widen the `check` filter instead.** Excluding `package.json` from the `should_run` heuristic is unsafe — a root `package.json` dependency/override bump genuinely affects every package's build and must run full CI. Gating on *artifacts actually produced* is the precise signal; it can't false-negative a real source change.
+**Why not widen the `check` filter instead.** Excluding `package.json` from the `should_run` heuristic is unsafe — a root `package.json` dependency/override bump genuinely affects every package's build and must run full CI. Gating on _artifacts actually produced_ is the precise signal; it can't false-negative a real source change.
 
-**Follow-up (#730): gate on files, not directories.** The first implementation computed `built` from **directory** existence (`shopt -s nullglob; produced=(packages/*/dist packages/*/coverage)`). That re-opened the exact failure it was meant to prevent: on a config-only PR (e.g. `.jscpd.json`) turbo affects zero packages, yet empty `packages/*/dist` / `packages/*/coverage` directories can still be present, so the glob set was non-empty → `built=true`, while `upload-artifact` (which requires files *inside* the path) uploaded nothing → `coverage`/`sonarcloud`/`bundle-size` failed on `Artifact not found` and the required CI Result gate blocked the PR (observed: runs 27182816369, 27162256870). Fixed by gating on a real file:
+**Follow-up (#730): gate on files, not directories.** The first implementation computed `built` from **directory** existence (`shopt -s nullglob; produced=(packages/*/dist packages/*/coverage)`). That re-opened the exact failure it was meant to prevent: on a config-only PR (e.g. `.jscpd.json`) turbo affects zero packages, yet empty `packages/*/dist` / `packages/*/coverage` directories can still be present, so the glob set was non-empty → `built=true`, while `upload-artifact` (which requires files _inside_ the path) uploaded nothing → `coverage`/`sonarcloud`/`bundle-size` failed on `Artifact not found` and the required CI Result gate blocked the PR (observed: runs 27182816369, 27162256870). Fixed by gating on a real file:
 
 ```bash
 produced="$(find packages \( -path '*/coverage/lcov.info' -o -path '*/dist/*' \) -type f -print -quit)"
 [ -n "$produced" ] && built=true || built=false
 ```
 
-The grouping parens `\( … \)` are **load-bearing**: `find … -path A -o -path B -type f -print` binds as `A OR (B AND -type f AND -print)` (implicit `-a` outranks `-o`), so a `coverage/lcov.info` match on branch `A` would carry no action and never print — the group applies `-type f -print -quit` to *both* branches. `-quit` stops at the first hit (cheap). Because any non-empty affected set runs `test` (→ `lcov.info`) **and** `bundle` (→ `dist/`) under the same `...[base]` filter, the OR is safe — both artifacts are always present together, never one without the other.
+The grouping parens `\( … \)` are **load-bearing**: `find … -path A -o -path B -type f -print` binds as `A OR (B AND -type f AND -print)` (implicit `-a` outranks `-o`), so a `coverage/lcov.info` match on branch `A` would carry no action and never print — the group applies `-type f -print -quit` to _both_ branches. `-quit` stops at the first hit (cheap). Because any non-empty affected set runs `test` (→ `lcov.info`) **and** `bundle` (→ `dist/`) under the same `...[base]` filter, the OR is safe — both artifacts are always present together, never one without the other.
 
 ### pnpm/action-setup v6
 
@@ -1038,32 +1042,32 @@ All CI workflows use `pnpm/action-setup@v6` (`ci.yml`, `changesets.yml`, `danger
 
 ### Workflows
 
-| Workflow             | File                       | Purpose                                                                           |
-| -------------------- | -------------------------- | --------------------------------------------------------------------------------- |
-| CI                   | `ci.yml`                   | Single Pipeline job on PRs: test + bundle, then smoke test, coverage, bundle size |
-| Post-Merge Build     | `post-merge.yml`           | Build-only verification on master push                                            |
-| Changesets           | `changesets.yml`           | Versioning and npm publish (triggered by Post-Merge Build success)                |
-| Changeset Check      | `changeset-check.yml`      | Validate changesets on PRs (format, references)                                   |
-| CodeQL               | `codeql.yml`               | Security scanning + dependency audit                                              |
-| Dependabot Dedupe    | `dependabot-dedupe.yml`    | `pnpm dedupe` a Dependabot PR lockfile so `lint:dedupe` passes (#1085)             |
-| Danger               | `danger.yml`               | Automated PR review checks                                                        |
-| Examples             | `examples.yml`             | Scheduled e2e tests for example apps (Mon & Thu)                                  |
+| Workflow          | File                    | Purpose                                                                           |
+| ----------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| CI                | `ci.yml`                | Single Pipeline job on PRs: test + bundle, then smoke test, coverage, bundle size |
+| Post-Merge Build  | `post-merge.yml`        | Build-only verification on master push                                            |
+| Changesets        | `changesets.yml`        | Versioning and npm publish (triggered by Post-Merge Build success)                |
+| Changeset Check   | `changeset-check.yml`   | Validate changesets on PRs (format, references)                                   |
+| CodeQL            | `codeql.yml`            | Security scanning + dependency audit                                              |
+| Dependabot Dedupe | `dependabot-dedupe.yml` | `pnpm dedupe` a Dependabot PR lockfile so `lint:dedupe` passes (#1085)            |
+| Danger            | `danger.yml`            | Automated PR review checks                                                        |
+| Examples          | `examples.yml`          | Scheduled e2e tests for example apps (Mon & Thu)                                  |
 
 **Removed:** `build.yml`, `sonarcloud.yml`, `coverage.yml`, `size.yml`, `release.yml` (consolidated into `ci.yml` and `changesets.yml`)
 
 ### Coverage scope is generated, not hardcoded (#732)
 
 **Problem.** The external quality gates' scope lived in three hand-maintained lists that were never
-updated as packages were added: Codecov's `files:` in `ci.yml` (16 stale paths, several *private*),
+updated as packages were added: Codecov's `files:` in `ci.yml` (16 stale paths, several _private_),
 `codecov.yml` `flags:` (17), and `sonar-project.properties` `sonar.sources` (11). Result: of 25
 published packages, Codecov saw 16 and Sonar 11 — ~14 public packages (all adapters except React,
 half the plugins) were in **neither**, so their coverage regressions went uncaught by Codecov/Sonar.
-(Coverage was still *enforced* per-package by vitest thresholds in the `pipeline` job — the gap was
+(Coverage was still _enforced_ per-package by vitest thresholds in the `pipeline` job — the gap was
 external-gate **visibility**, not enforcement.)
 
 **Solution.** Generate the scope from the filesystem; keep `sonar-project.properties` for stable
-policy only. **One source of truth:** `scripts/check-coverage-scope.mjs` both *guards* the static
-config (check mode, below) and *generates* the CI scope (`--emit` mode prints `sources=`/`tests=`/
+policy only. **One source of truth:** `scripts/check-coverage-scope.mjs` both _guards_ the static
+config (check mode, below) and _generates_ the CI scope (`--emit` mode prints `sources=`/`tests=`/
 `reports=` lines for `$GITHUB_OUTPUT`) — the same filesystem walk feeds both, so the CI scope and
 the drift guard cannot disagree by construction. The script is `node:fs`-only, so the `coverage`
 and `sonarcloud` jobs run it on the runner's system node without `pnpm install`.
@@ -1077,10 +1081,10 @@ and `sonarcloud` jobs run it on the runner's system node without `pnpm install`.
   sonar-scanner, which does not index files under symlinked directories — so the `src` symlinks of
   `browser-env`/`dom-utils` and the symlinked copies inside consumers like
   `packages/react/src/dom-utils` are invisible to Sonar) **plus `shared/*`**: the shared code is
-  analysed at its real location. It was *initially* coverage-excluded via `shared/**` because **no
+  analysed at its real location. It was _initially_ coverage-excluded via `shared/**` because **no
   lcov record for that code existed anywhere**: v8 coverage resolves symlinked files to their
   `shared/` realpath, which the root vitest include filter (`packages/*/src/**`) drops —
-  `browser-env`/`dom-utils` emitted *empty* lcov (their 100% thresholds passed vacuously over zero
+  `browser-env`/`dom-utils` emitted _empty_ lcov (their 100% thresholds passed vacuously over zero
   files) and consumers' lcov omit the symlinked files (verified: zero
   `browser-env`/`dom-utils`/`shared` SF records across all 31 lcov, except the angular copy below).
   **Superseded by #809** (next section): the shared dirs are now owner-measured at 100% and the
@@ -1095,7 +1099,7 @@ and `sonarcloud` jobs run it on the runner's system node without `pnpm install`.
 **Caveat handled — don't let phantom/no-coverage code red the Sonar gate.** Adapters
 (angular/solid/svelte/vue) carry compiler-phantom code via **lowered vitest thresholds**, and
 `core-types` has no tests → no lcov. A file in `sonar.sources` without clean coverage is scored as
-**uncovered** by Sonar, which would red the new-code-coverage gate (a *required* check via
+**uncovered** by Sonar, which would red the new-code-coverage gate (a _required_ check via
 `sonarcloud` in the `ci` gate). So `sonar.coverage.exclusions` gains
 `packages/{angular,solid,svelte,vue,core-types}/src/**` — those stay in `sources` (bugs/smells
 analysis runs) but Sonar doesn't score their coverage. Their coverage remains enforced by vitest and
@@ -1106,7 +1110,7 @@ ever pushes it under 99%, switch `status.project.default.target` to `auto`.
 **Extended to `.size-limit.js` — same guard, same class (check 4).** `.size-limit.js` was the third
 hand-maintained per-package list and had drifted the same way (it lacked an entry for the public
 `@real-router/fsm`). The fix is not "add the missing entry" but "close the class": the SAME question
-*"is this package public?"* must be answered consistently by every per-package list, not
+_"is this package public?"_ must be answered consistently by every per-package list, not
 independently — a package can otherwise be `private:false` + published on npm + a Codecov component +
 smoke-tested, yet silently absent from size tracking (exactly `fsm`'s state). Check 4 asserts every
 **npm-public** package (`private !== true`) has a `.size-limit.js` entry (matched by `esm("<name>"…)`
@@ -1123,7 +1127,7 @@ size-limit) — the guard will demand exactly that.
 
 **Components, not flags.** `codecov.yml` previously declared per-package `flags:` (with
 `carryforward: false`). Codecov **flags only exist when uploads are tagged with them** (`flags:`
-on the action / `-F` on the CLI) — our CI does a single *untagged* upload of all lcov files, so no
+on the action / `-F` on the CLI) — our CI does a single _untagged_ upload of all lcov files, so no
 per-flag report was ever created: the whole `flags:` section, including any `carryforward` setting,
 was **inert**. (It also means partial affected-only runs were never "zeroed" by
 `carryforward: false` — with untagged uploads, project coverage is simply computed over the files
@@ -1203,7 +1207,7 @@ realpath, which the base vitest `coverage.include` (`packages/*/src/**`) drops a
 `dom-utils`) emitted 0-byte lcov and their 100% thresholds passed **vacuously over zero files**.
 
 **Solution — owner-only measurement, NOT aggregate-union.** vitest's glob-pattern thresholds don't
-*exclude* files from the global threshold ("Vitest counts all files … into the global coverage
+_exclude_ files from the global threshold ("Vitest counts all files … into the global coverage
 thresholds"), so a consumer can't include shared code in its lcov without it gating the consumer's
 own 100%. Instead, each shared dir gets exactly one **measuring owner** whose vitest config sets
 `coverage.allowExternal = true` and a **dual** `coverage.include` — the owner's **own narrowed
@@ -1211,11 +1215,11 @@ src** plus the shared glob. It must NOT keep the base `packages/*/src/**` wildca
 `allowExternal` (that drags the whole aliased workspace graph — core/sources — into the report and
 fails the owner's own gate):
 
-| Shared dir           | Measuring owner                       | Include                                                          |
-| -------------------- | ------------------------------------- | ---------------------------------------------------------------- |
+| Shared dir           | Measuring owner                       | Include                                                                    |
+| -------------------- | ------------------------------------- | -------------------------------------------------------------------------- |
 | `shared/browser-env` | `packages/browser-plugin` (consumer)  | `["packages/browser-plugin/src/**/*.ts", "**/shared/browser-env/**/*.ts"]` |
-| `shared/dom-utils`   | `packages/react` (consumer)           | `["packages/react/src/**/*.{ts,tsx}", "**/shared/dom-utils/**/*.ts"]` |
-| `shared/ssr`         | `packages/ssr-data-plugin` (consumer) | `["**/packages/ssr-data-plugin/src/**/*.ts", "**/shared/ssr/**/*.ts"]` |
+| `shared/dom-utils`   | `packages/react` (consumer)           | `["packages/react/src/**/*.{ts,tsx}", "**/shared/dom-utils/**/*.ts"]`      |
+| `shared/ssr`         | `packages/ssr-data-plugin` (consumer) | `["**/packages/ssr-data-plugin/src/**/*.ts", "**/shared/ssr/**/*.ts"]`     |
 
 **Owner evolution.** browser-env/dom-utils began in tests-only wrapper packages
 (`packages/{browser-env,dom-utils}`, #809), moved to a single `shared/` test node
@@ -1227,7 +1231,7 @@ tests now live in the consumer's `tests/{functional,property,stress}/<tree>/` (n
 `// @vitest-environment jsdom` (react's property config is `node`).
 
 `shared/ssr` has no dedicated owner package (both consumers carry their own `src`), so the
-measurement rides on `ssr-data-plugin` with a dual include — the *specific* own-src path doesn't
+measurement rides on `ssr-data-plugin` with a dual include — the _specific_ own-src path doesn't
 leak the workspace graph the way the bare `src/**` wildcard does. Its tests cover the generic
 `createSsrLoaderPlugin` for both wirings (incl. the rsc-server-plugin shape: no deferred
 namespaces). Audit rule applied throughout (classify before testing): genuinely dead branches were
@@ -1284,11 +1288,12 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 #### Local Dependency Audit (PR #643)
 
-**Problem:** `actions/dependency-review-action` only runs on PRs in CI — contributors discover GHSAs after pushing, and the action only flags vulns *newly introduced* by the PR relative to base, so pre-existing CVEs in the lockfile stay invisible until something changes them.
+**Problem:** `actions/dependency-review-action` only runs on PRs in CI — contributors discover GHSAs after pushing, and the action only flags vulns _newly introduced_ by the PR relative to base, so pre-existing CVEs in the lockfile stay invisible until something changes them.
 
 **Solution:** `scripts/check-deps-audit.sh` wraps `osv-scanner` (`brew install osv-scanner`) to scan `pnpm-lock.yaml` + every `Cargo.lock` against the same GHSA database GitHub uses. Wired as `pnpm lint:audit` and runs in pre-push.
 
 **Behavior:**
+
 - Skips gracefully with a hint if `osv-scanner` is not installed (fresh clones / non-security contributors can still push).
 - `scripts/osv-scanner.toml` is the single source of truth for ignored advisories — mirrors `allow-ghsas:` in `codeql.yml` AND lists RUSTSEC unmaintained advisories without CVSS that GitHub Dependency Review ignores but osv-scanner reports (gtk/atk/gdk/glib/unic-\*/proc-macro-error — all transitive via Tauri 2.x in desktop examples only).
 
@@ -1296,9 +1301,10 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 **npm allowlist entries (vs the Rust/Tauri ones):** prefer a **bump** over an exemption — patch/minor bumps go in the affected `package.json`; transitive vulns whose dependency hard-pins the bad version get a `pnpm.overrides` security floor in the root `package.json` (the established pattern: `axios`/`qs`/`follow-redirects`/`node-forge`/`@babel/core`/`vite`/…). Only allowlist when **no in-range fix exists** — and "no fix" means you checked **every** node in the chain, not just the one that names the bad package.
 
-**Worked example — override the intermediary, not the leaf (`GHSA-h67p-54hq-rp68`, `js-yaml@3.14.2` quadratic-merge-key DoS):** js-yaml is fixed only in 4.x, and it was pinned by `read-yaml-file@1.1.0` (`js-yaml@^3`) deep under `@changesets/cli → @manypkg/get-packages`. The obvious override — force `js-yaml: 4.x` — **breaks `read-yaml-file`** (its v1 calls `yaml.safeLoad`, removed in js-yaml 4.x), so this advisory was originally **exempted** in both audit files. That was a local minimum. The real fix is to override one level up: `"read-yaml-file": ">=2.1.0 <3.0.0"` in `pnpm.overrides`. `read-yaml-file@2.1.0` is the last CJS line (3.0.0 is ESM-only `type: module` — hence the `<3.0.0` ceiling, since `@manypkg`'s `require('read-yaml-file')` is CJS), depends on `js-yaml@^4`, and keeps the exact API `@manypkg` consumes (default export + `.default` + `.sync`, now backed by `yaml.load`). This removes `js-yaml@3.14.2` from the tree entirely, so the **exemption was deleted** from `scripts/osv-scanner.toml` + `codeql.yml` rather than carried forever. Lesson: when the package that names the CVE can't be bumped, walk up to the nearest ancestor that *can* be re-pointed at a fixed-transitive line before reaching for an allowlist. Verify with `pnpm changeset status` (exercises `@manypkg/get-packages → read-yaml-file` reading `pnpm-workspace.yaml`) + `pnpm dedupe --check`.
+**Worked example — override the intermediary, not the leaf (`GHSA-h67p-54hq-rp68`, `js-yaml@3.14.2` quadratic-merge-key DoS):** js-yaml is fixed only in 4.x, and it was pinned by `read-yaml-file@1.1.0` (`js-yaml@^3`) deep under `@changesets/cli → @manypkg/get-packages`. The obvious override — force `js-yaml: 4.x` — **breaks `read-yaml-file`** (its v1 calls `yaml.safeLoad`, removed in js-yaml 4.x), so this advisory was originally **exempted** in both audit files. That was a local minimum. The real fix is to override one level up: `"read-yaml-file": ">=2.1.0 <3.0.0"` in `pnpm.overrides`. `read-yaml-file@2.1.0` is the last CJS line (3.0.0 is ESM-only `type: module` — hence the `<3.0.0` ceiling, since `@manypkg`'s `require('read-yaml-file')` is CJS), depends on `js-yaml@^4`, and keeps the exact API `@manypkg` consumes (default export + `.default` + `.sync`, now backed by `yaml.load`). This removes `js-yaml@3.14.2` from the tree entirely, so the **exemption was deleted** from `scripts/osv-scanner.toml` + `codeql.yml` rather than carried forever. Lesson: when the package that names the CVE can't be bumped, walk up to the nearest ancestor that _can_ be re-pointed at a fixed-transitive line before reaching for an allowlist. Verify with `pnpm changeset status` (exercises `@manypkg/get-packages → read-yaml-file` reading `pnpm-workspace.yaml`) + `pnpm dedupe --check`.
 
 **Coverage difference vs CI Dependency Review:**
+
 - CI: only flags vulns introduced by the PR (delta vs base).
 - Local: full state of current lockfiles (catches pre-existing CVEs too).
 
@@ -1377,7 +1383,7 @@ code/config decision — fix the flagged sites, or opt out of the new rules in
 `eslint.config.mjs` and track re-enabling (e.g. #712) — and is out of scope for
 `resolve:dependabot`.
 
-**Hardening (#814): branch guard + no `eval`.** The script takes a PR *number*
+**Hardening (#814): branch guard + no `eval`.** The script takes a PR _number_
 and resolves the head branch via `gh pr view`, so the branch name is
 attacker-controlled. git-refs forbid spaces and `~^:?*[` but **permit** `;`, `|`,
 `&`, `$`, `(`, `)` — and the `--merge` path used to run `eval "$PUSH_CMD"` /
@@ -1418,7 +1424,7 @@ GitHub honors the `permissions:` key to elevate the token for Dependabot
 loudly with a 403, never silently). No PAT, no GitHub App, no stored secret.
 
 **Why not `pull_request_target` + a PAT (the issue's original sketch):** a workflow
-*triggered by* Dependabot gets a **read-only** `GITHUB_TOKEN` and cannot see Actions
+_triggered by_ Dependabot gets a **read-only** `GITHUB_TOKEN` and cannot see Actions
 secrets (only Dependabot secrets); for `pull_request_target` on a Dependabot PR even
 Dependabot secrets are unavailable, and it would run a privileged checkout of an
 untrusted head. A plain `pull_request` run whose declared `permissions:` elevate
@@ -1452,7 +1458,7 @@ opened a per-patch PR for every one of them across **~150** example/adapter/benc
 manifests — a constant manual-review chore (each needs `resolve:dependabot` if it
 conflicts or leaves a dedupe split). Worse for `@angular/*`: its packages have
 **exact cross-peer requirements** (`@angular/router@x` peers `@angular/core@x`
-*exactly*), so when Dependabot bumped one in isolation (#1371 `@angular/router`
+_exactly_), so when Dependabot bumped one in isolation (#1371 `@angular/router`
 22.0.5→22.0.6) the repo papered over it with a pnpm `overrides` entry pinning
 `@angular/router` back to the framework version — which made the bump **cosmetic and
 lying**: the manifest declared `22.0.6`, the override forced `22.0.5` installed, and
@@ -1536,7 +1542,7 @@ pnpm danger:local
 
 **Solution:**
 
-- Added an **`actionlint` job** to `ci.yml` that runs on **every** PR with **no `should_run` gate** — so workflow-only PRs are validated. Pinned by digest: `docker://rhysd/actionlint@sha256:96d4a8c8…` (actionlint 1.7.8). The image bundles `shellcheck` + `pyflakes` (`FROM koalaman/shellcheck-alpine`), so shell bugs in `run:` blocks are caught too. Its result is folded into **`CI Result`** (added to `needs`, checked *before* the docs/CI short-circuit) — so the existing single required check now covers it, no new ruleset context needed for actionlint.
+- Added an **`actionlint` job** to `ci.yml` that runs on **every** PR with **no `should_run` gate** — so workflow-only PRs are validated. Pinned by digest: `docker://rhysd/actionlint@sha256:96d4a8c8…` (actionlint 1.7.8). The image bundles `shellcheck` + `pyflakes` (`FROM koalaman/shellcheck-alpine`), so shell bugs in `run:` blocks are caught too. Its result is folded into **`CI Result`** (added to `needs`, checked _before_ the docs/CI short-circuit) — so the existing single required check now covers it, no new ruleset context needed for actionlint.
 - `SHELLCHECK_OPTS: --severity=warning` drops the ~45 benign `SC2086` info findings (`>> $GITHUB_OUTPUT` and friends — unquoted but space-free) plus `SC2001` style noise, while keeping warnings, errors, and actionlint's own expression/script-injection rules **gating**.
 - Fixed the two genuine findings the linter surfaced so the gate passes clean: (a) `github.head_ref` interpolated directly into the `check` step's `run:` (script-injection class + an `SC2193` "can never be equal" **false positive** from actionlint substituting the `${{ }}` into the glob compare) → now passed via `env: HEAD_REF:` and compared as `"$HEAD_REF"`; (b) the lcov path-fix loop's `for … in $(find)` (`SC2044`) + `echo|sed` (`SC2001`) → rewritten as NUL-delimited `find -print0 | while read -r -d ''` with `${lcov%…}` parameter expansion.
 - Added **`Validate Changesets`** to `required_status_checks` in the `protect-master` ruleset (repo setting, applied via `gh api -X PUT repos/greydragon888/real-router/rulesets/12148150`). The job runs on every PR with no job-level `if` and handles release-PR deleted changesets gracefully (`[ -f "$file" ]` skip), so it always reports a status and won't deadlock the automated `changeset-release/*` PR.
@@ -1569,7 +1575,7 @@ The three low-severity residuals left open by the 2026-07-03 audit wave (re-audi
 
 **Problem.**
 
-1. **`bundle-size` serialized behind `base-test`.** Same class as smoke before #1130: the job starts from dist artifacts (`dist-base` + `dist-<shard>`) plus a cache-fill bundle — `base-test` produces NO dist, only coverage. Keeping it in `needs`/`if` delayed the job by the full core property-test run for zero integrity gain. Unlike #1130 the cost was latency of the PR size *comment*, not the merge gate (`bundle-size` is not in the `ci` gate's needs).
+1. **`bundle-size` serialized behind `base-test`.** Same class as smoke before #1130: the job starts from dist artifacts (`dist-base` + `dist-<shard>`) plus a cache-fill bundle — `base-test` produces NO dist, only coverage. Keeping it in `needs`/`if` delayed the job by the full core property-test run for zero integrity gain. Unlike #1130 the cost was latency of the PR size _comment_, not the merge gate (`bundle-size` is not in the `ci` gate's needs).
 2. **Release run could build a snapshot its trigger never validated.** In a `workflow_run` context the default checkout ref is the **current** default-branch tip, not the commit the triggering Post-Merge Build ran on. With two quick pushes, the release run fired by push #1 checked out push #2's tree and bundled/published it before push #2's own post-merge validation finished. Mitigated in practice by the serializing concurrency group + idempotent publish, but the "published ≠ validated" window existed.
 3. **`smoke-test-packages.sh` empty-array hazard on bash 3.2.** Expanding an EMPTY array with `"${arr[@]}"` under `set -u` is an "unbound variable" error on bash 3.2 — the CLAUDE.md lower bound for locally-run scripts (CI's bash 5 is unaffected). `PACKAGES`/`INSTALL_ARGS` are never empty today, so this was latent; and an empty tarball set would anyway have reached `npm install` as a literal unmatched glob rather than a clear error.
 
@@ -1583,9 +1589,9 @@ The three low-severity residuals left open by the 2026-07-03 audit wave (re-audi
 
 ### CI gate needs-completeness meta-test — the structural preventer for the #1127 class
 
-**Problem.** The gate model is "one required status check": the `ci` (CI Result) job aggregates every other ci.yml job via `needs` + explicit result checks, and the `protect-master` ruleset requires only that context. The model's failure mode is silent and recurrent: a job not wired into the gate's `needs` goes red while the PR stays mergeable. It already happened once (#1127 — `coverage` with the R2.4 shard-integrity guard ran, failed loudly, gated nothing), and nothing structural prevented the next occurrence: a job added tomorrow is outside the gate *by default*, `actionlint` cannot flag it (an unwired job is perfectly valid YAML), and review has to notice an *absence*. This is debt-map axis A6 ("every CI layer derives its own model of what must run; model-vs-reality drift defaults to silent green") — the per-site fixes landed as #1127/#1133/#1128 above, this is the class preventer.
+**Problem.** The gate model is "one required status check": the `ci` (CI Result) job aggregates every other ci.yml job via `needs` + explicit result checks, and the `protect-master` ruleset requires only that context. The model's failure mode is silent and recurrent: a job not wired into the gate's `needs` goes red while the PR stays mergeable. It already happened once (#1127 — `coverage` with the R2.4 shard-integrity guard ran, failed loudly, gated nothing), and nothing structural prevented the next occurrence: a job added tomorrow is outside the gate _by default_, `actionlint` cannot flag it (an unwired job is perfectly valid YAML), and review has to notice an _absence_. This is debt-map axis A6 ("every CI layer derives its own model of what must run; model-vs-reality drift defaults to silent green") — the per-site fixes landed as #1127/#1133/#1128 above, this is the class preventer.
 
-**Solution.** `scripts/ci-gate-completeness.test.mjs` — stdlib `node:test`, picked up automatically by the existing repo-lints glob step (`node --test scripts/*.test.mjs`, renamed "Test CI meta …"), so the preventer needed zero wiring of its own. Two single-purpose fail-closed extractors (top-level job ids; the gate's `needs` in flow and block styles) feed a pure `findViolations()` that asserts: (1) every job is in the gate's `needs` or in the in-test `OUTSIDE_GATE` allowlist, each entry carrying a written reason (today: `duplication` — informational jscpd SARIF channel, the hard threshold deliberately lives pre-push-only per #813; `bundle-size` — informational size-limit PR comment, "not a gate" by design per infra-review W4 §3.4); (2) the gate's `needs` reference existing jobs only (catches renames under the gate); (3) the allowlist is current — an entry that disappeared from ci.yml *or* got wired into `needs` after all fails the test. Fixtures inside the same file exercise every violation kind, so the check's discriminating power does not depend on the current (healthy) ci.yml.
+**Solution.** `scripts/ci-gate-completeness.test.mjs` — stdlib `node:test`, picked up automatically by the existing repo-lints glob step (`node --test scripts/*.test.mjs`, renamed "Test CI meta …"), so the preventer needed zero wiring of its own. Two single-purpose fail-closed extractors (top-level job ids; the gate's `needs` in flow and block styles) feed a pure `findViolations()` that asserts: (1) every job is in the gate's `needs` or in the in-test `OUTSIDE_GATE` allowlist, each entry carrying a written reason (today: `duplication` — informational jscpd SARIF channel, the hard threshold deliberately lives pre-push-only per #813; `bundle-size` — informational size-limit PR comment, "not a gate" by design per infra-review W4 §3.4); (2) the gate's `needs` reference existing jobs only (catches renames under the gate); (3) the allowlist is current — an entry that disappeared from ci.yml _or_ got wired into `needs` after all fails the test. Fixtures inside the same file exercise every violation kind, so the check's discriminating power does not depend on the current (healthy) ci.yml.
 
 **Why / verification.** Mutation-validated against the REAL ci.yml (per the stress-test doctrine — a guard without proven discriminating power is theatre): removing `coverage` from the gate's `needs` (the exact #1127 recurrence) fails the test naming the class; appending a phantom job fails it; the restored file + the full repo-lints glob pass. Not a YAML library: the extractors are ~30 lines and fail closed — a ci.yml restructuring that breaks them breaks the assertions loudly instead of passing vacuously. Not an actionlint rule: actionlint validates workflow syntax/expressions, not repo policy ("every job must feed the gate"). The allowlist lives in the test rather than a config file so the reason strings sit next to the enforcement and exempting a job is a reviewed code diff.
 
@@ -1625,11 +1631,11 @@ so the Release PR runs CI. Two consequences worth knowing:
 - **Until that secret exists the job dedupes but refuses to push**, emitting a
   `::warning::` + step summary naming `pnpm resolve:dependabot <PR#>`. Deliberately not
   a failure: `lint:dedupe` in `repo-lints` already reports the same problem as a red
-  *required* check, so a second red X would be noise. Degraded, never silently harmful —
+  _required_ check, so a second red X would be noise. Degraded, never silently harmful —
   the presence check rides in a job-level `env:` because the `secrets` context is not
   available in a job-level `if:`.
 
-The loop argument survives with a new basis: a PAT push *does* re-trigger
+The loop argument survives with a new basis: a PAT push _does_ re-trigger
 `pull_request`, but the retriggered run's `github.actor` is the PAT owner rather than
 `dependabot[bot]`, so the job's `if:` skips it — and `pnpm dedupe` is idempotent anyway
 (`changed=false` on a second pass). Side benefit: that retriggered run is an ordinary
@@ -1663,13 +1669,13 @@ the legitimate no-match exit.
 the fix was validated with a faithful shell model of the step run under the exact
 default shell (`bash -e`, no `pipefail`), old vs new, across five scenarios:
 
-| scenario | old | new |
-| --- | --- | --- |
-| source change | exit 0, `should_run=true` | exit 0, `should_run=true` |
-| docs-only | exit 0, `should_run=false` | exit 0, `should_run=false` |
-| workflow-only | exit 0, `should_run=false` | exit 0, `should_run=false` |
-| composite-action-only (#1128) | exit 0, `should_run=true` | exit 0, `should_run=true` |
-| **`git diff` fails** | **exit 0, `should_run=false`** | **exit 128** |
+| scenario                      | old                            | new                        |
+| ----------------------------- | ------------------------------ | -------------------------- |
+| source change                 | exit 0, `should_run=true`      | exit 0, `should_run=true`  |
+| docs-only                     | exit 0, `should_run=false`     | exit 0, `should_run=false` |
+| workflow-only                 | exit 0, `should_run=false`     | exit 0, `should_run=false` |
+| composite-action-only (#1128) | exit 0, `should_run=true`      | exit 0, `should_run=true`  |
+| **`git diff` fails**          | **exit 0, `should_run=false`** | **exit 128**               |
 
 Every healthy path is byte-identical; only the buggy input flips. `actionlint` 1.7.8 +
 shellcheck 0.11.0 with `SHELLCHECK_OPTS=--severity=warning` (the CI gate's exact mode)
@@ -1701,7 +1707,7 @@ from it — a toolchain bump (tsdown/rolldown/tinybench/Node) genuinely moves
 instruction counts. **Why skipping at the `on:` level is safe here** and would not
 be in `codeql.yml`: CodSpeed is not a required status check, so a workflow that
 never starts leaves nothing pending; `Dependency Review` is, which is exactly why
-that workflow gates at the *job* level instead. **Why push runs are never
+that workflow gates at the _job_ level instead. **Why push runs are never
 cancelled:** each master push seeds its own baseline, and dropping one leaves a
 hole in the comparison history; only superseded PR runs are cancelled. The two
 ignore lists are duplicated verbatim because GitHub Actions does not support YAML
@@ -1725,12 +1731,10 @@ to `exit 1`.
 **§1.5 — the last raw interpolation into executable code.** `bundle-size`'s
 comparison script embedded both size payloads in a JS **template literal**
 (`JSON.parse(\`${{ steps.pr_sizes.outputs.sizes }}\`)`). The names inside come
-from `.size-limit.js`, a file any PR can edit, so a backtick or `${` changed the
-program — anywhere from a syntax error to executing PR-shaped JS with the job's
-`pull-requests: write` token. actionlint cannot catch it: `steps.*.outputs.*` is
-not in its untrusted-input list. **Solution:** both values ride in `env:` and the
-script reads `process.env`. A `<<<` heredoc on `steps.publish.outputs.new_tags`
-remains in `changesets.yml`; its content is `changeset publish` output on a
+from `.size-limit.js`, a file any PR can edit, so a backtick or `${`changed the
+program — anywhere from a syntax error to executing PR-shaped JS with the job's`pull-requests: write`token. actionlint cannot catch it:`steps._.outputs._`is
+not in its untrusted-input list. **Solution:** both values ride in`env:`and the
+script reads`process.env`. A `<<<`heredoc on`steps.publish.outputs.new_tags`remains in`changesets.yml`; its content is `changeset publish` output on a
 trusted master snapshot, so it is a hygiene item, not this class.
 
 **§1.6 — the composite action was invisible to Dependabot.** `package-ecosystem:
@@ -1746,7 +1750,7 @@ composite realigned to `actions/setup-node@v7`. Effect is observable on the next
 Monday Dependabot run (or `@dependabot recheck`).
 
 **§4.1 — #1523 only half-landed.** `lint:duplicates` / `lint:duplicates:sarif`
-scan `packages/*/src/ shared/`; the *inline* `pnpm dlx jscpd …` command in
+scan `packages/*/src/ shared/`; the _inline_ `pnpm dlx jscpd …` command in
 `ci.yml`'s `duplication` job still scanned `packages/*/src/` alone, unchanged since
 #734. So the cross-boundary duplication blind spot that #1523 paid to close stayed
 open in the one channel that runs on every PR — while both the job comment and this
@@ -1800,8 +1804,8 @@ had never been loaded by any gate. Also dropped a stale comment line naming the
 `types` package, folded into core as the `/types` subpath in wave-2.
 
 **What §4.6 found immediately (tracked separately).**
-`require("@real-router/react/ink")` fails with *"require() cannot be used on an
-ESM graph with top-level await"*: `dist/cjs/ink.js` statically `require("ink")`,
+`require("@real-router/react/ink")` fails with _"require() cannot be used on an
+ESM graph with top-level await"_: `dist/cjs/ink.js` statically `require("ink")`,
 and `ink@7` is ESM-only with top-level await in `build/reconciler.js`, so it
 cannot be required on any Node version. The `./ink` export therefore advertises a
 `require` condition no consumer can use. Fixing it edits `packages/react/package.json`
@@ -1839,7 +1843,7 @@ So the published contract promised a build no consumer could use.
 
 **Why nothing caught it for a year.** publint reads the manifest; attw resolves
 **types** under the `require` condition; the package smoke test resolved every
-subpath through `import()` only, so `dist/cjs/**` was never *executed* by any
+subpath through `import()` only, so `dist/cjs/**` was never _executed_ by any
 gate. Adding a `require()` pass to the smoke test (2026-08-02 audit batch 3, §4.6)
 flagged it on the first run.
 
@@ -1853,7 +1857,7 @@ naming the real situation instead of a confusing TLA error; `import` is unchange
 1. **attw needed a scoped exemption.** tsdown runs attw with `profile: "strict"`,
    which requires every entrypoint to resolve in every mode, so an ESM-only
    subpath is reported as `No resolution (node16-cjs)` — and `failOnWarn:
-   "ci-only"` makes that a red build in CI. `packages/react/tsdown.config.mts`
+"ci-only"` makes that a red build in CI. `packages/react/tsdown.config.mts`
    therefore carries `attw: { excludeEntrypoints: ["./ink"] }`. The alternatives
    are both package-wide and were rejected: `profile: "esm-only"` stops flagging
    CJS-resolution problems for the six genuinely dual entries (precisely what attw
@@ -1913,7 +1917,7 @@ goes away). `packages/*/index.ts` matches nothing today but stays as a forward
 guard, now with a comment saying so instead of looking like live coverage.
 
 **§2.1 — a failed post-merge silently withheld the release.** `changesets.yml`
-triggered *only* on `workflow_run` with `conclusion == 'success'`, and
+triggered _only_ on `workflow_run` with `conclusion == 'success'`, and
 `post-merge.yml` runs `cancel-in-progress: true`, so both a failed build and one
 cancelled by the next push produce no release run at all — version bumps sit on
 master unpublished with nothing to alert on. Re-running an older release run is
@@ -1933,7 +1937,7 @@ the snapshot that already ran.)
   reconcile step backfills tags/Releases.
 - `post-merge.yml` gains a `notify-failure` job (`if: failure()`, `issues: write`),
   the same tracking-issue pattern `examples.yml` and `cross-router-bench.yml` already
-  use for their scheduled runs. The issue text names the *consequence* — the release
+  use for their scheduled runs. The issue text names the _consequence_ — the release
   chain is broken, bumps are unpublished — not just the red run, and states the two
   recoveries.
 
@@ -1949,7 +1953,7 @@ reported as a tolerated failure rather than a silent pass. Nothing that actually
 protects coverage moves: the R2.4 integrity guard ("Verify all coverage shards
 uploaded") stays hard, and the 100 % thresholds are enforced by vitest inside each
 test job. What is given up is dashboard freshness during an outage. ⚠ The same class
-is live for `sonarcloud`, which is a required *context* in the ruleset — an outage
+is live for `sonarcloud`, which is a required _context_ in the ruleset — an outage
 there blocks a merge and `continue-on-error` cannot help, because the context itself
 gates. Left as an owner policy decision, recorded rather than changed.
 
@@ -1964,7 +1968,7 @@ failing** on `ERR_PNPM_DEDUPE_CHECK_ISSUES`. The goal of #1085 ("so the required
 **Solution — not "skip the check for Dependabot", but "skip it exactly when an
 automatic fix is guaranteed to follow and be verified".** The plain actor guard both
 reviews proposed trades the guarantee away: with no push token the dedupe job cannot
-push, a non-deduped lockfile can reach master, and the next *human* PR fails
+push, a non-deduped lockfile can reach master, and the next _human_ PR fails
 `pnpm dedupe --check` for someone else's change. The condition is therefore two-part,
 and it rides on a context asymmetry:
 
@@ -1978,12 +1982,12 @@ env:                                                        # job-level, repo-li
 A Dependabot-triggered run sees **only** Dependabot secrets; the run its PAT push
 retriggers is authored by the token owner and sees none of them. So:
 
-| Run | `actor` | `HAS_DEDUPE_FIXER` | dedupe check |
-| --- | --- | --- | --- |
-| Dependabot PR, token present | `dependabot[bot]` | `true` | skipped — fix lands and is verified next run |
-| Dependabot PR, token absent | `dependabot[bot]` | `false` | **hard** — nothing will fix it, so red is accurate |
-| Retriggered by the PAT push | owner | `''` | **hard**, on the head SHA that gets merged |
-| Human PR | human | `''` | **hard** |
+| Run                          | `actor`           | `HAS_DEDUPE_FIXER` | dedupe check                                       |
+| ---------------------------- | ----------------- | ------------------ | -------------------------------------------------- |
+| Dependabot PR, token present | `dependabot[bot]` | `true`             | skipped — fix lands and is verified next run       |
+| Dependabot PR, token absent  | `dependabot[bot]` | `false`            | **hard** — nothing will fix it, so red is accurate |
+| Retriggered by the PAT push  | owner             | `''`               | **hard**, on the head SHA that gets merged         |
+| Human PR                     | human             | `''`               | **hard**                                           |
 
 When dedupe finds nothing to change there is no second run — but then the lockfile
 was already clean. Consequence to know: until `DEPENDABOT_PUSH_TOKEN` exists this is
@@ -2019,12 +2023,12 @@ that is how `check` participates).
 **Verification — mutational, against the REAL ci.yml rather than fixtures alone**
 (a guard whose discriminating power is only shown on a toy input is theatre):
 
-| input | `neededButUnread` |
-| --- | --- |
-| healthy `ci.yml` | `[]` |
-| read of `needs.coverage.result` removed | `["coverage"]` |
-| read of `needs.repo-lints.result` removed | `["repo-lints"]` |
-| read of `needs.smoke.result` removed | `["smoke"]` |
+| input                                     | `neededButUnread` |
+| ----------------------------------------- | ----------------- |
+| healthy `ci.yml`                          | `[]`              |
+| read of `needs.coverage.result` removed   | `["coverage"]`    |
+| read of `needs.repo-lints.result` removed | `["repo-lints"]`  |
+| read of `needs.smoke.result` removed      | `["smoke"]`       |
 
 Two fixtures back it up: one asserts that on "job waited for but never read" the new
 invariant fires **while the old `ungated` stays silent** — i.e. it catches precisely
@@ -2047,7 +2051,7 @@ core, 231 s adapters — ~8-10× headroom). With `cross-router-bench` (batch 3) 
 along with the run, so **no tracking issue was ever filed**. That exposes a trap in
 the fix itself: `if: failure()` does not match `cancelled`, and a job stopped by
 `timeout-minutes` ends as **cancelled**. A timeout alone would therefore have freed
-the runner *silently* — killing exactly the class (a wedged scheduled run) the
+the runner _silently_ — killing exactly the class (a wedged scheduled run) the
 notify job exists to surface. So `examples.yml` and `cross-router-bench.yml` now use
 `if: !success() && github.event_name == 'schedule'`.
 
@@ -2067,7 +2071,7 @@ workflows carry the `!success()` notify condition while post-merge keeps `failur
 **§2.2 — the release install ran dependency lifecycle scripts in the one job that
 can mint an OIDC publish token.** `changesets.yml` carries `id-token: write`, so the
 token-request env is reachable from ANY step in it, and `PAT_TOKEN` joins two steps
-later. pnpm's `allowBuilds` allowlist narrows *who* may run scripts, but the release
+later. pnpm's `allowBuilds` allowlist narrows _who_ may run scripts, but the release
 job needs none of them. What kept this open was the unknown "does `bundle` still work
 without them" — settled by experiment rather than argument: a fresh clone,
 `pnpm install --frozen-lockfile --ignore-scripts`, then the job's exact
@@ -2119,22 +2123,22 @@ depend on it, so the token list stays narrow.
 (three new cases: examples derived from the same query and kept OUT of `affected`,
 an examples-only change yielding zero packages but a non-empty example set, and the
 grouped-shard `distPaths` ↔ `filter` parity). The new job also exercises §1.9's
-fresh invariant immediately — it had to be added to the gate's `needs` *and* read in
+fresh invariant immediately — it had to be added to the gate's `needs` _and_ read in
 `Determine result`, or the meta-test would have failed.
 
-### `#trivial` now skips the *required* changeset gate, not just Danger
+### `#trivial` now skips the _required_ changeset gate, not just Danger
 
 > **⚠️ SUPERSEDED (2026-07-03, #1132) — the `#trivial` mechanism was REMOVED entirely (see "`#trivial` removed" below). Kept for history: it records why the hatch existed and why it was title-only.**
 
-**Problem.** `changeset-check.yml`'s `require-changeset` job — the **required** status check `Require Changeset` — hard-fails when a public package's `src/` changes without a changeset, and its own error message tells contributors to *"add #trivial to PR title"*. But nothing in the job read the title: `#trivial` was honoured only by the **advisory** DangerJS "Changeset reminder" (`dangerfile.ts`, "Skip checks: Add `#trivial`"). So a docs/comment/JSDoc-only edit inside a public package's `src/` — which trips the **path-based** source-changed check even with zero behaviour change — had no changeset-free path to green, contradicting the message the gate itself printed. Surfaced by the audit-doc batch (#801/#764/#770): correcting a misleading JSDoc/comment inside `src/` needs no release, yet failed the required gate.
+**Problem.** `changeset-check.yml`'s `require-changeset` job — the **required** status check `Require Changeset` — hard-fails when a public package's `src/` changes without a changeset, and its own error message tells contributors to _"add #trivial to PR title"_. But nothing in the job read the title: `#trivial` was honoured only by the **advisory** DangerJS "Changeset reminder" (`dangerfile.ts`, "Skip checks: Add `#trivial`"). So a docs/comment/JSDoc-only edit inside a public package's `src/` — which trips the **path-based** source-changed check even with zero behaviour change — had no changeset-free path to green, contradicting the message the gate itself printed. Surfaced by the audit-doc batch (#801/#764/#770): correcting a misleading JSDoc/comment inside `src/` needs no release, yet failed the required gate.
 
 **Solution.** Added `&& !contains(github.event.pull_request.title, '#trivial')` to the `Fail if changeset missing` step's `if:` in `changeset-check.yml`. The required gate now honours the same `#trivial` marker Danger already does, so a PR titled with `#trivial` skips **both** the advisory warn and the required hard-fail — the escape hatch the error message always advertised.
 
-**Why title-only (not body).** `changeset-check.yml`'s own error text says *"add #trivial to PR **title**"*, so the required gate reads the title to match its own advertised contract (Danger separately accepts title *or* body for its advisory warn). Title is also stable per `pull_request` event, avoiding a "green only after a body edit + re-run" race on a **gating** check. Use `#trivial` only for changes with no release impact (docs/comments/JSDoc); a real behaviour change still needs a changeset.
+**Why title-only (not body).** `changeset-check.yml`'s own error text says _"add #trivial to PR **title**"_, so the required gate reads the title to match its own advertised contract (Danger separately accepts title _or_ body for its advisory warn). Title is also stable per `pull_request` event, avoiding a "green only after a body edit + re-run" race on a **gating** check. Use `#trivial` only for changes with no release impact (docs/comments/JSDoc); a real behaviour change still needs a changeset.
 
 ### `#trivial` removed — path-based gate + manual override marker was inherently fragile (#1132)
 
-**Problem.** The `#trivial` marker had two consumers with **different** rules: the required `changeset-check` gate read it **title-only** (deliberately — race avoidance, above), while DangerJS read it **title-or-body**. A `#trivial` in the PR *body* silenced Danger's advisory reminder yet still tripped the required gate → "Danger is quiet but CI is red". A path-based required gate plus a hand-typed override marker is fragile by construction: the marker must be read identically in two places, and that desync is exactly where 3.2 broke. The hatch itself was used ~once (`gh pr list --search '#trivial in:title'` → #1124 merged; #442 was a closed config PR).
+**Problem.** The `#trivial` marker had two consumers with **different** rules: the required `changeset-check` gate read it **title-only** (deliberately — race avoidance, above), while DangerJS read it **title-or-body**. A `#trivial` in the PR _body_ silenced Danger's advisory reminder yet still tripped the required gate → "Danger is quiet but CI is red". A path-based required gate plus a hand-typed override marker is fragile by construction: the marker must be read identically in two places, and that desync is exactly where 3.2 broke. The hatch itself was used ~once (`gh pr list --search '#trivial in:title'` → #1124 merged; #442 was a closed config PR).
 
 **Solution.** Removed `#trivial` entirely — all 6 sites: `dangerfile.ts` (`isTrivial` const + 7 `if (isTrivial || isBot) return;` → `if (isBot) return;`; `prTitle` deleted as now-unused, `prBody` kept for the PR-description check), `changeset-check.yml` (the `!contains(title, '#trivial')` from the gate `if:`, its comment, and the error-message hint), `.changeset/README.md`, and this record (superseded banner above). No marker → no dual interpretation → the desync class is structurally impossible.
 
@@ -2150,7 +2154,7 @@ fresh invariant immediately — it had to be added to the gate's `needs` *and* r
 **Solution:**
 
 - **`duplication`:** dropped the install step; the duplication step now runs `pnpm dlx "jscpd@$(node -p '…devDependencies.jscpd')" packages/*/src/ …`. jscpd 5.x is the Rust `cpd` rewrite with **no** workspace-package dependencies — its engine ships as a platform binary via `optionalDependencies` (`cpd-linux-x64-gnu` on CI), and it only reads `packages/*/src/`. dlx hardlinks jscpd from the setup-node pnpm-store cache, skipping the 32-package link. Version is read from `package.json` so a Dependabot bump can't drift; args mirror the root `lint:duplicates:sarif` script (`-t 100` ⇒ always exit 0). Verified locally: `pnpm dlx jscpd@5.0.4 …` emits byte-identical SARIF (7 results) to the installed binary.
-- **`bundle-size` base side:** `post-merge.yml` (push → master) now measures `size-limit --json` after its build and uploads a `master-bundle-sizes` artifact (90-day retention). The PR job downloads that artifact for base sizes via `gh run list/download` (latest successful post-merge run; `github.base_ref` *is* master, so that run built the exact baseline) instead of re-checking-out + re-installing + re-bundling the base branch. This removes one full `pnpm install`, one full `turbo run bundle`, the base checkout, and the `turbo.json` save/restore dance — net **simpler** job. Needs `actions: read` on the job for the cross-workflow artifact read.
+- **`bundle-size` base side:** `post-merge.yml` (push → master) now measures `size-limit --json` after its build and uploads a `master-bundle-sizes` artifact (90-day retention). The PR job downloads that artifact for base sizes via `gh run list/download` (latest successful post-merge run; `github.base_ref` _is_ master, so that run built the exact baseline) instead of re-checking-out + re-installing + re-bundling the base branch. This removes one full `pnpm install`, one full `turbo run bundle`, the base checkout, and the `turbo.json` save/restore dance — net **simpler** job. Needs `actions: read` on the job for the cross-workflow artifact read.
 
 **Why a download-with-fallback, not a hard dependency:** the base artifact can be absent — the first PR after this lands (before that PR's own post-merge run uploads one) or after retention ages out. Both new shell blocks degrade to a valid `[]`: `size-limit` exits non-zero when a limit is exceeded but still prints its JSON, so post-merge captures it with `… || true` then guards `[ -s file ] || echo '[]'`; the PR side falls back to `sizes='[]'` when `gh` finds no run/artifact. Empty base ⇒ every package shows as "new" — exactly the pre-existing behaviour when base measurement failed, so the comparison comment never errors. Both jobs stay **informational** (not in `CI Result`'s `needs`), so even a hard failure can't block a merge.
 
@@ -2587,12 +2591,12 @@ Depends on `^bundle` to ensure packages are compiled before examples run e2e tes
 
 **Why R2 + Cloud Run:**
 
-| Constraint | How this stack satisfies it |
-|---|---|
-| $0/mo for OSS-scale CI | R2: 10 GB + 1M Class A / 10M Class B ops free. Cloud Run: 2M req/mo + 360 K GB·s free. Well above footprint. |
-| Deterministic retention | We control TTL via R2 lifecycle rules; no vendor-side eviction. |
-| Compatible with existing `TURBO_*` env contract | Adds `TURBO_API` (public URL var); `TURBO_TOKEN`/`TURBO_TEAM` reused. |
-| Minimal moving parts | Single stateless container, public endpoint, static bearer auth (`AUTH_MODE=static`). |
+| Constraint                                      | How this stack satisfies it                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| $0/mo for OSS-scale CI                          | R2: 10 GB + 1M Class A / 10M Class B ops free. Cloud Run: 2M req/mo + 360 K GB·s free. Well above footprint. |
+| Deterministic retention                         | We control TTL via R2 lifecycle rules; no vendor-side eviction.                                              |
+| Compatible with existing `TURBO_*` env contract | Adds `TURBO_API` (public URL var); `TURBO_TOKEN`/`TURBO_TEAM` reused.                                        |
+| Minimal moving parts                            | Single stateless container, public endpoint, static bearer auth (`AUTH_MODE=static`).                        |
 
 **Client wiring.** All 4 workflows (`ci.yml`, `post-merge.yml`, `changesets.yml`, `examples.yml`) declare `TURBO_API: ${{ vars.TURBO_API }}` alongside existing `TURBO_TOKEN`/`TURBO_TEAM`. When `TURBO_API` is unset, turbo falls back to Vercel's default endpoint — trivial rollback.
 
@@ -2604,12 +2608,12 @@ Depends on `^bundle` to ensure packages are compiled before examples run e2e tes
 
 **Empirical results (PR #491, April 2026).** Four back-to-back CI runs on the self-hosted cache validated both the headline fix and cascade precision:
 
-| Scenario | Pipeline | Tasks cached | Notes |
-|---|---|---|---|
-| Cold (first run, empty R2) | 14m39s | baseline | Populates R2 |
-| Rerun on same SHA | **3m5s** | ~100 % | `>>> FULL TURBO`. Zero `HIT → MISS` — the #490 failure mode is gone |
-| Foundation change (`@real-router/types`) | 13m1s | 30/162 | ~132 tasks invalidated by `dependsOn: ^bundle` cascade — unavoidable for a foundational package |
-| Leaf change (`@real-router/memory-plugin`) | **1m34s** | **156/162** | Only the 6 tasks of the edited package are MISS; cascade is surgically precise |
+| Scenario                                   | Pipeline  | Tasks cached | Notes                                                                                           |
+| ------------------------------------------ | --------- | ------------ | ----------------------------------------------------------------------------------------------- |
+| Cold (first run, empty R2)                 | 14m39s    | baseline     | Populates R2                                                                                    |
+| Rerun on same SHA                          | **3m5s**  | ~100 %       | `>>> FULL TURBO`. Zero `HIT → MISS` — the #490 failure mode is gone                             |
+| Foundation change (`@real-router/types`)   | 13m1s     | 30/162       | ~132 tasks invalidated by `dependsOn: ^bundle` cascade — unavoidable for a foundational package |
+| Leaf change (`@real-router/memory-plugin`) | **1m34s** | **156/162**  | Only the 6 tasks of the edited package are MISS; cascade is surgically precise                  |
 
 R2 HTTP summary across all four runs: 0× 401, 0× 5xx, `PUT 200` on every upload, `GET 200/404` split matches expected cold/warm state. Typical PR touches 1–3 leaf-ish packages → expect ~1–3 min CI vs 14+ min with a hypothetical cold cache.
 
@@ -2702,7 +2706,7 @@ Each override addresses a known vulnerability in older versions. Version-scoped 
 
 **Problem:** A Dependabot bump (`ink 7.0.1 → 7.0.5`, [#692](https://github.com/greydragon888/real-router/pull/692)) pulled `fflate@0.8.3` into the tree. `pnpm dedupe --check` (the `lint:dedupe` CI step) then wants to collapse `@arethetypeswrong/core@0.18.2` onto the single newest `fflate@0.8.3`. But `attw` (`lint:types` = `attw --pack .`) reads the packed tarball via `fflate`, and `0.8.3` crashes it for **every** package with `Cannot read properties of undefined (reading 'filename')`. This creates a direct conflict: satisfying `lint:dedupe` (dedupe → 0.8.3) breaks `lint:types` (attw needs 0.8.2).
 
-**Solution:** `"fflate": "0.8.2"` in `pnpm.overrides`. Forces a single `fflate` version across the tree, which simultaneously (a) satisfies `pnpm dedupe --check` (one version, nothing left to collapse) and (b) keeps `attw` on the working `0.8.2`. This is the only override that pins to an exact *older* version for compatibility rather than `>=` for security.
+**Solution:** `"fflate": "0.8.2"` in `pnpm.overrides`. Forces a single `fflate` version across the tree, which simultaneously (a) satisfies `pnpm dedupe --check` (one version, nothing left to collapse) and (b) keeps `attw` on the working `0.8.2`. This is the only override that pins to an exact _older_ version for compatibility rather than `>=` for security.
 
 **Why:** `0.8.3` is a patch with no public-API change any consumer depends on, so pinning down is safe. Remove this override once `@arethetypeswrong/core` ships a release compatible with `fflate@0.8.3` (or `fflate` patches the tar-read regression) — verify by deleting the line, running `pnpm install && pnpm -F @real-router/core lint:types`, and confirming attw stays green.
 
@@ -2798,8 +2802,8 @@ export default tsEslint.config(
     "**/*.min.js",
     "**/*.d.ts",
     "**/generated/**",
-    "**/*.bak*",        // Backup files
-    "**/*.mjs",         // JS config files
+    "**/*.bak*", // Backup files
+    "**/*.mjs", // JS config files
     "cz.config.js",
     ".changeset/**",
     "**/e2e/**",
@@ -2986,12 +2990,8 @@ Subpath exports: `@real-router/react` (React 19.2+) and `@real-router/react/lega
 // package.json
 {
   "exports": {
-    ".": {
-      /* main entry — full API */
-    },
-    "./legacy": {
-      /* legacy entry — without React 19.2-only components */
-    },
+    ".": {/* main entry — full API */},
+    "./legacy": {/* legacy entry — without React 19.2-only components */},
   },
 }
 ```
@@ -3453,7 +3453,7 @@ const router = createRouter(routes, {
 
 All packages using logger declare `"logger": "workspace:^"` dependency.
 
-Migrated: `@real-router/core`, `@real-router/browser-plugin`, `@real-router/logger-plugin`. *(Historical list — as of 2026-07 the runtime dependents are `@real-router/core` and `@real-router/validation-plugin`; browser-plugin and logger-plugin have since dropped the dependency.)*
+Migrated: `@real-router/core`, `@real-router/browser-plugin`, `@real-router/logger-plugin`. _(Historical list — as of 2026-07 the runtime dependents are `@real-router/core` and `@real-router/validation-plugin`; browser-plugin and logger-plugin have since dropped the dependency.)_
 
 ## Logger Plugin Performance Tracking
 
@@ -4181,14 +4181,14 @@ const direction = route.context.navigation.direction;
 
 ### Migrated plugins
 
-| Plugin                     | Context namespace(s)    | Data                                            |
-| -------------------------- | ----------------------- | ----------------------------------------------- |
-| `navigation-plugin`        | `navigation`            | direction, sourceElement, userInitiated         |
+| Plugin                     | Context namespace(s)                                               | Data                                                                     |
+| -------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `navigation-plugin`        | `navigation`                                                       | direction, sourceElement, userInitiated                                  |
 | `ssr-data-plugin`          | `data` (+ `ssrDataMode`, `ssrDataDeferred`, `ssrDataDeferredKeys`) | per-route loader result + mode marker + deferred-promise registry (#610) |
-| `rsc-server-plugin`        | `rsc` + `rscAction`     | per-route ReactNode + server-action results     |
-| `persistent-params-plugin` | `persistentParams`      | persistent params snapshot                      |
-| `browser-plugin`           | `browser` + `url`       | popstate/navigate source + URL fragment (#532)  |
-| `memory-plugin`            | `memory`                | direction, historyIndex                         |
+| `rsc-server-plugin`        | `rsc` + `rscAction`                                                | per-route ReactNode + server-action results                              |
+| `persistent-params-plugin` | `persistentParams`                                                 | persistent params snapshot                                               |
+| `browser-plugin`           | `browser` + `url`                                                  | popstate/navigate source + URL fragment (#532)                           |
+| `memory-plugin`            | `memory`                                                           | direction, historyIndex                                                  |
 
 ### Not migrated
 
@@ -4233,12 +4233,12 @@ Added `decodeURIComponent()` to both key and value extraction in `defaultParseQu
 
 `allowNotFound: false` had inconsistent semantics depending on the entry point:
 
-| Entry point                    | Behaviour on unmatched URL + strict mode                            |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `router.start(path)`           | throws `ROUTE_NOT_FOUND`                                            |
-| `browser-plugin` popstate      | silent `router.navigateToDefault({ reload, replace })`              |
-| `navigation-plugin` navigate   | silent `router.navigateToDefault()` in `event.intercept`            |
-| `hash-plugin` popstate         | silent fallback (shared `browser-env/popstate-handler`)             |
+| Entry point                  | Behaviour on unmatched URL + strict mode                 |
+| ---------------------------- | -------------------------------------------------------- |
+| `router.start(path)`         | throws `ROUTE_NOT_FOUND`                                 |
+| `browser-plugin` popstate    | silent `router.navigateToDefault({ reload, replace })`   |
+| `navigation-plugin` navigate | silent `router.navigateToDefault()` in `event.intercept` |
+| `hash-plugin` popstate       | silent fallback (shared `browser-env/popstate-handler`)  |
 
 The same configuration, the same unmatched URL → three different outcomes depending on how the URL arrived. `defaultRoute` was overloaded: explicit target for `navigateToDefault()` **and** implicit auto-fallback on popstate. The silent fallback hid errors from logs, analytics, and the `onTransitionError` hook.
 
@@ -4456,14 +4456,13 @@ The original RFC proposed adding `wrapWrite?: (write: () => void) => void` to `c
 ### Trade-offs
 
 - The refactor shrinks navigation-plugin LOC and removes one source file, but adds the `wrapNavigationBrowserWithSyncing` helper (~25 LOC). Net is still negative; the architectural win is single ownership inside the plugin instance.
-- User-supplied `NavigationBrowser` mocks no longer need to manage the flag themselves — the plugin wraps them in its constructor. This is a *contract change* for any external test code that previously wrapped manually, but no such consumer exists outside the monorepo (the `browser?` factory parameter has only ever been documented as "for testing").
+- User-supplied `NavigationBrowser` mocks no longer need to manage the flag themselves — the plugin wraps them in its constructor. This is a _contract change_ for any external test code that previously wrapped manually, but no such consumer exists outside the monorepo (the `browser?` factory parameter has only ever been documented as "for testing").
 - `factory.ts` and `types.ts` did not change as part of this refactor — `SyncingFlag` lives in `navigation-browser.ts` next to the wrapper, and the plugin constructor signature stays at 6 parameters. The flag never leaks to public types.
 
 ### Test coverage
 
 - `wrapNavigationBrowserWithSyncing` invariants — `packages/navigation-plugin/tests/functional/navigation-browser.test.ts`: 4 mutations × happy path, 4 mutations × throw path (flag clears in `finally`), non-mutation methods bypass the wrap, `currentEntry` getter stays live (not snapshotted).
 - All pre-existing functional + stress tests pass unchanged — observable behavior is identical (222 navigation-plugin, 129 browser-plugin, 84 hash-plugin).
-
 
 ## `getPluginApi(router).navigateToState(state, opts)` — plugin-only bypass for `buildNavigateState` (#525)
 
@@ -4472,12 +4471,12 @@ The original RFC proposed adding `wrapWrite?: (write: () => void) => void` to `c
 URL plugins (`browser-plugin`, `hash-plugin`, `navigation-plugin`) handle every browser-initiated navigation by:
 
 1. `api.matchPath(url)` — produces a fully-resolved `State` (includes `forwardState`, decoders, source-URL trailing-slash via `matchSourceTrailingSlash`).
-2. `router.navigate(matchedState.name, matchedState.params, opts)` — re-runs `buildNavigateState` (`wireNamespaces.ts`), which calls `ctx.forwardState` *and* `ctx.buildPath` again inside the navigation pipeline.
+2. `router.navigate(matchedState.name, matchedState.params, opts)` — re-runs `buildNavigateState` (`wireNamespaces.ts`), which calls `ctx.forwardState` _and_ `ctx.buildPath` again inside the navigation pipeline.
 
 The second pass had two costs documented in #525:
 
 - **Perf (Q3)**: 0.4–1.4 µs per browser navigation (1.20×–1.51× factor depending on fixture). Round-trip benchmark in `packages/core/tests/benchmarks/navigation/popstate-roundtrip.bench.ts`.
-- **Correctness (Q2)**: `buildNavigateState` rebuilds `state.path` *without* the source URL, so `trailingSlash:"preserve"` lost the trailing slash on every back/forward / link click. `matchedState.path === "/users/"` but committed `state.path === "/users"`. Confirmed by `packages/core/tests/functional/trailingSlashPreserve.test.ts`.
+- **Correctness (Q2)**: `buildNavigateState` rebuilds `state.path` _without_ the source URL, so `trailingSlash:"preserve"` lost the trailing slash on every back/forward / link click. `matchedState.path === "/users/"` but committed `state.path === "/users"`. Confirmed by `packages/core/tests/functional/trailingSlashPreserve.test.ts`.
 
 ### Solution
 
@@ -4499,7 +4498,7 @@ This makes `navigateToState` the canonical primitive for **every** URL-driven en
 
 ### Why bypassing `forwardState`/`buildPath` interceptors is correct, not a hack
 
-`matchPath` already runs `forwardState` (`RoutesNamespace.ts:261`, intercepted) once. Re-running it inside `buildNavigateState` is a no-op when forwarding is idempotent (the common case) and *unsafe* when it isn't — a dynamic `forwardFn` reading mutable global state could send the user to a different route than what the URL bar shows. Skipping the second pass is the correctness-preserving choice.
+`matchPath` already runs `forwardState` (`RoutesNamespace.ts:261`, intercepted) once. Re-running it inside `buildNavigateState` is a no-op when forwarding is idempotent (the common case) and _unsafe_ when it isn't — a dynamic `forwardFn` reading mutable global state could send the user to a different route than what the URL bar shows. Skipping the second pass is the correctness-preserving choice.
 
 `buildPath` interceptors (`persistent-params-plugin`) do NOT run on this path. For browser-initiated navigation the URL the user actually saw and clicked is the source of truth; transforming it would silently rewrite the URL bar after every back/forward. Programmatic callers (`router.navigate(name, params)`) still see all interceptors — that's the documented asymmetry, and the reason `navigateToState` lives on `PluginApi` rather than on `Router`.
 
@@ -4514,14 +4513,14 @@ This makes `navigateToState` the canonical primitive for **every** URL-driven en
 
 Delta from `popstate-roundtrip.bench.ts` on Apple silicon / Node 24:
 
-| Fixture | matchPath only | `+ navigate` (old) | `+ navigateToState` (new) | new vs old |
-| --- | --- | --- | --- | --- |
-| flat | 2.02 µs | 2.69 µs | 2.44 µs | **−0.25 µs (−9%)** |
-| nested-4 | 2.39 µs | 3.54 µs | 2.90 µs | **−0.64 µs (−18%)** |
-| search-params | 2.90 µs | 4.17 µs | 3.34 µs | **−0.83 µs (−20%)** |
-| forwardTo | 2.06 µs | 2.48 µs | 2.19 µs | **−0.29 µs (−12%)** |
-| defaultParams | 2.55 µs | 3.73 µs | 3.00 µs | **−0.73 µs (−20%)** |
-| trailingSlash:"preserve" | 2.06 µs | 2.66 µs | 2.53 µs | **−0.13 µs (−5%)** |
+| Fixture                  | matchPath only | `+ navigate` (old) | `+ navigateToState` (new) | new vs old          |
+| ------------------------ | -------------- | ------------------ | ------------------------- | ------------------- |
+| flat                     | 2.02 µs        | 2.69 µs            | 2.44 µs                   | **−0.25 µs (−9%)**  |
+| nested-4                 | 2.39 µs        | 3.54 µs            | 2.90 µs                   | **−0.64 µs (−18%)** |
+| search-params            | 2.90 µs        | 4.17 µs            | 3.34 µs                   | **−0.83 µs (−20%)** |
+| forwardTo                | 2.06 µs        | 2.48 µs            | 2.19 µs                   | **−0.29 µs (−12%)** |
+| defaultParams            | 2.55 µs        | 3.73 µs            | 3.00 µs                   | **−0.73 µs (−20%)** |
+| trailingSlash:"preserve" | 2.06 µs        | 2.66 µs            | 2.53 µs                   | **−0.13 µs (−5%)**  |
 
 The biggest wins are on the heavy-params fixtures (search-params, defaultParams) where the redundant `forwardState`/`buildPath` allocations dominate. trailing-slash fixture sees the smallest perf delta but fixes a correctness bug that the slow path could not.
 
@@ -4602,7 +4601,7 @@ For hash, both URL plugins use a **lazy read** in `onTransitionSuccess`: on the 
 
 **Problem.** `hash-plugin` synced the router only on `popstate`. But per [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event), `popstate` fires only on history **traversal** (back/forward). A same-document **fragment navigation** — a native `<a href="#/users">`, a manual address-bar hash edit, or `location.hash = "..."` from app/third-party code — fires `hashchange`, not `popstate`. So an external hash change updated the URL while the router stayed on the old route. (browser-plugin is unaffected: for it a path change is a full navigation / popstate.)
 
-**Solution.** A new `createHashSyncLifecycle` in `shared/browser-env/popstate-handler.ts` (hash-plugin's variant of `createPopstateLifecycle`) registers **both** `popstate` and `hashchange`, routing both through the *same* `createPopstateHandler`. A `hashchange` carries no `history.state`, so `getRouteFromEvent` resolves it via the `matchPath(location)` fallback — the URL is the source of truth for an external change, which is exactly right. Wiring:
+**Solution.** A new `createHashSyncLifecycle` in `shared/browser-env/popstate-handler.ts` (hash-plugin's variant of `createPopstateLifecycle`) registers **both** `popstate` and `hashchange`, routing both through the _same_ `createPopstateHandler`. A `hashchange` carries no `history.state`, so `getRouteFromEvent` resolves it via the `matchPath(location)` fallback — the URL is the source of truth for an external change, which is exactly right. Wiring:
 
 - `HistoryBrowser.addHashChangeListener` added symmetrically to `addPopstateListener` (`history-api.ts`, `safe-browser.ts`, no-op SSR fallback in `ssr-fallback.ts`).
 - `getRouteFromEvent` widened to `PopStateEvent | HashChangeEvent`; the `"state" in evt` guard skips the `makeState` branch for hashchange. Behaviour for `PopStateEvent` is byte-identical (it always has `state`), so browser-plugin is untouched.
@@ -4612,7 +4611,7 @@ For hash, both URL plugins use a **lazy read** in `onTransitionSuccess`: on the 
 
 **Why this layer.** `hashchange` lives in `browser-env` (the History-API abstraction) symmetric to `popstate`, but is wired **only** by hash-plugin's lifecycle — browser-plugin keeps `createPopstateLifecycle` (popstate only), so it never grows a `hashchange` listener it doesn't want. Clean split, zero behaviour change for browser-plugin / navigation-plugin.
 
-**RED-test caveat (jsdom).** Not reproducible via a naive `location.hash =` in jsdom: jsdom fires a *spurious* `popstate` (`state=undefined`) **in addition to** `hashchange` on a `location.hash=` assignment, so the pre-fix popstate path masks the gap and the router *appears* to sync. Real browsers fire `hashchange` alone for a same-document fragment navigation. The RED test therefore dispatches `new HashChangeEvent("hashchange")` **directly** (URL pre-set via `replaceState`, which fires neither event) to isolate the missing channel. Because `shared/browser-env` is coverage-gated in the `packages/browser-env` test package (not in the symlink consumers, whose coverage `include` misses the real `shared/**` path), the dedup and listener wiring are unit-tested there against 100% thresholds; hash-plugin adds integration-level tests through the public plugin.
+**RED-test caveat (jsdom).** Not reproducible via a naive `location.hash =` in jsdom: jsdom fires a _spurious_ `popstate` (`state=undefined`) **in addition to** `hashchange` on a `location.hash=` assignment, so the pre-fix popstate path masks the gap and the router _appears_ to sync. Real browsers fire `hashchange` alone for a same-document fragment navigation. The RED test therefore dispatches `new HashChangeEvent("hashchange")` **directly** (URL pre-set via `replaceState`, which fires neither event) to isolate the missing channel. Because `shared/browser-env` is coverage-gated in the `packages/browser-env` test package (not in the symlink consumers, whose coverage `include` misses the real `shared/**` path), the dedup and listener wiring are unit-tested there against 100% thresholds; hash-plugin adds integration-level tests through the public plugin.
 
 ## `invalidate(router, namespace)` — CSR revalidation channel for SSR loader plugins (#605)
 
@@ -4628,7 +4627,7 @@ This works for the application-layer subscribe-based fetcher (the RSC example fe
 
 1. Fires a fake transition: `onTransitionStart` / `onTransitionSuccess` plugins observe a navigation that didn't really happen.
 2. Pollutes `logger-plugin` history with "navigation" entries that were really cache-busts.
-3. No granularity for multi-namespace routes — a same-route reload is the **only** cache-bust available, and it forces *every* SSR plugin to re-run on this transition (or stay stale, since neither runs).
+3. No granularity for multi-namespace routes — a same-route reload is the **only** cache-bust available, and it forces _every_ SSR plugin to re-run on this transition (or stay stale, since neither runs).
 
 The parity gap with Nuxt `useAsyncData(...).refresh()` and SolidStart `redirect("/path", { revalidate })` was the most-cited DX delta in the SSR competitive analysis.
 
@@ -4676,9 +4675,9 @@ The `namespace` argument is typed as a literal (`"data"` for ssr-data-plugin, `"
 ### Trade-offs
 
 - **`subscribeLeave` always registered** — adds one leave listener per loader plugin even when `invalidate()` is never called. Forces `navigate()` onto the "with leave listeners" async path (~5 µs / nav with one no-op listener; see `core` Performance Notes). Acceptable: no-op early-return covers the steady state; lazy-registration would couple the registry to the plugin's lifecycle for a savings most apps will never measure.
-- **AbortSignal plumbed into the loader (#605, follow-up)** — `SsrLoaderFn<T>` now accepts an optional second argument `context?: { signal: AbortSignal }`. The leave handler passes the navigation's controller signal so cancellation-aware loaders can abort their in-flight work (fetch, DB query, …). Non-breaking via TypeScript contravariance — existing `(params) => ...` loaders ignore the second arg and still benefit from the post-await `signal.aborted` write-skip. Important pattern: a signal aborted *before* `addEventListener("abort", …)` does NOT auto-fire the listener, so cancellation-aware loaders must check `signal.aborted` upfront (see dogfooding `home` loader in each `ssr-mixed/` example for the canonical shape). The start interceptor does NOT pass a signal — SSR boot path apps that need request-scoped cancellation use the existing `getDep("abortSignal")` pattern from `createRequestScope` (#603) + `withTimeout({ upstreamSignal })` (#598).
+- **AbortSignal plumbed into the loader (#605, follow-up)** — `SsrLoaderFn<T>` now accepts an optional second argument `context?: { signal: AbortSignal }`. The leave handler passes the navigation's controller signal so cancellation-aware loaders can abort their in-flight work (fetch, DB query, …). Non-breaking via TypeScript contravariance — existing `(params) => ...` loaders ignore the second arg and still benefit from the post-await `signal.aborted` write-skip. Important pattern: a signal aborted _before_ `addEventListener("abort", …)` does NOT auto-fire the listener, so cancellation-aware loaders must check `signal.aborted` upfront (see dogfooding `home` loader in each `ssr-mixed/` example for the canonical shape). The start interceptor does NOT pass a signal — SSR boot path apps that need request-scoped cancellation use the existing `getDep("abortSignal")` pattern from `createRequestScope` (#603) + `withTimeout({ upstreamSignal })` (#598).
 - **Cross-namespace not transactional** — calling `invalidate(router, "data")` and `invalidate(router, "rsc")` separately marks both flags, but they are consumed by their respective plugins' independent listeners on the same navigation. There is no "atomic group" — if one loader rejects, the other has already started. Acceptable for the small N of namespaces in practice (data + rsc + at most 1-2 application namespaces); a transactional group would warrant a separate API.
-- **Loader rejection leaves flag set** — if `entry.loader(...)` throws, the navigation rejects with that error and the flag is *not* cleared (clearStale runs after `await`). User retries → loader runs again. Matches the existing start-interceptor behavior (no caching of failures).
+- **Loader rejection leaves flag set** — if `entry.loader(...)` throws, the navigation rejects with that error and the flag is _not_ cleared (clearStale runs after `await`). User retries → loader runs again. Matches the existing start-interceptor behavior (no caching of failures).
 - **Stale flag survives plugin teardown until the router is GC'd** — the per-router stale registry lives in a module-level `WeakMap<Router, Set<string>>`. `unsubscribe()` removes the **consumer** (the `subscribeLeave` listener) but **not the producer's mark** — a flag set by `invalidate(router, "data")` before `unsub()` remains in the WeakMap entry. Concretely: `invalidate(router, "data"); unsub(); router.usePlugin(ssrDataPluginFactory(loaders)); await router.navigate(...);` — the re-registered listener picks up the pre-existing flag and re-runs the loader. **Intentional for hot-swap scenarios** on long-lived router instances (plugin replacement without re-architecting cache busts). The flag becomes unreachable only when the router itself is GC'd; `cloneRouter()` clones get a fresh registry entry via WeakMap key isolation, so per-request SSR scopes are unaffected. To drop the flag without disposing the router, navigate once to a route with a registered loader and let the listener consume it, OR re-architect to avoid the hot-swap (typical apps don't need this). Documented as a gotcha in both plugins' `CLAUDE.md`.
 
 ### Test coverage
@@ -4692,6 +4691,7 @@ Non-breaking on the namespace contract. New named export (`invalidate`) on each 
 **Behavioural change (#605, sources):** `stabilizeState` in `@real-router/sources` now returns `next` whenever `next.transition.reload === true`, even when path and `state.context.url.hash` match `prev`. Without this change, `useRoute()` consumers and any source built atop `createRouteSource` / `createRouteNodeSource` saw a stable snapshot ref on `navigate({ reload: true })` to the same path — so a reload that refreshed `state.context.data` via the plugin's `subscribeLeave` handler did NOT trigger a re-render. Reload is the user's explicit non-idempotent signal; bypassing dedupe matches that semantic.
 
 Two consequences for adapters and examples:
+
 - `useRoute()`, `useRouteNode()`, `useRouterTransition()`, and the Solid/Vue/Svelte/Angular signal/store equivalents now re-emit on every `{ reload: true }` navigation.
 - Sources tests previously asserting "second reload preserves snapshot ref" were updated to assert "every reload produces a fresh ref" (`createRouteStore.test.ts`, `createRouteNodeStore.test.ts`, `stabilizeState.test.ts` + parallel adapter tests). Two now-defensive guards (`createRouteNodeSource.ts`, `createTransitionSource.ts`) carry `/* v8 ignore */` annotations — their false branches became structurally unreachable but remain as guards for future stabilizer changes.
 
@@ -4804,16 +4804,16 @@ Every adapter (`react`, `preact`, `solid`, `vue`, `svelte`, `angular`) ships a d
 // packages/react/package.json (excerpt)
 {
   "exports": {
-    ".": { /* main: hooks, RouterProvider, Link, RouteView */ },
+    ".": {/* main: hooks, RouterProvider, Link, RouteView */},
     "./ssr": {
       "@real-router/internal-source": "./src/ssr/index.ts",
       "react-server": "./src/ssr/index.react-server.ts", // type-only re-export
       "types": "./dist/ssr/index.d.ts",
       "import": "./dist/esm/ssr/index.mjs",
-      "require": "./dist/cjs/ssr/index.cjs"
+      "require": "./dist/cjs/ssr/index.cjs",
     },
-    "./legacy": { /* React 18 fallback, no <Await> */ }
-  }
+    "./legacy": {/* React 18 fallback, no <Await> */},
+  },
 }
 ```
 
@@ -4847,7 +4847,8 @@ The naive SSR pattern requires four steps per request, each easy to forget:
 app.use(async (req, res) => {
   const controller = new AbortController(); //                ↓ 1. allocate controller
   req.on("close", () => controller.abort()); //               ↓ 2. wire client-disconnect
-  const router = cloneRouter(baseRouter, { //                 ↓ 3. clone with request DI
+  const router = cloneRouter(baseRouter, {
+    //                 ↓ 3. clone with request DI
     abortSignal: controller.signal,
     currentUser: parseCookies(req).user,
   });
@@ -4938,7 +4939,7 @@ const loader = async (params, { signal }) => {
   return defer({
     critical: { product },
     deferred: {
-      reviews: fetchReviews(params.id, { signal }),     // resolves later
+      reviews: fetchReviews(params.id, { signal }), // resolves later
       related: fetchRelated(product.categoryId, { signal }), // resolves later
     },
   });
@@ -4946,6 +4947,7 @@ const loader = async (params, { signal }) => {
 ```
 
 The plugin:
+
 - Writes `critical` to `state.context.data` via the existing claim contract — same as a non-deferred loader return.
 - Writes the live `deferred` promise record to `state.context.ssrDataDeferred`.
 - Writes the keys array to `state.context.ssrDataDeferredKeys` for post-hydration registry reconstruction (so the client can pre-create awaiter slots before the inline scripts arrive).
@@ -4955,8 +4957,12 @@ The plugin:
 
 ```html
 <!-- Server emits one inline script per deferred key, in resolution order -->
-<script>__rrDefer__("reviews", [{"id":1,"text":"…"}])</script>
-<script>__rrDefer__("related", [{"id":42,"name":"…"}])</script>
+<script>
+  __rrDefer__("reviews", [{ id: 1, text: "…" }]);
+</script>
+<script>
+  __rrDefer__("related", [{ id: 42, name: "…" }]);
+</script>
 ```
 
 The `__rrDefer__` global is installed by `getDeferBootstrapScript()` before the deferred consumer hooks run; it looks up the promise stored in `__rrDeferRegistry__` (a global `Map<string, { promise, resolve, reject }>` populated lazily by `ensureRegistryPromise(key)`) and resolves it.
@@ -5093,8 +5099,10 @@ A one-shot **hydration scratchpad** at the core level. Before `router.start(stat
 // Client entry:
 import { hydrateRouter } from "@real-router/core/utils";
 
-const ssrJson = JSON.parse(document.getElementById("__SSR_STATE__")!.textContent!);
-const router = createRouter(routes, { /* deps */ });
+const ssrJson = JSON.parse(
+  document.getElementById("__SSR_STATE__")!.textContent!,
+);
+const router = createRouter(routes, {/* deps */});
 router.usePlugin(ssrDataPluginFactory(loaders), browserPluginFactory());
 
 await hydrateRouter(router, ssrJson); // parks ssrJson in scratchpad, calls router.start(ssrJson.path)
@@ -5133,7 +5141,7 @@ Symmetry with the other five adapters is preserved at the **contract level** (po
 ### Trade-offs
 
 - **Scratchpad is internal API.** `RouterInternals.hydrationState` is exposed only to the loader plugin via `getPluginApi(router)`. Apps cannot pre-populate the scratchpad to bypass loaders for non-hydration navigations — that would defeat the "scratchpad is hydration-specific" contract. Apps that need to inject pre-fetched data on regular navigation use `state.context.data` directly via a custom plugin.
-- **Path mismatch falls through to loader.** If the hydration `ssrState.path` does not match the URL the router resolves (mid-navigation redirect on the server, URL rewrite), the scratchpad is **not consumed** and the loader runs normally on the client. The mismatched scratchpad is then discarded on the next clear. Documented as a non-issue: server-side `LoaderRedirect` causes the server to render the *destination* page, so `ssrState.path` already reflects the post-redirect URL.
+- **Path mismatch falls through to loader.** If the hydration `ssrState.path` does not match the URL the router resolves (mid-navigation redirect on the server, URL rewrite), the scratchpad is **not consumed** and the loader runs normally on the client. The mismatched scratchpad is then discarded on the next clear. Documented as a non-issue: server-side `LoaderRedirect` causes the server to render the _destination_ page, so `ssrState.path` already reflects the post-redirect URL.
 - **No retry on failure.** If the scratchpad write fails (claim was released, namespace re-claimed by a different plugin), the path falls through to the loader — degraded but not broken. The mismatched-claim case is structurally impossible if `usePlugin` registration order is identical between server and client (documented invariant).
 
 ### Dogfooding
@@ -5300,14 +5308,14 @@ Both arms in the `replace` and `reload` checks are intentional. The plugin arm p
 
 ### Before / After — scroll-restore behaviour under `browser-plugin` (`scrollRestoration={{ mode: "restore" }}`)
 
-| Transition type                                                                                | Before                                              | After                                                          |
-| ---------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------- |
-| Forward push (`<Link>` without `replace`)                                                      | `scrollToHashOrTop` (snap to top / anchor)          | `scrollToHashOrTop` (unchanged)                                |
-| Replace (`navigate(..., { replace: true })`, OAuth callback, params canonicalization)          | `scrollToHashOrTop` (undesired snap)                | **skip** (preserve scroll position)                            |
-| Programmatic reload (`navigate(..., { reload: true })`)                                        | `scrollToHashOrTop` (snap, lose pre-reload position) | **restore** from `sessionStorage` (via `subscribe`'s `previousRoute` capture; `pagehide` does not fire on same-document programmatic nav) |
-| F5 cross-document (browser-driven reload)                                                      | `scrollToHashOrTop`                                 | `scrollToHashOrTop` (**unchanged** — `opts.reload` is undefined on the initial transition and browser-plugin has no Navigation API `getActivationType` analogue; closing this requires a core-level F5 priming, out of scope) |
-| Browser back/forward (popstate)                                                                | `scrollToHashOrTop` (snap)                          | `scrollToHashOrTop` (unchanged — `direction`/`traverse` disambiguation requires navigation-plugin) |
-| `navigateToNotFound()`                                                                         | `scrollToHashOrTop`                                 | **skip** (driven by inline `transition.replace = true`)        |
+| Transition type                                                                       | Before                                               | After                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Forward push (`<Link>` without `replace`)                                             | `scrollToHashOrTop` (snap to top / anchor)           | `scrollToHashOrTop` (unchanged)                                                                                                                                                                                               |
+| Replace (`navigate(..., { replace: true })`, OAuth callback, params canonicalization) | `scrollToHashOrTop` (undesired snap)                 | **skip** (preserve scroll position)                                                                                                                                                                                           |
+| Programmatic reload (`navigate(..., { reload: true })`)                               | `scrollToHashOrTop` (snap, lose pre-reload position) | **restore** from `sessionStorage` (via `subscribe`'s `previousRoute` capture; `pagehide` does not fire on same-document programmatic nav)                                                                                     |
+| F5 cross-document (browser-driven reload)                                             | `scrollToHashOrTop`                                  | `scrollToHashOrTop` (**unchanged** — `opts.reload` is undefined on the initial transition and browser-plugin has no Navigation API `getActivationType` analogue; closing this requires a core-level F5 priming, out of scope) |
+| Browser back/forward (popstate)                                                       | `scrollToHashOrTop` (snap)                           | `scrollToHashOrTop` (unchanged — `direction`/`traverse` disambiguation requires navigation-plugin)                                                                                                                            |
+| `navigateToNotFound()`                                                                | `scrollToHashOrTop`                                  | **skip** (driven by inline `transition.replace = true`)                                                                                                                                                                       |
 
 Opt-out for users who relied on the legacy snap-on-every-transition behaviour: `scrollRestoration={{ mode: "top" }}`.
 
@@ -5356,13 +5364,13 @@ No code changes in `cloneRouter.ts`. `createRequestScope` already routes per-req
 
 ```typescript
 const base = createRouter(routes, options, {
-  db: new DbClient(dbUrl),       // singleton — shared (correct)
+  db: new DbClient(dbUrl), // singleton — shared (correct)
   logger,
 });
 
 // Per request
 const clone = cloneRouter(base, {
-  currentUser,                   // unique per request
+  currentUser, // unique per request
   traceId,
 });
 // or, for Node/Web request lifecycles:
@@ -5517,7 +5525,7 @@ A **post-commit, fire-and-forget** event `TREE_CHANGED`, emitted after each stru
 
 ### Why
 
-**Single entry point, no facade method.** `router.subscribeTree()` and `api.addEventListener(events.TREE_CHANGED)` were both rejected. Tree mutations are an **infrastructural** concern (DevTools, plugin coordination), not an app-level event — app code observes external state (auth/role/flags) that *triggers* mutations, plus `router.subscribe` for navigation. Exposing a second entry point through `addEventListener` was also structurally impossible without growing the plugin surface (a new `Plugin.onTreeChange` method + `EventName` extension), which is exactly the surface the RFC set out to avoid.
+**Single entry point, no facade method.** `router.subscribeTree()` and `api.addEventListener(events.TREE_CHANGED)` were both rejected. Tree mutations are an **infrastructural** concern (DevTools, plugin coordination), not an app-level event — app code observes external state (auth/role/flags) that _triggers_ mutations, plus `router.subscribe` for navigation. Exposing a second entry point through `addEventListener` was also structurally impossible without growing the plugin surface (a new `Plugin.onTreeChange` method + `EventName` extension), which is exactly the surface the RFC set out to avoid.
 
 **Payload immutability without hostile cloning.** Payload routes are core-built and frozen per node (Invariant 4's "tree-built references" model), not deep clones of caller input — deep-cloning the `update` patch broke `update()`'s existing contract (circular refs / class instances in `defaultParams`, getter re-invocation). The `update.patch` is a fresh frozen envelope built from the already-destructured locals; nested values are by reference.
 
@@ -5559,7 +5567,7 @@ The script resolves the shared `.pnpm/electron@X` dir, downloads `electron-v<ver
 1. `node "$(… require.resolve('electron/install.js'))"` — re-ran electron's own installer.
 2. A Node wrapper (`scripts/ci-install-electron.cjs`) that `await`ed `@electron/get`'s `downloadArtifact → extract → writeFile('path.txt')` with a postcondition assert.
 
-Both failed the **same** way on the ubuntu runner: the install step exited **0 after printing only the first log line**, with no `path.txt` written and the postcondition guard never reached — a green step that installed nothing, so `_electron.launch` still threw `ENOENT … path.txt`. Root cause: `@electron/get`'s download does **not keep the Node event loop alive** on this runner, so the process drains and exits 0 **at the `await`** — `await` cannot keep a process alive for a promise that schedules no libuv work. (`electron/index.js:47` reads `path.txt` outside its `try`, turning the missing file into the launch ENOENT.) Locally on macOS the same download *does* keep the loop alive (verified: a forced cache-miss download stayed running >6 s), so the race was invisible there — which is exactly why a Node-based fix can't be trusted for this. The bash version removes Node from the download path entirely: `curl` blocks under `set -e`, and the postcondition is a `[ -f ]` test that always runs. `pnpm rebuild electron` / `pnpm rebuild -r electron` do **not** help — electron is not a direct dependency of any workspace root pnpm will match, so they no-op.
+Both failed the **same** way on the ubuntu runner: the install step exited **0 after printing only the first log line**, with no `path.txt` written and the postcondition guard never reached — a green step that installed nothing, so `_electron.launch` still threw `ENOENT … path.txt`. Root cause: `@electron/get`'s download does **not keep the Node event loop alive** on this runner, so the process drains and exits 0 **at the `await`** — `await` cannot keep a process alive for a promise that schedules no libuv work. (`electron/index.js:47` reads `path.txt` outside its `try`, turning the missing file into the launch ENOENT.) Locally on macOS the same download _does_ keep the loop alive (verified: a forced cache-miss download stayed running >6 s), so the race was invisible there — which is exactly why a Node-based fix can't be trusted for this. The bash version removes Node from the download path entirely: `curl` blocks under `set -e`, and the postcondition is a `[ -f ]` test that always runs. `pnpm rebuild electron` / `pnpm rebuild -r electron` do **not** help — electron is not a direct dependency of any workspace root pnpm will match, so they no-op.
 
 #### Second layer: headless runner has no display (xvfb)
 
@@ -5586,7 +5594,6 @@ Web examples run headless Chromium and ignore the virtual display; only the elec
 
 `electron` is in root `pnpm.onlyBuiltDependencies`, so its build script is approved. But its side effects — the binary under `~/.cache/electron` and `path.txt` in `node_modules` — are **not** captured by `cache: pnpm` (which only caches the pnpm store, not `node_modules` or `~/.cache`). pnpm 10 records a per-package "built" flag in the store; on a warm-store runner it sees electron as already built and skips re-running `install.js` into the fresh `node_modules`, so `path.txt` never reappears. Verified locally: deleting `dist/` + `path.txt` and re-running `pnpm install --frozen-lockfile` does **not** regenerate them, while running `install.js` directly does. An explicit install step is deterministic regardless of store-cache warmth. (The Electron tests themselves are healthy — they pass locally once the binary is present.)
 
-
 ## Turbo hashes `shared/` symlink content via a carpet glob (#810)
 
 ### Problem
@@ -5603,7 +5610,7 @@ Add a carpet glob `../../shared/**/*.ts` to the root `bundle`, `test`, `lint`, a
 
 **Gate patterns are narrowed to `.ts` (post-review):** the first cut used a bare `^shared/`, which also matched `shared/dom-utils/CLAUDE.md`, `shared/.claude/*.md`, and `shared/package.json` — a docs-only PR under `shared/` would fail the **required** `Require Changeset` check (and the "add #trivial" hint in its error message is dead text — only Danger implements `#trivial`, the required check does not). Both gates now use `shared/<dir>/…*.ts` excluding `__test-helpers/` (test-only, never bundled), mirroring the turbo glob: turbo says docs don't invalidate, so the changeset gate must not say docs need a release. `.ts`-only is correct by design — `shared/` is framework-agnostic by definition, so framework-specific extensions (`.tsx`/`.vue`/`.svelte`) cannot appear there.
 
-**Angular copy drift-guard (post-review):** the carpet glob leaves one residual: `packages/angular/src/dom-utils` is a git-tracked *copy* re-materialized from `shared/dom-utils` by `prebundle` (`scripts/sync-dom-utils.mjs` — not a plain copy: skips `__*` dirs, rewrites `./x.js` imports to bare). A `shared/dom-utils` PR that forgets `pnpm -F @real-router/angular bundle` would ship an angular dist built from fresh shared (prebundle runs in CI) while angular's tests exercised the stale committed copy — green CI, untested dist. The `pipeline` job now re-runs the sync script right after install (dependency-free, <1s) and fails via `git status --porcelain` (not `git diff` — newly added shared files appear as untracked in the copy) when the committed copy is out of date.
+**Angular copy drift-guard (post-review):** the carpet glob leaves one residual: `packages/angular/src/dom-utils` is a git-tracked _copy_ re-materialized from `shared/dom-utils` by `prebundle` (`scripts/sync-dom-utils.mjs` — not a plain copy: skips `__*` dirs, rewrites `./x.js` imports to bare). A `shared/dom-utils` PR that forgets `pnpm -F @real-router/angular bundle` would ship an angular dist built from fresh shared (prebundle runs in CI) while angular's tests exercised the stale committed copy — green CI, untested dist. The `pipeline` job now re-runs the sync script right after install (dependency-free, <1s) and fails via `git status --porcelain` (not `git diff` — newly added shared files appear as untracked in the copy) when the committed copy is out of date.
 
 Verified: a working-tree change to `shared/ssr/createSsrLoaderPlugin.ts` now yields a **non-empty** affected graph (565 `test` tasks incl. both `ssr-data-plugin` and `rsc-server-plugin` across all four tasks); each consumer type sees its shared files in `bundle`/`test`/`lint`/`type-check` (`--dry=json`).
 
@@ -5611,7 +5618,7 @@ Verified: a working-tree change to `shared/ssr/createSsrLoaderPlugin.ts` now yie
 
 The audit (#810) first proposed per-package `turbo.json` (`extends: ["//"]`) adding only each consumer's own shared glob, for precise invalidation. Empirically rejected: **package-level `inputs` _replace_ the root array, they don't merge** (and `$TURBO_DEFAULT$` changes the input set), so each of 12 packages × 4 tasks would have to **restate the full root input list** + the shared glob — 48 duplicated arrays that silently drift (under-hashing) the moment a root input changes, and would need a dedicated drift-guard to police. That is a fresh instance of the exact "list-drift" class the audit decries.
 
-The carpet glob has **no consumer list anywhere** → structurally drift-free, no guard needed. Cost: a `shared/` change now cache-misses every package's four tasks, not just consumers. Accepted because (a) `shared/` is stable infra that changes rarely, (b) it merely completes the over-invalidation the repo already lived with for `dom-utils#bundle`, and (c) when `shared/dom-utils` does change, the adapters *should* rebuild anyway. `packages/angular` is unaffected — it consumes a git-tracked **copy** of `dom-utils` (real files, hashed via `src/**`), re-synced by its `prebundle` script.
+The carpet glob has **no consumer list anywhere** → structurally drift-free, no guard needed. Cost: a `shared/` change now cache-misses every package's four tasks, not just consumers. Accepted because (a) `shared/` is stable infra that changes rarely, (b) it merely completes the over-invalidation the repo already lived with for `dom-utils#bundle`, and (c) when `shared/dom-utils` does change, the adapters _should_ rebuild anyway. `packages/angular` is unaffected — it consumes a git-tracked **copy** of `dom-utils` (real files, hashed via `src/**`), re-synced by its `prebundle` script.
 
 ## Release: `changeset publish` failure no longer masked by `|| true` (#811)
 
@@ -5649,22 +5656,22 @@ A red run on a partial publish is the desired outcome — a human re-runs the wo
 - **Summary guard for early aborts** — `Summary` is `always()`, so when the job dies before "Check for changesets" its output is `''` and a bare `[ "" != "0" ]` is true, falsely printing "Release PR created/updated". An explicit empty-check now reports "Run aborted before the changeset check" instead.
 - **Failure post-mortem names the gap** — `Fail if publish errored` lists the planned packages whose local version is still absent from npm (same local-vs-npm comparison as the unpublished check) in the `::error::` and the step summary, instead of "see the log". When everything IS on npm despite the non-zero exit, it says so (post-publish error — tagging/changelog) and points at re-run-to-reconcile.
 - **`timeout-minutes: 30` on the release job** — a hung npm/OIDC exchange would otherwise hold the job for the 6h default and, with `cancel-in-progress: false`, block every queued release behind it. Typical runs are 3-8 min.
-- **Reconcile backfills missing *tags*, not just Releases** — the last unrecoverable partial state was "npm published, tag push failed": the next run sees local==npm → `has_unpublished=false` → publish path skipped, and the Release reconcile only covered *existing* tags. Now, for every public package at HEAD whose local version is on npm (`npm view name@version`, checked only when the tag is missing — zero calls in steady state) but whose tag is absent, the tag is created at HEAD via `gh api …/git/refs` (the checkout has `persist-credentials: false`, so plain `git push` can't; the API works with the workflow's `contents: write` GITHUB_TOKEN) and mirrored locally so the same run's Release passes pick it up.
+- **Reconcile backfills missing _tags_, not just Releases** — the last unrecoverable partial state was "npm published, tag push failed": the next run sees local==npm → `has_unpublished=false` → publish path skipped, and the Release reconcile only covered _existing_ tags. Now, for every public package at HEAD whose local version is on npm (`npm view name@version`, checked only when the tag is missing — zero calls in steady state) but whose tag is absent, the tag is created at HEAD via `gh api …/git/refs` (the checkout has `persist-credentials: false`, so plain `git push` can't; the API works with the workflow's `contents: write` GITHUB_TOKEN) and mirrored locally so the same run's Release passes pick it up.
 
 ## `Dependency Review` is a required check; CodeQL gating moved to head-ref (audit 1.1/3.1)
 
 ### Problem
 
-The supply-chain gate was advisory. `protect-master` required only `Require Changeset`, `CI Result`, `Validate Changesets` — all *functional*. `Dependency Review` (`codeql.yml`, `fail-on-severity: moderate`) and CodeQL `Analyze` were not required, so a PR introducing a moderate-severity vulnerable dependency could merge green. For **Dependabot automerge** this is not hypothetical: `gh pr merge --auto` fires on the *required* checks only, and `semver-patch` (any dep) / `semver-minor` (dev) bumps could pull a vulnerable transitive without blocking.
+The supply-chain gate was advisory. `protect-master` required only `Require Changeset`, `CI Result`, `Validate Changesets` — all _functional_. `Dependency Review` (`codeql.yml`, `fail-on-severity: moderate`) and CodeQL `Analyze` were not required, so a PR introducing a moderate-severity vulnerable dependency could merge green. For **Dependabot automerge** this is not hypothetical: `gh pr merge --auto` fires on the _required_ checks only, and `semver-patch` (any dep) / `semver-minor` (dev) bumps could pull a vulnerable transitive without blocking.
 
-Naively adding `Dependency Review` to the required set would have **deadlocked release PRs**: `codeql.yml` had a workflow-level `paths-ignore: ["**/package.json", "**/CHANGELOG.md", ".changeset/**"]`, and a `changeset-release/*` PR changes only those paths → the whole workflow is skipped at the `on:` level → the required check *never reports* → the PR blocks forever on a pending check (GitHub does not auto-satisfy a required check whose workflow was skipped by a path/branch filter).
+Naively adding `Dependency Review` to the required set would have **deadlocked release PRs**: `codeql.yml` had a workflow-level `paths-ignore: ["**/package.json", "**/CHANGELOG.md", ".changeset/**"]`, and a `changeset-release/*` PR changes only those paths → the whole workflow is skipped at the `on:` level → the required check _never reports_ → the PR blocks forever on a pending check (GitHub does not auto-satisfy a required check whose workflow was skipped by a path/branch filter).
 
 ### Solution
 
 - **`codeql.yml`: drop the workflow-level `paths-ignore`; gate by head-ref at the job level** (mirrors the danger.yml pattern from `80f0ff62`):
   - `dependency-review`: `if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')`.
   - `analyze`: `if: github.event_name == 'schedule' || !startsWith(github.head_ref, 'changeset-release/')`.
-  A job skipped by `if:` (workflow *did* trigger) reports a **"skipped" conclusion**, which branch protection treats as a **pass** — so a release PR satisfies the required `Dependency Review` without running it, no deadlock. Dependabot dep PRs change `pnpm-lock.yaml` (never matched the old ignore), so they kept running and keep running.
+    A job skipped by `if:` (workflow _did_ trigger) reports a **"skipped" conclusion**, which branch protection treats as a **pass** — so a release PR satisfies the required `Dependency Review` without running it, no deadlock. Dependabot dep PRs change `pnpm-lock.yaml` (never matched the old ignore), so they kept running and keep running.
 - **Ruleset `protect-master`: add `Dependency Review` to `required_status_checks`** (integration_id 15368, GitHub Actions). CodeQL `Analyze` stays advisory — SAST on a router library is low-signal and autobuild occasionally flakes; the supply-chain gate is the one worth enforcing.
 
 ### Why / ordering
@@ -5732,7 +5739,7 @@ The `@real-router/internal-source` condition is already how `tsc`, the normal Vi
 
 ### Problem
 
-The `/mutation-score` workflow had the model hand-write a throwaway node script to aggregate `reports/mutation-report.json` on **every** run — pure re-derivation cost. Worse, the single most error-prone step lived *outside* any script, in manual eyeballing: deciding whether a Survived mutant can take a `// Stryker disable next-line <Mutator>` **without** silencing a co-located Killed sibling. `disable next-line` is **mutator-level and column-blind** — it silences every mutant of that mutator on the line, regardless of column or replacement value. So if the same mutator has a Killed variant elsewhere on the line (entangled by value, e.g. `ConditionalExpression →true` killed + `→false` survived; or by column, e.g. one `StringLiteral "."` killed in `.split(".")` while another survives in `.includes(".")`), disabling drops a real kill silently. On the route-tree run this was checked by hand (a `dumpline` script run 3× + per-column comparison of killed-vs-survived), which is exactly the kind of structural bookkeeping a human gets wrong and a script never does.
+The `/mutation-score` workflow had the model hand-write a throwaway node script to aggregate `reports/mutation-report.json` on **every** run — pure re-derivation cost. Worse, the single most error-prone step lived _outside_ any script, in manual eyeballing: deciding whether a Survived mutant can take a `// Stryker disable next-line <Mutator>` **without** silencing a co-located Killed sibling. `disable next-line` is **mutator-level and column-blind** — it silences every mutant of that mutator on the line, regardless of column or replacement value. So if the same mutator has a Killed variant elsewhere on the line (entangled by value, e.g. `ConditionalExpression →true` killed + `→false` survived; or by column, e.g. one `StringLiteral "."` killed in `.split(".")` while another survives in `.includes(".")`), disabling drops a real kill silently. On the route-tree run this was checked by hand (a `dumpline` script run 3× + per-column comparison of killed-vs-survived), which is exactly the kind of structural bookkeeping a human gets wrong and a script never does.
 
 ### Solution
 
@@ -5745,7 +5752,7 @@ The `/mutation-score` workflow had the model hand-write a throwaway node script 
 
 ### Why
 
-The disable-safety verdict is a **pure structural function** of the report — "does mutator X have a Killed sibling on this line?" — computed exactly the way Stryker's `disable next-line` behaves (mutator-level, column-blind). Automating it removes a class of silent error (losing a kill by suppressing a still-partly-killed mutator) that prose guidance could only warn about. **Critically, the tool flags only STRUCTURAL safety, never equivalence:** DISABLE-SAFE means "you *may* suppress without losing a kill," not "this is an equivalent." The skill still mandates empirical proof (inject the mutation → full suite green) before any disable, so the tool cannot induce disable-theater — it narrows *where* to look, the model still proves *whether*. The score formula and the column-aware grouping match the skill verbatim, making the tool a faithful executable of what was previously re-authored ad-hoc each run.
+The disable-safety verdict is a **pure structural function** of the report — "does mutator X have a Killed sibling on this line?" — computed exactly the way Stryker's `disable next-line` behaves (mutator-level, column-blind). Automating it removes a class of silent error (losing a kill by suppressing a still-partly-killed mutator) that prose guidance could only warn about. **Critically, the tool flags only STRUCTURAL safety, never equivalence:** DISABLE-SAFE means "you _may_ suppress without losing a kill," not "this is an equivalent." The skill still mandates empirical proof (inject the mutation → full suite green) before any disable, so the tool cannot induce disable-theater — it narrows _where_ to look, the model still proves _whether_. The score formula and the column-aware grouping match the skill verbatim, making the tool a faithful executable of what was previously re-authored ad-hoc each run.
 
 ## Local SonarCloud parity: `scripts/sonar-local.sh` (`pnpm sonar:local`)
 
@@ -5780,7 +5787,7 @@ Kept as a **manual command, not a pre-push hook**: the scanner UPLOADS to SonarC
 **Problem.** The coverage step was `pnpm test:coverage` → `turbo run test -- --coverage`. But coverage is already config-enabled (`vitest.config.unit.mts` → `coverage.enabled: true`), so the passthrough flag adds nothing yet does two kinds of harm, and it directly contradicts `ci.yml`'s "Test with coverage" step, which runs plain `pnpm turbo run test test:properties` with an explicit comment forbidding the re-addition of `-- --coverage` (it wipes property-config lcov → 0 % coverage). So the "parity" script diverged from CI in a third way:
 
 1. **Cache-buster → slow + maximal load.** `-- --coverage` hashes into the turbo task key, so the coverage run never reuses the warm `test` cache the pre-push/CI runs leave behind → cold full re-run of all ~34 packages every time.
-2. **Native crash.** The forced cold miss makes *every* jsdom package (12 of them: react/preact/vue/solid/svelte/angular + browser-env/browser-plugin/dom-utils/hash-plugin/navigation-plugin/preload-plugin) execute v8-coverage concurrently (turbo `concurrency: 4` × `maxWorkers: 4` threads). Under that fd/memory peak, css-tree (a jsdom transitive dep) hits a Node **worker-thread** `node::fs::ReadFileUtf8` → `Assertion failed: (0) == (uv_fs_close(...))` native abort (observed as SIGKILL/exit 137). A single jsdom package run in isolation passes — the bug is load-induced, specific to `pool: "threads"`.
+2. **Native crash.** The forced cold miss makes _every_ jsdom package (12 of them: react/preact/vue/solid/svelte/angular + browser-env/browser-plugin/dom-utils/hash-plugin/navigation-plugin/preload-plugin) execute v8-coverage concurrently (turbo `concurrency: 4` × `maxWorkers: 4` threads). Under that fd/memory peak, css-tree (a jsdom transitive dep) hits a Node **worker-thread** `node::fs::ReadFileUtf8` → `Assertion failed: (0) == (uv_fs_close(...))` native abort (observed as SIGKILL/exit 137). A single jsdom package run in isolation passes — the bug is load-induced, specific to `pool: "threads"`.
 
 **Solution.** `sonar-local.sh` now runs `pnpm test` (= `turbo run test`); the root `test:coverage` script was removed (no remaining consumer; `packages/core` keeps its own unrelated `test:coverage`). Plain `test` emits the same lcov (config-enabled), reuses the cache, and — because warm-cache hits skip execution — keeps few packages actually running coverage at once, so the race effectively does not fire.
 
@@ -5842,7 +5849,7 @@ defaults.
   multi-document lockfile class of breakage (turbo/osv/Dependabot parsers) does
   **not** apply: multi-doc only appears with `configDependencies`/
   `packageManagerDependencies`, which the repo has nowhere. `grep -c '^---$'
-  pnpm-lock.yaml` = 0.
+pnpm-lock.yaml` = 0.
 - **Clean `--frozen-lockfile` install passes with `strictDepBuilds: true`** —
   proving the `allowBuilds` map has no name typos (a wrong name fails the
   install) — and does **not** mutate the lockfile.
@@ -5895,13 +5902,14 @@ GitHub's heterogeneous `ubuntu-latest` pool put base/head on different CPUs → 
 
 ### Runtime — 2m32s, floor is deliberate
 
-Two ephemeral-runner defaults were pure overhead on the persistent VPS: `clean: false` on checkout keeps gitignored `node_modules` (install → ~1 s no-op; safe here — the job runs from `src` via tsx, no vitest/dist), and a `node-cache` input on the setup composite (default `"pnpm"`, codspeed passes `""`) skips setup-node's ~200 MB pnpm-store re-download (~20 s/run). Setup 36 s → 8 s; job ~3 min → **2m32s**. The **~2 min callgrind bench step is the floor** — it *is* the anti-phantom mass (shrinking K re-opens the lottery; parallelizing under callgrind corrupts counts). Server-side reserves exhausted: the VPS guest has no cpufreq driver (hypervisor-owned), tmpfs isn't worth the ops.
+Two ephemeral-runner defaults were pure overhead on the persistent VPS: `clean: false` on checkout keeps gitignored `node_modules` (install → ~1 s no-op; safe here — the job runs from `src` via tsx, no vitest/dist), and a `node-cache` input on the setup composite (default `"pnpm"`, codspeed passes `""`) skips setup-node's ~200 MB pnpm-store re-download (~20 s/run). Setup 36 s → 8 s; job ~3 min → **2m32s**. The **~2 min callgrind bench step is the floor** — it _is_ the anti-phantom mass (shrinking K re-opens the lottery; parallelizing under callgrind corrupts counts). Server-side reserves exhausted: the VPS guest has no cpufreq driver (hypervisor-owned), tmpfs isn't worth the ops.
 
 ### Adapter benches — all six frameworks under jsdom, pure tinybench + vite prebuild (2026-07-16)
 
 The doctrine's reserved adapter-bench slot is live: `benchmarks/adapter-bench/` + `.github/workflows/codspeed-adapters.yml` (dispatch-only Phase 1; **separate workflow** so adapter failures never block the core-gate signal). Shape: per-adapter vite prebuild (framework runtime + adapter + core + memory-plugin, production, from live `src` via the internal-source condition) into one self-contained bundle each, then ONE direct `node` process (`codspeed.mts`, mirroring the core entry) installs jsdom globals and runs all six suites serially under tinybench + the tinybench plugin — the process shape whose V8-flag injection the core gate proved (no vitest, so the vitest-worker question never arises). Three benches per framework (`navigate-param-swap` / `navigate-route-swap` / `back-forward` via memory-plugin); a shared `MountedApp` contract keeps framework-specific **synchronous-commit mechanics in the app** while `bench.add` stays in each per-framework file (URI attribution): react `flushSync` · preact `options.debounceRendering` **and** `options.requestAnimationFrame` forced sync (its adapter subscribes in an effect, and Preact flushes effects via rAF — without the second override nothing commits; caught by the mandatory pre-measure self-check) · vue the one ASYNC suite (`await nextTick()`, no flushSync exists) · solid none (synchronous signals) · svelte `flushSync()` from `svelte` · angular zoneless `bootstrapApplication` + `appRef.tick()` (AOT via `@analogjs/vite-plugin-angular`, as in cross-router).
 
 Build-pipeline landmines (all empirically caught, encoded in `vite/base.mts` + per-config comments):
+
 - **Vite 6+ `resolve.conditions` REPLACES the default list** — without spreading `defaultClientConditions` back, svelte resolved to its SERVER runtime (`lifecycle_function_unavailable`).
 - **The analog plugin strips exports from out-of-scope workspace `.ts`** (it runs the Angular compiler over the whole module graph) — so the angular suite resolves ALL `@real-router/*` to built dist (`internalSource: false`; prebuild bundles the angular graph via turbo first). The adapter's FESM is its only consumable form anyway.
 - **`@real-router/svelte` is the one adapter without the internal-source condition** (deliberate: its src entry imports `.svelte`, which tsc can't consume) — the suite aliases the package straight to `src/index.ts` (vite compiles `.svelte` fine); before the alias the local build silently bundled DIST and the CI runner (no dist) failed resolution.
@@ -5928,7 +5936,7 @@ The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent 
 
 **Solution.** Extended both jobs' `if` with a push-only clause that skips the release merge by its commit message: `!(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: version packages'))`. That prefix is the changesets `commit:` convention (`changesets.yml`), squash-merged verbatim onto master, so it uniquely identifies the release merge; ordinary `fix:`/`feat:`/`refactor:`/`chore:` merges don't match and still re-seed the baseline. `github.event.head_commit` is absent on `pull_request`/`workflow_dispatch`, and the clause is `event_name == 'push'`-guarded, so those events are untouched (and GHA property access on null → `''`, so even eager evaluation can't error). Per-release cost drops from 3 slow runs to **2**: feature PR + feature-merge push.
 
-**Why skip the release merge and NOT the feature merge (the direction matters).** Both cuts save exactly one run — throughput is identical — but they differ on baseline health. The feature-merge push is the run that records the baseline reflecting the *real code change*, immediately and per feature, so every later PR compares against its direct merge-base. Skipping *it* instead would defer every baseline update to release time: any feature merged while a prior release PR is still open would sit in no baseline until released, and a PR opened in that window would compare against a stale master (misattribution). Skipping the *release* merge has none of that cost — it only re-measures code already benchmarked at the feature merge — and as a bonus makes the release merge itself a CodSpeed no-op, so cutting a release is never queued behind a redundant bench. Verified before landing with a truth table across all seven event shapes (same-repo / fork / release PR; feature / release / infra push; workflow_dispatch) — only the release-merge push flips to skip.
+**Why skip the release merge and NOT the feature merge (the direction matters).** Both cuts save exactly one run — throughput is identical — but they differ on baseline health. The feature-merge push is the run that records the baseline reflecting the _real code change_, immediately and per feature, so every later PR compares against its direct merge-base. Skipping _it_ instead would defer every baseline update to release time: any feature merged while a prior release PR is still open would sit in no baseline until released, and a PR opened in that window would compare against a stale master (misattribution). Skipping the _release_ merge has none of that cost — it only re-measures code already benchmarked at the feature merge — and as a bonus makes the release merge itself a CodSpeed no-op, so cutting a release is never queued behind a redundant bench. Verified before landing with a truth table across all seven event shapes (same-repo / fork / release PR; feature / release / infra push; workflow_dispatch) — only the release-merge push flips to skip.
 
 ### Dependabot PRs skipped on the pull_request side — CodSpeed on the single runner (2026-07-20)
 
@@ -5943,8 +5951,9 @@ The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent 
 **Problem.** `benchmarks/vs-tanstack/` was a per-engine layout with a single scenario (the client-nav navigation loop): shared helpers (`jsdom`, `perf-utils`, `setup-helpers`, `memory-utils`, `vitest.setup`) sat at the root, and `real-router/{react,vue,solid}/` + `tanstack/{react,vue,solid}/` each held one app. TanStack's upstream `benchmarks/` had meanwhile grown to 4 sections (`client-nav`, `bundle-size`, `memory`, `ssr`) with **per-scenario isolation** — one app per scenario so route-tree size / IC state of one scenario can't shift another's numbers (same IC-megamorphism class documented for core Section 2). Adding new scenarios (navigation-churn, unique-location-churn, mount-unmount, …) on the flat layout would have polluted the existing bench and required combinatorial new scripts (×2 engine × 3 fw × 3 mode = 18 per scenario).
 
 **Solution.** Restructured into per-scenario layout (Phase 0 of `.claude/EXPANSION_PROPOSAL.md`):
+
 - Shared helpers → `vs-tanstack/shared/`; the navigation-loop bench → `vs-tanstack/client-nav/{real-router,tanstack}/<fw>/` (first scenario). `git mv` throughout (history preserved).
-- Relative imports to shared shifted `+1` level (`../../jsdom` → `../../../shared/jsdom`); imports *within* an engine subtree (`setup.ts → ../create-setup`, the dynamic `import("./<fw>/dist/app.mjs")` in `create-setup`) are **unchanged** — `create-setup` moves with its engine subtree, so that load-bearing relative link stays intact. Solid tsconfigs: `extends` `+1` (`../../../../../tsconfig.json`), `files` → `../../../shared/jsdom.d.ts`. Root `tsconfig.json`: `files` → `./shared/jsdom.d.ts`, `exclude` globs widened to `./*/...` so future scenarios inherit the solid/vue-JSX exclusions automatically.
+- Relative imports to shared shifted `+1` level (`../../jsdom` → `../../../shared/jsdom`); imports _within_ an engine subtree (`setup.ts → ../create-setup`, the dynamic `import("./<fw>/dist/app.mjs")` in `create-setup`) are **unchanged** — `create-setup` moves with its engine subtree, so that load-bearing relative link stays intact. Solid tsconfigs: `extends` `+1` (`../../../../../tsconfig.json`), `files` → `../../../shared/jsdom.d.ts`. Root `tsconfig.json`: `files` → `./shared/jsdom.d.ts`, `exclude` globs widened to `./*/...` so future scenarios inherit the solid/vue-JSX exclusions automatically.
 - vite configs: `outDir`/`entry` → `client-nav/`, `setupFiles` → `shared/`.
 - **Runner `vs-tanstack/run.mjs`** replaces 24 hardcoded package.json scripts: `node vs-tanstack/run.mjs <scenario> <engine> <framework> <mode>` resolves everything by path convention, so adding a scenario needs zero new scripts. package.json keeps only `bench:vs-tanstack` (dispatcher) + two react-speed shortcuts; `bench-compare-vs-tanstack.sh` paths repointed (still calls `vite`/`vitest` directly for its `nice`/`tee` orchestration).
 
@@ -5961,8 +5970,9 @@ The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent 
 **Solution.** Each scenario is a minimal app (2 static routes, or `/items/:id?q`) + a per-scenario `setup.ts` exposing `{before, tick, after}` for `runMemoryBenchmark`. React established the pattern; vue/solid were mechanically fanned out by subagents against the React reference + the client-nav adapter mount APIs, then verified (build + memory + per-folder type-check). A `vs-tanstack/tsconfig.solid.json` aggregate (glob `*/*/solid/**`) type-checks **all** solid scenarios in one pass — `bench:type-check` uses it instead of enumerating per-folder solid tsconfigs (auto-covers future solid scenarios). Each tick pairs `navigate` with its render signal via `Promise.all([navigate, rendered])` (one navigation in flight — TanStack memory-bench convention).
 
 **Two harness lessons (load-bearing for any future scenario):**
-- **mount-unmount must wait the framework render commit before unmount.** React 19 `createRoot.render` commits asynchronously; tearing down after only `drainMicrotasks` (not a real render signal) leaves `useSyncExternalStore` mount/unmount half-run and the router *transiently* uncollectable — a WeakRef probe showed **20/20 routers alive without the wait, 1/20 with it**. This produced a false ~84 KB/cycle "leak" that looked like an adapter bug (a subagent even misattributed it to a `WeakMap`/`noopDestroy` in `@real-router/sources` — but those caches are weak, so the router stays collectable). Fix: `waitForRender` polls `container.childNodes.length > 0` before unmount. Real-router mount-unmount then shows a flat floor (~400–700 b/cycle). TanStack's own setup waits `onRendered`, which is why it was flat from the start.
-- **`detectLeak` is a thresholdless trend heuristic and false-positives on small stable noise.** real-router solid navigation-churn flagged "leak YES" at ~92 b/nav while the heap *floor* stayed flat at 48.5 MB (rounds oscillated −35 / −10 / +34 / +35 KB). The heuristic only checks "last two rounds both positive"; ±0.07 % noise trips it. For small deltas, read the per-round floor, not the boolean (already noted in `.claude/EXPANSION_PROPOSAL.md` §7.2).
+
+- **mount-unmount must wait the framework render commit before unmount.** React 19 `createRoot.render` commits asynchronously; tearing down after only `drainMicrotasks` (not a real render signal) leaves `useSyncExternalStore` mount/unmount half-run and the router _transiently_ uncollectable — a WeakRef probe showed **20/20 routers alive without the wait, 1/20 with it**. This produced a false ~84 KB/cycle "leak" that looked like an adapter bug (a subagent even misattributed it to a `WeakMap`/`noopDestroy` in `@real-router/sources` — but those caches are weak, so the router stays collectable). Fix: `waitForRender` polls `container.childNodes.length > 0` before unmount. Real-router mount-unmount then shows a flat floor (~400–700 b/cycle). TanStack's own setup waits `onRendered`, which is why it was flat from the start.
+- **`detectLeak` is a thresholdless trend heuristic and false-positives on small stable noise.** real-router solid navigation-churn flagged "leak YES" at ~92 b/nav while the heap _floor_ stayed flat at 48.5 MB (rounds oscillated −35 / −10 / +34 / +35 KB). The heuristic only checks "last two rounds both positive"; ±0.07 % noise trips it. For small deltas, read the per-round floor, not the boolean (already noted in `.claude/EXPANSION_PROPOSAL.md` §7.2).
 
 **Honesty caveat.** Real-router shows a flat floor in all three scenarios across react/vue/solid. TanStack grows in navigation/unique-location under this code-based forceGC harness, but its upstream file-based + CodSpeed-predictable-GC bench is flat — so that growth is treated as a harness-equivalence artifact, **not** claimed as a TanStack leak (open equivalence question, deferred).
 
@@ -5971,6 +5981,7 @@ The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent 
 **Problem.** Phase 2 ports the adaptation-required TanStack `memory/client` churn scenarios. Three candidates — `interrupted-navigations`, `preload-churn`, `loader-data-retention` — each map onto a real-router mechanism that differs from TanStack's, so each needed a deliberate adaptation (or a rejection).
 
 **Outcomes:**
+
 - **`interrupted-navigations`** — a slow navigation hangs in a route's `canActivate` (a per-id deferred registry — the real-router analogue of TanStack's hanging slow loader); a fast navigation interrupts it (core's AbortController → `TRANSITION_CANCELLED`), then the slow guard is released. Detects that superseded in-flight navigations (closures, contexts, abort controllers) are reclaimed. real-router flat floor across react/vue/solid (~300–740 b/nav); core's built-in navigation cancellation is the strength this exercises.
 - **`loader-data-retention`** (Q3 resolved) — real-router has no built-in CSR loader, so the honest analogue is per-route **context** retention: a plugin writes a 200-record payload into `state.context.data` via `claimContextNamespace()` on each navigation; the departed route's context must be reclaimed. real-router flat floor across all frameworks (~300–1150 b/nav). tanstack uses a route loader returning the same payload with `gcTime: 0` + `defaultGcTime: 0`.
 - **`preload-churn` — DROPPED as a fake-analogy.** Reading `preload-plugin` end-to-end showed the divergence is deeper than the audit's S1: real-router's preload-plugin is a **transport layer** (hover → fire-and-forget `preload.fn`) plus a pre-resolved **State** cache (href→State, bounded LRU 32, evicted on `TREE_CHANGED` / `getPreloadedState` delete-on-read). TanStack's `preloadRoute` caches **loader data** (gcTime 0, evicted on nav commit). Different mechanisms under one name — an honest real-router test would measure "State-cache LRU bounded under hover-churn", not TanStack's data-cache; plus it needs new deps (browser-plugin + preload-plugin). Per `feedback_competitor_feature_analogies`, marked 🔴 in `.claude/EXPANSION_PROPOSAL.md` §6.6 rather than forcing a misleading comparison.
@@ -6012,7 +6023,9 @@ This completes the vs-tanstack expansion roadmap (Phases 0–3): per-scenario re
 
 ```js
 const touchesAdapterShared = groups["adapter-shared"].length > 0; // sources/route-utils
-if (affected.length <= K && !touchesCore && !touchesAdapterShared) { /* leaf */ }
+if (affected.length <= K && !touchesCore && !touchesAdapterShared) {
+  /* leaf */
+}
 ```
 
 `adapter-shared` is the classifier's existing bucket for exactly these two packages. When either is affected the planner now forces **sharded** regardless of count — the 6 adapter shards run in parallel (~5–8 min wall) instead of serializing. The pinning test was flipped to assert sharded; two regression tests added (sources-only → sharded; the override fires in isolation). `node --test scripts/build-matrix.test.mjs` → 19/19.
@@ -6035,7 +6048,7 @@ if (affected.length <= K && !touchesCore && !touchesAdapterShared) { /* leaf */ 
 
 `$FILTERS` is intentionally unquoted (bash word-splitting into separate `--filter=<pkg>` tokens — same pattern as the shards' `$SHARD_FILTER`). Verified locally: the closure now produces lcov for all 8 (`event-emitter` 1.8 KB, `path-matcher` 12 KB, …) where `--filter='@real-router/core...'` produced only `core`. `node --test scripts/build-matrix.test.mjs` → 19/19; `actionlint` clean.
 
-**Why not `dependsOn: ["^test"]` on the `test` task.** That would make every `test` run all upstream packages' tests first across the *entire* graph — a global change to the build/cache topology to fix one job's scoping. The filter is local to base-test and leaves the task graph untouched. **Why not hardcode the 8 names in ci.yml.** They already live in `CORE_LAYER`, which is also what excludes them from shards — two hand-maintained copies would drift the moment a 9th base-layer package appears, silently re-opening the same hole. Importing the one set keeps a single source of truth. **Misdiagnosis note:** the first attempt bumped the `vitest.config.common.mts` cache-bust marker (the #470 remedy for *stale* lcov-less cache entries). It did nothing here — the entries weren't stale; the tests simply never ran — and was reverted. The discriminator: the failure reproduced under `--force` (cache bypassed), and a healthy cache hit was shown to restore lcov correctly.
+**Why not `dependsOn: ["^test"]` on the `test` task.** That would make every `test` run all upstream packages' tests first across the _entire_ graph — a global change to the build/cache topology to fix one job's scoping. The filter is local to base-test and leaves the task graph untouched. **Why not hardcode the 8 names in ci.yml.** They already live in `CORE_LAYER`, which is also what excludes them from shards — two hand-maintained copies would drift the moment a 9th base-layer package appears, silently re-opening the same hole. Importing the one set keeps a single source of truth. **Misdiagnosis note:** the first attempt bumped the `vitest.config.common.mts` cache-bust marker (the #470 remedy for _stale_ lcov-less cache entries). It did nothing here — the entries weren't stale; the tests simply never ran — and was reverted. The discriminator: the failure reproduced under `--force` (cache bypassed), and a healthy cache hit was shown to restore lcov correctly.
 
 ## Cache layers & honest cold builds — clean scripts purge `.eslintcache` + `*.tsbuildinfo*` (2026-06-30)
 
@@ -6059,7 +6072,7 @@ A "clean" script that leaves tool caches warm is a silent correctness bug for an
 
 ### Problem
 
-Three plugins (`rsc-server-plugin`, `ssr-data-plugin`, `validation-plugin`) declared `@real-router/core` in **peerDependencies** as `workspace:^`, which pnpm publishes as `^0.62.0`. On a 0.x package `^0.x.y` is **patch-only** in semver, so any core *minor* bump (0.62 → 0.63) takes the peer out of range. With `onlyUpdatePeerDependentsWhenOutOfRange: true` (already set in `.changeset/config.json`), changesets then bumps these peer-dependents, and an out-of-range peer escalates to a **major** bump ([changesets/changesets#822](https://github.com/changesets/changesets/issues/822) — closed `completed` 2026-06-24 but with **no** code-fix; changesets 2.31 is latest and ships no option, so the workaround stays on the user). The 204-line `cap-major-bumps.mjs` post-version script existed solely to undo these unwanted majors. The 3 manifests also violated the project's own CLAUDE.md rule ("Never use `workspace:^` for peerDependencies on 0.x").
+Three plugins (`rsc-server-plugin`, `ssr-data-plugin`, `validation-plugin`) declared `@real-router/core` in **peerDependencies** as `workspace:^`, which pnpm publishes as `^0.62.0`. On a 0.x package `^0.x.y` is **patch-only** in semver, so any core _minor_ bump (0.62 → 0.63) takes the peer out of range. With `onlyUpdatePeerDependentsWhenOutOfRange: true` (already set in `.changeset/config.json`), changesets then bumps these peer-dependents, and an out-of-range peer escalates to a **major** bump ([changesets/changesets#822](https://github.com/changesets/changesets/issues/822) — closed `completed` 2026-06-24 but with **no** code-fix; changesets 2.31 is latest and ships no option, so the workaround stays on the user). The 204-line `cap-major-bumps.mjs` post-version script existed solely to undo these unwanted majors. The 3 manifests also violated the project's own CLAUDE.md rule ("Never use `workspace:^` for peerDependencies on 0.x").
 
 ### Solution
 
@@ -6077,7 +6090,7 @@ Three plugins (`rsc-server-plugin`, `ssr-data-plugin`, `validation-plugin`) decl
 
 The two release workflows carried load-bearing logic inline in bash:
 
-- `changeset-check.yml` `validate-changesets` (Check 1-4: PR-ref / multi-package / private / major) was a **bash re-implementation of the same rules `check-changeset.mjs` already enforces on pre-push** — two validators of one rule-set, free to drift (the bash one was already a strict *subset*, silently weaker).
+- `changeset-check.yml` `validate-changesets` (Check 1-4: PR-ref / multi-package / private / major) was a **bash re-implementation of the same rules `check-changeset.mjs` already enforces on pre-push** — two validators of one rule-set, free to drift (the bash one was already a strict _subset_, silently weaker).
 - `changesets.yml` Extract PR refs (`grep | sort -u | tr | xargs`) and Reconcile's `version_notes` / `version_has_own_changes` (awk/grep CHANGELOG section-parsing) were untested shell on the **release-critical** path.
 
 ### Solution
@@ -6089,7 +6102,7 @@ The two release workflows carried load-bearing logic inline in bash:
 
 DRY removes the silent-drift hazard (one changeset-rule validator, not a bash copy that can fall behind). The brittlest parsing (CHANGELOG sections, ref extraction) is isolated as pure functions out of the release-critical shell; awk-parity was demonstrated empirically at extraction time (21 package/version pairs).
 
-**Boundary — where this deliberately stops (vs the RFC's "all 8 blocks → ~30-50-line workflow"):** the `github-script` Comment/Remove steps are **context-bound** (need the GitHub API + `context.repo`) and stay in YAML — they only got *simpler* (per-file from JSON, not 4 hand-maintained per-type sections). `require-changeset`'s source-change detection (a `git diff` against the base ref) is not changeset-content validation and stays bash. And Reconcile's **gh/git orchestration** (`gh release create/list`, `gh api` tag backfill, `declare -A`, two-pass ordering) stays bash on purpose: it is release-critical, its real behaviour is **not locally verifiable** (needs GitHub + pushed tags + existing Releases), and `gh` is more natural in shell than `execSync` wrappers. Only the pure CHANGELOG-parsing came out. Net: the workflows got materially thinner and the extracted logic is tested, but "thin 30-50-line workflow" was an over-estimate — the irreducible remainder is API-bound or release-critical orchestration.
+**Boundary — where this deliberately stops (vs the RFC's "all 8 blocks → ~30-50-line workflow"):** the `github-script` Comment/Remove steps are **context-bound** (need the GitHub API + `context.repo`) and stay in YAML — they only got _simpler_ (per-file from JSON, not 4 hand-maintained per-type sections). `require-changeset`'s source-change detection (a `git diff` against the base ref) is not changeset-content validation and stays bash. And Reconcile's **gh/git orchestration** (`gh release create/list`, `gh api` tag backfill, `declare -A`, two-pass ordering) stays bash on purpose: it is release-critical, its real behaviour is **not locally verifiable** (needs GitHub + pushed tags + existing Releases), and `gh` is more natural in shell than `execSync` wrappers. Only the pure CHANGELOG-parsing came out. Net: the workflows got materially thinner and the extracted logic is tested, but "thin 30-50-line workflow" was an over-estimate — the irreducible remainder is API-bound or release-critical orchestration.
 
 ## tsdown-consolidated publint/attw — validation inside `bundle`, not separate tasks (2026-06-30)
 
@@ -6102,6 +6115,7 @@ Package-publishing validation was **two separate turbo tasks per public package*
 tsdown 0.22.3 runs publint + attw **built-in**. Added `publint: true` + `attw: true` to `commonConfig` in `tsdown.base.ts` — all **21 tsdown-built** public packages inherit it, so validation now runs as part of `bundle`. Removed the `lint:package`/`lint:types` scripts from those 21 `package.json`.
 
 Pilot on `core` proved parity + two non-obvious facts:
+
 - tsdown runs publint/attw **once** after the full dist (NOT per ESM/CJS config) even though the option lives in the shared `commonConfig` — so there was no need to inject it into only one format (the planned "decision A" turned out unnecessary).
 - `attw: true` (default) covers the **same 4 resolution modes** as `attw --pack .` — verdict identical ("No problems"). publint's `engines.node` suggestion is **info-level** (`ℹ`) and does NOT trip `failOnWarn: "ci-only"` — `CI=1 pnpm -F core bundle` exits 0.
 
@@ -6117,8 +6131,8 @@ Pilot on `core` proved parity + two non-obvious facts:
 
 Dependabot stopped opening **any** npm PRs for ~2 weeks (only the `github-actions` ecosystem kept working — e.g. `actions/cache 5→6`), while `pnpm outdated` showed 30+ available bumps (angular, tanstack, preact, svelte, rollup, eslint plugins, …). The Dependabot update-log (`/network/updates`) showed every npm job **errored**, culminating in a repository-level auto-pause:
 
-> *Dependabot updates have stopped for your repository due to repeated errors.*
-> *Dependabot cannot update undici to a non-vulnerable version. The latest possible version of undici that can be installed is 7.27.2. The earliest fixed version is 7.28.0.*
+> _Dependabot updates have stopped for your repository due to repeated errors._
+> _Dependabot cannot update undici to a non-vulnerable version. The latest possible version of undici that can be installed is 7.27.2. The earliest fixed version is 7.28.0._
 
 Root cause: three OSV/GHSA advisories on **transitive** deps were resolved by `overrides` in `pnpm-workspace.yaml` — `js-yaml` (2026-06-17, via `read-yaml-file '>=2.1.0'`), then `undici '>=7.28.0 <8.0.0'` + `piscina '>=5.2.0 <6.0.0'` (2026-06-18). The installed tree is genuinely clean (`undici@7.28.0`, `piscina@5.2.0`, `js-yaml@4.3.0`; `lint:audit`/osv-scanner: 1755 pkgs, no issues). **But Dependabot does not apply pnpm `overrides` during its own resolution** — it re-resolves each dep to its natural transitive ceiling (undici 7.27.2 < fixed 7.28.0), concludes it "cannot update to a non-vulnerable version", and **errors the entire npm job → zero PRs**. Successive errors (js-yaml → piscina → undici) tripped Dependabot's repo-wide auto-halt. **Not a pnpm-11 regression** — all three errors predate the 11.9 migration (2026-06-25); the overrides lived in `package.json#pnpm.overrides` at the time and Dependabot ignored them there too (it never honors pnpm overrides, in either location).
 
@@ -6128,7 +6142,7 @@ Add the three transitive, override-pinned deps to the npm ecosystem's `ignore` l
 
 ### Why this and not the alternatives
 
-**Not removing/loosening the overrides** — they are the actual fix that makes osv-scanner clean; dropping them re-opens the vulnerabilities. **Not disabling Dependabot security updates repo-wide** — that would blind us to advisories on *direct* deps (Dependabot's real job). **Not adding undici/piscina as direct devDeps** — pollutes manifests with transitive internals, and wouldn't help: Dependabot's resolver still can't reach 7.28.0 through the parent chain. The `ignore` list is surgical and codified. **Recurring-pattern note (in the config comment):** every future transitive-advisory-via-override adds another `ignore` entry, or Dependabot re-halts the whole npm ecosystem.
+**Not removing/loosening the overrides** — they are the actual fix that makes osv-scanner clean; dropping them re-opens the vulnerabilities. **Not disabling Dependabot security updates repo-wide** — that would blind us to advisories on _direct_ deps (Dependabot's real job). **Not adding undici/piscina as direct devDeps** — pollutes manifests with transitive internals, and wouldn't help: Dependabot's resolver still can't reach 7.28.0 through the parent chain. The `ignore` list is surgical and codified. **Recurring-pattern note (in the config comment):** every future transitive-advisory-via-override adds another `ignore` entry, or Dependabot re-halts the whole npm ecosystem.
 
 ## Dependabot npm job errors when it bumps ONE member of a peer-coupled set — nanostores, vite major (2026-07-02 / 2026-07-06)
 
@@ -6145,7 +6159,7 @@ A **second, distinct** way Dependabot errors the whole npm job (→ zero PRs →
 
 ### Why this and not the alternatives
 
-**Not `strictPeerDependencies: false`** — pnpm's own hint suggests it, but it would mask genuine peer breakage across the real install (not just Dependabot's dry-run), defeating the reason it's on. **Not letting Dependabot open the doomed PR anyway** — the job errors *before* producing any PR, taking the whole batch (and the other ecosystems' PRs) down with it, and repeated errors auto-halt Dependabot repo-wide (same failure mode as the advisory-override case above). **Not manually widening peer ranges / force-resolving vite 8** — the plugins genuinely don't support vite 8 yet; the router doesn't get to decide that. `ignore` is the surgical, codified block. **Recurring-pattern note (in the config comment):** every version-coupled set or ecosystem-gated major that Dependabot can't move in isolation adds another `ignore` entry (whole-set for coupled peers, major-scoped for gated majors), or the npm job re-errors.
+**Not `strictPeerDependencies: false`** — pnpm's own hint suggests it, but it would mask genuine peer breakage across the real install (not just Dependabot's dry-run), defeating the reason it's on. **Not letting Dependabot open the doomed PR anyway** — the job errors _before_ producing any PR, taking the whole batch (and the other ecosystems' PRs) down with it, and repeated errors auto-halt Dependabot repo-wide (same failure mode as the advisory-override case above). **Not manually widening peer ranges / force-resolving vite 8** — the plugins genuinely don't support vite 8 yet; the router doesn't get to decide that. `ignore` is the surgical, codified block. **Recurring-pattern note (in the config comment):** every version-coupled set or ecosystem-gated major that Dependabot can't move in isolation adds another `ignore` entry (whole-set for coupled peers, major-scoped for gated majors), or the npm job re-errors.
 
 ## CI shard MEMBERSHIP is input-aware, not the declared-dep graph — shared-source PRs (build-matrix.mjs) (2026-07-01)
 
@@ -6170,7 +6184,7 @@ Plus a **guard**: `mode=sharded` with an empty `include` under `touchesSharedSou
 
 ### Problem
 
-`build-matrix.mjs` routes a PR to the fast monolithic **leaf** path via `turbo query affected --packages`, but the `pipeline-leaf` job then **executed** a *different* affected policy — `pnpm turbo run test test:properties bundle lint:package … --filter='...[origin/master]'`. The two turbo APIs disagree on a **root-file** change: `query affected --packages` attributes a root `pnpm-lock.yaml` bump to the package whose deps actually changed, but the classic git-ref filter `--filter='...[ref]'` treats *any* root-file change as touching **every** workspace. So a Dependabot lockfile bump was routed as a **1-package leaf** yet the leaf job ran the **whole-repo graph**. Proven on PR #1112 (`bump preact 10.29.2→10.29.3`, run 28599031970) at its real base `957490f3`: `query affected --packages` → **1** `packages/*` (`@real-router/preact`) → `mode=leaf` (worktree repro, `--head HEAD`==checkout as in CI); `turbo run …--filter='...[957490f3…head]'` → **152 tasks / 31 packages** (the entire monorepo — `angular`, `vue`, `svelte`, every plugin).
+`build-matrix.mjs` routes a PR to the fast monolithic **leaf** path via `turbo query affected --packages`, but the `pipeline-leaf` job then **executed** a _different_ affected policy — `pnpm turbo run test test:properties bundle lint:package … --filter='...[origin/master]'`. The two turbo APIs disagree on a **root-file** change: `query affected --packages` attributes a root `pnpm-lock.yaml` bump to the package whose deps actually changed, but the classic git-ref filter `--filter='...[ref]'` treats _any_ root-file change as touching **every** workspace. So a Dependabot lockfile bump was routed as a **1-package leaf** yet the leaf job ran the **whole-repo graph**. Proven on PR #1112 (`bump preact 10.29.2→10.29.3`, run 28599031970) at its real base `957490f3`: `query affected --packages` → **1** `packages/*` (`@real-router/preact`) → `mode=leaf` (worktree repro, `--head HEAD`==checkout as in CI); `turbo run …--filter='...[957490f3…head]'` → **152 tasks / 31 packages** (the entire monorepo — `angular`, `vue`, `svelte`, every plugin).
 
 Normally invisible: with Remote Cache **on**, the ballooned whole-repo graph is ~all cache-**HIT** (a preact lockfile bump does **not** move upstream hashes — empirically the global `hashOfExternalDependencies bf0089345e2a1293` **and** every upstream task-hash stay bit-identical across a simulated preact lockfile mutation; turbo's lockfile hashing is fine-grained per-package, exactly as the PoC doc claims → `117 cached, 117 total … >>> FULL TURBO 256ms`). The lockfile does **not** invalidate the cache; it only **widens the git-ref scope**. Dependabot removed the mask: GitHub withholds repo `secrets.*` (hence `TURBO_TOKEN`) in the Dependabot event → the leaf job logged **`Remote caching disabled`** → the whole 152-task graph ran **cold** → 103 cold cache-misses in 8 min before the run was cancelled (vs the ~2 min a real leaf takes). So the symptom ("lockfile invalidates the cache") was really "leaf executes a wider set than it routed, and that set is cache-cold only under Dependabot."
 
@@ -6180,10 +6194,11 @@ Make leaf **execution** consume the **routing** set. `buildPlan` now also return
 
 ### Why this and not the alternatives
 
-**Not "give Dependabot the Remote Cache" as the fix** (a read-only `TURBO_TOKEN` via `vars.` instead of `secrets.`) — it only re-masks the balloon (whole-repo graph, now cache-HIT), never aligns execution with routing, and a `vars.`-exposed token is world-readable on a public repo. Worth doing as a *separate* cold-path insurance, but orthogonal. **Not routing lockfile PRs to sharded** — sharded membership is the input-aware `...[ref]` set, i.e. the *same* whole-repo balloon, and slower cold than a scoped leaf. **Symmetric with #1067:** that fix widened the *sharded* membership set (declared-dep `query affected` was too narrow — missed symlink consumers); this fix narrows the *leaf* execution set (`...[ref]` was too wide — root-file over-fanout). Same principle both times: **the packages a job executes must equal the packages the planner decided on**, never a second independently-derived turbo filter. Leaf is safe to scope by `query affected` precisely because the routing guards (`touchesCore` / `touchesAdapterShared` / `touchesSharedSources` → sharded) already divert every case where `query affected` is blind (the #1067 shared-source class) off the leaf path.
+**Not "give Dependabot the Remote Cache" as the fix** (a read-only `TURBO_TOKEN` via `vars.` instead of `secrets.`) — it only re-masks the balloon (whole-repo graph, now cache-HIT), never aligns execution with routing, and a `vars.`-exposed token is world-readable on a public repo. Worth doing as a _separate_ cold-path insurance, but orthogonal. **Not routing lockfile PRs to sharded** — sharded membership is the input-aware `...[ref]` set, i.e. the _same_ whole-repo balloon, and slower cold than a scoped leaf. **Symmetric with #1067:** that fix widened the _sharded_ membership set (declared-dep `query affected` was too narrow — missed symlink consumers); this fix narrows the _leaf_ execution set (`...[ref]` was too wide — root-file over-fanout). Same principle both times: **the packages a job executes must equal the packages the planner decided on**, never a second independently-derived turbo filter. Leaf is safe to scope by `query affected` precisely because the routing guards (`touchesCore` / `touchesAdapterShared` / `touchesSharedSources` → sharded) already divert every case where `query affected` is blind (the #1067 shared-source class) off the leaf path.
+
 ## Cross-router real-browser benchmarks — Playwright + CDP, per-cohort all competitors (2026-06-27)
 
-**Problem.** Existing benches measure routing in `jsdom` (`vs-tanstack`, speed/memory) or pure Node (`core`, mitata), and only against TanStack. jsdom has no layout/paint/real GC, and a single-competitor jsdom number is weak evidence for an external audience (and easy for a competitor to dismiss). We wanted **real-browser** numbers (actual paint, CPU, heap-after-GC) across **every standalone competitor in a framework's cohort** — but a naïve "leaderboard of all routers" is a trap: a cross-framework number is mostly a *framework* comparison (Solid's fine-grained reactivity beats React's reconciliation regardless of router quality), so it would be both misleading and a reputational liability.
+**Problem.** Existing benches measure routing in `jsdom` (`vs-tanstack`, speed/memory) or pure Node (`core`, mitata), and only against TanStack. jsdom has no layout/paint/real GC, and a single-competitor jsdom number is weak evidence for an external audience (and easy for a competitor to dismiss). We wanted **real-browser** numbers (actual paint, CPU, heap-after-GC) across **every standalone competitor in a framework's cohort** — but a naïve "leaderboard of all routers" is a trap: a cross-framework number is mostly a _framework_ comparison (Solid's fine-grained reactivity beats React's reconciliation regardless of router quality), so it would be both misleading and a reputational liability.
 
 **Solution.** `benchmarks/cross-router/` — Chromium via the `playwright` package (programmatic `chromium.launch()` + `context.newCDPSession`), metrics read from CDP (`Performance.getMetrics` → ScriptDuration/LayoutDuration/JSHeapUsedSize; `HeapProfiler.collectGarbage` for real forced GC). React cohort first: `@real-router/react`+`browser-plugin`, `react-router@8` (Data mode), `@tanstack/react-router` (full routers; `wouter` was prototyped then excluded — see the note below). Three design pillars:
 
@@ -6201,7 +6216,7 @@ Make leaf **execution** consume the **routing** set. `buildPlan` now also return
 - **Not `@playwright/test`** — the harness drives Chromium + CDP programmatically (build → preview → measure), so it depends on `playwright` (the browser package), not the test-runner.
 - **Not a CI gate** — real-browser cross-router numbers are noisy and pinning/bumping competitor versions in CI is costly; this is a local, manually-run credibility artifact (curated `REPORT.md` committed, raw `results/` gitignored), like `bench-compare*.sh`.
 
-Caveats baked into `REPORT.md`: latency is paint-noisy (CPU `script` + heap are the stable signals); `nav-churn.navsPerSec` is frame-capped (~identical for all — read CPU/nav + heap); FCP is jittery. **`wouter` excluded from the roster** (it was prototyped across all scenarios first): it is a minimalist location-matcher with no transition pipeline / guards / loaders / validated search, and no cross-framework analog (React/Preact only) — a *different class* that dilutes a like-for-like full-router comparison and can't appear in the Vue/Solid/Svelte/Angular cohorts. Stated in REPORT.md's **Scope** (a declared scoping choice, not a hidden cherry-pick). Its capability `N/A`s and its low per-nav baseline were two views of one fact — it costs less because it does less. (The prototype also empirically confirmed the audit's S1 caveat: inside a `<Route nest>` context wouter resolves `href` relative to the nest base, so `/sec/b` doubled to `/sec/sec/b`.) Design doc: `.claude/cross-router-benchmarks-design.md`.
+Caveats baked into `REPORT.md`: latency is paint-noisy (CPU `script` + heap are the stable signals); `nav-churn.navsPerSec` is frame-capped (~identical for all — read CPU/nav + heap); FCP is jittery. **`wouter` excluded from the roster** (it was prototyped across all scenarios first): it is a minimalist location-matcher with no transition pipeline / guards / loaders / validated search, and no cross-framework analog (React/Preact only) — a _different class_ that dilutes a like-for-like full-router comparison and can't appear in the Vue/Solid/Svelte/Angular cohorts. Stated in REPORT.md's **Scope** (a declared scoping choice, not a hidden cherry-pick). Its capability `N/A`s and its low per-nav baseline were two views of one fact — it costs less because it does less. (The prototype also empirically confirmed the audit's S1 caveat: inside a `<Route nest>` context wouter resolves `href` relative to the nest base, so `/sec/b` doubled to `/sec/sec/b`.) Design doc: `.claude/cross-router-benchmarks-design.md`.
 
 ### Unattended full-run orchestrator — `bench-cross-router.sh` (2026-07-03)
 
@@ -6209,7 +6224,7 @@ Caveats baked into `REPORT.md`: latency is paint-noisy (CPU `script` + heap are 
 
 **Solution.** `benchmarks/bench-cross-router.sh` — the cross-router analogue of `bench-compare.sh`: preflight (AC power / thermal `Nominal` / distracting-apps / heavy-CPU) → disable distractions (`caffeinate -dims -w $$`, Spotlight + Time-Machine off, `purge`) → `pnpm bundle` (all package dist, so the bench measures the merged adapter fixes, not stale `dist`) → optional `--smoke` (n=1 dry matrix — abort before the long run if any app fails to build/drive) → thermal-cooldown-gated per-cohort loop (`verify-features` for the react cohort → `run-all.mjs $RUNS $cohort` → `rme-gate` → `report.mjs`; wait for `Nominal` between cohorts). Flags: `--runs N`, `--no-build`, `--smoke`, `-y/--yes`, plus a cohort subset (`react vue solid svelte angular`).
 
-**Why the ROOT/USER split (the one non-obvious part).** `bench-compare.sh` runs its mitata workload **as root** (node-only, for `nice -20`). That is **wrong** for cross-router, which drives a real Chromium via Playwright: (1) Playwright's browser cache lives under the invoking user's `$HOME` (`~/Library/Caches/ms-playwright`) — as root `$HOME` is `/var/root` → "Executable doesn't exist"; (2) any `dist`/`results`/`.turbo` written as root breaks later non-sudo `pnpm`. So the script keeps only the **privileged** bits root (thermal read via `powermetrics`, `purge`, Spotlight/TM toggles, and *setting* `nice -20`) and delegates **all** build/benchmark work back to `$SUDO_USER` via `sudo -u -H` — reconstructing their login `PATH` (dscl for shell/home + a sentinel-wrapped interactive-shell `$PATH` capture, since sudo resets the env) and **inheriting the root-set `nice -20` across the privilege drop** (`nice -n -20 sudo -u … bash -c …`). Consequently no `chown` cleanup is needed (unlike `bench-compare.sh`, which runs the workload as root then chowns results back). Deliberately **not `set -e`**: a 3 h unattended run must survive one flaky cell / RME flag and continue — hard-fail only on `pnpm bundle` and `--smoke`; per-cohort matrix failures and RME flags are tallied in the summary, not fatal. Local artifact, not a CI gate (wraps the same manually-run harness as `bench-compare*.sh`).
+**Why the ROOT/USER split (the one non-obvious part).** `bench-compare.sh` runs its mitata workload **as root** (node-only, for `nice -20`). That is **wrong** for cross-router, which drives a real Chromium via Playwright: (1) Playwright's browser cache lives under the invoking user's `$HOME` (`~/Library/Caches/ms-playwright`) — as root `$HOME` is `/var/root` → "Executable doesn't exist"; (2) any `dist`/`results`/`.turbo` written as root breaks later non-sudo `pnpm`. So the script keeps only the **privileged** bits root (thermal read via `powermetrics`, `purge`, Spotlight/TM toggles, and _setting_ `nice -20`) and delegates **all** build/benchmark work back to `$SUDO_USER` via `sudo -u -H` — reconstructing their login `PATH` (dscl for shell/home + a sentinel-wrapped interactive-shell `$PATH` capture, since sudo resets the env) and **inheriting the root-set `nice -20` across the privilege drop** (`nice -n -20 sudo -u … bash -c …`). Consequently no `chown` cleanup is needed (unlike `bench-compare.sh`, which runs the workload as root then chowns results back). Deliberately **not `set -e`**: a 3 h unattended run must survive one flaky cell / RME flag and continue — hard-fail only on `pnpm bundle` and `--smoke`; per-cohort matrix failures and RME flags are tallied in the summary, not fatal. Local artifact, not a CI gate (wraps the same manually-run harness as `bench-compare*.sh`).
 
 ### Post-cohort sub-ms sanity re-measure + mid-run load recheck — #1261 (2026-07-05)
 
@@ -6227,6 +6242,7 @@ Caveats baked into `REPORT.md`: latency is paint-noisy (CPU `script` + heap are 
 **Problem.** `benchmarks/` carried three competitive suites: `core/` (mitata micro-benchmarks vs **router5 / router6** — the dead predecessor routers real-router was forked and cleaned from), `vs-tanstack/` (Vitest/**jsdom** speed + memory-churn + bundle-size vs TanStack), and `cross-router/` (real Chromium via Playwright + CDP, **all current competitors**, per-cohort). Once `cross-router` matured (5 cohorts, 11 scenarios, capability matrix, `allocKBPerNav` GC-pressure axis, sanity-gated orchestrator), the first two were redundant — router5/6 are dead lineage nobody weighs real-router against today, and jsdom-vs-TanStack is the same comparison `cross-router` runs in a real browser. They also carried ongoing cost: `router5`/`router6`/`jsdom`/`vitest`/`@tanstack/router-core` devDeps drew Dependabot bumps, and their large doc surface drifted.
 
 **Solution.**
+
 - Deleted the mitata suite (`core/{01..04}-*`, `index.ts`, `isolated-*.ts`, `helpers/`) and all of `vs-tanstack/`, plus the sudo runners `bench-compare.sh` / `bench-compare-vs-tanstack.sh` and `compare.mjs` / `check-rme.sh`.
 - Removed the now-orphaned deps `router5` / `router6` / `jsdom` / `vitest` / `@tanstack/router-core`. **Kept `mitata`** — the `/deep-audit` micro-latency probes import it directly.
 - **Hoisted the `/deep-audit` probe repository** `benchmarks/core/audit-probes/` → **`benchmarks/audit-probes/`** (git renames, history preserved) and removed the emptied `core/`. The 35 committed probe sets are audit artifacts, not a benchmark suite, so they get their own top-level home. Updated every reference (the `/deep-audit` skill's paths + micro-latency style sample, `packages/core/CLAUDE.md`'s clone-router regression-guard citation, probe `Run:` comments, `RESULTS.md`).
@@ -6242,11 +6258,11 @@ Caveats baked into `REPORT.md`: latency is paint-noisy (CPU `script` + heap are 
 
 Three confirmed bugs across three packages shared one abstract mechanism: **a shared mutable lifecycle resource is overwritten last-wins (or re-created per generation), and teardown acts on the shared slot _unconditionally_** — without checking "is this still mine / the current generation?" — so one instance's teardown corrupts another's live state.
 
-| Issue | Package | Shared resource | Corruption |
-| --- | --- | --- | --- |
-| #1206 | sources | per-name listener `Set` (re-created after teardown) | a stale unsubscribe closure empties the OLD Set, then `listenersByName.delete(name)` removes the NEW generation's entry → the live subscriber goes deaf, the count goes negative |
-| #1217 | dom-utils | announcer `refCount` + element (re-created) | a surviving old-generation instance's `destroy()` removes the NEW element (deleted by selector) / drives the count negative |
-| #1213 | browser / hash / navigation | `SharedFactoryState.removeXListener` slot (last-wins across routers in a factory pool) | the earlier router's `onStop`/`teardown` removes the LATER (active) router's listener → the winner goes deaf |
+| Issue | Package                     | Shared resource                                                                        | Corruption                                                                                                                                                                       |
+| ----- | --------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #1206 | sources                     | per-name listener `Set` (re-created after teardown)                                    | a stale unsubscribe closure empties the OLD Set, then `listenersByName.delete(name)` removes the NEW generation's entry → the live subscriber goes deaf, the count goes negative |
+| #1217 | dom-utils                   | announcer `refCount` + element (re-created)                                            | a surviving old-generation instance's `destroy()` removes the NEW element (deleted by selector) / drives the count negative                                                      |
+| #1213 | browser / hash / navigation | `SharedFactoryState.removeXListener` slot (last-wins across routers in a factory pool) | the earlier router's `onStop`/`teardown` removes the LATER (active) router's listener → the winner goes deaf                                                                     |
 
 Prior research settled the class as **point-bugs, not an RFC**: #1038 ruled the sources subscription-lifecycle class point-fix; #758 ruled the factory-pool low/documented. The three resources are heterogeneous (a `Set`; a DOM element + counter; a remover closure) in three packages — there is nothing to unify in code.
 
@@ -6274,11 +6290,11 @@ The three resources are genuinely heterogeneous across three packages — a `Cac
 
 Three findings (#1215, #1216, #1217) read as independent bugs but shared one structural root: **a derived reactive view (a source's snapshot; a dom-utility's resolved target) fails to re-synchronize with authoritative state across a lifecycle transition** — creation-with-preexisting-state, container remount, element regeneration. There was no uniform contract, so the guarantee drifted per source: `createRouteSource` reconciles (#765), its sibling `createErrorSource` did not.
 
-| Axis | Failure | Instance |
-| --- | --- | --- |
-| **reconcile-from-state** | source starts from a frozen default and observes only future events; never reads authoritative state on (re)creation / first-subscribe | #1215 |
-| **reconcile-trigger-scope** | `reconcile()` exists but its trigger can't observe the event that matters (an MO pointed at a container can't see the container's own removal) | #1216 |
-| **generation-identity** | lifecycle-shared state (a module counter + element) is not scoped to a generation | #1217 |
+| Axis                        | Failure                                                                                                                                        | Instance |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| **reconcile-from-state**    | source starts from a frozen default and observes only future events; never reads authoritative state on (re)creation / first-subscribe         | #1215    |
+| **reconcile-trigger-scope** | `reconcile()` exists but its trigger can't observe the event that matters (an MO pointed at a container can't see the container's own removal) | #1216    |
+| **generation-identity**     | lifecycle-shared state (a module counter + element) is not scoped to a generation                                                              | #1217    |
 
 ### Solution — the contract each source / utility obeys
 
@@ -6424,9 +6440,9 @@ Isolate stress from the concurrent build (issue Option 1), keeping `concurrency:
 
 ### Why `--concurrency=1`, not looser thresholds
 
-The issue's option 3 (widen every heap ceiling to the *loaded* worst-case) erodes leak-detection signal and fights the mutation discipline the thresholds are anchored to (CLAUDE.md: "Heap-threshold stress tests MUST have proven discriminating power"). Isolation removes the *cause* (contention) instead of masking the *symptom* (jitter), so thresholds stay anchored to the measured healthy baseline. `concurrency: 4` is untouched — property tests keep their throughput; only the stress invocation serializes.
+The issue's option 3 (widen every heap ceiling to the _loaded_ worst-case) erodes leak-detection signal and fights the mutation discipline the thresholds are anchored to (CLAUDE.md: "Heap-threshold stress tests MUST have proven discriminating power"). Isolation removes the _cause_ (contention) instead of masking the _symptom_ (jitter), so thresholds stay anchored to the measured healthy baseline. `concurrency: 4` is untouched — property tests keep their throughput; only the stress invocation serializes.
 
-Stress stays pre-push-only (CI/post-merge exclude it by design — see "CI: `test:stress` lives only in pre-push"); #1423 only changes *how* pre-push reaches it (dedicated step, not `build.dependsOn`). Infra-only → no changeset.
+Stress stays pre-push-only (CI/post-merge exclude it by design — see "CI: `test:stress` lives only in pre-push"); #1423 only changes _how_ pre-push reaches it (dedicated step, not `build.dependsOn`). Infra-only → no changeset.
 
 ## Cross-router text REPORTs retired for the infographic deck (2026-07-14)
 
@@ -6440,13 +6456,13 @@ Retired the text-REPORT subsystem. Deleted `REPORT-*.md` (5), `harness/report.mj
 
 ### Why delete rather than re-sync the schema drift
 
-The deck already renders every scenario the REPORTs did, from the same `results/`, with grounded per-cohort annotations. Re-syncing `report.mjs`'s `BASELINE_ROWS` + blurbs to each point-set change was pure duplicate cost with no consumer — the deck is what's shared. `verify-features` survives because it *verifies* (runs the capability demos, fails loud on a broken feature) rather than merely *presenting*. The `/bench-report` skill (which analyzed the REPORTs) is now moot. Infra-only → no changeset.
+The deck already renders every scenario the REPORTs did, from the same `results/`, with grounded per-cohort annotations. Re-syncing `report.mjs`'s `BASELINE_ROWS` + blurbs to each point-set change was pure duplicate cost with no consumer — the deck is what's shared. `verify-features` survives because it _verifies_ (runs the capability demos, fails loud on a broken feature) rather than merely _presenting_. The `/bench-report` skill (which analyzed the REPORTs) is now moot. Infra-only → no changeset.
 
 ## `isolate(produce())` Lint Guard — the throw-isolation class preventer (#1477)
 
-**Problem.** The "throw-isolation" class recurred five+ times: a callback-invoking site isolates the *invoke* (`try/catch`, re-throw-async, `.catch`) but a value-**producing** call that can also throw — a factory `(...) => cb`, a lazy compile, a loader — is evaluated **outside** the isolation, usually as an argument (JS evaluates arguments before entering the callee), so the produce-throw leaks. Members: #767 (sources) → #798 (lifecycle hook-body) → #799 (react/ink) → #806 (preload sync-throw) → #944 (async subscribe) → #1222 (lifecycle **compile**-throw) → #1476 (svelte `Lazy` loader sync-throw). #1039 (research, WEAK → point-bugs) decreed the structural preventer is a **lint rule** — deliberately *not* a shared `invokeSafely` primitive (a primitive nets core up and cannot enforce its own adoption; proven by `throwIfReentrantTreeMutation`, hand-wired into all 5 CRUD ops) — **but that lint rule was never built**, which is why the class kept recurring one seam at a time.
+**Problem.** The "throw-isolation" class recurred five+ times: a callback-invoking site isolates the _invoke_ (`try/catch`, re-throw-async, `.catch`) but a value-**producing** call that can also throw — a factory `(...) => cb`, a lazy compile, a loader — is evaluated **outside** the isolation, usually as an argument (JS evaluates arguments before entering the callee), so the produce-throw leaks. Members: #767 (sources) → #798 (lifecycle hook-body) → #799 (react/ink) → #806 (preload sync-throw) → #944 (async subscribe) → #1222 (lifecycle **compile**-throw) → #1476 (svelte `Lazy` loader sync-throw). #1039 (research, WEAK → point-bugs) decreed the structural preventer is a **lint rule** — deliberately _not_ a shared `invokeSafely` primitive (a primitive nets core up and cannot enforce its own adoption; proven by `throwIfReentrantTreeMutation`, hand-wired into all 5 CRUD ops) — **but that lint rule was never built**, which is why the class kept recurring one seam at a time.
 
-**Solution.** A `no-restricted-syntax` rule in `eslint.config.mjs` (the repo's **first** custom lint restriction — no custom-rule plugin infra needed) guards **shape 1**: `isolate(produce())`, a produce CALL passed as an isolator's argument. Seeded with the one named isolation wrapper that carried the bug, `runHook` (`packages/lifecycle-plugin/src/factory.ts`), the selector `CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']` flags a reintroduction of `runHook(compileHook(...))` (the #1222 regression), while the recipe form `runHook(hookName, routeName, …)` — first arg a string literal — passes cleanly. Extend the selector list as new isolation wrappers appear. **Shape 2** — a lazy `producer().then(...).catch(...)` whose *synchronous* throw escapes the async-only `.catch` (#806, #1476) — is **not** covered here: it is syntactically indistinguishable from any promise chain (the distinguishing facts — "the head is a throwing producer" and "not inside a `try`" — are semantic, needing ancestor-`try` analysis a `no-restricted-syntax` selector cannot express). It is guarded instead by a **per-producer sync-throw test** at each site (`Lazy.test.ts` "loader throws synchronously", the lifecycle factory-throw tests).
+**Solution.** A `no-restricted-syntax` rule in `eslint.config.mjs` (the repo's **first** custom lint restriction — no custom-rule plugin infra needed) guards **shape 1**: `isolate(produce())`, a produce CALL passed as an isolator's argument. Seeded with the one named isolation wrapper that carried the bug, `runHook` (`packages/lifecycle-plugin/src/factory.ts`), the selector `CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']` flags a reintroduction of `runHook(compileHook(...))` (the #1222 regression), while the recipe form `runHook(hookName, routeName, …)` — first arg a string literal — passes cleanly. Extend the selector list as new isolation wrappers appear. **Shape 2** — a lazy `producer().then(...).catch(...)` whose _synchronous_ throw escapes the async-only `.catch` (#806, #1476) — is **not** covered here: it is syntactically indistinguishable from any promise chain (the distinguishing facts — "the head is a throwing producer" and "not inside a `try`" — are semantic, needing ancestor-`try` analysis a `no-restricted-syntax` selector cannot express). It is guarded instead by a **per-producer sync-throw test** at each site (`Lazy.test.ts` "loader throws synchronously", the lifecycle factory-throw tests).
 
 **Why this split.** Shape 1 is precisely expressible syntactically (a named isolator + a call-expression first argument) → zero false positives, no first-in-repo custom-rule plugin. Shape 2 would need a full custom rule with scope/ancestor analysis and a high false-positive rate (every `x().then().catch()` looks alike) for marginal gain, since each producer site now carries its own regression test after #1222/#1476. So: lint the cheap-precise half, test the expensive-fuzzy half. Verified by a fire-test — the recipe form lints clean; a reintroduced `runHook(compileHook(...))` fires the rule with an actionable message. Infra-only (touches `eslint.config.mjs`, not `packages/*/src/`) → no changeset.
 
@@ -6474,13 +6490,13 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 **Why.** Validated offline: `lint-spec-parity` passes the tree and FAILS both mutations (a DEEP_TARGETS drift and a DEEP_DEPTH literal-80); the margin-rule A/B on the untouched reference changes exactly **1 GRID cell** — svelte/nav-latency g→y, the audit's named coin-flip cell (0.29 % margin under 1.66 % noise) — plus 13 borderline SWEEP points (ratios 1.12–1.26 or one-quantum mountMs gaps, incl. the committed vue link-build@8 quantum flip), with **zero** hard g↔r transitions and DATA byte-identical. K9 (single-nav sweep windows) was deliberately **decided, not changed**: the caption fix from batch 1 stands, and the K-nav summed-window unification is deferred to the re-run session where its live validation (paired empty-window probe, «Что НЕ проверили» §2) can run same-session. K10's live control (TARGETS.reverse() — the bump must follow the position) and K11's one-cell re-measure ride the owner's next run.
 
-**Batch-5 addendum — CI-integration deep audit (same day).** A step-by-step walk of `cross-router-bench.yml` through all four batches, with empirics on the REAL VPS artifact (green run 29639348876, n=50, Icelake Xeon): **(1)** caught the phantom K3 — the batch-2 commit message claimed the `shared/` freshness scan but the edit was never made; now REALLY landed and probe-validated against a synthetic tree (fresh → exit 0; pkg-src stale → 3; shared-only stale → OLD code exit 0 = the hole, NEW code exit 3). **(2)** The new scenario-scoped armed rme-gate **PASSES the real VPS data** (2064 metrics, exit 0; only 3 `blinkMs@N` single-nav points >40 % — report-only by design), so arming the stricter policy on the VPS is empirically safe. **(3)** New `deck-extract` on the VPS artifact: exit 0, full META (`matrix 166/166`, matcher `null` + the honest pre-K12 no-stamp warn), margin rule softens 5 borderline GRID (ratios 1.15–1.22 — the VPS's noisier sub-ms wall) + 13 SWEEP points to y, zero hard transitions; `ci-summary` renders the new stamp/disclaimer lines. **(4)** Fixed a wolf-cry the walk exposed: the K7 epoch-span bound was 6 h, but one honest same-session n=100 CI matrix runs ~6–6.5 h → bound raised to 12 h (commit-mix stays the primary signal). Advisory recorded: the run in flight at audit time (29656254741) checked out PRE-fix `20c89c5f` — its snapshot must NOT be adopted as the reference base; it makes a same-machine A/B contrast for the next post-fix dispatch instead. *(History note: remediation batches 1–6 were squashed into a single master commit before publication — the per-batch commit narratives survive only in these records.)*
+**Batch-5 addendum — CI-integration deep audit (same day).** A step-by-step walk of `cross-router-bench.yml` through all four batches, with empirics on the REAL VPS artifact (green run 29639348876, n=50, Icelake Xeon): **(1)** caught the phantom K3 — the batch-2 commit message claimed the `shared/` freshness scan but the edit was never made; now REALLY landed and probe-validated against a synthetic tree (fresh → exit 0; pkg-src stale → 3; shared-only stale → OLD code exit 0 = the hole, NEW code exit 3). **(2)** The new scenario-scoped armed rme-gate **PASSES the real VPS data** (2064 metrics, exit 0; only 3 `blinkMs@N` single-nav points >40 % — report-only by design), so arming the stricter policy on the VPS is empirically safe. **(3)** New `deck-extract` on the VPS artifact: exit 0, full META (`matrix 166/166`, matcher `null` + the honest pre-K12 no-stamp warn), margin rule softens 5 borderline GRID (ratios 1.15–1.22 — the VPS's noisier sub-ms wall) + 13 SWEEP points to y, zero hard transitions; `ci-summary` renders the new stamp/disclaimer lines. **(4)** Fixed a wolf-cry the walk exposed: the K7 epoch-span bound was 6 h, but one honest same-session n=100 CI matrix runs ~6–6.5 h → bound raised to 12 h (commit-mix stays the primary signal). Advisory recorded: the run in flight at audit time (29656254741) checked out PRE-fix `20c89c5f` — its snapshot must NOT be adopted as the reference base; it makes a same-machine A/B contrast for the next post-fix dispatch instead. _(History note: remediation batches 1–6 were squashed into a single master commit before publication — the per-batch commit narratives survive only in these records.)_
 
 **Batch-4 addendum (pre-flight, same day).** Closing batch 3 exposed one regression and two closable tails, fixed before the re-run: (1) the K13 sub-N_MIN refusal in `run-all` was aborting the orchestrator's own `--smoke` step (`run-all.mjs 1`) — `BENCH_SMOKE=1` now runs a **measure-only dry matrix** (apps must build + drive; nothing persisted; a non-persisted cell is not a failure) and the orchestrator smoke invocation sets it; validated build-free (bogus-framework probe: refused without the flag, passes the clamp with it). (2) The K10 live control became one command: `BENCH_REVERSE_TARGETS=1` reverses the nested/active/wide sweeps, and `write-cell` REFUSES to persist under the knob (position-permuted points can never poison `results/`; validated). (3) G1p's code tail: `react-router-bug/scenario.mjs` gained `matchCostAmortizedMs` (Data-mode prebuilt branches, same deep-import as matcher-bench) and `run.mjs` prints both matrices from one session — fresh pair: per-call 10.3× (the README's ~10× reproduced) vs **amortized 107×** (0.09 → 9.95 ms), construct share 59 % @l90-in-210, amortized parabola peak 11.6 ms @135 — all inside the audit's predicted ranges; README carries the same-session pair, so upstreaming #15249 absolutes is unblocked in amortized terms.
 
 ## Cross-router per-scenario N policy — sweeps at max(50, base/2) (2026-07-19)
 
-**Problem.** The weekly CI matrix (n=100) spends 5.1 h measuring, and the six sweep scenarios (`wide-config`/`deep-config`/`search-param-scaling`/`active-links`/`link-build`/`nested-switch`) burn ~63 % of it — yet a sweep *sample* is already an inner aggregate (nested/active average ΔTaskDuration over 20 navs; link-build mounts N links), so its sample-to-sample variance undercuts the per-nav scenarios' by an order of magnitude. Running every scenario at the same base N buys nothing at the sweeps' margins: their endpoint verdicts sit ×5–×31 in RME-growth away from a class flip, while halving N costs only ×√2.
+**Problem.** The weekly CI matrix (n=100) spends 5.1 h measuring, and the six sweep scenarios (`wide-config`/`deep-config`/`search-param-scaling`/`active-links`/`link-build`/`nested-switch`) burn ~63 % of it — yet a sweep _sample_ is already an inner aggregate (nested/active average ΔTaskDuration over 20 navs; link-build mounts N links), so its sample-to-sample variance undercuts the per-nav scenarios' by an order of magnitude. Running every scenario at the same base N buys nothing at the sweeps' margins: their endpoint verdicts sit ×5–×31 in RME-growth away from a class flip, while halving N costs only ×√2.
 
 **Solution.** `runsFor(scenario, base)` in `harness/scenarios-registry.mjs` (the shared registry, so `run-all`/`run-subset` can't drift): sweeps run at `max(50, floor(base/2))` when `base > 50`, everything else (and every bar scenario) at base. Both matrix runners pass the effective n to `measureInterleaved` + `writeCell` and print it in the scenario header; `run.mjs` stays literal (an explicit single-cell n is operator A/B intent). `deck-extract` now stamps `META.runs` as a **min–max range** over the physical cells (a 50/100 matrix must not be labeled "n=100"); `ci-summary`/`build-deck` render the string unchanged. The 50 floor keeps every persisted cell reference-grade, makes the policy a no-op for the local n=50 reference refresh (no write-cell n-downgrade conflicts — 50 = 50 overwrites fine), and leaves quick refreshes (base ≤ 50) untouched.
 
@@ -6524,51 +6540,51 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 **Problem.** `@real-router/core/utils` (`serializeState`, `serializeRouterState`, `hydrateRouter`, `getStaticPaths`, `createRequestScope`) was the only SSR-specific surface still living inside core — `shared/ssr`'s plugin-level loader scaffolding already lived outside it. The subpath persisted by inertia, not necessity: every runtime dependency it had (`cloneRouter`/`getPluginApi` via `@real-router/core/api`, `getInternals` via `@real-router/core/validation`) was already public. The one real coupling was **type-only**: `internals.ts`'s `RouterInternals.hydrationState: SerializedRouterState | null` — a would-be `core → ssr-utils` cycle if the type moved out wholesale. The subpath name also collided conceptually with the unrelated `@real-router/route-utils` (adapter-facing tree queries) despite the two sharing no code or audience.
 
-**Solution.** (1) **Decouple the type first.** `SerializedRouterState`'s *definition* moved into `packages/core/src/types/base.ts` (core owns the shape of its own hydration scratchpad) and is re-exported through `types/index.ts`'s existing "Base types" block — a plain `export type`, not near the `StateContext`/`NavigationOptions` augmentation-target declarations from #1540/#1519, so the two-phase-dts invariant above was untouched (confirmed by `check-dts-augment-targets.mjs` passing on the post-extraction rebuild). `internals.ts` now imports the type from `./types` instead of `./utils`. (2) **Scaffold `packages/ssr-utils`** per the New Package Checklist — `createIsomorphicConfig()` (same tsdown profile as `route-utils`/`sources`), `peerDependencies: { "@real-router/core": "workspace:>=0.1.0" }` (never `workspace:^` on a 0.x peer). The five modules moved with relative `../api`/`../internals`/`../types`/`../engine` imports rewritten to the public subpaths (`@real-router/core/api`, `/validation`, `/types`, and the root for `RouteTree`) — the same rewrite every external consumer already does. Tests (5 functional + 2 property + 3 stress, plus a trimmed local `tests/property/helpers.ts` rebuilding just `arbState`/`NUM_RUNS` without core's internal `DEFAULT_TRANSITION`) moved with them; two core tests (`boundary-gaps.test.ts`, `claimContextNamespace.test.ts`) and one property suite (`lifecycle.properties.ts`) kept using `hydrateRouter`/`serializeRouterState` as **test helpers**, so they stayed in core with the import swapped and a new `@real-router/ssr-utils` devDependency. (3) **Migrate consumers**: `@real-router/angular`'s `providersFactory.ts` (real runtime import → `dependencies`), `ssr-data-plugin`/`rsc-server-plugin` (test-only usage → `devDependencies`, no `src/` change, no changeset needed), and all 45 SSR/SSG/streaming/mixed example entry files across 6 frameworks × 23 app directories (import swap + `dependencies` entry, scripted — see gotchas).
+**Solution.** (1) **Decouple the type first.** `SerializedRouterState`'s _definition_ moved into `packages/core/src/types/base.ts` (core owns the shape of its own hydration scratchpad) and is re-exported through `types/index.ts`'s existing "Base types" block — a plain `export type`, not near the `StateContext`/`NavigationOptions` augmentation-target declarations from #1540/#1519, so the two-phase-dts invariant above was untouched (confirmed by `check-dts-augment-targets.mjs` passing on the post-extraction rebuild). `internals.ts` now imports the type from `./types` instead of `./utils`. (2) **Scaffold `packages/ssr-utils`** per the New Package Checklist — `createIsomorphicConfig()` (same tsdown profile as `route-utils`/`sources`), `peerDependencies: { "@real-router/core": "workspace:>=0.1.0" }` (never `workspace:^` on a 0.x peer). The five modules moved with relative `../api`/`../internals`/`../types`/`../engine` imports rewritten to the public subpaths (`@real-router/core/api`, `/validation`, `/types`, and the root for `RouteTree`) — the same rewrite every external consumer already does. Tests (5 functional + 2 property + 3 stress, plus a trimmed local `tests/property/helpers.ts` rebuilding just `arbState`/`NUM_RUNS` without core's internal `DEFAULT_TRANSITION`) moved with them; two core tests (`boundary-gaps.test.ts`, `claimContextNamespace.test.ts`) and one property suite (`lifecycle.properties.ts`) kept using `hydrateRouter`/`serializeRouterState` as **test helpers**, so they stayed in core with the import swapped and a new `@real-router/ssr-utils` devDependency. (3) **Migrate consumers**: `@real-router/angular`'s `providersFactory.ts` (real runtime import → `dependencies`), `ssr-data-plugin`/`rsc-server-plugin` (test-only usage → `devDependencies`, no `src/` change, no changeset needed), and all 45 SSR/SSG/streaming/mixed example entry files across 6 frameworks × 23 app directories (import swap + `dependencies` entry, scripted — see gotchas).
 
 **Why — three build-graph gotchas found only by attempting a full rebuild, not by editing `src/` alone:**
 
 - **`tsdown.config.mts`'s `entry` object is a second source of truth, independent of `package.json#exports`.** Deleting the `"./utils"` export and the `src/utils/` directory was not enough — core's `tsdown.config.mts` still listed `utils: "src/utils/index.ts"` in its two-phase `entry` map (see the #1540 entry above), and `tsdown --config-loader unrun` failed hard (`UNRESOLVED_ENTRY`) rather than silently dropping the stale entry. Any package with a hand-maintained multi-entry `tsdown.config.mts` needs the entry map edited in lockstep with `exports`.
 - **ng-packagr rejects new non-peer `dependencies` unless explicitly allowlisted.** Adding `@real-router/ssr-utils` to `angular/package.json#dependencies` (matching the existing `core`/`sources`/`route-utils` pattern) broke `ng-packagr -p ng-package.json` with `Dependency @real-router/ssr-utils must be explicitly allowed using the "allowedNonPeerDependencies" option` — fixed by adding the name to `ng-package.json#allowedNonPeerDependencies` alongside its three siblings. Angular is the only adapter with this extra allowlist layer (ng-packagr's own manifest-writing step, not pnpm or tsc).
-- **`examples/*/tsconfig.json` does not `extend` the root config, so it never sees `customConditions: ["@real-router/internal-source"]`.** Every other in-repo package resolves workspace deps via that condition straight to `src/`, so editing `src/` and running `pnpm -F <pkg> type-check` is a complete verification loop. Examples deliberately opt out (documented in root CLAUDE.md: "External consumers … resolve via import/require → dist/") to catch exactly the class of bug a source-only check would miss — but that means a new/edited package's `dist/` must exist and be current *before* example verification means anything: `pnpm -F @real-router/ssr-utils bundle` (first-ever build) and `pnpm -F @real-router/core bundle` (stale `dist/esm/utils.*` still physically present, though unreachable via the pruned `exports` map) were both required before any example's `tsc --noEmit` stopped reporting `TS2307`. A secondary trap: **examples have no `type-check` npm script** at all (`vite build` covers it implicitly) — verification is a direct `npx tsc --noEmit` per app directory (`vue-tsc` for the Vue apps specifically, per the existing "Vue examples use vue-tsc -b" convention; a bare `tsc` on a Vue app fails on `.vue` SFC imports for reasons unrelated to the migration).
+- **`examples/*/tsconfig.json` does not `extend` the root config, so it never sees `customConditions: ["@real-router/internal-source"]`.** Every other in-repo package resolves workspace deps via that condition straight to `src/`, so editing `src/` and running `pnpm -F <pkg> type-check` is a complete verification loop. Examples deliberately opt out (documented in root CLAUDE.md: "External consumers … resolve via import/require → dist/") to catch exactly the class of bug a source-only check would miss — but that means a new/edited package's `dist/` must exist and be current _before_ example verification means anything: `pnpm -F @real-router/ssr-utils bundle` (first-ever build) and `pnpm -F @real-router/core bundle` (stale `dist/esm/utils.*` still physically present, though unreachable via the pruned `exports` map) were both required before any example's `tsc --noEmit` stopped reporting `TS2307`. A secondary trap: **examples have no `type-check` npm script** at all (`vite build` covers it implicitly) — verification is a direct `npx tsc --noEmit` per app directory (`vue-tsc` for the Vue apps specifically, per the existing "Vue examples use vue-tsc -b" convention; a bare `tsc` on a Vue app fails on `.vue` SFC imports for reasons unrelated to the migration).
 
 ## Adapter scroll tests mock `sessionStorage` — Node ≥ 26 shadows jsdom's Storage (2026-07-30)
 
-**Problem.** Seven `createScrollRestoration` tests failed on a Node 26 dev machine while CI (Node 24) stayed green: `RouterProvider.scroll.test.*` ×1 in each of preact/react/solid/svelte/vue, plus `angular/tests/functional/scroll-restore.test.ts` ×2. All of them asserted through `vi.spyOn(Storage.prototype, "setItem")`, and the spy recorded **zero** calls. Worse than the failures: in each of the five adapter suites the *other* four assertions on that spy are `expect(setItem).not.toHaveBeenCalled()` — 20 assertions that pass **vacuously** when the spy can never fire, unable to distinguish "correctly skipped the write" from "never wrote at all". Angular's two were a third mode: `spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw QuotaExceededError })` never injected the failure, so the storage-error branch was silently unexercised. Cause chain, measured end-to-end: (1) Node ≥ 26 ships Web Storage as **unflagged globals** — `node -p "typeof sessionStorage"` is `"object"` on 26.5.0 and `"undefined"` on 24.11.1 (`localStorage` is present but evaluates to `undefined` without `--localstorage-file`); (2) vitest's jsdom environment only overrides a global that already exists on Node when the key is in its own allowlist — `getWindowKeys` does `if (k in global) return keysArray.includes(k)`, and `keysArray = additionalKeys + KEYS`, where `KEYS = LIVING_KEYS.concat(OTHER_KEYS)` contains the **`Storage`** interface but neither `sessionStorage` nor `localStorage`; (3) so the pair is mismatched — `globalThis.Storage` is jsdom's webidl class (`class Storage { constructor() { throw new globalObject.TypeError("Illegal constructor")`) while `globalThis.sessionStorage` is Node's native instance (`function Storage() { [native code] }`), and `Object.getPrototypeOf(sessionStorage) !== Storage.prototype`. A prototype spy patches a class nothing calls. On Node 24 both sides are the same jsdom class and the identical spy records 1 call. A/B on one commit, one tree: preact's suite is `1 failed | 35 passed` under node 26.5.0 and `36 passed` under node 24.11.1.
+**Problem.** Seven `createScrollRestoration` tests failed on a Node 26 dev machine while CI (Node 24) stayed green: `RouterProvider.scroll.test.*` ×1 in each of preact/react/solid/svelte/vue, plus `angular/tests/functional/scroll-restore.test.ts` ×2. All of them asserted through `vi.spyOn(Storage.prototype, "setItem")`, and the spy recorded **zero** calls. Worse than the failures: in each of the five adapter suites the _other_ four assertions on that spy are `expect(setItem).not.toHaveBeenCalled()` — 20 assertions that pass **vacuously** when the spy can never fire, unable to distinguish "correctly skipped the write" from "never wrote at all". Angular's two were a third mode: `spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw QuotaExceededError })` never injected the failure, so the storage-error branch was silently unexercised. Cause chain, measured end-to-end: (1) Node ≥ 26 ships Web Storage as **unflagged globals** — `node -p "typeof sessionStorage"` is `"object"` on 26.5.0 and `"undefined"` on 24.11.1 (`localStorage` is present but evaluates to `undefined` without `--localstorage-file`); (2) vitest's jsdom environment only overrides a global that already exists on Node when the key is in its own allowlist — `getWindowKeys` does `if (k in global) return keysArray.includes(k)`, and `keysArray = additionalKeys + KEYS`, where `KEYS = LIVING_KEYS.concat(OTHER_KEYS)` contains the **`Storage`** interface but neither `sessionStorage` nor `localStorage`; (3) so the pair is mismatched — `globalThis.Storage` is jsdom's webidl class (`class Storage { constructor() { throw new globalObject.TypeError("Illegal constructor")`) while `globalThis.sessionStorage` is Node's native instance (`function Storage() { [native code] }`), and `Object.getPrototypeOf(sessionStorage) !== Storage.prototype`. A prototype spy patches a class nothing calls. On Node 24 both sides are the same jsdom class and the identical spy records 1 call. A/B on one commit, one tree: preact's suite is `1 failed | 35 passed` under node 26.5.0 and `36 passed` under node 24.11.1.
 
 **Solution.** A store-backed **plain-object mock** installed per test with `vi.stubGlobal("sessionStorage", createMockStorage())` (`Map`-backed `getItem`/`setItem`/`removeItem`/`clear`/`key`/`length`), in every suite that spies on storage: the five adapter `RouterProvider.scroll.test.*`, `angular/tests/functional/scroll-restore.test.ts`, `react/tests/functional/dom-utils/scroll-restore.test.ts`, `preact/tests/stress/scroll-restoration-quota.stress.tsx`, `solid/tests/stress/scroll-restoration-rapid.stress.tsx`. Spies then target `sessionStorage` (i.e. the mock) rather than `Storage.prototype`, and the failure-path tests get their injection back by making the mock's `setItem`/`getItem` throw. The mock is also what un-blocked three preact quota-stress tests that had been `it.skip`ped rather than fixed.
 
-**Why a mock and not a spy on the live object.** Spying the real `sessionStorage` fails on **every** Node version, independent of the shadowing above: Web Storage is a Proxy implementing the WHATWG named-property setter, so `vi.spyOn(sessionStorage, "setItem")` is not installed as a JS own property at all — it is swallowed as a **stored item** (`sessionStorage.getItem("setItem")` becomes non-null) while `setItem` keeps resolving through the prototype. Measured: 0 calls on both 24 and 26. Replacing the whole global with a plain object is therefore the only spyable option, and it has the side benefit of removing the tests' dependency on *which* Storage implementation the host happens to provide. Related: `.nvmrc` was added in the same batch so a dev machine cannot silently diverge from CI's Node major again (see the next entry) — that divergence is the only reason this was invisible for ten days.
+**Why a mock and not a spy on the live object.** Spying the real `sessionStorage` fails on **every** Node version, independent of the shadowing above: Web Storage is a Proxy implementing the WHATWG named-property setter, so `vi.spyOn(sessionStorage, "setItem")` is not installed as a JS own property at all — it is swallowed as a **stored item** (`sessionStorage.getItem("setItem")` becomes non-null) while `setItem` keeps resolving through the prototype. Measured: 0 calls on both 24 and 26. Replacing the whole global with a plain object is therefore the only spyable option, and it has the side benefit of removing the tests' dependency on _which_ Storage implementation the host happens to provide. Related: `.nvmrc` was added in the same batch so a dev machine cannot silently diverge from CI's Node major again (see the next entry) — that divergence is the only reason this was invisible for ten days.
 
 ## `.nvmrc` as the Node single source of truth — dev/CI major drift is invisible otherwise (2026-07-30)
 
-**Problem.** The repo pinned Node only inside the workflows (`node-version: 24`, repeated in eight places) and had no `.nvmrc` and no `engines`. Nothing told a dev machine which major to run, and nothing noticed when it diverged. The cost was concrete: a local upgrade to Node 26 silently changed the host globals a jsdom test environment inherits — Node ≥ 26 ships Web Storage unflagged, which shadows jsdom's `sessionStorage` under vitest (see the previous entry) — and seven adapter scroll tests failed locally for ten days while CI stayed green. The failure mode is the worst kind: reproducible, deterministic, and *not* a bug in the code under test, so the natural reaction is to go looking in the wrong place. The repeated literal was a second problem: a future bump of the CI major would leave any advisory file behind and re-open the same gap.
+**Problem.** The repo pinned Node only inside the workflows (`node-version: 24`, repeated in eight places) and had no `.nvmrc` and no `engines`. Nothing told a dev machine which major to run, and nothing noticed when it diverged. The cost was concrete: a local upgrade to Node 26 silently changed the host globals a jsdom test environment inherits — Node ≥ 26 ships Web Storage unflagged, which shadows jsdom's `sessionStorage` under vitest (see the previous entry) — and seven adapter scroll tests failed locally for ten days while CI stayed green. The failure mode is the worst kind: reproducible, deterministic, and _not_ a bug in the code under test, so the natural reaction is to go looking in the wrong place. The repeated literal was a second problem: a future bump of the CI major would leave any advisory file behind and re-open the same gap.
 
-**Solution.** Two advisory layers, no hard gate. (1) **`.nvmrc` = `24`**, and every floating-major `setup-node` now reads it via `node-version-file: .nvmrc` — most importantly **`.github/actions/setup/action.yml`**, the composite action that eleven jobs across `ci.yml` / `codspeed.yml` / `codspeed-adapters.yml` / `cross-router-bench.yml` use (it is the one that actually provisions the Node running the test suite; easy to miss when grepping the workflows, since it is not a workflow file), plus the seven direct steps (`ci.yml` ×3, `examples.yml` ×2, `danger.yml`, `dependabot-dedupe.yml`, `post-merge.yml`). So the file *is* what CI runs, and nvm/fnm/`n auto`/asdf pick the same major up locally. Verified before landing that all nineteen call-sites run `actions/checkout` before the Node setup — `node-version-file` resolves against `GITHUB_WORKSPACE`, so a setup-before-checkout job would have started failing on a missing `.nvmrc`. `changesets.yml` is the one deliberate exception: it stays exact-pinned at `24.18.0` for the CVE-2026-48931 / node-fetch keep-alive reason documented inline, and its comment now says explicitly that it is not `.nvmrc`-driven on purpose (so a future "unify the workflows" pass doesn't silently relax it). (2) **A `.husky/pre-commit` warning** comparing the running major against `.nvmrc` — silent when they match, and it fires at exactly the moment the drift bites (you commit far more often than you install).
+**Solution.** Two advisory layers, no hard gate. (1) **`.nvmrc` = `24`**, and every floating-major `setup-node` now reads it via `node-version-file: .nvmrc` — most importantly **`.github/actions/setup/action.yml`**, the composite action that eleven jobs across `ci.yml` / `codspeed.yml` / `codspeed-adapters.yml` / `cross-router-bench.yml` use (it is the one that actually provisions the Node running the test suite; easy to miss when grepping the workflows, since it is not a workflow file), plus the seven direct steps (`ci.yml` ×3, `examples.yml` ×2, `danger.yml`, `dependabot-dedupe.yml`, `post-merge.yml`). So the file _is_ what CI runs, and nvm/fnm/`n auto`/asdf pick the same major up locally. Verified before landing that all nineteen call-sites run `actions/checkout` before the Node setup — `node-version-file` resolves against `GITHUB_WORKSPACE`, so a setup-before-checkout job would have started failing on a missing `.nvmrc`. `changesets.yml` is the one deliberate exception: it stays exact-pinned at `24.18.0` for the CVE-2026-48931 / node-fetch keep-alive reason documented inline, and its comment now says explicitly that it is not `.nvmrc`-driven on purpose (so a future "unify the workflows" pass doesn't silently relax it). (2) **A `.husky/pre-commit` warning** comparing the running major against `.nvmrc` — silent when they match, and it fires at exactly the moment the drift bites (you commit far more often than you install).
 
-**Considered and rejected: a root `engines.node` field.** Measured rather than assumed: with pnpm's default (`engine-strict` off, which is this repo's state) a mismatch prints `[WARN] Unsupported engine: wanted {"node":"^24.0.0"} (current: v26.5.0)` and exits **0**; only an explicit `engineStrict=true` turns it into `ERR_PNPM_UNSUPPORTED_ENGINE`. So it *would* have been safe — but with `.nvmrc` plus the hook already covering the signal, its only added effect is a warning line on every `pnpm install`, including for contributors deliberately testing a newer major. Dropped as noise, not as a risk. (Recorded so the next person does not re-derive the `engine-strict` semantics.)
+**Considered and rejected: a root `engines.node` field.** Measured rather than assumed: with pnpm's default (`engine-strict` off, which is this repo's state) a mismatch prints `[WARN] Unsupported engine: wanted {"node":"^24.0.0"} (current: v26.5.0)` and exits **0**; only an explicit `engineStrict=true` turns it into `ERR_PNPM_UNSUPPORTED_ENGINE`. So it _would_ have been safe — but with `.nvmrc` plus the hook already covering the signal, its only added effect is a warning line on every `pnpm install`, including for contributors deliberately testing a newer major. Dropped as noise, not as a risk. (Recorded so the next person does not re-derive the `engine-strict` semantics.)
 
-**Why advisory and not enforced.** A hard `engines` block would refuse installs on a newer Node for contributors who have every right to be there — forward-compat testing is legitimate, and the tests that actually broke were broken by a *test-harness* assumption, not by the router. What was missing was never permission, it was *information*: nothing said "you are not on CI's major, so a local-only failure may not be real". Both layers say that and get out of the way. The pre-commit line is the higher-value one — a single printed sentence would have collapsed the investigation that produced these two entries into one step.
+**Why advisory and not enforced.** A hard `engines` block would refuse installs on a newer Node for contributors who have every right to be there — forward-compat testing is legitimate, and the tests that actually broke were broken by a _test-harness_ assumption, not by the router. What was missing was never permission, it was _information_: nothing said "you are not on CI's major, so a local-only failure may not be real". Both layers say that and get out of the way. The pre-commit line is the higher-value one — a single printed sentence would have collapsed the investigation that produced these two entries into one step.
 
 **How the drift happened, for the record.** Homebrew's unversioned `node` formula tracks the **latest** major, so a routine `brew upgrade` on 2026-07-23 17:49 moved the dev machine from 24.x to 26.5.0 with no intent to change Node at all — and the workaround commit that introduced the storage mock is dated 07-24 07:07, the next morning. An `n`-managed 24.11.1 was installed but lost on `PATH` order (`/opt/homebrew/bin` precedes `/usr/local/bin`). The durable macOS fix is the keg-only `node@24` formula plus `brew pin node` so a later `brew upgrade` cannot relink the unversioned one; `brew uninstall node` is not an option here because `bitwarden-cli` depends on it.
 
 ## Changesets release: cap the GitHub GraphQL batch (`maxBatchSize`) — 109 changesets broke validation (2026-07-30)
 
-**Problem.** The `Changesets` workflow's "Create Release PR" step failed on master `cb6b507bc` — the merge of #1587 — with `🦋 error Error: Fetched data from GitHub returned errors [{ "code": "validationTimeout", "message": "Timeout on validation of query" }]` from `@changesets/get-github-info@0.8.0`. Not a network flake and not transient: a manual re-run produced the byte-identical error. The driver is batch size. `@changesets/changelog-github` calls `getInfo({repo, commit})` once per changeset to enrich each CHANGELOG line with its PR and author, and the library collapses every concurrent call into ONE GraphQL document — deliberately, per its own comment: *"getReleaseLine will be called a large number of times but it'll be called at the same time so instead of doing a bunch of network requests, we can do a single one."* The implementation is `new DataLoader(async requests => …)` with **no options**, so `maxBatchSize` defaults to `Infinity`. That is a win at the 1–3 changesets every prior release carried (`release: version packages (#1407) (#1547)`); at the **109** changesets the RFC-4 M2 merge accumulated, the generated document is too complex for GitHub to even *validate* inside its budget. Upstream offers no fix in range: 0.8.0 is the newest non-prerelease (only `1.0.0-next.*` beyond it) and `@changesets/changelog-github@0.7.0` pins `^0.8.0`.
+**Problem.** The `Changesets` workflow's "Create Release PR" step failed on master `cb6b507bc` — the merge of #1587 — with `🦋 error Error: Fetched data from GitHub returned errors [{ "code": "validationTimeout", "message": "Timeout on validation of query" }]` from `@changesets/get-github-info@0.8.0`. Not a network flake and not transient: a manual re-run produced the byte-identical error. The driver is batch size. `@changesets/changelog-github` calls `getInfo({repo, commit})` once per changeset to enrich each CHANGELOG line with its PR and author, and the library collapses every concurrent call into ONE GraphQL document — deliberately, per its own comment: _"getReleaseLine will be called a large number of times but it'll be called at the same time so instead of doing a bunch of network requests, we can do a single one."_ The implementation is `new DataLoader(async requests => …)` with **no options**, so `maxBatchSize` defaults to `Infinity`. That is a win at the 1–3 changesets every prior release carried (`release: version packages (#1407) (#1547)`); at the **109** changesets the RFC-4 M2 merge accumulated, the generated document is too complex for GitHub to even _validate_ inside its budget. Upstream offers no fix in range: 0.8.0 is the newest non-prerelease (only `1.0.0-next.*` beyond it) and `@changesets/changelog-github@0.7.0` pins `^0.8.0`.
 
 **Solution.** A pnpm patch (`patches/@changesets__get-github-info@0.8.0.patch`, wired via `patchedDependencies` in `pnpm-workspace.yaml`) passing `{ maxBatchSize: 20 }` as DataLoader's second argument, in **both** dist builds (`.cjs.js` and `.esm.js` — the ESM one is what a modern Node resolves, and patching only the CJS copy would silently do nothing). 109 lookups become 6 sequential documents instead of one. Verified behaviourally, not just textually: a probe that stubs `node-fetch` via a `Module._load` interceptor and counts calls returns **3 HTTP requests for 50 commits** (`ceil(50/20)`), where the unpatched library issues 1. The CHANGELOG keeps its PR links and author attributions.
 
-**Why not the cheaper options.** *Delete "unimportant" changesets* — measured first: the batch is 109 files, 1853 lines of description, median 14 lines each, and only **3** files have ≤2 lines, so there is no filler to drop. It is also version-neutral (changesets takes the highest bump per package; core had 31 `minor` + 16 `patch`, so the result is one `minor` no matter how many files survive), which means the entire cost lands on the CHANGELOG — ~1500 lines of release notes discarded on precisely the breaking release (`feat(core)!`, channel split) where consumers need them to migrate. And it is a guess: GitHub's validation budget is undocumented and load-dependent, so "delete until it passes" is a push-and-see loop that re-breaks on the next large release. *Switch to `@changesets/changelog-git`* — no API calls at all, but the CHANGELOG loses PR links and authors permanently. The patch is the only option that bounds the query **by construction** while keeping the output intact. Trade-off accepted: the patch must be re-validated on any `@changesets/*` upgrade; if upstream restructures the file the patch fails to apply and breaks `pnpm install` loudly, which is the right failure direction.
+**Why not the cheaper options.** _Delete "unimportant" changesets_ — measured first: the batch is 109 files, 1853 lines of description, median 14 lines each, and only **3** files have ≤2 lines, so there is no filler to drop. It is also version-neutral (changesets takes the highest bump per package; core had 31 `minor` + 16 `patch`, so the result is one `minor` no matter how many files survive), which means the entire cost lands on the CHANGELOG — ~1500 lines of release notes discarded on precisely the breaking release (`feat(core)!`, channel split) where consumers need them to migrate. And it is a guess: GitHub's validation budget is undocumented and load-dependent, so "delete until it passes" is a push-and-see loop that re-breaks on the next large release. _Switch to `@changesets/changelog-git`_ — no API calls at all, but the CHANGELOG loses PR links and authors permanently. The patch is the only option that bounds the query **by construction** while keeping the output intact. Trade-off accepted: the patch must be re-validated on any `@changesets/*` upgrade; if upstream restructures the file the patch fails to apply and breaks `pnpm install` loudly, which is the right failure direction.
 
 **Second failure mode of one seam.** `@changesets/get-github-info` → `api.github.com/graphql` has now broken twice, for unrelated reasons and with unrelated fixes: this one on query **size**, and the earlier one on the **transport** (Node 24.17.0's CVE-2026-48931 keep-alive change surfacing a latent node-fetch@2 bug as a false `ERR_STREAM_PREMATURE_CLOSE`, fixed by pinning `node-version: 24.18.0` in `changesets.yml` — see that entry above). Both scale with release size, both only appear at release time, and neither is covered by any PR gate. When this integration misbehaves again, check size and transport separately before assuming a flake.
 
 ## pnpm 11.9.0 → 11.18.0 — nine minors of package-manager security fixes; the churn is peer-keys only (#1596, 2026-07-30)
 
-**Problem.** `packageManager` had sat at `pnpm@11.9.0` since the pnpm 11 migration (#874) while the registry moved to `11.18.0`. The lag is not a feature gap — it is pnpm's *own* CVE surface, and several of the fixes sit directly on this repo's release path: **credentials printed in `publish` output**, path traversal via scoped package names, crafted lockfiles writing outside the virtual store, environment-variable expansion disabled in `httpProxy`/`httpsProxy`/`noProxy`/`proxy` read from workspace configs, `adm-zip` bumped so crafted ZIPs can't force excessive memory allocation (11.15), and web authentication no longer exhausting memory against a malicious registry (11.17). A package manager is the one dependency that runs before every gate, so its lag is the least visible and the least acceptable.
+**Problem.** `packageManager` had sat at `pnpm@11.9.0` since the pnpm 11 migration (#874) while the registry moved to `11.18.0`. The lag is not a feature gap — it is pnpm's _own_ CVE surface, and several of the fixes sit directly on this repo's release path: **credentials printed in `publish` output**, path traversal via scoped package names, crafted lockfiles writing outside the virtual store, environment-variable expansion disabled in `httpProxy`/`httpsProxy`/`noProxy`/`proxy` read from workspace configs, `adm-zip` bumped so crafted ZIPs can't force excessive memory allocation (11.15), and web authentication no longer exhausting memory against a malicious registry (11.17). A package manager is the one dependency that runs before every gate, so its lag is the least visible and the least acceptable.
 
-**Solution.** One field. `packageManager` → `pnpm@11.18.0+sha512.<hex>`, then `pnpm install` + `pnpm dedupe`. The integrity hash is derived the same way as in #874 — decode the base64 SRI from `pnpm view pnpm@11.18.0 dist.integrity`, not paste it — and the derivation was re-validated against the *outgoing* pin first (decoding 11.9.0's SRI reproduces the old field's hash byte-for-byte), so a bad hash could not be mistaken for a working one. No workflow edits: all nine `pnpm/action-setup@v6` call-sites read the field, and pnpm self-switches locally (`pnpm --version` reported `11.18.0` immediately after the edit, with no corepack involvement — the local install is `@pnpm/exe`).
+**Solution.** One field. `packageManager` → `pnpm@11.18.0+sha512.<hex>`, then `pnpm install` + `pnpm dedupe`. The integrity hash is derived the same way as in #874 — decode the base64 SRI from `pnpm view pnpm@11.18.0 dist.integrity`, not paste it — and the derivation was re-validated against the _outgoing_ pin first (decoding 11.9.0's SRI reproduces the old field's hash byte-for-byte), so a bad hash could not be mistaken for a working one. No workflow edits: all nine `pnpm/action-setup@v6` call-sites read the field, and pnpm self-switches locally (`pnpm --version` reported `11.18.0` immediately after the edit, with no corepack involvement — the local install is `@pnpm/exe`).
 
-**The lockfile churn is 1326 lines and changes nothing.** `pnpm install` alone left `pnpm-lock.yaml` **byte-identical**. The diff came entirely from the follow-up `pnpm dedupe`, which `lint:dedupe` newly demanded (`wait-on@9.0.10`) — and it is peer-key rewriting, not resolution movement: every changed line adds a `(supports-color@10.2.2)` / `(debug@4.4.3(...))` suffix to an existing resolution key. Proven rather than eyeballed — extracting the `name@version` set from the `packages:` section with peer suffixes stripped gives **1809 entries before and 1809 after with zero diff**, i.e. not one package version moved. The cause is the documented 11.15 change *"packages with optional peer dependencies declared only via `peerDependenciesMeta` are now resolved from a satisfying version already present in the dependency graph"*: `debug@4.4.3` declares no `peerDependencies` at all, only `peerDependenciesMeta: { "supports-color": { optional: true } }`, so every key routed through `debug` now carries the resolved peer. Expect the same one-time churn shape on any future pnpm upgrade crossing 11.15 — a big diff that is provably version-neutral is the signature, and the `name@version`-set comparison above is the cheap way to confirm it.
+**The lockfile churn is 1326 lines and changes nothing.** `pnpm install` alone left `pnpm-lock.yaml` **byte-identical**. The diff came entirely from the follow-up `pnpm dedupe`, which `lint:dedupe` newly demanded (`wait-on@9.0.10`) — and it is peer-key rewriting, not resolution movement: every changed line adds a `(supports-color@10.2.2)` / `(debug@4.4.3(...))` suffix to an existing resolution key. Proven rather than eyeballed — extracting the `name@version` set from the `packages:` section with peer suffixes stripped gives **1809 entries before and 1809 after with zero diff**, i.e. not one package version moved. The cause is the documented 11.15 change _"packages with optional peer dependencies declared only via `peerDependenciesMeta` are now resolved from a satisfying version already present in the dependency graph"_: `debug@4.4.3` declares no `peerDependencies` at all, only `peerDependenciesMeta: { "supports-color": { optional: true } }`, so every key routed through `debug` now carries the resolved peer. Expect the same one-time churn shape on any future pnpm upgrade crossing 11.15 — a big diff that is provably version-neutral is the signature, and the `name@version`-set comparison above is the cheap way to confirm it.
 
 **Verified before landing.** `pnpm install --frozen-lockfile` (what CI runs) rc=0 and non-mutating; `lint:dedupe` rc=0 after the dedupe; `lint:deps` (syncpack) clean; `lint:audit` (osv-scanner still parses the v11 lockfile) "No issues found"; a real package test run green at 100% coverage. Lockfile stays single-document `9.0` (`grep -c '^---$'` = 0), so the multi-doc parser breakage class still does not apply.
 
@@ -6578,11 +6594,11 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 ## Release preflight: "never published" is not "behind", and it cost 21 s a push (#1596, 2026-07-30)
 
-**Problem.** Two near-identical sequential bash loops in `changesets.yml` — the "Check for unpublished packages" preflight and the "Fail if publish errored" post-mortem — both compared each public package's local version against `pnpm view "$name" version 2>/dev/null || echo "0.0.0"`. That `|| echo` is the bug: it collapses *every* failure into `0.0.0`. A package that has **never been published** therefore looked byte-for-byte like one that is a release behind, so it entered the publish set and `changeset publish` died with a bare 404/403 naming nothing. The actual cause is unguessable from that error and, worse, unfixable by CI: a trusted publisher can only be attached to a package that already exists on the registry ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), and with the account's 2FA in `auth-and-writes` mode backed solely by a WebAuthn key, the one-time manual first publish is a **browser ceremony that cannot be scripted** (headless, npm exits `EOTP`; there is no TOTP fallback since npm stopped new TOTP enrollments in Sept 2025). The same `|| echo` also masked genuine registry/network failures as "needs publish". Second, unrelated cost: the preflight is gated on `changesets_count == 0`, which is **every infra push to master**, not just release merges — 23 sequential `pnpm view` round-trips, measured at **21.2 s** each time. The existing comment claiming those calls "cost nothing in the steady state" was written about the post-mortem (failure-path only) and is simply false for the preflight.
+**Problem.** Two near-identical sequential bash loops in `changesets.yml` — the "Check for unpublished packages" preflight and the "Fail if publish errored" post-mortem — both compared each public package's local version against `pnpm view "$name" version 2>/dev/null || echo "0.0.0"`. That `|| echo` is the bug: it collapses _every_ failure into `0.0.0`. A package that has **never been published** therefore looked byte-for-byte like one that is a release behind, so it entered the publish set and `changeset publish` died with a bare 404/403 naming nothing. The actual cause is unguessable from that error and, worse, unfixable by CI: a trusted publisher can only be attached to a package that already exists on the registry ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), and with the account's 2FA in `auth-and-writes` mode backed solely by a WebAuthn key, the one-time manual first publish is a **browser ceremony that cannot be scripted** (headless, npm exits `EOTP`; there is no TOTP fallback since npm stopped new TOTP enrollments in Sept 2025). The same `|| echo` also masked genuine registry/network failures as "needs publish". Second, unrelated cost: the preflight is gated on `changesets_count == 0`, which is **every infra push to master**, not just release merges — 23 sequential `pnpm view` round-trips, measured at **21.2 s** each time. The existing comment claiming those calls "cost nothing in the steady state" was written about the post-mortem (failure-path only) and is simply false for the preflight.
 
 **Solution.** Both loops replaced by one `.changeset/unpublished-packages.mjs`, following the `changelog-notes.mjs` / `extract-pr-refs.mjs` precedent of moving inline bash into a small unit-testable helper. It classifies each public package as `published` / `behind` / `never-published`, runs the queries through a concurrency pool, and emits `has_unpublished`, `packages`, `unpublished_specs` and the new `never_published` as step outputs. For a never-published package it prints a GitHub `::error::` spelling out the exact remediation (`npm login --auth-type=web` → `pnpm publish --filter` → `npm trust github … --allow-publish`). Non-404 query failures retry once and then throw, so a registry outage is a red step rather than a silent "needs publish"; the post-mortem distinguishes that case too instead of reporting "every planned version is now on npm".
 
-**Why annotate rather than fail the preflight.** Failing there would block every *other* package's release behind one unwired new package. `changeset publish` still fails on it and the final "Fail if publish errored" gate still turns the run red — the annotation only ensures the log says *why*, at the top, in words that name a step a human must perform.
+**Why annotate rather than fail the preflight.** Failing there would block every _other_ package's release behind one unwired new package. `changeset publish` still fails on it and the final "Fail if publish errored" gate still turns the run red — the annotation only ensures the log says _why_, at the top, in words that name a step a human must perform.
 
 **`pnpm view` kept as the transport, deliberately.** A direct `fetch` of the registry JSON would be faster still, but it would quietly drop registry/auth/proxy configuration semantics. Keeping the same client makes this a pure latency + classification change. Measured on the 23-package set: 21.2 s sequential → 6.2 s at concurrency 8 → **4.4-5.2 s at 16**, which is where it sits (bounded rather than unbounded so a future package count in the hundreds cannot fork a process per package). The bottleneck is process spawn, not the round-trip — worth knowing before anyone tries to tune it further.
 
@@ -6590,19 +6606,19 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 ## Release-path meta-tests: the runner and `id-token` are load-bearing and unguarded (#1596, 2026-07-30)
 
-**Problem.** Two properties of `changesets.yml` are required for OIDC publishing to work at all, and breaking either fails *nothing* until a release is mid-flight on master. (1) npm trusted publishing supports **GitHub-hosted runners only** — and this repo has four `runs-on: self-hosted` jobs (`codspeed`, `codspeed-adapters`, `examples`, `cross-router-bench`) one copy-paste away from the release job, which would then fail the OIDC exchange while the `cancel-in-progress: false` concurrency group holds every queued release behind it. (2) `id-token: write` in the workflow's permissions — an obvious casualty of a future "tighten permissions" pass. Nothing asserted either.
+**Problem.** Two properties of `changesets.yml` are required for OIDC publishing to work at all, and breaking either fails _nothing_ until a release is mid-flight on master. (1) npm trusted publishing supports **GitHub-hosted runners only** — and this repo has four `runs-on: self-hosted` jobs (`codspeed`, `codspeed-adapters`, `examples`, `cross-router-bench`) one copy-paste away from the release job, which would then fail the OIDC exchange while the `cancel-in-progress: false` concurrency group holds every queued release behind it. (2) `id-token: write` in the workflow's permissions — an obvious casualty of a future "tighten permissions" pass. Nothing asserted either.
 
 **Solution.** `scripts/release-workflow.test.mjs`, picked up by the existing `node --test scripts/*.test.mjs` step in `ci.yml`. Same shape as `ci-gate-completeness.test.mjs` (the #1127-class guard it is modelled on): single-purpose regex extractors rather than a YAML library, fail-closed, with **fixture-level mutation tests first** — self-hosted runner, a custom runner label (not just the literal `self-hosted`), a dropped `id-token: write`, and a renamed release job each proven to fail the check — so a green run against the healthy file means something. The file also unit-tests `classify()` from `unpublished-packages.mjs`, including the specific regression that motivated it (`classify(v, null) !== classify(v, "0.0.0")`).
 
 ## Smoke test pins the npm-12 script posture (#1596, 2026-07-30)
 
-**Problem.** npm 12 is already `latest` and makes dependency lifecycle scripts opt-in — but *permissively*: unapproved `preinstall`/`install`/`postinstall` and implicit node-gyp builds are skipped with a warning and the install still succeeds. So a published `@real-router/*` package whose tree acquired an install script would keep passing the smoke test here while silently not running that script on a consumer's machine. The repo's clean state today (verified: zero `preinstall`/`install`/`postinstall`/`prepare`/`prepack` and zero git/remote dependency specifiers across all public packages) is a property of the current tree, not an enforced invariant.
+**Problem.** npm 12 is already `latest` and makes dependency lifecycle scripts opt-in — but _permissively_: unapproved `preinstall`/`install`/`postinstall` and implicit node-gyp builds are skipped with a warning and the install still succeeds. So a published `@real-router/*` package whose tree acquired an install script would keep passing the smoke test here while silently not running that script on a consumer's machine. The repo's clean state today (verified: zero `preinstall`/`install`/`postinstall`/`prepare`/`prepack` and zero git/remote dependency specifiers across all public packages) is a property of the current tree, not an enforced invariant.
 
 **Solution.** `--strict-allow-scripts=true` on the smoke test's `npm install`, which turns that situation into a hard failure. Verified against the **real `npm@12.0.2`** (not the changelog) that the current dependency shape — local `.tgz` file specifiers plus the optional `ink` peer, `--install-strategy=hoisted` — exits 0 both with v12 defaults and with the strict flag, so this pins existing behaviour rather than changing it. npm ignores unknown flags silently (measured), so on a runner bundling npm < 11.16 this degrades to a no-op instead of breaking the job. Note for the future: `--allow-file` keeps its current default in v12, which is why installing from tarballs still resolves at all.
 
 ## `peerDependencies` are invisible to turbo — four packages cached against a stale core (2026-08-01)
 
-**Problem.** Turbo builds its task graph from `dependencies` / `devDependencies` / `optionalDependencies` — **not** `peerDependencies`. Four packages declared `@real-router/core` *only* as a peer: `route-utils`, `ssr-utils`, `ssr-data-plugin`, `rsc-server-plugin`. Verified directly — `@real-router/ssr-utils#type-check <- []`, no edge at all — while those same packages import core in 3 / 16 / 15 / 14 files and, thanks to the `@real-router/internal-source` condition, compile against `packages/core/src` rather than its `dist`. So a core change invalidated nothing of theirs: measured by appending a line to `packages/core/src/helpers.ts` and re-hashing — all sixteen `type-check` / `test` / `test:properties` / `bundle` hashes came back byte-identical. Turbo replayed results computed against a *previous* core, and a breaking core change would pass the pre-commit hook green, surfacing only where the cache happened to be cold. The other 20 packages were never exposed: they carry core in `dependencies`, so the edge exists.
+**Problem.** Turbo builds its task graph from `dependencies` / `devDependencies` / `optionalDependencies` — **not** `peerDependencies`. Four packages declared `@real-router/core` _only_ as a peer: `route-utils`, `ssr-utils`, `ssr-data-plugin`, `rsc-server-plugin`. Verified directly — `@real-router/ssr-utils#type-check <- []`, no edge at all — while those same packages import core in 3 / 16 / 15 / 14 files and, thanks to the `@real-router/internal-source` condition, compile against `packages/core/src` rather than its `dist`. So a core change invalidated nothing of theirs: measured by appending a line to `packages/core/src/helpers.ts` and re-hashing — all sixteen `type-check` / `test` / `test:properties` / `bundle` hashes came back byte-identical. Turbo replayed results computed against a _previous_ core, and a breaking core change would pass the pre-commit hook green, surfacing only where the cache happened to be cold. The other 20 packages were never exposed: they carry core in `dependencies`, so the edge exists.
 
 **Solution, and why it is two mechanisms rather than one.** Three of the four got `"@real-router/core": "workspace:^"` in `devDependencies` — the peer declaration is the published contract and stays untouched; the dev entry exists purely so turbo sees the edge (syncpack already sanctions this: its `workspace:^` group covers `dependencyTypes: ["prod", "dev"]`). `ssr-utils` could **not** take that fix: `core` keeps `@real-router/ssr-utils` in its own devDeps for three tests (`lifecycle.properties.ts`, `boundary-gaps.test.ts`, `claimContextNamespace.test.ts`), so the dev entry closes a loop and turbo refuses to run at all — `Cyclic dependency detected: @real-router/ssr-utils#type-check, @real-router/core#type-check`. It therefore gets `packages/ssr-utils/turbo.json` (`extends: ["//"]`) adding `../core/src/**/*.ts` to the `type-check` and `bundle` inputs. Those two are the only entry points needed: `test` depends on `type-check` and `test:properties` on `test`, so the invalidation cascades, while `bundle` (`dependsOn: ["^bundle"]`) has no path to either. `../`-escaping inputs do work in a package config — confirmed by the same probe, all four hashes moved.
 
@@ -6614,7 +6630,7 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 ## Core's two dts/JS passes were racing for the CJS entry names — now sequenced (2026-08-01)
 
-**Problem.** The two-phase build from "Core dts unbundled (two-phase tsdown)" above exported `[...jsConfigs, ...dtsConfigs]` from one `tsdown.config.mts`, and tsdown runs every config in a single `Promise.all` (`buildWithConfigs`). Both CJS configs therefore wrote `dist/cjs` concurrently, and they emit the **same entry names** — `index.js`, `api.js`, `validation.js`, `types.js`. Last writer won. The entry above assumed `emitDtsOnly` kept the dts pass declaration-only; it does for ESM, where declarations and JS come from one rolldown build, but **not** for CJS: `buildSingle` pushes a *separate* `cjsDts` config for CJS declarations (`format === "cjs" && dts`), so the ordinary CJS build still ran and emitted a full unbundled JS graph. Isolated to be sure — running the dts pass alone into a scratch directory produced `esm: 0` JS files and `cjs: 87`.
+**Problem.** The two-phase build from "Core dts unbundled (two-phase tsdown)" above exported `[...jsConfigs, ...dtsConfigs]` from one `tsdown.config.mts`, and tsdown runs every config in a single `Promise.all` (`buildWithConfigs`). Both CJS configs therefore wrote `dist/cjs` concurrently, and they emit the **same entry names** — `index.js`, `api.js`, `validation.js`, `types.js`. Last writer won. The entry above assumed `emitDtsOnly` kept the dts pass declaration-only; it does for ESM, where declarations and JS come from one rolldown build, but **not** for CJS: `buildSingle` pushes a _separate_ `cjsDts` config for CJS declarations (`format === "cjs" && dts`), so the ordinary CJS build still ran and emitted a full unbundled JS graph. Isolated to be sure — running the dts pass alone into a scratch directory produced `esm: 0` JS files and `cjs: 87`.
 
 Consequences, all measured on `packages/core`. The published CJS shape was **not** the one the config's comment claimed ("JS stays BUNDLED … package shape unchanged"): across 8 clean `pnpm bundle` runs, 7 shipped unbundled entries (`index.js` 580 B requiring 87 sibling modules) with the real bundle chunks orphaned beside them, and 1 shipped the bundled entries with those 87 modules as dead weight instead. Either way `dist` carried 334 files / 3 186 KB unpacked (914 KB tarball), against 168 / 2 208 KB (623 KB) for the intended output — ~900 KB of duplicate JS plus its sourcemaps. Nothing caught it: `size-limit` measures `dist/esm/index.mjs` (ESM was never affected), and `publint`/`attw` check validity, not shape.
 
@@ -6636,7 +6652,7 @@ Everything else lives in `tsdown.config.mts`, not in the script. Pass 1 discards
 2. **The cause is code splitting across entries, not bundling.** With a SINGLE entry (`types` alone) bundled dts keeps both interfaces lexically in `types.d.mts`. The barrel appears only because `src/types/index.ts` is an entry that the other entries also import, so rolldown gives it a shared chunk and leaves the entry as a facade. Core has four subpaths, so this is not avoidable by rearranging.
 3. **`preserveEntrySignatures` does not rescue it.** `"strict"` / `"exports-only"` / `"allow-extension"` all still produce the facade; `false` collapses the output to 4 files but tree-shakes the entry exports away — the interfaces disappear from `dist` entirely.
 4. **`unbundle` is a build-wide option, not a dts one** — no way to ask for unbundled declarations beside bundled JS in one pass. Confirmed against `rolldown-plugin-dts`'s own option list (`emitDtsOnly`, `dtsInput`, `cjsDefault`, … — nothing about chunking), and `emitDtsOnly` is documented there as being for "a separate build step" for CJS.
-5. **So the only single-pass option is unbundling EVERYTHING — and the cost is not what #1540 recorded.** That entry rejected full unbundle at "+713 B brotli on the root entry"; today the same experiment measures **+60 B** on `@real-router/core` and **+110 B** on `/api` (22.60 → 22.66 kB, 26.30 → 26.41 kB), and the tarball is actually *smaller* (535 KB vs 623 KB — many small sourcemaps compress better than two huge ones). Judged on size alone the two passes would no longer be worth it.
+5. **So the only single-pass option is unbundling EVERYTHING — and the cost is not what #1540 recorded.** That entry rejected full unbundle at "+713 B brotli on the root entry"; today the same experiment measures **+60 B** on `@real-router/core` and **+110 B** on `/api` (22.60 → 22.66 kB, 26.30 → 26.41 kB), and the tarball is actually _smaller_ (535 KB vs 623 KB — many small sourcemaps compress better than two huge ones). Judged on size alone the two passes would no longer be worth it.
 
    The reason they still are is **module-graph load time**, which that entry never measured: `require()` of the CJS entry goes 3.02 ms → 9.79 ms (median of 7 cold processes, 3 → 75 modules in `require.cache`) and `import()` of the ESM entry 3.48 ms → 11.57 ms — **×3.2–3.3 on every cold start**, which is SSR, CLI and serverless. Plus 486 published files against 168.
 
@@ -6661,8 +6677,8 @@ The required gate's critical path is `base-test` — **231 s of 297 s** wall-clo
 `--summarize` on every `test` / `bundle` invocation in `ci.yml` (`pipeline-leaf` ×2, `base-bundle`, `base-test`), an `if: always()` upload of `.turbo/runs/` in each of those three jobs, and the shards' existing summary artifact bumped from 1 day to 14.
 
 - **The whole directory is uploaded, never "the newest file".** A job that runs turbo more than once writes one summary per invocation (`pipeline-leaf` writes two), so picking a single file would silently drop the rest — the exact bug the first draft of the telemetry uploader had.
-- **14 days only for the summaries.** The `coverage-reports-*` / `dist-*` artifacts stay at 1 day: they are consumed by downstream jobs of the *same* run and are large. The summaries are a few KB and their whole point is cross-run comparison, which one day makes impossible.
-- **`turbo-summary-pipeline-leaf`, not `turbo-summary-leaf`.** `leaf` is also one of `build-matrix.mjs`'s `GROUP_NAMES`, so a sharded run can emit `turbo-summary-leaf` for the catch-all shard. The two modes never coexist in one run, so artifact names cannot actually collide — but comparing artifacts *across* runs would.
+- **14 days only for the summaries.** The `coverage-reports-*` / `dist-*` artifacts stay at 1 day: they are consumed by downstream jobs of the _same_ run and are large. The summaries are a few KB and their whole point is cross-run comparison, which one day makes impossible.
+- **`turbo-summary-pipeline-leaf`, not `turbo-summary-leaf`.** `leaf` is also one of `build-matrix.mjs`'s `GROUP_NAMES`, so a sharded run can emit `turbo-summary-leaf` for the catch-all shard. The two modes never coexist in one run, so artifact names cannot actually collide — but comparing artifacts _across_ runs would.
 - **`lint:package` / `lint:types` invocations deliberately left without `--summarize`.** publint/attw run as their own CI step, so their cost is already visible in the step timing; adding a third summary per job buys nothing.
 
 ### Why
@@ -6700,15 +6716,82 @@ Strictly sequential — 70 + 48 + 65 — because `test.dependsOn` was `["lint", 
 
 Measured A/B on `@real-router/core`, both arms with a cold `.eslintcache` (the first attempt was invalid — the "after" arm reused a warm cache from the "before" run and reported a flattering 47 s):
 
-| | wall-clock | shape |
-| --- | --- | --- |
-| before | 78.3 s | lint 0→32, test 32→49, properties 49→78 |
-| after | 58.8 s | lint 0→49 ∥ type-check 2→6 → test 6→25 → properties 25→59 |
+|        | wall-clock | shape                                                     |
+| ------ | ---------- | --------------------------------------------------------- |
+| before | 78.3 s     | lint 0→32, test 32→49, properties 49→78                   |
+| after  | 58.8 s     | lint 0→49 ∥ type-check 2→6 → test 6→25 → properties 25→59 |
 
 **−19.5 s (−25 %)**, and `lint` is now entirely hidden behind the test chain. On CI the same reshaping should take `base-test` from 183 s to roughly the 126 s of its `type-check → test → test:properties` chain, minus whatever the runner's four cores lose to contention — the first sharded run after this lands will say exactly.
 
 ### Why
 
-The dependency was never a correctness constraint: nothing in `test` consumes lint output, and turbo's cache keys are per-task, so a lint failure and a test failure are independent verdicts. It bought **fail-fast** — a lint error stopped the run before the expensive tests — and that is the one thing this trades away: with `--continue=never` (the default) turbo still refuses to *start* new tasks after a failure, but tasks already in flight run to completion. Paying up to one test-suite's wall-clock on a lint failure is worth ~60 s on every green run of the gate's critical path.
+The dependency was never a correctness constraint: nothing in `test` consumes lint output, and turbo's cache keys are per-task, so a lint failure and a test failure are independent verdicts. It bought **fail-fast** — a lint error stopped the run before the expensive tests — and that is the one thing this trades away: with `--continue=never` (the default) turbo still refuses to _start_ new tasks after a failure, but tasks already in flight run to completion. Paying up to one test-suite's wall-clock on a lint failure is worth ~60 s on every green run of the gate's critical path.
 
 Two traps for anyone touching this again: dropping `lint` from a run line does **not** fail anything — it silently stops linting that path (hence the explicit comment at every one of them); and `build.dependsOn` is what preserves the `pnpm build` contract documented in `CLAUDE.md`, so moving lint out of there re-opens the hole on the pre-push side.
+
+---
+
+## The router FSM diagrams drifted from the table for a year — now they are a test (2026-08-02)
+
+### Problem
+
+Two Mermaid `stateDiagram-v2` blocks draw the router's transition table — one in
+the root `ARCHITECTURE.md`, one under "Usage in @real-router/core" in
+`packages/core/src/utils/fsm/ARCHITECTURE.md`. Both had drifted, and neither
+drift was detectable by anything the repo runs.
+
+Found by hand while auditing the docs after the state-ownership slice, by
+comparing 21 edges one at a time. The comparison surfaced four defects in the
+root diagram and eight in the engine one:
+
+| Diagram                         | Drew what does not exist                                      | Never drew                                                     |
+| ------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------- |
+| `ARCHITECTURE.md`               | `READY --FAIL--> READY` (removed with its two senders, #1641) | both `SYSTEM_COMMIT` self-loops; `STARTING --STOP--> IDLE`     |
+| `.../utils/fsm/ARCHITECTURE.md` | the same                                                      | the same, plus every `DISPOSE` safety-net edge except `IDLE`'s |
+
+`STARTING --STOP--> IDLE` landed in **#1185** and was never drawn in either — so
+one of these omissions is roughly a year old. That is the shape of the problem:
+a hand-comparison gets done once, by whoever happens to be auditing, and then
+never again.
+
+It is not a cosmetic gap. `routerFSM.ts` carries a standing warning that **this
+graph may not be cleaned by trace coverage** — 15 of the 21 edges are never
+traversed by the suite, and each of the rest was mutated away individually to
+prove it is load-bearing. A diagram that under-draws the table is an argument
+for deleting live edges, aimed at exactly the reader who came to tidy up.
+
+### Solution
+
+`scripts/fsm-diagram-parity.test.mjs` — a repo-level guard that reads the table
+and both diagrams and asserts set equality of `FROM --EVENT--> TARGET` triples.
+It joins the existing `node --test scripts/*.test.mjs` step in the repo-lints
+job, so there is no wiring to forget.
+
+Two decisions in it are load-bearing:
+
+- **The table is read through the TypeScript AST, not by line regex.** The table
+  mixes a bare `routerStates.X` target with the guarded object form
+  `{ target, when?, update? }`, and a line-oriented parser silently drops the
+  second — the first draft of the audit script did exactly that and reported
+  "unknown" for the target of every guarded edge.
+- **The comparison includes TARGETS, not just `from:event`.** The ad-hoc script
+  used during the audit compared only the pair, which cannot see an edge
+  re-pointed at the wrong state.
+
+Mutationally validated in four directions: an edge added to the table, an edge
+removed from a diagram, an edge's **target** changed with `from:event` intact,
+and — the one that matters most — the table renamed, which would leave a naive
+parser comparing two empty sets and passing. A positive control asserting six
+states and ≥20 parsed edges catches that last one.
+
+### Why
+
+The alternative was to keep the diagrams as prose and accept that they describe
+the machine approximately. That is defensible for an illustration, and it is not
+what these are: both are titled as the router's states, both are what a reader
+consults before deciding an edge is dead, and one of them sits in the engine's
+own architecture doc where a wrong edge reads as engine behaviour.
+
+Deleting the second diagram was considered and rejected — it earns its place by
+showing what the generic engine looks like in its one real consumer. Making it
+correct-by-construction costs one test file that runs in milliseconds.

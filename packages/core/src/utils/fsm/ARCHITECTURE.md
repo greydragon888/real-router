@@ -367,24 +367,37 @@ stateDiagram-v2
     IDLE --> DISPOSED : DISPOSE
 
     STARTING --> READY : STARTED
+    STARTING --> STARTING : SYSTEM_COMMIT
     STARTING --> IDLE : FAIL
+    STARTING --> IDLE : STOP
+    STARTING --> DISPOSED : DISPOSE
 
     READY --> TRANSITION_STARTED : NAVIGATE
-    READY --> READY : FAIL
+    READY --> READY : SYSTEM_COMMIT
     READY --> IDLE : STOP
+    READY --> DISPOSED : DISPOSE
 
     TRANSITION_STARTED --> TRANSITION_STARTED : NAVIGATE
     TRANSITION_STARTED --> LEAVE_APPROVED : LEAVE_APPROVE
     TRANSITION_STARTED --> READY : CANCEL
     TRANSITION_STARTED --> READY : FAIL
+    TRANSITION_STARTED --> DISPOSED : DISPOSE
 
     LEAVE_APPROVED --> TRANSITION_STARTED : NAVIGATE
     LEAVE_APPROVED --> READY : COMPLETE
     LEAVE_APPROVED --> READY : CANCEL
     LEAVE_APPROVED --> READY : FAIL
+    LEAVE_APPROVED --> DISPOSED : DISPOSE
 
     DISPOSED --> [*]
 ```
+
+⚠ This is the ROUTER's table, not an engine example, so it is checked against
+`routerFSM.ts` edge-for-edge by `scripts/fsm-diagram-parity.test.mjs` — edit the
+table and this block fails until it is redrawn. It had drifted four ways before
+that guard existed (a `READY --FAIL--> READY` that no longer exists, both
+`SYSTEM_COMMIT` self-loops, `STARTING --STOP--> IDLE`, and every `DISPOSE`
+safety-net edge but one).
 
 ### EventBusNamespace Integration
 

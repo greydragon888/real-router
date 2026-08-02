@@ -290,8 +290,9 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
            │
            ▼
 ┌──────────────────────┐
-│  setState()          │  state.set(finalState)
-│  FSM send(COMPLETE)  │  → READY → emitTransitionSuccess(state, fromState, opts)
+│  ask, then fire      │  canCommitTransition(commit) — may refuse
+│  FSM send(COMPLETE)  │  → commit update writes the pair → READY
+│                      │  → emitTransitionSuccess(state, fromState, opts)
 └──────────┬───────────┘
            │
            ▼
@@ -302,12 +303,12 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
 
 Errors during navigation are routed through two different paths depending on FSM state:
 
-| Path            | Method                  | When                                                       | Effect                                   |
-| --------------- | ----------------------- | ---------------------------------------------------------- | ---------------------------------------- |
-| **Via FSM**     | `sendFail()` → FSM FAIL | FSM is in READY or TRANSITION_STARTED                      | FSM transitions → action emits `$$error` |
-| **Direct emit** | `emitTransitionError()` | Error before FSM transition (ROUTE_NOT_FOUND, SAME_STATES) | Emits directly, FSM state unchanged      |
+| Path            | Method                  | When                                                                                                                                                 | Effect                                   |
+| --------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **Via FSM**     | `sendFail()` → FSM FAIL | A transition failed: FSM is in `STARTING`, `TRANSITION_STARTED` or `LEAVE_APPROVED`                                                                  | FSM transitions → action emits `$$error` |
+| **Direct emit** | `emitTransitionError()` | A REPORT to observers, not a transition failure: early refusals (ROUTE_NOT_FOUND, SAME_STATES, the P3 channel guard) and the plugin-facing primitive | Emits directly, FSM state unchanged      |
 
-The branching logic lives in `EventBusNamespace.sendFailSafe()`. When an error occurs before `startTransition()`, `sendFailSafe()` checks `isReady()`: if READY — routes through FSM; if TRANSITION_STARTED — emits directly to avoid disturbing the ongoing transition. The wiring's `emitTransitionError` closure merely delegates to it.
+**There is no branching left to do, and that is the design.** `sendFailSafe()` — which used to choose between the two rows by asking its own FSM state (`isReady()`) — is gone, and so is the `READY --FAIL--> READY` edge it needed. Both of its callers belong to the second row by nature: they report to observers without a transition to fail, and neither knows (nor should decide) whether one is in flight. Each row now has a fixed set of senders instead of one sender picking a row at runtime. A stale `FAIL` in `READY` is therefore a table no-op structurally, and since the emit rides the edge's action it emits nothing at all rather than being filtered.
 
 ### navigateToNotFound() — Pipeline Bypass
 
@@ -316,11 +317,11 @@ The branching logic lives in `EventBusNamespace.sendFailSafe()`. When an error o
 1. Check `isActive()` → throw ROUTER_NOT_STARTED if false
 2. Resolve path → `path ?? currentState.path`
 3. Build UNKNOWN_ROUTE state + deep freeze
-4. `setState()` directly (no FSM transition)
-5. `emitTransitionSuccess(state, fromState, { replace: true })`
+4. **Ask the current route's `canDeactivate`** (#1643) → throw `CANNOT_DEACTIVATE` + emit `TRANSITION_ERROR` if it refuses
+5. `systemCommit()` — a `SYSTEM_COMMIT` edge that writes the committed pair and announces it as ONE table fact (#1641)
 6. Return State synchronously
 
-**No guards, no FSM transition, no AbortController.** Only `TRANSITION_SUCCESS` is emitted (no `TRANSITION_START`). Plugin authors must not assume every `onTransitionSuccess` is preceded by `onTransitionStart`.
+**No ACTIVATION guards, no AbortController, and only `TRANSITION_SUCCESS` is emitted** (no `TRANSITION_START`) — plugin authors must not assume every `onTransitionSuccess` is preceded by `onTransitionStart`. Two of the three "no"s this section used to carry are gone: it takes a table edge like everyone else, and it does ask about LEAVING. Only the activation half ever followed from being a 404 — there is nothing to activate at `UNKNOWN_ROUTE`, but there is very much something to deactivate, and this primitive is what the URL plugins call on an unmatched Back.
 
 ### Transition Path Calculation
 

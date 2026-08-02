@@ -189,7 +189,7 @@ Router.ts (facade) ────────────────────�
     ├── RouterFSM              — finite state machine (lifecycle + navigation state)
     │
     ├── RoutesNamespace        — route tree, path operations, forwarding
-    ├── StateNamespace         — current/previous state storage
+    ├── StateNamespace         — state service; the committed pair lives in the FSM context
     ├── NavigationNamespace    — navigate(), transition pipeline
     ├── OptionsNamespace       — router configuration
     ├── DependenciesStore      — dependency injection container (plain store)
@@ -223,11 +223,13 @@ stateDiagram-v2
     IDLE --> DISPOSED : DISPOSE
 
     STARTING --> READY : STARTED
+    STARTING --> STARTING : SYSTEM_COMMIT
     STARTING --> IDLE : FAIL
+    STARTING --> IDLE : STOP
     STARTING --> DISPOSED : DISPOSE
 
     READY --> TRANSITION_STARTED : NAVIGATE
-    READY --> READY : FAIL
+    READY --> READY : SYSTEM_COMMIT
     READY --> IDLE : STOP
     READY --> DISPOSED : DISPOSE
 
@@ -246,16 +248,20 @@ stateDiagram-v2
     DISPOSED --> [*]
 ```
 
-`DISPOSE` is wired from every non-DISPOSED state so `router.dispose()` always settles the FSM at `DISPOSED`. For healthy flows the facade still orchestrates cleanup through `IDLE` (`STOP` → `IDLE` → `DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` first (e.g. `dispose()` mid-`STARTING` after a start-pipeline throw).
+**21 edges over 6 states and 10 events**, and the diagram is the whole table — read it as the complete inventory, because two of its shapes are easy to mis-summarise. `SYSTEM_COMMIT` needs a self-loop on BOTH `READY` and `STARTING` (`start()` with `allowNotFound` commits its 404 while the machine is still starting), and there is deliberately no `READY --FAIL--> READY`: that edge was removed with the two senders it had (#1641), so a stale `FAIL` arriving in `READY` is a table no-op structurally rather than by a predicate.
 
-| State                | Description                                           |
-| -------------------- | ----------------------------------------------------- |
-| `IDLE`               | Router not started or stopped                         |
-| `STARTING`           | Initializing (synchronous window before first await)  |
-| `READY`              | Ready for navigation                                  |
-| `TRANSITION_STARTED` | Navigation in progress                                |
-| `LEAVE_APPROVED`     | Deactivation guards passed, activation guards pending |
-| `DISPOSED`           | Terminal state, no transitions out                    |
+`DISPOSE` is wired from every non-DISPOSED state so `router.dispose()` always settles the FSM at `DISPOSED`. For healthy flows the facade still orchestrates cleanup through `IDLE` (`STOP` → `IDLE` → `DISPOSE`); the direct transitions are a safety net for cases where the FSM cannot be returned to `IDLE` first (e.g. `dispose()` mid-`STARTING` after a start-pipeline throw). `STARTING --STOP--> IDLE` is the other non-obvious one (#1185): a `stop()` while `start()` is parked in an async interceptor cancels the start.
+
+⛔ **This graph may not be cleaned by trace coverage.** An `onTransition` recorder over the full suite traverses 15 of the edges; every one of the rest was mutated away individually and none was dead. The two `NAVIGATE` self-loops are never taken and are load-bearing anyway — they are read through `canSend()`, and their DECLARATION is what makes supersede legal. The three direct `DISPOSE` edges are fail-safes for flows no test reaches. The full taxonomy lives above the table in `packages/core/src/routerFSM.ts`.
+
+| State                | Description                                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------------- |
+| `IDLE`               | Router not started or stopped                                                                       |
+| `STARTING`           | Start in progress — spans the WHOLE async start-interceptor chain, not a synchronous window (#1185) |
+| `READY`              | Ready for navigation                                                                                |
+| `TRANSITION_STARTED` | Navigation in progress                                                                              |
+| `LEAVE_APPROVED`     | Deactivation guards passed, activation guards pending                                               |
+| `DISPOSED`           | Terminal state, no transitions out                                                                  |
 
 FSM events trigger observable emissions through two paths:
 
@@ -264,19 +270,20 @@ FSM events trigger observable emissions through two paths:
 - `STARTED` → `emitRouterStart()`
 - `STOP` → `emitRouterStop()`
 - `CANCEL` (from `TRANSITION_STARTED` or `LEAVE_APPROVED`) → `emitTransitionCancel()`
-- `FAIL` (from any state) → `emitTransitionError()`
+- `FAIL` (from `STARTING`, `TRANSITION_STARTED` or `LEAVE_APPROVED`) → `emitTransitionError()`. **Not from `READY`** — that edge was removed with the two senders it had, both of which report to observers rather than failing a transition, so they emit directly (#1643's sibling, #1641 S7). `STARTING --FAIL--> IDLE` is how a failed `start()` unwinds and is unconditional; the two in-flight edges carry `when: mayFail`, so a stale FAIL from a superseded navigation is a table no-op
 
-**Via the FSM table `send()` + emit action** — the three hot navigation transitions dispatch through the FSM table via `send()`, which fires a registered action that emits; `forceState()` is **not** used in core (a bundle-invariant). An invalid transition (e.g. `COMPLETE` from IDLE/DISPOSED after a listener's `stop()`/`dispose()`) is a table no-op that emits nothing, so the table is the sole authority over state — the FSM cannot be resurrected out of a terminal state:
+**Via the FSM table `send()` + emit action** — the navigation transitions dispatch through the FSM table via `send()`, which fires a registered action that emits; `forceState()` is **not** used in core (a bundle-invariant). An invalid transition (e.g. `COMPLETE` from IDLE/DISPOSED after a listener's `stop()`/`dispose()`) is a table no-op that emits nothing, so the table is the sole authority over state — the FSM cannot be resurrected out of a terminal state:
 
 - `NAVIGATE` (`sendNavigate`) → `send(NAVIGATE, {toState, fromState})` → action `emitTransitionStart()`
 - `LEAVE_APPROVE` (`sendLeaveApprove`) → `send(LEAVE_APPROVE, {…})` → action `emitTransitionLeaveApprove()`
 - `COMPLETE` (`sendComplete`) → `send(COMPLETE, {…})` → action `emitTransitionSuccess()`
+- `SYSTEM_COMMIT` (`systemCommit`) → `send(SYSTEM_COMMIT, {…})` → action `emitTransitionSuccess()` — the two commits that are NOT transitions (`navigateToNotFound`, the `replace()` revalidation). It needs TWO edges, `READY` and `STARTING`, because `start()` with `allowNotFound` commits while the machine is still starting
 
-Cost: one transition-payload allocation per navigation — a deliberate trade of micro-optimization for structural determinism. Correctness is enforced by the state machine, not by scattered re-checks.
+Cost: three transition-payload allocations per navigation (`NAVIGATE`, `LEAVE_APPROVE`, `COMPLETE` each carry one) — a deliberate trade of micro-optimization for structural determinism. Correctness is enforced by the state machine, not by scattered re-checks. **Since the state-ownership slice the table also OWNS the committed state**: `current` / `previous` are fields of the FSM context written by four edge `update`s and by nothing else, so "committed" and "announced" cannot come apart (`packages/core/INVARIANTS.md`, "Committed-state ownership").
 
 ### Route-tree mutation channel — `TREE_CHANGED` (orthogonal to the FSM)
 
-The seven events above are all about **transitions** (FSM state changes). A separate, **non-FSM** channel signals **structural route-tree mutations** (`add` / `remove` / `update` / `replace` / `clear` via `getRoutesApi`). It reuses the same `EventEmitter` through an **internal-only** key — `TREE_CHANGED` lives in `RouterEventMap` but **not** in the public `EventName` union / `events.*` registry / `Plugin` interface — and is observed only via `getRoutesApi(router).subscribeChanges(handler)`:
+The ten events above are all about **transitions** (FSM state changes). A separate, **non-FSM** channel signals **structural route-tree mutations** (`add` / `remove` / `update` / `replace` / `clear` via `getRoutesApi`). It reuses the same `EventEmitter` through an **internal-only** key — `TREE_CHANGED` lives in `RouterEventMap` but **not** in the public `EventName` union / `events.*` registry / `Plugin` interface — and is observed only via `getRoutesApi(router).subscribeChanges(handler)`:
 
 - **Post-commit, fire-and-forget** — emitted from the five `getRoutesApi` wrappers after the atomic commit, never from the shared internals that `dispose()`/`cloneRouter()`/`setRootPath()` reuse, so teardown and cloning stay silent.
 - **Discriminated payload** (`TreeChangedEvent`, keyed by `op`); `update` emits only on structural fields (guard-only patches are silent).
@@ -315,7 +322,8 @@ flowchart TD
     ASYNC --> COMPLETE
 
     COMPLETE["completeTransition()
-    setState + freeze → FSM READY"]
+    ask + FSM send(COMPLETE)
+    → commit update → READY"]
     COMPLETE --> RESOLVE["Promise‹State› resolves"]
 
     DEACTIVATE -.->|error at any step| ERR["emitTransitionError()
@@ -326,7 +334,7 @@ flowchart TD
 
 On error at any step: `emitTransitionError()`, Promise rejects with `RouterError`.
 
-**`navigateToNotFound()`** bypasses this pipeline entirely — sets state directly and emits only `TRANSITION_SUCCESS` (no guards, no AbortController, no `TRANSITION_START`). Always uses `replace: true`.
+**`navigateToNotFound()`** bypasses this pipeline — but neither the machine nor the deactivation guards. It emits only `TRANSITION_SUCCESS` (no `TRANSITION_START`, no AbortController) and always uses `replace: true`, while committing through a `SYSTEM_COMMIT` edge (#1641) and asking the current route's `canDeactivate` first (#1643) — a refusal throws `CANNOT_DEACTIVATE` instead of committing.
 
 **Cancellation sources:** external AbortController (`opts.signal`), concurrent navigation (aborts previous), `stop()`, `dispose()`. The internal AbortController is created **synchronously** whenever the navigation has guards or `subscribeLeave` listeners (they receive `signal` before it is known whether they run async); only the pure hot path — no guards, no leave listeners — allocates none. It is aborted solely on cancellation/error, never on success.
 
@@ -341,11 +349,11 @@ On error at any step: `emitTransitionError()`, Promise rejects with `RouterError
 
 Plugins intercept router methods via `addInterceptor()` on `PluginApi`. `InterceptableMethodMap` is fixed at compile time (`core/src/types/api.ts`):
 
-| Method         | Signature                                                                | Used by                                                                                          |
-| -------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `start`        | `(path?: string) => Promise<State>`                                      | browser-plugin, hash-plugin, navigation-plugin (via `createStartInterceptor` from `shared/browser-env`); ssr-data-plugin, rsc-server-plugin (via `createSsrLoaderPlugin` from `shared/ssr`) |
-| `buildPath`    | `(route: string, params?: Params, search?: SearchParams) => string`                             | persistent-params-plugin                                                                         |
-| `forwardState` | `(routeName: string, routeParams: Params, routeSearch?: SearchParams) => SimpleState`                | persistent-params-plugin, search-schema-plugin                                                   |
+| Method         | Signature                                                                             | Used by                                                                                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`        | `(path?: string) => Promise<State>`                                                   | browser-plugin, hash-plugin, navigation-plugin (via `createStartInterceptor` from `shared/browser-env`); ssr-data-plugin, rsc-server-plugin (via `createSsrLoaderPlugin` from `shared/ssr`) |
+| `buildPath`    | `(route: string, params?: Params, search?: SearchParams) => string`                   | persistent-params-plugin                                                                                                                                                                    |
+| `forwardState` | `(routeName: string, routeParams: Params, routeSearch?: SearchParams) => SimpleState` | persistent-params-plugin, search-schema-plugin                                                                                                                                              |
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` (original or previously-wrapped function) plus the method's arguments. Applied via `createInterceptable()` in `RouterInternals`.
 
@@ -357,14 +365,14 @@ Plugins extend the router instance with new properties via `extendRouter()` on `
 
 Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims a unique namespace key at registration time (O(1) collision detection via `Set<string>`), receives a `{ write, release }` object, and publishes data to `state.context.<namespace>` from lifecycle hooks. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Six plugins use this — 8 claims in total:
 
-| Plugin                   | Namespace key(s)       | Published fields (examples)                                |
-| ------------------------ | ---------------------- | ---------------------------------------------------------- |
-| browser-plugin           | `browser` + `url`      | source, fullUrl                                            |
-| navigation-plugin        | `navigation`           | direction, sourceElement                                   |
-| memory-plugin            | `memory`               | direction, historyIndex                                    |
-| persistent-params-plugin | `persistentParams`     | persisted query param snapshot                             |
-| ssr-data-plugin          | `data`                 | per-route loader result (via `createSsrLoaderPlugin`)      |
-| rsc-server-plugin        | `rsc` + `rscAction`    | per-route ReactNode (via `createSsrLoaderPlugin`) + server-action results |
+| Plugin                   | Namespace key(s)    | Published fields (examples)                                               |
+| ------------------------ | ------------------- | ------------------------------------------------------------------------- |
+| browser-plugin           | `browser` + `url`   | source, fullUrl                                                           |
+| navigation-plugin        | `navigation`        | direction, sourceElement                                                  |
+| memory-plugin            | `memory`            | direction, historyIndex                                                   |
+| persistent-params-plugin | `persistentParams`  | persisted query param snapshot                                            |
+| ssr-data-plugin          | `data`              | per-route loader result (via `createSsrLoaderPlugin`)                     |
+| rsc-server-plugin        | `rsc` + `rscAction` | per-route ReactNode (via `createSsrLoaderPlugin`) + server-action results |
 
 ### Validator Slot
 
@@ -398,7 +406,7 @@ These are deliberately designed constraints. Violating them will break the syste
 - **Guards return `boolean | Promise<boolean>` only** — no redirects, no state modification, no `State` return.
 - **Plugins are observers** — they react to events but cannot block or modify the transition pipeline.
 - **Guard execution order is fixed**: deactivation innermost → outermost, then activation outermost → innermost.
-- **`navigateToNotFound()` bypasses both** — no guards run, plugins only see `onTransitionSuccess`.
+- **`navigateToNotFound()` bypasses ACTIVATION guards and plugins** — plugins only see `onTransitionSuccess`, and nothing is activated at `UNKNOWN_ROUTE`. It does consult the current route's `canDeactivate` (#1643): leaving is still leaving.
 
 ### Navigation
 

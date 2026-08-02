@@ -459,7 +459,8 @@ router.navigate(name, params, search, opts)   // search = query channel; opts at
   │
   ├── SYNC PATH (no async guards):
   │   └── commit-gate (if suspendable && cancelled/terminated → reject; #1169)
-  │       → completeTransition() → setState + FSM send(COMPLETE) → action emits TRANSITION_SUCCESS
+  │       → completeTransition() → ask + FSM send(COMPLETE) → commit update writes the pair,
+  │                                    action emits TRANSITION_SUCCESS
   │       → return Promise.resolve(state)
   │
   └── ASYNC PATH (async guard detected):
@@ -547,7 +548,7 @@ Sync listeners run inline; a sync throw rejects `navigate()` with that **origina
 - **Listener signature:** `(payload: { route: State, previousRoute?: State }) => void` — no `signal` (no cancellation, the transition already committed).
 - **Invocation order:** `router.subscribe` listeners fire in registration order, all before `navigate()` resolves. Do not rely on other subscribers having run their async tails when your listener executes.
 
-**`navigateToNotFound()` bypasses both:** no guards run, plugins only see `onTransitionSuccess` (no `onTransitionStart`).
+**`navigateToNotFound()` bypasses plugins and ACTIVATION guards:** plugins only see `onTransitionSuccess` (no `onTransitionStart`), and there is nothing to activate at `UNKNOWN_ROUTE`. It DOES consult the current route's `canDeactivate` (#1643) — leaving is still leaving, and this is the primitive the URL plugins call on an unmatched Back.
 
 ### When `navigate()`'s Promise resolves vs subscribers
 
@@ -557,8 +558,9 @@ navigate()
   ├── LEAVE_APPROVED: subscribeLeave listeners  ← awaited (blocks pipeline)
   ├── activation guards (sync/async)
   ├── completeTransition():
-  │    ├── setState(finalState)
-  │    └── emit(TRANSITION_SUCCESS) → subscribe listeners fire synchronously
+  │    ├── ask the table (canCommitTransition) — may refuse
+  │    ├── send(COMPLETE) → the edge's update writes current/previous
+  │    └── the edge's action emits TRANSITION_SUCCESS → subscribe listeners fire synchronously
   │        (returned Promises ignored)
   └── return Promise.resolve(finalState)   ← resolves here
 ```
@@ -902,7 +904,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 
 - **Optimistic sync execution** — guards run synchronously, async path deferred. No AbortController/Promise on sync path
 - **`hasGuards` is per-TRANSITION, not per-router.** `planPhases` asks whether a segment THIS transition walks carries a guard (`hasGuardOnPath`, one `Map.has` per segment, short-circuited by an empty-Map check), not whether the router holds a guard anywhere. Reading the Maps' `size` answered a different question, and the difference was pure waste: one `canActivate` on an admin route armed the full cancellation machinery for every public navigation — an `AbortController`, the `isCurrentNav` closure and a three-phase walk that found no guard on any step. Measured on the production bundle (same-session A/B, alternating processes, medians of 3+3 runs, A/A floor 0.3–3.5%): a navigation that never touches the guarded route cost **+97.7 ns / +643 B** over the guard-free one and now costs **+4.7 ns / +24 B** — i.e. **−93 ns (−12%) and −619 B (−29%)** on the affected navigation, with the guard-free router unchanged. The predicate mirrors the interpreter (a phase whose short-circuit is false runs no step, so `forceDeactivate` also disarms it), so it is a gate on the fast path and not a second policy about guards. ⚠ The two branches are behaviourally equivalent — which is why the waste was invisible to 3826 tests — so it is pinned by COUNTING controllers (`guards-off-path.test.ts`, mutationally validated on both halves of the predicate: widening it fails 2 tests, disarming the deactivate half 1, the activate half 3), never by timing
-- **FSM `send()` (table-driven, #1169)** — the NAVIGATE/LEAVE_APPROVE/COMPLETE transitions dispatch through the FSM table via `send()`, which fires the registered emit action; **`forceState()` is no longer called anywhere in core** — the bypass primitive was removed from the FSM engine (`src/utils/fsm`) outright, and `tests/functional/fsm-state-authority.test.ts` locks the invariant in two layers (the FSM engine exposes no `forceState`; a static scan of core `src` finds zero `.forceState` accesses). An invalid transition (e.g. `COMPLETE` after a listener's `stop()`/`dispose()`) is a table no-op, so the FSM is the sole authority over state and cannot be resurrected out of IDLE/DISPOSED. Deliberate trade-off (owner decision): ~+15–20% on `navigate/*` + one transition-payload allocation per navigation, bought for structural determinism (cancellation enforced by the state machine, not scattered re-checks). The pre-`setState` **commit-gate** in `NavigationNamespace` (active only when a listener window is reachable) rejects a navigation cancelled/terminated mid-flight before it commits
+- **FSM `send()` (table-driven, #1169)** — the NAVIGATE/LEAVE_APPROVE/COMPLETE transitions, plus `SYSTEM_COMMIT` for the two commits that are not transitions, dispatch through the FSM table via `send()`, which fires the registered emit action; **`forceState()` is no longer called anywhere in core** — the bypass primitive was removed from the FSM engine (`src/utils/fsm`) outright, and `tests/functional/fsm-state-authority.test.ts` locks the invariant in two layers (the FSM engine exposes no `forceState`; a static scan of core `src` finds zero `.forceState` accesses). An invalid transition (e.g. `COMPLETE` after a listener's `stop()`/`dispose()`) is a table no-op, so the FSM is the sole authority over state and cannot be resurrected out of IDLE/DISPOSED. Deliberate trade-off (owner decision): ~+15–20% on `navigate/*` + one transition-payload allocation per navigation, bought for structural determinism (cancellation enforced by the state machine, not scattered re-checks). The pre-`setState` **commit-gate** in `NavigationNamespace` (active only when a listener window is reachable) rejects a navigation cancelled/terminated mid-flight before it commits
 - **Explicit params instead of `...args`, in BOTH dispatch primitives** — `EventEmitter.emit(name, a?, b?, c?, d?)`, and since the state-ownership slice the FSM's `send` / `canSend` too: a rest parameter materialises an array per call, and these run several times per navigation. The FSM keeps the conditional rest TUPLE in its overload (it is the only way to express payload correlation, #753) and takes the payload positionally in the implementation. Measured **−88 B/navigation**, p90 tail 2384 → 2133 B, timing unchanged — the engine had simply never received the trade the EventEmitter made years earlier
 - **Cached error rejections** — pre-allocated `Promise.reject()` for SAME_STATES, ROUTER_NOT_STARTED, ROUTE_NOT_FOUND (zero alloc per rejection)
 - **`getFunctions()` cached tuple** — `RouteLifecycleNamespace` returns pre-allocated `[deactivate, activate]` array (no alloc per navigate)
