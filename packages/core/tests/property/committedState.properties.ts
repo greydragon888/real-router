@@ -29,7 +29,11 @@ import { test, fc } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
 import { NUM_RUNS } from "./helpers";
@@ -189,6 +193,80 @@ describe("Committed state is owned by the navigation in flight", () => {
       // The phase-0.1 wording, kept as a SEPARATE assertion so its (measured)
       // insensitivity to #1610 stays visible rather than being assumed.
       expect(fsmWindowViolations).toStrictEqual([]);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// The chain invariant that makes the machine's context self-sufficient
+// (`fsm-as-state-owner-2026-07-31.md` §3, acceptance criterion §12.3).
+//
+// If `fromState` of the next commit is always `toState` of the previous one,
+// the machine never has to read the departure point from outside — it is
+// already there as the result of the last transition. That is precisely what
+// lets the state cells move INTO the context later without the machine growing
+// a dependency on the store.
+//
+// It could not be asserted before the system commit landed: `navigateToNotFound`
+// and `replace()`'s revalidation wrote the state and announced it themselves,
+// so the chain held in the STORE but not in the machine. Both go through
+// `SYSTEM_COMMIT` now, which is why this belongs here and not earlier.
+// ---------------------------------------------------------------------------
+
+const arbCommitSequence = fc.array(
+  fc.constantFrom<"navigate" | "notFound" | "revalidate">(
+    "navigate",
+    "notFound",
+    "revalidate",
+  ),
+  { minLength: 2, maxLength: 5 },
+);
+
+describe("fromState of the next commit is toState of the previous one", () => {
+  test.prop([arbCommitSequence], { numRuns: NUM_RUNS.fast })(
+    "holds across navigate, navigateToNotFound and replace() revalidation alike",
+    async (steps) => {
+      const definitions: Route[] = [
+        { name: "home", path: "/" },
+        { name: "a", path: "/a" },
+        { name: "b", path: "/b" },
+      ];
+      const router = createRouter(definitions);
+      const commits: { to: string; from: string | undefined }[] = [];
+
+      router.usePlugin(() => ({
+        onTransitionSuccess: (to, from) => {
+          commits.push({ to: to.name, from: from?.name });
+        },
+      }));
+
+      await router.start("/");
+
+      let flip = false;
+
+      for (const step of steps) {
+        if (step === "navigate") {
+          flip = !flip;
+          // Alternate the target: navigating to the committed route is a
+          // SAME_STATES refusal and commits nothing, which would leave a hole
+          // in the chain for reasons unrelated to the invariant.
+          await router.navigate(flip ? "a" : "b").catch(() => {
+            /* a refusal commits nothing; the ledger below is what matters */
+          });
+        } else if (step === "notFound") {
+          getInternals(router).navigateToNotFound("/gone");
+        } else {
+          // A survivor revalidation: the URL still maps to the same route, so
+          // it re-commits the state it already had.
+          getRoutesApi(router).replace(definitions);
+        }
+      }
+
+      for (let index = 1; index < commits.length; index++) {
+        expect(commits[index].from).toBe(commits[index - 1].to);
+      }
+
+      router.dispose();
     },
   );
 });

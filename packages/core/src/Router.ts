@@ -222,6 +222,12 @@ export class Router<
       abortController: (reason) => {
         this.#navigation.abortCurrentController(reason);
       },
+      // The FSM SYSTEM_COMMIT action writes the state through this effect, so
+      // the 404 bypass and `replace()`'s revalidation stop writing it
+      // themselves — "no commit outside the table".
+      commitState: (state) => {
+        this.#state.set(state);
+      },
     });
 
     // =========================================================================
@@ -338,9 +344,6 @@ export class Router<
       emitTransitionError: (error) => {
         this.#eventBus.sendFailSafe(undefined, this.#state.get(), error);
       },
-      emitTransitionSuccess: (toState, fromState, opts) => {
-        this.#eventBus.emitTransitionSuccess(toState, fromState, opts);
-      },
       navigateToNotFound: (path) => this.#navigation.navigateToNotFound(path),
       start: createInterceptable(
         "start",
@@ -384,12 +387,11 @@ export class Router<
       // Cross-namespace state (issue #174)
       getStateName: () => this.#state.get()?.name,
       isTransitioning: () => this.#eventBus.isTransitioning(),
-      isActive: () => this.#eventBus.isActive(),
+      systemCommit: (toState, fromState, opts) => {
+        this.#eventBus.systemCommit({ toState, fromState, opts });
+      },
       clearState: () => {
         this.#state.set(undefined);
-      },
-      setState: (state) => {
-        this.#state.set(state);
       },
       routerExtensions: [],
       contextClaimRecords: new Set(),

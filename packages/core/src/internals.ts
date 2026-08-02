@@ -122,18 +122,6 @@ export interface RouterInternals<
   readonly emitTransitionError: (error: Error) => void;
 
   /**
-   * Emits `TRANSITION_SUCCESS` directly (no FSM transition) — used by
-   * `getRoutesApi().replace()` to notify `router.subscribe` listeners when a
-   * structural replace revalidates the active state (#950). Mirrors the success
-   * emission `completeTransition` / `navigateToNotFound` perform.
-   */
-  readonly emitTransitionSuccess: (
-    toState: State,
-    fromState: State | undefined,
-    opts?: NavigationOptions,
-  ) => void;
-
-  /**
    * Commits the not-found (`UNKNOWN_ROUTE`) state for `path` and emits
    * `TRANSITION_SUCCESS` — the `NavigationNamespace.navigateToNotFound`
    * primitive. `replace()` uses it when a structural replace drops the active
@@ -204,14 +192,21 @@ export interface RouterInternals<
   readonly getStateName: () => string | undefined;
   readonly isTransitioning: () => boolean;
   /**
-   * Is the router still live (FSM neither IDLE nor DISPOSED)? Asked by
-   * `replace()`'s revalidation commit, which runs application code
-   * (`clearDefinitionGuards` recompiles a surviving external factory) between
-   * its entry `throwIfDisposed()` and the commit itself (#1627).
+   * Commit a state that is NOT the product of a navigation — the 404 bypass and
+   * `replace()`'s revalidation. Writes AND announces through the FSM
+   * `SYSTEM_COMMIT` action, so neither half happens outside the table.
+   *
+   * Throws `ROUTER_DISPOSED` when the machine has no edge to take. The throw is
+   * NOT redundant with the table: a refusal there is silent (a `send` from a
+   * state without an edge is a no-op), and the contract these callers already
+   * had promises an error, not a quietly skipped commit (#1186).
    */
-  readonly isActive: () => boolean;
+  readonly systemCommit: (
+    toState: State,
+    fromState: State | undefined,
+    opts: NavigationOptions,
+  ) => void;
   readonly clearState: () => void;
-  readonly setState: (state: State) => void;
   readonly routerExtensions: { keys: string[] }[];
   readonly contextClaimRecords: Set<string>;
 

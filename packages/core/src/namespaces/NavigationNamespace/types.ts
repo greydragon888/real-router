@@ -125,6 +125,17 @@ export interface NavigationDependencies {
   getNavigationEpoch: () => number;
 
   /**
+   * Commit a state that is NOT the product of a navigation, through the FSM
+   * `SYSTEM_COMMIT` action (write + announce in one table fact). Throws
+   * `ROUTER_DISPOSED` when the machine has no edge to take.
+   */
+  systemCommit: (
+    toState: State,
+    fromState: State | undefined,
+    opts: NavigationOptions,
+  ) => void;
+
+  /**
    * Cancel the in-flight navigation via the FSM `CANCEL` event. The `CANCEL`
    * action aborts the current controller (with `reason`, if given — surfaces as
    * the leave signal's `reason`, #943) and emits `TRANSITION_CANCEL`. No-op when
@@ -155,13 +166,6 @@ export interface NavigationDependencies {
     toState: State | undefined,
     fromState: State | undefined,
     error: unknown,
-  ) => void;
-
-  /** Emit TRANSITION_SUCCESS event to listeners (without FSM transition) */
-  emitTransitionSuccess: (
-    toState: State,
-    fromState?: State,
-    opts?: NavigationOptions,
   ) => void;
 
   /** Send LEAVE_APPROVE event to routerFSM and emit to listeners */

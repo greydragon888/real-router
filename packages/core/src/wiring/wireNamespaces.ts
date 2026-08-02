@@ -341,6 +341,9 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       ns.eventBus.sendNavigate(toState, fromState);
     },
     getNavigationEpoch: () => ns.eventBus.getNavigationEpoch(),
+    systemCommit: (toState, fromState, opts) => {
+      ns.eventBus.systemCommit({ toState, fromState, opts });
+    },
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },
@@ -352,9 +355,6 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     },
     emitTransitionError: (toState, fromState, error) => {
       ns.eventBus.sendFailSafe(toState, fromState, error);
-    },
-    emitTransitionSuccess: (toState, fromState, opts) => {
-      ns.eventBus.emitTransitionSuccess(toState, fromState, opts);
     },
     sendLeaveApprove: (toState, fromState) => {
       ns.eventBus.sendLeaveApprove(toState, fromState);

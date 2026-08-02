@@ -115,6 +115,8 @@ export class EventBusNamespace {
   // Effect of the FSM CANCEL action: aborts the in-flight navigation's
   // controller. Wired to NavigationNamespace.
   readonly #abortController: (reason?: unknown) => void;
+
+  readonly #commitState: (state: State) => void;
   // Lazy accessor for the opt-in RouterValidator (wired by wireNamespaces).
   // Returns `null` until validation-plugin is registered — so the proactive
   // listener-count threshold (#1188) costs the no-plugin path nothing.
@@ -140,6 +142,7 @@ export class EventBusNamespace {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
     this.#abortController = options.abortController;
+    this.#commitState = options.commitState;
     this.#setupFSMActions();
   }
 
@@ -375,6 +378,26 @@ export class EventBusNamespace {
 
   sendCancel(toState: State, fromState?: State, reason?: unknown): void {
     this.#fsm.send(routerEvents.CANCEL, { toState, fromState, reason });
+  }
+
+  /**
+   * Commit a state that is NOT the product of a navigation — the 404 bypass and
+   * `replace()`'s revalidation. The write and the announce both happen inside
+   * the FSM `SYSTEM_COMMIT` action, so neither escapes the table.
+   *
+   * ask and fire live HERE, one above the other, deliberately: the table
+   * refuses SILENTLY (a `send` from a state without an edge is a no-op), so a
+   * caller that only fired would skip the commit and nobody would hear about
+   * it. Asking first turns that into the `ROUTER_DISPOSED` these callers were
+   * already promised (#1186) — the guard did not disappear when it became
+   * structural, it moved to where it cannot be forgotten.
+   */
+  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): void {
+    if (!this.#fsm.canSend(routerEvents.SYSTEM_COMMIT)) {
+      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
+
+    this.#fsm.send(routerEvents.SYSTEM_COMMIT, payload);
   }
 
   canBeginTransition(): boolean {
@@ -779,6 +802,28 @@ export class EventBusNamespace {
 
     fsm.on(routerStates.TRANSITION_STARTED, routerEvents.CANCEL, handleCancel);
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.CANCEL, handleCancel);
+
+    // The SYSTEM_COMMIT action does BOTH halves — the write and the announce —
+    // so neither happens outside the table. Same function on both edges, the
+    // established idiom here (`emitNavigate` sits on three, `handleCancel` on
+    // two).
+    const handleSystemCommit = (
+      payload: RouterPayloads["SYSTEM_COMMIT"],
+    ): void => {
+      this.#commitState(payload.toState);
+      this.emitTransitionSuccess(
+        payload.toState,
+        payload.fromState,
+        payload.opts,
+      );
+    };
+
+    fsm.on(routerStates.READY, routerEvents.SYSTEM_COMMIT, handleSystemCommit);
+    fsm.on(
+      routerStates.STARTING,
+      routerEvents.SYSTEM_COMMIT,
+      handleSystemCommit,
+    );
 
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, (payload) => {
       this.#emitFailPayload(payload);

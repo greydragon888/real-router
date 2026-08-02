@@ -1,11 +1,5 @@
 import { abortPreviousNavigation } from "./executeNavigation";
-import {
-  EMPTY_PARAMS,
-  EMPTY_SEARCH,
-  errorCodes,
-  constants,
-} from "../../../constants";
-import { RouterError } from "../../../RouterError";
+import { EMPTY_PARAMS, EMPTY_SEARCH, constants } from "../../../constants";
 import { nameToIDs } from "../../../transitionPath";
 
 import type { NavigationOptions, State, TransitionMeta } from "../../../types";
@@ -47,14 +41,12 @@ export function navigateToNotFound(
   // why that arm was already safe while the two commit arms beside it were not
   // (#1627).
   //
-  // `!isActive()` covers a merely-stopped (IDLE) router as well as a disposed
-  // one, so the `ROUTER_DISPOSED` code is slightly broad for the stopped case
-  // — fail-closed is deliberate (committing on a stopped router is out of
-  // contract), and the disposed race is the one that matters.
-  if (!deps.isActive()) {
-    throw new RouterError(errorCodes.ROUTER_DISPOSED);
-  }
-
+  // ⚑ The gate MOVED rather than disappeared: it is now the ask half of
+  // `systemCommit` below, which refuses on the same states (`SYSTEM_COMMIT` is
+  // declared from READY and STARTING only) with the same code. Asking there and
+  // not here is what makes it structural — a caller cannot forget it — but the
+  // explicit THROW has to stay either way, because a table refusal is silent
+  // and the contract promises an error (#1186).
   abortPreviousNavigation(deps);
 
   const fromState = deps.getState();
@@ -93,8 +85,11 @@ export function navigateToNotFound(
 
   Object.freeze(state);
 
-  deps.setState(state);
-  deps.emitTransitionSuccess(state, fromState, FROZEN_REPLACE_OPTS);
+  // Write AND announce as one table fact — this is the second of the two
+  // ruptures of "every channel that changes committed state goes through the
+  // machine" (plan §6.1), and closing it is what finally lets `fromState` of
+  // the next navigation equal `toState` of the previous one (plan §12.3).
+  deps.systemCommit(state, fromState, FROZEN_REPLACE_OPTS);
 
   return state;
 }

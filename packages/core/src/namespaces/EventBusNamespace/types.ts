@@ -6,6 +6,7 @@ import type {
   RouterPayloads,
   RouterState,
 } from "../../routerFSM";
+import type { State } from "../../types";
 import type { RouterEventMap } from "../../types/internal";
 import type { EventEmitter } from "../../utils/event-emitter";
 import type { FSM } from "../../utils/fsm";
@@ -21,4 +22,12 @@ export interface EventBusOptions {
    * the controller's `signal.reason` (#943).
    */
   abortController: (reason?: unknown) => void;
+  /**
+   * Writes the committed state — the **effect** of the FSM `SYSTEM_COMMIT`
+   * action, injected exactly like {@link abortController} is for `CANCEL`. The
+   * machine owns "when a system commit is announced"; this is how it performs
+   * the write that goes with it, without the event bus knowing about
+   * `StateNamespace`.
+   */
+  commitState: (state: State) => void;
 }

@@ -48,6 +48,13 @@ export const routerEvents = {
   CANCEL: "CANCEL",
   STOP: "STOP",
   DISPOSE: "DISPOSE",
+  /**
+   * A commit that is NOT a navigation: the 404 bypass and `replace()`'s
+   * revalidation. Both used to write the state and announce it themselves,
+   * outside the machine — the two remaining ruptures of "every channel that
+   * changes committed state goes through the table" (plan §6.1, §6.2).
+   */
+  SYSTEM_COMMIT: "SYSTEM_COMMIT",
 } as const;
 
 export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
@@ -85,6 +92,11 @@ export interface RouterPayloads {
     error?: unknown;
   };
   CANCEL: { toState: State; fromState?: State | undefined; reason?: unknown };
+  SYSTEM_COMMIT: {
+    toState: State;
+    fromState?: State | undefined;
+    opts: NavigationOptions;
+  };
 }
 
 /**
@@ -168,6 +180,12 @@ const routerTransitions: TransitionTable<
   },
   [routerStates.STARTING]: {
     [routerEvents.STARTED]: routerStates.READY,
+    // ⚠ Two SYSTEM_COMMIT edges are needed, not one, and this is the
+    // non-obvious half: `start()` with `allowNotFound` commits its 404 while
+    // the machine is still STARTING, and so does a `replace()` running inside
+    // an async start interceptor (#1204). Confirmed independently on both
+    // ruptures by the phase-4.1 spikes.
+    [routerEvents.SYSTEM_COMMIT]: routerStates.STARTING,
     [routerEvents.FAIL]: routerStates.IDLE,
     [routerEvents.STOP]: routerStates.IDLE,
     [routerEvents.DISPOSE]: routerStates.DISPOSED,
@@ -184,6 +202,7 @@ const routerTransitions: TransitionTable<
     // (early validation errors, the plugin-facing report), which are re-routed
     // off the machine in S7 — the edge itself goes with them.
     [routerEvents.FAIL]: routerStates.READY,
+    [routerEvents.SYSTEM_COMMIT]: routerStates.READY,
     [routerEvents.STOP]: routerStates.IDLE,
     [routerEvents.DISPOSE]: routerStates.DISPOSED,
   },
