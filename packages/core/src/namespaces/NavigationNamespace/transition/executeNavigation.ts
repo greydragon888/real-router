@@ -371,16 +371,12 @@ export function executeNavigation(
     // `Promise<State>`; the allocation is the same one, one frame higher.
     return finalState;
   } catch (error) {
-    const outcome = handleNavigateError(
-      deps,
-      inFlight,
-      error,
-      controller,
+    const outcome = handleNavigateError(deps, inFlight, error, controller, {
       myId,
       myEpoch,
       toState,
       fromState,
-    );
+    });
 
     // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from guards or transition pipeline
     return Promise.reject(outcome);
@@ -556,19 +552,35 @@ async function finishAsyncNavigation(
  * arc this check guards is a THIRD one it does not reach, because
  * `STARTING --FAIL--> IDLE` carries no epoch to refuse.
  */
+/**
+ * What a failed navigation still knows about itself.
+ *
+ * These four are mirrored OUTSIDE the `try` on purpose — `plan` is declared
+ * inside it, so a throw from the prologue (before `beginTransition` returns)
+ * leaves nothing else to report with, and `myId === 0` is precisely how the
+ * handler asks "did this navigation ever announce itself". Grouping them is
+ * what keeps the handler at five parameters instead of eight, and it is FREE:
+ * the object is built in the `catch`, so the happy path allocates nothing.
+ */
+interface AttemptedNavigation {
+  readonly myId: number;
+  readonly myEpoch: number;
+  readonly toState: State | undefined;
+  readonly fromState: State | undefined;
+}
+
 function handleNavigateError(
   deps: NavigationDependencies,
   inFlight: InFlightNavigation,
   error: unknown,
   controller: AbortController | null,
-  myId: number,
-  myEpoch: number,
-  toState: State | undefined,
-  fromState: State | undefined,
+  attempted: AttemptedNavigation,
 ): unknown {
   if (controller) {
     inFlight.release(controller, true, error);
   }
+
+  const { myId, toState } = attempted;
 
   if (myId !== 0 && toState) {
     const outcome =
@@ -576,7 +588,13 @@ function handleNavigateError(
         ? error
         : asCancellation(error);
 
-    routeTransitionError(deps, outcome, toState, fromState, myEpoch);
+    routeTransitionError(
+      deps,
+      outcome,
+      toState,
+      attempted.fromState,
+      attempted.myEpoch,
+    );
 
     return outcome;
   }

@@ -607,14 +607,22 @@ function replaceRoutes<
 
           commitRevalidated(ctx, nextState, currentState);
         } else {
-          ctx.navigateToNotFound(currentState.path);
+          // `canNavigateTo` above already asked the deactivation guards and was
+          // refused; asking again inside `navigateToNotFound` (#1643) would put
+          // the same question twice and turn a decided fallback into a throw.
+          ctx.navigateToNotFound(currentState.path, { skipDeactivation: true });
         }
       }
     } else {
       // The active route no longer exists in the new tree — surface it as
       // not-found (commits UNKNOWN_ROUTE + emits TRANSITION_SUCCESS) so the
       // change is observable, rather than silently clearing the state.
-      ctx.navigateToNotFound(currentState.path);
+      //
+      // No deactivation consult (#1643): the route whose guard would be asked
+      // is the one that just stopped existing. There is nothing to refuse on
+      // behalf of, and a guard closure over a removed route is not a contract
+      // this can honour.
+      ctx.navigateToNotFound(currentState.path, { skipDeactivation: true });
     }
   }
 }

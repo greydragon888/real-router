@@ -2,6 +2,7 @@ import { assertChannelCorrect } from "./channels";
 
 import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";
+import type { NotFoundOptions } from "./namespaces/NavigationNamespace/types";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { RouteResolver } from "./pipeline";
 import type { Router as RouterClass } from "./Router";
@@ -128,7 +129,7 @@ export interface RouterInternals<
    * route, so subscribers are notified instead of the state silently clearing
    * (#950).
    */
-  readonly navigateToNotFound: (path: string) => State;
+  readonly navigateToNotFound: (path: string, opts?: NotFoundOptions) => State;
 
   readonly start: (path: string) => Promise<State>;
 

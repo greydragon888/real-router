@@ -363,6 +363,9 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     },
     canNavigate: () => ns.eventBus.canBeginTransition(),
     getLifecycleFunctions: () => ns.routeLifecycle.getFunctions(),
+    // Deactivation half only — the 404 has no route to activate (#1643).
+    canDeactivateCurrent: (deactivated, toState, fromState) =>
+      ns.routeLifecycle.canNavigateTo(deactivated, [], toState, fromState),
     isActive: () => ns.router.isActive(),
     isTransitioning: () => ns.eventBus.isTransitioning(),
     // Post-leave auto-cleanup unregisters only the EXTERNAL (component-managed)
@@ -386,6 +389,8 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
     getOptions: () => ns.options.get(),
     navigateToState: (state, opts) =>
       ns.navigation.navigateToState(state, opts),
+    // No opts: `start()` commits before anything is committed, so the
+    // deactivation consult (#1643) short-circuits on an absent `fromState`.
     navigateToNotFound: (path) => ns.navigation.navigateToNotFound(path),
     matchPath: (path) => ns.routes.matchPath(path, ns.options.get()),
     completeStart: () => {

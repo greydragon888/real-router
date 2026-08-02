@@ -12,7 +12,7 @@ import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
 import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 
-import type { NavigationDependencies } from "./types";
+import type { NavigationDependencies, NotFoundOptions } from "./types";
 import type {
   NavigationOptions,
   Params,
@@ -102,8 +102,8 @@ export class NavigationNamespace {
     return this.#settle(this.#navigateToDefault(opts));
   }
 
-  navigateToNotFound(path: string): State {
-    return navigateToNotFound(this.#deps, path);
+  navigateToNotFound(path: string, opts?: NotFoundOptions): State {
+    return navigateToNotFound(this.#deps, path, opts);
   }
 
   /**

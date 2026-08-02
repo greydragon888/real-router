@@ -1,9 +1,15 @@
 import { abortPreviousNavigation } from "./executeNavigation";
-import { EMPTY_PARAMS, EMPTY_SEARCH, constants } from "../../../constants";
+import {
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+  constants,
+  errorCodes,
+} from "../../../constants";
+import { RouterError } from "../../../RouterError";
 import { nameToIDs } from "../../../transitionPath";
 
 import type { NavigationOptions, State, TransitionMeta } from "../../../types";
-import type { NavigationDependencies } from "../types";
+import type { NavigationDependencies, NotFoundOptions } from "../types";
 
 /**
  * The one commit primitive that is NOT a transition.
@@ -23,6 +29,7 @@ const FROZEN_REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 export function navigateToNotFound(
   deps: NavigationDependencies,
   path: string,
+  opts?: NotFoundOptions,
 ): State {
   // #1186 — liveness gate. This internal commit primitive has no FSM
   // transition of its own, so without this check a `dispose()` that lands
@@ -84,6 +91,52 @@ export function navigateToNotFound(
   };
 
   Object.freeze(state);
+
+  // ⚑ The 404 is a DEPARTURE, and a departure the user can refuse (#1643).
+  //
+  // "Bypasses the pipeline" used to mean "runs no guards", and only the
+  // ACTIVATION half of that follows from being a 404 — there is nothing to
+  // activate at `UNKNOWN_ROUTE`, but there is very much something to
+  // deactivate. The gap was reachable by pressing Back: the shipped URL
+  // plugins call this from their popstate / navigate handlers, so an editor
+  // with unsaved changes lost them to any URL that no longer matched a route,
+  // with the app's own confirm dialog never shown.
+  //
+  // Refusing here is what the surrounding handlers ALREADY expect. The
+  // matched-route branch beside this one rejects on a blocking guard and its
+  // `catch` rolls the URL back; the strict-mode branch throws for the same
+  // purpose ("synchronous throw is the rollback signal" — navigation-plugin).
+  // The `allowNotFound` branch was the only one that could not refuse, and
+  // that asymmetry was the defect.
+  //
+  // ⚠ The abort above has already happened, deliberately: `navigate` also
+  // supersedes before its guards run, so a refused 404 cancels an in-flight
+  // navigation exactly as a refused `navigate` does. Matching the established
+  // shape beats leaving two orders to reason about.
+  //
+  // `skipDeactivation` is INTERNAL and has exactly two users, both in
+  // `replace()`'s revalidation, both because asking here would be wrong rather
+  // than merely redundant: one arm has already put the same question to
+  // `canNavigateTo` and been refused, and the other reaches this because the
+  // current route no longer exists in the new tree — there is no guard left to
+  // consult on a route that is gone.
+  if (
+    opts?.skipDeactivation !== true &&
+    fromState !== undefined &&
+    !deps.canDeactivateCurrent(deactivated, state, fromState)
+  ) {
+    const error = new RouterError(errorCodes.CANNOT_DEACTIVATE, {
+      path,
+      message: `[router.navigateToNotFound] a canDeactivate guard on "${fromState.name}" refused to leave for ${path}`,
+    });
+
+    // Report before throwing, so an observer sees the refusal on the same
+    // channel a blocked `navigate` uses — the popstate handler's own `catch`
+    // is written against "navigate() already emitted $$error".
+    deps.emitTransitionError(undefined, fromState, error);
+
+    throw error;
+  }
 
   // Write AND announce as one table fact — this is the second of the two
   // ruptures of "every channel that changes committed state goes through the

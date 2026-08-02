@@ -350,7 +350,8 @@ export class Router<
           error as RouterError,
         );
       },
-      navigateToNotFound: (path) => this.#navigation.navigateToNotFound(path),
+      navigateToNotFound: (path, opts) =>
+        this.#navigation.navigateToNotFound(path, opts),
       start: createInterceptable(
         "start",
         (path: string) => {
