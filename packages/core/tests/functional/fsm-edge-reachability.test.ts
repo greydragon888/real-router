@@ -90,8 +90,10 @@ const UNREACHED: Record<string, string> = {
   // Permission bits: never taken, load-bearing anyway. `abortPreviousNavigation`
   // walks the machine back to READY before `sendNavigate`, so the self-loop
   // never fires — but its DECLARATION is what makes `canSend(NAVIGATE)` true
-  // mid-navigation, i.e. what makes supersede legal. Measured: removing them
-  // fails 5 and 14 tests, with supersede dying silently at the predicate.
+  // mid-navigation, i.e. what makes supersede legal. Measured on HEAD: removing
+  // them fails 10 and 30 tests — 9 and 29 of those are supersede BEHAVIOUR, the
+  // remaining one each is this file's own closure assertion — with supersede
+  // dying silently at the predicate, not at the send.
   "TRANSITION_STARTED|NAVIGATE":
     "permission bit read through canSend(), never taken",
   "LEAVE_APPROVED|NAVIGATE":

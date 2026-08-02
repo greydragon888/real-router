@@ -245,12 +245,13 @@ export function executeNavigation(
     myId = plan.myId;
     myEpoch = plan.myEpoch;
 
-    // Post-`startTransition` supersession is now caught at the commit-gate
-    // below (before `completeTransition`'s setState): a `stop()`/`dispose()`/
-    // external-abort from the TRANSITION_START listener leaves the FSM in
-    // IDLE/DISPOSED, which `!deps.isActive()` detects. (Async supersession is
-    // additionally caught in `#finishAsyncNavigation` / the guard pipeline's
-    // `isCurrentNav`; a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
+    // Post-`startTransition` supersession is caught by `when: mayCommit` on the
+    // COMPLETE edge, asked inside `completeTransition`: a `stop()`/`dispose()`
+    // from the TRANSITION_START listener leaves the FSM in IDLE/DISPOSED, where
+    // COMPLETE is not declared at all, and an aborted external `opts.signal` is
+    // read straight off the commit payload. (Async supersession is additionally
+    // caught in `finishAsyncNavigation` / the guard pipeline's `isCurrentNav`;
+    // a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
 
     planPhases(deps, plan);
 
@@ -528,6 +529,23 @@ async function finishAsyncNavigation(
 }
 
 /**
+ * What a failed navigation still knows about itself.
+ *
+ * These four are mirrored OUTSIDE the `try` on purpose — `plan` is declared
+ * inside it, so a throw from the prologue (before `beginTransition` returns)
+ * leaves nothing else to report with, and `myId === 0` is precisely how the
+ * handler asks "did this navigation ever announce itself". Grouping them is
+ * what keeps the handler at five parameters instead of eight, and it is FREE:
+ * the object is built in the `catch`, so the happy path allocates nothing.
+ */
+interface AttemptedNavigation {
+  readonly myId: number;
+  readonly myEpoch: number;
+  readonly toState: State | undefined;
+  readonly fromState: State | undefined;
+}
+
+/**
  * Settle a failed navigation on the SYNCHRONOUS arc: release its controller,
  * report it only while it is still the navigation in flight, and hand back the
  * outcome the caller's promise should carry.
@@ -552,23 +570,6 @@ async function finishAsyncNavigation(
  * arc this check guards is a THIRD one it does not reach, because
  * `STARTING --FAIL--> IDLE` carries no epoch to refuse.
  */
-/**
- * What a failed navigation still knows about itself.
- *
- * These four are mirrored OUTSIDE the `try` on purpose — `plan` is declared
- * inside it, so a throw from the prologue (before `beginTransition` returns)
- * leaves nothing else to report with, and `myId === 0` is precisely how the
- * handler asks "did this navigation ever announce itself". Grouping them is
- * what keeps the handler at five parameters instead of eight, and it is FREE:
- * the object is built in the `catch`, so the happy path allocates nothing.
- */
-interface AttemptedNavigation {
-  readonly myId: number;
-  readonly myEpoch: number;
-  readonly toState: State | undefined;
-  readonly fromState: State | undefined;
-}
-
 function handleNavigateError(
   deps: NavigationDependencies,
   inFlight: InFlightNavigation,

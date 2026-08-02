@@ -89,8 +89,12 @@ export interface RouterPayloads {
   FAIL: {
     /**
      * The navigation this failure belongs to. `undefined` is legal and means
-     * "not a navigation failure at all" — start-unwind and the READY self-loop
-     * of early validation errors both send without one.
+     * "not a navigation failure at all" — today the start-unwind
+     * (`Router.#unwindFailedStart`, taking `STARTING --FAIL--> IDLE`) is the
+     * only sender that leaves it out. The early validation errors that used to
+     * be the second such sender do not send FAIL at all any more: S7 re-routed
+     * them to a direct `TRANSITION_ERROR` emit and removed the `READY→FAIL`
+     * edge they took (§16.5).
      */
     epoch?: number | undefined;
     toState?: State | undefined;
@@ -240,7 +244,7 @@ const endNavigation = (ctx: RouterFSMContext): void => {
  * Transitions:
  * - IDLE → STARTING (START), DISPOSED (DISPOSE)
  * - STARTING → READY (STARTED), IDLE (FAIL, STOP), DISPOSED (DISPOSE)
- * - READY → TRANSITION_STARTED (NAVIGATE), READY (FAIL, self-loop for early validation errors), IDLE (STOP), DISPOSED (DISPOSE)
+ * - READY → TRANSITION_STARTED (NAVIGATE), READY (SYSTEM_COMMIT, self-loop for the two commits that are not transitions), IDLE (STOP), DISPOSED (DISPOSE)
  * - TRANSITION_STARTED → LEAVE_APPROVED (LEAVE_APPROVE), TRANSITION_STARTED (NAVIGATE, self-loop), READY (CANCEL, FAIL), DISPOSED (DISPOSE)
  * - LEAVE_APPROVED → READY (COMPLETE, CANCEL, FAIL), TRANSITION_STARTED (NAVIGATE), DISPOSED (DISPOSE)
  * - DISPOSED → (no transitions)
@@ -269,8 +273,11 @@ const endNavigation = (ctx: RouterFSMContext): void => {
  *    are these: `abortPreviousNavigation` walks the machine back to READY
  *    before `sendNavigate`, so the loop never fires, but its DECLARATION is
  *    what makes `canSend(NAVIGATE)` true mid-navigation, i.e. what makes
- *    supersede legal. Removing them fails 5 and 14 tests respectively — with
- *    supersede dying SILENTLY at the predicate, not at the send. `canSend` is
+ *    supersede legal. Removing them fails 10 and 30 tests respectively (9 and
+ *    29 of those are supersede BEHAVIOUR; the remaining one each is the
+ *    closure assertion in `fsm-edge-reachability.test.ts`, which notices the
+ *    edge is gone) — with supersede dying SILENTLY at the predicate, not at
+ *    the send. `canSend` is
  *    read exactly three times in core (NAVIGATE / START / CANCEL); an edge for
  *    one of those events is a candidate for this category by construction.
  * 3. **Fail-safe** — dead on every healthy flow and there precisely for the
@@ -352,7 +359,8 @@ const routerTransitions: TransitionTable<
     // is what makes `canNavigate()` true while a navigation is in flight, i.e.
     // what makes supersede legal at all; it is never traversed, because the
     // cancel always runs first, so this `update` never fires. Removing the edge
-    // kills supersede silently at `canNavigate()` — 9 tests.
+    // kills supersede silently at `canNavigate()` — 9 behaviour tests (10 with
+    // the edge-reachability closure assertion).
     [routerEvents.NAVIGATE]: {
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
@@ -379,7 +387,8 @@ const routerTransitions: TransitionTable<
     },
   },
   [routerStates.LEAVE_APPROVED]: {
-    // Same permission bit as above — 29 tests depend on it being declared.
+    // Same permission bit as above — 29 behaviour tests depend on it being
+    // declared (30 with the edge-reachability closure assertion).
     [routerEvents.NAVIGATE]: {
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,

@@ -143,8 +143,6 @@ export class EventBusNamespace {
   // no-op at the emitter, #1033 — so no event can re-enter its own dispatch.)
   #dispatchDepth = 0;
 
-  // Abort reason for the pending CANCEL — read by handleCancel, set by sendCancel.
-
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
@@ -794,9 +792,10 @@ export class EventBusNamespace {
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.CANCEL, handleCancel);
 
     // The SYSTEM_COMMIT action does BOTH halves — the write and the announce —
-    // so neither happens outside the table. Same function on both edges, the
-    // established idiom here (`emitNavigate` sits on three, `handleCancel` on
-    // two).
+    // so neither happens outside the table. It sits on ONE edge since the
+    // `STARTING` one was removed; kept as a named function rather than inlined
+    // so the registration reads like its `emitNavigate` / `handleCancel`
+    // siblings.
     const handleSystemCommit = (
       payload: RouterPayloads["SYSTEM_COMMIT"],
     ): void => {

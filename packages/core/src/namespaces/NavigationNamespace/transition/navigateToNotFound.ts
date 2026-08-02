@@ -49,11 +49,19 @@ export function navigateToNotFound(
   // (#1627).
   //
   // ⚑ The gate MOVED rather than disappeared: it is now the ask half of
-  // `systemCommit` below, which refuses on the same states (`SYSTEM_COMMIT` is
-  // declared from READY and STARTING only) with the same code. Asking there and
-  // not here is what makes it structural — a caller cannot forget it — but the
-  // explicit THROW has to stay either way, because a table refusal is silent
-  // and the contract promises an error (#1186).
+  // `systemCommit` below. Asking there and not here is what makes it structural
+  // — a caller cannot forget it — and the explicit THROW has to stay either
+  // way, because a table refusal is silent and the contract promises an error
+  // (#1186).
+  //
+  // ⚠ The moved gate is NOT the same predicate. #1186 refused on `!isActive()`,
+  // i.e. IDLE / DISPOSED; `SYSTEM_COMMIT` is declared from READY ALONE, so the
+  // ask also refuses in STARTING and — for the `replace()` caller, which does
+  // not abort first — mid-transition, and it reports every one of them as
+  // `ROUTER_DISPOSED`. The transition band self-heals here (the abort above
+  // walks the machine back to READY), but a call from inside an async `start`
+  // interceptor lands in STARTING and now throws where it used to commit.
+  // Measured A/B against `4c3b95424`; see the review note on `systemCommit`.
   abortPreviousNavigation(deps);
 
   const fromState = deps.getState();

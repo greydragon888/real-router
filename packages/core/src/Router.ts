@@ -72,12 +72,13 @@ const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
  * - OptionsNamespace: getOptions (immutable)
  * - DependenciesStore: get/set/remove dependencies
  * - EventEmitter: subscribe
- * - StateNamespace: state storage (getState, setState, getPreviousState)
+ * - StateNamespace: state SERVICE (makeState, areStatesEqual); the committed
+ *   pair itself lives in the FSM context (#1641)
  * - RoutesNamespace: route tree operations
  * - RouteLifecycleNamespace: canActivate/canDeactivate guards
  * - PluginsNamespace: plugin lifecycle
  * - NavigationNamespace: navigate
- * - RouterLifecycleNamespace: start, stop, isStarted
+ * - RouterLifecycleNamespace: start (stop/dispose are FSM edges, not methods)
  *
  * @internal This class implementation is internal. Use createRouter() instead.
  */
