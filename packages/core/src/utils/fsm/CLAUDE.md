@@ -18,8 +18,7 @@ Generic synchronous finite-state-machine engine. Zero runtime dependencies.
 | ----------------------------------------------- | ----- | -------------------------------------------------------------------------- |
 | `FSM<TStates, TEvents, TContext, TPayloadMap?>` | Class | The state machine engine                                                   |
 | `FSMConfig`                                     | Type  | Constructor config: `{ initial, context, transitions }`                    |
-| `TransitionDeclaration`                         | Type  | ONE table entry — a bare target state, or `{ target, when?, update? }`     |
-| `TransitionTable`                               | Type  | `Record<state, Partial<Record<event, TransitionDeclaration>>>`             |
+| `TransitionTable`                               | Type  | `Record<state, Partial<Record<event, TransitionDeclaration>>>` — ONE entry is a bare target state, or `{ target, when?, update? }` |
 | `TransitionInfo`                                | Type  | Payload passed to `onTransition` listeners: `{ from, to, event, payload }` |
 
 `TransitionListener` is **internal** (`types.ts`) and not re-exported.
