@@ -1239,11 +1239,14 @@ jobs:
     runs-on: ubuntu-latest
     # sonarcloud is deliberately NOT in needs (latency): its ~90s scan was
     # the longest serial tail of this required check. The SonarCloud job still
-    # runs and reports its own status on the PR. ⚠ The master ruleset's
-    # required_status_checks lists only CI Result (+changesets/dep-review) — so
-    # until the owner adds the "SonarCloud" context there, a red quality gate no
-    # longer BLOCKS a merge (it is visible but advisory). Revert = re-add
-    # `sonarcloud` here + the SONAR line + `ok "$SONAR"` below.
+    # runs and reports its own status on the PR — and that status GATES: the
+    # master ruleset lists "SonarCloud" as a required status check in its own
+    # right, beside "CI Result" / "Require Changeset" / "Validate Changesets" /
+    # "Dependency Review" (verified 2026-08-03 via
+    # `gh api /repos/greydragon888/real-router/rulesets/12148150`). So a red
+    # quality gate blocks the merge; it just does not sit on this job's critical
+    # path. Revert = re-add `sonarcloud` here + the SONAR line + `ok "$SONAR"`
+    # below.
     needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build]
     if: always()
     steps:

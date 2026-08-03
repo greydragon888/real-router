@@ -1597,9 +1597,12 @@ The three low-severity residuals left open by the 2026-07-03 audit wave (re-audi
 
 ### 2026-08-01 CI/CD audit fixes — dedupe push blocked the merge + `check` failed open
 
-Two findings from the deep CI/CD audit (`.claude/ci-cd-audit-2026-08-01.md`, §1.1 and
-§1.2), fixed straight on master (infra — no changeset). Both are the same shape as the
-#1133 class: a mechanism that looks like a gate but resolves to "nothing happened".
+Two findings from the deep CI/CD audit (§1.1 and §1.2), fixed straight on master (infra —
+no changeset). Both are the same shape as the #1133 class: a mechanism that looks like a
+gate but resolves to "nothing happened". (That audit was merged into
+`.claude/infra-review-report-2026-08-01.md` on 2026-08-03 and its own file deleted — the
+`§N.N` numbering referenced from workflow comments across `.github/**` is kept there as a
+lookup table.)
 
 **Problem 1 — `dependabot-dedupe.yml` made Dependabot PRs unmergeable.** The workflow
 commits the deduped `pnpm-lock.yaml` and pushes it with the default `GITHUB_TOKEN`.
@@ -6812,3 +6815,61 @@ own architecture doc where a wrong edge reads as engine behaviour.
 Deleting the second diagram was considered and rejected — it earns its place by
 showing what the generic engine looks like in its one real consumer. Making it
 correct-by-construction costs one test file that runs in milliseconds.
+
+## The gate's own docs said "advisory" about a required check; three npm scripts deleted
+
+Two leftovers from the 2026-08-01 CI/CD audit (§5.1 and §6), both in the class the audit
+calls documentation drift — text that is not merely stale but load-bearing.
+
+### Problem 1 — the allowlist entry that justifies an exclusion was arguing from a false premise
+
+`sonarcloud` is deliberately absent from the `ci` job's `needs` (its ~90 s scan was the
+longest serial tail of the required check). The reason recorded in two places —
+`scripts/ci-gate-completeness.test.mjs`'s `OUTSIDE_GATE` map and the comment above the `ci`
+job — was: gating "moves to the master ruleset … adding the 'SonarCloud' context there is a
+tracked follow-up in #1520; until then the quality gate is advisory."
+
+Both halves are false today. The ruleset **does** list `SonarCloud` as a required status
+check (verified: `gh api /repos/greydragon888/real-router/rulesets/12148150` returns
+`Require Changeset`, `CI Result`, `Validate Changesets`, `Dependency Review`, `SonarCloud`),
+and #1520 is a closed, unrelated issue ("Fold the internal foundation packages into core").
+
+This is not a comment nit: the `OUTSIDE_GATE` string is *enforcement* — the meta-test prints
+it when a job is missing from the gate, so it is what the next reader uses to decide whether
+the exclusion is still sound. Left as-is it invites exactly the wrong fix (re-adding
+`sonarcloud` to `needs`, paying the 90 s back for a guarantee that already exists).
+
+**Solution.** Both texts now state what is true — the exclusion is about *latency*, the
+gating lives in the ruleset — and name the command that verifies it, so the next audit can
+re-check in one call instead of re-deriving.
+
+### Problem 2 — three npm scripts nobody calls, one of them dangerous
+
+- `release` (`pnpm build && changeset publish`) — publishing goes through `changesets.yml`
+  with OIDC + provenance. A hand-run of this script publishes **outside** that path.
+- `sonar` (`dotenv -- sonar-scanner-npm -Dsonar.login=$SONAR_TOKEN`) — broken by its own
+  admission: `scripts/sonar-local.sh` documents that `$SONAR_TOKEN` expanded in a shell
+  without `.env` was "always empty" and that `-Dsonar.login` is deprecated, which is why it
+  invokes the scanner directly and explicitly *not* via `pnpm run sonar`.
+- `verify:examples` — no caller anywhere; example validation is `examples.yml` + the
+  `examples-build` job.
+
+**Solution.** All three deleted. Two stale references followed them: `sonar-project.properties`
+said `pnpm sonar`, now `pnpm sonar:local`; `sonar-local.sh` credited `.env` loading to "the
+`sonar` npm script", now to its own `dotenv --` wrapper.
+
+**The one non-obvious consequence — knip.** `@sonar/scan` and `dotenv-cli` were reachable
+*only* through the deleted `sonar` script, so removing it made knip report both as unused
+devDependencies. They are genuinely used, by `scripts/sonar-local.sh`. Measured, not assumed:
+knip lists `scripts/*.{sh,mjs,ts}` as entry, but it does **not** resolve binaries out of shell
+scripts at all — dropping the `pnpm exec` prefix (`exec dotenv -- sonar-scanner-npm`) changes
+nothing, both stay unused. So they go to `ignoreDependencies`. The cost is honest and worth
+recording: if `sonar-local.sh` is ever deleted, those two dependencies will linger unnoticed —
+delete them in the same change.
+
+**Why not the tidier alternative.** Keeping a thin `sonar:scan` wrapper script would have kept
+knip honest without an ignore. Rejected: `sonar-local.sh:81` says in so many words "run the
+scanner directly via dotenv — NOT `pnpm run sonar -- …`", and the wrapper's argument handling
+cannot be tested locally without uploading a real analysis to SonarCloud. Re-introducing the
+indirection the script was written to avoid, on an untestable path, to satisfy a linter, is a
+bad trade.
