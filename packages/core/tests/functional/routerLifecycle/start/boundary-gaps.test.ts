@@ -50,37 +50,114 @@ describe("router.start() - boundary gaps (#1190)", () => {
   });
 
   describe("onStart plugin hook", () => {
-    it("does NOT ban a sync navigate() from onStart; it is superseded by the start navigation", async () => {
+    // ⚠ This block used to assert the OUTCOME ("accepted", final state `a`) under
+    // the title "it is superseded by the start navigation", and both the title
+    // and its comment were WRONG about the mechanism — measured on #1661: there
+    // was no supersede and no rejection. `navigate('b')` ran to completion,
+    // committed, and announced `TRANSITION_SUCCESS` to every subscriber; the
+    // boot then overwrote it. The assertion could not see that, because the
+    // phantom and the fix agree on everything it looked at — the call throws
+    // nothing either way and the final state is `a` either way. #1190 asked for
+    // coverage of this arc and got a green test over a live defect.
+    //
+    // What discriminates is the LEDGER of what subscribers were handed.
+    it.each([
+      ["navigate", (r: Router) => r.navigate("b")],
+      ["navigateToDefault", (r: Router) => r.navigateToDefault()],
+      [
+        "navigateToState",
+        (r: Router) => {
+          const api = getPluginApi(r);
+
+          return api.navigateToState(api.makeState("b"));
+        },
+      ],
+    ])(
+      "refuses %s from onStart — nothing may commit before the start navigation does (#1661)",
+      async (_label, drive) => {
+        const router = createRouter(
+          [
+            { name: "a", path: "/a" },
+            { name: "b", path: "/b" },
+          ],
+          { defaultRoute: "b" },
+        );
+
+        const announced: string[] = [];
+        let navOutcome = "(not called)";
+        let settled = "(not settled)";
+
+        router.subscribe(({ route }) => announced.push(route.name));
+
+        router.usePlugin(() => ({
+          onStart() {
+            // ROUTER_START does not raise dispatchDepth, so this is NOT the §4
+            // reentrancy ban (#1181) — it is the start window's own precondition.
+            const thrown = captureSyncThrow(() => {
+              drive(router).then(
+                () => (settled = "resolved"),
+                (error: unknown) =>
+                  (settled = `rejected:${(error as { code?: string }).code}`),
+              );
+            });
+
+            navOutcome =
+              thrown === undefined
+                ? "accepted"
+                : `threw:${(thrown as { code?: string }).code}`;
+          },
+        }));
+
+        const state = await router.start("/a");
+
+        // Refused as a REJECTION, not a sync throw: `navigate` reports failure
+        // through its promise, and changing that shape here would break every
+        // caller written against it (the sibling `navigateToNotFound` refusal of
+        // #1644 throws because that primitive is synchronous).
+        expect(navOutcome).toBe("accepted");
+        expect(settled).toBe(`rejected:${errorCodes.ROUTER_NOT_STARTED}`);
+
+        // The half with the discriminating power: no subscriber was ever handed
+        // a state other than the one `start()` settled on.
+        expect(announced).toStrictEqual(["a"]);
+        expect(state.name).toBe("a");
+        expect(router.getState()?.name).toBe("a");
+
+        router.dispose();
+      },
+    );
+
+    it("still allows a navigate() from a GUARD of the start navigation (the classic redirect)", async () => {
+      // The other side of the #1661 predicate, and the reason it reads
+      // `isTransitioning()` rather than just "nothing committed": from `onStart`
+      // that is false, from a guard of the boot navigation it is true. Both run
+      // on a READY machine with no committed state, so FSM state alone cannot
+      // tell them apart.
       const router = createRouter([
-        { name: "a", path: "/a" },
+        {
+          name: "a",
+          path: "/a",
+          canActivate: (r) => () => {
+            r.navigate("b").catch(() => {
+              /* superseded by nothing; the redirect wins */
+            });
+
+            return true;
+          },
+        },
         { name: "b", path: "/b" },
       ]);
 
-      let navOutcome = "(not called)";
+      const announced: string[] = [];
 
-      router.usePlugin(() => ({
-        onStart() {
-          // ROUTER_START does not raise dispatchDepth, so this is NOT a reentrant
-          // navigation (contrast the §4 ban from transition listeners, #1181).
-          // It is accepted, then silently superseded by the start navigation.
-          // (The superseded navigate('b') rejection is fire-and-forget-suppressed
-          // by core, #721 — no unhandled rejection.)
-          const thrown = captureSyncThrow(() => router.navigate("b"));
+      router.subscribe(({ route }) => announced.push(route.name));
 
-          navOutcome =
-            thrown === undefined
-              ? "accepted"
-              : `banned:${(thrown as { code?: string }).code}`;
-        },
-      }));
+      await expect(router.start("/a")).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
-      const state = await router.start("/a");
-
-      // navigate('b') was accepted (not banned)...
-      expect(navOutcome).toBe("accepted");
-      // ...but the start navigation wins: final committed state is the start path.
-      expect(state.name).toBe("a");
-      expect(router.getState()?.name).toBe("a");
+      expect(announced).toStrictEqual(["b"]);
+      expect(router.getState()?.name).toBe("b");
 
       router.dispose();
     });

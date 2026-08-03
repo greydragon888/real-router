@@ -198,6 +198,116 @@ describe("Committed state is owned by the navigation in flight", () => {
 });
 
 // ---------------------------------------------------------------------------
+// The SISTER window (#1661). The property above owns the pre-start window of
+// `navigate()`; this one owns the one `start()` opens, and they are different
+// windows rather than two spellings of one: `completeStart()` sends STARTED —
+// leaving STARTING for READY — BEFORE the boot navigation commits, so every
+// `onStart` hook runs on a READY machine with `getState() === undefined` and a
+// commit still owed. `NAVIGATE` is declared on READY, so the nested call is
+// accepted, runs to completion synchronously and announces itself; the boot
+// then writes over it.
+//
+// Scope, deliberately: the ban is on the `onStart` window, NOT on user code in
+// general. A GUARD of the boot navigation that navigates is the classic
+// redirect and stays legal — measured, it is the `isTransitioning()` half of
+// the predicate that separates them (from `onStart` it reads false, from a boot
+// guard true). Guards are therefore not generated here.
+// ---------------------------------------------------------------------------
+
+const arbStartCase = fc.record({
+  // How the boot navigation ends. `guardRefused` matters on its own: there the
+  // boot never commits at all, so ANY commit is foreign and the nested state
+  // does not even get overwritten — it stands on a router whose `start()`
+  // rejected.
+  bootArc: fc.constantFrom<"match" | "notFound" | "guardRefused">(
+    "match",
+    "notFound",
+    "guardRefused",
+  ),
+  // Which entry point the plugin drives from `onStart`. All three reach the
+  // same `canNavigate()` gate, which is why this is a class guard and not a pin
+  // on the one channel the issue reported.
+  action: fc.constantFrom<
+    "none" | "navigate" | "navigateToDefault" | "navigateToState"
+  >("none", "navigate", "navigateToDefault", "navigateToState"),
+});
+
+describe("Nothing commits before the start navigation does (#1661)", () => {
+  test.prop([arbStartCase], { numRuns: NUM_RUNS.fast })(
+    "no state is announced to subscribers except the one start() settles on",
+    async ({ bootArc, action }) => {
+      const observed: string[] = [];
+
+      const router = createRouter(
+        bootArc === "guardRefused"
+          ? ROUTES.map((route) =>
+              route.name === "outer"
+                ? { ...route, canActivate: () => () => false }
+                : route,
+            )
+          : ROUTES,
+        {
+          allowNotFound: bootArc === "notFound",
+          ...(action === "navigateToDefault" ? { defaultRoute: "nested" } : {}),
+        },
+      );
+
+      router.subscribe(({ route }) => {
+        observed.push(route.name);
+      });
+
+      router.usePlugin(() => ({
+        onStart() {
+          const swallow = (): void => {
+            /* fire-and-forget: refused once #1661 is closed */
+          };
+
+          switch (action) {
+            case "navigate": {
+              router.navigate("nested").catch(swallow);
+
+              break;
+            }
+            case "navigateToDefault": {
+              router.navigateToDefault().catch(swallow);
+
+              break;
+            }
+            case "navigateToState": {
+              const api = getPluginApi(router);
+
+              api.navigateToState(api.makeState("nested")).catch(swallow);
+
+              break;
+            }
+            // No default
+          }
+        },
+      }));
+
+      const outcome = await router
+        .start(bootArc === "notFound" ? "/nope" : "/outer")
+        .then(
+          (state) => state.name,
+          () => undefined,
+        );
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5);
+      });
+
+      // The invariant, stated per observation rather than as a snapshot of the
+      // whole ledger: a subscriber must never be handed a state that is not the
+      // one the boot settled on. When `start()` rejects there is no such state,
+      // so every announcement is foreign.
+      const foreign = observed.filter((name) => name !== outcome);
+
+      expect(foreign).toStrictEqual([]);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // The chain invariant that makes the machine's context self-sufficient
 // (`fsm-as-state-owner-2026-07-31.md` §3, acceptance criterion §12.3).
 //
