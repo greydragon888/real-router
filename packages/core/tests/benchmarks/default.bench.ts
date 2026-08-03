@@ -213,9 +213,15 @@ export async function run(): Promise<void> {
     const targets = ["page", "home"] as const;
     let i = 0;
 
+    // ⚗ MEASUREMENT PROBE — this branch exists only to measure the BASE code at
+    // K=512 and is never merged. PR #1642 raises this same K on the slice; with
+    // master at 192 the two are compared at different batch sizes, so the report
+    // cannot say whether the slice costs anything. One point at matching K
+    // settles it. Same remedy `navigate/sync-baseline` already carries above,
+    // for the same reason (GC alignment near the measure window).
     bench.add(
       "navigate/sync-guards",
-      batched(192, () => {
+      batched(512, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
