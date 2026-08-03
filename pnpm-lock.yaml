@@ -332,7 +332,7 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.6.2
-        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.23.1)(yaml@2.8.3))
+        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.23.1)(yaml@2.8.3))
       '@angular/build':
         specifier: ~22.0.6
         version: 22.0.6(534708c7dc11ddb80a17ca3cf997eb19)
@@ -977,10 +977,10 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.6.2
-        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
+        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
       '@analogjs/vitest-angular':
         specifier: 2.6.2
-        version: 2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.1(chokidar@5.0.0))(@angular-devkit/schematics@22.0.1(chokidar@5.0.0))(vitest@4.1.10)
+        version: 2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.1(chokidar@5.0.0))(@angular-devkit/schematics@22.0.1(chokidar@5.0.0))(vitest@4.1.10)
       '@angular-devkit/architect':
         specifier: 0.2200.1
         version: 0.2200.1(chokidar@5.0.0)
@@ -1047,10 +1047,10 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.6.2
-        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
+        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
       '@analogjs/vitest-angular':
         specifier: 2.6.2
-        version: 2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.1(chokidar@5.0.0))(@angular-devkit/schematics@22.0.1(chokidar@5.0.0))(vitest@4.1.10)
+        version: 2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.1(chokidar@5.0.0))(@angular-devkit/schematics@22.0.1(chokidar@5.0.0))(vitest@4.1.10)
       '@angular-devkit/architect':
         specifier: 0.2200.1
         version: 0.2200.1(chokidar@5.0.0)
@@ -1212,10 +1212,10 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.6.2
-        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
+        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
       '@analogjs/vitest-angular':
         specifier: 2.6.2
-        version: 2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.1(chokidar@5.0.0))(@angular-devkit/schematics@22.0.1(chokidar@5.0.0))(vitest@4.1.10)
+        version: 2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.1(chokidar@5.0.0))(@angular-devkit/schematics@22.0.1(chokidar@5.0.0))(vitest@4.1.10)
       '@angular-devkit/architect':
         specifier: 0.2200.1
         version: 0.2200.1(chokidar@5.0.0)
@@ -6206,10 +6206,10 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.6.2
-        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
+        version: 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
       '@analogjs/vitest-angular':
         specifier: 2.6.2
-        version: 2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.6(chokidar@5.0.0))(@angular-devkit/schematics@22.0.6(chokidar@5.0.0))(vitest@4.1.10)
+        version: 2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.6(chokidar@5.0.0))(@angular-devkit/schematics@22.0.6(chokidar@5.0.0))(vitest@4.1.10)
       '@angular/build':
         specifier: ~22.0.6
         version: 22.0.6(534708c7dc11ddb80a17ca3cf997eb19)
@@ -7376,9 +7376,6 @@ packages:
   '@emnapi/core@1.11.1':
     resolution: {integrity: sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==}
 
-  '@emnapi/core@1.11.2':
-    resolution: {integrity: sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA==}
-
   '@emnapi/core@2.0.0-alpha.3':
     resolution: {integrity: sha512-AZypUeJ/yByuxyS7BlSNRDOMLMlROYtjYdIAuBmJssVz1UJDSeYxLrdizhXCFYhedC5bqd/ASy8EuNXbVVXp9g==}
 
@@ -7390,9 +7387,6 @@ packages:
 
   '@emnapi/runtime@1.11.1':
     resolution: {integrity: sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw==}
-
-  '@emnapi/runtime@1.11.2':
-    resolution: {integrity: sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA==}
 
   '@emnapi/runtime@2.0.0-alpha.3':
     resolution: {integrity: sha512-hFPAhMUjJD9BSyCANEISPOogeXC9Zo9ZQl7L6vKnaVsMkCtzznaW/naYypeyl0Gv5rYfWYsZbpixTMpjDJzQeA==}
@@ -8185,12 +8179,6 @@ packages:
   '@napi-rs/nice@1.1.1':
     resolution: {integrity: sha512-xJIPs+bYuc9ASBl+cvGsKbGrJmS6fAKaSZCnT0lhahT5rhA2VVy9/EcIgd2JhtEuFOJNx7UHNn/qiTPTY4nrQw==}
     engines: {node: '>= 10'}
-
-  '@napi-rs/wasm-runtime@1.1.6':
-    resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
-    peerDependencies:
-      '@emnapi/core': ^1.7.1
-      '@emnapi/runtime': ^1.7.1
 
   '@napi-rs/wasm-runtime@1.2.2':
     resolution: {integrity: sha512-JfB4kuJQjaoHuCTseIINHtHWeJnvgEcxjwA5t/Y00ZgaOO1Crz3fjT/p8kT28zA/Caz7oiUMn3d6H2yOVCVwuw==}
@@ -14230,10 +14218,6 @@ packages:
     resolution: {integrity: sha512-7cR8rLy2QhYHpsBDBVYnnWXm8uRTr38RoZakFSW7Bs7PzfMPNZthuMLkwqZv7MTu8lhQ91cOFYS5a7iFj2oR3w==}
     engines: {node: '>=4'}
 
-  tinyexec@1.2.4:
-    resolution: {integrity: sha512-SHf/r48b7vOrjve9PxJo3MN5v5yuyjHvdUcrQffT3WXMUfnGmHDVbC4k3sHJaJTgZCwpUplIaAo5ANtMyp3YHg==}
-    engines: {node: '>=18'}
-
   tinyexec@1.3.0:
     resolution: {integrity: sha512-QKAl9m8gWWGHV8jZcPeym6j+XULi6tOf1mT83WYJ4Lk2ytW/uwAWkrP0uFsdoYMdueVJ0qs26wZ+23xeB4ibNQ==}
     engines: {node: '>=18'}
@@ -15054,11 +15038,11 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
 
-  '@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))':
+  '@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))':
     dependencies:
       magic-string: 0.30.21
       obug: 2.1.4
-      oxc-parser: 0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
+      oxc-parser: 0.121.0(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)
       tinyglobby: 0.2.17
       ts-morph: 21.0.1
     optionalDependencies:
@@ -15068,11 +15052,11 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  '@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.23.1)(yaml@2.8.3))':
+  '@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.23.1)(yaml@2.8.3))':
     dependencies:
       magic-string: 0.30.21
       obug: 2.1.4
-      oxc-parser: 0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
+      oxc-parser: 0.121.0(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)
       tinyglobby: 0.2.17
       ts-morph: 21.0.1
     optionalDependencies:
@@ -15082,16 +15066,16 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  '@analogjs/vitest-angular@2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.1(chokidar@5.0.0))(@angular-devkit/schematics@22.0.1(chokidar@5.0.0))(vitest@4.1.10)':
+  '@analogjs/vitest-angular@2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.1(chokidar@5.0.0))(@angular-devkit/schematics@22.0.1(chokidar@5.0.0))(vitest@4.1.10)':
     dependencies:
-      '@analogjs/vite-plugin-angular': 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
+      '@analogjs/vite-plugin-angular': 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
       '@angular-devkit/architect': 0.2200.1(chokidar@5.0.0)
       '@angular-devkit/schematics': 22.0.1(chokidar@5.0.0)
       vitest: 4.1.10(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
 
-  '@analogjs/vitest-angular@2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.6(chokidar@5.0.0))(@angular-devkit/schematics@22.0.6(chokidar@5.0.0))(vitest@4.1.10)':
+  '@analogjs/vitest-angular@2.6.2(@analogjs/vite-plugin-angular@2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)))(@angular-devkit/architect@0.2200.6(chokidar@5.0.0))(@angular-devkit/schematics@22.0.6(chokidar@5.0.0))(vitest@4.1.10)':
     dependencies:
-      '@analogjs/vite-plugin-angular': 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
+      '@analogjs/vite-plugin-angular': 2.6.2(@angular/build@22.0.6(534708c7dc11ddb80a17ca3cf997eb19))(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
       '@angular-devkit/architect': 0.2200.6(chokidar@5.0.0)
       '@angular-devkit/schematics': 22.0.6(chokidar@5.0.0)
       vitest: 4.1.10(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3))
@@ -15839,7 +15823,7 @@ snapshots:
       '@commitlint/load': 21.2.0(@types/node@24.13.3)(typescript@6.0.3)
       '@commitlint/read': 21.2.1
       '@commitlint/types': 21.2.0
-      tinyexec: 1.2.4
+      tinyexec: 1.3.0
       yargs: 18.0.0
     transitivePeerDependencies:
       - '@types/node'
@@ -15909,7 +15893,7 @@ snapshots:
       '@commitlint/top-level': 21.2.0
       '@commitlint/types': 21.2.0
       '@conventional-changelog/git-client': 3.1.0
-      tinyexec: 1.2.4
+      tinyexec: 1.3.0
     transitivePeerDependencies:
       - conventional-commits-filter
       - conventional-commits-parser
@@ -16084,12 +16068,6 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@emnapi/core@1.11.2':
-    dependencies:
-      '@emnapi/wasi-threads': 1.2.2
-      tslib: 2.8.1
-    optional: true
-
   '@emnapi/core@2.0.0-alpha.3':
     dependencies:
       '@emnapi/wasi-threads': 2.0.1
@@ -16107,11 +16085,6 @@ snapshots:
     optional: true
 
   '@emnapi/runtime@1.11.1':
-    dependencies:
-      tslib: 2.8.1
-    optional: true
-
-  '@emnapi/runtime@1.11.2':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -16815,27 +16788,6 @@ snapshots:
       '@napi-rs/nice-win32-x64-msvc': 1.1.1
     optional: true
 
-  '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
-    dependencies:
-      '@emnapi/core': 1.10.0
-      '@emnapi/runtime': 1.10.0
-      '@tybys/wasm-util': 0.10.3
-    optional: true
-
-  '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
-    dependencies:
-      '@emnapi/core': 1.11.1
-      '@emnapi/runtime': 1.11.1
-      '@tybys/wasm-util': 0.10.3
-    optional: true
-
-  '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
-    dependencies:
-      '@emnapi/core': 1.11.2
-      '@emnapi/runtime': 1.11.2
-      '@tybys/wasm-util': 0.10.3
-    optional: true
-
   '@napi-rs/wasm-runtime@1.2.2(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
       '@emnapi/core': 1.10.0
@@ -16847,6 +16799,13 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.11.0
       '@emnapi/runtime': 1.11.0
+      '@tybys/wasm-util': 0.10.3
+    optional: true
+
+  '@napi-rs/wasm-runtime@1.2.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
+    dependencies:
+      '@emnapi/core': 1.11.1
+      '@emnapi/runtime': 1.11.1
       '@tybys/wasm-util': 0.10.3
     optional: true
 
@@ -17090,9 +17049,9 @@ snapshots:
   '@oxc-parser/binding-openharmony-arm64@0.137.0':
     optional: true
 
-  '@oxc-parser/binding-wasm32-wasi@0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
+  '@oxc-parser/binding-wasm32-wasi@0.121.0(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)':
     dependencies:
-      '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
+      '@napi-rs/wasm-runtime': 1.2.2(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -17102,7 +17061,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
-      '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+      '@napi-rs/wasm-runtime': 1.2.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
     optional: true
 
   '@oxc-parser/binding-win32-arm64-msvc@0.121.0':
@@ -18314,7 +18273,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
-      '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+      '@napi-rs/wasm-runtime': 1.2.2(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optional: true
 
   '@unrs/resolver-binding-win32-arm64-msvc@1.12.2':
@@ -21812,7 +21771,7 @@ snapshots:
 
   override-require@1.1.1: {}
 
-  oxc-parser@0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2):
+  oxc-parser@0.121.0(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3):
     dependencies:
       '@oxc-project/types': 0.121.0
     optionalDependencies:
@@ -21832,7 +21791,7 @@ snapshots:
       '@oxc-parser/binding-linux-x64-gnu': 0.121.0
       '@oxc-parser/binding-linux-x64-musl': 0.121.0
       '@oxc-parser/binding-openharmony-arm64': 0.121.0
-      '@oxc-parser/binding-wasm32-wasi': 0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
+      '@oxc-parser/binding-wasm32-wasi': 0.121.0(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)
       '@oxc-parser/binding-win32-arm64-msvc': 0.121.0
       '@oxc-parser/binding-win32-ia32-msvc': 0.121.0
       '@oxc-parser/binding-win32-x64-msvc': 0.121.0
@@ -23128,8 +23087,6 @@ snapshots:
 
   tinydate@1.3.0: {}
 
-  tinyexec@1.2.4: {}
-
   tinyexec@1.3.0: {}
 
   tinyglobby@0.2.16:
@@ -23527,7 +23484,7 @@ snapshots:
       picomatch: 4.0.4
       std-env: 4.2.0
       tinybench: 2.9.0
-      tinyexec: 1.2.4
+      tinyexec: 1.3.0
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
       vite: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.1)(yaml@2.8.3)
@@ -23557,7 +23514,7 @@ snapshots:
       picomatch: 4.0.4
       std-env: 4.2.0
       tinybench: 2.9.0
-      tinyexec: 1.2.4
+      tinyexec: 1.3.0
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
       vite: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(tsx@4.23.1)(yaml@2.8.3)
