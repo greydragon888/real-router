@@ -6086,6 +6086,14 @@ if (affected.length <= K && !touchesCore && !touchesAdapterShared) {
 
 A "clean" script that leaves tool caches warm is a silent correctness bug for any cold benchmark or bug reproduction — the build still succeeds, so nothing flags it; only the numbers lie (the 20x lint gap is the proof). Single-source-of-truth via `source` + `BASH_SOURCE` guard is the cheapest way to stop the two scripts re-diverging the next time a cache layer is added. To take a genuinely cold measurement: run `clean-all.sh` **then** `turbo run … --force` (the `--force` covers the turbo layer the script intentionally leaves to turbo's own invalidation; the script covers the tool layers turbo can't see).
 
+### Follow-up (2026-08-03) — two more cache layers, and `-delete` was the wrong verb
+
+Inventorying what actually survives a "clean" turned up two directories the list never covered — `packages/svelte/.svelte-kit` and `.stryker-tmp` (in `logger-plugin` and `rx`) — both now swept by the same `find … -type d -exec rm -rf {} +` form as the rest.
+
+`*.tsbuildinfo*` was also switched from `-delete` to `-exec rm -rf {} +`. `-delete` is **not recursive**: it removes a `.tsbuildinfo` file but silently leaves a directory carrying a matching name. Measured on a fixture rather than assumed — a populated `x.tsbuildinfo.d/` survives `-delete` and is removed by `rm -rf`. Every match in the tree is a file today (`./.tsbuildinfo`, `benchmarks/.tsbuildinfo-node`, `packages/{core,angular}/.tsbuildinfo-node`), so this changes nothing now; the point is that the sweep cannot go quiet later if a tool starts emitting a directory. Verified on a sandbox that the `node_modules` exclusion still holds — a planted `node_modules/.stryker-tmp/keepme` survives all three new sweeps.
+
+Scope, stated in the script header now that "ALL tool caches" invites the question: **all caches inside the repo**. Machine-global stores — the pnpm store, `~/.cache/ms-playwright`, the npm cache — are untouched by both scripts, deliberately.
+
 ## peerDep range fix — `workspace:^` → `workspace:>=0.1.0` removes the #822 unwanted-major class (2026-06-30)
 
 ### Problem
