@@ -10,6 +10,14 @@ import type {
   State,
 } from "../../types";
 
+/** The single payload both halves of the commit read — ask-free by design. */
+export interface CommitPayload {
+  epoch: number;
+  toState: State;
+  fromState?: State | undefined;
+  opts?: NavigationOptions | undefined;
+}
+
 export interface NavigationContext {
   /**
    * Supersession token — `#navigationId` at the moment this navigation began.
@@ -19,6 +27,13 @@ export interface NavigationContext {
    * move: no `NavigationContext` is ever built independently of a plan.
    */
   myId: number;
+  /**
+   * The machine's epoch for THIS navigation, read right after the NAVIGATE
+   * update ran. Stamped onto the FAILs this navigation sends, so a report from
+   * one that has already been superseded is refused by the table
+   * (`when: mayFail`) instead of moving the machine out from under the live one.
+   */
+  myEpoch: number;
   toState: State;
   fromState: State | undefined;
   opts: NavigationOptions;
@@ -58,6 +73,19 @@ export interface NavigationPlan extends NavigationContext {
  * These are function references from other namespaces/facade,
  * avoiding the need to pass the entire Router object.
  */
+/**
+ * INTERNAL options for `navigateToNotFound`. Not on the public facade — the
+ * only opt-out is `replace()`'s revalidation, which is core calling core.
+ */
+export interface NotFoundOptions {
+  /**
+   * Commit without asking the current route's `canDeactivate` guards (#1643).
+   * Legal only where asking would be WRONG, not merely redundant; both call
+   * sites carry the reason inline.
+   */
+  skipDeactivation?: boolean | undefined;
+}
+
 export interface NavigationDependencies {
   /** Per-router logger instance (from `getInternals(router).logger`) */
   logger: RouterLogger;
@@ -92,8 +120,21 @@ export interface NavigationDependencies {
   /** Get current state */
   getState: () => State | undefined;
 
-  /** Set router state */
-  setState: (state: State) => void;
+  /**
+   * May the router LEAVE the committed state? Deactivation guards only — the
+   * 404 has no route to activate.
+   *
+   * Routed through `RouteLifecycleNamespace.canNavigateTo` with an empty
+   * activate list rather than walking the guard Maps here, so there is ONE
+   * synchronous guard policy and `navigateToNotFound` cannot drift from
+   * `canNavigateTo` (async guard → `false`, throwing guard → `false` + a
+   * `logger.warn`).
+   */
+  canDeactivateCurrent: (
+    deactivated: string[],
+    toState: State,
+    fromState: State,
+  ) => boolean;
 
   /** Build complete navigate state: forwardState + route check + buildPath + makeState in one step */
   buildNavigateState: (
@@ -114,6 +155,20 @@ export interface NavigationDependencies {
   /** Start transition and send NAVIGATE event to routerFSM */
   startTransition: (toState: State, fromState: State | undefined) => void;
 
+  /** The machine's current navigation epoch — read right after `startTransition`. */
+  getNavigationEpoch: () => number;
+
+  /**
+   * Commit a state that is NOT the product of a navigation, through the FSM
+   * `SYSTEM_COMMIT` action (write + announce in one table fact). Throws
+   * `ROUTER_DISPOSED` when the machine has no edge to take.
+   */
+  systemCommit: (
+    toState: State,
+    fromState: State | undefined,
+    opts: NavigationOptions,
+  ) => void;
+
   /**
    * Cancel the in-flight navigation via the FSM `CANCEL` event. The `CANCEL`
    * action aborts the current controller (with `reason`, if given — surfaces as
@@ -123,17 +178,19 @@ export interface NavigationDependencies {
   cancelNavigation: (reason?: unknown) => void;
 
   /** Send COMPLETE event to routerFSM */
-  sendTransitionDone: (
-    state: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ) => void;
+  /** ask-half of the commit — same table row as {@link sendTransitionDone}. */
+  canCommitTransition: (payload: CommitPayload) => boolean;
+  sendTransitionDone: (payload: CommitPayload) => void;
 
-  /** Send FAIL event to routerFSM */
+  /**
+   * Send FAIL event to routerFSM, stamped with the sending navigation's epoch
+   * so the table can refuse a report from one that has already been superseded.
+   */
   sendTransitionFail: (
     toState: State,
     fromState: State | undefined,
     error: unknown,
+    epoch: number,
   ) => void;
 
   /** Emit TRANSITION_ERROR event to listeners */
@@ -143,15 +200,12 @@ export interface NavigationDependencies {
     error: unknown,
   ) => void;
 
-  /** Emit TRANSITION_SUCCESS event to listeners (without FSM transition) */
-  emitTransitionSuccess: (
-    toState: State,
-    fromState?: State,
-    opts?: NavigationOptions,
-  ) => void;
-
   /** Send LEAVE_APPROVE event to routerFSM and emit to listeners */
-  sendLeaveApprove: (toState: State, fromState: State | undefined) => void;
+  sendLeaveApprove: (
+    epoch: number,
+    toState: State,
+    fromState: State | undefined,
+  ) => void;
 
   /** Check if navigation can begin (router is started) */
   canNavigate: () => boolean;

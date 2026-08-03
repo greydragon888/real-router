@@ -133,9 +133,17 @@ function beginTransition(
     shouldDeactivate: false,
     shouldActivate: false,
     hasGuards: false,
+    // Written below: the epoch does not exist until the NAVIGATE update ran.
+    myEpoch: 0,
   };
 
   deps.startTransition(toState, fromState);
+
+  // Read AFTER `startTransition`, because that is what runs the NAVIGATE update
+  // that bumps it. Safe to read synchronously: a reentrant navigate is banned
+  // (RFC navigation-cancellation-unification §4), so nothing can bump it again
+  // between the send and this line.
+  plan.myEpoch = deps.getNavigationEpoch();
 
   return plan;
 }
@@ -156,12 +164,11 @@ function beginTransition(
  */
 function completeImmediate(
   deps: NavigationDependencies,
-  inFlight: InFlightNavigation,
   plan: NavigationPlan,
 ): State {
-  deps.sendLeaveApprove(plan.toState, plan.fromState);
+  deps.sendLeaveApprove(plan.myEpoch, plan.toState, plan.fromState);
 
-  return completeTransition(deps, inFlight, plan);
+  return completeTransition(deps, plan);
 }
 
 /**
@@ -218,6 +225,9 @@ export function executeNavigation(
   // may only report for a navigation that was announced AND is still the one in
   // flight (#1609).
   let myId = 0;
+  // Hoisted for the same reason as `myId`: the catch below cannot see `plan`,
+  // and the error path needs the epoch to stamp its FAIL with.
+  let myEpoch = 0;
   let controller: AbortController | null = null;
 
   try {
@@ -233,13 +243,15 @@ export function executeNavigation(
     const plan = beginTransition(deps, inFlight, toState, fromState, opts);
 
     myId = plan.myId;
+    myEpoch = plan.myEpoch;
 
-    // Post-`startTransition` supersession is now caught at the commit-gate
-    // below (before `completeTransition`'s setState): a `stop()`/`dispose()`/
-    // external-abort from the TRANSITION_START listener leaves the FSM in
-    // IDLE/DISPOSED, which `!deps.isActive()` detects. (Async supersession is
-    // additionally caught in `#finishAsyncNavigation` / the guard pipeline's
-    // `isCurrentNav`; a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
+    // Post-`startTransition` supersession is caught by `when: mayCommit` on the
+    // COMPLETE edge, asked inside `completeTransition`: a `stop()`/`dispose()`
+    // from the TRANSITION_START listener leaves the FSM in IDLE/DISPOSED, where
+    // COMPLETE is not declared at all, and an aborted external `opts.signal` is
+    // read straight off the commit payload. (Async supersession is additionally
+    // caught in `finishAsyncNavigation` / the guard pipeline's `isCurrentNav`;
+    // a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
 
     planPhases(deps, plan);
 
@@ -255,11 +267,10 @@ export function executeNavigation(
     // listener may still register a guard. Hoisting the read would change
     // behaviour, not just shape.
     if (!plan.hasGuards && !plan.suspendable) {
-      return completeImmediate(deps, inFlight, plan);
+      return completeImmediate(deps, plan);
     }
 
     const {
-      suspendable,
       canDeactivateFunctions,
       canActivateFunctions,
       toDeactivate,
@@ -297,7 +308,7 @@ export function executeNavigation(
       const signal = controller.signal;
 
       const emitLeaveApproveCallback = (): Promise<void> | undefined => {
-        deps.sendLeaveApprove(confirmedToState, fromState);
+        deps.sendLeaveApprove(plan.myEpoch, confirmedToState, fromState);
 
         if (deps.hasLeaveListeners()) {
           return deps.awaitLeaveListeners(confirmedToState, fromState, signal);
@@ -340,22 +351,17 @@ export function executeNavigation(
       inFlight.release(controller, false);
     }
 
-    // #1169 commit-gate — refuse to commit a navigation cancelled or
-    // terminated during a listener window, BEFORE `completeTransition`'s
-    // setState. The FSM table (D-full) already prevents the forceState
-    // resurrection; this prevents the state commit that precedes the emit.
-    // Gated on `suspendable` so the pure sync hot path pays nothing. A
-    // `stop()`/`dispose()` from the listener lands the FSM in IDLE/DISPOSED
-    // (caught by `!isActive()`); an external `opts.signal` abort is caught
-    // directly. No supersession check: a reentrant navigate() (the only thing
-    // that could bump the token synchronously) is banned
-    // (REENTRANT_NAVIGATION, §4), so on this sync path the token still holds — async
-    // supersede is caught in `#finishAsyncNavigation`'s `isCurrentNav`.
-    if (suspendable && (!deps.isActive() || opts.signal?.aborted === true)) {
-      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-    }
+    // ⚑ The #1169 external commit-gate stood HERE and is gone, absorbed by
+    // `when: mayCommit` on the COMPLETE edge. Both of its clauses are that
+    // condition now: a `stop()`/`dispose()` from a listener leaves the machine
+    // in IDLE/DISPOSED, where COMPLETE is not declared, and an aborted external
+    // `opts.signal` is read straight off the commit payload.
+    //
+    // Proven by two-sided mutation, not by reading: removing it alone leaves
+    // 3897/3897 green, removing it together with the ask reds eight tests
+    // across `commit-gate-1169` and `commit-after-teardown-1611`.
 
-    const finalState = completeTransition(deps, inFlight, plan);
+    const finalState = completeTransition(deps, plan);
 
     // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
     // announces "this navigation already settled, synchronously", which used
@@ -366,15 +372,12 @@ export function executeNavigation(
     // `Promise<State>`; the allocation is the same one, one frame higher.
     return finalState;
   } catch (error) {
-    const outcome = handleNavigateError(
-      deps,
-      inFlight,
-      error,
-      controller,
+    const outcome = handleNavigateError(deps, inFlight, error, controller, {
       myId,
+      myEpoch,
       toState,
       fromState,
-    );
+    });
 
     // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from guards or transition pipeline
     return Promise.reject(outcome);
@@ -467,7 +470,7 @@ async function finishAsyncNavigation(
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
 
-    const state = completeTransition(deps, inFlight, nav);
+    const state = completeTransition(deps, nav);
 
     succeeded = true;
 
@@ -487,7 +490,13 @@ async function finishAsyncNavigation(
 
     failureReason = outcome;
 
-    routeTransitionError(deps, outcome, nav.toState, nav.fromState);
+    routeTransitionError(
+      deps,
+      outcome,
+      nav.toState,
+      nav.fromState,
+      nav.myEpoch,
+    );
 
     throw outcome;
     // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
@@ -520,6 +529,23 @@ async function finishAsyncNavigation(
 }
 
 /**
+ * What a failed navigation still knows about itself.
+ *
+ * These four are mirrored OUTSIDE the `try` on purpose — `plan` is declared
+ * inside it, so a throw from the prologue (before `beginTransition` returns)
+ * leaves nothing else to report with, and `myId === 0` is precisely how the
+ * handler asks "did this navigation ever announce itself". Grouping them is
+ * what keeps the handler at five parameters instead of eight, and it is FREE:
+ * the object is built in the `catch`, so the happy path allocates nothing.
+ */
+interface AttemptedNavigation {
+  readonly myId: number;
+  readonly myEpoch: number;
+  readonly toState: State | undefined;
+  readonly fromState: State | undefined;
+}
+
+/**
  * Settle a failed navigation on the SYNCHRONOUS arc: release its controller,
  * report it only while it is still the navigation in flight, and hand back the
  * outcome the caller's promise should carry.
@@ -539,23 +565,23 @@ async function finishAsyncNavigation(
  * which this arc cannot: the guard-free leave arc keeps its controller local and
  * has already released it by the time an error arrives here.
  *
- * ⚠ Interim form (#1609) — see `asCancellation` in `./errorHandling` for what
- * absorbs it and what does NOT: `mayFail` on the in-flight FAIL edges takes the
- * load-bearing half by construction, the `READY`-edge noise waits on the open
- * RFC-10a §16.5.
+ * ⚑ NOT interim any more — see `asCancellation` in `./errorHandling` for the
+ * measurement. The table absorbed the two halves #1609 was written against; the
+ * arc this check guards is a THIRD one it does not reach, because
+ * `STARTING --FAIL--> IDLE` carries no epoch to refuse.
  */
 function handleNavigateError(
   deps: NavigationDependencies,
   inFlight: InFlightNavigation,
   error: unknown,
   controller: AbortController | null,
-  myId: number,
-  toState: State | undefined,
-  fromState: State | undefined,
+  attempted: AttemptedNavigation,
 ): unknown {
   if (controller) {
     inFlight.release(controller, true, error);
   }
+
+  const { myId, toState } = attempted;
 
   if (myId !== 0 && toState) {
     const outcome =
@@ -563,7 +589,13 @@ function handleNavigateError(
         ? error
         : asCancellation(error);
 
-    routeTransitionError(deps, outcome, toState, fromState);
+    routeTransitionError(
+      deps,
+      outcome,
+      toState,
+      attempted.fromState,
+      attempted.myEpoch,
+    );
 
     return outcome;
   }
@@ -587,7 +619,7 @@ function handleNoGuardsLeave(
 ): Promise<State> | undefined {
   const { toState, fromState, myId } = plan;
 
-  deps.sendLeaveApprove(toState, fromState);
+  deps.sendLeaveApprove(plan.myEpoch, toState, fromState);
 
   if (deps.hasLeaveListeners()) {
     const controller = new AbortController();

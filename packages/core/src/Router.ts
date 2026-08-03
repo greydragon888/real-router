@@ -72,12 +72,13 @@ const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
  * - OptionsNamespace: getOptions (immutable)
  * - DependenciesStore: get/set/remove dependencies
  * - EventEmitter: subscribe
- * - StateNamespace: state storage (getState, setState, getPreviousState)
+ * - StateNamespace: state SERVICE (makeState, areStatesEqual); the committed
+ *   pair itself lives in the FSM context (#1641)
  * - RoutesNamespace: route tree operations
  * - RouteLifecycleNamespace: canActivate/canDeactivate guards
  * - PluginsNamespace: plugin lifecycle
  * - NavigationNamespace: navigate
- * - RouterLifecycleNamespace: start, stop, isStarted
+ * - RouterLifecycleNamespace: start (stop/dispose are FSM edges, not methods)
  *
  * @internal This class implementation is internal. Use createRouter() instead.
  */
@@ -197,6 +198,11 @@ export class Router<
     // =========================================================================
 
     const routerFSM = createRouterFSM();
+
+    // The state service reads the machine's context from here on — the cells
+    // themselves live there (plan §11.A2). Assigned before anything can read
+    // state: the namespaces are still being constructed.
+    this.#state.setContext(routerFSM.getContext());
 
     const emitter = new EventEmitter<RouterEventMap>({
       // Shared per-listener error sink: EventEmitter reports synchronous listener
@@ -336,12 +342,17 @@ export class Router<
         interceptorsMap,
       ),
       emitTransitionError: (error) => {
-        this.#eventBus.sendFailSafe(undefined, this.#state.get(), error);
+        // Channel (б): a REPORT to observers, not a machine failure. It comes
+        // from a plugin, at a moment core does not control, so it must never
+        // drive a transition that could collide with one in flight.
+        this.#eventBus.emitTransitionError(
+          undefined,
+          this.#state.get(),
+          error as RouterError,
+        );
       },
-      emitTransitionSuccess: (toState, fromState, opts) => {
-        this.#eventBus.emitTransitionSuccess(toState, fromState, opts);
-      },
-      navigateToNotFound: (path) => this.#navigation.navigateToNotFound(path),
+      navigateToNotFound: (path, opts) =>
+        this.#navigation.navigateToNotFound(path, opts),
       start: createInterceptable(
         "start",
         (path: string) => {
@@ -384,12 +395,11 @@ export class Router<
       // Cross-namespace state (issue #174)
       getStateName: () => this.#state.get()?.name,
       isTransitioning: () => this.#eventBus.isTransitioning(),
-      isActive: () => this.#eventBus.isActive(),
-      clearState: () => {
-        this.#state.set(undefined);
+      systemCommit: (toState, fromState, opts) => {
+        this.#eventBus.systemCommit({ toState, fromState, opts });
       },
-      setState: (state) => {
-        this.#state.set(state);
+      clearState: () => {
+        this.#state.clearCommitted();
       },
       routerExtensions: [],
       contextClaimRecords: new Set(),
@@ -623,7 +633,7 @@ export class Router<
       return this;
     }
 
-    this.#lifecycle.stop();
+    // The STOP edge's `update` shifts the pair — the facade only sends.
     this.#eventBus.sendStop();
 
     return this;
@@ -639,7 +649,6 @@ export class Router<
     this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
-      this.#lifecycle.stop();
       this.#eventBus.sendStop();
     }
 
@@ -671,7 +680,6 @@ export class Router<
 
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
-    this.#state.reset();
     this.#dependenciesStore.dependencies = Object.create(
       null,
     ) as Partial<Dependencies>;
@@ -973,7 +981,26 @@ export class Router<
       );
     }
 
+    const current = this.#state.get();
+
     if (path !== undefined) {
+      // #1644: nothing is committed yet AND no navigation is in flight to
+      // displace — so `start()` has not reached its own commit, and a 404
+      // committed here is a PHANTOM: the boot overwrites it a tick later and
+      // subscribers get a `TRANSITION_SUCCESS` for a state that never survives
+      // (measured on both sides of the state-ownership slice; the #1610 shape).
+      //
+      // The `isTransitioning()` half is what keeps this from over-reaching: with
+      // a navigation in flight the primitive aborts it first, so its commit is
+      // displaced rather than overwritten and the 404 legitimately stands —
+      // that is how a guard of the start navigation routes to not-found.
+      if (current === undefined && !this.#eventBus.isTransitioning()) {
+        throw new RouterError(errorCodes.ROUTER_NOT_STARTED, {
+          message:
+            "[router.navigateToNotFound] cannot commit before the start navigation does — the boot would overwrite it; await start() first",
+        });
+      }
+
       return this.#navigation.navigateToNotFound(path);
     }
 
@@ -981,9 +1008,8 @@ export class Router<
     // During the two-phase start window the router is active (`isActive()` true)
     // while `getState()` is still undefined, so throw an actionable RouterError
     // instead of a cryptic `TypeError` from dereferencing the absent state —
-    // same class as the #939 always-on invariant guards.
-    const current = this.#state.get();
-
+    // same class as the #939 always-on invariant guards. Unconditional on the
+    // in-flight question above: there is no path to derive either way.
     if (current === undefined) {
       throw new RouterError(errorCodes.ROUTER_NOT_STARTED, {
         message:
@@ -1114,7 +1140,6 @@ export class Router<
    */
   #unwindFailedStart(error: unknown): never {
     if (this.#eventBus.isReady() && this.#state.get() === undefined) {
-      this.#lifecycle.stop();
       this.#eventBus.sendStop();
     } else if (this.#eventBus.isStarting()) {
       this.#eventBus.sendFail(undefined, undefined, error);

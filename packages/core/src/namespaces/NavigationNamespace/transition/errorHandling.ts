@@ -40,23 +40,31 @@ function isTransitionCancelled(error: unknown): boolean {
  * canonicalized leave rejection keeps its `reason` (#943) and the cancellation
  * the resolve path throws is not wrapped in a second one.
  *
- * ⚠ Interim form, and only PARTLY absorbed — the halves have different fates,
- * which is why this says more than "see RFC-10a". Once `FAIL` carries an epoch:
+ * ⚑ NOT interim any more, and the reason is worth keeping: both halves this
+ * was written against ARE absorbed by the table now, and it survived anyway.
  *
- * - the **load-bearing** half goes by construction: `when: mayFail` on the
- *   `TRANSITION_STARTED` / `LEAVE_APPROVED` edges is already in the RFC-10a §7.3
- *   sketch, so a `FAIL` with a foreign epoch becomes a table no-op and the
- *   silent commit (state committed, no `TRANSITION_SUCCESS`, no subscriber
- *   notified) stops being expressible. That covers BOTH arcs — the table does
- *   not care which one sent it;
- * - the **noise** half does not, yet: the `READY` edge is unconditional in that
- *   same sketch, so a stale `FAIL` arriving after somebody else's
- *   `TRANSITION_SUCCESS` is still stopped by an operational check and not by the
- *   table. Whether to put `mayFail` there (or drop the edge outright) is the
- *   OPEN question RFC-10a §16.5.
+ * - the **load-bearing** half is held HERE, not by the table. `when: mayFail` on
+ *   the `TRANSITION_STARTED` / `LEAVE_APPROVED` edges would make a `FAIL` with a
+ *   foreign epoch a table no-op — but it never gets the chance, because this
+ *   function restates the lost-liveness failure first and `routeTransitionError`
+ *   filters `TRANSITION_CANCELLED` before any send. Measured (#1646): `mayFail`
+ *   is asked 206 times across the functional tier and refuses zero, and three
+ *   adversarial supersede arcs all end in `CANCELLED` with no report at all. The
+ *   predicate is defence-in-depth behind this call site, not the mechanism;
+ * - the **noise** half went further than the sketch proposed: the `READY→FAIL`
+ *   edge is REMOVED rather than conditioned (§16.5, owner 2026-08-02), and
+ *   since the emit rides the edge's action, a stale report there now emits
+ *   nothing at all instead of being filtered.
  *
- * So: delete this when §7.3 lands **and** §16.5 is answered — not on §7.3 alone.
- * Plan `.claude/fsm-as-state-owner-2026-07-31.md` §10, phase 0 item 0.2.
+ * What holds it up is a THIRD arc neither reaches. `STARTING --FAIL--> IDLE` is
+ * how a failed `start()` unwinds, so it is unconditional and carries no epoch to
+ * refuse — a listener that stopped and restarted the router leaves the machine
+ * in `STARTING`, and a stale `FAIL` arriving there kills the RESTART. Plus the
+ * caller-facing half was never a table question at all: which error
+ * `navigate()` rejects with is a contract (`TRANSITION_CANCELLED` carrying the
+ * guard verdict as `reason`), not an FSM edge. Measured, not argued — removing
+ * this on both arcs with the table fully in place fails 5 tests, three of them
+ * exactly those two shapes (`superseded-guard-rejection-1609.test.ts`).
  */
 export function asCancellation(error: unknown): unknown {
   return isTransitionCancelled(error)
@@ -69,6 +77,7 @@ export function routeTransitionError(
   error: unknown,
   toState: State,
   fromState: State | undefined,
+  epoch: number,
 ): void {
   const routerError = error as RouterError;
 
@@ -79,7 +88,7 @@ export function routeTransitionError(
     return;
   }
 
-  deps.sendTransitionFail(toState, fromState, routerError);
+  deps.sendTransitionFail(toState, fromState, routerError, epoch);
 }
 
 export function handleGuardError(

@@ -97,16 +97,4 @@ export class RouterLifecycleNamespace {
 
     return deps.navigateToNotFound(startPath);
   }
-
-  /**
-   * Stops the router and resets state.
-   *
-   * Called for READY / TRANSITION_STARTED and, since #1185, STARTING (a stop()
-   * that cancels a parked start — state is still `undefined` there, so
-   * `clearState()` is a no-op that keeps the reset symmetric). The facade
-   * handles IDLE / DISPOSED.
-   */
-  stop(): void {
-    this.#deps.clearState();
-  }
 }

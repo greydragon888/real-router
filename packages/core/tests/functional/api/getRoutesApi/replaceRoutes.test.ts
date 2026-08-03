@@ -1339,7 +1339,12 @@ describe("replace() revalidation on a router torn down mid-call (#1627)", () => 
     expect(events).toStrictEqual([]);
   });
 
-  it("refuses the same way when the factory merely STOPS the router", async () => {
+  // #1627 wanted both teardowns to REFUSE, and they both still do. What #1644
+  // separated is the code: a router the factory merely STOPPED is not disposed,
+  // and calling it disposed was the mislabelling that issue is about. The two
+  // tests above are the discriminator — they use `dispose()` and still get
+  // `ROUTER_DISPOSED`.
+  it("refuses a factory-STOPPED router as NOT_STARTED, not DISPOSED (#1644)", async () => {
     const { router, events, arm } = createFixture((r) => r.stop());
 
     await router.start("/home");
@@ -1349,7 +1354,7 @@ describe("replace() revalidation on a router torn down mid-call (#1627)", () => 
     expect(() => {
       getRoutesApi(router).replace([{ name: "renamed", path: "/home" }]);
     }).toThrow(
-      expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }) as Error,
+      expect.objectContaining({ code: errorCodes.ROUTER_NOT_STARTED }) as Error,
     );
 
     expect(events).toStrictEqual([]);

@@ -8,7 +8,7 @@
 hashPluginFactory({
   hashPrefix: "!", // default: "" — prefix after # (e.g., "!" → #!/path)
   base: "", // default: "" — base path before hash (e.g., "/app" → /app#!/path)
-  forceDeactivate: true, // default: true — bypass canDeactivate on back/forward
+  forceDeactivate: false, // default: false — run canDeactivate on back/forward. Set true to bypass
 });
 ```
 
