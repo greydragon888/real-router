@@ -230,13 +230,25 @@ const arbStartCase = fc.record({
   action: fc.constantFrom<
     "none" | "navigate" | "navigateToDefault" | "navigateToState"
   >("none", "navigate", "navigateToDefault", "navigateToState"),
+  // Does the nested navigation target the boot's OWN route (#1662)? This is the
+  // axis that separates the two symptoms of one window, and the first revision
+  // of this generator had it fixed at "different" — so the whole of #1662 sat
+  // outside the domain. Same target and the boot's own `navigateToState` meets
+  // its same-state check, so the boot is refused rather than overwriting:
+  // `start()` REJECTS while the router is active and holding the right state.
+  // (On the `notFound` arc the boot's target is `UNKNOWN_ROUTE`, which no name
+  // can address, so this axis degenerates to a second "different" there —
+  // harmless, and cheaper than a conditional generator.)
+  sameTarget: fc.boolean(),
 });
 
 describe("Nothing commits before the start navigation does (#1661)", () => {
   test.prop([arbStartCase], { numRuns: NUM_RUNS.fast })(
     "no state is announced to subscribers except the one start() settles on",
-    async ({ bootArc, action }) => {
+    async ({ bootArc, action, sameTarget }) => {
       const observed: string[] = [];
+      // "outer" IS the boot's route on the match / guardRefused arcs.
+      const nestedTarget = sameTarget ? "outer" : "nested";
 
       const router = createRouter(
         bootArc === "guardRefused"
@@ -248,7 +260,9 @@ describe("Nothing commits before the start navigation does (#1661)", () => {
           : ROUTES,
         {
           allowNotFound: bootArc === "notFound",
-          ...(action === "navigateToDefault" ? { defaultRoute: "nested" } : {}),
+          ...(action === "navigateToDefault"
+            ? { defaultRoute: nestedTarget }
+            : {}),
         },
       );
 
@@ -264,7 +278,7 @@ describe("Nothing commits before the start navigation does (#1661)", () => {
 
           switch (action) {
             case "navigate": {
-              router.navigate("nested").catch(swallow);
+              router.navigate(nestedTarget).catch(swallow);
 
               break;
             }
@@ -276,7 +290,7 @@ describe("Nothing commits before the start navigation does (#1661)", () => {
             case "navigateToState": {
               const api = getPluginApi(router);
 
-              api.navigateToState(api.makeState("nested")).catch(swallow);
+              api.navigateToState(api.makeState(nestedTarget)).catch(swallow);
 
               break;
             }
@@ -285,7 +299,9 @@ describe("Nothing commits before the start navigation does (#1661)", () => {
         },
       }));
 
-      const outcome = await router
+      // `undefined` on rejection, which BOTH assertions below read as "there is
+      // no state start() stands behind".
+      const settled = await router
         .start(bootArc === "notFound" ? "/nope" : "/outer")
         .then(
           (state) => state.name,
@@ -296,13 +312,26 @@ describe("Nothing commits before the start navigation does (#1661)", () => {
         setTimeout(resolve, 5);
       });
 
-      // The invariant, stated per observation rather than as a snapshot of the
-      // whole ledger: a subscriber must never be handed a state that is not the
-      // one the boot settled on. When `start()` rejects there is no such state,
-      // so every announcement is foreign.
-      const foreign = observed.filter((name) => name !== outcome);
+      // #1661 — stated per observation rather than as a snapshot of the whole
+      // ledger: a subscriber must never be handed a state that is not the one
+      // the boot settled on. When `start()` rejects there is no such state, so
+      // every announcement is foreign.
+      const foreign = observed.filter((name) => name !== settled);
 
       expect(foreign).toStrictEqual([]);
+
+      // #1662 — the other half of the same window, and a DIFFERENT contract:
+      // `start()`'s own promise. One equality says both directions — a resolved
+      // start is the committed state, a rejected one leaves nothing committed.
+      // Pre-fix on the same-target arc it read `undefined === "outer"`: the
+      // router was active and correct while its promise said it had failed.
+      //
+      // ⚠ Scoped to THIS domain, and deliberately: `start()` legitimately
+      // rejects over a committed state when an interceptor throws AFTER the
+      // commit (#763, "never retract an observed success"). No interceptor is
+      // generated here — widen the generator that way and this assertion needs
+      // the carve-out, not a repair.
+      expect(router.getState()?.name).toBe(settled);
     },
   );
 });

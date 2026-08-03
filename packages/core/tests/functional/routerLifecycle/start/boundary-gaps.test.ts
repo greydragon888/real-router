@@ -127,6 +127,57 @@ describe("router.start() - boundary gaps (#1190)", () => {
       },
     );
 
+    // #1662 — the same window's OTHER symptom, and a different contract: not
+    // what subscribers were handed, but what `start()`'s own promise says. When
+    // the nested navigation targeted the boot's OWN route it committed first,
+    // the boot's `navigateToState` then met its same-state check and refused, and
+    // `await start()` threw over a router that was active and holding exactly the
+    // right state. `#unwindFailedStart` correctly left it alone (a state IS
+    // committed — #763), so nothing was broken except the promise.
+    //
+    // Kept apart from the table above on purpose: that one asserts the ledger and
+    // would stay green on a run where the boot is refused rather than overwritten.
+    it.each([
+      ["navigate", (r: Router) => r.navigate("a")],
+      ["navigateToDefault", (r: Router) => r.navigateToDefault()],
+      [
+        "navigateToState",
+        (r: Router) => {
+          const api = getPluginApi(r);
+
+          return api.navigateToState(api.makeState("a"));
+        },
+      ],
+    ])(
+      "start() does not lie when onStart drives %s at the BOOT route (#1662)",
+      async (_label, drive) => {
+        const router = createRouter(
+          [
+            { name: "a", path: "/a" },
+            { name: "b", path: "/b" },
+          ],
+          { defaultRoute: "a" },
+        );
+
+        router.usePlugin(() => ({
+          onStart() {
+            drive(router).catch(() => {
+              /* refused by the window's precondition */
+            });
+          },
+        }));
+
+        const state = await router.start("/a");
+
+        // The promise and the router agree — that is the whole contract here.
+        expect(state.name).toBe("a");
+        expect(router.getState()?.name).toBe("a");
+        expect(router.isActive()).toBe(true);
+
+        router.dispose();
+      },
+    );
+
     it("still allows a navigate() from a GUARD of the start navigation (the classic redirect)", async () => {
       // The other side of the #1661 predicate, and the reason it reads
       // `isTransitioning()` rather than just "nothing committed": from `onStart`
