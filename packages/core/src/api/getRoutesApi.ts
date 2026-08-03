@@ -579,12 +579,36 @@ function replaceRoutes<
       } else {
         // Route-identity change — the URL is now owned by a DIFFERENT route (an
         // ownership reshuffle, or a newly-added `forwardTo` that teleports the
-        // state). That is effectively a navigation the user never performed, so
-        // consult the new route's guards exactly as `navigate` would (#1201).
-        // Commit on pass; on a block — or an async guard that cannot be
-        // evaluated synchronously (mirrors `canNavigateTo`) — route to
-        // not-found rather than silently activating a guarded route.
-        const { toDeactivate, toActivate } = getTransitionPath(
+        // state). Consult the new route's ACTIVATION guards (#1201): commit on
+        // pass; on a block — or an async guard that cannot be evaluated
+        // synchronously (mirrors `canNavigateTo`) — route to not-found rather
+        // than silently activating a guarded route.
+        //
+        // ⚠ ACTIVATION ONLY — the deactivate list is deliberately empty (#1652).
+        // `canNavigateTo` collapses both halves into ONE boolean, and this arm
+        // routes every `false` to not-found. That reading is right for "cannot
+        // ENTER" and exactly backwards for "do not LEAVE": the guard exists to
+        // keep the user where they are, and eviction to a 404 is the worst
+        // outcome available. Measured before the fix: with no `canDeactivate`
+        // the user landed on the new route, WITH a refusing one on
+        // UNKNOWN_ROUTE — a guard that cannot be honoured was making the result
+        // worse than no guard at all.
+        //
+        // Not asking is what the other two revalidation arms already do, each
+        // with its reason written beside it (survivor: the user was legitimately
+        // here, #1201; vanished: the route whose guard would speak is gone). So
+        // this removes the odd one out rather than adding a mechanism: a tree
+        // swap is an operation the APPLICATION performed, not a departure the
+        // user chose, and `canDeactivate` has no "stay" branch to offer here —
+        // after the swap the old route may not exist, or may live at another
+        // path, so a retained state would point at a route that no longer owns
+        // its URL. Checking for unsaved work before swapping the tree is the
+        // caller's job; the router does not promise to veto its own API.
+        //
+        // Side effect, and an improvement: the refusal used to short-circuit
+        // before the activation guards ran at all, so "may the user be on the
+        // new route" went unasked. Now it is always asked.
+        const { toActivate } = getTransitionPath(
           revalidated,
           currentState,
           ctx.getMetaForState,
@@ -593,7 +617,7 @@ function replaceRoutes<
         const allowed =
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
           store.lifecycleNamespace!.canNavigateTo(
-            toDeactivate,
+            [],
             toActivate,
             revalidated,
             currentState,
@@ -607,9 +631,12 @@ function replaceRoutes<
 
           commitRevalidated(ctx, nextState, currentState);
         } else {
-          // `canNavigateTo` above already asked the deactivation guards and was
-          // refused; asking again inside `navigateToNotFound` (#1643) would put
-          // the same question twice and turn a decided fallback into a throw.
+          // `skipDeactivation` stays, and its reason CHANGED with #1652: it is
+          // no longer "the question was already put above" (it no longer is) but
+          // the same rule as the consult itself — revalidation does not consult
+          // deactivate guards. Dropping it would let the fallback throw
+          // CANNOT_DEACTIVATE out of a route-CRUD call, which is the shape
+          // #1643 deliberately kept for user-initiated departures only.
           ctx.navigateToNotFound(currentState.path, { skipDeactivation: true });
         }
       }

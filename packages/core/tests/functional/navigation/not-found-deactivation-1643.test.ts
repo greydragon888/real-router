@@ -153,34 +153,69 @@ describe("#1643 — leaving a state always asks canDeactivate", () => {
     });
   });
 
-  // The second cell the sweep found. `replace()` reaches `navigateToNotFound`
-  // on two of its three revalidation arms, and on BOTH of them asking would be
-  // wrong rather than redundant — so both opt out, and this pins that the
-  // opt-out is exactly two arms wide and that neither double-asks.
-  describe("replace() revalidation — where asking would be wrong", () => {
-    it("route-identity change asks exactly ONCE — the refusal does NOT keep the user (open, #1652)", async () => {
-      const { router, calls } = await onGuardedEdit();
+  // The second cell the sweep found, and #1652 closed it by SUBTRACTION: all
+  // THREE revalidation arms now agree that a tree swap does not consult
+  // `canDeactivate`. Survivor and vanished-route already did (each with its
+  // reason written in `getRoutesApi.ts`); route-identity change was the odd one
+  // out — it asked, was refused, and evicted to 404 anyway, which made having a
+  // guard WORSE than having none. These pin the rule on every arm, so a future
+  // "let's consult here too" re-opens the defect loudly.
+  describe("replace() revalidation — a tree swap does not ask canDeactivate", () => {
+    // Both assertions below were a RECORD of open behaviour until #1652; they
+    // are a contract now. The count went 1 -> 0 and the outcome UNKNOWN_ROUTE ->
+    // the new route, because the arm stopped putting a question it could not
+    // honour.
+    it("route-identity change does not ask canDeactivate, and commits the new route", async () => {
+      const { router, calls } = await onGuardedEdit(); // guard REFUSES
 
-      // `/edit` now belongs to `other`, so #1201 consults the guards.
+      // `/edit` now belongs to `other`, so #1201 consults its ACTIVATION guards.
       getRoutesApi(router).replace([
         { name: "other", path: "/edit" },
         { name: "home", path: "/" },
       ]);
 
-      // ⚠ THE CONTRACT HERE IS THE CALL COUNT, NOT THE OUTCOME.
-      // ONE call, not two: the fallback must not re-put a decided question.
-      // That half is settled and mutation-validated (dropping the
-      // `skipDeactivation` opt-out makes it 2).
-      expect(calls()).toBe(1);
+      expect(calls()).toBe(0);
+      expect(router.getState()?.name).toBe("other");
+    });
 
-      // ⚠ The line below PINS OPEN BEHAVIOUR — read it as a record, not a
-      // contract. The guard said "do not leave" and the user is evicted to 404
-      // anyway, because a refusal to DEACTIVATE has no "stay" branch on this
-      // arc. Tracked as #1652 (cell 2 of #1643, which shipped cell 1); the
-      // four sketches live in #1643's body. When it is fixed, this expectation
-      // CHANGES — it is not a regression guard for the eviction, and nothing
-      // here endorses it.
+    // The `skipDeactivation` opt-out on the fallback keeps its job even though
+    // its REASON changed (#1652): it is no longer "already asked above" but the
+    // arm-wide rule. Dropping it makes this 1 and turns the fallback into a
+    // CANNOT_DEACTIVATE throw out of a route-CRUD call.
+    it("the not-found fallback does not ask it either", async () => {
+      const { router, calls } = await onGuardedEdit(); // guard REFUSES
+
+      // `other` refuses activation, so the arm falls back to not-found.
+      getRoutesApi(router).replace([
+        { name: "other", path: "/edit", canActivate: () => () => false },
+        { name: "home", path: "/" },
+      ]);
+
+      expect(calls()).toBe(0);
       expect(router.getState()?.name).toBe(constants.UNKNOWN_ROUTE);
+    });
+
+    // #1652 RED — the discriminator is the COMPARISON, not the outcome: a guard
+    // that cannot be honoured must not make things WORSE than having no guard.
+    it("a refusing canDeactivate does not leave the user worse off than no guard", async () => {
+      const withoutGuard = createRouter(ROUTES, { allowNotFound: true });
+
+      await withoutGuard.start("/edit");
+      getRoutesApi(withoutGuard).replace([
+        { name: "other", path: "/edit" },
+        { name: "home", path: "/" },
+      ]);
+      const baseline = withoutGuard.getState()?.name;
+
+      const { router } = await onGuardedEdit(); // canDeactivate REFUSES
+
+      getRoutesApi(router).replace([
+        { name: "other", path: "/edit" },
+        { name: "home", path: "/" },
+      ]);
+
+      expect(baseline).toBe("other");
+      expect(router.getState()?.name).toBe(baseline);
     });
 
     it("a vanished route is not asked at all", async () => {

@@ -31,11 +31,10 @@ will now throw — make the guard synchronous, or catch the refusal.
 
 Unchanged: `start()` with `allowNotFound` (nothing is committed yet, so the
 consult short-circuits), a router with no `canDeactivate` guards at all, and
-`replace()`'s revalidation. The last one opts out deliberately on both of its
-not-found arms, because asking there would be wrong rather than redundant — the
-route-identity arm has already put the same question to `canNavigateTo` and been
-refused, and the vanished-route arm reaches not-found precisely because the route
-whose guard would speak no longer exists.
+`replace()`'s revalidation, which opts out on EVERY arm (#1652, same PR): a tree
+swap is an operation the application performed, not a departure the user chose,
+and it has no "stay" branch to offer — after the swap the old route may not
+exist, or may live at another path.
 
 Related to #524, which was this contract broken one layer up, in
 `navigation-plugin`'s `forceDeactivate` default. That fix restored confirm-on-back
