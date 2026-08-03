@@ -158,19 +158,29 @@ describe("#1643 — leaving a state always asks canDeactivate", () => {
   // wrong rather than redundant — so both opt out, and this pins that the
   // opt-out is exactly two arms wide and that neither double-asks.
   describe("replace() revalidation — where asking would be wrong", () => {
-    it("route-identity change asks exactly ONCE, through canNavigateTo", async () => {
+    it("route-identity change asks exactly ONCE — the refusal does NOT keep the user (open, #1652)", async () => {
       const { router, calls } = await onGuardedEdit();
 
-      // `/edit` now belongs to `other`, so #1201 consults the guards; they
-      // refuse, and the documented fallback is not-found.
+      // `/edit` now belongs to `other`, so #1201 consults the guards.
       getRoutesApi(router).replace([
         { name: "other", path: "/edit" },
         { name: "home", path: "/" },
       ]);
 
-      expect(router.getState()?.name).toBe(constants.UNKNOWN_ROUTE);
+      // ⚠ THE CONTRACT HERE IS THE CALL COUNT, NOT THE OUTCOME.
       // ONE call, not two: the fallback must not re-put a decided question.
+      // That half is settled and mutation-validated (dropping the
+      // `skipDeactivation` opt-out makes it 2).
       expect(calls()).toBe(1);
+
+      // ⚠ The line below PINS OPEN BEHAVIOUR — read it as a record, not a
+      // contract. The guard said "do not leave" and the user is evicted to 404
+      // anyway, because a refusal to DEACTIVATE has no "stay" branch on this
+      // arc. Tracked as #1652 (cell 2 of #1643, which shipped cell 1); the
+      // four sketches live in #1643's body. When it is fixed, this expectation
+      // CHANGES — it is not a regression guard for the eviction, and nothing
+      // here endorses it.
+      expect(router.getState()?.name).toBe(constants.UNKNOWN_ROUTE);
     });
 
     it("a vanished route is not asked at all", async () => {
