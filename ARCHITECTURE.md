@@ -342,50 +342,129 @@ Tree mutations are an **infrastructural** concern (DevTools, microfrontend coord
 
 ## Navigation Pipeline
 
-All navigation methods return `Promise<State>`. The pipeline uses **optimistic sync execution** — guards run synchronously until one returns a Promise, then switches to the async path.
+Four entry points reach the transition machinery. They differ only in where the target state comes from; everything after that is shared.
+
+| Entry point                                      | Target state                                                                                                                                                           | Returns              |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `navigate(target \| name, params, search, opts)` | built through `src/pipeline` — `canonicalize` (forward-chain resolution + route defaults + query-mode gate) feeding `buildURL` + `materialize`                         | `Promise<State>`     |
+| `navigateToDefault(opts)`                        | resolves `defaultRoute` / `defaultParams` / `defaultSearch` (each may be a dependency-resolved callback), then runs `navigate`'s core                                  | `Promise<State>`     |
+| `navigateToState(state, opts)`                   | the caller's `State`, taken as given — no `forwardState`, no `buildPath`, so a URL plugin's `matchPath` result flows through unchanged; `start()` commits through here | `Promise<State>`     |
+| `navigateToNotFound(path)`                       | a hand-built `UNKNOWN_ROUTE` state — the one commit primitive that is not a transition                                                                                 | `State`, synchronous |
+
+The facade owes callers a Promise and wraps a navigation that already settled. One frame below it the return TYPE carries the fact instead: a bare `State` says the navigation could not suspend at all.
+
+The pipeline uses **optimistic sync execution** — guards run synchronously until one hands back a Promise, and only then does the walk switch to the asynchronous interpreter.
 
 ```mermaid
 flowchart TD
-    NAV["router.navigate(name, params, search, options)"] --> BUILD
-    BUILD["buildNavigateState()
-    src/pipeline: canonicalize → buildURL + materialize"] --> DEACTIVATE
-    DEACTIVATE["Deactivation guards
-    inner→outer"]
+    ENTRY["navigate() · navigateToDefault() · navigateToState()"] --> BUILD
 
-    DEACTIVATE --> LEAVE["[LEAVE_APPROVED]
-    emit TRANSITION_LEAVE_APPROVE
-    subscribeLeave() callbacks"]
+    BUILD["target state
+    navigate / navigateToDefault: canonicalize → buildURL + materialize
+    navigateToState: the caller's State, as given"] --> SAME
 
-    LEAVE --> ACTIVATE["Activation guards
-    outer→inner"]
+    SAME{"same path,
+    no reload / force?"}
+    SAME -->|yes| SAMEERR["emit TRANSITION_ERROR
+    reject SAME_STATES — the machine does not move"]
 
-    ACTIVATE -->|all guards returned boolean| SYNC
-    ACTIVATE -->|a guard returned Promise| ASYNC
+    SAME -->|no| BEGIN["beginTransition()
+    supersede whatever is in flight (FSM CANCEL) · take the token
+    read suspendable · send(NAVIGATE) → emit TRANSITION_START · read the epoch"]
 
-    SYNC["Complete inline
-    no await, controller released (not aborted)"]
-    ASYNC["await remaining guards
-    under AbortController"]
+    BEGIN --> PLAN["planPhases()
+    transition path · guard maps · phase short-circuits · hasGuards"]
 
-    SYNC --> COMPLETE
-    ASYNC --> COMPLETE
+    PLAN --> ARC{"what can this
+    navigation do?"}
+
+    ARC -->|"no guards, nothing can suspend it"| IMMEDIATE["completeImmediate()
+    send(LEAVE_APPROVE)
+    no controller, no liveness closure, returns a bare State"]
+
+    ARC -->|"no guards, but suspendable"| LEAVE["send(LEAVE_APPROVE)
+    subscribeLeave() listeners awaited
+    controller allocated only if such listeners exist"]
+
+    ARC -->|"a guard on a walked segment"| GUARDS["guard program — 3 phases, 1 cursor
+    deactivate inner → outer
+    leave: LEAVE_APPROVE + subscribeLeave()
+    activate outer → inner
+    controller allocated;
+    its signal goes to guards and listeners"]
+
+    IMMEDIATE --> COMPLETE
+    LEAVE -->|"settled synchronously"| COMPLETE
+    GUARDS -->|"every step synchronous"| COMPLETE
+    LEAVE -->|"a listener returned a Promise"| ASYNC
+    GUARDS -->|"a step returned a Promise"| ASYNC
+
+    ASYNC["finishAsyncNavigation()
+    race(pending work, abort) → liveness check"] --> COMPLETE
 
     COMPLETE["completeTransition()
-    ask + FSM send(COMPLETE)
-    → commit update → READY"]
+    ask the table (mayCommit) → send(COMPLETE)
+    the update writes current/previous · the action emits TRANSITION_SUCCESS"]
     COMPLETE --> RESOLVE["Promise‹State› resolves"]
 
-    DEACTIVATE -.->|error at any step| ERR["emitTransitionError()
-    Promise rejects with RouterError"]
-    ACTIVATE -.->|error at any step| ERR
-    ASYNC -.->|abort / cancel| ERR
+    GUARDS -.->|"a guard refuses or throws"| ERR
+    ASYNC -.->|"abort / supersede"| ERR
+    COMPLETE -.->|"the table refuses"| ERR
+
+    ERR["still the navigation in flight → send(FAIL) → emit TRANSITION_ERROR
+    superseded → restated as TRANSITION_CANCELLED, nothing reported
+    Promise rejects"]
 ```
 
-On error at any step: `emitTransitionError()`, Promise rejects with `RouterError`.
+### Prologue
 
-**`navigateToNotFound()`** bypasses this pipeline — but neither the machine nor the deactivation guards. It emits only `TRANSITION_SUCCESS` (no `TRANSITION_START`, no AbortController) and always uses `replace: true`, while committing through a `SYSTEM_COMMIT` edge (#1641) and asking the current route's `canDeactivate` first (#1643) — a refusal throws `CANNOT_DEACTIVATE` instead of committing.
+Every navigation runs the same prologue before a guard can run:
 
-**Cancellation sources:** external AbortController (`opts.signal`), concurrent navigation (aborts previous), `stop()`, `dispose()`. The internal AbortController is created **synchronously** whenever the navigation has guards or `subscribeLeave` listeners (they receive `signal` before it is known whether they run async); only the pure hot path — no guards, no leave listeners — allocates none. It is aborted solely on cancellation/error, never on success.
+1. **Admission** — the table is asked whether `NAVIGATE` is declared from the state the machine is in. A refusal returns a cached rejection, and a router that is still `STARTING` gets its own sentence, so a caller who is inside `start()` is not told to call `start()`.
+2. **Target state** — per the table above. For `navigate` / `navigateToDefault` this is the **pre-start window**: `forwardState` / `buildPath` interceptors, route codecs and the default-resolving callbacks are application code running before anything is announced, so a navigation started from there is refused with `REENTRANT_NAVIGATION`.
+3. **`replace` from a 404** — navigating away from `UNKNOWN_ROUTE` forces `replace: true`, so a 404 never accumulates history entries.
+4. **Same-state check** — an identical `state.path` with neither `reload` nor `force` reports `SAME_STATES` and rejects, and the machine does not move.
+5. **`beginTransition`** — supersede whatever is in flight (through FSM `CANCEL`, whose action aborts its controller), take the supersession token, read `suspendable`, then `send(NAVIGATE)`, whose action emits `TRANSITION_START`. The navigation's epoch is read immediately after the send, because the `NAVIGATE` update is what bumps it.
+6. **`planPhases`** — segments to deactivate and activate, the guard maps, the per-phase short-circuits, and `hasGuards`. It runs AFTER the announce, because a `TRANSITION_START` listener may still register a guard.
+
+Two facts decided there pick the arc:
+
+- **`hasGuards`** asks whether a segment THIS transition walks carries a guard — not whether the router holds one somewhere. One `canActivate` on an admin route must not arm the cancellation machinery for every public navigation. It mirrors the interpreter's own short-circuits, so `opts.forceDeactivate` disarms the deactivation half exactly as it disarms the phase.
+- **`suspendable`** asks whether a synchronous supersede is reachable at all: an external `opts.signal`, `subscribeLeave` listeners, or a pre-commit plugin listener (`onTransitionStart` / `onTransitionLeaveApprove`).
+
+### Three arcs
+
+- **Immediate** (`!hasGuards && !suspendable`) — `LEAVE_APPROVE`, then the commit, and nothing else. The cancellation machinery is not skipped here, it is **absent**: no `AbortController`, no liveness closure, and the return is a bare `State` — "this navigation cannot suspend" is a property of the code rather than something to remember. It still puts its commit to the table like every other arc; what it does not carry is the machinery for an interruption that cannot reach it.
+- **Leave-only** (`!hasGuards && suspendable`) — emits `LEAVE_APPROVE` and awaits the `subscribeLeave` listeners. A controller is allocated only when such listeners exist: an external signal or a pre-commit listener makes a navigation suspendable without giving it anything to hand a signal to.
+- **Guarded** — the guard program is three fixed phases (deactivate, leave, activate) walked by a cursor of two numbers, with **two interpreters** over it. The synchronous one walks until a step hands back a Promise, then stops and reports where; the asynchronous one settles that Promise and hands the cursor straight back. Switching pipelines is therefore one act — giving up the cursor — and a **single** cancellation check sits in the head of a step, which is every position that matters. Here the controller is allocated unconditionally; its signal is what guards and leave listeners receive.
+
+Guard order is fixed: deactivation innermost → outermost, then activation outermost → innermost, with the leave phase between them.
+
+### Commit
+
+`completeTransition` is the only place a navigation's state is committed, and it puts the commit to the table:
+
+1. Re-check that the target route still exists — route CRUD can have removed it mid-flight — otherwise `ROUTE_NOT_FOUND` through `FAIL`.
+2. Build the commit payload: epoch, `toState`, `fromState`, and `opts` **unstripped**, because `mayCommit` reads the external signal off it. Sanitising for subscribers is the announcement's job and happens in the edge's action.
+3. If the post-leave cleanup has an external `canDeactivate` to unregister, **ask the table first**. That cleanup is destructive, and a cancelled navigation must not unregister the guard of the route the user is staying on. The ask is gated on there actually being a slot to clear, so the common navigation pays a walk of a 1–3 element array and no `canSend`.
+4. Attach and freeze the `TransitionMeta`, freeze the state.
+5. **Ask, then fire** — the same table row, in the same synchronous window, with no user code between them. `send(COMPLETE)`'s `update` writes `current` / `previous`; its action emits `TRANSITION_SUCCESS`.
+
+The second ask is not a repeat of the first: it is the one that sees what a guard factory recompiled by the cleanup has just done. Reading the verdict from the effect instead ("did `getState()` become my state?") cannot work — a `subscribe` listener may legitimately `replace()` during the success emit, and identity cannot tell that second commit from a refusal.
+
+### Failure and cancellation
+
+Every cancellation source — an external `opts.signal`, a concurrent navigation, `stop()`, `dispose()` — routes through FSM `CANCEL`, whose action aborts the in-flight controller; nothing aborts it by hand. Success **releases** the controller without aborting it, so a `subscribeLeave` listener that captured the signal still observes `aborted === false` after the navigation commits.
+
+The internal `AbortController` is allocated only when there is something to hand its signal to: a guard on a walked segment, or a `subscribeLeave` listener. The pure hot path allocates none. A non-cooperative async guard cannot wedge the navigation either — the asynchronous arc races the pending work against the controller's abort, so an abort settles it whether or not the guard ever does.
+
+A failure is reported **only while the navigation is still the one in flight**. One that has lost liveness has whatever its guard or listener decided restated as `TRANSITION_CANCELLED` carrying the original as `reason`, and reports nothing: a stale `FAIL` is a real edge out of the transition band and would move the machine out from under the live navigation, turning that navigation's `COMPLETE` into a table no-op — state committed, `TRANSITION_SUCCESS` never emitted, subscribers never notified. A live failure goes through `FAIL`, whose action emits `TRANSITION_ERROR`; `TRANSITION_CANCELLED` and `ROUTE_NOT_FOUND` are never announced that way. The early refusals — `SAME_STATES`, an unknown route name, a mis-channelled key at `navigateToState` — emit `TRANSITION_ERROR` directly, because there is no transition of theirs to fail.
+
+### `navigateToNotFound()`
+
+It bypasses this pipeline — but neither the machine nor the deactivation guards. It supersedes whatever is in flight, hand-builds a frozen `UNKNOWN_ROUTE` state, consults the current route's `canDeactivate`, and commits through the `SYSTEM_COMMIT` edge. It emits only `TRANSITION_SUCCESS` — no `TRANSITION_START`, no `AbortController` — and always carries `replace: true`.
+
+Only the ACTIVATION half of "bypasses the guards" follows from being a 404: there is nothing to activate at `UNKNOWN_ROUTE`, but there is very much something to deactivate, and the shipped URL plugins call this from their popstate handlers. A refusal emits `TRANSITION_ERROR` and throws `CANNOT_DEACTIVATE`, which is what those handlers already expect — the matched-route branch beside them rejects and its `catch` rolls the URL back. An async `canDeactivate` cannot be answered by a synchronous primitive and resolves to refuse: for a guard whose job is preventing loss, the fail-safe direction is "do not leave". The one opt-out is internal — `replace()`'s revalidation, where asking would be wrong rather than redundant.
 
 ## Extension Points
 
@@ -440,8 +519,8 @@ These are deliberately designed constraints. Violating them will break the syste
 ### State & Immutability
 
 - **All `State` objects are deeply frozen** (`Object.freeze`). Never mutate — always create new.
-- **`State` has two param channels** — `state.params` (path params) and `state.search` (query params) are separate and independently typed (`State<Params, Search>`), split in RFC-4 M2 (#1548). Both are always present (a frozen `{}` when empty); `navigate` / `buildPath` / `isActiveRoute` take `search` as the argument after `params`.
-- **The router never moves a key between the channels** — the slot IS the channel: `params` / `defaultParams` are the path, `search` / `defaultSearch` the query, and the two meet in exactly one place, the printed URL. Enforcement rather than convention: a key the route declares with `?` supplied in the path bag makes `navigate` / `makeState` / `buildNavigationState` throw synchronously and `navigateToState` reject, a `defaultParams` naming such a key is refused at registration, and `canNavigateTo` answers `false` for the shape the verbs refuse. There is no repair step — an earlier release moved the key silently, which let a producer believe its own bag had shipped.
+- **`State` has two param channels** — `state.params` (path params) and `state.search` (query params) are separate and independently typed (`State<Params, Search>`). Both are always present (a frozen `{}` when empty); `navigate` / `buildPath` / `isActiveRoute` take `search` as the argument after `params`.
+- **The router never moves a key between the channels** — the slot IS the channel: `params` / `defaultParams` are the path, `search` / `defaultSearch` the query, and the two meet in exactly one place, the printed URL. Enforcement rather than convention: a key the route declares with `?` supplied in the path bag makes `navigate` / `makeState` / `buildNavigationState` throw synchronously and `navigateToState` reject, a `defaultParams` naming such a key is refused at registration, and `canNavigateTo` answers `false` for the shape the verbs refuse. **There is no repair step, deliberately:** a mis-channelled key is refused, never relocated behind the producer's back, so the bag a producer wrote is the bag that ships — a silent move would let it believe otherwise.
 - **Router options are immutable** — deep-frozen at construction time.
 
 ### FSM & Events
@@ -455,7 +534,7 @@ These are deliberately designed constraints. Violating them will break the syste
 - **Guards return `boolean | Promise<boolean>` only** — no redirects, no state modification, no `State` return.
 - **Plugins are observers** — they react to events but cannot block or modify the transition pipeline.
 - **Guard execution order is fixed**: deactivation innermost → outermost, then activation outermost → innermost.
-- **`navigateToNotFound()` bypasses ACTIVATION guards and plugins** — plugins only see `onTransitionSuccess`, and nothing is activated at `UNKNOWN_ROUTE`. It does consult the current route's `canDeactivate` (#1643): leaving is still leaving.
+- **`navigateToNotFound()` bypasses ACTIVATION guards and plugins** — plugins only see `onTransitionSuccess`, and nothing is activated at `UNKNOWN_ROUTE`. It does consult the current route's `canDeactivate`: leaving is still leaving.
 
 ### Navigation
 
